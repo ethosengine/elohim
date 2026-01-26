@@ -1,0 +1,12 @@
+Scenario: Care skills recognized as professional assets
+    Given Robert has developed sophisticated coordination, resource management, and emotional intelligence through care work
+    And these skills directly enhance his professional capability
+    And traditional workplaces don't recognize care skills as professional qualifications
+    When workplace_elohim analyzes Robert's professional capabilities
+    Then it should make visible how care work develops professional skills
+    And recognize that coordinating multigenerational care builds management capability
+    And surface: "Your care coordination skills enhance your project management effectiveness"
+    And help Robert articulate care skills in professional contexts
+    And advocate that care experience should be valued in performance reviews
+    And demonstrate that care responsibilities enhance rather than diminish professional capability
+    And build workplace culture that recognizes care as skill development

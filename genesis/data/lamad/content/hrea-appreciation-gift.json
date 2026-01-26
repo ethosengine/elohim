@@ -1,0 +1,22 @@
+{
+  "id": "hrea-appreciation-gift",
+  "title": "Appreciation: Supporting Gift Economies",
+  "content": "# Appreciation: The Gift Economy Module\n\n## Beyond Exchange: Recognition\n\nMost economic systems assume **exchange**: I give you X, you give me Y.\n\nBut much of human value creation is **gift**: I give because giving is good.\n\nhREA's Appreciation module supports this.\n\n## What is Appreciation?\n\nFrom hREA docs:\n> \"An Appreciation ties an economic event given in loose fulfilment for another economic event, **without commitments or expectations**. It is a key component for supporting gift economies.\"\n\n```\nAppreciation:\n├── appreciationOf: nurse_care_event (what's being appreciated)\n├── appreciationWith: care_token_grant (the gift given)\n└── note: \"Thank you for your compassionate care\"\n```\n\n## Appreciation vs. Exchange\n\n| Exchange | Appreciation |\n|----------|--------------|\n| Quid pro quo | Gift |\n| Obligation | Gratitude |\n| Transactional | Relational |\n| Expected | Voluntary |\n| Balanced | Asymmetric is okay |\n\n## Care Economy Applications\n\nAppreciation enables:\n\n**Community Care Recognition**:\n- Neighbors appreciate each other's help\n- No expectation of return\n- Builds social capital\n\n**Creator Recognition**:\n- Users appreciate open-source contributions\n- No licensing required\n- Voluntary support accumulates\n\n**Invisible Labor Visibility**:\n- Family members appreciate caregiving\n- Work that was unseen becomes recognized\n- Care tokens flow to care providers\n\n## The Elohim Connection\n\nIn the Elohim Protocol:\n- **Care tokens** are appreciation made tangible\n- Events of care are **witnessed**\n- Appreciation **accumulates** over time\n- The network **sees** your contribution\n\nThis transforms the gift economy from invisible to visible, from unrecognized to appreciated.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/economic_coordination/epic.md",
+  "tags": [
+    "hrea",
+    "appreciation",
+    "gift-economy",
+    "care-tokens",
+    "recognition"
+  ],
+  "relationships": [
+    {
+      "target": "valueflows-elohim-bridge",
+      "type": "prereq"
+    }
+  ],
+  "createdAt": "2025-12-16T03:29:01.394Z",
+  "updatedAt": "2025-12-16T03:29:41.304Z"
+}

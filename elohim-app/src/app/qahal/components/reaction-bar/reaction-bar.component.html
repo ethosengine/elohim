@@ -1,0 +1,105 @@
+<div class="reaction-bar" [class.compact]="compact">
+  <!-- Available Reactions -->
+  <div class="reactions-list">
+    <button
+      *ngFor="let reaction of availableReactions"
+      class="reaction-btn"
+      [class.active]="isUserReaction(reaction.type)"
+      [class.mediated]="reaction.mediated"
+      [class.supportive]="reaction.category === 'supportive'"
+      [class.critical]="reaction.category === 'critical'"
+      [attr.aria-label]="reaction.description"
+      [attr.title]="reaction.description"
+      (click)="onReactionClick(reaction)"
+      type="button"
+    >
+      <span class="reaction-icon">{{ reaction.icon }}</span>
+      <span class="reaction-label" *ngIf="!compact">{{ reaction.label }}</span>
+      <span class="reaction-count" *ngIf="showCounts && getReactionCount(reaction.type) > 0">
+        {{ getReactionCount(reaction.type) }}
+      </span>
+      <span class="mediated-indicator" *ngIf="reaction.mediated" title="This reaction is mediated">
+        ⚖️
+      </span>
+    </button>
+  </div>
+
+  <!-- Aggregate Summary -->
+  <div class="reaction-summary" *ngIf="showCounts && reactionCounts && reactionCounts.total > 0">
+    <span class="summary-total">{{ reactionCounts.total }} reactions</span>
+    <span
+      class="summary-breakdown"
+      *ngIf="reactionCounts.byCategory.supportive > 0 || reactionCounts.byCategory.critical > 0"
+    >
+      <span class="supportive-count" *ngIf="reactionCounts.byCategory.supportive > 0">
+        💚 {{ reactionCounts.byCategory.supportive }}
+      </span>
+      <span class="critical-count" *ngIf="reactionCounts.byCategory.critical > 0">
+        🧡 {{ reactionCounts.byCategory.critical }}
+      </span>
+    </span>
+  </div>
+</div>
+
+<!-- Mediation Dialog -->
+<div class="mediation-overlay" *ngIf="showMediationDialog" (click)="closeMediationDialog()">
+  <div class="mediation-dialog" (click)="$event.stopPropagation()">
+    <div class="mediation-header">
+      <span class="mediation-icon">⚖️</span>
+      <h3>A Moment of Reflection</h3>
+    </div>
+
+    <div class="mediation-content" *ngIf="mediationContext">
+      <div class="reaction-preview">
+        <span class="preview-icon">{{ mediationContext.reaction.icon }}</span>
+        <span class="preview-label">{{ mediationContext.reaction.label }}</span>
+      </div>
+
+      <p class="mediation-prompt">
+        {{ mediationContext.mediationConfig.mediationPrompt }}
+      </p>
+
+      <div class="constitutional-reasoning">
+        <h4>Constitutional Reasoning</h4>
+        <p>{{ mediationContext.mediationConfig.constitutionalReasoning }}</p>
+      </div>
+
+      <div
+        class="consequence-note"
+        *ngIf="!mediationContext.mediationConfig.proceedBehavior.visibleToAuthor"
+      >
+        <p class="consequence-text">
+          {{ mediationContext.mediationConfig.proceedBehavior.consequenceExplanation }}
+        </p>
+      </div>
+
+      <!-- Suggested Alternatives -->
+      <div
+        class="alternatives-section"
+        *ngIf="mediationContext.mediationConfig.suggestedAlternatives?.length"
+      >
+        <h4>Consider These Alternatives</h4>
+        <div class="alternatives-list">
+          <button
+            *ngFor="let alt of mediationContext.mediationConfig.suggestedAlternatives"
+            class="alternative-btn"
+            (click)="onMediationResponse(false, alt)"
+            type="button"
+          >
+            <span class="alt-icon">{{ getReactionDisplay(alt)?.icon }}</span>
+            <span class="alt-label">{{ getReactionDisplay(alt)?.label }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mediation-actions">
+      <button class="btn-reconsider" (click)="closeMediationDialog()" type="button">
+        Reconsider
+      </button>
+      <button class="btn-proceed" (click)="onMediationResponse(true)" type="button">
+        Proceed Anyway
+      </button>
+    </div>
+  </div>
+</div>

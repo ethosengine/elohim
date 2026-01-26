@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elohim Node Setup</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="setup-page">
+    <div class="setup-container">
+        <div class="setup-header">
+            <div class="logo-large">E</div>
+            <h1>Elohim Node Setup</h1>
+            <p>Configure this node to join your family network</p>
+        </div>
+
+        <!-- Discovered Peers Alert -->
+        <div id="peers-alert" class="alert alert-info" style="display: none;">
+            <strong>Elohim peers detected!</strong>
+            <p id="peers-alert-text">Found existing peers on your local network.</p>
+            <button id="view-peers-btn" class="btn btn-small">View Peers</button>
+        </div>
+
+        <!-- Mode Selection -->
+        <div class="setup-modes" id="mode-selection">
+            <div class="mode-card" data-mode="join">
+                <div class="mode-icon">+</div>
+                <h3>Join Network</h3>
+                <p>Connect to an existing Elohim family network using a join key</p>
+            </div>
+            <div class="mode-card" data-mode="doorway">
+                <div class="mode-icon">*</div>
+                <h3>Become Doorway</h3>
+                <p>Set up this node as a bootstrap doorway for your family</p>
+            </div>
+        </div>
+
+        <!-- Join Network Form -->
+        <form id="join-form" class="setup-form" style="display: none;">
+            <h2>Join Existing Network</h2>
+
+            <div class="form-group">
+                <label for="join-key">Join Key</label>
+                <input type="text" id="join-key" name="join_key"
+                       placeholder="Paste the join key from your operator"
+                       required>
+                <small>Get this key from someone who manages your family network</small>
+            </div>
+
+            <div class="form-group">
+                <label for="doorway-url">Doorway URL</label>
+                <input type="url" id="doorway-url" name="doorway_url"
+                       placeholder="https://doorway.yourfamily.net"
+                       required>
+                <small>The bootstrap server URL for your network</small>
+            </div>
+
+            <div class="form-group">
+                <label for="cluster-name">Cluster Name (Optional)</label>
+                <input type="text" id="cluster-name" name="cluster_name"
+                       placeholder="Leave blank to use default">
+                <small>Override the cluster name from the join key</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" id="join-back">Back</button>
+                <button type="submit" class="btn btn-primary">Join Network</button>
+            </div>
+        </form>
+
+        <!-- Doorway Setup Form -->
+        <form id="doorway-form" class="setup-form" style="display: none;">
+            <h2>Doorway Configuration</h2>
+
+            <div class="form-group">
+                <label for="hostname">Public Hostname</label>
+                <input type="text" id="hostname" name="hostname"
+                       placeholder="doorway.yourfamily.net"
+                       required>
+                <small>The domain name that will point to this node</small>
+            </div>
+
+            <div class="form-group">
+                <label for="dns-provider">DNS Provider</label>
+                <select id="dns-provider" name="dns_provider">
+                    <option value="none">None (Static IP / Manual DNS)</option>
+                    <option value="cloudflare">Cloudflare</option>
+                    <option value="duckdns">DuckDNS</option>
+                    <option value="noip">No-IP</option>
+                    <option value="ddclient">Custom (ddclient)</option>
+                </select>
+                <small>Choose your dynamic DNS provider if you don't have a static IP</small>
+            </div>
+
+            <!-- Cloudflare Fields -->
+            <div id="cloudflare-fields" class="dns-fields" style="display: none;">
+                <div class="form-group">
+                    <label for="cf-api-token">Cloudflare API Token</label>
+                    <input type="password" id="cf-api-token" name="cf_api_token">
+                </div>
+                <div class="form-group">
+                    <label for="cf-zone-id">Zone ID</label>
+                    <input type="text" id="cf-zone-id" name="cf_zone_id">
+                </div>
+            </div>
+
+            <!-- DuckDNS Fields -->
+            <div id="duckdns-fields" class="dns-fields" style="display: none;">
+                <div class="form-group">
+                    <label for="duck-token">DuckDNS Token</label>
+                    <input type="password" id="duck-token" name="duck_token">
+                </div>
+                <div class="form-group">
+                    <label for="duck-domain">DuckDNS Domain</label>
+                    <input type="text" id="duck-domain" name="duck_domain"
+                           placeholder="yourfamily (without .duckdns.org)">
+                </div>
+            </div>
+
+            <!-- No-IP Fields -->
+            <div id="noip-fields" class="dns-fields" style="display: none;">
+                <div class="form-group">
+                    <label for="noip-username">No-IP Username</label>
+                    <input type="text" id="noip-username" name="noip_username">
+                </div>
+                <div class="form-group">
+                    <label for="noip-password">No-IP Password</label>
+                    <input type="password" id="noip-password" name="noip_password">
+                </div>
+                <div class="form-group">
+                    <label for="noip-hostname">No-IP Hostname</label>
+                    <input type="text" id="noip-hostname" name="noip_hostname">
+                </div>
+            </div>
+
+            <!-- ddclient Fields -->
+            <div id="ddclient-fields" class="dns-fields" style="display: none;">
+                <div class="form-group">
+                    <label for="ddclient-config">ddclient Configuration</label>
+                    <textarea id="ddclient-config" name="ddclient_config" rows="6"
+                              placeholder="Paste your ddclient.conf contents"></textarea>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="enable-https" name="enable_https" checked>
+                    Enable HTTPS (Let's Encrypt)
+                </label>
+            </div>
+
+            <div class="form-group" id="email-group">
+                <label for="admin-email">Admin Email</label>
+                <input type="email" id="admin-email" name="admin_email"
+                       placeholder="admin@yourfamily.net">
+                <small>Required for Let's Encrypt certificate notifications</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" id="doorway-back">Back</button>
+                <button type="submit" class="btn btn-primary">Configure Doorway</button>
+            </div>
+        </form>
+
+        <!-- Setup Progress -->
+        <div id="setup-progress" class="setup-progress" style="display: none;">
+            <div class="progress-spinner"></div>
+            <h3 id="progress-title">Setting up...</h3>
+            <p id="progress-message">Please wait while we configure your node</p>
+        </div>
+
+        <!-- Setup Result -->
+        <div id="setup-result" class="setup-result" style="display: none;">
+            <div id="result-icon" class="result-icon"></div>
+            <h3 id="result-title"></h3>
+            <p id="result-message"></p>
+            <div id="result-details" class="result-details"></div>
+            <button id="result-action" class="btn btn-primary">Continue</button>
+        </div>
+
+        <!-- Peers Modal -->
+        <div id="peers-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h2>Discovered Peers</h2>
+                <div id="modal-peers-list" class="peers-list"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="close-modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/setup.js"></script>
+</body>
+</html>

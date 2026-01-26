@@ -1,0 +1,11 @@
+Scenario: Household budget coordination across competing needs
+    Given the household has limited financial resources
+    And Tommy needs school supplies, Emma needs sports equipment
+    And utilities need paying and groceries need buying
+    When Sarah manages household budget
+    Then the household_elohim should coordinate across all needs
+    And it should surface conflicts and trade-offs
+    And it should help prioritize based on family values
+    And budget decisions should be transparent to both partners
+    And financial management should be recognized as skilled labor
+    And Sarah's budget work should accumulate care tokens

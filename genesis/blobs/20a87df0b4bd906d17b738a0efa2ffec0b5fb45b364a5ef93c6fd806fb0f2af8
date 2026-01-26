@@ -1,0 +1,11 @@
+Scenario: Reconciling conflicting regional constitutional interpretations
+    Given different regions interpreted same principle differently
+    And inconsistency creates confusion and injustice
+    When we provide definitive national interpretation
+    Then we honor: legitimate regional diversity where appropriate
+    And we establish: national minimums all regions must respect
+    And we explain: which variation is constitutional and which violates
+    And we create: coherence without imposing uniformity
+    And we guide: regional councils with clear framework
+    And we enable: coordinated governance across diverse communities
+    And we demonstrate: how subsidiarity and consistency coexist

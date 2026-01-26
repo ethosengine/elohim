@@ -1,0 +1,9 @@
+Scenario: Accessing precedent to understand similar cases
+    Given I am considering filing an appeal
+    And I want to understand how similar cases were decided
+    When I search the precedent database for "mental health intervention + privacy"
+    Then I can see anonymized cases with constitutional reasoning
+    And I can view outcomes and protocol changes that resulted
+    And I can see success rates for different appeal types
+    And I can understand the constitutional framework being applied
+    And This helps me calibrate my expectations and build my appeal argument

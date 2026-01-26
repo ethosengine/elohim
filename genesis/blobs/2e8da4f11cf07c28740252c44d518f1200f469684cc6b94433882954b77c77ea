@@ -1,0 +1,10 @@
+Scenario: Global appeal data informs protocol evolution
+    Given millions of appeals have been filed globally over 7 years
+    And researchers have analyzed patterns across cultures and contexts
+    When Constitutional Convention reviews protocol effectiveness
+    Then appeal success rates are examined (40% overturned or modified)
+    And most common appeal types are identified (adolescent autonomy)
+    And systematic biases are investigated
+    And marginalized community outcomes are assessed
+    And appellants' aggregate experience shapes constitutional amendments
+    And protocol improvements are guided by lived experience at scale

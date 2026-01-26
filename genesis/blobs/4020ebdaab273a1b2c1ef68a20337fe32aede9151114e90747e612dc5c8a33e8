@@ -1,0 +1,10 @@
+Scenario: Community care during academic pressure peaks
+    Given exam periods create intense stress across student community
+    And everyone is struggling simultaneously
+    When student community provides collective support during finals
+    Then the community_elohim should coordinate mutual care
+    And it should recognize study space hosting, meal provision, emotional support
+    And it should value care work that helps community through crisis period
+    And collective survival should be recognized as care economy
+    And the system should support community resilience
+    And students should learn that community carries each other through hard times

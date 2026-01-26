@@ -1,0 +1,9 @@
+Scenario: Multi-location franchise conversion creates worker coordination opportunities
+    Given James's three locations previously competed for corporate favor
+    And workers at different locations didn't coordinate or support each other
+    When all three locations convert to democratic EAE network simultaneously
+    Then workers across locations share learning and mutual support
+    And successful practices at one location spread to others
+    And workers can transfer between locations while maintaining ownership stakes
+    And collective bargaining power increases through multi-location coordination
+    And workplace_elohim facilitates inter-location worker collaboration

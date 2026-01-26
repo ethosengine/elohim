@@ -1,0 +1,10 @@
+Scenario: Employment board member tracks implementation of living wage policy
+    Given board approved living wage requirement for city contractors two years ago
+    And staff reports successful implementation and compliance
+    And community advocates report ongoing wage violations by contractors
+    When the board member uses Observer implementation tracking
+    Then they see contractor wage data showing compliance rates over time
+    And discover enforcement gaps allowing violations to persist
+    And find workers at some contractors still earning below living wage
+    And access comparison to peer cities with stronger enforcement mechanisms
+    And impact tracking reveals gap between policy adoption and actual outcomes

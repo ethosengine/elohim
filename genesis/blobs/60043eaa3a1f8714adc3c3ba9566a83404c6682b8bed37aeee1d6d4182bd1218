@@ -1,0 +1,9 @@
+Scenario: Parent tracks school board promises over time
+    Given the school board promised to "address transportation issues by Q2"
+    And the parent's child still has unreliable bus service three months later
+    When the parent checks Observer's commitment tracking
+    Then they see the exact promise made in the February meeting
+    And view that no action has been taken despite deadline passing
+    And can raise specific accountability question at next meeting
+    And institutional memory persists beyond administrator turnover
+    And board commitments to parents aren't forgotten when attention shifts

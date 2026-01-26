@@ -1,0 +1,10 @@
+Scenario: Neighborhood resource sharing reduces household costs
+    Given many families have similar needs
+    And resource sharing could reduce individual costs
+    When the neighborhood_elohim identifies sharing opportunities
+    Then Marcus's family should be connected to sharing networks
+    And bulk buying cooperatives should be suggested
+    And tool libraries and resource sharing should be facilitated
+    And neighborhood coordination should stretch Marcus's budget further
+    And collective consumption should reduce individual scarcity
+    And care economy should operate at neighborhood scale

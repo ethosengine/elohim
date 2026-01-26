@@ -1,0 +1,9 @@
+Scenario: Manager coordinates with community organizations for mutual benefit
+    Given workers decided to partner with youth employment program
+    And operational coordination is needed for internship program
+    When Marcus coordinates youth internship logistics
+    Then Marcus works with youth program on participant selection and scheduling
+    And Marcus ensures youth interns receive quality training and mentorship
+    And Marcus tracks program outcomes (skill development, employment, community impact)
+    And Marcus reports to workers who govern program strategic decisions
+    And community organization recognizes Marcus as reliable coordinator supporting youth

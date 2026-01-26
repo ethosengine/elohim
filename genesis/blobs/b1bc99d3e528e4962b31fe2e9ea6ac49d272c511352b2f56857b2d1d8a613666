@@ -1,0 +1,11 @@
+Scenario: Privacy rights preserved despite family care coordination needs
+    Given Helen's family needs information for care coordination
+    And Helen retains full personhood and privacy rights
+    When Helen's care data is accessed
+    Then Helen must maintain control over her own data
+    And she must explicitly delegate any family access
+    And default should preserve her privacy unless she chooses sharing
+    And she is not someone to be managed without consent
+    And safety needs do not automatically override privacy rights
+    And the system must balance autonomy with necessary coordination
+    And Helen remains a person with full rights, not a patient to be managed

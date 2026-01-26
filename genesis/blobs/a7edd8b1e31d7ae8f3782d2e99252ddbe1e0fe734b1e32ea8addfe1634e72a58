@@ -1,0 +1,10 @@
+Scenario: Building resilience through care economy participation
+    Given Kenji faces significant stress and uncertainty
+    And he is geographically separated from family support networks
+    When the personal_agent supports Kenji's resilience development
+    Then it should recognize his participation in care economy as building connection
+    And it should show how his care contributions create community
+    And it should validate that resilience comes from reciprocal relationships
+    And the agent should help him build care networks in temporary community
+    And the system should teach that care economy creates security
+    And Kenji should learn that giving and receiving care builds resilience

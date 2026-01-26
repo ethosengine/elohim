@@ -1,0 +1,11 @@
+Scenario: Providing local context to Constitutional Council deliberations
+    Given community council is reviewing appeal requiring local knowledge
+    And I have information about Riverside history and circumstances
+    When I testify to provide community context
+    Then I explain: relevant history, cultural factors, relationships
+    And I clarify: why something might seem unusual to outsiders
+    And I don't advocate: for particular outcome in appeal
+    And I inform: council's judgment with local wisdom
+    And I respect: council's independence and authority
+    And I enable: constitutional interpretation grounded in reality
+    And community knowledge: enriches democratic governance

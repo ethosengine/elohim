@@ -1,0 +1,9 @@
+Scenario: State legislator tracks accountability for legislative commitments
+    Given the politician co-sponsored criminal justice reform bill
+    And committed to reducing incarceration rates
+    When the Observer monitors policy implementation
+    Then they see whether state agencies implement legislative intent
+    And track incarceration trends after legislation passage
+    And identify bureaucratic resistance to reform
+    And receive alerts when outcomes diverge from expectations
+    And intervene to ensure legislation achieves intended impact

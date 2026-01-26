@@ -1,0 +1,11 @@
+Scenario: Selected for National Constitutional Council serving entire nation
+    Given I have experience from community and regional council service
+    And I was randomly selected for national level
+    When I accept my 6-month national council appointment
+    Then I understand: my judgments will affect millions of people
+    And I receive: intensive training on national constitutional interpretation
+    And I meet: weekly with diverse citizens from across the nation
+    And I am supported: with full compensation and resources
+    And I feel: profound responsibility for democratic governance
+    And I bring: nurse-mother wisdom to questions of national importance
+    And I know: ordinary citizens like me are humanity's democratic hope

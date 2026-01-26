@@ -1,0 +1,9 @@
+Scenario: Citizen evaluates school board candidate claims
+    Given a school board candidate promises to improve education quality
+    And the election is approaching
+    When the citizen reviews Observer analysis
+    Then they see the candidate's specific policy positions
+    And view comparisons to successful districts' approaches
+    And understand likely impacts of proposed policies
+    And can evaluate campaign promises against evidence
+    And informed voting becomes accessible

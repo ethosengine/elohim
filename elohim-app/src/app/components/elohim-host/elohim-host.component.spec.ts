@@ -8,9 +8,8 @@ describe('ElohimHostComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ElohimHostComponent]
-    })
-    .compileComponents();
+      imports: [ElohimHostComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(ElohimHostComponent);
     component = fixture.componentInstance;

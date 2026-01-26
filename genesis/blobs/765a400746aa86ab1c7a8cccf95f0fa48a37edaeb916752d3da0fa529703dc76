@@ -1,0 +1,10 @@
+Scenario: Informal learning and developmental support recognized as education
+    Given Margaret teaches grandchildren through daily interactions
+    And she provides learning opportunities through play, conversation, activities
+    When the educational_elohim tracks Margaret's educational contributions
+    Then it should recognize informal teaching as valuable education
+    And it should value developmental care as sophisticated work
+    And it should track learning moments and educational interactions
+    And informal education should accumulate care tokens
+    And Margaret's teaching should be recognized alongside formal schooling
+    And grandparent education should be valued as essential learning

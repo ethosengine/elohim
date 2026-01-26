@@ -1,0 +1,11 @@
+Scenario: Participating in Protocol Research Council review
+    Given I serve 6-month rotating term on Protocol Research Council
+    And developers propose Agent Protocol v2.3.7 update
+    When I evaluate proposed update before deployment
+    Then I assess: whether update solves claimed problem
+    And I check: for new vulnerabilities introduced
+    And I verify: constitutional alignment is maintained
+    And I test: adversarial robustness
+    And I collaborate: with other experts on review
+    And I recommend: approval, rejection, or modification
+    And updates require: expert approval before Constitutional Council authorization

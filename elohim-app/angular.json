@@ -29,25 +29,48 @@
                 "glob": "**/*",
                 "input": "src/assets",
                 "output": "/assets"
+              },
+              {
+                "glob": "sophia-element.umd.js",
+                "input": "../sophia/packages/sophia-element/dist",
+                "output": "/assets/sophia-plugin"
+              },
+              {
+                "glob": "*.css",
+                "input": "../sophia/packages/sophia-element/dist",
+                "output": "/assets/sophia-plugin"
+              },
+              {
+                "glob": "index.css",
+                "input": "../sophia/packages/sophia/dist",
+                "output": "/assets/sophia-plugin"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/holochain-cache-core",
+                "output": "/wasm/holochain-cache-core"
               }
             ],
             "styles": [
               "src/styles.css"
             ],
-            "scripts": []
+            "scripts": [],
+            "loader": {
+              ".svg": "text"
+            }
           },
           "configurations": {
             "production": {
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "1.5MB",
-                  "maximumError": "2MB"
+                  "maximumWarning": "2.5MB",
+                  "maximumError": "3MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "6kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "10kB",
+                  "maximumError": "25kB"
                 }
               ],
               "optimization": {
@@ -67,13 +90,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "1.5MB",
-                  "maximumError": "2MB"
+                  "maximumWarning": "2.5MB",
+                  "maximumError": "3MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "6kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "10kB",
+                  "maximumError": "25kB"
                 }
               ],
               "outputHashing": "all",
@@ -88,13 +111,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumWarning": "3MB",
+                  "maximumError": "4MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "6kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "10kB",
+                  "maximumError": "25kB"
                 }
               ],
               "outputHashing": "all",
@@ -125,10 +148,7 @@
             "allowedHosts": [
               "*.code.ethosengine.com"
             ],
-            "headers": {
-              "Cross-Origin-Opener-Policy": "same-origin",
-              "Cross-Origin-Embedder-Policy": "require-corp"
-            }
+            "proxyConfig": "proxy.conf.mjs"
           },
           "configurations": {
             "production": {

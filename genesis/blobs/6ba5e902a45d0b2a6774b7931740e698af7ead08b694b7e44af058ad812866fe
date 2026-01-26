@@ -1,0 +1,13 @@
+Scenario: Household budget management amid competing generational demands
+    Given the household supports adult children financially
+    And contributes to parents' care costs
+    And maintains their own household
+    And saves for retirement
+    When household_elohim manages budget
+    Then it should track spending across generational categories
+    And surface when one category expands unsustainably
+    And provide analysis: "Child support increased 40% last quarter while retirement savings decreased"
+    And help them make conscious choices about allocation
+    And recognize when external support is needed
+    And support sustainable household financial management
+    And prevent financial crisis from competing demands

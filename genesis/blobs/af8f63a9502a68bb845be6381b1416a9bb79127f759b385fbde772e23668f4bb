@@ -1,0 +1,9 @@
+Scenario: Journalist exposes misclassification of workers as contractors
+    Given gig economy companies classify workers as independent contractors
+    And the journalist investigates worker classification
+    When the Observer analyzes employment patterns and labor violations
+    Then the journalist sees workers have employer control without worker rights
+    And documents workers denied minimum wage, overtime, and benefits
+    And shows companies avoid taxes through misclassification
+    And identifies regulatory agencies failing to enforce classification rules
+    And publishes investigation on worker exploitation through misclassification

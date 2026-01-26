@@ -31,7 +31,7 @@ import {
   GovernanceEvent,
   GovernanceEventType,
   ContentGovernanceSummary,
-  GovernableEntityType
+  GovernableEntityType,
 } from './governance-feedback.model';
 
 // ============================================================================
@@ -80,16 +80,16 @@ export interface GovernanceQuickAction {
 }
 
 export type QuickActionType =
-  | 'flag'              // Report a concern
-  | 'discuss'           // Start a discussion thread
-  | 'challenge'         // Challenge a label/decision
-  | 'vote'              // Vote on active proposal
-  | 'review'            // Request or provide review
-  | 'edit'              // Propose edit (if allowed)
-  | 'protect'           // Request protection
-  | 'view-history'      // View full history
-  | 'view-discussions'  // View talk page
-  | 'subscribe';        // Subscribe to updates
+  | 'flag' // Report a concern
+  | 'discuss' // Start a discussion thread
+  | 'challenge' // Challenge a label/decision
+  | 'vote' // Vote on active proposal
+  | 'review' // Request or provide review
+  | 'edit' // Propose edit (if allowed)
+  | 'protect' // Request protection
+  | 'view-history' // View full history
+  | 'view-discussions' // View talk page
+  | 'subscribe'; // Subscribe to updates
 
 export interface GovernanceAlert {
   id: string;
@@ -101,12 +101,12 @@ export interface GovernanceAlert {
 }
 
 export type AlertType =
-  | 'vote-open'           // Active vote needs your participation
-  | 'challenge-pending'   // Your challenge needs attention
-  | 'discussion-active'   // Active discussion on content you follow
-  | 'label-applied'       // New label applied to content you own
-  | 'review-requested'    // Someone requested you review this
-  | 'sla-warning';        // SLA deadline approaching
+  | 'vote-open' // Active vote needs your participation
+  | 'challenge-pending' // Your challenge needs attention
+  | 'discussion-active' // Active discussion on content you follow
+  | 'label-applied' // New label applied to content you own
+  | 'review-requested' // Someone requested you review this
+  | 'sla-warning'; // SLA deadline approaching
 
 // ============================================================================
 // Graduated Feedback Selector (Loomio-inspired)
@@ -167,36 +167,36 @@ export interface GraduatedFeedbackSelector {
  */
 export type FeedbackContext =
   // Content quality
-  | 'accuracy'            // Is this accurate?
-  | 'usefulness'          // Was this useful to you?
-  | 'clarity'             // Is this clear and understandable?
-  | 'depth'               // Is this sufficiently thorough?
-  | 'timeliness'          // Is this current/up-to-date?
+  | 'accuracy' // Is this accurate?
+  | 'usefulness' // Was this useful to you?
+  | 'clarity' // Is this clear and understandable?
+  | 'depth' // Is this sufficiently thorough?
+  | 'timeliness' // Is this current/up-to-date?
 
   // Content appropriateness
-  | 'appropriateness'     // Is this appropriate for the context?
-  | 'sensitivity'         // Does this handle sensitive topics well?
+  | 'appropriateness' // Is this appropriate for the context?
+  | 'sensitivity' // Does this handle sensitive topics well?
 
   // Governance decisions
-  | 'label-agreement'     // Do you agree with this label?
-  | 'decision-agreement'  // Do you agree with this decision?
-  | 'proposal-position'   // What's your position on this proposal?
+  | 'label-agreement' // Do you agree with this label?
+  | 'decision-agreement' // Do you agree with this decision?
+  | 'proposal-position' // What's your position on this proposal?
 
   // Contributor evaluation
-  | 'contribution-value'  // How valuable was this contribution?
-  | 'trust-level'         // How much do you trust this contributor?
+  | 'contribution-value' // How valuable was this contribution?
+  | 'trust-level' // How much do you trust this contributor?
 
   // Elohim evaluation
-  | 'elohim-helpfulness'  // Was this Elohim helpful?
-  | 'elohim-accuracy'     // Was this Elohim's guidance accurate?
-  | 'elohim-fairness';    // Was this Elohim fair?
+  | 'elohim-helpfulness' // Was this Elohim helpful?
+  | 'elohim-accuracy' // Was this Elohim's guidance accurate?
+  | 'elohim-fairness'; // Was this Elohim fair?
 
 /**
  * FeedbackOption - A single option in a graduated feedback selector.
  */
 export interface FeedbackOption {
   id: string;
-  value: number;  // Numeric value for aggregation
+  value: number; // Numeric value for aggregation
   label: string;
   description: string;
   icon?: string;
@@ -214,45 +214,196 @@ export interface FeedbackOption {
  */
 export const FEEDBACK_SCALES: Record<FeedbackContext, FeedbackOption[]> = {
   // Accuracy scale (fact-checking)
-  'accuracy': [
-    { id: 'accurate', value: 2, label: 'Accurate', description: 'Verified and correct', icon: '✓', color: 'green', requiresReasoning: false },
-    { id: 'mostly-accurate', value: 1, label: 'Mostly Accurate', description: 'Minor issues', icon: '~', color: 'light-green', requiresReasoning: true, reasoningPrompt: 'What needs correction?' },
-    { id: 'uncertain', value: 0, label: 'Uncertain', description: 'Cannot verify', icon: '?', color: 'gray', requiresReasoning: false },
-    { id: 'inaccurate', value: -1, label: 'Inaccurate', description: 'Contains errors', icon: '✗', color: 'orange', requiresReasoning: true, reasoningPrompt: 'What is incorrect?' },
-    { id: 'false', value: -2, label: 'False', description: 'Significantly misleading', icon: '⚠', color: 'red', requiresReasoning: true, reasoningPrompt: 'Please provide evidence' },
+  accuracy: [
+    {
+      id: 'accurate',
+      value: 2,
+      label: 'Accurate',
+      description: 'Verified and correct',
+      icon: '✓',
+      color: 'green',
+      requiresReasoning: false,
+    },
+    {
+      id: 'mostly-accurate',
+      value: 1,
+      label: 'Mostly Accurate',
+      description: 'Minor issues',
+      icon: '~',
+      color: 'light-green',
+      requiresReasoning: true,
+      reasoningPrompt: 'What needs correction?',
+    },
+    {
+      id: 'uncertain',
+      value: 0,
+      label: 'Uncertain',
+      description: 'Cannot verify',
+      icon: '?',
+      color: 'gray',
+      requiresReasoning: false,
+    },
+    {
+      id: 'inaccurate',
+      value: -1,
+      label: 'Inaccurate',
+      description: 'Contains errors',
+      icon: '✗',
+      color: 'orange',
+      requiresReasoning: true,
+      reasoningPrompt: 'What is incorrect?',
+    },
+    {
+      id: 'false',
+      value: -2,
+      label: 'False',
+      description: 'Significantly misleading',
+      icon: '⚠',
+      color: 'red',
+      requiresReasoning: true,
+      reasoningPrompt: 'Please provide evidence',
+    },
   ],
 
   // Usefulness scale (personal value)
-  'usefulness': [
-    { id: 'transformative', value: 3, label: 'Transformative', description: 'Changed my understanding', icon: '★', color: 'gold', requiresReasoning: false },
-    { id: 'very-useful', value: 2, label: 'Very Useful', description: 'Significantly helped', icon: '✓✓', color: 'green', requiresReasoning: false },
-    { id: 'useful', value: 1, label: 'Useful', description: 'Somewhat helpful', icon: '✓', color: 'light-green', requiresReasoning: false },
-    { id: 'neutral', value: 0, label: 'Neutral', description: 'Neither helpful nor unhelpful', icon: '−', color: 'gray', requiresReasoning: false },
-    { id: 'not-useful', value: -1, label: 'Not Useful', description: 'Did not help me', icon: '✗', color: 'orange', requiresReasoning: true, reasoningPrompt: 'What were you looking for?' },
+  usefulness: [
+    {
+      id: 'transformative',
+      value: 3,
+      label: 'Transformative',
+      description: 'Changed my understanding',
+      icon: '★',
+      color: 'gold',
+      requiresReasoning: false,
+    },
+    {
+      id: 'very-useful',
+      value: 2,
+      label: 'Very Useful',
+      description: 'Significantly helped',
+      icon: '✓✓',
+      color: 'green',
+      requiresReasoning: false,
+    },
+    {
+      id: 'useful',
+      value: 1,
+      label: 'Useful',
+      description: 'Somewhat helpful',
+      icon: '✓',
+      color: 'light-green',
+      requiresReasoning: false,
+    },
+    {
+      id: 'neutral',
+      value: 0,
+      label: 'Neutral',
+      description: 'Neither helpful nor unhelpful',
+      icon: '−',
+      color: 'gray',
+      requiresReasoning: false,
+    },
+    {
+      id: 'not-useful',
+      value: -1,
+      label: 'Not Useful',
+      description: 'Did not help me',
+      icon: '✗',
+      color: 'orange',
+      requiresReasoning: true,
+      reasoningPrompt: 'What were you looking for?',
+    },
   ],
 
   // Proposal position (Loomio-style consent)
   'proposal-position': [
-    { id: 'strongly-agree', value: 3, label: 'Strongly Agree', description: 'Fully support this', icon: '✓✓', color: 'green', requiresReasoning: false },
-    { id: 'agree', value: 2, label: 'Agree', description: 'Support with minor concerns', icon: '✓', color: 'light-green', requiresReasoning: false },
-    { id: 'abstain', value: 0, label: 'Abstain', description: 'No strong opinion', icon: '−', color: 'gray', requiresReasoning: false },
-    { id: 'disagree', value: -1, label: 'Disagree', description: 'Have concerns', icon: '✗', color: 'orange', requiresReasoning: true, reasoningPrompt: 'What are your concerns?' },
-    { id: 'block', value: -3, label: 'Block', description: 'Cannot proceed as-is', icon: '⊘', color: 'red', requiresReasoning: true, reasoningPrompt: 'Why must this be blocked?' },
+    {
+      id: 'strongly-agree',
+      value: 3,
+      label: 'Strongly Agree',
+      description: 'Fully support this',
+      icon: '✓✓',
+      color: 'green',
+      requiresReasoning: false,
+    },
+    {
+      id: 'agree',
+      value: 2,
+      label: 'Agree',
+      description: 'Support with minor concerns',
+      icon: '✓',
+      color: 'light-green',
+      requiresReasoning: false,
+    },
+    {
+      id: 'abstain',
+      value: 0,
+      label: 'Abstain',
+      description: 'No strong opinion',
+      icon: '−',
+      color: 'gray',
+      requiresReasoning: false,
+    },
+    {
+      id: 'disagree',
+      value: -1,
+      label: 'Disagree',
+      description: 'Have concerns',
+      icon: '✗',
+      color: 'orange',
+      requiresReasoning: true,
+      reasoningPrompt: 'What are your concerns?',
+    },
+    {
+      id: 'block',
+      value: -3,
+      label: 'Block',
+      description: 'Cannot proceed as-is',
+      icon: '⊘',
+      color: 'red',
+      requiresReasoning: true,
+      reasoningPrompt: 'Why must this be blocked?',
+    },
   ],
 
   // Label agreement
   'label-agreement': [
-    { id: 'agree', value: 1, label: 'Agree', description: 'Label is appropriate', icon: '✓', color: 'green', requiresReasoning: false },
-    { id: 'unsure', value: 0, label: 'Unsure', description: 'Cannot determine', icon: '?', color: 'gray', requiresReasoning: false },
-    { id: 'disagree', value: -1, label: 'Disagree', description: 'Label is inappropriate', icon: '✗', color: 'red', requiresReasoning: true, reasoningPrompt: 'Why is this label wrong?' },
+    {
+      id: 'agree',
+      value: 1,
+      label: 'Agree',
+      description: 'Label is appropriate',
+      icon: '✓',
+      color: 'green',
+      requiresReasoning: false,
+    },
+    {
+      id: 'unsure',
+      value: 0,
+      label: 'Unsure',
+      description: 'Cannot determine',
+      icon: '?',
+      color: 'gray',
+      requiresReasoning: false,
+    },
+    {
+      id: 'disagree',
+      value: -1,
+      label: 'Disagree',
+      description: 'Label is inappropriate',
+      icon: '✗',
+      color: 'red',
+      requiresReasoning: true,
+      reasoningPrompt: 'Why is this label wrong?',
+    },
   ],
 
   // Placeholder for other contexts - would be filled in similarly
-  'clarity': [],
-  'depth': [],
-  'timeliness': [],
-  'appropriateness': [],
-  'sensitivity': [],
+  clarity: [],
+  depth: [],
+  timeliness: [],
+  appropriateness: [],
+  sensitivity: [],
   'decision-agreement': [],
   'contribution-value': [],
   'trust-level': [],
@@ -273,11 +424,11 @@ export interface FeedbackResponse {
 
 export interface FeedbackAggregateView {
   totalResponses: number;
-  distribution: Array<{
+  distribution: {
     optionId: string;
     count: number;
     percentage: number;
-  }>;
+  }[];
 
   /** Average value across all responses */
   averageValue: number;
@@ -346,31 +497,31 @@ export interface DeliberationProposal {
 }
 
 export type ProposalType =
-  | 'advice'        // Seeking input, proposer decides
-  | 'consent'       // Proceed unless objection
-  | 'consensus'     // Seek unanimous agreement
-  | 'sense-check'   // Gauge sentiment, non-binding
+  | 'advice' // Seeking input, proposer decides
+  | 'consent' // Proceed unless objection
+  | 'consensus' // Seek unanimous agreement
+  | 'sense-check' // Gauge sentiment, non-binding
   | 'ranked-choice' // Multiple options, ranked preference
-  | 'dot-vote'      // Allocate limited votes across options
-  | 'score-vote';   // Score each option independently
+  | 'dot-vote' // Allocate limited votes across options
+  | 'score-vote'; // Score each option independently
 
 export type ProposalPhase =
-  | 'draft'         // Being written
-  | 'discussion'    // Open for discussion before voting
-  | 'voting'        // Voting open
-  | 'closed'        // Voting closed, awaiting decision
-  | 'decided'       // Outcome determined
-  | 'implemented';  // Action taken
+  | 'draft' // Being written
+  | 'discussion' // Open for discussion before voting
+  | 'voting' // Voting open
+  | 'closed' // Voting closed, awaiting decision
+  | 'decided' // Outcome determined
+  | 'implemented'; // Action taken
 
 export interface VotingConfiguration {
   mechanism: VotingMechanism;
 
   /** Options to vote on (for multi-option proposals) */
-  options?: Array<{
+  options?: {
     id: string;
     label: string;
     description: string;
-  }>;
+  }[];
 
   /** For dot voting: how many dots each voter gets */
   dotsPerVoter?: number;
@@ -382,7 +533,7 @@ export interface VotingConfiguration {
   quorumPercentage?: number;
 
   /** Threshold for passage */
-  passageThreshold?: number;  // e.g., 0.66 for 2/3 majority
+  passageThreshold?: number; // e.g., 0.66 for 2/3 majority
 }
 
 export interface ProposalResults {
@@ -391,19 +542,19 @@ export interface ProposalResults {
   participationRate: number;
   quorumMet: boolean;
 
-  optionResults: Array<{
+  optionResults: {
     optionId: string;
     votes: number;
     percentage: number;
     score?: number;
     rank?: number;
-  }>;
+  }[];
 
   // For consent: any blocks?
-  blocks?: Array<{
+  blocks?: {
     voterId: string;
     reason: string;
-  }>;
+  }[];
 
   // Current recommendation based on results
   recommendation: 'pass' | 'fail' | 'unclear' | 'blocked';
@@ -457,11 +608,11 @@ export interface OpinionCluster {
   participantPercentage: number;
 
   // What characterizes this cluster?
-  characteristicStatements: Array<{
+  characteristicStatements: {
     statementId: string;
     text: string;
-    agreementLevel: number;  // ===== How much this cluster agrees
-  }>;
+    agreementLevel: number; // ===== How much this cluster agrees
+  }[];
 
   // Centroid position for visualization
   centroid: { x: number; y: number };
@@ -472,41 +623,40 @@ export interface ConsensusStatement {
   text: string;
   overallAgreement: number;
 
-  clusterAgreement: Array<{
+  clusterAgreement: {
     clusterId: string;
     agreement: number;
-  }>;
+  }[];
 
-  bridgingPotential: string;  // Why this matters
+  bridgingPotential: string; // Why this matters
 }
 
 export interface DivisiveStatement {
   id: string;
   text: string;
-  variance: number;  
+  variance: number;
 
-  clusterPositions: Array<{
+  clusterPositions: {
     clusterId: string;
-    position: number;  // Range: -1 to 1
-  }>;
+    position: number; // Range: -1 to 1
+  }[];
 }
 
 export interface ClusterVisualizationData {
-  projection: 'pca' | 'tsne' | 'umap';  // 2D projection of high-dimensional opinion space
+  projection: 'pca' | 'tsne' | 'umap'; // 2D projection of high-dimensional opinion space
 
   // Points for rendering
-  points: Array<{
-    participantId: string;  // Anonymous or identified
+  points: {
+    participantId: string; // Anonymous or identified
     x: number;
     y: number;
     clusterId: string;
-  }>;
+  }[];
 
-
-  clusterBoundaries: Array<{
+  clusterBoundaries: {
     clusterId: string;
-    polygon: Array<{ x: number; y: number }>;
-  }>;
+    polygon: { x: number; y: number }[];
+  }[];
 }
 
 // ============================================================================
@@ -542,11 +692,11 @@ export interface GovernanceHistoryView {
 }
 
 export type HistoryTab =
-  | 'summary'      // Overview dashboard
-  | 'versions'     // Edit history
-  | 'discussions'  // Talk page
-  | 'governance'   // Labels, challenges, appeals
-  | 'engagement';  // Views, affinity, citations
+  | 'summary' // Overview dashboard
+  | 'versions' // Edit history
+  | 'discussions' // Talk page
+  | 'governance' // Labels, challenges, appeals
+  | 'engagement'; // Views, affinity, citations
 
 export interface HistorySummaryTab {
   /** Quick stats */
@@ -579,7 +729,7 @@ export interface HistorySummaryTab {
 export interface HistoryVersionsTab {
   versions: VersionRecord[];
   compareMode: boolean;
-  selectedVersions?: [number, number];  // For diff view
+  selectedVersions?: [number, number]; // For diff view
 }
 
 export interface HistoryDiscussionsTab {
@@ -595,12 +745,12 @@ export interface HistoryGovernanceTab {
   activeLabels: GovernanceLabel[];
 
   // Label history
-  labelHistory: Array<{
+  labelHistory: {
     label: GovernanceLabel;
     action: 'added' | 'removed' | 'challenged';
     timestamp: string;
     actor: string;
-  }>;
+  }[];
 
   challenges: {
     active: Challenge[];
@@ -615,22 +765,22 @@ export interface HistoryGovernanceTab {
 export interface HistoryEngagementTab {
   // Time series data
   timeSeries: {
-    views: Array<{ date: string; count: number }>;
-    affinityMarks: Array<{ date: string; count: number }>;
-    citations: Array<{ date: string; count: number }>;
+    views: { date: string; count: number }[];
+    affinityMarks: { date: string; count: number }[];
+    citations: { date: string; count: number }[];
   };
 
   // Top engagers (anonymized if needed)
-  topEngagers: Array<{
+  topEngagers: {
     engagerId: string;
     engagementScore: number;
     lastEngaged: string;
-  }>;
+  }[];
 
   // Citation network
   citations: {
-    citedBy: Array<{ entityId: string; entityTitle: string }>;
-    cites: Array<{ entityId: string; entityTitle: string }>;
+    citedBy: { entityId: string; entityTitle: string }[];
+    cites: { entityId: string; entityTitle: string }[];
   };
 }
 
@@ -692,11 +842,9 @@ export const GOVERNANCE_ROUTES = {
   sensemaking: (entityType: string, entityId: string) =>
     `/lamad/${entityType}:${entityId}/governance/sensemaking`,
 
-  precedents: () =>
-    `/lamad/governance/precedents`,
+  precedents: () => `/lamad/governance/precedents`,
 
-  precedent: (precedentId: string) =>
-    `/lamad/governance/precedents/${precedentId}`,
+  precedent: (precedentId: string) => `/lamad/governance/precedents/${precedentId}`,
 };
 
 // ============================================================================
@@ -711,28 +859,64 @@ export interface GovernanceDeliberationService {
   getContextMenu(entityType: string, entityId: string): Promise<GovernanceContextMenu>;
 
   // ===== Feedback
-  getFeedbackSelector(entityType: string, entityId: string, context: FeedbackContext): Promise<GraduatedFeedbackSelector>;
-  submitFeedback(entityType: string, entityId: string, context: FeedbackContext, response: FeedbackResponse): Promise<void>;
-  getFeedbackAggregate(entityType: string, entityId: string, context: FeedbackContext): Promise<FeedbackAggregateView>;
+  getFeedbackSelector(
+    entityType: string,
+    entityId: string,
+    context: FeedbackContext
+  ): Promise<GraduatedFeedbackSelector>;
+  submitFeedback(
+    entityType: string,
+    entityId: string,
+    context: FeedbackContext,
+    response: FeedbackResponse
+  ): Promise<void>;
+  getFeedbackAggregate(
+    entityType: string,
+    entityId: string,
+    context: FeedbackContext
+  ): Promise<FeedbackAggregateView>;
 
   // ===== Deliberation
-  getProposals(entityType: string, entityId: string, filters?: { phase?: ProposalPhase }): Promise<DeliberationProposal[]>;
+  getProposals(
+    entityType: string,
+    entityId: string,
+    filters?: { phase?: ProposalPhase }
+  ): Promise<DeliberationProposal[]>;
   getProposal(proposalId: string): Promise<DeliberationProposal>;
-  createProposal(proposal: Omit<DeliberationProposal, 'id' | 'proposedAt' | 'phase' | 'results'>): Promise<DeliberationProposal>;
+  createProposal(
+    proposal: Omit<DeliberationProposal, 'id' | 'proposedAt' | 'phase' | 'results'>
+  ): Promise<DeliberationProposal>;
   voteOnProposal(proposalId: string, vote: unknown): Promise<void>;
 
   // ===== Sensemaking
-  getSensemakingVisualization(entityType: string, entityId: string): Promise<SensemakingVisualization>;
+  getSensemakingVisualization(
+    entityType: string,
+    entityId: string
+  ): Promise<SensemakingVisualization>;
   submitStatement(entityType: string, entityId: string, statement: string): Promise<string>;
   voteOnStatement(statementId: string, vote: 'agree' | 'disagree' | 'pass'): Promise<void>;
 
   // ===== History
-  getHistoryView(entityType: string, entityId: string, tab: HistoryTab, filters?: HistoryFilters): Promise<GovernanceHistoryView>;
+  getHistoryView(
+    entityType: string,
+    entityId: string,
+    tab: HistoryTab,
+    filters?: HistoryFilters
+  ): Promise<GovernanceHistoryView>;
 
   // ===== Discussions
   getDiscussionThread(threadId: string): Promise<DiscussionThread>;
-  createDiscussionThread(entityType: string, entityId: string, category: DiscussionCategory, topic: string, initialMessage: string): Promise<DiscussionThread>;
-  postMessage(threadId: string, message: Omit<DiscussionMessage, 'id' | 'timestamp' | 'reactions' | 'edited' | 'hidden'>): Promise<DiscussionMessage>;
+  createDiscussionThread(
+    entityType: string,
+    entityId: string,
+    category: DiscussionCategory,
+    topic: string,
+    initialMessage: string
+  ): Promise<DiscussionThread>;
+  postMessage(
+    threadId: string,
+    message: Omit<DiscussionMessage, 'id' | 'timestamp' | 'reactions' | 'edited' | 'hidden'>
+  ): Promise<DiscussionMessage>;
 
   // ===== Challenges
   fileChallenge(challenge: Omit<Challenge, 'id' | 'filedAt' | 'state'>): Promise<Challenge>;

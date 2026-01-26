@@ -1,0 +1,9 @@
+Scenario: Soil health improvements are documented and knowledge is shared
+    Given soil degradation is systemic problem in industrial agriculture
+    And regenerative soil building requires knowledge and long-term commitment
+    When democratic farms document and share soil health practices
+    Then soil testing shows organic matter increases and biological activity improvements
+    And successful practices are shared across bioregional farm network
+    And soil health knowledge accumulates and spreads through democratic coordination
+    And bioregional soil regeneration accelerates through collective learning
+    And bioregional_elohim manages soil health documentation and knowledge sharing

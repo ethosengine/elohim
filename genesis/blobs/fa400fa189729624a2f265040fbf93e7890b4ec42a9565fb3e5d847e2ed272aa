@@ -1,0 +1,10 @@
+Scenario: Coordinating care across multiple generations simultaneously
+    Given Sarah provides care to her children, her partner, and increasingly to her parents
+    And she is in the sandwich generation
+    When the family_elohim tracks care flows
+    Then it should map care moving upward to parents
+    And it should track care downward to children
+    And it should recognize care inward for Sarah's own well-being
+    And it should value care outward to community
+    And Sarah should see the full complexity of her care work
+    And multi-generational care patterns should be visible

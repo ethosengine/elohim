@@ -14,12 +14,8 @@ describe('DebugBarComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [DebugBarComponent],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting()
-      ]
-    })
-    .compileComponents();
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(DebugBarComponent);
     component = fixture.componentInstance;
@@ -31,11 +27,13 @@ describe('DebugBarComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should show debug bar for staging environment', (done) => {
-    spyOn(configService, 'getConfig').and.returnValue(of({
-      logLevel: 'debug',
-      environment: 'staging'
-    }));
+  it('should show debug bar for staging environment', done => {
+    spyOn(configService, 'getConfig').and.returnValue(
+      of({
+        logLevel: 'debug',
+        environment: 'staging',
+      })
+    );
 
     component.ngOnInit();
 
@@ -46,11 +44,13 @@ describe('DebugBarComponent', () => {
     });
   });
 
-  it('should show debug bar for alpha environment', (done) => {
-    spyOn(configService, 'getConfig').and.returnValue(of({
-      logLevel: 'debug',
-      environment: 'alpha'
-    }));
+  it('should show debug bar for alpha environment', done => {
+    spyOn(configService, 'getConfig').and.returnValue(
+      of({
+        logLevel: 'debug',
+        environment: 'alpha',
+      })
+    );
 
     component.ngOnInit();
 
@@ -61,11 +61,13 @@ describe('DebugBarComponent', () => {
     });
   });
 
-  it('should not show debug bar for production environment', (done) => {
-    spyOn(configService, 'getConfig').and.returnValue(of({
-      logLevel: 'error',
-      environment: 'production'
-    }));
+  it('should not show debug bar for production environment', done => {
+    spyOn(configService, 'getConfig').and.returnValue(
+      of({
+        logLevel: 'error',
+        environment: 'production',
+      })
+    );
 
     component.ngOnInit();
 

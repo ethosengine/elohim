@@ -1,0 +1,9 @@
+Scenario: Franchise fee elimination creates immediate value distribution dividend
+    Given corporate extracted $30K franchise fee + $18K marketing fee per location annually
+    And mandatory purchasing added 30% markup ($50K+ annually per location)
+    When franchise termination eliminates all corporate extraction
+    Then $100K+ annually per location is freed for redistribution
+    And workers receive substantial wage increases (60% of freed value)
+    And community programs are funded (30% of freed value)
+    And sustainability investments are made (10% of freed value)
+    And workplace_elohim documents value circulation replacing extraction

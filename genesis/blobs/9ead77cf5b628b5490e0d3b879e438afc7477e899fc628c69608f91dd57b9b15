@@ -1,0 +1,11 @@
+Scenario: Elder care coordination with spouse for mother-in-law
+    Given Frank and his wife help maintain Frank's mother-in-law's home
+    And they provide transportation and advocacy support
+    And elder care is substantial and skilled labor
+    When family_elohim tracks elder care contributions
+    Then Frank's home maintenance support should be recognized
+    And transportation and medical advocacy should be valued
+    And his construction skills applied to elder care should be quantified
+    And care burden should be monitored for sustainability
+    And family should see Frank's elder care contributions
+    And his care work should accumulate family care tokens

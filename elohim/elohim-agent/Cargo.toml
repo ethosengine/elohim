@@ -1,0 +1,41 @@
+[package]
+name = "elohim-agent"
+description = "AI agent orchestration for Elohim Protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+# Streaming support
+tokio-stream.workspace = true
+pin-project-lite.workspace = true
+
+# Optional: TypeScript export
+ts-rs = { workspace = true, optional = true }
+
+# Internal
+constitution.workspace = true
+
+# Optional: llama.cpp bindings
+llama-cpp-2 = { version = "0.1", optional = true }
+
+[features]
+default = []
+typescript = ["ts-rs", "constitution/typescript"]
+llamacpp = ["llama-cpp-2"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+wiremock = "0.6"

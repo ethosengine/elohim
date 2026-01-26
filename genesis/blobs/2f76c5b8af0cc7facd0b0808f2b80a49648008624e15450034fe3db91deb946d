@@ -1,0 +1,9 @@
+Scenario: Manager demonstrates ChickenMax democratic model to curious community
+    Given community members are curious about worker ownership
+    And Marcus has visible coordinator role in community institution
+    When community members ask about democratic business model
+    Then Marcus explains transformation from corporate extraction to worker ownership
+    And Marcus emphasizes workers govern, he coordinates with their consent
+    And Marcus's transparency about coordinator vs. owner role educates community
+    And community sees democratic governance as viable alternative
+    And other small businesses consider conversion after seeing example

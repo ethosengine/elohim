@@ -1,0 +1,10 @@
+Scenario: Cross-community appeal requiring regional coordination
+    Given my appeal involves agent decisions affecting multiple communities
+    And communities have different local calibrations creating conflict
+    When Regional Constitutional Council reviews the inter-community issue
+    Then they evaluate how subsidiarity principle applies across communities
+    And They examine if regional coordination is constitutionally required
+    And They consider if local diversity should be preserved or harmonized
+    And They may establish regional minimums while allowing local variation
+    And They create precedent for how communities coordinate at scale
+    And My appeal contributes to multi-layer governance coherence

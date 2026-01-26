@@ -1,0 +1,10 @@
+Scenario: Neighborhood knowledge and connection from long residence
+    Given Margaret has lived in neighborhood for many years
+    And she knows neighborhood history, patterns, and relationships
+    When the neighborhood_elohim recognizes resident knowledge
+    Then it should value Margaret's accumulated neighborhood wisdom
+    And it should recognize long-term residents as knowledge keepers
+    And her connections should be seen as neighborhood social capital
+    And institutional memory should be valued and utilized
+    And Margaret's knowledge should inform neighborhood decisions
+    And elder residents should be recognized as neighborhood resources

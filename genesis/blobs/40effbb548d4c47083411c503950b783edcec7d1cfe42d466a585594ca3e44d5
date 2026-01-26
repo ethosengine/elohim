@@ -1,0 +1,11 @@
+Scenario: Collaborating with Dr. Chen on global sortition research
+    Given Dr. Chen presents research on constitutional council effectiveness
+    And my technical expertise complements his social science
+    When I help explain technical aspects of his findings
+    Then I clarify: how technical design enables or constrains democratic oversight
+    And I interpret: patterns in agent-council interactions
+    And I assess: whether technical systems adequately support citizen governance
+    And I respect: his authority on democratic theory and outcomes
+    And we integrate: technical and social understanding
+    And we serve: evidence-based global constitutional deliberation
+    And we demonstrate: interdisciplinary collaboration

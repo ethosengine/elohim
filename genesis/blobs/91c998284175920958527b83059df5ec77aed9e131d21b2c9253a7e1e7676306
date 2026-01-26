@@ -1,0 +1,9 @@
+Scenario: Franchise operator role (if staying) transforms from controller to facilitator
+    Given James controlled workers because franchise corporate controlled him
+    And hierarchical enforcement was required by franchise agreement
+    When James stays as transition steward facilitating democratic conversion
+    Then his role shifts from implementing corporate mandates to supporting worker autonomy
+    And operational expertise becomes consultation, not commands
+    And workers request his input because it's valuable, not because he's boss
+    And franchise termination liberates him to serve rather than control
+    And workplace_elohim ensures steward role doesn't recreate hierarchy

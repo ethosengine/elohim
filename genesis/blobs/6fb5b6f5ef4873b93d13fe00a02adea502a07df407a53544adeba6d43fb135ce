@@ -1,0 +1,12 @@
+Scenario: Coordinating educational services across multiple children with different needs
+    Given I have multiple children (ages 4 and 7) with different educational contexts
+    And each child has unique needs, schools, and support requirements
+    When I manage educational coordination for multiple children
+    Then the Value Scanner tracks each child's educational needs separately
+    And coordinates across different schools, teachers, and support services
+    And helps me prioritize when children's needs conflict
+    And ensures neither child's education suffers due to complexity
+    And my personal_agent manages multiple educational calendars and requirements
+    And recognizes multi-child educational coordination as substantial labor
+    And validates that managing multiple children's education is complex
+    And prevents educational tasks from overwhelming me

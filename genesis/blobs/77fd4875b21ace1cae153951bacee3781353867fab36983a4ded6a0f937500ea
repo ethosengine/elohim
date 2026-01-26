@@ -1,0 +1,9 @@
+Scenario: Developer prevailing wage compliance gains monitoring
+    Given a developer receives public subsidy requiring prevailing wage
+    And claims compliance with wage requirements
+    When the Observer monitors wage compliance
+    Then analysis shows: certified payroll reports show prevailing wage
+    But worker interviews reveal unpaid overtime and deductions
+    And actual take-home pay is below prevailing wage requirements
+    And compliance on paper differs from worker reality
+    And enforcement mechanisms need worker-centered monitoring

@@ -1,0 +1,9 @@
+Scenario: Social connection preserved against isolation
+    Given intensive caregiving creates profound isolation
+    And James loses social connections as care intensifies
+    When the personal_agent monitors social isolation
+    Then it should recognize dangerous isolation patterns
+    And it should prompt James to maintain key relationships
+    And it should suggest respite opportunities for social connection
+    And it should connect him to other caregivers who understand
+    And social isolation should be actively prevented

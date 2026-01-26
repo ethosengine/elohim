@@ -1,0 +1,10 @@
+Scenario: Connecting retired residents for mutual support networks
+    Given Frank is one of several retired residents in the neighborhood
+    And retired people have time to build mutual support systems
+    When the neighborhood_elohim coordinates among retired residents
+    Then it should help Frank connect with other retired neighbors
+    And facilitate mutual aid networks among those with time availability
+    And coordinate skill sharing across retired residents
+    And support check-in systems for isolated or vulnerable neighbors
+    And build neighborhood resilience through retired resident networks
+    And enable Frank to both give and receive neighborhood support

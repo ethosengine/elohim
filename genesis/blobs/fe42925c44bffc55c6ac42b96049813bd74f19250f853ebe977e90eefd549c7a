@@ -1,0 +1,10 @@
+Scenario: Knowledge of traditional medicinal and useful plants
+    Given Margaret knows traditional uses of local plants
+    And she learned herbal remedies and plant knowledge from her elders
+    When the bioregional_elohim tracks traditional plant knowledge
+    Then it should recognize Margaret's ethnobotanical expertise
+    And it should value traditional medicinal plant knowledge
+    And it should facilitate transmission of plant wisdom to grandchildren
+    And traditional knowledge should be documented and preserved
+    And Margaret's expertise should contribute to bioregional health
+    And plant knowledge should be recognized as valuable care economy contribution

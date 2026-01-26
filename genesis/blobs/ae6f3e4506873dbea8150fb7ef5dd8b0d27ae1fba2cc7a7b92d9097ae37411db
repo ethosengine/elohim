@@ -1,0 +1,9 @@
+Scenario: Respite care prescribed as medical necessity
+    Given caregiver burnout threatens James's ability to provide care
+    And respite is essential for sustainable caregiving
+    When the healthcare_elohim advocates for respite
+    Then respite care should be prescribed as medical necessity
+    And insurance should cover respite like other medical care
+    And providers should understand caregiver burnout is medical concern
+    And James's health should be recognized as essential care infrastructure
+    And healthcare system should support caregiver sustainability

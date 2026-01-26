@@ -1,0 +1,11 @@
+Scenario: Weather pattern knowledge from lifetime of observation
+    Given Helen has observed local weather patterns for 82 years
+    And her memory includes pre-climate change baselines
+    When Helen describes historical weather patterns
+    Then her observations should inform climate adaptation planning
+    And community should learn from her memory of normal patterns
+    And changes should be understood through personal testimony
+    And bioregional climate knowledge should include elder perspectives
+    And the protocol should capture knowledge before it's lost
+    And Helen's observations should contribute to local climate understanding
+    And environmental memory should be preserved through elder participation

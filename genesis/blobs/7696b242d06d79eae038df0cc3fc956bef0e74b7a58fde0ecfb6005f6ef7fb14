@@ -1,0 +1,10 @@
+Scenario: Identity development beyond student role
+    Given Kenji's identity is currently shaped by being a student
+    And he will graduate and transition to other adult roles
+    When the personal_agent supports Kenji's identity development
+    Then it should recognize him as complete person beyond student status
+    And it should support his interests in environmental science as life calling
+    And it should help him build identity that will persist after graduation
+    And it should validate his current contributions (cooking, care work) as real
+    And the agent should support integrated identity across contexts
+    And Kenji should develop sense of self beyond temporary student role

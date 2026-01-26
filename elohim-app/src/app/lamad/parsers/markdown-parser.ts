@@ -55,7 +55,7 @@ export class MarkdownParser {
     const { featureIds, relatedEpicIds } = this.extractReferences(content, tags);
 
     // Determine content type
-    const contentType = frontmatter?.['type'] ?? 'epic'; 
+    const contentType = frontmatter?.['type'] ?? 'epic';
 
     // Extract metadata
     const metadata: ContentMetadata = {
@@ -65,7 +65,7 @@ export class MarkdownParser {
       version: frontmatter?.['version'] ?? '1.0',
       wordCount: this.countWords(content),
       headingCount: sections.length,
-      sections // Keep sections in metadata for viewers that might want them
+      sections, // Keep sections in metadata for viewers that might want them
     };
 
     return {
@@ -80,7 +80,7 @@ export class MarkdownParser {
       relatedNodeIds: [...featureIds, ...relatedEpicIds],
       metadata,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
   }
 
@@ -88,7 +88,7 @@ export class MarkdownParser {
    * Alias for backward compatibility if needed, but prefer parseContent
    */
   static parseEpic(content: string, sourcePath: string): ContentNode {
-      return this.parseContent(content, sourcePath);
+    return this.parseContent(content, sourcePath);
   }
 
   /**
@@ -173,7 +173,7 @@ export class MarkdownParser {
           level,
           anchor,
           content: '',
-          embeddedReferences: []
+          embeddedReferences: [],
         };
       } else if (currentSection) {
         // Add line to current section
@@ -209,7 +209,7 @@ export class MarkdownParser {
         type: 'feature',
         nodeId: this.textToId('feature', match[1]),
         position,
-        displayText: match[1].trim()
+        displayText: match[1].trim(),
       });
     }
 
@@ -218,7 +218,7 @@ export class MarkdownParser {
         type: 'scenario',
         nodeId: this.textToId('scenario', match[1]),
         position,
-        displayText: match[1].trim()
+        displayText: match[1].trim(),
       });
     }
 
@@ -233,7 +233,9 @@ export class MarkdownParser {
 
     // From frontmatter
     if (frontmatter?.['tags']) {
-      const fmTags = Array.isArray(frontmatter['tags']) ? frontmatter['tags'] : [frontmatter['tags']];
+      const fmTags = Array.isArray(frontmatter['tags'])
+        ? frontmatter['tags']
+        : [frontmatter['tags']];
       fmTags.forEach(tag => tags.add(tag));
     }
 
@@ -267,7 +269,7 @@ export class MarkdownParser {
 
     return {
       featureIds: Array.from(featureIds),
-      relatedEpicIds: Array.from(relatedEpicIds)
+      relatedEpicIds: Array.from(relatedEpicIds),
     };
   }
 
@@ -298,10 +300,13 @@ export class MarkdownParser {
   /**
    * Generate Node ID from file path
    */
-  private static generateNodeId(sourcePath: string, frontmatter: Record<string, any> | null): string {
+  private static generateNodeId(
+    sourcePath: string,
+    frontmatter: Record<string, any> | null
+  ): string {
     // Prefer ID from frontmatter
     if (frontmatter?.['id']) return frontmatter['id'];
-    
+
     // Fallback to path-based ID
     return sourcePath
       .split('/')
@@ -332,8 +337,10 @@ export class MarkdownParser {
     const lowerTitle = title.toLowerCase();
 
     if (lowerTitle.includes('observer')) return 'observer';
-    if (lowerTitle.includes('shopping') || lowerTitle.includes('value scanner')) return 'value-scanner';
-    if (lowerTitle.includes('autonomous') || lowerTitle.includes('workplace')) return 'autonomous-entity';
+    if (lowerTitle.includes('shopping') || lowerTitle.includes('value scanner'))
+      return 'value-scanner';
+    if (lowerTitle.includes('autonomous') || lowerTitle.includes('workplace'))
+      return 'autonomous-entity';
     if (lowerTitle.includes('social') || lowerTitle.includes('medium')) return 'social';
 
     // Check tags

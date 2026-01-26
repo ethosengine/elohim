@@ -1,0 +1,10 @@
+Scenario: Habitat for Humanity work recognized as housing care economy contribution
+    Given Frank's volunteer work builds housing for families in need
+    And his construction expertise enables affordable housing
+    When the community_elohim tracks housing care economy
+    Then Frank's work should be recognized as addressing housing crisis
+    And building homes should be valued as community care contribution
+    And his labor should be connected to housing outcomes (families housed)
+    And community should see that Frank's work creates housing that policy fails to provide
+    And volunteer construction should be understood as care economy infrastructure
+    And Frank should experience his work as meaningful community contribution

@@ -1,0 +1,11 @@
+Scenario: Operating as junior partner in family governance
+    Given Marcus makes real decisions about family resources
+    And Sarah maintains ultimate parental authority
+    When family governance decisions are made
+    Then Marcus should be treated as junior partner, not dependent
+    And his judgment should be increasingly trusted
+    And the family_elohim should coordinate their partnership
+    And Marcus's autonomy should grow with demonstrated capability
+    And Sarah should maintain oversight without micromanaging
+    And the balance should reflect his developmental stage
+    And partnership model should prevent both parentification and infantilization

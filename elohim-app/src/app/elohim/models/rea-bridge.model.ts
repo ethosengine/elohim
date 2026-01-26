@@ -41,10 +41,10 @@
  * - hREA Docs: https://docs.hrea.io
  */
 
-import {
-  type TokenType,
-  type GovernanceLayer,
-} from './protocol-core.model';
+import { type TokenType, type GovernanceLayer } from './protocol-core.model';
+
+// Re-export governance types for consumers
+export type { GovernanceLayer } from './protocol-core.model';
 
 // ============================================================================
 // ValueFlows Action Vocabulary
@@ -60,40 +60,40 @@ import {
  */
 export type REAAction =
   // Input actions (consume/use resources)
-  | 'use'           // Use without consuming (view content, attend session)
-  | 'consume'       // Use up completely (one-time access tokens)
-  | 'cite'          // Reference another's work (creates recognition flow)
+  | 'use' // Use without consuming (view content, attend session)
+  | 'consume' // Use up completely (one-time access tokens)
+  | 'cite' // Reference another's work (creates recognition flow)
 
   // Output actions (create/produce resources)
-  | 'produce'       // Create new resource (author content, synthesize map)
-  | 'raise'         // Increase quantity (accumulate recognition)
-  | 'lower'         // Decrease quantity (reduce holdings)
+  | 'produce' // Create new resource (author content, synthesize map)
+  | 'raise' // Increase quantity (accumulate recognition)
+  | 'lower' // Decrease quantity (reduce holdings)
 
   // Transfer actions (move between agents)
-  | 'transfer'      // Move resource to another agent (ownership transfer)
+  | 'transfer' // Move resource to another agent (ownership transfer)
   | 'transfer-custody' // Move custody without ownership change
   | 'transfer-all-rights' // Transfer all rights to resource
-  | 'move'          // Move resource between locations (same agent)
+  | 'move' // Move resource between locations (same agent)
 
   // Modification actions
-  | 'modify'        // Change resource properties
-  | 'combine'       // Merge resources (path extensions into base path)
-  | 'separate'      // Split resource (fork a learning path)
+  | 'modify' // Change resource properties
+  | 'combine' // Merge resources (path extensions into base path)
+  | 'separate' // Split resource (fork a learning path)
 
   // Work actions
-  | 'work'          // Contribute labor (stewardship, review, curation)
+  | 'work' // Contribute labor (stewardship, review, curation)
   | 'deliver-service' // Provide service (Elohim synthesis, tutoring)
 
   // Logistics actions (for physical resource handling)
-  | 'pickup'        // Take custody of a resource at a location
-  | 'dropoff'       // Release custody of a resource at a location
+  | 'pickup' // Take custody of a resource at a location
+  | 'dropoff' // Release custody of a resource at a location
 
   // Exchange actions
-  | 'give'          // Give a resource (one side of exchange)
-  | 'take'          // Take a resource (other side of exchange)
+  | 'give' // Give a resource (one side of exchange)
+  | 'take' // Take a resource (other side of exchange)
 
   // Acceptance actions
-  | 'accept';       // Accept a transfer or commitment (claim presence)
+  | 'accept'; // Accept a transfer or commitment (claim presence)
 
 /**
  * Action effects on resources - used for validation.
@@ -104,47 +104,70 @@ export type REAAction =
  * - onhandEffect: How the action affects onhand quantity (for custody tracking)
  * - pairsWith: For paired actions (give/take, pickup/dropoff)
  */
-export const REA_ACTION_EFFECTS: Record<REAAction, {
-  resourceEffect: 'increment' | 'decrement' | 'no-effect' | 'decrement-increment';
-  inputOutput: 'input' | 'output' | 'both' | 'na';
-  onhandEffect?: 'increment' | 'decrement' | 'no-effect';
-  pairsWith?: REAAction;
-}> = {
+export const REA_ACTION_EFFECTS: Record<
+  REAAction,
+  {
+    resourceEffect: 'increment' | 'decrement' | 'no-effect' | 'decrement-increment';
+    inputOutput: 'input' | 'output' | 'both' | 'na';
+    onhandEffect?: 'increment' | 'decrement' | 'no-effect';
+    pairsWith?: REAAction;
+  }
+> = {
   // Input actions
-  'use': { resourceEffect: 'no-effect', inputOutput: 'input' },
-  'consume': { resourceEffect: 'decrement', inputOutput: 'input', onhandEffect: 'decrement' },
-  'cite': { resourceEffect: 'no-effect', inputOutput: 'input' },
+  use: { resourceEffect: 'no-effect', inputOutput: 'input' },
+  consume: { resourceEffect: 'decrement', inputOutput: 'input', onhandEffect: 'decrement' },
+  cite: { resourceEffect: 'no-effect', inputOutput: 'input' },
 
   // Output actions
-  'produce': { resourceEffect: 'increment', inputOutput: 'output', onhandEffect: 'increment' },
-  'raise': { resourceEffect: 'increment', inputOutput: 'na', onhandEffect: 'increment' },
-  'lower': { resourceEffect: 'decrement', inputOutput: 'na', onhandEffect: 'decrement' },
+  produce: { resourceEffect: 'increment', inputOutput: 'output', onhandEffect: 'increment' },
+  raise: { resourceEffect: 'increment', inputOutput: 'na', onhandEffect: 'increment' },
+  lower: { resourceEffect: 'decrement', inputOutput: 'na', onhandEffect: 'decrement' },
 
   // Transfer actions
-  'transfer': { resourceEffect: 'decrement-increment', inputOutput: 'na' },
+  transfer: { resourceEffect: 'decrement-increment', inputOutput: 'na' },
   'transfer-custody': { resourceEffect: 'no-effect', inputOutput: 'na', onhandEffect: 'decrement' },
   'transfer-all-rights': { resourceEffect: 'decrement-increment', inputOutput: 'na' },
-  'move': { resourceEffect: 'no-effect', inputOutput: 'na' },
+  move: { resourceEffect: 'no-effect', inputOutput: 'na' },
 
   // Modification actions
-  'modify': { resourceEffect: 'no-effect', inputOutput: 'both' },
-  'combine': { resourceEffect: 'decrement', inputOutput: 'input', onhandEffect: 'decrement' },
-  'separate': { resourceEffect: 'increment', inputOutput: 'output', onhandEffect: 'increment' },
+  modify: { resourceEffect: 'no-effect', inputOutput: 'both' },
+  combine: { resourceEffect: 'decrement', inputOutput: 'input', onhandEffect: 'decrement' },
+  separate: { resourceEffect: 'increment', inputOutput: 'output', onhandEffect: 'increment' },
 
   // Work actions
-  'work': { resourceEffect: 'no-effect', inputOutput: 'input' },
+  work: { resourceEffect: 'no-effect', inputOutput: 'input' },
   'deliver-service': { resourceEffect: 'no-effect', inputOutput: 'output' },
 
   // Logistics actions (paired)
-  'pickup': { resourceEffect: 'no-effect', inputOutput: 'na', onhandEffect: 'increment', pairsWith: 'dropoff' },
-  'dropoff': { resourceEffect: 'no-effect', inputOutput: 'na', onhandEffect: 'decrement', pairsWith: 'pickup' },
+  pickup: {
+    resourceEffect: 'no-effect',
+    inputOutput: 'na',
+    onhandEffect: 'increment',
+    pairsWith: 'dropoff',
+  },
+  dropoff: {
+    resourceEffect: 'no-effect',
+    inputOutput: 'na',
+    onhandEffect: 'decrement',
+    pairsWith: 'pickup',
+  },
 
   // Exchange actions (paired)
-  'give': { resourceEffect: 'decrement', inputOutput: 'na', onhandEffect: 'decrement', pairsWith: 'take' },
-  'take': { resourceEffect: 'increment', inputOutput: 'na', onhandEffect: 'increment', pairsWith: 'give' },
+  give: {
+    resourceEffect: 'decrement',
+    inputOutput: 'na',
+    onhandEffect: 'decrement',
+    pairsWith: 'take',
+  },
+  take: {
+    resourceEffect: 'increment',
+    inputOutput: 'na',
+    onhandEffect: 'increment',
+    pairsWith: 'give',
+  },
 
   // Acceptance
-  'accept': { resourceEffect: 'no-effect', inputOutput: 'na' },
+  accept: { resourceEffect: 'no-effect', inputOutput: 'na' },
 };
 
 // ============================================================================
@@ -191,23 +214,28 @@ export interface ResourceSpecification {
  */
 export type ResourceClassification =
   // Lamad content classifications
-  | 'content'           // Learning content (epics, features, scenarios)
-  | 'attention'         // Human attention/engagement
-  | 'recognition'       // Attestation of value/contribution
-  | 'credential'        // Earned capabilities/attestations
-  | 'curation'          // Curated collections/paths
-  | 'synthesis'         // AI-generated maps/analysis
-  | 'stewardship'       // Care/maintenance of presences
-  | 'membership'        // Network participation rights
-  | 'compute'           // Computational resources (for Elohim)
-  | 'currency'          // Mutual credit (Unyt/HoloFuel integration)
+  | 'content' // Learning content (epics, features, scenarios)
+  | 'attention' // Human attention/engagement
+  | 'recognition' // Attestation of value/contribution
+  | 'credential' // Earned capabilities/attestations
+  | 'curation' // Curated collections/paths
+  | 'synthesis' // AI-generated maps/analysis
+  | 'stewardship' // Care/maintenance of presences
+  | 'membership' // Network participation rights
+  | 'compute' // Computational resources (for Elohim)
+  | 'currency' // Mutual credit (Unyt/HoloFuel integration)
+
+  // Consent & Data Economy classifications (ImagoDei/Qahal Research)
+  | 'consent' // Consent grant (the relationship itself is a resource)
+  | 'data' // Personal data shared under consent (research responses, etc.)
+  | 'data-token' // Token representing data value contribution
 
   // Shefa token classifications (from whitepaper)
-  | 'care-token'        // Witnessed caregiving acts
-  | 'time-token'        // Hours contributed to community
-  | 'learning-token'    // Skills developed and taught
-  | 'steward-token'     // Environmental/resource protection
-  | 'creator-token'     // Content that helps others
+  | 'care-token' // Witnessed caregiving acts
+  | 'time-token' // Hours contributed to community
+  | 'learning-token' // Skills developed and taught
+  | 'steward-token' // Environmental/resource protection
+  | 'creator-token' // Content that helps others
   | 'infrastructure-token'; // Network maintenance contribution
 
 /**
@@ -221,7 +249,7 @@ export const CLASSIFICATION_TO_TOKEN_TYPE: Partial<Record<ResourceClassification
   'steward-token': 'steward',
   'creator-token': 'creator',
   'infrastructure-token': 'infrastructure',
-  'recognition': 'recognition',
+  recognition: 'recognition',
 };
 
 /**
@@ -256,11 +284,19 @@ export interface Unit {
  * Standard unit names for type safety.
  */
 export type LamadUnitName =
-  | 'view' | 'minute' | 'session'       // Attention units
-  | 'affinity' | 'endorsement' | 'attestation'  // Recognition units
-  | 'node' | 'step' | 'path'            // Content units
-  | 'token' | 'cycle'                   // Compute units
-  | 'each' | 'one';                     // Generic
+  | 'view'
+  | 'minute'
+  | 'session' // Attention units
+  | 'affinity'
+  | 'endorsement'
+  | 'attestation' // Recognition units
+  | 'node'
+  | 'step'
+  | 'path' // Content units
+  | 'token'
+  | 'cycle' // Compute units
+  | 'each'
+  | 'one'; // Generic
 
 /**
  * Standard units for Lamad resources.
@@ -271,21 +307,61 @@ export const LAMAD_UNITS: Record<LamadUnitName, Unit> = {
   // Attention units
   view: { id: 'unit-view', label: 'View', symbol: 'view', omUnitIdentifier: 'elohim:view' },
   minute: { id: 'unit-minute', label: 'Minute', symbol: 'min', omUnitIdentifier: 'om:minute' },
-  session: { id: 'unit-session', label: 'Session', symbol: 'sess', omUnitIdentifier: 'elohim:session' },
+  session: {
+    id: 'unit-session',
+    label: 'Session',
+    symbol: 'sess',
+    omUnitIdentifier: 'elohim:session',
+  },
 
   // Recognition units
-  affinity: { id: 'unit-affinity', label: 'Affinity Point', symbol: 'aff', omUnitIdentifier: 'elohim:affinity' },
-  endorsement: { id: 'unit-endorsement', label: 'Endorsement', symbol: 'end', omUnitIdentifier: 'elohim:endorsement' },
-  attestation: { id: 'unit-attestation', label: 'Attestation', symbol: 'att', omUnitIdentifier: 'elohim:attestation' },
+  affinity: {
+    id: 'unit-affinity',
+    label: 'Affinity Point',
+    symbol: 'aff',
+    omUnitIdentifier: 'elohim:affinity',
+  },
+  endorsement: {
+    id: 'unit-endorsement',
+    label: 'Endorsement',
+    symbol: 'end',
+    omUnitIdentifier: 'elohim:endorsement',
+  },
+  attestation: {
+    id: 'unit-attestation',
+    label: 'Attestation',
+    symbol: 'att',
+    omUnitIdentifier: 'elohim:attestation',
+  },
 
   // Content units
-  node: { id: 'unit-node', label: 'Content Node', symbol: 'node', omUnitIdentifier: 'elohim:contentNode' },
-  step: { id: 'unit-step', label: 'Path Step', symbol: 'step', omUnitIdentifier: 'elohim:pathStep' },
-  path: { id: 'unit-path', label: 'Learning Path', symbol: 'path', omUnitIdentifier: 'elohim:learningPath' },
+  node: {
+    id: 'unit-node',
+    label: 'Content Node',
+    symbol: 'node',
+    omUnitIdentifier: 'elohim:contentNode',
+  },
+  step: {
+    id: 'unit-step',
+    label: 'Path Step',
+    symbol: 'step',
+    omUnitIdentifier: 'elohim:pathStep',
+  },
+  path: {
+    id: 'unit-path',
+    label: 'Learning Path',
+    symbol: 'path',
+    omUnitIdentifier: 'elohim:learningPath',
+  },
 
   // Compute units (for Elohim/Unyt)
   token: { id: 'unit-token', label: 'Token', symbol: 'tok', omUnitIdentifier: 'elohim:token' },
-  cycle: { id: 'unit-cycle', label: 'Compute Cycle', symbol: 'cyc', omUnitIdentifier: 'elohim:computeCycle' },
+  cycle: {
+    id: 'unit-cycle',
+    label: 'Compute Cycle',
+    symbol: 'cyc',
+    omUnitIdentifier: 'elohim:computeCycle',
+  },
 
   // Generic (standard OM2 units)
   each: { id: 'unit-each', label: 'Each', symbol: 'ea', omUnitIdentifier: 'om:one' },
@@ -364,12 +440,12 @@ export interface Measure {
  * ResourceState - Lifecycle state of a resource.
  */
 export type ResourceState =
-  | 'available'     // Ready to use/transfer
-  | 'committed'     // Promised but not yet transferred
-  | 'in-use'        // Currently being used
-  | 'consumed'      // Fully consumed
-  | 'archived'      // No longer active
-  | 'disputed';     // Under review/appeal
+  | 'available' // Ready to use/transfer
+  | 'committed' // Promised but not yet transferred
+  | 'in-use' // Currently being used
+  | 'consumed' // Fully consumed
+  | 'archived' // No longer active
+  | 'disputed'; // Under review/appeal
 
 // ============================================================================
 // Agent (REA Extension)
@@ -416,12 +492,12 @@ export interface REAAgent {
  * REAAgentType - Classification of economic agents.
  */
 export type REAAgentType =
-  | 'human'                  // Individual person
-  | 'organization'           // Group/org with shared identity
-  | 'contributor-presence'   // Unclaimed/stewarded external contributor
-  | 'elohim'                 // Autonomous constitutional agent
-  | 'family'                 // Family unit (economic household)
-  | 'community';             // Community collective
+  | 'human' // Individual person
+  | 'organization' // Group/org with shared identity
+  | 'contributor-presence' // Unclaimed/stewarded external contributor
+  | 'elohim' // Autonomous constitutional agent
+  | 'family' // Family unit (economic household)
+  | 'community'; // Community collective
 
 /**
  * ExternalIdentifier - Links to external identity systems.
@@ -483,14 +559,14 @@ export interface AgentRelationship {
  * AgentRelationshipType - Types of agent relationships.
  */
 export type AgentRelationshipType =
-  | 'member-of'          // Agent is member of organization
-  | 'steward-of'         // Agent stewards a presence
-  | 'created-by'         // Resource created by agent
-  | 'endorsed-by'        // Agent endorsed another
-  | 'student-of'         // Learning relationship
-  | 'mentor-of'          // Teaching relationship
-  | 'family-of'          // Family relationship
-  | 'delegate-of';       // Agent acts on behalf of another
+  | 'member-of' // Agent is member of organization
+  | 'steward-of' // Agent stewards a presence
+  | 'created-by' // Resource created by agent
+  | 'endorsed-by' // Agent endorsed another
+  | 'student-of' // Learning relationship
+  | 'mentor-of' // Teaching relationship
+  | 'family-of' // Family relationship
+  | 'delegate-of'; // Agent acts on behalf of another
 
 // ============================================================================
 // Accounting Scope (hREA inScopeOf)
@@ -517,11 +593,11 @@ export type AgentRelationshipType =
  * ScopeType - Classification of accounting scopes.
  */
 export type ScopeType =
-  | 'organization'    // Formal organization boundary
-  | 'community'       // Community (Qahal) boundary
-  | 'project'         // Project or initiative scope
-  | 'cohort'          // Learning cohort
-  | 'family'          // Family economic unit
+  | 'organization' // Formal organization boundary
+  | 'community' // Community (Qahal) boundary
+  | 'project' // Project or initiative scope
+  | 'cohort' // Learning cohort
+  | 'family' // Family economic unit
   | 'constitutional'; // Constitutional governance scope (e.g., dignity floor enforcement)
 
 // ============================================================================
@@ -582,14 +658,14 @@ export interface Process {
  * ProcessClassification - Types of processes in Lamad.
  */
 export type ProcessClassification =
-  | 'learning-journey'    // Human traversing a learning path
-  | 'content-creation'    // Creating new content
-  | 'curation'            // Curating content into paths
-  | 'synthesis'           // Elohim synthesizing knowledge maps
-  | 'review'              // Peer review process
-  | 'attestation'         // Granting attestations
-  | 'stewardship'         // Maintaining creator presences
-  | 'governance';         // Governance decision process
+  | 'learning-journey' // Human traversing a learning path
+  | 'content-creation' // Creating new content
+  | 'curation' // Curating content into paths
+  | 'synthesis' // Elohim synthesizing knowledge maps
+  | 'review' // Peer review process
+  | 'attestation' // Granting attestations
+  | 'stewardship' // Maintaining creator presences
+  | 'governance'; // Governance decision process
 
 /**
  * ProcessSpecification - Template for a type of process.
@@ -769,12 +845,12 @@ export interface Commitment {
  * CommitmentState - Lifecycle of a commitment.
  */
 export type CommitmentState =
-  | 'proposed'    // Offered but not accepted
-  | 'accepted'    // Accepted by receiver
+  | 'proposed' // Offered but not accepted
+  | 'accepted' // Accepted by receiver
   | 'in-progress' // Being fulfilled
-  | 'fulfilled'   // Fully satisfied
-  | 'cancelled'   // Cancelled before fulfillment
-  | 'breached';   // Failed to fulfill
+  | 'fulfilled' // Fully satisfied
+  | 'cancelled' // Cancelled before fulfillment
+  | 'breached'; // Failed to fulfill
 
 // ============================================================================
 // Agreement (Governance)
@@ -815,12 +891,12 @@ export interface Agreement {
  * AgreementClassification - Types of agreements.
  */
 export type AgreementClassification =
-  | 'constitution'        // Foundational governance document
-  | 'community-covenant'  // Community membership terms
+  | 'constitution' // Foundational governance document
+  | 'community-covenant' // Community membership terms
   | 'stewardship-contract' // Creator presence stewardship
   | 'learning-commitment' // Commitment to learning path
-  | 'review-assignment'   // Peer review agreement
-  | 'attestation-grant';  // Attestation issuance terms
+  | 'review-assignment' // Peer review agreement
+  | 'attestation-grant'; // Attestation issuance terms
 
 // ============================================================================
 // Proposal (Offer/Request Matching)
@@ -1058,7 +1134,7 @@ export const LAMAD_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
   },
 
   // Attention resources
-  'attention': {
+  attention: {
     id: 'spec-attention',
     name: 'Attention',
     note: 'Human engagement with content',
@@ -1069,7 +1145,7 @@ export const LAMAD_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
   },
 
   // Recognition resources
-  'recognition': {
+  recognition: {
     id: 'spec-recognition',
     name: 'Recognition',
     note: 'Acknowledgment of value created',
@@ -1077,7 +1153,7 @@ export const LAMAD_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
     resourceClassifiedAs: ['recognition'],
     substitutable: true,
   },
-  'endorsement': {
+  endorsement: {
     id: 'spec-endorsement',
     name: 'Endorsement',
     note: 'Formal endorsement from a qualified agent',
@@ -1087,7 +1163,7 @@ export const LAMAD_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
   },
 
   // Credential resources
-  'attestation': {
+  attestation: {
     id: 'spec-attestation',
     name: 'Attestation',
     note: 'A credential earned through demonstrated capability',
@@ -1124,6 +1200,32 @@ export const LAMAD_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
     defaultUnitOfResource: LAMAD_UNITS.cycle,
     resourceClassifiedAs: ['compute'],
     substitutable: true,
+  },
+
+  // Consent & Data Economy resources (ImagoDei/Qahal Research)
+  'consent-grant': {
+    id: 'spec-consent',
+    name: 'Consent Grant',
+    note: 'A consent relationship for data access - the grant itself is a resource',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['consent'],
+    substitutable: false, // Each consent relationship is unique
+  },
+  'research-data': {
+    id: 'spec-data',
+    name: 'Research Data',
+    note: 'Personal data contributed under consent (assessment responses, etc.)',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['data'],
+    substitutable: false, // Each data contribution is unique
+  },
+  'data-token': {
+    id: 'spec-data-token',
+    name: 'Data Token',
+    note: 'Token representing value from data contribution - flows back to data subject',
+    defaultUnitOfResource: LAMAD_UNITS.token,
+    resourceClassifiedAs: ['data-token'],
+    substitutable: true, // Fungible value token
   },
 };
 
@@ -1209,10 +1311,10 @@ export const TOKEN_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
  * For general protocol-wide constraints, see ConstitutionalConstraint in protocol-core.model.ts.
  */
 export type ValueFlowLayer =
-  | 'dignity_floor'    // Layer 1: Existential minimums
-  | 'attribution'      // Layer 2: Contribution recognition
-  | 'circulation'      // Layer 3: Community velocity
-  | 'sustainability';  // Layer 4: Network development
+  | 'dignity_floor' // Layer 1: Existential minimums
+  | 'attribution' // Layer 2: Contribution recognition
+  | 'circulation' // Layer 3: Community velocity
+  | 'sustainability'; // Layer 4: Network development
 
 /**
  * ValueFlowConstraint - Inviolable constraints on economic value flow.
@@ -1386,12 +1488,12 @@ export interface AttributionClaim {
  * ClaimState - Lifecycle of an attribution claim.
  */
 export type ClaimState =
-  | 'pending_identity'      // Awaiting identity attestation
+  | 'pending_identity' // Awaiting identity attestation
   | 'pending_responsibility' // Awaiting responsibility verification
-  | 'pending_review'        // Under Elohim review
-  | 'approved'              // Claim approved
-  | 'rejected'              // Claim rejected
-  | 'withdrawn';            // Claimant withdrew
+  | 'pending_review' // Under Elohim review
+  | 'approved' // Claim approved
+  | 'rejected' // Claim rejected
+  | 'withdrawn'; // Claimant withdrew
 
 /**
  * Re-export Shefa-related types from protocol-core for convenience.

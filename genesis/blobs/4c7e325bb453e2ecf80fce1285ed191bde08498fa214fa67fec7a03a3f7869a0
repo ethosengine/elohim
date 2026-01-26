@@ -1,0 +1,10 @@
+Scenario: Local advisory board member evaluates community facility needs
+    Given community center requires major renovations or replacement
+    And advisory board must recommend priorities to city council
+    And board wants to understand diverse community facility needs
+    When the board member seeks community input through Observer
+    Then they receive aggregated data on facility usage patterns
+    And see survey responses from various community demographic groups
+    And access needs assessment comparing current offerings to community priorities
+    And discover seniors, youth, and working families have different needs
+    And community accountability helps board advocate for inclusive facility design

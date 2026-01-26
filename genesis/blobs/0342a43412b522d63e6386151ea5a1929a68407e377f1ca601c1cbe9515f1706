@@ -1,0 +1,10 @@
+Scenario: Sibling relationships and care coordination
+    Given Sarah's siblings also have care responsibilities
+    And they coordinate care for aging parents
+    When the family_elohim tracks sibling care contributions
+    Then it should show who is doing what for parents
+    And it should prevent care labor from falling unequally on one sibling
+    And it should enable equitable distribution of elder care
+    And sibling relationships should be based on fair care sharing
+    And the system should prevent family dynamics where one child does everything
+    And care economy should create accountability among siblings

@@ -1,0 +1,11 @@
+Scenario: Global research ethics and decolonizing methodology
+    Given historical research often extracted from Global South for Global North benefit
+    And I want to practice ethical global research
+    When I design my research methodology and partnerships
+    Then I ensure: local researchers lead studies in their contexts
+    And I practice: equitable benefit sharing and co-authorship
+    And I support: capacity building in Global South institutions
+    And I challenge: Western-centric theories and methods
+    And I listen: to diverse epistemologies and knowledge systems
+    And I acknowledge: positionality and power in research relationships
+    And My practice embodies: research ethics aligned with protocol's dignity principles

@@ -1,0 +1,10 @@
+Scenario: Value formation through autonomous exploration
+    Given Jasmine is consciously forming her personal values
+    And she tests values through real economic decisions
+    When Jasmine makes purchasing choices reflecting her values
+    Then her personal_agent should help her track alignment between values and actions
+    And surface patterns: "You've prioritized local/sustainable products 12 of 15 purchases"
+    And support her value exploration without imposing external values
+    And recognize that she's developing adult value framework
+    And protect her space for individual identity development
+    And acknowledge her increasing moral sophistication

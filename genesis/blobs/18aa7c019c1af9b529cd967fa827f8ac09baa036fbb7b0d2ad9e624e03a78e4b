@@ -1,0 +1,9 @@
+Scenario: Manager coordinates community programs while workers govern priorities
+    Given workers democratically decided to implement senior meal program
+    And operational coordination is needed for program execution
+    When Marcus coordinates senior meal program logistics
+    Then Marcus ensures meals meet quality and dietary requirements
+    And Marcus coordinates with senior center on scheduling and delivery
+    And Marcus tracks program metrics (meals served, costs, feedback)
+    But workers determine program scope, pricing, and continuation
+    And community_elohim ensures program serves community without exploiting workers

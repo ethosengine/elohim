@@ -1,0 +1,9 @@
+Scenario: Operator's family investment is honored and fairly compensated
+    Given James's family invested $400K supporting his franchise dream
+    And they took real risk and deserve fair treatment
+    When acquisition provides $150K return after debt repayment
+    Then family receives back substantial portion of investment
+    And return reflects their risk and support over five years
+    And family can choose to reinvest in community investment pool if desired
+    And family investors appreciate dignified resolution protecting workers and James
+    And workplace_elohim ensures family investor treatment is transparent and fair

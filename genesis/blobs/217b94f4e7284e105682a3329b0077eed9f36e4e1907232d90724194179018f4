@@ -1,0 +1,8 @@
+Scenario: Connecting with workers across food service industry
+    Given food service workers face similar exploitation patterns
+    And collective action requires cross-workplace organization
+    When I want to connect with other food service workers
+    Then the protocol should facilitate industry-wide worker networks
+    And help me find worker organizing groups and unions
+    And support building solidarity across restaurants and food businesses
+    And enable coordination for industry-level advocacy

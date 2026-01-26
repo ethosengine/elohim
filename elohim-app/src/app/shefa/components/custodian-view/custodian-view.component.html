@@ -1,0 +1,183 @@
+<!-- Bidirectional Custodian View -->
+
+<div class="custodian-view" [class.mode-summary]="displayMode === 'summary'">
+  <!-- Loading State -->
+  <div class="loading" *ngIf="isLoading">
+    <span class="spinner"></span>
+    <span>Loading custodian relationships...</span>
+  </div>
+
+  <!-- Error State -->
+  <div class="error" *ngIf="error">
+    <span class="icon">⚠️</span>
+    <span>{{ error }}</span>
+  </div>
+
+  <!-- Content -->
+  <ng-container *ngIf="!isLoading && !error && view">
+    <!-- Header Section -->
+    <header class="view-header">
+      <h2>Mutual Aid Network</h2>
+      <p class="subtitle">Who you're helping and who's helping you</p>
+    </header>
+
+    <!-- Balance Summary -->
+    <div class="balance-summary" [ngClass]="getBalanceClass()">
+      <div class="balance-icon">{{ getBalanceIcon() }}</div>
+      <div class="balance-content">
+        <div class="balance-message">{{ view.mutualAidBalance.message }}</div>
+        <div class="balance-stats">
+          <span class="stat">
+            <span class="label">Helping</span>
+            <span class="value">
+              {{ view.helpingCount }} people ({{ formatGB(view.helpingTotalGB) }})
+            </span>
+          </span>
+          <span class="divider">|</span>
+          <span class="stat">
+            <span class="label">Being helped by</span>
+            <span class="value">
+              {{ view.beingHelpedByCount }} people ({{ formatGB(view.beingHelpedByTotalGB) }})
+            </span>
+          </span>
+        </div>
+      </div>
+      <div class="community-strength" [ngClass]="getStrengthClass()">
+        <span class="strength-label">Community</span>
+        <span class="strength-value">{{ view.communityStrength | titlecase }}</span>
+      </div>
+    </div>
+
+    <!-- Summary Mode -->
+    <ng-container *ngIf="displayMode === 'summary'">
+      <div class="summary-grid">
+        <div class="summary-card helping">
+          <h4>People You Help</h4>
+          <div class="count">{{ view.helpingCount }}</div>
+          <div class="details">{{ formatGB(view.helpingTotalGB) }} stored</div>
+        </div>
+        <div class="summary-card being-helped">
+          <h4>People Helping You</h4>
+          <div class="count">{{ view.beingHelpedByCount }}</div>
+          <div class="details">{{ formatGB(view.beingHelpedByTotalGB) }} protected</div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Full Mode -->
+    <ng-container *ngIf="displayMode === 'full'">
+      <!-- Tab Navigation -->
+      <nav class="tab-nav">
+        <button
+          class="tab-btn"
+          [class.active]="activeTab === 'helping'"
+          (click)="setActiveTab('helping')"
+        >
+          <span class="tab-icon">💝</span>
+          <span class="tab-label">People I Help</span>
+          <span class="tab-count">{{ view.helpingCount }}</span>
+        </button>
+        <button
+          class="tab-btn"
+          [class.active]="activeTab === 'beingHelped'"
+          (click)="setActiveTab('beingHelped')"
+        >
+          <span class="tab-icon">🙏</span>
+          <span class="tab-label">People Helping Me</span>
+          <span class="tab-count">{{ view.beingHelpedByCount }}</span>
+        </button>
+      </nav>
+
+      <!-- Relationship List -->
+      <div class="relationship-list">
+        <div
+          class="relationship-card"
+          *ngFor="let rel of activeList"
+          (click)="selectCustodian(rel)"
+        >
+          <!-- Card Header -->
+          <div class="card-header">
+            <span class="rel-icon">{{ getRelationshipIcon(rel.relationshipType) }}</span>
+            <div class="rel-info">
+              <span class="rel-name">{{ rel.displayName }}</span>
+              <span class="rel-type">{{ rel.relationshipType | titlecase }}</span>
+            </div>
+            <span class="rel-status" [ngClass]="getStatusClass(rel.status)">
+              {{ rel.status | titlecase }}
+            </span>
+          </div>
+
+          <!-- Card Body -->
+          <div class="card-body">
+            <!-- Direction indicator -->
+            <div class="direction-indicator">
+              <span *ngIf="rel.direction === 'i-help-them'" class="direction helping">
+                You store their content
+              </span>
+              <span *ngIf="rel.direction === 'they-help-me'" class="direction being-helped">
+                They store your content
+              </span>
+            </div>
+
+            <!-- Content Summary -->
+            <div class="content-summary">
+              <div class="summary-stat">
+                <span class="stat-value">{{ rel.contentSummary.totalItems }}</span>
+                <span class="stat-label">items</span>
+              </div>
+              <div class="summary-stat">
+                <span class="stat-value">{{ formatGB(rel.contentSummary.totalGB) }}</span>
+                <span class="stat-label">stored</span>
+              </div>
+              <div class="summary-stat">
+                <span class="stat-value">{{ rel.trustScore }}</span>
+                <span class="stat-label">trust</span>
+              </div>
+            </div>
+
+            <!-- Content Type Breakdown -->
+            <div class="content-types" *ngIf="rel.contentSummary.contentTypes.length > 0">
+              <div class="type-tag" *ngFor="let ct of rel.contentSummary.contentTypes.slice(0, 4)">
+                {{ ct.type }}: {{ ct.count }}
+              </div>
+              <span class="more-types" *ngIf="rel.contentSummary.contentTypes.length > 4">
+                +{{ rel.contentSummary.contentTypes.length - 4 }} more
+              </span>
+            </div>
+          </div>
+
+          <!-- Card Footer -->
+          <div class="card-footer">
+            <div class="reliability">
+              <span class="reliability-label">Reliability</span>
+              <div class="reliability-bar">
+                <div
+                  class="reliability-fill"
+                  [style.width]="getReliabilityWidth(rel.reliability)"
+                ></div>
+              </div>
+              <span class="reliability-value">{{ rel.reliability }}%</span>
+            </div>
+            <div class="last-activity">
+              Last active: {{ rel.lastActivity | date: 'mediumDate' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" *ngIf="activeList.length === 0">
+          <span class="empty-icon" *ngIf="activeTab === 'helping'">💝</span>
+          <span class="empty-icon" *ngIf="activeTab === 'beingHelped'">🙏</span>
+          <p *ngIf="activeTab === 'helping'">
+            You're not helping anyone store their content yet. Consider inviting family or friends
+            to join your network.
+          </p>
+          <p *ngIf="activeTab === 'beingHelped'">
+            No one is helping you store your content yet. Connect with family or community members
+            to increase your protection.
+          </p>
+        </div>
+      </div>
+    </ng-container>
+  </ng-container>
+</div>

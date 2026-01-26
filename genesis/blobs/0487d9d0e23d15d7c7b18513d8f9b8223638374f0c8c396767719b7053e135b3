@@ -1,0 +1,9 @@
+Scenario: Household maintenance prevents costly emergencies
+    Given Aisha is learning household maintenance
+    And prevention is cheaper than emergency repairs
+    When the personal_agent tracks household maintenance
+    Then it should provide preventive maintenance schedules
+    And it should flag issues before they become emergencies
+    And it should educate about maintenance tasks Aisha might not know
+    And the system should protect her from expensive neglect
+    And household competence should include preventive thinking

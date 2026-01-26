@@ -1,0 +1,10 @@
+Scenario: Exercising privacy rights with dignity
+    Given Jordan deserves privacy like any adult
+    And Jordan has personal information and private moments
+    When Jordan uses privacy controls in the Value Scanner
+    Then the interface explains privacy with simple concepts and pictures
+    And Jordan can choose what information is private vs. shared
+    And the system respects Jordan's privacy choices
+    And support workers only access information when truly needed
+    And Jordan's dignity is preserved through privacy respect
+    And Jordan learns about privacy boundaries in accessible way

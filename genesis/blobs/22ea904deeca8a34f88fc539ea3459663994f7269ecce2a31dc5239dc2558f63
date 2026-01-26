@@ -1,0 +1,9 @@
+Scenario: Workers recall underperforming coordinator through democratic process
+    Given Marcus transitioned from manager to democratic coordinator
+    And workers have expressed concerns about his facilitation effectiveness
+    When workers initiate a recall process
+    Then workplace_elohim facilitates a fair evaluation process
+    And Marcus receives specific feedback on coordination failures
+    And workers vote on recall with 2/3 supermajority required
+    And if recalled, Marcus transitions gracefully with support for next role
+    And democratic accountability prevents hierarchical abuse

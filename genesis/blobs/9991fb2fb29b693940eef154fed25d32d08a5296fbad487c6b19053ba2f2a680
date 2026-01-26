@@ -1,0 +1,10 @@
+Scenario: Journalist investigates state criminal justice disparities
+    Given the journalist covers criminal justice policy
+    And data suggests racial disparities in enforcement
+    When the Observer analyzes statewide criminal justice data
+    Then the journalist sees Black residents arrested at 4x rate for same offenses
+    And documents sentencing disparities for similar crimes
+    And tracks outcomes showing selective enforcement patterns
+    And identifies counties with extreme disparities
+    And publishes investigation exposing systemic racism
+    And pattern recognition reveals injustice at scale

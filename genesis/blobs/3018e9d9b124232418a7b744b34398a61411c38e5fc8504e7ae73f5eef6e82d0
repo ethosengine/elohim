@@ -1,0 +1,9 @@
+Scenario: Municipal tax revenue stability increases through worker ownership
+    Given small business failure drains municipal tax base
+    And worker-owned businesses show higher survival rates and stability
+    When Rosa's conversion demonstrates enhanced business sustainability
+    Then municipality experiences more stable tax revenue from democratic businesses
+    And higher worker wages generate increased income tax revenue
+    And business continuity maintains property tax base
+    And city fiscal planners recognize democratic ownership reduces revenue volatility
+    And municipality_elohim documents tax revenue benefits for policy advocacy

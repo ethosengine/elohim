@@ -1,0 +1,10 @@
+Scenario: Family resource allocation based on care contributions
+    Given Sarah contributes enormous care labor to family
+    And family resources are finite
+    When the family makes resource allocation decisions
+    Then Sarah's care contributions should give her standing
+    And her care tokens should influence family governance
+    And those who do care work should have voice in resource decisions
+    And family economics should reflect care economy principles
+    And Sarah should not be economically dependent despite unpaid care work
+    And the system should enable care-based family governance

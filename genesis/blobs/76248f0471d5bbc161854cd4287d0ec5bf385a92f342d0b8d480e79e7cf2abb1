@@ -1,0 +1,10 @@
+Scenario: Sandwich generation care burden made visible across family
+    Given James cares simultaneously for spouse and aging parent
+    And he provides intensive care in both directions
+    When the family_elohim tracks James's care contributions
+    Then his care work for David should be quantified fully
+    And his care coordination for his mother should be visible
+    And extended family should see his dual care burden
+    And sandwich generation reality should be recognized explicitly
+    And family should understand the overwhelming scope of James's labor
+    And visibility should enable family support rather than more demands

@@ -1,0 +1,11 @@
+Scenario: Teaching grandchildren care economy values and principles
+    Given Margaret is modeling care economy through her actions
+    And Tommy and Emma are learning from her example
+    When Margaret provides care and teaches family values
+    Then the family_elohim should support intergenerational value transmission
+    And children should learn that care creates value
+    And they should see that elders have wisdom and worth
+    And they should understand families are reciprocal care networks
+    And Margaret's care teaching should be recognized as developmental work
+    And next generation should internalize care economy principles
+    And family culture should be transformed through children's learning

@@ -1,0 +1,12 @@
+Scenario: Workplace advocacy coordinates with other caregiving employees
+    Given Robert works with other employees managing care responsibilities
+    And collective advocacy is more effective than individual negotiation
+    And workplace care economy benefits all caregiving employees
+    When workplace_elohim facilitates collective advocacy
+    Then it should connect Robert with other caregiving employees
+    And support formation of employee resource groups for caregivers
+    And facilitate collective advocacy for care-friendly policies
+    And build workplace power through caregiver solidarity
+    And demonstrate that care economy includes collective action
+    And create workplace transformation through organized advocacy
+    And leverage numbers for policy change

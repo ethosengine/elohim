@@ -1,0 +1,10 @@
+Scenario: Workers access transparent financial information previously hidden by corporate
+    Given corporate kept financial information opaque to workers
+    And workers now have complete financial transparency
+    When workers access the financial dashboard
+    Then they see real-time revenue, costs, and profit
+    And they see exactly how much was previously extracted by franchise fees
+    And they see supplier costs and markup comparisons
+    And they see complete compensation breakdown for all workers
+    And they can audit any financial transaction
+    And workplace_elohim ensures financial literacy support for all workers

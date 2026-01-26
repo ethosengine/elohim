@@ -1,0 +1,9 @@
+Scenario: Coordinating family care with partner in equitable partnership
+    Given Sarah and partner share parenting responsibilities
+    And they're raising children together
+    When family care labor is distributed
+    Then the family_elohim should track both partners' contributions
+    And labor should be distributed equitably
+    And neither partner should bear unfair burden
+    And children should see modeled equitable partnership
+    And family governance should be genuinely shared

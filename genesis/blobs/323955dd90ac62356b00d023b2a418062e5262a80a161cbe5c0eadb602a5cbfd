@@ -1,0 +1,9 @@
+Scenario: Organizer develops worker leaders for city council testimony
+    Given restaurant workers face wage theft and unsafe conditions
+    And most have never engaged in civic advocacy
+    When the organizer supports leadership development via Observer
+    Then workers receive accessible data on wage theft patterns
+    And get testimony framework they can personalize with their stories
+    And see labor protection policies from other cities
+    And practice addressing council member questions
+    And workers become powerful advocates for their own interests

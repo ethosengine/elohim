@@ -1,0 +1,9 @@
+Scenario: Politician distinguishes industry fear-mongering from legitimate economic concerns
+    Given industry lobbyists claim environmental regulation will destroy jobs
+    And present catastrophic economic projections
+    When the Observer fact-checks industry claims with evidence
+    Then they see similar regulations in comparable jurisdictions
+    And review actual employment impacts versus predicted job losses
+    And identify compliance costs versus health and environmental benefits
+    And understand which industries adapted successfully to regulations
+    And resist manipulation through evidence-based economic analysis

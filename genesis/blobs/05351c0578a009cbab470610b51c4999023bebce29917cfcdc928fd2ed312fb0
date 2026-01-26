@@ -1,0 +1,11 @@
+Scenario: Advising on national security vs constitutional rights tension
+    Given appeal involves claimed national security justification
+    And technical assessment is needed of security claims
+    When I evaluate security-rights tradeoff technically
+    Then I assess: whether claimed vulnerability is technically legitimate
+    And I explore: whether less rights-violating technical alternatives exist
+    And I examine: whether proposed security measure would actually work
+    And I clarify: technical reality vs security theater
+    And I avoid: dismissing security needs or exaggerating threats
+    And I provide: honest technical assessment
+    And I let: council judge values tradeoff given technical facts

@@ -1,0 +1,12 @@
+Scenario: Coordinating support from extended family members who are helpful
+    Given some extended family members (my parents, siblings) want to help
+    And their support is genuine and appropriate
+    When I coordinate family assistance with children or resources
+    Then the family_elohim helps me organize extended family support
+    And tracks who's helping with what to distribute requests fairly
+    And maintains my authority as primary decision-maker
+    And ensures family help respects my boundaries and parenting choices
+    And facilitates communication about children's needs
+    And my personal_agent helps me ask for help when needed
+    And recognizes that coordinating family support is labor
+    And validates that accepting help is strength, not failure

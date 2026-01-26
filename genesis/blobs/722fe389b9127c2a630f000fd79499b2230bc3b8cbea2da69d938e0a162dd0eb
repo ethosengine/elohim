@@ -1,0 +1,10 @@
+Scenario: Household governance transitions as care recipient loses capacity
+    Given David participated in household decisions before diagnosis
+    And his decision-making capability is now declining
+    When the household_elohim tracks governance participation
+    Then it should recognize David's changing capacity sensitively
+    And it should adjust his governance role appropriately
+    And it should preserve David's dignity despite declining capability
+    And it should support James in taking on decisions David once made
+    And governance transition should be respectful and gradual
+    And David should maintain maximum autonomy possible

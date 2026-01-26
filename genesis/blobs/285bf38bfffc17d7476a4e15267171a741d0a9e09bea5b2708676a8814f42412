@@ -1,0 +1,9 @@
+Scenario: Bioregional resilience built through local care economy networks
+    Given climate change increases need for local resilience
+    And Sarah's bioregion needs to build adaptive capacity
+    When bioregional care economy develops
+    Then the bioregional_elohim should coordinate local resource networks
+    And it should strengthen connections between producers and consumers
+    And it should build bioregional food security
+    And local resilience should be created through care economy practices
+    And climate adaptation should be care economy project

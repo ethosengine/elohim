@@ -1,0 +1,11 @@
+Scenario: Volunteer labor addressing municipal housing needs quantified
+    Given Frank volunteers 20 hours/week with Habitat for Humanity
+    And Habitat builds affordable housing the municipality fails to provide
+    And his volunteer work substitutes for municipal housing policy
+    When the municipal_elohim tracks housing care economy
+    Then Frank's volunteer construction work should be quantified
+    And aggregate volunteer labor should be calculated municipality-wide
+    And data should reveal that volunteers provide housing infrastructure
+    And municipal housing policy should recognize volunteer contributions
+    And Frank's work should demonstrate need for municipal investment
+    And volunteers should be understood as filling municipal policy gaps

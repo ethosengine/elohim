@@ -1,0 +1,11 @@
+Scenario: Reviewing systematic bias revealed across community appeals
+    Given researcher identified pattern of biased agent decisions
+    And multiple similar appeals came from affected communities
+    When we treat this as systemic review not individual cases
+    Then we investigate: if protocol implementation has regional problems
+    And we examine: if certain demographics are disadvantaged
+    And we consult: researchers on the pattern data
+    And we may order: regional protocol audit or recalibration
+    And we address: structural injustice not just individual grievances
+    And we demonstrate: constitutional accountability works at scale
+    And we prevent: systemic violations through democratic oversight

@@ -1,0 +1,10 @@
+Scenario: Creator prevented from spreading misinformation
+    Given Jordan creates content making unsupported health claims
+    And the claims contradict scientific consensus
+    When Jordan attempts to contribute the content
+    Then the verification agent surfaces counter-evidence
+    And Jordan sees the evidence gaps before distribution
+    And Jordan can revise with better sources or accept limited reach
+    And if posted without revision, reach is limited to personal connections
+    And communities are protected from health misinformation
+    And Jordan learns that evidence standards enable trust and reach

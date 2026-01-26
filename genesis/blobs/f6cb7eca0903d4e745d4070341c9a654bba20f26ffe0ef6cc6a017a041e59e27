@@ -1,0 +1,10 @@
+Scenario: Educational privacy protects learning data from exploitation
+    Given Aisha's learning patterns generate valuable data
+    And educational data is often exploited commercially
+    When educational data is collected
+    Then it must be used only to improve educational outcomes
+    And Aisha's privacy must be absolutely protected
+    And no commercial exploitation of learning data should occur
+    And data should serve her learning, not surveillance capitalism
+    And educational privacy must be maintained
+    And learning should never be monetized

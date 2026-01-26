@@ -1,0 +1,9 @@
+Scenario: Teacher connects working conditions to student learning
+    Given administrators claim teacher working conditions are "employee issues"
+    And dismiss working condition advocacy as self-interested
+    When teachers document connection between conditions and student outcomes
+    Then data shows schools with better planning time have better student results
+    And adequate support staff correlates with student wellbeing
+    And sustainable teacher workload predicts teacher retention and student consistency
+    And working conditions advocacy is reframed as student-centered
+    And labor rights and educational quality become aligned not opposed

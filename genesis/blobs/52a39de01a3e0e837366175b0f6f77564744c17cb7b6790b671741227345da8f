@@ -1,0 +1,11 @@
+Scenario: Elder care support shared across neighborhood
+    Given Robert's parents visit regularly and will eventually need local care
+    And several neighbors are also managing elder care
+    When neighborhood_elohim coordinates elder care support
+    Then it should connect neighbors managing similar challenges
+    And facilitate sharing of resources, knowledge, and respite
+    And surface: "Three neighbors use the same home health agency—could coordinate for better rates"
+    And build neighborhood capacity to support aging residents
+    And prevent isolation for those managing elder care
+    And create mutual support network for common challenges
+    And strengthen neighborhood through shared caregiving

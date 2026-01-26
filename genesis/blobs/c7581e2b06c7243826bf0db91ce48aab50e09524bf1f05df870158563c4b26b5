@@ -1,0 +1,9 @@
+Scenario: Parent challenges traffic safety near schools
+    Given traffic speeds and volume near the school create danger
+    And the parent has witnessed multiple near-miss incidents
+    When the parent reviews Observer's traffic safety data
+    Then they see documented speeding violations near school hours
+    And learn which other schools have traffic calming measures
+    And understand city transportation department can install measures
+    And coordinate with school principal and other parents
+    And municipal traffic safety includes school zone protection

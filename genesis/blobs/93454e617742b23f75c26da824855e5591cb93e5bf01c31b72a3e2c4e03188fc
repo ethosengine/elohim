@@ -1,0 +1,9 @@
+Scenario: Symptom tracking supports accurate reporting to providers
+    Given David's Alzheimer's symptoms fluctuate and progress
+    And accurate symptom reporting is essential for care
+    When the healthcare_elohim tracks symptoms
+    Then it should maintain detailed symptom logs
+    And it should identify patterns and changes over time
+    And it should prepare symptom summaries for appointments
+    And provider understanding should be improved by detailed tracking
+    And caregiver observation should enhance medical accuracy

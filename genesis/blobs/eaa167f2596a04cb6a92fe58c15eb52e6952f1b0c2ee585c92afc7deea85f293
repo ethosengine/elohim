@@ -1,0 +1,10 @@
+Scenario: Protecting seniors from municipal surveillance while enabling services
+    Given Margaret participates in municipal programs
+    And municipal systems collect data
+    When the municipality_elohim manages Margaret's municipal data
+    Then her privacy must be protected from surveillance
+    And service access should not require surrendering privacy
+    And data collection should be minimal and purposeful
+    And Margaret should control what municipal government knows
+    And elder surveillance should be prevented
+    And dignity should be preserved in all municipal interactions

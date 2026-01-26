@@ -1,0 +1,9 @@
+Scenario: Household care tokens include supplements for single-parent resource constraints
+    Given Maria's household operates on severely limited income
+    And the Value Scanner should be accessible regardless of economic status
+    When household care tokens are calculated
+    Then Maria should receive care token supplements based on income level
+    And her single-parent status should qualify for enhanced support
+    And supplements should enable continued participation without financial barrier
+    And care economy should function as economic support system
+    And access should be dignified, never requiring means-tested humiliation

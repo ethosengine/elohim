@@ -1,0 +1,12 @@
+Scenario: Family care tokens reflect four-generation care flows
+    Given care flows in multiple directions across the family
+    And Robert receives support from siblings and provides support to parents and children
+    And care contributions need to be recognized across all flows
+    When family_elohim calculates family care tokens
+    Then it should track care across all four generations
+    And recognize Robert's care for parents and support for children
+    And value siblings' parent care contributions
+    And recognize adult children's emerging care contributions
+    And track grandparent care across the family
+    And make visible the complex web of family care reciprocity
+    And demonstrate that family functions through mutual care

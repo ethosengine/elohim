@@ -1,0 +1,7 @@
+Scenario: Advocating for worker and environmental justice together
+    Given worker exploitation and environmental exploitation are connected
+    When I organize for worker dignity and fair compensation
+    Then the protocol should help me connect labor justice to ecological justice
+    And recognize that care economy serves both human and ecological flourishing
+    And support advocacy that addresses both worker conditions and environmental sustainability
+    And build movements connecting labor rights and environmental protection

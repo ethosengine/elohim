@@ -1,0 +1,9 @@
+Scenario: Elder preserves bioregional knowledge across displacement
+    Given community elders hold traditional knowledge of coastal ecology
+    And this knowledge is being lost as the community displaces
+    When elders document traditional knowledge through the network
+    And younger displaced community members learn and preserve it
+    Then bioregional ecological knowledge is preserved
+    And the knowledge can inform restoration efforts
+    And future generations maintain connection to ancestral place
+    And cultural-ecological wisdom survives displacement

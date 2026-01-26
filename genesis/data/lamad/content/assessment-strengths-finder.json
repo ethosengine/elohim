@@ -1,0 +1,375 @@
+{
+  "id": "assessment-strengths-finder",
+  "contentType": "assessment",
+  "title": "Character Strengths Discovery",
+  "description": "Identify your signature character strengths",
+  "content": [
+    {
+      "id": "str-q1",
+      "question": {
+        "content": "I always find new ways to look at things.\n\n[[☃ widget 1]]",
+        "images": {},
+        "widgets": {
+          "widget 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Like Me",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5 - Very Much Like Me",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "creativity"
+        ],
+        "scaleType": "likert-5",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "str-q2",
+      "question": {
+        "content": "I am always curious about the world.\n\n[[☃ widget 2]]",
+        "images": {},
+        "widgets": {
+          "widget 2": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Like Me",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5 - Very Much Like Me",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "curiosity"
+        ],
+        "scaleType": "likert-5",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "str-q3",
+      "question": {
+        "content": "I always let others share first.\n\n[[☃ widget 3]]",
+        "images": {},
+        "widgets": {
+          "widget 3": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Like Me",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5 - Very Much Like Me",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "fairness"
+        ],
+        "scaleType": "likert-5",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "str-q4",
+      "question": {
+        "content": "I try to help everyone I meet.\n\n[[☃ widget 4]]",
+        "images": {},
+        "widgets": {
+          "widget 4": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Like Me",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5 - Very Much Like Me",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "kindness"
+        ],
+        "scaleType": "likert-5",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "str-q5",
+      "question": {
+        "content": "I finish what I start.\n\n[[☃ widget 5]]",
+        "images": {},
+        "widgets": {
+          "widget 5": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Like Me",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5 - Very Much Like Me",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "perseverance"
+        ],
+        "scaleType": "likert-5",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "str-q6",
+      "question": {
+        "content": "I can always find the positive in what seems negative.\n\n[[☃ widget 6]]",
+        "images": {},
+        "widgets": {
+          "widget 6": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Like Me",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5 - Very Much Like Me",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "hope"
+        ],
+        "scaleType": "likert-5",
+        "reverseScored": false
+      }
+    }
+  ],
+  "contentFormat": "perseus-quiz-json",
+  "tags": [
+    "assessment",
+    "strengths",
+    "character",
+    "self-knowledge"
+  ],
+  "sourcePath": "generated/assessment-strengths-finder.json",
+  "relatedNodeIds": [
+    "know-thyself-path"
+  ],
+  "metadata": {
+    "instrumentType": "discovery",
+    "domain": "strengths",
+    "estimatedTime": "20-30 minutes",
+    "attestationId": "strengths-aware",
+    "validation": {
+      "inspired_by": "VIA Character Strengths Survey",
+      "reliability": "Adapted for educational purposes"
+    },
+    "sourceFormat": "assessment-json",
+    "migratedAt": "2025-12-26T05:45:22.690Z",
+    "questionCount": 6,
+    "interpretation": {
+      "method": "ranking",
+      "dimensions": [
+        "creativity",
+        "curiosity",
+        "fairness",
+        "kindness",
+        "perseverance",
+        "hope"
+      ]
+    }
+  },
+  "createdAt": "2025-11-28T00:09:03.479947",
+  "updatedAt": "2025-11-28T00:09:03.479948"
+}

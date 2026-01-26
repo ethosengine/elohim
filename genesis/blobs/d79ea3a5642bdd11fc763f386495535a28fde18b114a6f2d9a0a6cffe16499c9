@@ -1,0 +1,10 @@
+Scenario: Water systems and food production understanding
+    Given food production requires water resources
+    And Marcus is learning about ecological systems
+    When Marcus learns about food origins
+    Then the personal_agent should teach about water in agriculture
+    And it should explain water footprint of different foods
+    And it should connect food choices to watershed health
+    And bioregional water systems should be part of his literacy
+    And he should understand water as precious resource
+    And care economy should include stewardship of water

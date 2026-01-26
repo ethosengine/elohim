@@ -1,0 +1,142 @@
+{
+  "id": "quiz-care-economics",
+  "contentType": "assessment",
+  "title": "Care Economics",
+  "description": "Test your understanding of care work economics and recognition",
+  "content": [
+    {
+      "id": "ce-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "Why is most care work 'invisible' in traditional economics?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                { "content": "It doesn't happen", "correct": false, "id": "ce-q1-choice-0" },
+                { "content": "It occurs outside market transactions", "correct": true, "id": "ce-q1-choice-1" },
+                { "content": "Caregivers prefer anonymity", "correct": false, "id": "ce-q1-choice-2" },
+                { "content": "Governments hide it", "correct": false, "id": "ce-q1-choice-3" }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Care work often happens outside markets, making it invisible to GDP and traditional metrics.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-care-economics",
+        "assessesContentId": "value-scanner-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["value-scanner", "economics", "care-work"]
+      }
+    },
+    {
+      "id": "ce-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "The Value Scanner aims to monetize all care work.\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                { "content": "True", "correct": false, "id": "ce-q2-true" },
+                { "content": "False", "correct": true, "id": "ce-q2-false" }
+              ],
+              "randomize": false,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "The goal is recognition and valuation, not necessarily monetization of all care.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-care-economics",
+        "assessesContentId": "value-scanner-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "easy",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["value-scanner", "true-false"]
+      }
+    },
+    {
+      "id": "ce-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is REA in the context of value recognition?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                { "content": "Real Estate Assessment", "correct": false, "id": "ce-q3-choice-0" },
+                { "content": "Resource-Event-Agent accounting model", "correct": true, "id": "ce-q3-choice-1" },
+                { "content": "Revenue Enhancement Algorithm", "correct": false, "id": "ce-q3-choice-2" },
+                { "content": "Reciprocal Exchange Agreement", "correct": false, "id": "ce-q3-choice-3" }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "REA (Resource-Event-Agent) is a semantic accounting model for tracking value flows.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-care-economics",
+        "assessesContentId": "value-scanner-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["value-scanner", "rea", "accounting"]
+      }
+    }
+  ],
+  "contentFormat": "sophia",
+  "tags": ["assessment", "value-scanner", "economics", "care-work"],
+  "relatedNodeIds": ["value-scanner-epic"],
+  "metadata": {
+    "assessmentType": "mastery",
+    "category": "value-scanner",
+    "attestationId": "care-economics",
+    "difficulty": "medium",
+    "questionCount": 3,
+    "migratedAt": "2026-01-24T00:00:00.000Z"
+  },
+  "createdAt": "2025-11-28T00:09:03.479358",
+  "updatedAt": "2026-01-24T00:00:00.000Z"
+}

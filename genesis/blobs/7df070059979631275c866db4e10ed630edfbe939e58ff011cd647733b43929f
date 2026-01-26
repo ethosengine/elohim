@@ -1,0 +1,11 @@
+Scenario: Studying national Constitutional Convention as deliberative democracy
+    Given National Constitutional Convention convenes with randomly-selected citizens
+    And this is largest deliberative democracy experiment in history
+    When I study the convention process and outcomes
+    Then I examine: how 10,000 citizens deliberate on existential questions
+    And I analyze: what enables productive vs polarizing disagreement
+    And I assess: quality of deliberation at unprecedented scale
+    And I explore: how amendments emerge from collective wisdom
+    And I track: influence of diverse perspectives vs expert domination
+    And I investigate: whether citizens can make wise choices under deep uncertainty
+    And My research tests: limits and possibilities of democratic capacity

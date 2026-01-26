@@ -1,0 +1,24 @@
+{
+  "id": "org-pure-valley-association",
+  "did": "did:web:elohim.host:org:pure-valley-association",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Pure Valley Community Association",
+  "description": "Organization with 1 members",
+  "content": "# Pure Valley Community Association\n\n**Members:** 1",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-renold-regent"
+  ],
+  "metadata": {
+    "category": "organization",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-26T21:04:01.857Z"
+}

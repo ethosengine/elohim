@@ -1,0 +1,9 @@
+Scenario: Balancing ecological impact with household budget constraints
+    Given Sarah wants to make environmentally responsible choices
+    And household budget is $65k/year with tight food budget
+    When Sarah makes purchasing decisions
+    Then the bioregional_elohim should present ecological impact information
+    And it should integrate cost, nutrition, and environmental factors
+    And it should help Sarah make best choices within budget constraints
+    And ecological care should not be only available to wealthy
+    And affordable options should be environmentally informed

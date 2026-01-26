@@ -1,0 +1,10 @@
+Scenario: Food sharing and collective cooking in student community
+    Given many students face food insecurity
+    And collective meals reduce individual costs
+    When Kenji participates in community meal sharing
+    Then the community_elohim should recognize communal feeding as care work
+    And it should value both cooking for others and hosting shared meals
+    And it should track "Kenji cooked dinner for 8 people in study group"
+    And food sharing should be core care economy practice
+    And the system should make nutrition care visible and valued
+    And collective eating should build community bonds

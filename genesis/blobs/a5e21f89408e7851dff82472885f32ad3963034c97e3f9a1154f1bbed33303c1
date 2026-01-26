@@ -1,0 +1,9 @@
+Scenario: Weekend respite care for desperately needed breaks
+    Given Maria parents intensively seven days per week with no co-parent breaks
+    And everyone needs occasional rest to remain sustainable
+    When Maria needs brief respite from parenting demands
+    Then the neighborhood_elohim should coordinate respite care offers
+    And neighbors should be able to take her children for a few hours
+    And Maria should be able to accept respite without guilt or stigma
+    And respite should be framed as care economy reciprocity, not charity
+    And Maria should get occasional breaks that partnered parents get from co-parents

@@ -1,0 +1,9 @@
+Scenario: Neighborhood awareness of caregiver situation and needs
+    Given many neighbors may not know about James's caregiving burden
+    And invisibility prevents neighbors from offering support
+    When the neighborhood_elohim shares appropriate information
+    Then neighbors should be aware James is providing intensive care
+    And they should understand his situation without violating privacy
+    And awareness should enable neighbors to offer help meaningfully
+    And James should not be invisible in his own neighborhood
+    And caregiver situation should be visible enough to enable support

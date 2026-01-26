@@ -1,0 +1,29 @@
+{
+  "id": "concept-poverty-of-currency",
+  "contentType": "concept",
+  "title": "Poverty of Currency",
+  "description": "In light of modern computation, our currencies are astonishingly primitive.",
+  "content": "In light of modern computation, our currencies are astonishingly primitive.",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/crisis-economic/concept-poverty-of-currency.json",
+  "tags": [
+    "crisis",
+    "economics",
+    "currency",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "economic-coordination-epic",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "crisis-economic",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.000163",
+  "updatedAt": "2025-12-24T03:05:25.880Z"
+}

@@ -1,0 +1,11 @@
+Scenario: Balancing national security claims with individual rights
+    Given an appeal challenges agent decision justified by security concerns
+    And I must weigh existential threats against individual dignity
+    When we review the security-rights balance
+    Then we evaluate: if security claim was legitimate or pretext
+    And we examine: if less rights-violating alternatives existed
+    And we consider: transparency appropriate to security context
+    And we establish: constitutional limits on authority even under threat
+    And we prevent: security from becoming excuse for unchecked power
+    And we create: precedent for how democracy functions under danger
+    And we protect: both security and rights through wise judgment

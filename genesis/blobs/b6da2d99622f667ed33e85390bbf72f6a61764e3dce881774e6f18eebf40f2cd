@@ -1,0 +1,9 @@
+Scenario: Workplace advocacy connects to broader care economy transformation
+    Given Sarah's workplace advocacy could influence other employers
+    And workplace policy changes could spread
+    When Sarah's workplace successfully implements care economy policies
+    Then the workplace_elohim should share success with other organizations
+    And effective policies should be documented and promoted
+    And Sarah's advocacy should contribute to broader transformation
+    And workplace care economy should grow from successful examples
+    And employment should shift toward care economy principles at scale

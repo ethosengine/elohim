@@ -1,0 +1,12 @@
+Scenario: Municipal employer influenced through employee advocacy
+    Given municipal government is major employer
+    And Robert may work for municipality or know municipal employees
+    And municipal employment policy sets standards
+    When municipal_elohim supports workplace advocacy
+    Then it should recognize opportunities to influence municipal employment policy
+    And help Robert advocate for municipal employee work-family balance
+    And support municipal adoption of care economy employment practices
+    And demonstrate that municipal government should model care economy principles
+    And build municipal workplace that supports employee caregiving
+    And create demonstration that care-friendly employment is possible
+    And influence broader employment culture through municipal example

@@ -64,7 +64,9 @@
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, opacity 0.2s;
+  transition:
+    background-color 0.2s,
+    opacity 0.2s;
 }
 
 .btn:disabled {
@@ -139,11 +141,12 @@
   border-radius: 4px;
   font-size: 0.9375rem;
   font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .form-input:focus {
-  outline: none;
   border-color: var(--primary-color, #2196f3);
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
@@ -226,7 +229,7 @@
 }
 
 .content-textarea:focus {
-  outline: none;
+  /* Focus handled by global :focus-visible */
 }
 
 .content-textarea.with-line-numbers {

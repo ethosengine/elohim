@@ -1,0 +1,13 @@
+Scenario: Financial autonomy maintained while supporting multiple generations
+    Given Robert provides financial support to children
+    And he contributes to parents' long-term care costs
+    And he maintains his household
+    And he saves for his own retirement
+    When his personal_agent analyzes his financial situation
+    Then it should help him balance competing financial demands
+    And protect his own financial security
+    And surface when generational support threatens his retirement
+    And provide analysis: "Continuing current support level will delay retirement by 3 years"
+    And help him make informed tradeoffs
+    And ensure he doesn't sacrifice his own future for present generational needs
+    And support sustainable multigenerational financial planning

@@ -1,0 +1,9 @@
+Scenario: Legislator evaluates major bill with comprehensive impact analysis
+    Given education reform legislation has 200 pages
+    And supporters present optimistic outcomes while opponents predict disaster
+    When the Observer provides evidence-based impact analysis
+    Then they see how similar legislation performed in other states
+    And understand fiscal impacts on districts with different demographics
+    And identify which students benefit versus harmed by changes
+    And review educator and parent perspectives from constituent communities
+    And make informed vote beyond partisan talking points

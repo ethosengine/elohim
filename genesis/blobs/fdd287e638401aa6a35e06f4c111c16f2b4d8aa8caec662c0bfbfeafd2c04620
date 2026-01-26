@@ -1,0 +1,11 @@
+Scenario: Lifetime contributions create legitimate claims on community support
+    Given Helen has contributed to community for 60+ years of adult life
+    And she now requires substantial assistance
+    When Helen accesses community care resources
+    Then her care tokens should reflect decades of contribution
+    And community support should be framed as reciprocity
+    And she should not experience shame about needing help
+    And assistance should flow as legitimate return on lifetime of giving
+    And the community_elohim should make her contribution history visible
+    And the protocol should demonstrate that care economy honors lifetime reciprocity
+    And Helen should experience dignity, not charity

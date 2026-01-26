@@ -1,0 +1,10 @@
+Scenario: Neighborhood care patterns prevent teen isolation
+    Given Jasmine could experience typical teen social isolation
+    And care economy creates connection across age groups
+    When she participates in neighborhood care patterns
+    Then she should build relationships with neighbors beyond her peer group
+    And experience being known and valued by her community
+    And have access to support beyond her immediate family
+    And develop sense of belonging to neighborhood community
+    And learn that care economy builds social fabric
+    And experience reduced isolation through meaningful community connection

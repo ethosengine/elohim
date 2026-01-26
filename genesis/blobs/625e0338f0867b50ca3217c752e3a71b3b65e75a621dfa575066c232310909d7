@@ -1,0 +1,11 @@
+Scenario: Family decision-making about care arrangements and boundaries
+    Given care arrangements affect multiple family members
+    And boundaries need to be negotiated and maintained
+    When the family discusses care commitments and changes
+    Then the family_elohim should facilitate clear communication
+    And it should help family make decisions that respect all members
+    And Margaret's capacity and boundaries should be honored
+    And Sarah's parenting authority should be respected
+    And care arrangements should be mutually agreed upon
+    And family governance should be participatory and equitable
+    And decisions should serve the flourishing of all generations

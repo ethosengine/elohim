@@ -1,0 +1,12 @@
+Scenario: Choosing my own timeline for crisis recovery
+    Given well-meaning people have expectations about how quickly I should "move on"
+    And I am recovering at my own pace
+    When external pressure conflicts with my needs
+    Then the Value Scanner supports my chosen timeline
+    And validates that recovery is not linear
+    And helps me resist pressure to rush or perform recovery
+    And tracks my progress according to my goals, not external standards
+    And recognizes that trauma recovery takes time
+    And my personal_agent reminds me that my pace is appropriate
+    And celebrates progress without imposing arbitrary milestones
+    And supports my right to heal in my own way

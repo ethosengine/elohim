@@ -1,0 +1,9 @@
+Scenario: Family cultural recognition of caregiving as sacred work
+    Given some cultural traditions honor caregiving as sacred
+    And family culture may recognize James's care work meaningfully
+    When the family_elohim tracks cultural care values
+    Then it should recognize cultural frameworks that honor caregiving
+    And it should support family cultural practices around care
+    And cultural recognition should supplement economic recognition
+    And diverse family cultures should be respected and valued
+    And care economy should align with family cultural values

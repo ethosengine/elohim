@@ -1,0 +1,11 @@
+Scenario: Promoting research on global AI governance effectiveness
+    Given we need evidence about what works across contexts
+    And global patterns require global research
+    When I support international research infrastructure
+    Then I fund: global research networks
+    And I promote: data sharing with privacy protection
+    And I support: global South researchers leading local studies
+    And I ensure: open access to findings
+    And I enable: cumulative knowledge building
+    And I use: evidence for global policy advocacy
+    And I demonstrate: policy making based on science not ideology

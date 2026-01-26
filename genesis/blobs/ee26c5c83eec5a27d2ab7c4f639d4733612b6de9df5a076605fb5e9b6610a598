@@ -1,0 +1,9 @@
+Scenario: Democratic food service supply chain coordination outcompetes franchise purchasing
+    Given franchise mandatory purchasing extracts through 30% markup on supplies
+    And individual democratic locations lack volume purchasing power
+    When EAE network coordinates purchasing across converted franchise locations
+    Then volume purchasing power matches or exceeds franchise corporate leverage
+    And democratic coordination eliminates markup (suppliers paid fairly, buyers pay less)
+    And supply chain becomes transparent partnership, not extractive mandate
+    And food service sector learns democratic coordination provides efficiency without extraction
+    And industry_sector_elohim coordinates democratic supply chain across network

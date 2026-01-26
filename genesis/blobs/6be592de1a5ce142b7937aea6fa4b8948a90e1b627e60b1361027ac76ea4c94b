@@ -1,0 +1,9 @@
+Scenario: Cognitive load management when mental labor is overwhelming
+    Given Maria tracks countless details across three children's lives plus household plus work
+    And she has no partner to share the mental load
+    When Maria's cognitive load becomes unsustainable
+    Then the personal_agent should actively hold complexity for her
+    And it should remember what she can't
+    And it should surface important details at the right time
+    And it should reduce rather than increase mental labor
+    And Maria should have external cognitive support that makes solo parenting more manageable

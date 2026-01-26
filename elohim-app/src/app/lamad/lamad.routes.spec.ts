@@ -31,10 +31,10 @@ describe('Lamad Routes', () => {
     expect(mapRoute).toBeDefined();
   });
 
-  it('should have content viewer child route', () => {
+  it('should have resource viewer child route', () => {
     const children = LAMAD_ROUTES[0].children;
-    const contentRoute = children?.find(r => r.path === 'content/:id');
-    expect(contentRoute).toBeDefined();
+    const resourceRoute = children?.find(r => r.path === 'resource/:resourceId');
+    expect(resourceRoute).toBeDefined();
   });
 
   it('should have search child route', () => {

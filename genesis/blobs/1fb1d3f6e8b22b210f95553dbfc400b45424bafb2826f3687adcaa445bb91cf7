@@ -1,0 +1,9 @@
+Scenario: Activist tracks polluter violations and regulatory failure
+    Given a facility near the activist's community violates air quality standards
+    And regulatory response seems inadequate
+    When the Observer documents violation history
+    Then the activist sees 47 violations over three years
+    And learns penalties were minimal and ineffective
+    And identifies which regulators approved permits despite violations
+    And exposes revolving door between industry and enforcement
+    And regulatory capture becomes visible and challengeable

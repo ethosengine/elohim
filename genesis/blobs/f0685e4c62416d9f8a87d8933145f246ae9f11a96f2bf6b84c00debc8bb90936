@@ -1,0 +1,9 @@
+Scenario: Caregiver's own future planning despite uncertainty
+    Given James faces uncertain future as David's condition progresses
+    And he needs to plan for multiple scenarios
+    When James considers his own future needs
+    Then the personal_agent should help him plan for scenarios
+    And it should recognize his vulnerability as caregiver
+    And his care token accumulation should build toward future security
+    And his own aging and care needs should be part of planning
+    And the protocol should help James prepare for his own vulnerability

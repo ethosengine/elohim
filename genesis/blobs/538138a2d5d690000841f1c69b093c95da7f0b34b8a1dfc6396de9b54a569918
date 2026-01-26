@@ -1,0 +1,10 @@
+Scenario: Community accountability for supporting families
+    Given communities depend on families raising next generation
+    And Sarah's parenting work benefits entire community
+    When the community_elohim tracks community support for families
+    Then it should measure whether community is adequately supporting parents
+    And it should identify gaps in family resources and support
+    And it should create accountability for community investment in children
+    And the system should ensure communities reciprocate for parent contributions
+    And care economy should make community obligations to families visible
+    And the community should be accountable for enabling parent success

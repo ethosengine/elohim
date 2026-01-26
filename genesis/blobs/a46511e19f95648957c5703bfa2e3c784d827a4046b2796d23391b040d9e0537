@@ -1,0 +1,154 @@
+@epic:value_scanner
+@user_type:child
+@governance_layer:family
+@related_users:young_child,preteen,parent,student
+@related_layers:individual,neighborhood,educational
+@elohim_agents:personal_agent,family_elohim
+
+Feature: Family Layer Value Recognition for Child
+  As a child in the value scanner system
+  Operating at the family governance layer
+  I want to be recognized as a junior contributor to family flourishing
+  So that I experience my role shifting from dependent to capable family member
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the child user "Emma" is registered in the system
+    And Emma is 8 years old
+    And Emma is part of a family unit with parent Sarah and brother Tommy (5)
+    And the family household income is $40,000/year
+    And the family governance context is active
+    And the family_elohim is coordinating family care economy
+    And Emma's personal_agent communicates with family_elohim
+
+  Scenario: Child's substantive care contributions visible to family
+    Given Emma has made budget-conscious cereal choice
+    And she selected store brand to save $2
+    When the family_elohim processes the contribution
+    Then Emma's stewardship should be visible on family dashboard
+    And parent Sarah should receive specific recognition prompts
+    And the prompt should highlight Emma's economic reasoning
+    And the contribution should be attributed with concrete impact
+    And family care tokens should reflect genuine value created
+    And visibility should enable meaningful parental acknowledgment
+
+  Scenario: Shifting from dependent to junior contributor role
+    Given Emma has increasing capability at age 8
+    And her family role is evolving
+    When Emma makes care contributions through the scanner
+    Then she should be recognized as junior contributor, not just helper
+    And her voice in family decisions should carry real weight
+    And the family_elohim should track her growing capability
+    And Sarah should be supported in granting appropriate autonomy
+    And Emma should experience increasing responsibility
+    And family dynamics should reflect her developmental transition
+
+  Scenario: Coordinating care work with younger sibling
+    Given Emma's brother Tommy is 5 years old
+    And Emma sometimes helps Tommy make choices
+    When Emma assists Tommy in the Value Scanner
+    Then her teaching and support should be recognized as care work
+    And the family_elohim should track sibling care patterns
+    And Emma should learn that helping others is valuable contribution
+    And Tommy should benefit from Emma's greater capability
+    And cross-generational care should be made visible
+    And Emma should build identity as both care receiver and care provider
+
+  Scenario: Family budget constraints shape real economic learning
+    Given the family income is $40,000/year
+    And Emma is learning genuine resource constraint
+    When Emma makes purchasing decisions
+    Then her personal_agent should provide real budget information
+    And the agent should say "We have $30 left for groceries this week"
+    And Emma should experience actual financial limits
+    And her choices should have real impact on family resources
+    And she should learn stewardship through authentic constraint
+    And economic education should reflect family's actual circumstances
+
+  Scenario: Child influences family values while family shapes child
+    Given Emma is forming her own values at age 8
+    And family values still primarily guide her
+    When Emma suggests trying new products or priorities
+    Then the family_elohim should track her value proposals
+    And Sarah should receive prompts to consider Emma's input
+    And Emma's voice should genuinely influence family decisions
+    And bidirectional value formation should occur
+    And Emma should experience being heard in family governance
+    And family culture should evolve with children's input
+
+  Scenario: Earning increased autonomy through demonstrated stewardship
+    Given Emma has shown good judgment over time
+    And parents can adjust boundaries through family_elohim
+    When Emma's decision patterns demonstrate capability
+    Then Sarah should be prompted to expand Emma's freedom
+    And specific areas for increased autonomy should be suggested
+    And Emma should understand connection between responsibility and freedom
+    And the family should have clear process for granting trust
+    And autonomy should be earned through demonstrated care
+    And family governance should respond to growing capability
+
+  Scenario: Family care token economy includes child contributions
+    Given the family participates in care token system
+    And Emma makes multiple types of care contributions
+    When family care tokens are calculated weekly
+    Then Emma's economic decisions should generate tokens
+    And her care for Tommy should be valued
+    And her household contributions should be recognized
+    And tokens should reflect genuine value created
+    And Emma should have age-appropriate awareness of her economic impact
+    And care token distribution should teach that care creates value
+
+  Scenario: Sibling care relationships built through mutual recognition
+    Given Emma cares for Tommy and Tommy cares for Emma
+    And both children make care contributions
+    When the family_elohim tracks sibling interactions
+    Then reciprocal care patterns should be highlighted
+    And Emma should be prompted to recognize Tommy's care for her
+    And Tommy should be prompted to recognize Emma's help
+    And the family should see mutual care, not hierarchy
+    And positive feedback loops should strengthen sibling bonds
+    And care economy should build family relationships
+
+  Scenario: Parental oversight balances with expanding child autonomy
+    Given Emma has more freedom than Tommy
+    And she still needs parental guidance at age 8
+    When Emma makes independent scanner decisions
+    Then Sarah should have full visibility into Emma's choices
+    And Sarah should maintain ultimate authority
+    And Emma's autonomy should be genuine within parental bounds
+    And the balance should protect both safety and capability development
+    And Sarah should be supported in letting go appropriately
+    And trust should grow as Emma demonstrates judgment
+
+  Scenario: Family shopping as collaborative care experience
+    Given Emma and Sarah shop together
+    And they both use the Value Scanner
+    When they coordinate on family purchasing decisions
+    Then Emma should be learning from Sarah's modeling
+    And Sarah should be teaching through real decision-making
+    And the family_elohim should coordinate their different roles
+    And Emma's contributions should be recognized alongside Sarah's
+    And shopping should be experienced as family care work
+    And collaborative decision-making should strengthen relationship
+
+  Scenario: Child's care work saves family money with real impact
+    Given the family has tight budget constraints
+    And Emma chooses cost-effective options consistently
+    When Emma's choices accumulate over time
+    Then actual savings should be calculated and visible
+    And Emma should see concrete impact: "Your choices saved $47 this month"
+    And the family should be able to allocate savings to other needs
+    And Emma's stewardship should have measurable benefit
+    And economic contribution should be recognized as genuine help
+    And she should understand her agency affects family flourishing
+
+  Scenario: Family cultural values shape child's economic reasoning
+    Given Emma's family has specific cultural framework
+    And these values are configured in family_elohim
+    When Emma makes value decisions
+    Then guidance should align with family cultural context
+    And her personal_agent should reinforce family values
+    And economic literacy should be culturally appropriate
+    And the protocol should serve family's chosen framework
+    And diverse family cultures should be respected
+    And value formation should honor family identity

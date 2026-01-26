@@ -1,0 +1,10 @@
+Scenario: Data-informed negotiation for equitable labor distribution
+    Given household labor distribution is currently inequitable
+    And Sarah wants fair partnership without resentment
+    When Sarah and her partner negotiate labor distribution
+    Then the household_elohim should provide specific data
+    And it should show time spent, complexity of tasks, and mental load
+    And it should enable "Let's talk about the 75/25 split" conversation
+    And negotiation should be based on reality, not perception
+    And the system should support movement toward equity
+    And care economy principles should guide fair distribution

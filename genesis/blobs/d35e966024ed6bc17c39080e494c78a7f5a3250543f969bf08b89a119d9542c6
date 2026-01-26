@@ -1,0 +1,8 @@
+Scenario: Accessing neighborhood food resources during tight budget periods
+    Given neighborhood has community gardens, food co-ops, or meal programs
+    And my budget is extremely tight some periods
+    When I need food support
+    Then the protocol should connect me to neighborhood food resources
+    And help me access support with dignity based on my care contributions
+    And recognize that my work serves community (I am not taking charity)
+    And facilitate reciprocal care economy participation

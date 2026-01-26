@@ -1,0 +1,9 @@
+Scenario: Customer spending circulates wealth in neighborhood economy
+    Given Ms. Johnson spends $900 annually at democratic ChickenMax/Maria's Kitchen
+    And multiply her spending by hundreds of neighborhood customers
+    When democratic ownership ensures value circulates locally instead of extracting
+    Then $540 of her spending goes to workers who spend in neighborhood
+    And $270 supports community programs benefiting neighbors
+    And $90 funds environmental stewardship protecting local health
+    And aggregate customer spending ($200K+ annually from regulars) massively benefits community
+    And community_elohim documents wealth circulation vs. previous corporate extraction

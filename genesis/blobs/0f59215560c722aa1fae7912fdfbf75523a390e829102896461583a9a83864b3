@@ -1,0 +1,10 @@
+Scenario: Teen participates in bioregional ecological restoration
+    Given Jasmine volunteers for watershed cleanup events
+    And she plants native species in community restoration projects
+    When bioregional_elohim tracks her ecological care labor
+    Then it should recognize restoration work as care for land and ecosystem
+    And value her labor for ecosystem health at care economy rates
+    And calculate ecological benefits from restoration participation
+    And acknowledge that she's doing work professional ecologists would be paid for
+    And demonstrate that ecological labor deserves recognition and compensation
+    And support her understanding that ecosystem repair is collective responsibility

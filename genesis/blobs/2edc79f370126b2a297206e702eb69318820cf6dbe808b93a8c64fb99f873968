@@ -1,0 +1,9 @@
+Scenario: Teacher monitors superintendent promise on evaluation reform
+    Given the superintendent promised to reduce evaluation paperwork burden
+    And teachers experience evaluation as compliance not professional growth
+    When the Observer tracks implementation over time
+    Then teachers document that paperwork actually increased
+    And evaluation time went from 8 hours to 12 hours annually
+    And no evidence of professional development benefit
+    And bring accountability data to board on broken promise
+    And administrative commitments become enforceable through transparency

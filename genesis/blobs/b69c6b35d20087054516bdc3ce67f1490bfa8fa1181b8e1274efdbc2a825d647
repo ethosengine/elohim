@@ -1,0 +1,10 @@
+Scenario: Understanding food systems complexity through shopping
+    Given Marcus shops regularly and makes food choices
+    And food connects to complex agricultural and distribution systems
+    When Marcus scans food items
+    Then the personal_agent should surface information about food origins
+    And it should show where food comes from and who grows it
+    And it should explain care labor embedded in food production
+    And Marcus should learn that his choices connect to larger systems
+    And food system awareness should develop through practice
+    And ecological consciousness should build on care economy foundation

@@ -1,12 +1,22 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, forkJoin } from 'rxjs';
+
 import { map, catchError } from 'rxjs/operators';
 
+import { Observable, of, forkJoin } from 'rxjs';
+
 // Services from elohim (local)
-import { DataLoaderService } from './data-loader.service';
-import { AgentService } from './agent.service';
 
 // Models from elohim (local)
+
+// Models from lamad pillar (content-specific)
+import {
+  ContentAttestation,
+  CONTENT_REACH_LEVELS,
+} from '../../lamad/models/content-attestation.model';
+import { ContentNode, ContentFlag } from '../../lamad/models/content-node.model';
+
+// Services from lamad pillar
+import { ContentService } from '../../lamad/services/content.service';
 import {
   TrustBadge,
   CompactTrustBadge,
@@ -26,15 +36,11 @@ import {
   generateAriaLabel,
   toCompactBadge,
   badgeToIndicator,
-  warningToIndicator
+  warningToIndicator,
 } from '../models/trust-badge.model';
 
-// Models from lamad pillar (content-specific)
-import { ContentNode, ContentFlag } from '../../lamad/models/content-node.model';
-import { ContentAttestation, CONTENT_REACH_LEVELS } from '../../lamad/models/content-attestation.model';
-
-// Services from lamad pillar
-import { ContentService } from '../../lamad/services/content.service';
+import { AgentService } from './agent.service';
+import { DataLoaderService } from './data-loader.service';
 
 /**
  * TrustBadgeService - Computes UI-ready trust badges for content.
@@ -80,7 +86,7 @@ export class TrustBadgeService {
   getBadge(contentId: string): Observable<TrustBadge> {
     return forkJoin({
       content: this.contentService.getContent(contentId),
-      attestations: this.dataLoader.getAttestationsForContent(contentId)
+      attestations: this.dataLoader.getAttestationsForContent(contentId),
     }).pipe(
       map(({ content, attestations }) => this.computeBadge(content, attestations)),
       catchError(err => {
@@ -94,9 +100,7 @@ export class TrustBadgeService {
    * Get compact badge for list/card views.
    */
   getCompactBadge(contentId: string): Observable<CompactTrustBadge> {
-    return this.getBadge(contentId).pipe(
-      map(badge => toCompactBadge(badge))
-    );
+    return this.getBadge(contentId).pipe(map(badge => toCompactBadge(badge)));
   }
 
   /**
@@ -109,9 +113,7 @@ export class TrustBadgeService {
     }
 
     const badgeRequests = contentIds.map(id =>
-      this.getBadge(id).pipe(
-        map(badge => ({ id, badge }))
-      )
+      this.getBadge(id).pipe(map(badge => ({ id, badge })))
     );
 
     return forkJoin(badgeRequests).pipe(
@@ -147,7 +149,7 @@ export class TrustBadgeService {
   getIndicators(contentId: string): Observable<TrustIndicatorSet> {
     return forkJoin({
       content: this.contentService.getContent(contentId),
-      attestations: this.dataLoader.getAttestationsForContent(contentId)
+      attestations: this.dataLoader.getAttestationsForContent(contentId),
     }).pipe(
       map(({ content, attestations }) => this.computeIndicatorSet(content, attestations)),
       catchError(err => {
@@ -165,9 +167,7 @@ export class TrustBadgeService {
       return of(new Map());
     }
 
-    const requests = contentIds.map(id =>
-      this.getIndicators(id).pipe(map(set => ({ id, set })))
-    );
+    const requests = contentIds.map(id => this.getIndicators(id).pipe(map(set => ({ id, set }))));
 
     return forkJoin(requests).pipe(
       map(results => {
@@ -201,7 +201,7 @@ export class TrustBadgeService {
         ...config,
         attestationType: att.attestationType,
         grantedBy: att.grantedBy.grantorName ?? att.grantedBy.grantorId,
-        grantedAt: att.grantedAt
+        grantedAt: att.grantedAt,
       };
       return badgeToIndicator(badge, ATTESTATION_PRIORITY[att.attestationType]);
     });
@@ -211,7 +211,7 @@ export class TrustBadgeService {
       const config = WARNING_CONFIG[flag.type];
       const warning: BadgeWarning = {
         ...config,
-        flaggedAt: flag.flaggedAt
+        flaggedAt: flag.flaggedAt,
       };
       return warningToIndicator(warning);
     });
@@ -243,7 +243,7 @@ export class TrustBadgeService {
       trustPercentage: Math.round(trustScore * 100),
       reach,
       summary,
-      ariaLabel
+      ariaLabel,
     };
   }
 
@@ -261,7 +261,7 @@ export class TrustBadgeService {
       trustPercentage: 0,
       reach: 'commons',
       summary: 'No trust information available.',
-      ariaLabel: 'Content with no trust indicators.'
+      ariaLabel: 'Content with no trust indicators.',
     };
   }
 
@@ -310,7 +310,7 @@ export class TrustBadgeService {
       warnings,
       summary,
       ariaLabel,
-      actions
+      actions,
     };
   }
 
@@ -326,7 +326,7 @@ export class TrustBadgeService {
       'steward-approved',
       'safety-reviewed',
       'community-endorsed',
-      'author-verified'
+      'author-verified',
     ];
 
     // Find highest priority attestation
@@ -338,7 +338,7 @@ export class TrustBadgeService {
           ...config,
           attestationType: type,
           grantedBy: attestation.grantedBy.grantorName ?? attestation.grantedBy.grantorId,
-          grantedAt: attestation.grantedAt
+          grantedAt: attestation.grantedAt,
         };
       }
     }
@@ -351,7 +351,7 @@ export class TrustBadgeService {
       label: reachConfig.label,
       description: reachConfig.description,
       color: reachConfig.color,
-      verified: false
+      verified: false,
     };
   }
 
@@ -374,7 +374,7 @@ export class TrustBadgeService {
         label: reachConfig.label,
         description: reachConfig.description,
         color: reachConfig.color,
-        verified: false
+        verified: false,
       });
     }
 
@@ -389,7 +389,7 @@ export class TrustBadgeService {
         ...config,
         attestationType: attestation.attestationType,
         grantedBy: attestation.grantedBy.grantorName ?? attestation.grantedBy.grantorId,
-        grantedAt: attestation.grantedAt
+        grantedAt: attestation.grantedAt,
       });
     }
 
@@ -404,7 +404,7 @@ export class TrustBadgeService {
       const config = WARNING_CONFIG[flag.type];
       return {
         ...config,
-        flaggedAt: flag.flaggedAt
+        flaggedAt: flag.flaggedAt,
       };
     });
   }
@@ -428,7 +428,7 @@ export class TrustBadgeService {
       'community-endorsed': 0.15,
       'accessibility-checked': 0.1,
       'license-cleared': 0.1,
-      'author-verified': 0.1
+      'author-verified': 0.1,
     };
 
     const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
@@ -439,7 +439,7 @@ export class TrustBadgeService {
     }
 
     // Cap at 1.0
-    return Math.min(earnedWeight / totalWeight * 2, 1.0);
+    return Math.min((earnedWeight / totalWeight) * 2, 1.0);
   }
 
   /**
@@ -459,13 +459,12 @@ export class TrustBadgeService {
       label: 'View Trust Profile',
       icon: '🔍',
       available: true,
-      route: `/lamad/resource/${content.id}/trust`
+      route: `/lamad/resource/${content.id}/trust`,
     });
 
     // Endorse - available to community members
     const hasEndorsed = attestations.some(
-      a => a.attestationType === 'community-endorsed' &&
-           a.grantedBy.grantorId === currentAgentId
+      a => a.attestationType === 'community-endorsed' && a.grantedBy.grantorId === currentAgentId
     );
 
     if (!hasEndorsed && currentAgentId) {
@@ -476,7 +475,7 @@ export class TrustBadgeService {
         available: agentAttestations.includes('community-member'),
         unavailableReason: !agentAttestations.includes('community-member')
           ? 'Requires community membership'
-          : undefined
+          : undefined,
       });
     }
 
@@ -487,7 +486,7 @@ export class TrustBadgeService {
         label: 'Request Review',
         icon: '📝',
         available: true,
-        route: `/lamad/resource/${content.id}/attestation/request`
+        route: `/lamad/resource/${content.id}/attestation/request`,
       });
     }
 
@@ -497,7 +496,7 @@ export class TrustBadgeService {
         action: 'report',
         label: 'Report Issue',
         icon: '🚩',
-        available: true
+        available: true,
       });
     }
 
@@ -519,7 +518,7 @@ export class TrustBadgeService {
         label: reachConfig.label,
         description: reachConfig.description,
         color: reachConfig.color,
-        verified: false
+        verified: false,
       },
       secondary: [],
       trustLevel: 'unverified',
@@ -530,13 +529,15 @@ export class TrustBadgeService {
       warnings: [],
       summary: 'Content not yet verified.',
       ariaLabel: 'Unverified content. No trust attestations available.',
-      actions: [{
-        action: 'view-trust-profile',
-        label: 'View Trust Profile',
-        icon: '🔍',
-        available: true,
-        route: `/lamad/resource/${contentId}/trust`
-      }]
+      actions: [
+        {
+          action: 'view-trust-profile',
+          label: 'View Trust Profile',
+          icon: '🔍',
+          available: true,
+          route: `/lamad/resource/${contentId}/trust`,
+        },
+      ],
     };
   }
 
@@ -555,7 +556,16 @@ export class TrustBadgeService {
    * Get the next reach level (for "earn more trust" UI hints).
    */
   getNextReachLevel(currentReach: ContentReach): ContentReach | null {
-    const levels: ContentReach[] = ['private', 'invited', 'local', 'neighborhood', 'municipal', 'bioregional', 'regional', 'commons'];
+    const levels: ContentReach[] = [
+      'private',
+      'invited',
+      'local',
+      'neighborhood',
+      'municipal',
+      'bioregional',
+      'regional',
+      'commons',
+    ];
     const currentIndex = levels.indexOf(currentReach);
     if (currentIndex < levels.length - 1) {
       return levels[currentIndex + 1];
@@ -577,14 +587,14 @@ export class TrustBadgeService {
     }
 
     const requirements: Record<ContentReach, ContentAttestationType[]> = {
-      'private': [],
-      'invited': ['author-verified'],
-      'local': ['author-verified'],
-      'neighborhood': ['author-verified', 'community-endorsed'],
-      'municipal': ['steward-approved', 'community-endorsed', 'safety-reviewed'],
-      'bioregional': ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
-      'regional': ['peer-reviewed', 'governance-ratified'],
-      'commons': ['governance-ratified', 'safety-reviewed', 'license-cleared']
+      private: [],
+      invited: ['author-verified'],
+      local: ['author-verified'],
+      neighborhood: ['author-verified', 'community-endorsed'],
+      municipal: ['steward-approved', 'community-endorsed', 'safety-reviewed'],
+      bioregional: ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
+      regional: ['peer-reviewed', 'governance-ratified'],
+      commons: ['governance-ratified', 'safety-reviewed', 'license-cleared'],
     };
 
     const needed = requirements[nextReach] || [];

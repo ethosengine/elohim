@@ -1,0 +1,249 @@
+<div class="interview-container">
+  <!-- Header -->
+  <div class="interview-header">
+    <span class="material-icons header-icon">record_voice_over</span>
+    <h1>Recovery Interviews</h1>
+    <p class="subtitle">Help verify identity recovery requests</p>
+  </div>
+
+  <!-- Error Display -->
+  @if (error()) {
+    <div class="error-banner" role="alert" (click)="clearError()">
+      <span class="material-icons">error_outline</span>
+      <span>{{ error() }}</span>
+      <button type="button" class="dismiss-btn">Dismiss</button>
+    </div>
+  }
+
+  <!-- Queue View -->
+  @if (viewMode() === 'queue') {
+    <div class="queue-section">
+      <div class="section-header">
+        <h2>Pending Requests</h2>
+        <button class="refresh-btn" (click)="loadPendingRequests()" [disabled]="isLoading()">
+          <span class="material-icons" [class.spinning]="isLoading()">refresh</span>
+        </button>
+      </div>
+
+      @if (isLoading() && pendingRequests().length === 0) {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading requests...</p>
+        </div>
+      }
+
+      @if (!isLoading() && pendingRequests().length === 0) {
+        <div class="empty-state">
+          <span class="material-icons">inbox</span>
+          <h3>No Pending Requests</h3>
+          <p>There are no recovery requests needing interviews right now.</p>
+        </div>
+      }
+
+      @if (pendingRequests().length > 0) {
+        <div class="requests-list">
+          @for (request of pendingRequests(); track trackByRequestId($index, request)) {
+            <div class="request-card" [class.already-attested]="request.alreadyAttested">
+              <div class="request-header">
+                <div class="identity-info">
+                  <span class="masked-identity">{{ request.maskedIdentity }}</span>
+                  <span class="doorway-name">via {{ request.doorwayName }}</span>
+                </div>
+                <div class="priority-badge" [class.urgent]="request.priority > 5">
+                  {{ request.priority > 5 ? 'Urgent' : 'Normal' }}
+                </div>
+              </div>
+
+              <div class="request-progress">
+                <span>
+                  {{ request.progress.affirmCount }} of
+                  {{ request.progress.requiredCount }} attestations
+                </span>
+                <div class="progress-bar small">
+                  <div
+                    class="progress-fill"
+                    [style.width.%]="request.progress.progressPercent"
+                  ></div>
+                </div>
+              </div>
+
+              <div class="request-meta">
+                <span class="meta-item">
+                  <span class="material-icons">schedule</span>
+                  Expires in {{ request.expiresIn | number: '1.0-0' }} hours
+                </span>
+                <span class="meta-item">
+                  <span class="material-icons">event</span>
+                  {{ request.createdAt | date: 'short' }}
+                </span>
+              </div>
+
+              <div class="request-actions">
+                @if (request.alreadyAttested) {
+                  <span class="already-attested-label">
+                    <span class="material-icons">check</span>
+                    Already Attested
+                  </span>
+                } @else {
+                  <button
+                    class="btn btn-primary"
+                    (click)="startInterview(request.requestId)"
+                    [disabled]="isLoading()"
+                  >
+                    <span class="material-icons">play_arrow</span>
+                    Start Interview
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Interview View -->
+  @if (viewMode() === 'interview') {
+    <div class="interview-section">
+      <div class="interview-progress">
+        <span>Question {{ currentQuestionIndex() + 1 }} of {{ questions().length }}</span>
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="getProgressPercentage()"></div>
+        </div>
+      </div>
+
+      @if (getCurrentQuestion(); as question) {
+        <div class="question-card">
+          <div class="question-type">
+            <span class="material-icons">{{ getQuestionTypeDisplay(question.type).icon }}</span>
+            <span>{{ getQuestionTypeDisplay(question.type).label }}</span>
+          </div>
+
+          <h2 class="question-text">{{ question.question }}</h2>
+
+          @if (question.expectedContext) {
+            <p class="question-context">
+              <span class="material-icons">lightbulb</span>
+              {{ question.expectedContext }}
+            </p>
+          }
+
+          <div class="answer-input">
+            <label for="answer">Claimant's Response</label>
+            <textarea
+              id="answer"
+              [value]="getCurrentAnswer()"
+              (input)="setAnswer(question.id, $any($event.target).value)"
+              placeholder="Enter the claimant's response..."
+              rows="4"
+            ></textarea>
+          </div>
+
+          <div class="question-actions">
+            <button
+              class="btn btn-secondary"
+              (click)="previousQuestion()"
+              [disabled]="currentQuestionIndex() === 0"
+            >
+              <span class="material-icons">arrow_back</span>
+              Previous
+            </button>
+            <button
+              class="btn btn-primary"
+              (click)="submitAnswer()"
+              [disabled]="!getCurrentAnswer().trim()"
+            >
+              @if (currentQuestionIndex() === questions().length - 1) {
+                Finish Interview
+              } @else {
+                Next Question
+                <span class="material-icons">arrow_forward</span>
+              }
+            </button>
+          </div>
+        </div>
+      }
+
+      <button class="abandon-btn" (click)="abandonInterview()">
+        <span class="material-icons">close</span>
+        Abandon Interview
+      </button>
+    </div>
+  }
+
+  <!-- Attestation View -->
+  @if (viewMode() === 'attestation') {
+    <div class="attestation-section">
+      <h2>Submit Your Attestation</h2>
+      <p class="section-description">
+        Based on your interview, decide whether to affirm or deny this recovery request.
+      </p>
+
+      <!-- Decision Selection -->
+      <div class="decision-selector">
+        <label class="decision-option" [class.selected]="decision === 'affirm'">
+          <input type="radio" name="decision" value="affirm" [(ngModel)]="decision" />
+          <span class="material-icons">check_circle</span>
+          <span class="decision-label">Affirm</span>
+          <span class="decision-description">I believe this is the legitimate identity owner</span>
+        </label>
+
+        <label class="decision-option" [class.selected]="decision === 'deny'">
+          <input type="radio" name="decision" value="deny" [(ngModel)]="decision" />
+          <span class="material-icons">cancel</span>
+          <span class="decision-label">Deny</span>
+          <span class="decision-description">I do not believe this is the legitimate owner</span>
+        </label>
+
+        <label class="decision-option" [class.selected]="decision === 'abstain'">
+          <input type="radio" name="decision" value="abstain" [(ngModel)]="decision" />
+          <span class="material-icons">remove_circle</span>
+          <span class="decision-label">Abstain</span>
+          <span class="decision-description">I cannot make a determination</span>
+        </label>
+      </div>
+
+      <!-- Confidence Slider -->
+      <div class="confidence-section">
+        <label>
+          Confidence Level:
+          <strong>{{ confidence }}%</strong>
+          <span class="confidence-label">({{ getConfidenceLabel() }})</span>
+        </label>
+        <input type="range" min="0" max="100" [(ngModel)]="confidence" class="confidence-slider" />
+      </div>
+
+      <!-- Notes -->
+      <div class="notes-section">
+        <label for="notes">Private Notes (Optional)</label>
+        <textarea
+          id="notes"
+          [(ngModel)]="notes"
+          placeholder="Any notes about your decision (not shared with claimant)..."
+          rows="3"
+        ></textarea>
+      </div>
+
+      <!-- Submit Buttons -->
+      <div class="attestation-actions">
+        <button class="btn btn-secondary" (click)="viewMode.set('interview')">
+          <span class="material-icons">arrow_back</span>
+          Back to Interview
+        </button>
+        <button
+          class="btn btn-primary"
+          [class]="getDecisionClass()"
+          (click)="submitAttestation()"
+          [disabled]="isLoading()"
+        >
+          @if (isLoading()) {
+            <span class="spinner"></span>
+            Submitting...
+          } @else {
+            Submit Attestation
+          }
+        </button>
+      </div>
+    </div>
+  }
+</div>

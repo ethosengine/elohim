@@ -1,0 +1,9 @@
+Scenario: Crisis intervention planning for medical emergencies
+    Given David's condition could deteriorate suddenly
+    And medical crises require rapid coordinated response
+    When the healthcare_elohim prepares for crisis
+    Then it should maintain emergency care plan
+    And it should ensure all providers have emergency contacts
+    And it should coordinate with emergency services
+    And it should prepare James for likely crisis scenarios
+    And medical emergencies should have planned responses

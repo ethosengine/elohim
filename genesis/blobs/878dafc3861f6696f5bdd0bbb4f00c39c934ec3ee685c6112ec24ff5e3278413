@@ -1,0 +1,9 @@
+Scenario: Developer receives honest job creation analysis
+    Given a developer claims project will "create 200 jobs"
+    And uses job creation to justify public subsidies
+    When the Observer provides independent employment impact analysis
+    Then the developer sees: 180 jobs are temporary construction jobs
+    And only 20 are permanent positions
+    And median permanent job wage is $15/hour in area with $22/hour living wage
+    And honest accounting distinguishes temporary versus permanent employment
+    And job quality matters as much as job quantity

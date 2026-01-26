@@ -1,0 +1,9 @@
+Scenario: Community policy advocacy informed by care economy data
+    Given Sarah advocates for community policy changes
+    And data about care work supports policy arguments
+    When Sarah engages in advocacy
+    Then the community_elohim should provide aggregated care economy data
+    And Sarah should show that care work is substantial and invisible
+    And policy discussions should be informed by actual care patterns
+    And advocacy should be strengthened by quantified evidence
+    And care economy data should transform policy debates

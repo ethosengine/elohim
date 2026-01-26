@@ -1,0 +1,10 @@
+Scenario: Appeal includes community context testimony
+    Given I filed an appeal that requires local knowledge to understand
+    And the Constitutional Council needs community context
+    When Community Leader provides testimony about local circumstances
+    Then the leader explains relevant history, cultural factors, and relationships
+    And The context helps council understand what might seem unusual to outsiders
+    And The leader doesn't advocate for outcome, just provides information
+    And The council weighs local context alongside constitutional principles
+    And Community knowledge enriches constitutional interpretation
+    And My appeal benefits from those who understand our community deeply

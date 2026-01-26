@@ -1,0 +1,12 @@
+Scenario: Contributing my lived experience to community knowledge and advocacy
+    Given my experience navigating domestic violence, housing crisis, or social services provides valuable insight
+    And community advocacy could benefit from my perspective
+    When opportunities arise to contribute to advocacy or community knowledge
+    Then the Value Scanner facilitates my participation in advocacy
+    And values my experiential knowledge as expertise
+    And helps me contribute to policy advocacy or community education
+    And protects my privacy while amplifying my voice
+    And recognizes advocacy participation as valuable community contribution
+    And my personal_agent identifies advocacy opportunities matching my capacity
+    And tracks my advocacy contributions with care economy credit
+    And celebrates that vulnerable people's knowledge shapes community

@@ -1,0 +1,487 @@
+/**
+ * Elohim Steward Pipeline
+ *
+ * Builds steward apps (desktop + mobile) using tauri-plugin-holochain.
+ * For those who run their own Holochain nodes as stewards of co-creation.
+ *
+ * This is a multibranch pipeline within the elohim mono-repo.
+ * Jenkins job configured to look at steward/Jenkinsfile
+ *
+ * Platforms:
+ *   - Linux: AppImage, .deb (default)
+ *   - macOS: .dmg (future, requires macOS agent)
+ *   - Windows: .exe (future, requires Windows agent)
+ *   - Android: .apk (future, requires Android SDK)
+ *
+ * Dependencies (fetched from other pipelines in mono-repo):
+ *   - elohim.happ from elohim/holochain pipeline artifacts
+ *   - Angular dist from elohim/elohim-app pipeline artifacts
+ */
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  nodeSelector:
+    node-type: operations
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  volumes:
+    - name: cargo-cache
+      persistentVolumeClaim:
+        claimName: cargo-cache-holochain
+    - name: fuse
+      hostPath:
+        path: /dev/fuse
+        type: CharDevice
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      command: [cat]
+      tty: true
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          memory: "8Gi"
+          cpu: "4"
+        limits:
+          memory: "16Gi"
+          cpu: "8"
+      volumeMounts:
+        - name: cargo-cache
+          mountPath: /root/.cargo
+        - name: fuse
+          mountPath: /dev/fuse
+'''
+        }
+    }
+
+    environment {
+        PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+        // Required for AppImage bundling in containerized environments without FUSE
+        APPIMAGE_EXTRACT_AND_RUN = '1'
+    }
+
+    options {
+        timeout(time: 90, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(
+            name: 'HAPP_VERSION',
+            defaultValue: 'dev-latest',
+            description: 'hApp version/tag to fetch from holochain pipeline'
+        )
+        string(
+            name: 'UI_VERSION',
+            defaultValue: 'dev-latest',
+            description: 'UI version/tag to fetch from elohim-app pipeline'
+        )
+        booleanParam(
+            name: 'PUBLISH_RELEASE',
+            defaultValue: false,
+            description: 'Publish to GitHub Releases'
+        )
+    }
+
+    stages {
+        stage('Check Trigger') {
+            steps {
+                script {
+                    // Steward builds are release artifacts - only run when manually triggered
+                    def isManualTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UserIdCause')
+                    }
+
+                    if (!isManualTrigger) {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        ⏭️ SKIPPING STEWARD BUILD
+                        ═══════════════════════════════════════════════════════════
+                        Steward builds desktop/mobile release artifacts and should
+                        only run when explicitly triggered for a release.
+
+                        To build Steward:
+                        1. Go to Jenkins → elohim-steward → your branch
+                        2. Click "Build with Parameters"
+                        3. Set HAPP_VERSION, UI_VERSION as needed
+                        4. Check PUBLISH_RELEASE if releasing to GitHub
+
+                        Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+                        currentBuild.result = 'NOT_BUILT'
+                        error('Pipeline skipped - Steward only runs on manual trigger')
+                    }
+
+                    echo "✅ Manual trigger detected: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                }
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+                        checkout scm
+
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        📦 STEWARD BUILD CONTEXT
+                        ═══════════════════════════════════════════════════════════
+                        Branch: ${env.BRANCH_NAME}
+                        hApp Version: ${params.HAPP_VERSION}
+                        UI Version: ${params.UI_VERSION}
+                        Publish Release: ${params.PUBLISH_RELEASE}
+                        ═══════════════════════════════════════════════════════════
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Setup Nix Cache') {
+            // Manual-only pipeline - no changeset conditions needed
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo 'Configuring Nix with Holochain and Darksoil Cachix...'
+                            sh '''
+                                nix --version
+                                echo "Nix config:"
+                                nix show-config | grep -E "(substituters|trusted-public-keys)" || true
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('📦 Fetch hApp Artifact') {
+            // Manual-only pipeline - no changeset conditions needed
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            📦 FETCHING hApp ARTIFACT
+                            ═══════════════════════════════════════════════════════════
+                            Target version: ${params.HAPP_VERSION}
+                            Branch: ${env.BRANCH_NAME}
+                            ═══════════════════════════════════════════════════════════
+                            """
+
+                            // Strategy: Three-tier fallback for maximum reliability
+                            // 1. Fetch from Jenkins artifacts (fast, ~30 sec)
+                            // 2. Fall back to local build (slow, ~20-40 min)
+                            // 3. Error if neither works
+
+                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/elohim.happ"
+
+                            // Ensure workdir exists
+                            sh 'mkdir -p workdir'
+
+                            // Strategy 1: Try to fetch from Jenkins artifacts
+                            echo """
+                            🔄 STRATEGY 1: Fetching from Jenkins artifacts...
+                            URL: ${artifactUrl}
+                            """
+
+                            def fetched = sh(
+                                script: """
+                                    set +e
+                                    wget --timeout=30 --tries=3 -O workdir/elohim.happ '${artifactUrl}' 2>&1
+                                    exit_code=\$?
+                                    set -e
+                                    exit \$exit_code
+                                """,
+                                returnStatus: true
+                            ) == 0
+
+                            if (fetched && fileExists('workdir/elohim.happ')) {
+                                def fileSize = sh(script: 'ls -lh workdir/elohim.happ | awk \'{print \$5}\'', returnStdout: true).trim()
+                                echo """
+                                ✅ hApp fetched from Jenkins artifacts (${fileSize})
+
+                                ═══════════════════════════════════════════════════════════
+                                ⏱️  Artifact fetch completed in ~30 seconds
+                                💰 Saved ~35 minutes vs local build!
+                                ═══════════════════════════════════════════════════════════
+                                """
+                            } else {
+                                // Strategy 2: Fallback to local build
+                                echo """
+                                ⚠️  STRATEGY 2: Artifact not found in Jenkins
+                                ⚠️  Falling back to local hApp build (20-40 minutes)
+
+                                This should rarely happen. If you see this often:
+                                - Check holochain pipeline succeeded
+                                - Verify artifacts are archived correctly
+                                - Check network connectivity to Jenkins
+                                ═══════════════════════════════════════════════════════════
+                                """
+
+                                sh '''#!/usr/bin/env bash
+                                    set -euo pipefail
+
+                                    export HOME="${HOME:-/root}"
+                                    mkdir -p "$HOME"
+                                    echo "[safe]" > "$HOME/.gitconfig"
+                                    echo "    directory = *" >> "$HOME/.gitconfig"
+                                    export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                    cd ../holochain/dna/elohim
+
+                                    echo "Building hApp from source (this will take 20-40 minutes)..."
+                                    nix develop --accept-flake-config --command bash -c '
+                                        set -euo pipefail
+                                        cargo build --release --target wasm32-unknown-unknown
+                                        hc dna pack . -o workdir/lamad.dna
+                                        hc app pack workdir -o elohim.happ
+                                    '
+
+                                    cp elohim.happ ../../../steward/workdir/elohim.happ
+                                    echo "✅ Local hApp build completed"
+                                '''
+                            }
+
+                            // Strategy 3: Verify artifact exists (error if missing)
+                            if (!fileExists('workdir/elohim.happ')) {
+                                error "hApp artifact not found after fetch/build attempt"
+                            }
+
+                            sh 'echo "Final artifact:"; ls -lh workdir/elohim.happ'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('📱 Fetch UI') {
+            // Manual-only pipeline - no changeset conditions needed
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            📱 FETCHING UI FROM ELOHIM-APP PIPELINE
+                            ═══════════════════════════════════════════════════════════
+                            """
+
+                            def artifactUrl = "https://jenkins.ethosengine.com/job/elohim-app/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/*zip*/archive.zip"
+
+                            sh 'mkdir -p ui'
+
+                            echo "Fetching UI from: ${artifactUrl}"
+
+                            def fetched = sh(
+                                script: """
+                                    set +e
+                                    wget --timeout=30 --tries=3 -O /tmp/ui-archive.zip '${artifactUrl}' 2>&1
+                                    exit_code=\$?
+                                    set -e
+                                    exit \$exit_code
+                                """,
+                                returnStatus: true
+                            ) == 0
+
+                            if (fetched) {
+                                sh '''
+                                    cd /tmp
+                                    unzip -o ui-archive.zip
+                                    # Find the browser output and copy to steward/ui
+                                    if [ -d archive/dist/elohim-app/browser ]; then
+                                        cp -r archive/dist/elohim-app/browser/* /home/jenkins/agent/workspace/*/steward/ui/ 2>/dev/null || \
+                                        cp -r archive/dist/elohim-app/browser/* $WORKSPACE/steward/ui/
+                                    fi
+                                    rm -rf archive ui-archive.zip
+                                '''
+                                echo "✅ UI fetched from elohim-app pipeline"
+                            } else {
+                                echo "⚠️ Could not fetch UI from pipeline - building locally"
+                                sh '''
+                                    cd ../elohim-app
+                                    npm ci
+                                    npm run build
+                                    cp -r dist/elohim-app/browser/* ../steward/ui/
+                                '''
+                            }
+
+                            sh 'echo "UI directory:"; ls -la ui/ | head -20'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Steward App - Linux') {
+            // Manual-only pipeline - no changeset conditions needed
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            echo 'Building Steward app with Nix + Tauri...'
+                            echo 'First build may take 30-60 minutes. Subsequent builds use cache.'
+
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+
+                                # Fix git safe.directory for containerized builds where workspace owner differs
+                                # Create explicit gitconfig file and point GIT_CONFIG_GLOBAL to it
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                echo "[safe]" > "$HOME/.gitconfig"
+                                echo "    directory = *" >> "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                echo "=== Git config set ==="
+                                cat "$GIT_CONFIG_GLOBAL"
+
+                                # Set build environment based on branch
+                                # dev/feature branches -> dev endpoints
+                                # main -> production endpoints (default)
+                                if [ "$BRANCH_NAME" = "main" ]; then
+                                    echo "=== Building for PRODUCTION environment ==="
+                                    ELOHIM_ENV="prod"
+                                else
+                                    echo "=== Building for DEV environment ==="
+                                    ELOHIM_ENV="dev"
+                                fi
+                                echo "ELOHIM_ENV=$ELOHIM_ENV"
+
+                                echo "=== Entering Nix development shell ==="
+                                # Pass ELOHIM_ENV to nix shell for Rust compile-time config
+                                ELOHIM_ENV="$ELOHIM_ENV" nix develop --accept-flake-config --command bash -c '
+                                    set -euo pipefail
+
+                                    echo "=== Installing npm dependencies ==="
+                                    npm install
+
+                                    echo ""
+                                    echo "=== Using committed app icons ==="
+                                    # Icons are pre-generated and committed in src-tauri/icons/
+                                    # Generated from elohim_protocol_app_logo.png with black background
+                                    ls -la src-tauri/icons/*.png | head -5 || echo "Warning: icons not found"
+
+                                    echo ""
+                                    echo "=== Debug: Testing linuxdeploy & plugin ==="
+                                    # Download and test both linuxdeploy and the appimage plugin
+                                    curl -L -o /tmp/linuxdeploy https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage
+                                    curl -L -o /tmp/linuxdeploy-plugin-appimage https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+                                    chmod +x /tmp/linuxdeploy /tmp/linuxdeploy-plugin-appimage
+
+                                    echo "FUSE device:"
+                                    ls -la /dev/fuse || echo "FUSE device not found"
+
+                                    echo ""
+                                    echo "Testing linuxdeploy..."
+                                    /tmp/linuxdeploy --version 2>&1 || echo "linuxdeploy failed with exit code $?"
+
+                                    echo ""
+                                    echo "Testing linuxdeploy-plugin-appimage..."
+                                    /tmp/linuxdeploy-plugin-appimage --help 2>&1 || echo "plugin failed with exit code $?"
+
+                                    echo "=== End debug ==="
+
+                                    echo ""
+                                    echo "=== Building Tauri app (compile only) ==="
+                                    # Build without bundling first
+                                    npx tauri build --no-bundle --verbose
+
+                                    echo ""
+                                    echo "=== Patching binary for non-Nix systems ==="
+                                    # Fix the interpreter path so binary works on standard Linux
+                                    BINARY="src-tauri/target/release/elohim-steward"
+                                    echo "Before patching:"
+                                    patchelf --print-interpreter "$BINARY" || true
+                                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "$BINARY"
+                                    echo "After patching:"
+                                    patchelf --print-interpreter "$BINARY"
+
+                                    echo ""
+                                    echo "=== Bundling .deb package ==="
+                                    # Now bundle with the patched binary
+                                    npx tauri bundle --verbose
+
+                                    echo ""
+                                    echo "=== Build artifacts ==="
+                                    ls -lh src-tauri/target/release/bundle/appimage/ || true
+                                    ls -lh src-tauri/target/release/bundle/deb/ || true
+                                '
+                            '''
+
+                            // Archive artifacts
+                            archiveArtifacts artifacts: 'src-tauri/target/release/bundle/**/*', allowEmptyArchive: true
+                            stash name: 'steward-linux', includes: 'src-tauri/target/release/bundle/**/*.AppImage,src-tauri/target/release/bundle/**/*.deb', allowEmpty: true
+
+                            echo 'Steward build complete!'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Publish GitHub Release') {
+            when {
+                allOf {
+                    branch 'main'
+                    expression { return params.PUBLISH_RELEASE == true }
+                }
+            }
+            steps {
+                container('builder') {
+                    dir('steward') {
+                        script {
+                            def version = readFile('VERSION').trim()
+                            echo "Publishing release steward-v${version} to GitHub..."
+
+                            withCredentials([string(credentialsId: 'github-release-token', variable: 'GH_TOKEN')]) {
+                                sh """#!/usr/bin/env bash
+                                    set -euo pipefail
+
+                                    # Install GitHub CLI if needed
+                                    which gh || nix-env -iA nixpkgs.gh
+
+                                    # Create release and upload assets (to elohim mono-repo)
+                                    gh release create steward-v${version} \\
+                                        --repo ethosengine/elohim \\
+                                        --title "Elohim Steward v${version}" \\
+                                        --generate-notes \\
+                                        src-tauri/target/release/bundle/deb/*.deb \\
+                                        src-tauri/target/release/bundle/appimage/*.AppImage
+                                """
+                            }
+
+                            echo "Release steward-v${version} published!"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Steward pipeline completed successfully"
+        }
+        failure {
+            echo "Steward pipeline failed"
+            echo "If this is a first-time build, it may need more time/resources for cache population"
+        }
+    }
+}

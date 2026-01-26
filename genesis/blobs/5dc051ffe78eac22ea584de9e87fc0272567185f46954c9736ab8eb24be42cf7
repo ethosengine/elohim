@@ -1,0 +1,9 @@
+Scenario: Transition steward compensation reflects expertise without recreating extraction
+    Given Rosa receives $55K annually for coordination and knowledge transfer
+    And this must be fair without enabling exploitation
+    When steward compensation is evaluated democratically
+    Then workers verify Rosa's salary is justified by coordination value
+    And compensation is transparent and subject to democratic approval
+    And Rosa cannot use steward role to reclaim ownership control
+    And after two years, role ends with clear transition to worker autonomy
+    And workplace_elohim monitors to prevent steward role from becoming new hierarchy

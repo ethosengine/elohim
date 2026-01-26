@@ -1,0 +1,10 @@
+Scenario: Parent participation in school governance and advocacy
+    Given Sarah participates in school board meetings and parent committees
+    And she advocates for better educational policies
+    When the community_elohim tracks Sarah's civic engagement
+    Then it should recognize school participation as care labor
+    And advocacy for children's education should accumulate care tokens
+    And parent organizing should be valued as political work
+    And Sarah's effort to improve schools should be community contribution
+    And the system should recognize that parents are primary education stakeholders
+    And civic labor should be visible and valued

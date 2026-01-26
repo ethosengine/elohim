@@ -1,0 +1,9 @@
+Scenario: Investor capital supports bioregional watershed protection
+    Given water quality depends on land use throughout watershed
+    And Patricia's investments affect and depend on watershed health
+    When democratic businesses prioritize watershed stewardship
+    Then farms implement water protection practices (buffer strips, reduced chemicals, wetland restoration)
+    And investment compensates watershed stewardship through sustainability premiums
+    And bioregional water quality improves through coordinated investment in sustainable practices
+    And community benefits from clean water enabled by investment priorities
+    And bioregional_elohim monitors watershed health and coordinates protection investment

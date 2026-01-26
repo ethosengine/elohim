@@ -1,0 +1,10 @@
+Scenario: Nutrition and cooking education for changing health needs
+    Given Margaret's dietary needs are changing with age
+    And cooking knowledge supports health and budget
+    When the educational_elohim provides nutrition education
+    Then senior-specific nutrition information should be accessible
+    And cooking for health conditions should be taught
+    And Margaret's existing knowledge should be built upon
+    And education should support health management through diet
+    And practical cooking skills should address budget constraints
+    And nutrition education should empower health agency

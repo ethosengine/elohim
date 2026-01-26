@@ -1,0 +1,9 @@
+Scenario: Activist documents neighborhood displacement patterns
+    Given the activist is organizing against gentrification
+    And needs evidence of displacement in specific neighborhoods
+    When the Observer provides hyperlocal data
+    Then the activist sees rent increase patterns by block
+    And views eviction filing trends over time
+    And identifies buildings with code violations
+    And maps demographic changes showing displacement
+    And organizes residents with documented evidence

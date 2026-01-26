@@ -1,0 +1,11 @@
+Scenario: Community governance includes disabled people's voices
+    Given community decisions often exclude disabled people
+    And "Nothing about us without us" is disability rights principle
+    When community governance decisions are made
+    Then the community_elohim should ensure disabled people's participation
+    And Alex should be included in relevant decision-making processes
+    And accessibility should be standard for all governance activities
+    And disabled people's expertise should shape community policy
+    And the protocol should structurally include disabled voices
+    And community should practice disability justice in governance
+    And Alex's participation should be valued, not tokenized

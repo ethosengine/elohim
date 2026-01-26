@@ -1,0 +1,9 @@
+Scenario: Board member evaluates superintendent budget proposal with impact analysis
+    Given administration proposes budget with cuts and reallocations
+    And presents optimistic framing of difficult trade-offs
+    When the Observer provides impact analysis
+    Then they see which students and schools bear burden of cuts
+    And understand transportation changes affect working parent schedules
+    And identify which programs lose funding versus protected priorities
+    And compare budget choices to similar districts
+    And ask informed questions challenging rosy assumptions

@@ -1,0 +1,12 @@
+Scenario: Rebuilding household material stability after losing everything
+    Given I left my previous household with minimal possessions
+    And I am rebuilding household from nearly nothing
+    When I work to acquire essential household items
+    Then the Value Scanner helps me prioritize what household needs most urgently
+    And connects me to resources for furniture, household goods, children's items
+    And tracks what I have and what I still need
+    And helps me access assistance without stigma
+    And coordinates donations and support from community networks
+    And my personal_agent surfaces opportunities for needed items
+    And recognizes household rebuilding as substantial productive labor
+    And celebrates each step toward material stability

@@ -1,0 +1,10 @@
+Scenario: Managing household independently as single senior
+    Given Margaret lives alone in her household
+    And she manages all household responsibilities independently
+    When Margaret coordinates household tasks
+    Then her personal_agent should support her independence
+    And all household labor should be visible and valued
+    And the system should help her maintain self-sufficiency
+    And she should feel capable, not isolated
+    And household management should feel manageable
+    And her autonomy should be preserved and celebrated

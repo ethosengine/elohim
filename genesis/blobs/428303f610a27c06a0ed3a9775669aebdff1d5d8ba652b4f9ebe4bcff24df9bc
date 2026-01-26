@@ -1,0 +1,9 @@
+Scenario: Teacher connects state policy to classroom impacts
+    Given state cut education budget by $400M this year
+    And politicians claim "no impact on classroom instruction"
+    When teachers document actual classroom impacts through Observer
+    Then statewide data shows 1,200 teaching positions eliminated
+    And class sizes increased average 3 students per class
+    And art/music/counseling programs cut in 40% of districts
+    And teachers connect budget abstraction to learning reality
+    And teacher evidence exposes political rhetoric vs classroom truth

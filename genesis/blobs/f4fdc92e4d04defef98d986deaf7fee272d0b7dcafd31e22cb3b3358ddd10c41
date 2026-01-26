@@ -1,0 +1,11 @@
+Scenario: Analyzing Global Constitutional Convention deliberations
+    Given 10,000 randomly-selected global citizens convene every 7 years
+    And this is unprecedented experiment in planetary democracy
+    When I study the Global Constitutional Convention process
+    Then I examine: how citizens from radically different contexts deliberate together
+    And I analyze: what enables agreement despite profound disagreement
+    And I assess: quality of translation and cross-cultural understanding
+    And I explore: how amendments emerge from global collective wisdom
+    And I identify: power dynamics (Global North vs South, wealthy vs poor)
+    And I investigate: whether global sortition can produce legitimate law
+    And My research reveals: possibilities and limits of planetary democratic governance

@@ -1,13 +1,14 @@
 import { Injectable, Type } from '@angular/core';
+
+import { ContentNode } from '../../models/content-node.model';
 import {
   ContentFormatPlugin,
   ContentRenderer,
   ContentEditorComponent,
   EditorConfig,
-  DEFAULT_EDITOR_CONFIG
+  DEFAULT_EDITOR_CONFIG,
 } from '../interfaces/content-format-plugin.interface';
 import { FormatMetadata } from '../interfaces/format-metadata.interface';
-import { ContentNode } from '../../models/content-node.model';
 
 /**
  * ContentFormatRegistryService - Unified registry for content format plugins.
@@ -33,12 +34,13 @@ import { ContentNode } from '../../models/content-node.model';
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ContentFormatRegistryService {
   private readonly plugins = new Map<string, ContentFormatPlugin>();
   private readonly extensionMap = new Map<string, string[]>(); // extension → formatIds
   private readonly mimeTypeMap = new Map<string, string[]>(); // mimeType → formatIds
+  private readonly formatAliases = new Map<string, string>(); // alias → canonical formatId
 
   /** Default editor component to use when plugin doesn't provide one */
   private defaultEditorComponent: Type<ContentEditorComponent> | null = null;
@@ -88,6 +90,35 @@ export class ContentFormatRegistryService {
   }
 
   /**
+   * Register a format alias.
+   *
+   * Allows multiple format IDs to resolve to the same plugin.
+   * For example: 'quiz-json' → 'perseus' means quiz-json content uses Perseus renderer.
+   *
+   * @param alias - The alias format ID
+   * @param canonicalFormatId - The actual plugin format ID to use
+   */
+  registerAlias(alias: string, canonicalFormatId: string): void {
+    if (!this.plugins.has(canonicalFormatId)) {
+      console.warn(
+        `Cannot register alias '${alias}' → '${canonicalFormatId}': target plugin not found`
+      );
+      return;
+    }
+    this.formatAliases.set(alias, canonicalFormatId);
+  }
+
+  /**
+   * Resolve a format ID to its canonical form (following aliases).
+   *
+   * @param formatId - The format ID to resolve
+   * @returns The canonical format ID (same as input if no alias exists)
+   */
+  resolveFormat(formatId: string): string {
+    return this.formatAliases.get(formatId) ?? formatId;
+  }
+
+  /**
    * Unregister a plugin from the registry.
    *
    * @param formatId - The format ID to unregister
@@ -102,14 +133,20 @@ export class ContentFormatRegistryService {
     for (const ext of plugin.fileExtensions) {
       const normalizedExt = this.normalizeExtension(ext);
       const existing = this.extensionMap.get(normalizedExt) ?? [];
-      this.extensionMap.set(normalizedExt, existing.filter(id => id !== formatId));
+      this.extensionMap.set(
+        normalizedExt,
+        existing.filter(id => id !== formatId)
+      );
     }
 
     // Remove from MIME type map
     for (const mime of plugin.mimeTypes) {
       const normalizedMime = mime.toLowerCase();
       const existing = this.mimeTypeMap.get(normalizedMime) ?? [];
-      this.mimeTypeMap.set(normalizedMime, existing.filter(id => id !== formatId));
+      this.mimeTypeMap.set(
+        normalizedMime,
+        existing.filter(id => id !== formatId)
+      );
     }
 
     this.plugins.delete(formatId);
@@ -120,10 +157,11 @@ export class ContentFormatRegistryService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Get a plugin by format ID.
+   * Get a plugin by format ID (resolves aliases automatically).
    */
   getPlugin(formatId: string): ContentFormatPlugin | undefined {
-    return this.plugins.get(formatId);
+    const resolved = this.resolveFormat(formatId);
+    return this.plugins.get(resolved);
   }
 
   /**
@@ -167,13 +205,14 @@ export class ContentFormatRegistryService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Get the renderer component for a format.
+   * Get the renderer component for a format (resolves aliases automatically).
    *
    * @param formatId - The content format ID
    * @returns Component class or null if no renderer available
    */
   getRendererComponent(formatId: string): Type<ContentRenderer> | null {
-    const plugin = this.plugins.get(formatId);
+    const resolved = this.resolveFormat(formatId);
+    const plugin = this.plugins.get(resolved);
     if (!plugin?.canRender) {
       return null;
     }
@@ -191,10 +230,11 @@ export class ContentFormatRegistryService {
   }
 
   /**
-   * Check if any renderer can handle this format.
+   * Check if any renderer can handle this format (resolves aliases automatically).
    */
   canRender(format: string): boolean {
-    const plugin = this.plugins.get(format);
+    const resolved = this.resolveFormat(format);
+    const plugin = this.plugins.get(resolved);
     return plugin?.canRender === true && plugin.getRendererComponent() !== null;
   }
 
@@ -388,7 +428,7 @@ export class ContentFormatRegistryService {
       editableFormats: plugins.filter(p => p.canEdit).length,
       importableFormats: plugins.filter(p => p.canImport).length,
       exportableFormats: plugins.filter(p => p.canExport).length,
-      hasDefaultEditor: this.defaultEditorComponent !== null
+      hasDefaultEditor: this.defaultEditorComponent !== null,
     };
   }
 

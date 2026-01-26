@@ -1,0 +1,10 @@
+Scenario: Municipal planning includes elder wisdom and long-term perspective
+    Given Frank has lived in the municipality for decades
+    And he's observed long-term patterns and changes
+    When the municipal_elohim facilitates planning processes
+    Then it should actively seek Frank's long-term perspective
+    And elder wisdom should inform infrastructure and policy decisions
+    And decades of observation should guide municipal adaptation
+    And Frank's experience should be valued in planning conversations
+    And municipal governance should benefit from elder knowledge
+    And intergenerational planning should integrate experienced voices

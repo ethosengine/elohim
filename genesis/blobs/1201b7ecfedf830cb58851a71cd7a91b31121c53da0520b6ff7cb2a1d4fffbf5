@@ -1,0 +1,10 @@
+Scenario: Balancing environmental responsibility with budget constraints
+    Given Aisha has limited financial resources
+    And sustainable options often cost more
+    When Aisha makes purchasing decisions
+    Then the personal_agent should help navigate trade-offs
+    And it should identify affordable sustainable choices
+    And it should explain when spending more reduces environmental impact
+    And it should validate doing her best within constraints
+    And the system should never shame financial limitations
+    And environmental responsibility should be accessible at all income levels

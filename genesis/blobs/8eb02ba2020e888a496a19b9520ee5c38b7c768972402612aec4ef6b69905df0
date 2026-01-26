@@ -1,0 +1,10 @@
+Scenario: Community care contributions qualify Sarah for leadership
+    Given Sarah has accumulated substantial care contributions
+    And community leadership positions require demonstrated commitment
+    When community selects leaders
+    Then Sarah's quantified care work should be visible evidence
+    And her school involvement should be tracked
+    And her food cooperative participation should be recognized
+    And her community organizing should be valued
+    And leadership should go to those who demonstrate care, not just those who talk
+    And care economy should create accountability in community governance

@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
+
 import { BehaviorSubject, Observable, of } from 'rxjs';
+
 import {
   SourceChainEntry,
   EntryLink,
@@ -66,7 +68,9 @@ export class LocalSourceChainService {
    */
   getAgentId(): string {
     if (!this.agentId) {
-      throw new Error('[LocalSourceChainService] Agent not initialized. Call initializeForAgent first.');
+      throw new Error(
+        '[LocalSourceChainService] Agent not initialized. Call initializeForAgent first.'
+      );
     }
     return this.agentId;
   }
@@ -238,9 +242,7 @@ export class LocalSourceChainService {
    * Get links from a base entry.
    */
   getLinksFromBase(baseHash: string, linkType?: LamadLinkType): EntryLink[] {
-    let links = this.linksSubject.value.filter(
-      l => l.baseHash === baseHash && !l.deleted
-    );
+    let links = this.linksSubject.value.filter(l => l.baseHash === baseHash && !l.deleted);
 
     if (linkType) {
       links = links.filter(l => l.linkType === linkType);
@@ -253,9 +255,7 @@ export class LocalSourceChainService {
    * Get links to a target entry.
    */
   getLinksToTarget(targetHash: string, linkType?: LamadLinkType): EntryLink[] {
-    let links = this.linksSubject.value.filter(
-      l => l.targetHash === targetHash && !l.deleted
-    );
+    let links = this.linksSubject.value.filter(l => l.targetHash === targetHash && !l.deleted);
 
     if (linkType) {
       links = links.filter(l => l.linkType === linkType);
@@ -542,7 +542,7 @@ export class LocalSourceChainService {
    */
   private generateEntryHash(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);  // NOSONAR - Non-cryptographic hash generation
+    const random = Math.random().toString(36).substring(2, 10); // NOSONAR - Non-cryptographic hash generation
     return `entry-${timestamp}-${random}`;
   }
 
@@ -551,7 +551,7 @@ export class LocalSourceChainService {
    */
   private generateLinkHash(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);  // NOSONAR - Non-cryptographic hash generation
+    const random = Math.random().toString(36).substring(2, 10); // NOSONAR - Non-cryptographic hash generation
     return `link-${timestamp}-${random}`;
   }
 
@@ -572,7 +572,11 @@ export class LocalSourceChainService {
   /**
    * Get all raw data (for debugging).
    */
-  getRawData(): { entries: SourceChainEntry[]; links: EntryLink[]; metadata: ChainMetadata | null } {
+  getRawData(): {
+    entries: SourceChainEntry[];
+    links: EntryLink[];
+    metadata: ChainMetadata | null;
+  } {
     return {
       entries: this.entriesSubject.value,
       links: this.linksSubject.value,

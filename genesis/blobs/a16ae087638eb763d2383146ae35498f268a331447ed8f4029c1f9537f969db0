@@ -1,0 +1,10 @@
+Scenario: Journalist investigates regional economic inequality patterns
+    Given the journalist covers regional economy
+    And economic growth statistics mask inequality
+    When the Observer analyzes economic data by demographics and geography
+    Then the journalist sees wage growth concentrated in top income brackets
+    And documents working-class wage stagnation despite economic growth claims
+    And shows poverty increasing in communities of color despite job growth
+    And identifies industries paying poverty wages receiving subsidies
+    And publishes investigation exposing economic inequality
+    And pattern recognition reveals who benefits from "strong economy"

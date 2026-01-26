@@ -1,0 +1,10 @@
+Scenario: Family budget constraints shape real economic learning
+    Given the family income is $40,000/year
+    And Emma is learning genuine resource constraint
+    When Emma makes purchasing decisions
+    Then her personal_agent should provide real budget information
+    And the agent should say "We have $30 left for groceries this week"
+    And Emma should experience actual financial limits
+    And her choices should have real impact on family resources
+    And she should learn stewardship through authentic constraint
+    And economic education should reflect family's actual circumstances

@@ -1,14 +1,17 @@
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin, of } from 'rxjs';
+
 import { map, switchMap, shareReplay, catchError } from 'rxjs/operators';
 
+import { Observable, forkJoin, of } from 'rxjs';
+
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+
 import { ContentNode, ContentMetadata } from '../models/content-node.model';
 import {
   LearningPath,
   PathStep,
   PathContentMetadata,
-  PathReference
+  PathReference,
 } from '../models/learning-path.model';
 
 /**
@@ -78,7 +81,7 @@ export class PathGraphService {
       forkedFromPathId: path.forkedFrom,
       canonicalStatus: 'draft', // New paths start as draft
       pathType: path.pathType,
-      attestationsGranted: path.attestationsGranted
+      attestationsGranted: path.attestationsGranted,
     };
 
     const pathNode: ContentNode = {
@@ -94,7 +97,7 @@ export class PathGraphService {
       authorId: path.createdBy,
       reach: this.mapVisibilityToReach(path.visibility),
       createdAt: path.createdAt,
-      updatedAt: path.updatedAt
+      updatedAt: path.updatedAt,
     };
 
     // In prototype mode, we just return the node
@@ -125,7 +128,7 @@ export class PathGraphService {
               nodeId: pathNodeId,
               pathId: metadata.pathId,
               title: pathNode.title,
-              relationship: 'contains'
+              relationship: 'contains',
             });
           }
 
@@ -135,7 +138,7 @@ export class PathGraphService {
               nodeId: pathNodeId,
               pathId: metadata.pathId,
               title: pathNode.title,
-              relationship: 'references'
+              relationship: 'references',
             });
           }
         }
@@ -155,9 +158,7 @@ export class PathGraphService {
    * @returns Observable<string[]> - Content node IDs
    */
   getPathContentNodes(pathId: string): Observable<string[]> {
-    return this.dataLoader.getPath(pathId).pipe(
-      map(path => this.extractContentNodeIds(path))
-    );
+    return this.dataLoader.getPath(pathId).pipe(map(path => this.extractContentNodeIds(path)));
   }
 
   /**
@@ -174,7 +175,7 @@ export class PathGraphService {
   getRelatedPaths(pathId: string): Observable<PathReference[]> {
     return forkJoin({
       contentNodes: this.getPathContentNodes(pathId),
-      allPathNodes: this.loadPathNodes()
+      allPathNodes: this.loadPathNodes(),
     }).pipe(
       map(({ contentNodes, allPathNodes }) => {
         const contentSet = new Set(contentNodes);
@@ -187,16 +188,14 @@ export class PathGraphService {
           if (metadata.pathId === pathId) continue;
 
           // Count shared content
-          const sharedContent = metadata.contentNodeIds?.filter(id =>
-            contentSet.has(id)
-          ) || [];
+          const sharedContent = metadata.contentNodeIds?.filter(id => contentSet.has(id)) || [];
 
           if (sharedContent.length > 0) {
             results.push({
               nodeId: pathNodeId,
               pathId: metadata.pathId,
               title: pathNode.title,
-              relationship: 'contains' // They share content
+              relationship: 'contains', // They share content
             });
           }
         }
@@ -231,9 +230,7 @@ export class PathGraphService {
    * This uses the graph's nodesByType index for efficient filtering.
    */
   loadPathNodes(): Observable<Map<string, ContentNode>> {
-    this.pathNodesCache$ ??= this.buildPathNodesFromIndex().pipe(
-      shareReplay(1)
-    );
+    this.pathNodesCache$ ??= this.buildPathNodesFromIndex().pipe(shareReplay(1));
     return this.pathNodesCache$;
   }
 
@@ -362,7 +359,9 @@ export class PathGraphService {
   /**
    * Map path visibility to content reach.
    */
-  private mapVisibilityToReach(visibility: string): 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons' {
+  private mapVisibilityToReach(
+    visibility: string
+  ): 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons' {
     switch (visibility) {
       case 'public':
         return 'commons';

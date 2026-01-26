@@ -1,0 +1,11 @@
+Scenario: Contributing to global explainability research agenda
+    Given delegates need better explainability for oversight
+    And current technical capabilities are insufficient
+    When I help shape global research priorities
+    Then I identify: key explainability challenges for governance
+    And I propose: research approaches worth global investment
+    And I coordinate: international research collaboration
+    And I avoid: promising solutions we cannot deliver
+    And I enable: informed global investment in governance technology
+    And I serve: long-term capability development for democratic AI
+    And I demonstrate: how expertise serves collective problem-solving

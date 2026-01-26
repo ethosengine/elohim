@@ -1,0 +1,27 @@
+{
+  "id": "unit-constitutional-councils",
+  "title": "Constitutional Councils: Multi-Stakeholder AI Oversight",
+  "content": "# Constitutional Councils: Multi-Stakeholder AI Oversight\n\n## The Core Idea\n\nWhat if AI systems had boards of directors—but for ethics, not profits?\n\nConstitutional Councils are multi-stakeholder bodies that provide ongoing oversight of AI systems. They don't replace technical teams; they complement them with perspectives those teams lack.\n\n## Why \"Constitutional\"?\n\nThe term is deliberate. Like a constitution:\n- **Sets boundaries** on what the system can do\n- **Protects rights** of affected parties\n- **Evolves through process**, not unilateral decision\n- **Binds everyone**, including the creators\n\nUnlike corporate boards, Constitutional Councils aren't accountable to shareholders. They're accountable to stakeholders—everyone affected by the AI system's decisions.\n\n## Council Composition\n\nEffective oversight requires diverse perspectives:\n\n### Technical Representatives\n- Understand what the system can and cannot do\n- Can evaluate proposed constraints for feasibility\n- Translate between technical and policy language\n\n### Domain Experts\n- Deep knowledge of the field where AI is applied\n- Understand context that data can't capture\n- Identify edge cases and failure modes\n\n### Affected Community Members\n- Direct experience of AI decisions\n- Perspectives often invisible to designers\n- Legitimacy that expertise alone can't provide\n\n### Ethics and Rights Advocates\n- Focus on dignity and fairness\n- Long-term and systemic thinking\n- Protection of minority interests\n\n## How Councils Work\n\n### Ongoing Oversight, Not One-Time Approval\n- Regular review of system behavior\n- Access to performance data and incident reports\n- Authority to request changes\n\n### Clear Decision Authority\n- What requires council approval vs. notification\n- Escalation paths for disagreements\n- Emergency intervention powers\n\n### Transparent Deliberation\n- Public minutes (with appropriate confidentiality)\n- Stated reasoning for decisions\n- Accessible to affected parties\n\n## Different Scales, Different Councils\n\nConstitutional governance scales fractally:\n\n### Individual AI Assistants (Elohim)\nEach user's AI has constitutional constraints set by higher councils, but the user has customization rights within those bounds.\n\n### Community-Level Systems\nLocal councils for systems serving specific communities (neighborhoods, workplaces, interest groups).\n\n### Domain-Level Systems\nIndustry or sector councils for widely-deployed systems (healthcare AI, financial AI, educational AI).\n\n### Global Commons\nHigh-level councils for AI systems with planetary impact.\n\n## For Policy Makers: Implementation Considerations\n\n- **Legal status**: Councils can be statutory, contractual, or voluntary\n- **Liability**: Clear allocation of responsibility when things go wrong\n- **Resources**: Councils need staff, expertise, and independence\n- **Enforcement**: Meaningful consequences for violations\n\n## For Developers: What This Means for You\n\nConstitutional Councils aren't obstacles—they're collaborators:\n- Early feedback prevents costly redesigns\n- Stakeholder buy-in reduces deployment friction\n- Documented oversight protects against liability\n- Diversity of perspective improves system quality\n\nThe next unit explains what happens when the system fails: the appeals process.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/governance/epic.md",
+  "tags": [
+    "governance",
+    "councils",
+    "oversight",
+    "unit",
+    "stakeholders",
+    "constitutional"
+  ],
+  "relationships": [
+    {
+      "target": "governance-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-governance-crisis",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:32:23.318Z",
+  "updatedAt": "2025-12-17T01:32:43.400Z"
+}

@@ -1,0 +1,11 @@
+Scenario: Grandparent-grandchild relationships maintained despite limitations
+    Given Helen's mobility and cognitive limitations affect interaction
+    And grandchildren want relationship with Helen
+    When grandparent-grandchild connection is facilitated
+    Then the family_elohim should coordinate visits that don't overwhelm Helen
+    And communication should be adapted to her capabilities
+    And grandchildren should be guided on how to interact respectfully
+    And Helen's contributions to grandchildren should be recognized
+    And relationships should be preserved despite changing capabilities
+    And the protocol should support connection across limitations
+    And grandchildren should learn to value elders through maintained relationship

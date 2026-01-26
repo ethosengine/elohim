@@ -1,0 +1,9 @@
+Scenario: Developer union relations become transparency issue
+    Given a developer has pattern of union-busting and labor resistance
+    And claims to support workers while fighting unionization
+    When the Observer documents labor relations history
+    Then analysis shows: developer spent $400K on union-busting consultants
+    And filed NLRB complaints against worker organizing attempts
+    And rhetoric about supporting workers contradicts anti-union actions
+    And labor relations pattern becomes visible to workers and community
+    And developers face accountability for anti-worker practices

@@ -1,0 +1,10 @@
+Scenario: Coordinating volunteer participation with other life commitments
+    Given Frank volunteers 20 hours/week
+    And he also provides family care and participates in neighborhood governance
+    When the community_elohim coordinates his participation
+    Then it should integrate volunteer work with other commitments
+    And help Frank maintain sustainable participation level
+    And prevent volunteer burnout through overcommitment
+    And coordinate scheduling across community, family, and neighborhood
+    And support Frank in balancing diverse care contributions
+    And enable long-term sustainable volunteer engagement

@@ -1,0 +1,9 @@
+Scenario: Educational design prevents formation of consumer identity
+    Given consumer capitalism targets children for identity formation
+    And Tommy is highly vulnerable to conditioning
+    When Tommy learns through the Value Scanner
+    Then no gamification should train extraction thinking
+    And no points systems should create achievement addiction
+    And no rewards should condition consumption behavior
+    And identity formation should center on care, not acquisition
+    And Tommy should learn to see himself as contributor, not consumer

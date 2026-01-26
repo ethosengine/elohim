@@ -1,0 +1,9 @@
+Scenario: Appeal precedent cited in research on democratic AI governance
+    Given my appeal created important regional precedent
+    And Dr. James Chen is researching constitutional council effectiveness
+    When he analyzes appeal patterns and outcomes
+    Then my case (anonymized) becomes research data
+    And The precedent illustrates how sortition governance works
+    And Research findings feed back into protocol improvement
+    And My appeal contributes to global understanding of democratic AI governance
+    And Individual justice and systemic learning happen together

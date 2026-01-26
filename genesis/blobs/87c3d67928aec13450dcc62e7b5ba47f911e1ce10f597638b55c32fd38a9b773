@@ -1,0 +1,10 @@
+Scenario: Tracking mental load separately from physical tasks
+    Given Sarah manages meal planning, scheduling, inventory, coordination
+    And mental labor is typically invisible to partners
+    When the household_elohim tracks cognitive labor
+    Then it should distinguish planning from execution
+    And it should show "Sarah performed 89% of household planning labor this week"
+    And mental load should be valued as heavily as physical work
+    And the partner should see that "helping with dishes" doesn't equal Sarah's total coordination
+    And cognitive labor should become visible and valued
+    And the full scope of Sarah's work should be undeniable

@@ -1,0 +1,12 @@
+Scenario: Household governance adapts to changing life stage needs
+    Given Robert and Jennifer's care responsibilities are evolving
+    And children are moving toward independence
+    And parents are requiring increasing care
+    And they approach their own pre-retirement years
+    When household_elohim supports governance evolution
+    Then it should help them adapt to changing circumstances
+    And recognize shifts: "Child support demands are decreasing while parent care is increasing"
+    And support planning for next life stage transitions
+    And help them reimagine household as children leave
+    And prepare for increased elder care coordination
+    And support them in navigating lifecycle transitions together

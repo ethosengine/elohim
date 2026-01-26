@@ -1,0 +1,10 @@
+Scenario: Preteen exercises genuine autonomy in real economic decisions
+    Given Marcus has $75 budget for weekly groceries
+    And the budget is not hypothetical but actual family resource constraint
+    When Marcus uses the Value Scanner to plan weekly shopping
+    Then he should have full autonomy within budget boundaries
+    And his personal_agent should provide adult-level decision support
+    And the interface should treat him as capable, not as a child
+    And his choices should have real consequences for family survival
+    And the system should recognize he's not practicing but performing
+    And autonomy should be genuine, not simulated learning

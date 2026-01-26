@@ -1,0 +1,202 @@
+<div class="elohim-verify">
+  <!-- Error Banner -->
+  @if (error()) {
+    <div class="error-banner">
+      <span class="error-icon">warning</span>
+      <span class="error-text">{{ error() }}</span>
+      <button class="error-close" (click)="clearError()">close</button>
+    </div>
+  }
+
+  <!-- Intro Step -->
+  @if (currentStep() === 'intro') {
+    <div class="intro-section">
+      <div class="intro-icon">psychology</div>
+      <h2>Elohim Knowledge Check</h2>
+      <p class="intro-description">
+        Verify your identity by answering questions about your profile. These questions are based on
+        your actual usage - paths you've completed, relationships, quiz scores, and preferences.
+      </p>
+      <div class="intro-info">
+        <div class="info-item">
+          <span class="info-icon">timer</span>
+          <span>{{ timeLimitSeconds() / 60 }} minute time limit</span>
+        </div>
+        <div class="info-item">
+          <span class="info-icon">security</span>
+          <span>70% accuracy required to pass</span>
+        </div>
+        <div class="info-item">
+          <span class="info-icon">verified</span>
+          <span>Contributes up to 60% confidence</span>
+        </div>
+      </div>
+      <button class="primary-button" (click)="startVerification()" [disabled]="isLoading()">
+        @if (isLoading()) {
+          <span class="spinner"></span>
+          <span>Starting...</span>
+        } @else {
+          <span>Begin Verification</span>
+        }
+      </button>
+    </div>
+  }
+
+  <!-- Questions Step -->
+  @if (currentStep() === 'questions') {
+    <div class="questions-section">
+      <!-- Header with timer -->
+      <div class="questions-header">
+        <div class="question-progress">
+          Question {{ currentQuestionIndex() + 1 }} of {{ questions().length }}
+        </div>
+        <div class="timer" [class.warning]="isTimeWarning()">
+          <span class="timer-icon">timer</span>
+          <span>{{ timeDisplay() }}</span>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="progress()"></div>
+      </div>
+
+      <!-- Question navigation dots -->
+      <div class="question-dots">
+        @for (q of questions(); track q.id; let i = $index) {
+          <button
+            class="question-dot"
+            [class.current]="i === currentQuestionIndex()"
+            [class.answered]="isQuestionAnswered(i)"
+            (click)="goToQuestion(i)"
+          >
+            {{ i + 1 }}
+          </button>
+        }
+      </div>
+
+      <!-- Current question -->
+      @if (currentQuestion(); as question) {
+        <div class="question-card">
+          <div class="question-category">
+            <span class="category-icon">{{ getCategoryIcon(question.category) }}</span>
+            <span>{{ getCategoryLabel(question.category) }}</span>
+          </div>
+          <h3 class="question-text">{{ question.question }}</h3>
+
+          @if (question.is_multiple_choice && question.options) {
+            <!-- Multiple choice -->
+            <div class="options-list">
+              @for (option of question.options; track option) {
+                <button
+                  class="option-button"
+                  [class.selected]="getAnswerForQuestion(question.id) === option"
+                  (click)="setAnswer(question.id, option)"
+                >
+                  {{ option }}
+                </button>
+              }
+            </div>
+          } @else {
+            <!-- Free text -->
+            <textarea
+              class="answer-input"
+              [value]="getAnswerForQuestion(question.id)"
+              (input)="setAnswer(question.id, $any($event.target).value)"
+              placeholder="Type your answer..."
+              rows="3"
+            ></textarea>
+          }
+        </div>
+      }
+
+      <!-- Navigation buttons -->
+      <div class="question-nav">
+        <button
+          class="nav-button"
+          (click)="prevQuestion()"
+          [disabled]="currentQuestionIndex() === 0"
+        >
+          Previous
+        </button>
+        @if (currentQuestionIndex() < questions().length - 1) {
+          <button class="nav-button primary" (click)="nextQuestion()">Next</button>
+        } @else {
+          <button class="nav-button submit" (click)="submitAnswers()" [disabled]="!canSubmit()">
+            Submit Answers
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Submitting Step -->
+  @if (currentStep() === 'submitting') {
+    <div class="submitting-section">
+      <div class="spinner large"></div>
+      <p>Evaluating your answers...</p>
+    </div>
+  }
+
+  <!-- Result Step -->
+  @if (currentStep() === 'result' && result(); as res) {
+    <div class="result-section">
+      <div class="result-icon" [class.passed]="res.passed" [class.failed]="!res.passed">
+        @if (res.passed) {
+          verified
+        } @else {
+          gpp_bad
+        }
+      </div>
+
+      <h2 class="result-title">
+        @if (res.passed) {
+          Verification Passed
+        } @else {
+          Verification Failed
+        }
+      </h2>
+
+      <p class="result-summary">{{ res.summary }}</p>
+
+      <div class="result-stats">
+        <div class="stat">
+          <div class="stat-value">{{ res.accuracyPercent | number: '1.0-0' }}%</div>
+          <div class="stat-label">Accuracy</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ res.confidenceScore | number: '1.0-0' }}</div>
+          <div class="stat-label">Confidence Points</div>
+        </div>
+      </div>
+
+      <!-- Feedback details -->
+      @if (res.feedback && res.feedback.length > 0) {
+        <div class="feedback-section">
+          <h4>Question Results</h4>
+          <div class="feedback-list">
+            @for (fb of res.feedback; track fb.questionId; let i = $index) {
+              <div class="feedback-item" [class.correct]="fb.correct">
+                <span class="feedback-num">{{ i + 1 }}</span>
+                <span class="feedback-icon">
+                  @if (fb.correct) {
+                    check_circle
+                  } @else {
+                    cancel
+                  }
+                </span>
+                <span class="feedback-message">{{ fb.message }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="result-actions">
+        @if (!res.passed) {
+          <button class="secondary-button" (click)="retry()">Try Again</button>
+        }
+      </div>
+    </div>
+  }
+</div>

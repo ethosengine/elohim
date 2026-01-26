@@ -1,0 +1,9 @@
+Scenario: Organizer detects organizing opportunity from community complaint patterns
+    Given 47 residents across three blocks have reported the same landlord issues
+    And most residents don't know others are affected
+    When the Observer detects the shared grievance pattern
+    Then the organizer sees the organizing opportunity alert
+    And receives contact information for residents who opted in
+    And views specific issues by building and timeline
+    And gets recommended organizing approach for tenant association
+    And isolated frustration becomes basis for collective action

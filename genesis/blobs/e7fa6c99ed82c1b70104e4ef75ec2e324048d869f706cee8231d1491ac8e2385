@@ -1,0 +1,10 @@
+Scenario: Personal burnout prevention during academic pressure
+    Given Kenji faces intense academic demands during midterms and finals
+    And he also must maintain work hours to pay for expenses
+    When the personal_agent detects unsustainable stress patterns
+    Then it should flag burnout risk explicitly
+    And it should say "You've slept 4 hours three nights in a row. This is dangerous."
+    And it should help him identify what must give to protect health
+    And it should connect him to campus mental health resources if needed
+    And crisis intervention should prioritize his survival
+    And the system should validate that breaking under these demands is not failure

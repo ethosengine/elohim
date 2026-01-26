@@ -1,0 +1,10 @@
+Scenario: Recognizing family investment as care economy transaction
+    Given Kenji's family invests time, money, and emotional energy in his development
+    And Kenji invests in family relationships and contributes what he can
+    When the family_elohim tracks family care economy
+    Then it should recognize mutual investment across generations
+    And it should value family support of student as care contribution
+    And it should value student's family participation as reciprocal care
+    And family economy should be understood as long-term reciprocal exchange
+    And the system should frame family support as investment in flourishing
+    And intergenerational care should be recognized as care economy foundation

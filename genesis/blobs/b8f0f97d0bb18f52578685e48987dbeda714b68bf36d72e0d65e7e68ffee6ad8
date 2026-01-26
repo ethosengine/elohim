@@ -1,0 +1,12 @@
+Scenario: Multigenerational care coordination across three generations
+    Given Frank provides occasional grandchild care
+    And he helps maintain his mother-in-law's home
+    And he supports his adult children with wisdom and occasional financial help
+    When family_elohim coordinates care across generations
+    Then it should track care flowing from Frank to grandchildren
+    And care flowing from Frank to his mother-in-law
+    And support flowing from Frank to adult children
+    And emerging care flowing from adult children to Frank
+    And all flows should be visible and valued
+    And multigenerational reciprocity should be recognized
+    And Frank should see himself in ongoing care web

@@ -1,0 +1,96 @@
+@epic:public_observer
+@user_type:board_member
+@governance_layer:district
+@related_users:citizen,parent,teacher,politician,activist
+@related_layers:municipality,community,educational
+@elohim_agents:public_observer,domain_elohim,accountability_elohim
+
+Feature: District Governance for Board Member
+  As a board member serving on a district board in the public_observer system
+  Operating at the district governance layer
+  I want independent analysis and accessible expertise for district-wide decisions
+  So that I can exercise informed judgment on consequential policies affecting thousands of constituents
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the board_member user is registered in the system
+    And the district governance context is active
+    And I am a volunteer serving on a school board or special district board
+
+  Scenario: Board member receives independent analysis of staff budget recommendation
+    Given district superintendent recommends budget with significant program cuts
+    And 200-page budget packet emphasizes efficiency and fiscal responsibility
+    And board meeting is in 3 days with vote expected
+    When the board member requests Observer independent analysis
+    Then they receive concise summary identifying key trade-offs staff minimized
+    And see comparison of per-student spending across district schools showing disparities
+    And access data on community impacts of proposed cuts by demographic group
+    And get examples of how similar districts managed budget challenges differently
+    And independent analysis reveals information asymmetry in staff presentation
+
+  Scenario: Board member learns accessible expertise on complex water infrastructure decision
+    Given water district faces decision on $50M infrastructure upgrade
+    And engineering staff presentation uses technical jargon and assumptions
+    And board member has no engineering background but must vote responsibly
+    When the board member uses Observer to understand the decision
+    Then they receive plain-language explanation of technical trade-offs
+    And see comparison of infrastructure approaches used by similar districts
+    And access key questions to ask staff about cost estimates and alternatives
+    And get context on long-term maintenance and rate impacts
+    And accessible expertise enables informed decision without full-time study
+
+  Scenario: Board member tracks implementation of previous transportation policy
+    Given board voted two years ago to optimize bus routes for efficiency
+    And transportation director promised improved reliability and cost savings
+    And parents increasingly complain about late buses and long routes
+    When the board member checks Observer implementation tracking
+    Then they see on-time performance has actually declined since policy change
+    And discover cost savings didn't materialize as promised
+    And find low-income neighborhoods disproportionately affected by route changes
+    And access parent feedback data showing systematic reliability problems
+    And impact tracking reveals staff promises diverged from actual outcomes
+
+  Scenario: Board member detects potential conflict of interest in vendor contract
+    Given district staff recommends contract with technology vendor
+    And recommendation emphasizes vendor qualifications and competitive pricing
+    And board will vote on $2M multi-year contract next meeting
+    When the board member uses Observer to review the recommendation
+    Then they discover vendor donated to superintendent's previous campaigns
+    And see vendor's track record in other districts shows implementation problems
+    And find contract terms more favorable to vendor than peer district contracts
+    And access data showing alternative vendors with better performance
+    And capture protection makes conflict of interest and manipulation visible
+
+  Scenario: Board member understands community priorities beyond meeting testimony
+    Given board considers policy change to school calendar
+    And testimony at meeting is dominated by teachers union advocating position
+    And only 15 community members attended to testify
+    When the board member seeks community accountability data from Observer
+    Then they see survey data from thousands of district families on calendar preferences
+    And discover working families have different priorities than those who testified
+    And access childcare impact analysis showing consequences for different populations
+    And understand community needs beyond who has time to attend meetings
+    And community accountability helps board serve diverse constituent interests
+
+  Scenario: Board member compares district performance to jurisdictional peers
+    Given board reviews annual student achievement and equity data
+    And superintendent presents results emphasizing positive trends
+    And board wants to understand if district is truly serving all students well
+    When the board member uses Observer cross-district comparison
+    Then they see district's achievement gaps larger than similar districts
+    And discover other districts closed equity gaps while this one widened
+    And access specific practices peer districts used to improve outcomes
+    And identify areas where staff presentation masked concerning patterns
+    And independent analysis helps board exercise meaningful oversight
+
+  Scenario: Board member prepares for contentious development decision in special district
+    Given transit district board must decide on major service expansion
+    And developers advocate for routes serving new developments
+    And existing riders advocate for frequency improvements on current routes
+    And staff recommendation favors expansion over frequency
+    When the board member uses Observer decision support
+    Then they receive ridership data showing current overcrowding and reliability issues
+    And see community benefits analysis comparing expansion versus improvement
+    And access transportation equity analysis of who is served by each option
+    And get examples of how peer transit districts approached similar trade-offs
+    And accessible expertise enables informed judgment balancing competing interests

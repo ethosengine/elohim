@@ -1,0 +1,10 @@
+Scenario: Receiving family financial support with dignity
+    Given Kenji receives some financial support from family
+    And traditional economics treats this as dependency or charity
+    When the family_elohim tracks family resource flows
+    Then it should frame financial support as family care investment
+    And it should recognize that families invest in young members' development
+    And it should help Kenji receive support without shame
+    And it should track this as reciprocal care economy, not dependency
+    And the system should value family investment in student development
+    And receiving family support should be dignified participation in family economy

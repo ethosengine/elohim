@@ -1,0 +1,10 @@
+Scenario: Household nutrition planning and execution
+    Given Sarah plans meals for family nutritional needs
+    And she manages Tommy's preferences, Emma's activities, budget constraints
+    When Sarah performs nutrition work
+    Then the household_elohim should track planning and execution separately
+    And it should recognize nutritional knowledge as professional skill
+    And it should value meal planning as complex decision-making
+    And it should show the full scope: planning, shopping, prep, cooking, cleanup
+    And nutrition work should be recognized as health care labor
+    And Sarah's nutrition expertise should be valued professionally

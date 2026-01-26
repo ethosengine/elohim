@@ -1,0 +1,10 @@
+Scenario: Student mutual aid networks as care economy foundation
+    Given Kenji participates in student mutual aid group
+    And students share resources, knowledge, and support
+    When the community_elohim tracks mutual aid participation
+    Then it should recognize meal sharing as care contribution
+    And it should value textbook lending, note sharing, and skill exchange
+    And it should accumulate care tokens for helping other students
+    And mutual aid should be understood as care economy practice
+    And the system should make reciprocal support visible
+    And student mutual aid should be recognized as community building

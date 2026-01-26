@@ -1,0 +1,10 @@
+Scenario: Partner accountability for equitable labor sharing
+    Given the household_elohim makes labor distribution visible
+    And the partner can see he performs only 25% of household work
+    When the partner commits to increasing his contribution
+    Then the system should track whether he follows through
+    And it should provide accountability for behavioral change
+    And it should show whether labor distribution is actually improving
+    And accountability should be built into the care economy system
+    And moving toward equity should be trackable and measurable
+    And the system should support partnership transformation

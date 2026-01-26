@@ -1,0 +1,9 @@
+Scenario: Regenerative consumption replaces extractive consumption patterns
+    Given traditional consumption extracts from ecological systems
+    And Sarah wants to shift to regenerative practices
+    When Sarah makes consumption choices over time
+    Then the bioregional_elohim should guide toward regenerative options
+    And it should educate about regenerative agriculture principles
+    And Sarah's consumption should support ecological health
+    And care economy should enable shift from extraction to regeneration
+    And household consumption should contribute to ecosystem restoration

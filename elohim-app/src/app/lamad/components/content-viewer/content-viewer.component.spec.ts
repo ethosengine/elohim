@@ -3,10 +3,14 @@ import { ContentViewerComponent } from './content-viewer.component';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
+import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentService } from '../../services/content.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
+import { GovernanceService } from '@app/elohim/services/governance.service';
+import { ContentEditorService } from '../../content-io/services/content-editor.service';
+import { PathContextService } from '../../services/path-context.service';
 import { SeoService } from '../../../services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
 import { ContentNode } from '../../models/content-node.model';
@@ -15,12 +19,17 @@ describe('ContentViewerComponent', () => {
   let component: ContentViewerComponent;
   let fixture: ComponentFixture<ContentViewerComponent>;
   let affinityServiceSpy: jasmine.SpyObj<AffinityTrackingService>;
+  let agentServiceSpy: jasmine.SpyObj<AgentService>;
   let contentServiceSpy: jasmine.SpyObj<ContentService>;
   let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
   let trustBadgeServiceSpy: jasmine.SpyObj<TrustBadgeService>;
+  let governanceServiceSpy: jasmine.SpyObj<GovernanceService>;
+  let editorServiceSpy: jasmine.SpyObj<ContentEditorService>;
+  let pathContextServiceSpy: jasmine.SpyObj<PathContextService>;
   let rendererRegistrySpy: jasmine.SpyObj<RendererRegistryService>;
   let routerSpy: jasmine.SpyObj<Router>;
   let affinityChangesSubject: Subject<any>;
+  let pathContextSubject: Subject<any>;
 
   const mockContentNode: ContentNode = {
     id: 'test-content-1',
@@ -31,7 +40,7 @@ describe('ContentViewerComponent', () => {
     content: '# Test Content',
     tags: ['test'],
     relatedNodeIds: ['related-1'],
-    metadata: { category: 'test-category', authors: ['Author 1'], version: '1.0' }
+    metadata: { category: 'test-category', authors: ['Author 1'], version: '1.0' },
   };
 
   const mockRelatedNode: ContentNode = {
@@ -43,22 +52,44 @@ describe('ContentViewerComponent', () => {
     content: '# Related',
     tags: ['related'],
     relatedNodeIds: [],
-    metadata: {}
+    metadata: {},
   };
 
   beforeEach(async () => {
     affinityChangesSubject = new Subject();
+    pathContextSubject = new Subject();
 
-    const affinitySpyObj = jasmine.createSpyObj('AffinityTrackingService', [
-      'getAffinity', 'trackView', 'incrementAffinity', 'setAffinity'
-    ], { changes$: affinityChangesSubject.asObservable() });
+    const affinitySpyObj = jasmine.createSpyObj(
+      'AffinityTrackingService',
+      ['getAffinity', 'trackView', 'incrementAffinity', 'setAffinity'],
+      { changes$: affinityChangesSubject.asObservable() }
+    );
 
+    const agentSpyObj = jasmine.createSpyObj('AgentService', ['markContentSeen']);
     const contentSpyObj = jasmine.createSpyObj('ContentService', ['getContainingPathsSummary']);
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContent']);
+    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
+      'getContent',
+      'getGovernanceState',
+    ]);
     const trustBadgeSpyObj = jasmine.createSpyObj('TrustBadgeService', ['getBadge']);
+    const governanceSpyObj = jasmine.createSpyObj('GovernanceService', [
+      'getGovernanceState',
+      'getChallengesForEntity',
+      'getDiscussionsForEntity',
+    ]);
+    const editorSpyObj = jasmine.createSpyObj('ContentEditorService', ['canEdit']);
+    const pathContextSpyObj = jasmine.createSpyObj(
+      'PathContextService',
+      ['startDetour', 'returnToPath'],
+      { context$: pathContextSubject.asObservable() }
+    );
     const rendererRegistrySpyObj = jasmine.createSpyObj('RendererRegistryService', ['getRenderer']);
     const routerSpyObj = jasmine.createSpyObj('Router', ['navigate']);
-    const seoServiceSpyObj = jasmine.createSpyObj('SeoService', ['updateForContent', 'updateSeo', 'setTitle']);
+    const seoServiceSpyObj = jasmine.createSpyObj('SeoService', [
+      'updateForContent',
+      'updateSeo',
+      'setTitle',
+    ]);
 
     await TestBed.configureTestingModule({
       imports: [ContentViewerComponent],
@@ -68,31 +99,51 @@ describe('ContentViewerComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            params: of({ id: 'test-content-1' })
-          }
+            params: of({ resourceId: 'test-content-1' }),
+          },
         },
         { provide: AffinityTrackingService, useValue: affinitySpyObj },
+        { provide: AgentService, useValue: agentSpyObj },
         { provide: ContentService, useValue: contentSpyObj },
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
+        { provide: GovernanceService, useValue: governanceSpyObj },
+        { provide: ContentEditorService, useValue: editorSpyObj },
+        { provide: PathContextService, useValue: pathContextSpyObj },
         { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
-        { provide: SeoService, useValue: seoServiceSpyObj }
-      ]
+        { provide: SeoService, useValue: seoServiceSpyObj },
+      ],
     }).compileComponents();
 
-    affinityServiceSpy = TestBed.inject(AffinityTrackingService) as jasmine.SpyObj<AffinityTrackingService>;
+    affinityServiceSpy = TestBed.inject(
+      AffinityTrackingService
+    ) as jasmine.SpyObj<AffinityTrackingService>;
+    agentServiceSpy = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
     contentServiceSpy = TestBed.inject(ContentService) as jasmine.SpyObj<ContentService>;
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
     trustBadgeServiceSpy = TestBed.inject(TrustBadgeService) as jasmine.SpyObj<TrustBadgeService>;
-    rendererRegistrySpy = TestBed.inject(RendererRegistryService) as jasmine.SpyObj<RendererRegistryService>;
+    governanceServiceSpy = TestBed.inject(GovernanceService) as jasmine.SpyObj<GovernanceService>;
+    editorServiceSpy = TestBed.inject(ContentEditorService) as jasmine.SpyObj<ContentEditorService>;
+    pathContextServiceSpy = TestBed.inject(
+      PathContextService
+    ) as jasmine.SpyObj<PathContextService>;
+    rendererRegistrySpy = TestBed.inject(
+      RendererRegistryService
+    ) as jasmine.SpyObj<RendererRegistryService>;
     routerSpy = TestBed.inject(Router) as any; // Use real router from provideRouter
     spyOn(routerSpy, 'navigate');
 
     // Default spy returns
     affinityServiceSpy.getAffinity.and.returnValue(0.5);
+    agentServiceSpy.markContentSeen.and.returnValue(of(undefined));
     dataLoaderSpy.getContent.and.returnValue(of(mockContentNode));
+    dataLoaderSpy.getGovernanceState.and.returnValue(of(null));
     contentServiceSpy.getContainingPathsSummary.and.returnValue(of([]));
     trustBadgeServiceSpy.getBadge.and.returnValue(of(null as any));
+    governanceServiceSpy.getGovernanceState.and.returnValue(of(null));
+    governanceServiceSpy.getChallengesForEntity.and.returnValue(of([]));
+    governanceServiceSpy.getDiscussionsForEntity.and.returnValue(of([]));
+    editorServiceSpy.canEdit.and.returnValue(false);
     rendererRegistrySpy.getRenderer.and.returnValue(null);
 
     fixture = TestBed.createComponent(ContentViewerComponent);
@@ -382,9 +433,7 @@ describe('ContentViewerComponent', () => {
 
   describe('containing paths', () => {
     it('should load containing paths', fakeAsync(() => {
-      const mockPaths = [
-        { pathId: 'path-1', pathTitle: 'Path 1', stepIndex: 0 }
-      ];
+      const mockPaths = [{ pathId: 'path-1', pathTitle: 'Path 1', stepIndex: 0 }];
       contentServiceSpy.getContainingPathsSummary.and.returnValue(of(mockPaths));
 
       fixture.detectChanges();

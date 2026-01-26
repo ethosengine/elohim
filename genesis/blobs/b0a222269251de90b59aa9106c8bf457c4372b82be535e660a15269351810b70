@@ -1,0 +1,8 @@
+Scenario: Right to disconnect maintained even for young child
+    Given Tommy has been using the Value Scanner
+    And constitutional constraints apply at all layers
+    When Tommy or his parents choose to disconnect
+    Then the system must honor the disconnection immediately
+    And no data retention beyond legal requirements should occur
+    And Tommy's right to not participate must be respected
+    And no manipulative patterns to retain usage should be employed

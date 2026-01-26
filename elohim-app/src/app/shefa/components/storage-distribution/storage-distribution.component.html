@@ -1,0 +1,260 @@
+<!-- Storage Distribution Component -->
+
+<div class="storage-distribution" [class.mode-summary]="displayMode === 'summary'">
+  <!-- Loading State -->
+  <div class="loading" *ngIf="isLoading">
+    <span class="spinner"></span>
+    <span>Loading storage distribution...</span>
+  </div>
+
+  <!-- Error State -->
+  <div class="error" *ngIf="error">
+    <span class="icon">⚠️</span>
+    <span>{{ error }}</span>
+  </div>
+
+  <!-- Content -->
+  <ng-container *ngIf="!isLoading && !error && distribution">
+    <!-- Header -->
+    <header class="dist-header">
+      <h2>Storage Distribution</h2>
+      <p class="subtitle">What's stored and where</p>
+    </header>
+
+    <!-- Summary Stats -->
+    <div class="summary-stats">
+      <div class="stat-card">
+        <span class="stat-icon">📦</span>
+        <div class="stat-content">
+          <span class="stat-value">{{ distribution.totalContent.items | number }}</span>
+          <span class="stat-label">Total Items</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">💾</span>
+        <div class="stat-content">
+          <span class="stat-value">{{ formatSize(distribution.totalContent.sizeGB) }}</span>
+          <span class="stat-label">Total Size</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🔄</span>
+        <div class="stat-content">
+          <span class="stat-value">{{ distribution.totalContent.replicaCount | number }}</span>
+          <span class="stat-label">Replicas</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Mode -->
+    <ng-container *ngIf="displayMode === 'summary'">
+      <div class="summary-content">
+        <!-- Top content type -->
+        <div class="top-type" *ngIf="largestContentType">
+          <span class="type-icon">{{ getContentTypeIcon(largestContentType.contentType) }}</span>
+          <div class="type-info">
+            <span class="type-name">{{ largestContentType.displayLabel }}</span>
+            <span class="type-details">
+              {{ largestContentType.itemCount | number }} items ({{
+                formatSize(largestContentType.sizeGB)
+              }})
+            </span>
+          </div>
+          <span class="type-percent">
+            {{ largestContentType.percentOfTotal | number: '1.0-0' }}%
+          </span>
+        </div>
+
+        <!-- Mini bar chart -->
+        <div class="mini-chart">
+          <div
+            *ngFor="let ct of distribution.byContentType"
+            class="chart-segment"
+            [style.flex]="ct.percentOfTotal"
+            [title]="ct.displayLabel + ': ' + ct.percentOfTotal + '%'"
+            [attr.data-type]="ct.contentType"
+          ></div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Full Mode -->
+    <ng-container *ngIf="displayMode === 'full'">
+      <!-- Tab Navigation -->
+      <nav class="view-nav">
+        <button
+          class="nav-btn"
+          [class.active]="activeView === 'type'"
+          (click)="setActiveView('type')"
+        >
+          By Type
+        </button>
+        <button
+          class="nav-btn"
+          [class.active]="activeView === 'reach'"
+          (click)="setActiveView('reach')"
+        >
+          By Reach
+        </button>
+        <button
+          class="nav-btn"
+          [class.active]="activeView === 'node'"
+          (click)="setActiveView('node')"
+        >
+          By Node
+        </button>
+      </nav>
+
+      <!-- By Content Type View -->
+      <div class="view-content" *ngIf="activeView === 'type'">
+        <div
+          class="type-row"
+          *ngFor="let ct of distribution.byContentType"
+          (click)="selectContentType(ct)"
+        >
+          <div class="type-header">
+            <span class="type-icon">{{ getContentTypeIcon(ct.contentType) }}</span>
+            <span class="type-name">{{ ct.displayLabel }}</span>
+            <span class="type-count">{{ ct.itemCount | number }} items</span>
+          </div>
+
+          <div class="type-bar">
+            <div class="bar-bg">
+              <div class="bar-fill" [style.width]="ct.percentOfTotal + '%'"></div>
+            </div>
+            <span class="bar-value">{{ formatSize(ct.sizeGB) }}</span>
+          </div>
+
+          <div class="type-replication">
+            <span class="replication-label">Replication:</span>
+            <span class="replication-stats">
+              <span class="stat good">{{ ct.fullyReplicated }} OK</span>
+              <span class="stat bad" *ngIf="ct.underReplicated > 0">
+                {{ ct.underReplicated }} under
+              </span>
+            </span>
+            <span class="avg-replicas">(avg {{ ct.averageReplicas | number: '1.1-1' }})</span>
+          </div>
+        </div>
+
+        <div class="empty-state" *ngIf="distribution.byContentType.length === 0">
+          <span class="empty-icon">📭</span>
+          <p>No content stored yet</p>
+        </div>
+      </div>
+
+      <!-- By Reach Level View -->
+      <div class="view-content" *ngIf="activeView === 'reach'">
+        <div
+          class="reach-row"
+          *ngFor="let rl of distribution.byReachLevel"
+          [ngClass]="getReplicationClass(rl.replicationStatus)"
+        >
+          <div class="reach-header">
+            <span class="reach-icon">{{ getReachIcon(rl.reachLevel) }}</span>
+            <div class="reach-info">
+              <span class="reach-name">{{ rl.reachLabel }}</span>
+              <span class="reach-level">Level {{ rl.reachLevel }}</span>
+            </div>
+            <span class="reach-count">{{ rl.itemCount | number }} items</span>
+          </div>
+
+          <div class="reach-bar">
+            <div class="bar-bg">
+              <div
+                class="bar-fill"
+                [style.width]="getProgressWidth(rl.sizeGB, distribution.totalContent.sizeGB)"
+              ></div>
+            </div>
+            <span class="bar-value">{{ formatSize(rl.sizeGB) }}</span>
+          </div>
+
+          <div class="reach-replication">
+            <span class="replica-info">
+              {{ rl.currentReplicas | number: '1.1-1' }} / {{ rl.targetReplicas }} replicas
+            </span>
+            <span class="replica-status" [ngClass]="getReplicationClass(rl.replicationStatus)">
+              {{
+                rl.replicationStatus === 'met'
+                  ? '✓'
+                  : rl.replicationStatus === 'under'
+                    ? '⚠️'
+                    : '⬆️'
+              }}
+            </span>
+          </div>
+        </div>
+
+        <div class="empty-state" *ngIf="distribution.byReachLevel.length === 0">
+          <span class="empty-icon">📭</span>
+          <p>No content stored yet</p>
+        </div>
+      </div>
+
+      <!-- By Node View -->
+      <div class="view-content" *ngIf="activeView === 'node'">
+        <div
+          class="node-row"
+          *ngFor="let node of distribution.byNode"
+          [ngClass]="getNodeStatusClass(node.nodeStatus)"
+          (click)="selectNode(node)"
+        >
+          <div class="node-header">
+            <span class="node-status-indicator"></span>
+            <div class="node-info">
+              <span class="node-name">{{ node.nodeName }}</span>
+              <span class="node-status">{{ node.nodeStatus | titlecase }}</span>
+            </div>
+            <span class="node-usage">
+              {{ formatSize(node.usedGB) }} / {{ formatSize(node.totalGB) }}
+            </span>
+          </div>
+
+          <div class="node-bar">
+            <div class="bar-bg">
+              <div
+                class="bar-segment my-content"
+                [style.width]="getProgressWidth(node.contentBreakdown.myContent, node.totalGB)"
+                title="My content"
+              ></div>
+              <div
+                class="bar-segment custodied"
+                [style.width]="
+                  getProgressWidth(node.contentBreakdown.custodiedContent, node.totalGB)
+                "
+                title="Custodied content"
+              ></div>
+              <div
+                class="bar-segment cache"
+                [style.width]="getProgressWidth(node.contentBreakdown.cacheContent, node.totalGB)"
+                title="Cache"
+              ></div>
+            </div>
+          </div>
+
+          <div class="node-breakdown">
+            <span class="breakdown-item my-content">
+              <span class="dot"></span>
+              My: {{ formatSize(node.contentBreakdown.myContent) }}
+            </span>
+            <span class="breakdown-item custodied">
+              <span class="dot"></span>
+              Custodied: {{ formatSize(node.contentBreakdown.custodiedContent) }}
+            </span>
+            <span class="breakdown-item cache">
+              <span class="dot"></span>
+              Cache: {{ formatSize(node.contentBreakdown.cacheContent) }}
+            </span>
+          </div>
+
+          <div class="node-available">{{ formatSize(node.availableGB) }} available</div>
+        </div>
+
+        <div class="empty-state" *ngIf="distribution.byNode.length === 0">
+          <span class="empty-icon">🖥️</span>
+          <p>No nodes configured</p>
+        </div>
+      </div>
+    </ng-container>
+  </ng-container>
+</div>

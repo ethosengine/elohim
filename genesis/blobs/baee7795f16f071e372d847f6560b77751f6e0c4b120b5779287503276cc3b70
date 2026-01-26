@@ -1,0 +1,10 @@
+Scenario: Nutrition education integrated with shopping decisions
+    Given Aisha wants to eat healthfully
+    And she has limited nutrition knowledge
+    When Aisha selects food items
+    Then the personal_agent should provide nutrition education
+    And it should explain nutritional value of options
+    And it should teach balancing nutrition with budget
+    And it should help her understand dietary needs
+    And learning should integrate seamlessly with decision-making
+    And nutrition literacy should develop through practice

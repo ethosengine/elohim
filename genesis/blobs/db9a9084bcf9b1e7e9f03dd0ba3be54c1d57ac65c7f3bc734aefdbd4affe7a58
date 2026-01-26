@@ -1,0 +1,12 @@
+Scenario: Accumulated community knowledge valued in neighborhood governance
+    Given Frank has lived in the neighborhood for decades
+    And he knows neighborhood history, patterns, and relationships
+    And institutional knowledge is valuable governance resource
+    When Frank participates in neighborhood decisions
+    Then his accumulated knowledge should be recognized and valued
+    And long-term perspective should inform neighborhood planning
+    And the neighborhood_elohim should surface relevant historical context
+    And Frank's memory of neighborhood patterns should guide policy
+    And elder knowledge should shape community decisions
+    And decades of participation should confer legitimate standing
+    And his experience should be actively sought, not marginalized

@@ -1,11 +1,12 @@
-import { Injectable, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
+import { Injectable, inject } from '@angular/core';
+
 import { ConfigService } from './config.service';
 
 const GA_TRACKING_ID = 'G-NSL7PVP55B' as const;
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AnalyticsService {
   private readonly configService = inject(ConfigService);
@@ -40,24 +41,21 @@ export class AnalyticsService {
 
     // Initialize dataLayer and gtag
     (window as any).dataLayer = (window as any).dataLayer ?? [];
-    (window as any).gtag = function() {
-      (window as any).dataLayer.push(arguments);
+    (window as any).gtag = (...args: unknown[]) => {
+      (window as any).dataLayer.push(args);
     };
-
 
     // Load script
     const script = this.document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`;
-    
+
     // Configure GA
     script.onload = () => {
       (window as any).gtag('js', new Date());
       (window as any).gtag('config', GA_TRACKING_ID);
     };
-    
+
     this.document.head.appendChild(script);
-
-
   }
 }

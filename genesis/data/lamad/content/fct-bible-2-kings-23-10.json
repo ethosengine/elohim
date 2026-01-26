@@ -1,0 +1,52 @@
+{
+  "id": "fct-bible-2-kings-23-10",
+  "contentType": "bible-verse",
+  "title": "2 Kings 23:10",
+  "description": "Scripture reference used in FCT Module 2",
+  "content": "## 2 Kings 23:10\n\n> The worship of Moloch, involving human sacrifice, particularly the sacrifice of children by fire, is a historical example that can be related to the concept of a multipolar trap in game theory. In the context of 2 Kings 23:10, King Josiah's reforms, including the desecration of Topheth in the Valley of Ben Hinnom to prevent sacrifices to Moloch, highlight a societal effort to escape from a deeply entrenched and destructive practice.\n\n*ESV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "2-kings",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-02-systems-thinking",
+    "thematicContext": "Systems Thinking"
+  },
+  "createdAt": "2025-11-28T21:10:19.191118",
+  "updatedAt": "2025-12-24T03:05:25.929Z",
+  "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "2 Kings 23:10",
+    "ogDescription": "Scripture reference used in FCT Module 2",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-2-kings-23-10",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "2 Kings 23:10 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-2-kings-23-10",
+    "identifier": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+    "name": "2 Kings 23:10",
+    "description": "Scripture reference used in FCT Module 2",
+    "dateCreated": "2025-11-28T21:10:19.191118",
+    "dateModified": "2025-11-28T21:10:19.191119",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

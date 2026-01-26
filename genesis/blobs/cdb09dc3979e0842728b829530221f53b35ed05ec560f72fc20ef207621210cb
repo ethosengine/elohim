@@ -1,0 +1,12 @@
+Scenario: Municipal planning includes middle-aged caregiver voice
+    Given Robert represents large demographic managing multigenerational care
+    And municipal planning often misses caregiver needs
+    And his experience could improve municipal systems
+    When municipal_elohim connects him to planning processes
+    Then it should identify municipal planning opportunities
+    And help him participate in comprehensive planning, transportation planning, and housing policy
+    And surface how planning decisions affect caregivers
+    And advocate for aging-in-place infrastructure, accessible transportation, and multigenerational housing
+    And ensure municipal planning reflects caregiver perspectives
+    And build municipalities that support care economy
+    And recognize that planning should serve actual resident needs

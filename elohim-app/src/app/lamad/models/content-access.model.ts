@@ -96,12 +96,12 @@ export interface AccessCheckResult {
  * AccessDeniedReason - Why access was denied.
  */
 export type AccessDeniedReason =
-  | 'not-authenticated'      // User is a visitor, content requires member
-  | 'missing-attestation'    // User lacks required attestation
-  | 'missing-path'           // User hasn't completed required path
-  | 'governance-pending'     // Governance approval not yet granted
-  | 'age-verification'       // Age verification required
-  | 'content-removed';       // Content has been removed
+  | 'not-authenticated' // User is a visitor, content requires member
+  | 'missing-attestation' // User lacks required attestation
+  | 'missing-path' // User hasn't completed required path
+  | 'governance-pending' // Governance approval not yet granted
+  | 'age-verification' // Age verification required
+  | 'content-removed'; // Content has been removed
 
 /**
  * AccessAction - What the human can do to gain access.
@@ -127,11 +127,11 @@ export interface AccessAction {
  * AccessActionType - Types of actions to gain access.
  */
 export type AccessActionType =
-  | 'install-holochain'      // Join the network
-  | 'complete-path'          // Complete a prerequisite path
-  | 'earn-attestation'       // Earn a required attestation
-  | 'request-access'         // Request governance approval
-  | 'verify-age';            // Complete age verification
+  | 'install-holochain' // Join the network
+  | 'complete-path' // Complete a prerequisite path
+  | 'earn-attestation' // Earn a required attestation
+  | 'request-access' // Request governance approval
+  | 'verify-age'; // Complete age verification
 
 /**
  * Predefined access requirements for common scenarios.

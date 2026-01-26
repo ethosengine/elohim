@@ -1,0 +1,8 @@
+Scenario: Pushing for industry scheduling regulations
+    Given unpredictable scheduling is endemic in food service
+    When workers advocate for fair scheduling laws
+    Then the protocol should support advocacy for scheduling regulations
+    Such as advance notice requirements, predictable hours, right to request schedule
+    And provide evidence of harm from current scheduling practices
+    And coordinate workers pushing for legislative change
+    And transform industry standards through policy intervention

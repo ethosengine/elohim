@@ -1,0 +1,10 @@
+Scenario: Coordinating household care with external family obligations
+    Given Margaret provides care for grandchildren at her home sometimes
+    And her mother may visit or require household accommodation
+    When the household_elohim coordinates multi-generational care
+    Then it should help Margaret prepare household for care provision
+    And it should track supplies needed for grandchild visits
+    And it should plan for mother's accessibility needs
+    And household resources should flex for care obligations
+    And Margaret's home should support her care contributions
+    And the household should be center of care economy activity

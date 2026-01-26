@@ -1,0 +1,10 @@
+Scenario: Celebrating household milestones together
+    Given the household has lived together for one year
+    And housemates want to celebrate their community
+    When Jordan helps plan the anniversary celebration
+    Then Jordan contributes ideas using the visual planning interface
+    And Jordan's suggestions are valued equally with others
+    And Jordan helps with celebration preparations at their capability
+    And the Value Scanner records Jordan's party planning contributions
+    And Jordan experiences being part of a caring community
+    And the celebration honors everyone's contributions to household life

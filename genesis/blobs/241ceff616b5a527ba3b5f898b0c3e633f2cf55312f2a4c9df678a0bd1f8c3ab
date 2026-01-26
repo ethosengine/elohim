@@ -1,0 +1,8 @@
+Scenario: Understanding ingredient sourcing and bioregional food
+    Given my restaurant uses ingredients from various sources
+    And some may be local/seasonal while others are industrial/imported
+    When I want to understand food sourcing
+    Then the protocol should provide information about ingredient origins
+    And help me understand bioregional vs. industrial food systems
+    And recognize that bioregional food supports local ecology and economy
+    And build consciousness about care economy implications of sourcing

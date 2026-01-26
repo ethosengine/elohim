@@ -1,0 +1,9 @@
+Scenario: Municipal data privacy protects residents while enabling planning
+    Given municipal care economy involves data about many residents
+    And privacy must be rigorously protected
+    When municipal planning uses care economy data
+    Then the municipal_elohim should only provide aggregated anonymized data
+    And no individual household should be identifiable
+    And Sarah's privacy should be absolute unless she chooses disclosure
+    And municipal benefits should not require privacy sacrifice
+    And data governance should be transparent and accountable

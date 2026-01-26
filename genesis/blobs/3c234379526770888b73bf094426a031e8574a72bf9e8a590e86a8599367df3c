@@ -1,0 +1,9 @@
+Scenario: Activist identifies state preemption blocking local solutions
+    Given the activist's community wants rent control
+    But local municipality cannot enact it
+    When the Observer explains state preemption law
+    Then the activist learns state policy blocks local authority
+    And sees which legislators voted for preemption
+    And identifies campaign donors (real estate lobby)
+    And connects to statewide coalition fighting preemption
+    And local organizing scales to state-level campaign

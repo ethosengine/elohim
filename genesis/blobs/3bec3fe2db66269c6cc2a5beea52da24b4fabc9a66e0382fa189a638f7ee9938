@@ -1,0 +1,9 @@
+Scenario: Household resource allocation based on visible contributions
+    Given Sarah and partner make joint financial decisions
+    And both contribute care labor to household
+    When household resources are allocated
+    Then the household_elohim should present both partners' contributions
+    And care labor should be valued alongside paid employment
+    And Sarah's unpaid care work should carry equal weight to partner's income
+    And resource decisions should reflect all contributions, not just money
+    And household economics should recognize care creates value

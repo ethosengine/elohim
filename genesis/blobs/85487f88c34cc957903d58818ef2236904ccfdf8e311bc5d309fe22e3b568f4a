@@ -1,0 +1,9 @@
+Scenario: Activist tracks local environmental justice issues
+    Given pollution sources affect the activist's community
+    And residents report health concerns
+    When the Observer documents environmental conditions
+    Then the activist sees air quality trends by neighborhood
+    And maps proximity of industrial facilities to residences
+    And tracks permit violations and regulatory responses
+    And organizes community for accountability demands
+    And environmental racism becomes documented and actionable

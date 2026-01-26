@@ -1,0 +1,9 @@
+Scenario: Teacher tracks contract implementation and enforcement
+    Given union contract includes working condition provisions
+    But contract enforcement is inconsistent across schools
+    When the Observer monitors contract implementation
+    Then teachers document where contract is violated (planning time, class sizes, duties)
+    And patterns show which administrators ignore contract provisions
+    And union identifies systemic enforcement gaps vs isolated violations
+    And brings accountability data to district and grievance process
+    And contract becomes enforceable through transparency

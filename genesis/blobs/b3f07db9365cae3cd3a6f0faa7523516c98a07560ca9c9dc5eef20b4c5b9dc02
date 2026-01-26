@@ -1,0 +1,9 @@
+Scenario: Bioregional food system reduces fossil fuel dependence dramatically
+    Given industrial food system depends on fossil fuels (synthetic fertilizers, pesticides, transportation)
+    And energy transition requires reducing agricultural fossil fuel use
+    When democratic bioregional food system prioritizes energy sustainability
+    Then local distribution eliminates long-haul transportation energy use
+    And organic practices reduce synthetic fertilizer dependence
+    And renewable energy powers farm operations and distribution
+    And food system fossil fuel use decreases 80%+ through bioregional coordination
+    And bioregional_elohim tracks energy use and transition to renewable sources

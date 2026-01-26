@@ -1,0 +1,10 @@
+Scenario: Elder shares family wisdom with grandchildren
+    Given Rose's granddaughter Emma asks about Rose's childhood during WWII
+    When Rose creates a contribution sharing her memories
+    And she includes photos from her family album
+    And she describes what life was like during wartime
+    Then the contribution reaches all family members immediately
+    And Emma learns family history and develops deeper connection
+    And other grandchildren engage with questions and appreciation
+    And Rose experiences meaningful intergenerational exchange
+    And the family history is preserved in the network

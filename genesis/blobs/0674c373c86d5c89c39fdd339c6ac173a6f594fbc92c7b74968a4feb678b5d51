@@ -1,0 +1,9 @@
+Scenario: Journalist investigates municipal service delivery disparities
+    Given residents in certain neighborhoods report neglected infrastructure
+    And the journalist suspects systematic discrimination
+    When the Observer analyzes municipal operations by neighborhood
+    Then the journalist sees pothole repairs average 2 days in white areas
+    And same repairs take 47 days in Black neighborhoods
+    And code enforcement targets rental properties in immigrant communities
+    And documents service quality correlating with neighborhood race and income
+    And publishes investigation exposing structural racism in city operations

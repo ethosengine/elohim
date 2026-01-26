@@ -1,0 +1,9 @@
+Scenario: Journalist tracks climate commitments to accountability
+    Given city and state announced climate action plans
+    And the journalist covered initial announcements
+    When the Observer monitors climate policy implementation
+    Then the journalist finds emissions reduction targets are not being met
+    And sees policies that would reduce emissions remain unimplemented
+    And identifies budget cuts to climate programs despite commitments
+    And documents gap between climate rhetoric and action
+    And publishes accountability story on broken climate promises

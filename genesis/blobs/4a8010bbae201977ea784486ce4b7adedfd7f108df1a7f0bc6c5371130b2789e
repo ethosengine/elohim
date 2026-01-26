@@ -1,0 +1,9 @@
+Scenario: Community investment enables farm democratic conversion and expansion
+    Given Tom wants to convert farm to worker ownership but farmworkers lack capital
+    And community members want to support local agriculture but lack pathway
+    When community investment pool funds farm acquisition and expansion
+    Then neighbors invest $2K-$20K each in democratic farm conversion
+    And investors receive fair return (5% annually) plus food security benefit
+    And farm gains capital for sustainable infrastructure and expansion
+    And community builds ownership stake in local food production
+    And community_elohim manages community investment in farm democratization

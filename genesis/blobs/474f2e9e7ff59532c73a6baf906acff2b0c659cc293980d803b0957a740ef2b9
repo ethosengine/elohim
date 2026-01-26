@@ -1,0 +1,10 @@
+Scenario: Student community as political and cultural force
+    Given students are networked, idealistic, and trend-setting
+    And student movements have historically created cultural change
+    When student community adopts care economy practices
+    Then the community_elohim should recognize students as change agents
+    And it should support spread of care economy culture among students
+    And it should help students see themselves as building alternative economy
+    And student community should be recognized as site for cultural transformation
+    And the system should empower students as care economy pioneers
+    And student adoption could spread care economy to broader generation

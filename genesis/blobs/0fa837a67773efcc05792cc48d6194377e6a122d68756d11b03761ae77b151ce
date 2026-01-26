@@ -1,0 +1,11 @@
+Scenario: Teen provides sibling care as valued family contribution
+    Given Jasmine provides regular after-school care for Jordan
+    And this care enables parent Maya to work full-time
+    And Jasmine's care work has substantial economic value
+    When Jasmine's sibling care is tracked
+    Then it should be valued as the labor it is, not dismissed as "just babysitting"
+    And the care should be recognized in family care token allocation
+    And Maya should receive prompts to explicitly acknowledge this contribution
+    And Jordan should learn to recognize Jasmine's care work
+    And the family should understand that Jasmine's care enables their current lifestyle
+    And if external childcare would cost $15/hour, Jasmine's care should be valued accordingly

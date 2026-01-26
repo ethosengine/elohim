@@ -8,9 +8,8 @@ describe('PathForwardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PathForwardComponent]
-    })
-    .compileComponents();
+      imports: [PathForwardComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(PathForwardComponent);
     component = fixture.componentInstance;

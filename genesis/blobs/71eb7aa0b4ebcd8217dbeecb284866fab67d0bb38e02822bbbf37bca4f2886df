@@ -1,0 +1,10 @@
+Scenario: Reciprocal care flows between Margaret and adult children
+    Given Margaret provides childcare for her daughter's family
+    And her daughter provides technology help and transportation
+    When the family_elohim coordinates these reciprocal care exchanges
+    Then all care flows should be tracked in both directions
+    And Margaret gives care (grandchildren); daughter gives care (support)
+    And reciprocity should be visible to prevent imbalance
+    And both generations' contributions should be valued
+    And the relationship should feel equitable, not one-sided
+    And multigenerational care patterns should be sustainable

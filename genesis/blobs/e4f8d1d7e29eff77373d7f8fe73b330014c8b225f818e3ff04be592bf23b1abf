@@ -1,0 +1,10 @@
+Scenario: Tracking nutritional needs across family members
+    Given Marcus is responsible for feeding himself and Keisha
+    And Keisha has specific dietary needs and preferences
+    When Marcus plans meals and shops
+    Then the personal_agent should track both their nutritional requirements
+    And it should alert Marcus to Keisha's needs: "Keisha needs more iron this week"
+    And it should help him find affordable foods that meet her requirements
+    And age-appropriate nutrition for both should be maintained
+    And Marcus should have tools to ensure Keisha's healthy development
+    And nutritional tracking should prevent inadequate diet

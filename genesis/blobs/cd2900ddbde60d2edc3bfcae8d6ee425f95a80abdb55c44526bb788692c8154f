@@ -1,0 +1,11 @@
+Scenario: Explaining cryptographic impossibility of backdoor mandates
+    Given policy makers consider requiring backdoors for law enforcement
+    And this would break constitutional verification
+    When I testify to National Council about technical implications
+    Then I explain: backdoors make cryptographic alignment proof impossible
+    And I clarify: cannot have both backdoors and constitutional verification
+    And I demonstrate: this is mathematical fact not implementation choice
+    And I present: security vulnerabilities backdoors create
+    And I acknowledge: this constrains what governance can mandate
+    And I provide: evidence policy makers need for informed choice
+    And I maintain: that I'm explaining constraints not dictating values

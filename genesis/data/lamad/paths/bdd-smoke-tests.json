@@ -1,0 +1,70 @@
+{
+  "id": "bdd-smoke-tests",
+  "did": "did:elohim:path:bdd-smoke-tests",
+  "contentType": "path",
+  "title": "BDD Smoke Tests",
+  "description": "Ordered sequence of product test features for smoke testing the Elohim platform. Used by the BDD pipeline to validate deployments.",
+  "difficulty": "beginner",
+  "estimatedMinutes": 5,
+  "tags": [
+    "bdd",
+    "smoke",
+    "product-test",
+    "automation"
+  ],
+  "metadata": {
+    "pathType": "bdd-tests",
+    "testCategory": "smoke",
+    "executionOrder": "sequential",
+    "purpose": "Validates core platform functionality after deployment"
+  },
+  "chapters": [
+    {
+      "id": "doorway-tests",
+      "title": "Doorway & Navigation",
+      "description": "Core platform accessibility and navigation tests",
+      "steps": [
+        {
+          "resourceId": "product-test-doorway-hosting",
+          "title": "Doorway Hosting Flow",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "lamad-tests",
+      "title": "Lamad Content System",
+      "description": "Learning content and path navigation tests",
+      "steps": [
+        {
+          "resourceId": "product-test-lamad-content",
+          "title": "Content Display",
+          "required": true
+        },
+        {
+          "resourceId": "product-test-lamad-paths",
+          "title": "Learning Paths",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "shefa-tests",
+      "title": "Shefa Dashboard",
+      "description": "Community dashboard and metrics tests",
+      "steps": [
+        {
+          "resourceId": "product-test-shefa-dashboard",
+          "title": "Dashboard Functionality",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "relatedNodeIds": [
+    "product-test-doorway-hosting",
+    "product-test-lamad-content",
+    "product-test-lamad-paths",
+    "product-test-shefa-dashboard"
+  ]
+}

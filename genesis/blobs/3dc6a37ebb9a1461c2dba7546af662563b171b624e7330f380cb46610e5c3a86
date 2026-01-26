@@ -1,0 +1,11 @@
+Scenario: Coordinating multiple contexts of care contribution
+    Given Frank contributes across multiple contexts simultaneously
+    And he volunteers with Habitat, provides family care, serves on council
+    When his personal_agent tracks contributions across contexts
+    Then it should integrate volunteer work, family care, and civic participation
+    And it should coordinate scheduling across multiple commitments
+    And it should prevent overcommitment and burnout
+    And it should surface conflicts and help prioritize
+    And Frank should see his full contribution across all contexts
+    And multi-context participation should be supported and celebrated
+    And the system should help him balance diverse contributions effectively

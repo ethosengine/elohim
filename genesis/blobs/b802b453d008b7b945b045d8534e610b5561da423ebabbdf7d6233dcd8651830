@@ -1,0 +1,10 @@
+Scenario: Cultural and artistic education enriches later life
+    Given Margaret has time for creative pursuits
+    And arts and culture support quality of life
+    When the educational_elohim connects Margaret to arts education
+    Then accessible arts programs should be available
+    And creative learning should be encouraged at all ages
+    And artistic development should continue in retirement
+    And cultural education should enrich Margaret's life
+    And creativity should be understood as lifelong capacity
+    And arts education should support whole-person flourishing

@@ -1,0 +1,9 @@
+Scenario: Municipal school policy shaped by parent care work advocacy
+    Given Sarah works as teacher and is parent advocate
+    And she has deep knowledge of educational needs
+    When municipal school policy is debated
+    Then Sarah's professional and parent care work should be recognized
+    And her advocacy should be informed by care economy data
+    And school policy should reflect actual parent and educator experiences
+    And care economy should strengthen parent voice in education policy
+    And municipal education should benefit from care worker input

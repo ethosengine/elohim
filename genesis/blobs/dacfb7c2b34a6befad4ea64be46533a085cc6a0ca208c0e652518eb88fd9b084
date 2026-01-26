@@ -1,0 +1,11 @@
+Scenario: Learning value beyond price through multi-dimensional comparison
+    Given Emma is evaluating fair-trade chocolate
+    And she has capacity for understanding multiple value dimensions
+    When Emma scans the chocolate product
+    Then her personal_agent should show nutritional value
+    And the agent should show environmental impact
+    And the agent should explain care labor: "The farmers who grew this were paid fairly for their care work"
+    And the agent should show community benefit
+    And price should be one factor among many
+    And Emma should learn to read the world's complexity, not just price tags
+    And value literacy should extend beyond simple cost comparison

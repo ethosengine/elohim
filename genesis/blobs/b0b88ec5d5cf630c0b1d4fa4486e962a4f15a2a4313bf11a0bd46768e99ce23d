@@ -1,0 +1,9 @@
+Scenario: Elder joins quilting affinity network
+    Given Rose is a quilter interested in connecting with other quilters
+    When she discovers a regional quilting network on Elohim
+    And the network includes elders and younger crafters
+    Then she can join and share her quilting patterns
+    And she connects with others who appreciate traditional techniques
+    And she mentors younger quilters learning the craft
+    And her patterns are valued and spread through the network
+    And she finds meaningful community around her lifelong passion

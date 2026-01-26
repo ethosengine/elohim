@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-matthew-desmond",
+  "contentType": "contributor",
+  "title": "Matthew Desmond",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Matthew Desmond\n\n**Role:** author\n\n**Works:** Poverty, by America\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice",
+    "fct-media-11-book-poverty-by-america"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-12-fairness-justice"
+  },
+  "createdAt": "2025-11-28T21:10:19.219713",
+  "updatedAt": "2025-12-24T03:05:26.065Z",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Matthew Desmond",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-matthew-desmond",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Matthew Desmond - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-matthew-desmond",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Matthew Desmond",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.219713",
+    "dateModified": "2025-11-28T21:10:19.219714",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

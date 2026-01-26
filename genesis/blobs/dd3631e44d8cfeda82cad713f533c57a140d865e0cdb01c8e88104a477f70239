@@ -1,0 +1,10 @@
+Scenario: Neighborhood safety and child supervision cooperation
+    Given parents worry about children's neighborhood safety
+    And collective supervision is more effective than isolation
+    When the neighborhood_elohim coordinates safety cooperation
+    Then it should enable coordinated supervision of playing children
+    And it should help parents watch out for all neighborhood kids
+    And collective care should be recognized and valued
+    And neighborhood should become safer through cooperation
+    And children should have freedom within community care
+    And the system should enable collective responsibility for children

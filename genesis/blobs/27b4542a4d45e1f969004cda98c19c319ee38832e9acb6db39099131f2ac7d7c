@@ -1,0 +1,9 @@
+Scenario: Community members invest in preserving neighborhood institution
+    Given neighbors value Rosa's Auto but have no ownership pathway
+    And community members want to support local businesses beyond patronage
+    When community investment pool enables neighborhood participation
+    Then neighbors invest modest amounts ($2K-$10K) in acquisition financing
+    And investors receive fair return (5% annually) plus social benefit
+    And investment enables Rosa's dignified exit while protecting workers
+    And community gains democratic governance voice in institution they supported
+    And community_elohim manages investment relationships transparently

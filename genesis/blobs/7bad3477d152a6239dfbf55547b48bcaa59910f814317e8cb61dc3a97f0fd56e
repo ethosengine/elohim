@@ -1,0 +1,10 @@
+Scenario: Surveillance transforms from extraction to protection
+    Given workplace cameras previously monitored workers for corporate benefit
+    And cameras now operate as witness infrastructure under worker control
+    When a customer harasses Maria during her shift
+    And the incident is captured on camera
+    Then the footage is immediately available to Maria
+    And Maria can democratically propose banning the customer
+    And management cannot delete or modify the footage
+    And the footage cannot be used for speedup or discipline without worker consent
+    And Maria's dignity is architecturally protected

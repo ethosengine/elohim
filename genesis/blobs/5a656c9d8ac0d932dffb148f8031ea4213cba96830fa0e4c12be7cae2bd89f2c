@@ -1,0 +1,10 @@
+Scenario: Care economy capital accumulation for community standing
+    Given Margaret makes substantial community contributions
+    And accumulated care tokens represent community standing
+    When community decisions are made about resources or priorities
+    Then Margaret's care contributions should give her voice
+    And care economy should inform community governance
+    And those who contribute care should have standing in decisions
+    And community should operate on care economy principles
+    And Margaret's service should be recognized in community leadership
+    And care-based governance should be operational

@@ -1,0 +1,26 @@
+{
+  "id": "community-homeschool-coop",
+  "did": "did:web:elohim.host:community:homeschool-coop",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Homeschool Coop",
+  "description": "Community with 3 members",
+  "content": "# Homeschool Coop\n\n**Members:** 3\n\n## Member List\n\n- human-susan-spouse\n- human-sammy-son\n- human-timothy-tutor",
+  "contentFormat": "markdown",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-susan-spouse",
+    "human-sammy-son",
+    "human-timothy-tutor"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 3
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-26T21:04:01.745Z"
+}

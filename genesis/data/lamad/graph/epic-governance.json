@@ -1,0 +1,505 @@
+{
+  "id": "graph-epic-governance",
+  "title": "AI Governance Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Governance epic",
+  "lastUpdated": "2025-11-28T21:09:48.302024",
+  "zoomLevel": 1,
+  "parentId": "governance-epic",
+  "epicKey": "governance",
+  "nodes": [
+    {
+      "id": "governance-epic",
+      "title": "AI Governance",
+      "contentType": "epic",
+      "description": "Constitutional oversight, appeals, and democratic AI governance",
+      "hasChildren": true,
+      "childCount": 25,
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "level": 1,
+      "isParent": true
+    },
+    {
+      "id": "feature-governance-policy-maker-scenarios-nation-state",
+      "title": "National-Level Policy Making for AI Governance",
+      "contentType": "feature",
+      "description": "As a policy_maker in the governance system Operating at the nation_state governance layer I want to establish national framework for democratic AI governance So that protocol can flourish while integr",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 150.0,
+        "y": 0.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-policy-maker-scenarios-global",
+      "title": "Global-Level Policy Making for AI Governance",
+      "contentType": "feature",
+      "description": "As a policy_maker in the governance system Operating at the global governance layer I want to participate in international AI governance frameworks So that democratic governance can flourish globally ",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 145.28747416929465,
+        "y": 37.30348307472822
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-policy-maker-scenarios-provincial-state",
+      "title": "Provincial/State-Level Policy Making for AI Governance",
+      "contentType": "feature",
+      "description": "As a policy_maker in the governance system Operating at the provincial_state governance layer I want to create enabling legislation for democratic AI governance So that protocol serves communities whi",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 131.44600200657953,
+        "y": 72.2630511152573
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-appellant-scenarios-nation-state",
+      "title": "National-Level Appeal Process for Appellant",
+      "contentType": "feature",
+      "description": "As an appellant in the governance system Operating at the national governance layer I want appeals addressing fundamental constitutional questions So that national precedent protects human dignity acr",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 109.34529411321174,
+        "y": 102.68206588930329
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-appellant-scenarios-individual-family",
+      "title": "Individual/Family Governance for Appellant",
+      "contentType": "feature",
+      "description": "As an appellant in the governance system Operating at the individual/family governance layer I want to challenge agent decisions that affect my personal autonomy and privacy So that I can maintain dig",
+      "hasChildren": true,
+      "childCount": 7,
+      "position": {
+        "x": 80.37401924684949,
+        "y": 126.64918882530226
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-appellant-scenarios-family",
+      "title": "Family-Level Appeal Process for Appellant",
+      "contentType": "feature",
+      "description": "As an appellant in the governance system Operating at the family governance layer I want to appeal Family Elohim decisions that affect family dynamics and relationships So that family autonomy and car",
+      "hasChildren": true,
+      "childCount": 10,
+      "position": {
+        "x": 46.35254915624212,
+        "y": 142.65847744427302
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-appellant-scenarios-individual",
+      "title": "Individual-Level Appeal Process for Appellant",
+      "contentType": "feature",
+      "description": "As an appellant in the governance system Operating at the individual governance layer I want to appeal AI agent decisions that affect my personal autonomy and dignity So that I have meaningful recours",
+      "hasChildren": true,
+      "childCount": 10,
+      "position": {
+        "x": 9.41857792939703,
+        "y": 149.70400926424074
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-appellant-scenarios-global",
+      "title": "Global Governance for Appellant",
+      "contentType": "feature",
+      "description": "As an appellant in the governance system Operating at the global governance layer I want participation in humanity's constitutional evolution So that lived experience of dignity violations shapes univ",
+      "hasChildren": true,
+      "childCount": 9,
+      "position": {
+        "x": -28.10719718785869,
+        "y": 147.3430876093033
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-appellant-scenarios-community",
+      "title": "Community-Level Appeal Process for Appellant",
+      "contentType": "feature",
+      "description": "As an appellant in the governance system Operating at the community governance layer I want rapid, accessible appeals for Community Elohim decisions So that local governance remains responsive and acc",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -63.86689373476091,
+        "y": 135.7240578699029
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-appellant-scenarios-provincial-state",
+      "title": "Provincial/State-Level Appeal Process for Appellant",
+      "contentType": "feature",
+      "description": "As an appellant in the governance system Operating at the provincial/state governance layer I want appeals that establish regional constitutional precedent So that complex cases and novel situations g",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -95.61359846230346,
+        "y": 115.57698641636838
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-researcher-scenarios-nation-state",
+      "title": "National-Level Governance Research for Researcher",
+      "contentType": "feature",
+      "description": "As a researcher in the governance system Operating at the national governance layer I want to analyze governance patterns affecting entire nations So that I can inform national policy and understand d",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -121.3525491562421,
+        "y": 88.16778784387098
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-researcher-scenarios-global",
+      "title": "Global-Level Governance Research for Researcher",
+      "contentType": "feature",
+      "description": "As a researcher in the governance system Operating at the global governance layer I want to study protocol adoption and governance across all humanity So that I can understand universal patterns and c",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -139.4664728832377,
+        "y": 55.21868290270172
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-researcher-scenarios-community",
+      "title": "Community-Level Governance Research for Researcher",
+      "contentType": "feature",
+      "description": "As a researcher in the governance system Operating at the community governance layer I want to conduct intensive case studies of how sortition governance works in practice So that I can understand liv",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -148.81720519717166,
+        "y": 18.79998503464568
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-researcher-scenarios-national",
+      "title": "National Governance for Researcher",
+      "contentType": "feature",
+      "description": "As a researcher in the governance system Operating at the national governance layer I want to conduct longitudinal research on democratic AI governance So that long-term effects and transformations ar",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -148.8172051971717,
+        "y": -18.799985034645644
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-researcher-scenarios-provincial-state",
+      "title": "Provincial/State-Level Governance Research for Researcher",
+      "contentType": "feature",
+      "description": "As a researcher in the governance system Operating at the provincial/state governance layer I want to conduct comparative quantitative studies across many communities So that I can identify patterns, ",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -139.4664728832377,
+        "y": -55.21868290270169
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-community-leader-scenarios-municipality",
+      "title": "Municipal-Level Governance Coordination for Community Leader",
+      "contentType": "feature",
+      "description": "As a community_leader in the governance system Operating at the municipal governance layer I want to coordinate protocol across neighborhoods within the city So that different areas can collaborate wh",
+      "hasChildren": true,
+      "childCount": 14,
+      "position": {
+        "x": -121.35254915624216,
+        "y": -88.1677878438709
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-community-leader-scenarios-municipal",
+      "title": "Municipal Governance for Community Leader",
+      "contentType": "feature",
+      "description": "As a community_leader in the governance system Operating at the municipal governance layer I want to coordinate across Riverside neighborhoods for citywide flourishing So that diverse neighborhood nee",
+      "hasChildren": true,
+      "childCount": 7,
+      "position": {
+        "x": -95.61359846230343,
+        "y": -115.5769864163684
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-community-leader-scenarios-community",
+      "title": "Community-Level Governance Integration for Community Leader",
+      "contentType": "feature",
+      "description": "As a community_leader in the governance system Operating at the community governance layer I want to integrate Elohim Protocol with existing democratic structures So that AI governance serves communit",
+      "hasChildren": true,
+      "childCount": 14,
+      "position": {
+        "x": -63.86689373476082,
+        "y": -135.72405786990296
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-technical-expert-scenarios-nation-state",
+      "title": "National-Level Technical Expertise for Constitutional Governance",
+      "contentType": "feature",
+      "description": "As a technical_expert in the governance system Operating at the nation_state governance layer I want to advise on national constitutional questions involving technical complexity So that democratic go",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -28.107197187858695,
+        "y": -147.3430876093033
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-technical-expert-scenarios-global",
+      "title": "Global-Level Technical Expertise for Planetary AI Governance",
+      "contentType": "feature",
+      "description": "As a technical_expert in the governance system Operating at the global governance layer I want to inform Global Constitutional Convention about superintelligence governance So that humanity can make i",
+      "hasChildren": true,
+      "childCount": 14,
+      "position": {
+        "x": 9.418577929396925,
+        "y": -149.70400926424074
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-technical-expert-scenarios-provincial-state",
+      "title": "Provincial/State-Level Technical Expertise for Council Advisory",
+      "contentType": "feature",
+      "description": "As a technical_expert in the governance system Operating at the provincial_state governance layer I want to explain complex AI systems to Constitutional Councils So that citizen deliberation is inform",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 46.352549156242084,
+        "y": -142.65847744427305
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-constitutional-council-member-scenarios-nation-state",
+      "title": "National-Level Constitutional Council Deliberation for Council Member",
+      "contentType": "feature",
+      "description": "As a constitutional_council_member in the governance system Operating at the nation_state governance layer I want to deliberate on fundamental constitutional questions affecting millions So that natio",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": 80.37401924684951,
+        "y": -126.64918882530225
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-constitutional-council-member-scenarios-global",
+      "title": "Global-Level Constitutional Council Deliberation for Council Member",
+      "contentType": "feature",
+      "description": "As a constitutional_council_member in the governance system Operating at the global governance layer I want to participate in planetary constitutional governance So that humanity collectively shapes h",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 109.34529411321168,
+        "y": -102.68206588930335
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-constitutional-council-member-scenarios-community",
+      "title": "Community-Level Constitutional Council Deliberation for Council Member",
+      "contentType": "feature",
+      "description": "As a constitutional_council_member in the governance system Operating at the community governance layer I want to provide democratic oversight of AI decisions through citizen deliberation So that agen",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": 131.44600200657948,
+        "y": -72.26305111525741
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-governance-constitutional-council-member-scenarios-provincial-state",
+      "title": "Provincial/State-Level Constitutional Council Deliberation for Council Member",
+      "contentType": "feature",
+      "description": "As a constitutional_council_member in the governance system Operating at the provincial_state governance layer I want to deliberate on complex regional appeals and establish precedent So that constitu",
+      "hasChildren": true,
+      "childCount": 10,
+      "position": {
+        "x": 145.28747416929465,
+        "y": -37.303483074728305
+      },
+      "level": 1,
+      "isParent": false
+    }
+  ],
+  "edges": [
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-policy-maker-scenarios-nation-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-policy-maker-scenarios-global",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-policy-maker-scenarios-provincial-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-appellant-scenarios-nation-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-appellant-scenarios-individual-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-appellant-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-appellant-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-appellant-scenarios-global",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-appellant-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-appellant-scenarios-provincial-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-researcher-scenarios-nation-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-researcher-scenarios-global",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-researcher-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-researcher-scenarios-national",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-researcher-scenarios-provincial-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-community-leader-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-community-leader-scenarios-municipal",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-community-leader-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-technical-expert-scenarios-nation-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-technical-expert-scenarios-global",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-technical-expert-scenarios-provincial-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-constitutional-council-member-scenarios-nation-state",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-constitutional-council-member-scenarios-global",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-constitutional-council-member-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "governance-epic",
+      "target": "feature-governance-constitutional-council-member-scenarios-provincial-state",
+      "type": "CONTAINS"
+    }
+  ],
+  "totalNodes": 26,
+  "totalEdges": 25
+}

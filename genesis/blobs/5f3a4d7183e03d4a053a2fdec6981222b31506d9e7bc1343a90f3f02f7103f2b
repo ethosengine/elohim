@@ -1,0 +1,7 @@
+Scenario: Navigating family expectations about availability
+    Given family members may not understand my work constraints
+    When family expects more availability than I can provide
+    Then the protocol should help me communicate my limitations
+    And provide evidence of my actual time and energy constraints
+    And support me in setting realistic boundaries
+    And help family understand that my constraints reflect employment structure not lack of care

@@ -1,0 +1,9 @@
+Scenario: Emergency backup support from trusted neighbors
+    Given caregiving emergencies occur unexpectedly
+    And James might need urgent help with David
+    When the neighborhood_elohim coordinates emergency support
+    Then it should identify trusted neighbors for backup
+    And it should ensure neighbors are trained for basic support
+    And emergency contacts should be readily available
+    And neighborhood should provide safety net for crisis
+    And James should have local emergency backup beyond 911

@@ -1,0 +1,12 @@
+Scenario: Neighborhood time bank values all contributions equitably
+    Given Robert contributes professional skills and labor
+    And neighbors contribute different skills and capacities
+    And all contributions have value in care economy
+    When neighborhood_elohim manages time bank
+    Then it should value Robert's professional mentoring and manual labor equally
+    And recognize all neighborhood contributions as care work
+    And prevent hierarchy where professional skills are valued more than care labor
+    And build neighborhood equity through time bank reciprocity
+    And demonstrate care economy principles in practice
+    And strengthen neighborhood through mutual recognition
+    And create alternative economy based on care rather than market

@@ -1,0 +1,10 @@
+Scenario: Protecting Margaret's time for self-care and personal life
+    Given Margaret's family depends on her care contributions
+    And she needs time for her own health and well-being
+    When the family_elohim monitors Margaret's time allocation
+    Then it should protect her time for personal needs
+    And it should flag when family demands encroach on self-care
+    And Margaret should be supported in setting boundaries
+    And family should understand that her care capacity requires self-care
+    And she should be encouraged to maintain her own friendships and interests
+    And the system should prevent family from consuming all her time

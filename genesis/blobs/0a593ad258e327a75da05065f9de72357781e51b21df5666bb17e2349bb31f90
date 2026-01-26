@@ -1,0 +1,9 @@
+Scenario: Multigenerational family care patterns include young child
+    Given Tommy's grandparent is part of the extended family
+    And the grandparent provides childcare
+    When Tommy interacts with grandparent through care economy
+    Then his care contributions should be visible to grandparent
+    And grandparent's care for Tommy should be tracked
+    And the family_elohim should coordinate across generations
+    And Tommy should learn that care flows in multiple directions
+    And family care economy should span beyond nuclear household

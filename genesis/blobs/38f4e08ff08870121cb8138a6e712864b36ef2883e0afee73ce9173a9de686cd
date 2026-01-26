@@ -1,0 +1,10 @@
+Scenario: Teen learns healthy work-life boundaries
+    Given Jasmine's employer frequently requests last-minute schedule changes
+    And this disrupts her school and family commitments
+    When workplace_elohim tracks scheduling patterns
+    Then it should recognize the boundary violation
+    And help her understand that she has right to reasonable scheduling
+    And support her in negotiating better scheduling practices
+    And teach her that workers can and should set boundaries
+    And build her expectation that work should respect whole life
+    And prepare her for adult advocacy for work-life balance

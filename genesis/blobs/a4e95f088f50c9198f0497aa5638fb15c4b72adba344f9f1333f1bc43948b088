@@ -1,0 +1,10 @@
+Scenario: Environmental education through direct nature connection
+    Given children need connection to living world
+    And Sarah takes Tommy and Emma to parks, forests, waterways
+    When the ecological_elohim tracks nature-based education
+    Then it should recognize outdoor time as valuable educational labor
+    And it should value Sarah's work facilitating nature connection
+    And teaching through direct ecological experience should accumulate tokens
+    And the system should recognize that nature connection is parenting work
+    And environmental education should be valued alongside academic learning
+    And Sarah's effort to build children's nature relationship should be recognized

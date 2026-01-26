@@ -1,0 +1,12 @@
+Scenario: Managing workplace performance while dealing with ongoing trauma and stress
+    Given I am working while still recovering from trauma
+    And trauma symptoms may affect my workplace performance
+    When trauma impacts my work capability
+    Then the workplace_elohim helps me manage performance expectations realistically
+    And provides strategies for trauma management in workplace
+    And helps me access workplace mental health resources if available
+    And validates that trauma affects work capacity and that's normal
+    And identifies when workplace environment is retraumatizing
+    And my personal_agent reminds me of coping strategies during work stress
+    And recognizes that working while traumatized is extraordinarily difficult
+    And supports appropriate accommodations or job changes if needed

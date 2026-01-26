@@ -1,0 +1,11 @@
+Scenario: Neighbors checking on elderly without surveillance feeling
+    Given Helen lives alone and neighbors are concerned
+    And informal neighborhood care networks exist
+    When neighbors check on Helen's wellbeing
+    Then the neighborhood_elohim should coordinate wellness checks
+    And neighbors should be guided to check naturally: "Saw you haven't been out"
+    And Helen should experience concern, not surveillance
+    And her privacy should be respected
+    And neighborhood care should feel organic, not institutional
+    And connection should preserve dignity
+    And the protocol should facilitate genuine community care

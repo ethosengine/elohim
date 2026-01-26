@@ -1,0 +1,9 @@
+Scenario: Preventing work-care burnout through boundary support
+    Given Maria faces constant impossible conflicts between work and sole parenting
+    And work-care conflict is primary driver of single parent burnout
+    When the workplace_elohim monitors Maria's situation
+    Then it should detect when conflicts are becoming unsustainable
+    And it should alert Maria before burnout occurs
+    And it should help her maintain necessary boundaries with employer
+    And it should suggest interventions including policy advocacy or job changes if needed
+    And Maria should have AI support for preventing work-driven burnout

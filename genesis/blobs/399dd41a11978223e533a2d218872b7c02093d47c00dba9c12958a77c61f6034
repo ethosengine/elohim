@@ -1,0 +1,9 @@
+Scenario: Developer childcare commitment becomes enforceable
+    Given a developer promised on-site childcare facility as community benefit
+    And families counted on childcare when development was approved
+    When the Observer tracks community benefit delivery
+    Then monitoring shows: childcare space was never built
+    And developer converted it to retail space increasing revenue
+    And families who moved to development lack promised childcare
+    And broken commitment affects working families' ability to afford housing
+    And accountability creates real consequences for unkept promises

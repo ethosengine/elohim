@@ -1,0 +1,10 @@
+Scenario: Teaching food sovereignty through kitchen skills
+    Given Margaret knows how to cook from scratch and make nutritious meals
+    And kitchen skills support food sovereignty and health
+    When Margaret teaches grandchildren cooking and food preparation
+    Then the bioregional_elohim should recognize cooking as care work
+    And it should value food sovereignty education
+    And it should track kitchen skills transmission
+    And cooking should accumulate care tokens
+    And Margaret's teaching should support family and community food security
+    And traditional food knowledge should be preserved and valued

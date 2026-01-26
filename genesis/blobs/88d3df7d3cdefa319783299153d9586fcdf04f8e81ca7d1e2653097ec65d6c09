@@ -1,0 +1,10 @@
+Scenario: Maintaining personal flourishing under care responsibilities
+    Given Sarah has been prioritizing everyone else's needs
+    And her personal_agent monitors her well-being patterns
+    And Sarah's nutrition, exercise, and social connection are declining
+    When two weeks pass without self-care
+    Then the personal_agent should recognize unsustainable sacrifice
+    And it should prompt "You've prioritized everyone else's needs for two weeks—what would support your flourishing?"
+    And it should frame self-care as essential stewardship, not selfishness
+    And it should recognize that care for self enables care for others
+    And Sarah should receive support in maintaining her own capacity

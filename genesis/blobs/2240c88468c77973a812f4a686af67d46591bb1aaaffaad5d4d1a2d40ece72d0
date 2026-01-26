@@ -1,0 +1,11 @@
+Scenario: Sustainable building practices in Habitat construction work
+    Given Frank volunteers 20 hours/week in construction
+    And building practices have significant environmental impact
+    When the bioregional_elohim tracks Frank's construction work
+    Then it should recognize opportunities for sustainable building techniques
+    And suggest energy-efficient construction methods
+    And facilitate use of recycled or sustainable materials
+    And help Frank apply his skills to ecological building
+    And quantify environmental benefit of sustainable construction choices
+    And recognize that his labor can serve both housing and ecological goals
+    And Habitat work should model sustainable building practices

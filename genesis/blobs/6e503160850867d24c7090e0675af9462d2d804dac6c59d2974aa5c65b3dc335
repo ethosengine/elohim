@@ -1,0 +1,9 @@
+Scenario: Manager coordinates operations to serve community needs workers prioritize
+    Given workers democratically decided to prioritize local sourcing
+    And operational coordination is needed for supply chain transition
+    When Marcus coordinates shift from Sysco to Johnson Farm
+    Then Marcus manages logistics of local procurement
+    And Marcus tracks quality, costs, and community feedback
+    And Marcus ensures operational transition doesn't disrupt service
+    And workers govern strategic decision, Marcus executes operationally
+    And community benefits from local food system Marcus helps coordinate

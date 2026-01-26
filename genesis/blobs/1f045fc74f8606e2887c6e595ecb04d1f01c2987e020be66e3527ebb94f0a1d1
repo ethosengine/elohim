@@ -1,0 +1,10 @@
+Scenario: Building care relationships that will support Margaret's aging
+    Given Margaret is building neighborhood relationships now
+    And she will need neighborhood support as she ages
+    When the neighborhood_elohim tracks care relationship development
+    Then it should recognize Margaret is building care economy capital
+    And her current contributions should create future reciprocity
+    And neighbors she helps now will help her later
+    And neighborhood care networks should support aging in place
+    And Margaret's care work should enable her own aging in community
+    And neighborhood relationships should provide long-term security

@@ -1,0 +1,10 @@
+Scenario: Coordinating family support without infantilization
+    Given Jordan sometimes needs family help with complex tasks
+    And Jordan's mother tends to be over-protective
+    When Jordan requests help with a medical appointment
+    Then the personal_agent sends the help request to family
+    And the family_elohim reminds parents about supported decision-making
+    And Jordan's mother helps Jordan understand options
+    But Jordan makes the final decision with support
+    And Jordan's adult autonomy is preserved through the interaction
+    And the family learns to support without taking over

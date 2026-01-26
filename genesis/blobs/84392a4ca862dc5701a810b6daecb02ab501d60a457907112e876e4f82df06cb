@@ -1,0 +1,9 @@
+Scenario: Teacher understanding of single-parent household stress on children
+    Given children in single-parent families may experience unique stressors
+    And teachers should understand these realities without stigmatizing
+    When teachers work with Maria's children
+    Then the educational_elohim should help educators understand single-parent contexts
+    And teachers should recognize potential impacts on children without deficit framing
+    And children should receive appropriate support without being labeled as "at-risk" due to family structure
+    And schools should support thriving despite different family structures
+    And Maria's children should be seen as individuals, not stereotyped by single-parent status

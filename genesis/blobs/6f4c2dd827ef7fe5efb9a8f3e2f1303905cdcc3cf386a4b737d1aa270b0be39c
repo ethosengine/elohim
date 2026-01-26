@@ -1,0 +1,9 @@
+Scenario: Neighborhood memorial preparation supports anticipatory grief
+    Given David's condition is progressive and terminal
+    And James experiences anticipatory grief constantly
+    When the neighborhood_elohim recognizes grief support needs
+    Then it should connect James to grief support resources
+    And neighbors should be prepared to support through eventual loss
+    And anticipatory grief should be recognized and honored
+    And neighborhood should plan to support James through progressive loss
+    And care relationships should extend through grief and beyond

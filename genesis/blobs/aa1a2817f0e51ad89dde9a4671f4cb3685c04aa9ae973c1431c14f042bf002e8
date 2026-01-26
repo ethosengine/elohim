@@ -1,0 +1,10 @@
+Scenario: Grandparents' childcare contributions recognized and valued
+    Given Sarah's parents provide regular childcare
+    And they help with Tommy and Emma multiple times weekly
+    When the family_elohim tracks grandparent care
+    Then their contributions should be quantified and valued
+    And they should accumulate care tokens for their labor
+    And their work should be recognized as essential family support
+    And grandparents should not be taken for granted
+    And multigenerational care should be reciprocal, not extractive
+    And the system should make grandparent labor visible and valued

@@ -1,0 +1,9 @@
+Scenario: Teacher provides evidence on class size policy
+    Given the board is considering budget cuts increasing class sizes
+    And board claims research shows class size doesn't matter
+    When teachers coordinate evidence-based advocacy through Observer
+    Then they present district's own data showing outcomes decline as sizes increase
+    And cite research on class size effects by grade level
+    And show neighboring district has lower ratios and better results
+    And provide teacher professional judgment grounded in evidence
+    And board decision becomes informed by multiple evidence sources

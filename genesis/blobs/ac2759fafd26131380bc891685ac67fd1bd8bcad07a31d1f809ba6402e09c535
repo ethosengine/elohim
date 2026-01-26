@@ -1,0 +1,10 @@
+Scenario: Joining neighborhood meal prep group
+    Given a meal prep group is forming in Aisha's neighborhood
+    And joining would reduce her time pressure and build community
+    When the neighborhood_elohim surfaces the opportunity
+    Then it should highlight the practical benefits
+    And it should show how it fits her budget and time constraints
+    And it should explain the care economy dimension
+    And the system should facilitate her joining process
+    And neighborhood participation should provide tangible value
+    And community building should solve real problems

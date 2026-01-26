@@ -5,7 +5,8 @@ import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
-import { LearningPath, AgentProgress } from '../../models';
+import { LearningPath } from '../../models';
+import { AgentProgress } from '@app/elohim/models/agent.model';
 
 describe('PathOverviewComponent', () => {
   let component: PathOverviewComponent;
@@ -37,7 +38,7 @@ describe('PathOverviewComponent', () => {
         stepNarrative: 'First step',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 1,
@@ -46,7 +47,7 @@ describe('PathOverviewComponent', () => {
         stepNarrative: 'Second step',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 2,
@@ -55,7 +56,7 @@ describe('PathOverviewComponent', () => {
         stepNarrative: 'Third step',
         learningObjectives: [],
         optional: true,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 3,
@@ -64,9 +65,9 @@ describe('PathOverviewComponent', () => {
         stepNarrative: 'Fourth step',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
-      }
-    ]
+        completionCriteria: [],
+      },
+    ],
   };
 
   const mockProgress: AgentProgress = {
@@ -79,7 +80,7 @@ describe('PathOverviewComponent', () => {
     stepAffinity: {},
     stepNotes: {},
     reflectionResponses: {},
-    attestationsEarned: []
+    attestationsEarned: [],
   };
 
   const mockAccessibleSteps = [0, 1, 2];
@@ -91,7 +92,7 @@ describe('PathOverviewComponent', () => {
     completedUniqueContent: 2,
     contentCompletionPercentage: 50,
     stepCompletionPercentage: 50,
-    sharedContentCompleted: 0
+    sharedContentCompleted: 0,
   };
 
   const mockContent: any = {
@@ -103,14 +104,42 @@ describe('PathOverviewComponent', () => {
     contentFormat: 'markdown',
     tags: [],
     relatedNodeIds: [],
-    metadata: {}
+    metadata: {},
   };
 
-  const mockAllSteps: any[] = [
-    { step: mockPath.steps[0], content: { ...mockContent, id: 'node-1' }, isCompleted: true, completedInOtherPath: false, isCompletedGlobally: true, hasPrevious: false, hasNext: true },
-    { step: mockPath.steps[1], content: { ...mockContent, id: 'node-2' }, isCompleted: true, completedInOtherPath: false, isCompletedGlobally: true, hasPrevious: true, hasNext: true },
-    { step: mockPath.steps[2], content: { ...mockContent, id: 'node-3' }, isCompleted: false, completedInOtherPath: false, isCompletedGlobally: false, hasPrevious: true, hasNext: true },
-    { step: mockPath.steps[3], content: { ...mockContent, id: 'node-4' }, isCompleted: false, completedInOtherPath: false, isCompletedGlobally: false, hasPrevious: true, hasNext: false }
+  const mockStepsMetadata: any[] = [
+    {
+      step: mockPath.steps[0],
+      stepIndex: 0,
+      isCompleted: true,
+      completedInOtherPath: false,
+      masteryLevel: 2,
+      masteryTier: 'practiced',
+    },
+    {
+      step: mockPath.steps[1],
+      stepIndex: 1,
+      isCompleted: true,
+      completedInOtherPath: false,
+      masteryLevel: 2,
+      masteryTier: 'practiced',
+    },
+    {
+      step: mockPath.steps[2],
+      stepIndex: 2,
+      isCompleted: false,
+      completedInOtherPath: false,
+      masteryLevel: 0,
+      masteryTier: 'unseen',
+    },
+    {
+      step: mockPath.steps[3],
+      stepIndex: 3,
+      isCompleted: false,
+      completedInOtherPath: false,
+      masteryLevel: 0,
+      masteryTier: 'unseen',
+    },
   ];
 
   beforeEach(async () => {
@@ -119,12 +148,16 @@ describe('PathOverviewComponent', () => {
       'getAccessibleSteps',
       'getPathCompletionByContent',
       'getChapterSummariesWithContent',
-      'getAllStepsWithCompletionStatus',
+      'getAllStepsMetadata',
       'getConceptProgressForPath',
-      'getChapterFirstStep'
+      'getChapterFirstStep',
     ]);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getProgressForPath']);
-    const seoServiceSpy = jasmine.createSpyObj('SeoService', ['updateForPath', 'updateSeo', 'setTitle']);
+    const seoServiceSpy = jasmine.createSpyObj('SeoService', [
+      'updateForPath',
+      'updateSeo',
+      'setTitle',
+    ]);
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path' });
 
@@ -137,9 +170,9 @@ describe('PathOverviewComponent', () => {
         { provide: SeoService, useValue: seoServiceSpy },
         {
           provide: ActivatedRoute,
-          useValue: { params: paramsSubject.asObservable() }
-        }
-      ]
+          useValue: { params: paramsSubject.asObservable() },
+        },
+      ],
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
@@ -152,7 +185,7 @@ describe('PathOverviewComponent', () => {
     pathService.getAccessibleSteps.and.returnValue(of(mockAccessibleSteps));
     pathService.getPathCompletionByContent.and.returnValue(of(mockCompletion));
     pathService.getChapterSummariesWithContent.and.returnValue(of([]));
-    pathService.getAllStepsWithCompletionStatus.and.returnValue(of(mockAllSteps));
+    pathService.getAllStepsMetadata.and.returnValue(of(mockStepsMetadata));
     pathService.getConceptProgressForPath.and.returnValue(of([]));
 
     fixture = TestBed.createComponent(PathOverviewComponent);
@@ -208,7 +241,7 @@ describe('PathOverviewComponent', () => {
       stepAffinity: {},
       stepNotes: {},
       reflectionResponses: {},
-      attestationsEarned: []
+      attestationsEarned: [],
     };
     agentService.getProgressForPath.and.returnValue(of(progressAllComplete));
     fixture.detectChanges();
@@ -237,7 +270,7 @@ describe('PathOverviewComponent', () => {
       stepAffinity: {},
       stepNotes: {},
       reflectionResponses: {},
-      attestationsEarned: []
+      attestationsEarned: [],
     };
     expect(component.hasStarted()).toBe(false);
   });
@@ -253,7 +286,7 @@ describe('PathOverviewComponent', () => {
       stepAffinity: {},
       stepNotes: {},
       reflectionResponses: {},
-      attestationsEarned: []
+      attestationsEarned: [],
     };
     agentService.getProgressForPath.and.returnValue(of(progressAllRequired));
     fixture.detectChanges();
@@ -320,7 +353,7 @@ describe('PathOverviewComponent', () => {
   it('should display advanced difficulty', () => {
     const advancedPath: LearningPath = {
       ...mockPath,
-      difficulty: 'advanced'
+      difficulty: 'advanced',
     };
     pathService.getPath.and.returnValue(of(advancedPath));
     fixture.detectChanges();

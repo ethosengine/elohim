@@ -1,0 +1,9 @@
+Scenario: Elder reaches out during health concern
+    Given Rose is feeling unwell and wants family support
+    When she creates a contribution mentioning she's not feeling well
+    And the guardian agent detects health concern indicators
+    Then her children are notified appropriately
+    And family members can coordinate support and check-ins
+    And if needed, healthcare resources are surfaced
+    And Rose experiences family care without having to explicitly ask for help
+    And the system respects her privacy while enabling family support

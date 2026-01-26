@@ -1,0 +1,9 @@
+Scenario: Individual privacy is constitutionally protected while value is witnessed
+    Given the Observer network documents workplace contributions
+    And Emma prefers privacy about certain personal matters
+    When Emma sets her privacy preferences
+    Then work contributions are documented (with her consent)
+    And personal conversations are not recorded or analyzed
+    And bathroom breaks are not monitored for duration
+    And her personal data (health, family, beliefs) remains sovereign
+    And surveillance serves dignity protection, not corporate control

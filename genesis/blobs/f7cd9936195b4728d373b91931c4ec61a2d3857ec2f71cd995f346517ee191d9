@@ -1,0 +1,11 @@
+Scenario: Addressing implementation challenges pragmatically
+    Given Riverside faces practical problems with protocol
+    And elderly residents struggle with technology
+    When I work to solve accessibility issues
+    Then we maintain: human service windows for tech-reluctant residents
+    And we offer: paper-based alternatives to digital interfaces
+    And we run: continuous education programs
+    And we provide: in-person support and assistance
+    And we ensure: no resident excluded due to tech barriers
+    And we adapt: implementation to community reality
+    And protocol serves: everyone not just tech-savvy

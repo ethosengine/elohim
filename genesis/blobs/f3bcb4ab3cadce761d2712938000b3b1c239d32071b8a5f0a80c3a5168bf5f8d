@@ -1,0 +1,12 @@
+Scenario: Mentoring and leadership valued as care contribution
+    Given Robert mentors junior employees and provides leadership
+    And workplace mentoring is care work
+    And his leadership develops others' capabilities
+    When workplace_elohim recognizes workplace care contributions
+    Then it should value Robert's mentoring as care economy participation
+    And track his contributions: mentoring relationships, team development, organizational leadership
+    And recognize that developing others is care for people and organization
+    And demonstrate that leadership is care work
+    And value workplace care contributions in care token economy
+    And build understanding that all work includes care dimensions
+    And integrate workplace care with broader care economy participation

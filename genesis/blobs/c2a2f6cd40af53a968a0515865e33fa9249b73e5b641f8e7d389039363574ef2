@@ -1,0 +1,11 @@
+Scenario: Preparing community for potential authoritarian resistance
+    Given authoritarian threat to protocol might emerge
+    And I plan for protecting community sovereignty
+    When I establish contingency plans for resistance
+    Then we maintain: encrypted backups of community data
+    And we prepare: mesh networking for internet disruption
+    And we identify: sanctuary partners (university, churches)
+    And we plan: civil disobedience protocols if needed
+    And we retain: community fork option as last resort
+    And we hope: never to use these
+    And we know: community sovereignty matters more than protocol uniformity

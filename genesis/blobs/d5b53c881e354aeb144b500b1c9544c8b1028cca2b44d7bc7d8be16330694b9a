@@ -1,0 +1,10 @@
+Scenario: Municipal healthcare coordination supports aging residents
+    Given Frank and his wife both have aging-related healthcare needs
+    And navigating healthcare is increasingly complex
+    When the municipal_elohim coordinates healthcare access
+    Then it should help Frank navigate Medicare and healthcare systems
+    And coordinate with municipal health services
+    And support access to preventive and chronic care
+    And connect healthcare to care economy support systems
+    And Frank should maintain health through accessible municipal infrastructure
+    And municipal health policy should serve aging residents effectively

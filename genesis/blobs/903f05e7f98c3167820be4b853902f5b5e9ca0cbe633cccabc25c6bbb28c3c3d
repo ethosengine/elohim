@@ -1,0 +1,12 @@
+Scenario: Industry retirement and benefits policy includes care economy
+    Given Robert approaches retirement years
+    And industry benefits often inadequately support caregivers
+    And retirement policy should recognize care contributions
+    When industry_elohim supports benefits policy advocacy
+    Then it should help Robert advocate for care-inclusive benefits
+    And support industry adoption of caregiver support benefits
+    And help develop retirement policy that values care economy participation
+    And build benefits frameworks that support multigenerational care
+    And advance industry benefits that recognize whole-person needs
+    And demonstrate that care economy should inform benefits design
+    And create industry practices that support lifecycle care needs

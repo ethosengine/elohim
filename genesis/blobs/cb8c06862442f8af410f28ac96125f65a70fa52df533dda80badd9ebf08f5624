@@ -1,0 +1,9 @@
+Scenario: Customer privacy is protected while patterns inform worker decisions
+    Given corporate surveillance tracks customers for manipulative marketing
+    And Ms. Johnson values privacy but also appreciates being known
+    When democratic business respects privacy while valuing relationships
+    Then workers remember her through human relationship, not algorithmic tracking
+    And no customer data is sold or used for manipulation
+    And aggregate patterns (many customers requesting vegan options) inform decisions without individual surveillance
+    And privacy and personalization coexist through human dignity, not data extraction
+    And community_elohim ensures privacy-protecting pattern recognition

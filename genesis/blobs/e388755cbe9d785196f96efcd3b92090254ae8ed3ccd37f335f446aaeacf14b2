@@ -1,0 +1,10 @@
+Scenario: Workplace skills as transferable care economy capabilities
+    Given Kenji develops skills through work (customer service, teamwork, reliability)
+    And these capabilities serve him throughout life
+    When the workplace_elohim documents Kenji's skill development
+    Then it should recognize customer service as care economy skill
+    And it should value teamwork, communication, and problem-solving
+    And it should translate work skills to care economy capabilities
+    And it should help Kenji articulate skills for future opportunities
+    And the system should recognize all work as capability development
+    And Kenji should understand his part-time work as building life skills

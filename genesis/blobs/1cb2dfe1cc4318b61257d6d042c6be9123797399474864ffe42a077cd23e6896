@@ -1,0 +1,11 @@
+Scenario: Natural experiment comparing communities with vs without protocol
+    Given some adjacent communities adopted protocol while neighbors didn't
+    And these communities are similar in demographics and economics
+    When I study outcomes comparing adopters to non-adopters
+    Then I isolate: protocol effects from confounding factors
+    And I measure: differences in wellbeing, crisis response, social cohesion
+    And I examine: spillover effects across community boundaries
+    And I analyze: why some communities adopted and others resisted
+    And I provide: quasi-experimental evidence about causality
+    And My findings distinguish: correlation from causation in protocol effects
+    And Evidence serves policymakers deciding whether to support adoption

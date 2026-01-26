@@ -2,14 +2,12 @@
  * Barrel export for Lamad services
  *
  * Lamad is the Content/Learning pillar of the Elohim Protocol.
- * This barrel re-exports services from other pillars for backward compatibility.
  *
- * Pillar Structure:
- * - elohim/: Protocol-core (data loading, agents, trust)
- * - imagodei/: Identity (session, profile)
- * - lamad/: Content (paths, content, exploration, maps)
- * - qahal/: Community (affinity, consent, governance)
- * - shefa/: Economy (future)
+ * For services from other pillars, import directly:
+ * - @app/elohim/services/* - Protocol-core (data loading, agents, trust)
+ * - @app/imagodei/services/* - Identity (session, profile)
+ * - @app/qahal/services/* - Community (affinity, consent, governance)
+ * - @app/shefa/services/* - Economy
  */
 
 // ============================================================================
@@ -21,9 +19,6 @@ export { PathService } from './path.service';
 
 // Content access
 export { ContentService } from './content.service';
-
-// Kuzu embedded database (WASM) - re-exported from elohim
-export { KuzuDataService } from '@app/elohim/services/kuzu-data.service';
 
 // Graph exploration
 export { ExplorationService } from './exploration.service';
@@ -49,61 +44,34 @@ export { PathNegotiationService } from './path-negotiation.service';
 
 // Content mastery
 export { ContentMasteryService } from './content-mastery.service';
+export type { MigrationResult } from './content-mastery.service';
 
-// Local source chain (Holochain-style agent-centric storage) - re-exported from elohim
-export { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+// Mastery service (elohim-storage backend)
+export { MasteryService, MasteryLevels, MASTERY_LEVEL_ORDER } from './mastery.service';
+export type { MasteryLevelType } from './mastery.service';
+
+// Content relationships (elohim-storage backend)
+export { RelationshipService } from './relationship.service';
+
+// Practice pool and challenges (Khan Academy-style)
+export { PracticeService } from './practice.service';
+
+// Learning points (Shefa integration)
+export { PointsService } from './points.service';
 
 // Progress migration
 export { ProgressMigrationService } from './progress-migration.service';
 
 // ============================================================================
-// RE-EXPORTS FROM ELOHIM (Protocol-Core)
+// LAMAD STEWARD ECONOMY SERVICES
 // ============================================================================
 
-// Data loading
-export { DataLoaderService } from '@app/elohim/services/data-loader.service';
+// Stewardship allocations (one-to-many content stewardship)
+export { StewardshipAllocationService } from './stewardship-allocation.service';
+export type { StewardPortfolio, RecognitionDistribution } from './stewardship-allocation.service';
 
-// Also export data types for consumers
-export type {
-  AssessmentIndex,
-  AssessmentIndexEntry,
-  GovernanceIndex,
-  ChallengeRecord,
-  ProposalRecord,
-  PrecedentRecord,
-  DiscussionRecord,
-  GovernanceStateRecord
-} from '@app/elohim/services/data-loader.service';
+// Contributor dashboard & impact tracking
+export { ContributorService } from './contributor.service';
 
-// Agent management
-export { AgentService } from '@app/elohim/services/agent.service';
-
-// Elohim agent (AI guardians)
-export { ElohimAgentService } from '@app/elohim/services/elohim-agent.service';
-
-// Trust indicators
-export { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
-
-// ============================================================================
-// RE-EXPORTS FROM IMAGODEI (Identity)
-// ============================================================================
-
-// Session human (MVP temporary identity)
-export { SessionHumanService } from '@app/imagodei/services/session-human.service';
-
-// Profile (human-centered identity view, Imago Dei aligned)
-export { ProfileService } from '@app/imagodei/services/profile.service';
-
-// ============================================================================
-// RE-EXPORTS FROM QAHAL (Community)
-// ============================================================================
-
-// Learning state / affinity tracking
-export { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
-
-// Human consent (graduated intimacy)
-export { HumanConsentService } from '@app/qahal/services/human-consent.service';
-
-// Governance (challenges, proposals, precedents, deliberation)
-export { GovernanceService } from '@app/qahal/services/governance.service';
-export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from '@app/qahal/services/governance.service';
+// Steward economy (credentials, gates, access, revenue)
+export { StewardService } from './steward.service';

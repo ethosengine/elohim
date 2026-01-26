@@ -1,0 +1,12 @@
+Scenario: Negotiating employment flexibility for childcare and recovery needs
+    Given I need employment flexibility for childcare, therapy, legal appointments, and crisis management
+    And employers may resist flexibility or see it as liability
+    When I negotiate employment terms
+    Then the workplace_elohim helps me request appropriate accommodations
+    And provides language for negotiating flexibility professionally
+    And helps me understand my legal rights to reasonable accommodation
+    And validates that my needs are reasonable and should be accommodated
+    And identifies employers more likely to provide needed flexibility
+    And my personal_agent coaches me through negotiation conversations
+    And recognizes that advocating for my needs is professional strength
+    And supports me in finding employment compatible with my life

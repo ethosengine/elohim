@@ -1,0 +1,10 @@
+Scenario: Local board member identifies when community issues require higher-level action
+    Given neighborhood board addresses various community concerns
+    And some issues are within board authority while others require city or district action
+    And board wants to be effective by focusing advocacy appropriately
+    When the board member uses Observer governance layer analysis
+    Then they see which issues are addressable at community level
+    And identify which concerns require municipality or district decisions
+    And access guidance on advocacy strategies for different governance levels
+    And connect to relevant board members at higher governance layers
+    And clear governance mapping makes advocacy more strategic and effective

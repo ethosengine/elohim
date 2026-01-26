@@ -1,0 +1,11 @@
+Scenario: Household routines maintained for cognitive support
+    Given Helen's dementia makes routine important for functioning
+    And familiar patterns help her maintain independence
+    When the household_elohim supports daily routines
+    Then her established patterns should be preserved
+    And reminders should support her existing habits
+    And changes should be minimized to reduce confusion
+    And her personal_agent should say "Time for your morning tea, like always"
+    And routine should provide cognitive scaffolding
+    And household familiarity should support her capability
+    And the protocol should recognize that routine enables autonomy

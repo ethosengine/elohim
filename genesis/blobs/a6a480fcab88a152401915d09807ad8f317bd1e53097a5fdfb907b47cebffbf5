@@ -1,0 +1,9 @@
+Scenario: Customer benefits from community programs funded by value circulation
+    Given corporate extraction left minimal resources for community benefit
+    And Ms. Johnson and neighbors needed community support but lacked access
+    When democratic value distribution funds community programs
+    Then senior meal program provides affordable nutritious food and social connection
+    And subsidized pricing (sliding scale) ensures access across income levels
+    And community space is available for neighborhood organizing
+    And her patronage directly supports programs benefiting her and neighbors
+    And community_elohim manages community programs funded by democratic business

@@ -1,0 +1,10 @@
+Scenario: Parent recognized as child's primary educator
+    Given Sarah teaches Tommy and Emma continuously at home
+    And she is their first and most influential teacher
+    When the educational_elohim tracks educational contributions
+    Then it should recognize Sarah's parenting as educational work
+    And it should value home education alongside school education
+    And Sarah's teaching labor should accumulate care tokens
+    And parents should be understood as primary educators
+    And schools should be partners in education, not replacements for parents
+    And the system should make parent educational labor visible

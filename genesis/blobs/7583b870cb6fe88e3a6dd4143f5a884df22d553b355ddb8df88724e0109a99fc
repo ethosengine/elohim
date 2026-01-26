@@ -1,0 +1,12 @@
+Scenario: Communication and decision-making supported amid stress
+    Given Robert and Jennifer are both under substantial stress
+    And care demands can strain even strong partnerships
+    And important household decisions must be made collaboratively
+    When household_elohim facilitates communication
+    Then it should provide structured decision-making support
+    And ensure both partners have voice in household governance
+    And surface when stress is affecting communication
+    And prompt for check-ins: "You haven't had a planning conversation in 3 weeks"
+    And support them in maintaining partnership health
+    And recognize that their relationship needs protection amid care demands
+    And prevent household governance breakdown under stress

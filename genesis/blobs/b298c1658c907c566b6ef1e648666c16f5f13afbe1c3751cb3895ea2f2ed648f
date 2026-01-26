@@ -1,0 +1,10 @@
+Scenario: Neighborhood bulk shopping coordination
+    Given Margaret shops regularly at local stores
+    And bulk buying could reduce costs for multiple households
+    When the neighborhood_elohim coordinates shopping
+    Then Margaret should be connected to shopping cooperatives
+    And she could coordinate bulk purchases given her time availability
+    And multiple households should split bulk quantities
+    And Margaret's organizational labor should be recognized
+    And cost savings should benefit all participating households
+    And her time availability should serve neighborhood benefit

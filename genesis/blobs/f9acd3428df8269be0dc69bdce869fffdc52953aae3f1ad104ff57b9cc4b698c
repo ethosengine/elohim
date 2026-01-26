@@ -1,0 +1,12 @@
+Scenario: Understanding workplace rights and protections as vulnerable worker
+    Given I may face workplace discrimination, harassment, or rights violations
+    And vulnerable workers are often targeted for workplace abuse
+    When I encounter workplace problems or need to understand my rights
+    Then the workplace_elohim provides information on my workplace rights
+    And helps me identify illegal workplace practices
+    And connects me to legal resources or worker advocacy organizations
+    And validates that I deserve workplace protection and dignity
+    And helps me document workplace problems
+    And my personal_agent alerts me to rights violations
+    And recognizes that vulnerable workers need extra rights awareness
+    And supports me in demanding legal workplace treatment

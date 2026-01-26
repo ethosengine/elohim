@@ -1,0 +1,116 @@
+---
+epic: public_observer
+user_type: journalist
+archetype_name: "Democratic Sense-Maker"
+epic_domain: "Civic Democracy - Public oversight and democratic participation"
+governance_scope: [community, municipality, regional, state, national]
+related_users: [citizen, activist, politician, board_member, community_organizer]
+---
+
+# Journalist - Public Observer
+
+## Archetype
+
+The journalist archetype represents professional sense-makers, investigators, and accountability journalists who are supposed to inform the public and hold power accountable—but increasingly can't. Local newspapers have collapsed, replaced by nothing or by national outlets covering only sensational stories. The journalists who remain are stretched impossibly thin: one reporter covering city hall, county government, school board, planning commission, and five other civic bodies. They can't attend every meeting, read every document, track every promise, investigate every claim. They depend on press releases, official statements, and whoever returns calls—systematically favoring those with PR departments (government, corporations) over those without (community groups, individual citizens). Investigative journalism requires time and resources that most outlets no longer provide.
+
+When the epic says Observers are "the journalist that can't be fired," it captures both crisis and possibility. The crisis: trusted local journalism is being systematically defunded and destroyed because it doesn't generate sufficient profit for corporate owners, despite being essential democratic infrastructure. Advertisers fled to digital platforms, readers expect free content, hedge funds buy newspapers to strip assets and cut costs. The possibility: AI-powered observers can provide the systematic documentation, pattern recognition, and accountability tracking that journalism needs but can no longer afford—not replacing human journalists but giving them superpowers. An Observer monitoring every civic meeting, fact-checking every claim, tracking every promise, detecting every pattern, and maintaining institutional memory becomes infrastructure for human journalists to do what they do best: investigate, interpret, synthesize, and tell compelling stories that move public understanding and political will.
+
+Public Observers transform journalism from resource-constrained crisis management into empowered public service. Instead of one reporter trying to cover twelve civic bodies and mostly writing from press releases, that reporter has comprehensive civic meeting coverage as baseline, can quickly identify important patterns and stories, has fact-checking and research capacity on demand, and can focus time on investigative depth, human stories, and synthesis rather than mechanical coverage. For citizens, this means local journalism can exist again—not corporate-owned papers dependent on advertisers, but community-supported journalism built on Observer infrastructure. For democracy, this means accountability mechanisms return—corruption can't hide, patterns get exposed, power must answer to informed scrutiny.
+
+## Core Needs
+
+- **Comprehensive Civic Surveillance Infrastructure**: Journalists need systematic monitoring of all civic processes—every meeting, every decision, every document—which is impossible for human reporters to provide alone. A reporter can attend Tuesday's city council meeting OR Wednesday's planning commission OR Thursday's school board, not all three. Important decisions happen in meetings no journalist covers. Observers provide comprehensive civic surveillance: monitoring all meetings across all civic bodies, recording and transcribing everything, tracking all decisions and votes, maintaining searchable archives. This gives journalists complete coverage baseline—they can review any meeting, search for any topic, track any issue across time and jurisdictions. No important civic decision happens in the dark; journalists can find any story that emerges.
+
+- **Pattern Recognition at Scale**: Journalists need to detect patterns that indicate systemic issues, corruption, or important trends—but pattern recognition requires analyzing massive amounts of information. One zoning variance is a story; the same developer getting variances in eight municipalities despite community opposition is a pattern indicating corruption or system failure. One school closure is local news; systematic closure of schools in Black neighborhoods across a region is structural racism. Observers detect patterns: tracking actors across jurisdictions, identifying repeated tactics and outcomes, surfacing disparities and trends, connecting dots humans can't easily see. A journalist learns through Observer analysis that a development firm has been denied permits in three states for environmental violations, but just got approval from local planning commission—investigates relationships and conflicts of interest.
+
+- **Instant Research and Fact-Checking**: Journalists need to verify claims, investigate backgrounds, and research context—but this takes time they often don't have on deadline. A developer claims their project will create 200 jobs; journalist needs their actual track record. A politician claims to support climate action; journalist needs their voting record. An official cites a study; journalist needs to evaluate its credibility. Observers provide instant research: track records of actors (developers, politicians, organizations), voting histories and pattern analysis, fact-checking claims against public records, citation verification and source evaluation, historical context for current issues. A journalist writing about a school board vote has instant access to: board member voting histories, administrator claims verified against past performance, parent testimony contextualized with school data, comparison to other districts.
+
+- **Accountability Tracking Over Time**: Journalists need to track whether promises become reality, whether policies produce claimed results, whether institutions deliver on commitments—but this requires institutional memory that individual reporters can't maintain (especially with journalism job turnover). Politicians promise action then hope everyone forgets; programs launch with fanfare then quietly fail; commitments made to communities go unfulfilled. Observers maintain perfect institutional memory: tracking promises and commitments, monitoring policy implementation, measuring outcomes against projections, and alerting journalists when accountability stories emerge. A journalist gets Observer alert that three years ago city promised affordable housing development that was never built, investigates why, holds officials accountable.
+
+- **Source Development and Protection**: Journalists need sources—people with inside knowledge willing to share information—but source development takes time and relationships, and source protection requires security infrastructure. Observers can facilitate source development by: identifying people with relevant knowledge or stakes in issues, providing background research on potential sources, creating secure channels for anonymous tips and document sharing, and protecting whistleblowers and sensitive sources. A journalist investigates school district corruption, Observer identifies which board members voted against suspicious contracts (potential sources), provides secure channel for teachers to share information anonymously, tracks document trails showing conflicts of interest.
+
+## Key Relationships
+
+**To Citizens**: Journalists serve citizens by providing information needed for democratic participation and accountability. But traditional journalism often serves advertisers or corporate owners rather than community information needs. Observers help journalists serve citizens by: surfacing issues citizens actually care about (not just sensational headlines or elite concerns), enabling journalists to cover community news comprehensively rather than selectively, providing citizens with context and depth beyond headlines, and helping citizens verify information and participate in civic journalism. A journalist uses Observer data on community concerns to prioritize coverage of bus route issues affecting 230 families rather than following only official press releases.
+
+**To Activists and Organizers**: Journalists and activists have symbiotic but sometimes tense relationships. Activists need media coverage to amplify issues and build pressure; journalists need stories and sources but guard editorial independence. Activists may distrust journalists to frame issues accurately; journalists may see activists as biased sources. Observers help by: providing independent data both journalists and activists can trust, verifying activist claims against evidence, surfacing patterns that merit journalistic investigation, and facilitating journalist access to community voices activists organize. An activist shares Observer data on displacement patterns; journalist investigates and publishes in-depth story; public pressure builds for policy change.
+
+**To Politicians and Officials**: Journalists hold politicians and officials accountable—investigating decisions, verifying claims, exposing corruption, tracking promises. This is often adversarial (as it should be) but can also be collaborative (when officials want to communicate honestly). Observers strengthen accountability journalism by: making politician and official actions comprehensively visible, enabling real-time fact-checking of statements and claims, tracking voting records and policy outcomes, and exposing when rhetoric diverges from action. A journalist fact-checks mayor's speech in real-time using Observer data on city budget and policy outcomes, publishes analysis showing claims versus reality.
+
+**To Board Members**: Journalists cover volunteer boards making consequential decisions but often struggle to understand complex board domains (education policy, planning, housing finance) or distinguish between genuine board independence and rubber-stamping. Observers help journalists cover boards by: providing context and expertise on board domains, tracking board member voting patterns and decision history, identifying when boards are captured by staff or interests, and surfacing board decisions that merit public scrutiny. A journalist investigates school board using Observer data showing board consistently approves administrator recommendations despite community concerns—story exposes board capture by superintendent.
+
+**To Teachers and Public Employees**: Public employees are essential sources for journalists investigating government operations, policy impacts, and institutional dysfunction. But employees face retaliation for speaking to press. Observers help by: aggregating employee insights anonymously (patterns surface without exposing individuals), providing journalists with evidence to pursue stories without burning sources, creating secure channels for whistleblowing and document sharing, and documenting retaliation when it occurs. A journalist investigates school district using aggregated Observer data from teachers about unsafe conditions, doesn't need to quote individual teachers, protects sources while publishing accountability journalism.
+
+**To Other Journalists**: Journalists increasingly collaborate across outlets and regions, especially for investigative projects. Observers facilitate journalist collaboration by: providing shared civic surveillance infrastructure (all journalists can access same comprehensive meeting coverage), enabling coordinated investigation across jurisdictions, supporting journalist networks and information sharing, and democratizing access to research capacity (small outlets and independent journalists get same tools as large organizations). Regional journalists collaborate on investigation of housing displacement using Observer data across multiple municipalities, publish coordinated story revealing systemic patterns.
+
+**To Community**: Journalists are increasingly accountable to communities rather than corporate owners—through nonprofit models, membership support, community ownership. Observers support community-accountable journalism by: surfacing community information needs and priorities, enabling comprehensive local coverage despite resource constraints, providing infrastructure for community-supported journalism, and facilitating community participation in journalism (citizen verification, local knowledge contribution, collaborative investigation). A community-supported news outlet uses Observer infrastructure to provide comprehensive civic coverage, engages community members in story identification and verification, sustains journalism through memberships not advertising.
+
+**With Elohim Agents**:
+- **Public_observer agent**: Provides comprehensive civic meeting monitoring, transcription, and archiving—baseline surveillance infrastructure for journalism
+- **Pattern_elohim agent**: Analyzes civic data to detect patterns, trends, and anomalies that merit journalistic investigation
+- **Research_elohim agent**: Provides on-demand research, fact-checking, background investigation, and evidence compilation for journalists
+- **Archive_elohim agent**: Maintains searchable historical archive of civic decisions, documents, and outcomes for investigative journalism
+
+## Relevant Governance Layers
+
+### Geographic/Political
+
+**Community Layer**
+Community-level journalism (neighborhood news, hyperlocal coverage) is mostly extinct but desperately needed. Observers enable community journalism by: documenting neighborhood conditions and changes, tracking hyperlocal civic decisions, surfacing community stories and concerns, and enabling community members to participate in journalism. A neighborhood news site uses Observer infrastructure to monitor community meetings, track development proposals, document park conditions, and facilitate resident journalism contributions.
+
+**Municipality Layer**
+City and town governance is traditional domain of local journalism—city council, mayor, departments, planning, budgets. But most municipalities have lost dedicated coverage. Observers enable comprehensive municipal journalism by: monitoring all municipal meetings and decisions, tracking budget and policy implementation, analyzing municipal operations and outcomes, and enabling journalists to cover municipal governance despite resource constraints. One reporter covers entire city hall using Observer infrastructure, focuses time on investigative depth and accountability stories rather than mechanical meeting coverage.
+
+**Regional Layer**
+Regional patterns require journalism that crosses municipal boundaries—tracking development pressures, environmental issues, economic trends, policy outcomes across multiple cities. But regional journalism is expensive and rare. Observers enable regional journalism by: providing civic surveillance across multiple jurisdictions, detecting patterns at regional scale, facilitating journalist collaboration across coverage areas, and enabling comparison analysis across cities and counties. Regional journalists collaborate on affordable housing crisis investigation using Observer data across 15 municipalities, reveal systemic patterns and policy failures.
+
+**State/National Layer**
+State and national policy affects local communities but coverage is often disconnected from local impacts. Observers connect local and state/national journalism by: tracking how state policy affects specific communities, surfacing local stories that illustrate national issues, enabling local journalists to contribute to state/national coverage, and helping national journalists ground policy coverage in lived local realities. A national journalist covering education policy partners with local reporters using Observer data to show how state legislation affects specific schools and families across different communities.
+
+### Functional
+
+**Educational Layer**
+Education journalism is critically important but resource-intensive—requires understanding complex policy, tracking multiple districts and schools, monitoring boards and state agencies. Observers enable education journalism by: providing comprehensive education governance monitoring, analyzing student outcome patterns and disparities, tracking education funding and resource distribution, and surfacing teacher and parent perspectives. An education journalist covers regional education using Observer infrastructure, investigates equity gaps across districts, holds education systems accountable.
+
+**Ecological Layer**
+Environmental journalism requires tracking pollution, climate impacts, sustainability policy, and environmental justice across jurisdictions and time. Observers enable environmental journalism by: documenting environmental conditions and changes over time, tracking environmental permits and decisions, analyzing environmental disparities and justice issues, and monitoring climate policy implementation. Environmental journalists investigate regional pollution patterns using Observer data, expose environmental racism and regulatory failure.
+
+**Workplace Layer**
+Labor journalism covers worker conditions, wage trends, labor organizing, economic justice. Observers enable labor journalism by: documenting wage and employment patterns, tracking labor policy and violations, analyzing economic development outcomes for workers, and surfacing worker perspectives. Labor journalists investigate wage theft and worker exploitation using Observer data on violations and enforcement, hold employers and regulators accountable.
+
+## Implementation Notes
+
+- **Technical**:
+  - Journalist workspace: comprehensive civic meeting archive, advanced search and research tools, pattern detection and analysis, fact-checking infrastructure
+  - API access for integration with newsroom tools and custom analysis
+  - Alert systems for breaking stories and investigation opportunities
+  - Collaboration features for multi-journalist and cross-outlet projects
+  - Source management and protection infrastructure
+  - Evidence compilation and citation tools for publishing
+  - Integration with content management systems and publishing platforms
+  - Mobile access for on-the-ground reporting
+
+- **Privacy**:
+  - Journalists need access to public information (civic meetings, government actions, public official conduct) but must protect sources
+  - Observer provides: public official accountability transparency, anonymous source channels and protection, whistleblower security infrastructure, journalist communication security
+  - Clear distinction between public figure accountability (politicians, officials, powerful interests) and private citizen privacy
+  - No surveillance of journalist activities, sources, or investigations
+  - Protection from subpoenas and forced disclosure of journalist-source communications through Observer platform
+
+- **Interface**:
+  - Professional research tools for deep investigation
+  - Quick story identification: "What happened today that's newsworthy?"
+  - Background research: comprehensive information on any civic actor, issue, or decision
+  - Fact-checking tools: verify any claim against public records
+  - Pattern detection: "Show me all votes by this council member on housing policy over three years"
+  - Comparison analysis: "How does this city's approach compare to neighboring municipalities?"
+  - Citation and attribution: proper documentation for journalistic standards
+  - Training resources: "How to use Observer data for investigative journalism," "Civic governance primer for journalists"
+
+- **Democratic Health**:
+  - Journalists strengthen democracy by providing information citizens need to participate, holding power accountable, exposing corruption and injustice, and facilitating public deliberation—Observers make journalism sustainable and powerful despite economic collapse of traditional models
+  - Failure modes to avoid: Replacing journalist judgment with algorithmic news, automating journalism in ways that eliminate human sense-making and narrative, creating journalist dependence that could be weaponized, facilitating journalism that serves clicks over community information needs
+  - Success metrics: More comprehensive civic coverage, more investigative journalism exposing corruption and injustice, increased public trust in journalism, better-informed citizens and democratic participation, sustainable journalism models independent of advertising
+  - Distinction between journalism as public service (information commons) and as commercial product (attention extraction)—Observers support public service journalism
+  - Key principle: Observers provide infrastructure for journalism—systematic documentation, research capacity, pattern detection—but don't replace journalist skills of investigation, interpretation, synthesis, storytelling, and judgment about newsworthiness and public interest
+  - Recognition that journalism itself is governance layer (Fourth Estate)—holding other layers accountable, facilitating public deliberation, investigating corruption and injustice

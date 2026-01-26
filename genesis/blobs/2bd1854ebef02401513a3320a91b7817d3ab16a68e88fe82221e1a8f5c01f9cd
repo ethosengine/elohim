@@ -1,0 +1,10 @@
+Scenario: Emergency preparedness includes senior needs and capabilities
+    Given Margaret has nursing background and crisis response experience
+    And seniors have specific vulnerabilities in emergencies
+    When the municipality_elohim coordinates emergency planning
+    Then Margaret should be part of emergency response networks
+    And her skills should be known to emergency management
+    And senior vulnerabilities should be planned for
+    And senior capabilities should be mobilized in crisis
+    And municipal preparedness should include and empower seniors
+    And Margaret should contribute to community resilience

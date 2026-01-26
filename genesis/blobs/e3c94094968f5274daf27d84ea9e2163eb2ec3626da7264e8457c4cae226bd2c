@@ -1,0 +1,9 @@
+Scenario: Local food access points expand through community distribution partnerships
+    Given farmers markets and farm visits are not accessible to all community members
+    And transportation and schedule barriers limit food access
+    When democratic farm partners with community organizations for distribution
+    Then produce is delivered to senior centers, community centers, and schools
+    And distribution partnerships increase food access for mobility-limited residents
+    And community institutions become food access points supporting local agriculture
+    And equitable distribution ensures farm benefits entire community
+    And community_elohim coordinates community distribution partnerships

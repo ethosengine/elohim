@@ -1,0 +1,9 @@
+Scenario: Parent evaluates city's childcare infrastructure crisis
+    Given the parent struggles to find affordable childcare
+    And municipal zoning rules restrict home-based childcare
+    When the parent reviews Observer's childcare access analysis
+    Then they see municipality has 1 childcare slot per 4 children
+    And understand zoning restrictions reduce supply
+    And learn neighboring cities changed zoning to expand access
+    And discover other parents facing same childcare crisis
+    And parent advocacy targets municipal policy barriers

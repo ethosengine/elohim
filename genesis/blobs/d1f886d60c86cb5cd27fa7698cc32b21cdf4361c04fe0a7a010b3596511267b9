@@ -1,0 +1,11 @@
+Scenario: Longitudinal study of Constitutional Council member development
+    Given I am tracking council members like Sarah over time
+    And I want to understand how service affects them
+    When I study council members before, during, and after service
+    Then I measure: constitutional literacy development
+    And I assess: deliberative skill acquisition
+    And I examine: civic confidence and participation changes
+    And I track: whether capabilities persist after service ends
+    And I explore: whether service affects children's civic development
+    And I analyze: whether sortition creates democratic capacity at population scale
+    And My research tests: whether citizen governance transforms citizens

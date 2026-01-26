@@ -1,0 +1,9 @@
+Scenario: Organizer creates accessible materials on school funding formula
+    Given parents don't understand why their school has fewer resources
+    And school funding formula is complex and opaque
+    When the organizer requests education materials from Observer
+    Then they receive plain-language explanation of funding sources
+    And see visual comparison of per-pupil spending across schools
+    And get breakdown of how formula creates inequities
+    And access talking points for advocating for funding changes
+    And technical education finance becomes accessible community knowledge

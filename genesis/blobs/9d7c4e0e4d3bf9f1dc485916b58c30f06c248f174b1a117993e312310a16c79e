@@ -1,0 +1,11 @@
+Scenario: Family cultural values shape elderly care approach
+    Given Helen's family has specific cultural values about elder care
+    And different cultures have different expectations
+    When family care is coordinated
+    Then the family_elohim should respect cultural context
+    And care approaches should align with family cultural values
+    And Helen should receive care consistent with her cultural expectations
+    And family obligations should be understood culturally
+    And the protocol should serve diverse family structures and values
+    And no single model of "good elder care" should be imposed
+    And cultural wisdom about aging should be honored

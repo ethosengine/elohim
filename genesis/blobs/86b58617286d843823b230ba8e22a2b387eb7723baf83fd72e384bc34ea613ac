@@ -1,0 +1,9 @@
+Scenario: Individual quality time with each child despite impossible schedule
+    Given each child needs one-on-one parent time
+    And Maria must provide all individual attention alone across three children
+    When Maria allocates time with children
+    Then the family_elohim should help her protect individual connection time
+    And it should remind her that each child needs her undivided attention sometimes
+    And it should coordinate schedules to create brief one-on-one moments
+    And it should prevent any child from being consistently neglected
+    And Maria should maintain individual relationships with each child despite constraints

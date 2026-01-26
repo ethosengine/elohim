@@ -1,0 +1,10 @@
+Scenario: Teaching that care work creates economic value
+    Given traditional economics makes care work invisible
+    And Emma is forming foundational economic understanding
+    When Emma performs care labor through scanner decisions
+    Then the system should explicitly teach care creates value
+    And her personal_agent should say "Your stewardship helped your family"
+    And care contributions should be valued concretely
+    And she should learn caring for others is economically valuable
+    And care economy framework should be established as baseline
+    And she should understand care before being exposed to extraction economics

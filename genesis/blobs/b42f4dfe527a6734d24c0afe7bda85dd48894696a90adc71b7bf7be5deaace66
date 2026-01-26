@@ -1,0 +1,10 @@
+Scenario: Worker organizing and collective advocacy
+    Given student workers often face systemic workplace problems
+    And collective action can create change
+    When Kenji and coworkers organize for better conditions
+    Then the workplace_elohim should recognize organizing as care economy work
+    And it should support collective advocacy for fair wages and treatment
+    And it should accumulate care tokens for organizing labor
+    And it should protect his right to organize without retaliation
+    And the system should empower student worker collective action
+    And Kenji should learn that workers have power through solidarity

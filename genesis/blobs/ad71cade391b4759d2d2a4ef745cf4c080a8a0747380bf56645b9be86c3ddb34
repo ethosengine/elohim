@@ -1,0 +1,10 @@
+Scenario: Academic learning applied to daily ecological choices
+    Given Kenji studies environmental science academically
+    And he makes consumption decisions daily
+    When the bioregional_elohim connects learning to practice
+    Then it should help him apply academic knowledge to personal choices
+    And it should show "Your understanding of nitrogen cycles informs food decisions"
+    And it should bridge theory and practice
+    And it should recognize his daily life as laboratory for ecological care
+    And the system should integrate academic and practical ecological knowledge
+    And Kenji should live his environmental science education

@@ -1,0 +1,10 @@
+Scenario: Personal values preservation despite intense care demands
+    Given Sarah has core values beyond efficient caregiving
+    And she wants to raise children aligned with those values
+    When Sarah makes care decisions under pressure
+    Then the personal_agent should help her honor her values
+    And it should flag when expedience conflicts with principles
+    And it should support value-aligned decision making even when harder
+    And Sarah's integrity should be preserved despite overwhelming demands
+    And the system should help her be the parent she wants to be
+    And values should not be sacrificed to mere survival

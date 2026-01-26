@@ -22,7 +22,7 @@ describe('SearchService', () => {
         trustScore: 0.95,
         flags: [],
         createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-02T00:00:00.000Z'
+        updatedAt: '2025-01-02T00:00:00.000Z',
       },
       {
         id: 'content-2',
@@ -34,7 +34,7 @@ describe('SearchService', () => {
         trustScore: 0.85,
         flags: [],
         createdAt: '2025-01-02T00:00:00.000Z',
-        updatedAt: '2025-01-03T00:00:00.000Z'
+        updatedAt: '2025-01-03T00:00:00.000Z',
       },
       {
         id: 'content-3',
@@ -46,7 +46,7 @@ describe('SearchService', () => {
         trustScore: 0.75,
         flags: [],
         createdAt: '2025-01-03T00:00:00.000Z',
-        updatedAt: '2025-01-04T00:00:00.000Z'
+        updatedAt: '2025-01-04T00:00:00.000Z',
       },
       {
         id: 'content-4',
@@ -58,7 +58,7 @@ describe('SearchService', () => {
         trustScore: 0.3,
         flags: ['accuracy-concern'],
         createdAt: '2025-01-04T00:00:00.000Z',
-        updatedAt: '2025-01-05T00:00:00.000Z'
+        updatedAt: '2025-01-05T00:00:00.000Z',
       },
       {
         id: 'content-5',
@@ -70,28 +70,49 @@ describe('SearchService', () => {
         trustScore: 0.9,
         flags: [],
         createdAt: '2025-01-05T00:00:00.000Z',
-        updatedAt: '2025-01-06T00:00:00.000Z'
-      }
+        updatedAt: '2025-01-06T00:00:00.000Z',
+      },
     ],
-    lastUpdated: '2025-01-06T00:00:00.000Z'
+    lastUpdated: '2025-01-06T00:00:00.000Z',
+  };
+
+  const mockPathIndex = {
+    paths: [
+      {
+        id: 'path-1',
+        title: 'Governance Learning Path',
+        description: 'Learn about governance',
+        tags: ['governance'],
+        difficulty: 'intermediate' as const,
+        estimatedDuration: '2h',
+        stepCount: 5,
+        createdAt: '2025-01-01T00:00:00.000Z',
+      },
+    ],
+    totalCount: 1,
+    lastUpdated: '2025-01-06T00:00:00.000Z',
   };
 
   beforeEach(() => {
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContentIndex']);
+    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
+      'getContentIndex',
+      'getPathIndex',
+    ]);
     const trustBadgeSpyObj = jasmine.createSpyObj('TrustBadgeService', ['getTrustBadges']);
 
     TestBed.configureTestingModule({
       providers: [
         SearchService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: TrustBadgeService, useValue: trustBadgeSpyObj }
-      ]
+        { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
+      ],
     });
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
     trustBadgeSpy = TestBed.inject(TrustBadgeService) as jasmine.SpyObj<TrustBadgeService>;
 
     dataLoaderSpy.getContentIndex.and.returnValue(of(mockContentIndex));
+    dataLoaderSpy.getPathIndex.and.returnValue(of(mockPathIndex));
 
     service = TestBed.inject(SearchService);
   });
@@ -105,15 +126,16 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('search', () => {
-    it('should return all results when no text query', (done) => {
+    it('should return all results when no text query', done => {
       service.search({ text: '' }).subscribe(results => {
-        expect(results.totalCount).toBe(5);
-        expect(results.results.length).toBe(5);
+        // 5 content nodes + 1 path = 6 total
+        expect(results.totalCount).toBe(6);
+        expect(results.results.length).toBe(6);
         done();
       });
     });
 
-    it('should filter by text query', (done) => {
+    it('should filter by text query', done => {
       service.search({ text: 'governance' }).subscribe(results => {
         expect(results.totalCount).toBeGreaterThan(0);
         // Should match title "Governance Framework" and tag "governance"
@@ -122,7 +144,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should score title matches higher than description', (done) => {
+    it('should score title matches higher than description', done => {
       service.search({ text: 'governance' }).subscribe(results => {
         // "Governance Framework" should be ranked higher than "Protocol Implementation"
         // which only has governance in tags and description
@@ -136,7 +158,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should include relevance score', (done) => {
+    it('should include relevance score', done => {
       service.search({ text: 'governance' }).subscribe(results => {
         for (const result of results.results) {
           expect(result.relevanceScore).toBeDefined();
@@ -146,7 +168,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should include matched fields', (done) => {
+    it('should include matched fields', done => {
       service.search({ text: 'governance' }).subscribe(results => {
         const governance = results.results.find(r => r.title === 'Governance Framework');
         expect(governance?.matchedFields.some(f => f.field === 'title')).toBe(true);
@@ -154,7 +176,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should include highlights', (done) => {
+    it('should include highlights', done => {
       service.search({ text: 'governance' }).subscribe(results => {
         const governance = results.results.find(r => r.title === 'Governance Framework');
         expect(governance?.highlights.length).toBeGreaterThan(0);
@@ -162,13 +184,16 @@ describe('SearchService', () => {
       });
     });
 
-    it('should handle multi-word queries', (done) => {
+    it('should handle multi-word queries', done => {
       service.search({ text: 'governance design' }).subscribe(results => {
         // Should match content with both words
-        expect(results.results.some(r =>
-          r.title.toLowerCase().includes('governance') ||
-          r.title.toLowerCase().includes('design')
-        )).toBe(true);
+        expect(
+          results.results.some(
+            r =>
+              r.title.toLowerCase().includes('governance') ||
+              r.title.toLowerCase().includes('design')
+          )
+        ).toBe(true);
         done();
       });
     });
@@ -179,7 +204,7 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('filtering', () => {
-    it('should filter by content type', (done) => {
+    it('should filter by content type', done => {
       service.search({ text: '', contentTypes: ['epic', 'feature'] }).subscribe(results => {
         for (const result of results.results) {
           expect(['epic', 'feature']).toContain(result.contentType);
@@ -188,7 +213,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should filter by reach level', (done) => {
+    it('should filter by reach level', done => {
       service.search({ text: '', reachLevels: ['commons', 'regional'] }).subscribe(results => {
         for (const result of results.results) {
           expect(['commons', 'regional']).toContain(result.reach);
@@ -197,11 +222,11 @@ describe('SearchService', () => {
       });
     });
 
-    it('should filter by tags (OR logic)', (done) => {
+    it('should filter by tags (OR logic)', done => {
       service.search({ text: '', tags: ['governance', 'trust'] }).subscribe(results => {
         for (const result of results.results) {
-          const hasMatchingTag = result.tags.some(t =>
-            t.toLowerCase() === 'governance' || t.toLowerCase() === 'trust'
+          const hasMatchingTag = result.tags.some(
+            t => t.toLowerCase() === 'governance' || t.toLowerCase() === 'trust'
           );
           expect(hasMatchingTag).toBe(true);
         }
@@ -209,7 +234,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should filter by required tags (AND logic)', (done) => {
+    it('should filter by required tags (AND logic)', done => {
       service.search({ text: '', requiredTags: ['governance', 'design'] }).subscribe(results => {
         for (const result of results.results) {
           const tags = result.tags.map(t => t.toLowerCase());
@@ -220,7 +245,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should filter by minimum trust score', (done) => {
+    it('should filter by minimum trust score', done => {
       service.search({ text: '', minTrustScore: 0.8 }).subscribe(results => {
         for (const result of results.results) {
           expect(result.trustScore).toBeGreaterThanOrEqual(0.8);
@@ -229,7 +254,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should exclude flagged content', (done) => {
+    it('should exclude flagged content', done => {
       service.search({ text: '', excludeFlagged: true }).subscribe(results => {
         for (const result of results.results) {
           expect(result.hasFlags).toBe(false);
@@ -238,17 +263,19 @@ describe('SearchService', () => {
       });
     });
 
-    it('should combine text search with filters', (done) => {
-      service.search({
-        text: 'governance',
-        contentTypes: ['epic']
-      }).subscribe(results => {
-        expect(results.totalCount).toBeGreaterThan(0);
-        for (const result of results.results) {
-          expect(result.contentType).toBe('epic');
-        }
-        done();
-      });
+    it('should combine text search with filters', done => {
+      service
+        .search({
+          text: 'governance',
+          contentTypes: ['epic'],
+        })
+        .subscribe(results => {
+          expect(results.totalCount).toBeGreaterThan(0);
+          for (const result of results.results) {
+            expect(result.contentType).toBe('epic');
+          }
+          done();
+        });
     });
   });
 
@@ -257,38 +284,43 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('sorting', () => {
-    it('should sort by relevance (default)', (done) => {
+    it('should sort by relevance (default)', done => {
       service.search({ text: 'governance' }).subscribe(results => {
         // Results should be in descending relevance order
         for (let i = 0; i < results.results.length - 1; i++) {
-          expect(results.results[i].relevanceScore)
-            .toBeGreaterThanOrEqual(results.results[i + 1].relevanceScore);
+          expect(results.results[i].relevanceScore).toBeGreaterThanOrEqual(
+            results.results[i + 1].relevanceScore
+          );
         }
         done();
       });
     });
 
-    it('should sort by title ascending', (done) => {
+    it('should sort by title ascending', done => {
       service.search({ text: '', sortBy: 'title', sortDirection: 'asc' }).subscribe(results => {
         for (let i = 0; i < results.results.length - 1; i++) {
-          expect(results.results[i].title.localeCompare(results.results[i + 1].title))
-            .toBeLessThanOrEqual(0);
+          expect(
+            results.results[i].title.localeCompare(results.results[i + 1].title)
+          ).toBeLessThanOrEqual(0);
         }
         done();
       });
     });
 
-    it('should sort by trust score descending', (done) => {
-      service.search({ text: '', sortBy: 'trustScore', sortDirection: 'desc' }).subscribe(results => {
-        for (let i = 0; i < results.results.length - 1; i++) {
-          expect(results.results[i].trustScore)
-            .toBeGreaterThanOrEqual(results.results[i + 1].trustScore);
-        }
-        done();
-      });
+    it('should sort by trust score descending', done => {
+      service
+        .search({ text: '', sortBy: 'trustScore', sortDirection: 'desc' })
+        .subscribe(results => {
+          for (let i = 0; i < results.results.length - 1; i++) {
+            expect(results.results[i].trustScore).toBeGreaterThanOrEqual(
+              results.results[i + 1].trustScore
+            );
+          }
+          done();
+        });
     });
 
-    it('should sort by newest', (done) => {
+    it('should sort by newest', done => {
       service.search({ text: '', sortBy: 'newest', sortDirection: 'desc' }).subscribe(results => {
         for (let i = 0; i < results.results.length - 1; i++) {
           expect(results.results[i].createdAt! >= results.results[i + 1].createdAt!).toBe(true);
@@ -303,14 +335,14 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('pagination', () => {
-    it('should return first page by default', (done) => {
+    it('should return first page by default', done => {
       service.search({ text: '' }).subscribe(results => {
         expect(results.page).toBe(1);
         done();
       });
     });
 
-    it('should paginate results', (done) => {
+    it('should paginate results', done => {
       service.search({ text: '', pageSize: 2, page: 1 }).subscribe(results => {
         expect(results.results.length).toBe(2);
         expect(results.pageSize).toBe(2);
@@ -319,7 +351,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should return correct page', (done) => {
+    it('should return correct page', done => {
       service.search({ text: '', pageSize: 2, page: 2 }).subscribe(results => {
         expect(results.page).toBe(2);
         expect(results.results.length).toBeLessThanOrEqual(2);
@@ -327,14 +359,14 @@ describe('SearchService', () => {
       });
     });
 
-    it('should calculate total pages correctly', (done) => {
+    it('should calculate total pages correctly', done => {
       service.search({ text: '', pageSize: 2 }).subscribe(results => {
         expect(results.totalPages).toBe(3); // 5 items / 2 per page = 3 pages
         done();
       });
     });
 
-    it('should set hasMore correctly on last page', (done) => {
+    it('should set hasMore correctly on last page', done => {
       service.search({ text: '', pageSize: 2, page: 3 }).subscribe(results => {
         expect(results.hasMore).toBe(false);
         done();
@@ -347,7 +379,7 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('facets', () => {
-    it('should return facets with results', (done) => {
+    it('should return facets with results', done => {
       service.search({ text: '' }).subscribe(results => {
         expect(results.facets).toBeDefined();
         expect(results.facets.byContentType.length).toBeGreaterThan(0);
@@ -357,7 +389,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should count content types correctly', (done) => {
+    it('should count content types correctly', done => {
       service.search({ text: '' }).subscribe(results => {
         const epicCount = results.facets.byContentType.find(f => f.value === 'epic');
         expect(epicCount?.count).toBe(1);
@@ -365,23 +397,25 @@ describe('SearchService', () => {
       });
     });
 
-    it('should count tags correctly', (done) => {
+    it('should count tags correctly', done => {
       service.search({ text: '' }).subscribe(results => {
         const governanceTag = results.facets.byTag.find(f => f.value === 'governance');
-        expect(governanceTag?.count).toBe(3); // 3 items have governance tag
+        // 3 content items + 1 path have governance tag = 4 total
+        expect(governanceTag?.count).toBe(4);
         done();
       });
     });
 
-    it('should count flag status', (done) => {
+    it('should count flag status', done => {
       service.search({ text: '' }).subscribe(results => {
         expect(results.facets.byFlagStatus.flagged).toBe(1);
-        expect(results.facets.byFlagStatus.unflagged).toBe(4);
+        // 4 content items + 1 path are unflagged = 5 total
+        expect(results.facets.byFlagStatus.unflagged).toBe(5);
         done();
       });
     });
 
-    it('should mark selected facet values', (done) => {
+    it('should mark selected facet values', done => {
       service.search({ text: '', contentTypes: ['epic'] }).subscribe(results => {
         const epicFacet = results.facets.byContentType.find(f => f.value === 'epic');
         expect(epicFacet?.selected).toBe(true);
@@ -395,14 +429,14 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('suggest', () => {
-    it('should return empty for short queries', (done) => {
+    it('should return empty for short queries', done => {
       service.suggest('g').subscribe(suggestions => {
         expect(suggestions.suggestions.length).toBe(0);
         done();
       });
     });
 
-    it('should return title suggestions', (done) => {
+    it('should return title suggestions', done => {
       service.suggest('gov').subscribe(suggestions => {
         const titleSuggestions = suggestions.suggestions.filter(s => s.type === 'title');
         expect(titleSuggestions.length).toBeGreaterThan(0);
@@ -410,7 +444,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should return tag suggestions', (done) => {
+    it('should return tag suggestions', done => {
       service.suggest('gov').subscribe(suggestions => {
         const tagSuggestions = suggestions.suggestions.filter(s => s.type === 'tag');
         expect(tagSuggestions.length).toBeGreaterThan(0);
@@ -418,7 +452,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should include result count for tag suggestions', (done) => {
+    it('should include result count for tag suggestions', done => {
       service.suggest('gov').subscribe(suggestions => {
         const tagSuggestion = suggestions.suggestions.find(s => s.type === 'tag');
         expect(tagSuggestion?.resultCount).toBeGreaterThan(0);
@@ -426,7 +460,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should highlight matched text', (done) => {
+    it('should highlight matched text', done => {
       service.suggest('gov').subscribe(suggestions => {
         const suggestion = suggestions.suggestions[0];
         expect(suggestion?.highlight).toContain('<mark>');
@@ -434,14 +468,14 @@ describe('SearchService', () => {
       });
     });
 
-    it('should respect limit parameter', (done) => {
+    it('should respect limit parameter', done => {
       service.suggest('co', 2).subscribe(suggestions => {
         expect(suggestions.suggestions.length).toBeLessThanOrEqual(2);
         done();
       });
     });
 
-    it('should handle empty query', (done) => {
+    it('should handle empty query', done => {
       service.suggest('').subscribe(suggestions => {
         expect(suggestions.suggestions.length).toBe(0);
         done();
@@ -454,7 +488,7 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('getTagCloud', () => {
-    it('should return all tags with counts', (done) => {
+    it('should return all tags with counts', done => {
       service.getTagCloud().subscribe(cloud => {
         expect(cloud.length).toBeGreaterThan(0);
         for (const item of cloud) {
@@ -465,7 +499,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should sort by count descending', (done) => {
+    it('should sort by count descending', done => {
       service.getTagCloud().subscribe(cloud => {
         for (let i = 0; i < cloud.length - 1; i++) {
           expect(cloud[i].count).toBeGreaterThanOrEqual(cloud[i + 1].count);
@@ -474,7 +508,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should have governance as most common tag', (done) => {
+    it('should have governance as most common tag', done => {
       service.getTagCloud().subscribe(cloud => {
         expect(cloud[0].tag).toBe('governance');
         expect(cloud[0].count).toBe(3);
@@ -488,7 +522,7 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('error handling', () => {
-    it('should handle data loader errors gracefully', (done) => {
+    it('should handle data loader errors gracefully', done => {
       dataLoaderSpy.getContentIndex.and.returnValue(throwError(() => new Error('Network error')));
 
       service.search({ text: 'test' }).subscribe(results => {
@@ -498,7 +532,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should include execution time in results', (done) => {
+    it('should include execution time in results', done => {
       service.search({ text: '' }).subscribe(results => {
         expect(results.executionTimeMs).toBeDefined();
         expect(results.executionTimeMs).toBeGreaterThanOrEqual(0);
@@ -506,7 +540,7 @@ describe('SearchService', () => {
       });
     });
 
-    it('should handle empty content index', (done) => {
+    it('should handle empty content index', done => {
       dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: [] }));
 
       service.search({ text: 'test' }).subscribe(results => {
@@ -516,8 +550,9 @@ describe('SearchService', () => {
       });
     });
 
-    it('should handle undefined nodes', (done) => {
+    it('should handle undefined nodes', done => {
       dataLoaderSpy.getContentIndex.and.returnValue(of({}));
+      dataLoaderSpy.getPathIndex.and.returnValue(of({ paths: [], totalCount: 0, lastUpdated: '' }));
 
       service.search({ text: '' }).subscribe(results => {
         expect(results.totalCount).toBe(0);
@@ -531,7 +566,7 @@ describe('SearchService', () => {
   // =========================================================================
 
   describe('match scoring', () => {
-    it('should score exact matches higher than contains', (done) => {
+    it('should score exact matches higher than contains', done => {
       // Add a node with exact word "trust" and one with "trustworthy"
       const indexWithMatches = {
         nodes: [
@@ -543,7 +578,7 @@ describe('SearchService', () => {
             tags: [],
             reach: 'commons',
             trustScore: 1,
-            flags: []
+            flags: [],
           },
           {
             id: 'contains',
@@ -553,9 +588,9 @@ describe('SearchService', () => {
             tags: [],
             reach: 'commons',
             trustScore: 1,
-            flags: []
-          }
-        ]
+            flags: [],
+          },
+        ],
       };
       dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithMatches));
 

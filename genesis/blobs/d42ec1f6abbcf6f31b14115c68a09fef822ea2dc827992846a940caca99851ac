@@ -1,0 +1,9 @@
+Scenario: Parent tracks special education compliance
+    Given the parent's child has IEP for learning disability
+    And required support services aren't being provided
+    When the parent reviews Observer's special education tracking
+    Then they see federal law mandates these services
+    And understand district is violating child's legal rights
+    And learn process for filing compliance complaint
+    And connect with other special education parents
+    And district cannot quietly violate disability rights

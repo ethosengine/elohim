@@ -1,0 +1,9 @@
+Scenario: Customer learns food sourcing story connecting to agricultural labor
+    Given corporate food system obscures where food comes from and who grew it
+    And Ms. Johnson wants to know her food's origin but lacked information
+    When democratic supply chain provides sourcing transparency
+    Then she learns tomatoes come from Johnson Farm where Tom practices regenerative agriculture
+    And she can visit farm during open houses if interested
+    And farmworker conditions and wages are transparent
+    And food becomes connected to human labor and environmental stewardship, not faceless commodity
+    And community_elohim provides supply chain stories and farm connections

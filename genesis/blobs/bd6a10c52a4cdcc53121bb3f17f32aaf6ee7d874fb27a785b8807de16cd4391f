@@ -1,0 +1,9 @@
+Scenario: Neighborhood care token recognition for caregiver contributions
+    Given James contributes to community by caring for David
+    And he's reducing burden on institutional care systems
+    When neighborhood care economy evaluates contributions
+    Then James should accumulate care tokens for caregiving work
+    And neighborhood should recognize his care as community contribution
+    And care tokens should give him standing to access support
+    And caregiving should be valued within neighborhood economy
+    And James should be able to access help based on his contributions

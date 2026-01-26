@@ -1,0 +1,10 @@
+Scenario: Connecting retired residents to volunteer opportunities matching their skills
+    Given Frank has construction expertise
+    And community has diverse volunteer needs
+    When the community_elohim matches volunteers to opportunities
+    Then it should identify opportunities utilizing Frank's specific skills
+    And surface construction-related needs beyond Habitat
+    And coordinate with organizations seeking skilled volunteers
+    And help Frank find meaningful work aligned with expertise
+    And maximize community benefit from his particular capabilities
+    And enable Frank to contribute at highest skill level

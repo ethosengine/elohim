@@ -1,0 +1,9 @@
+Scenario: State legislator verifies industry claims about regulation impacts
+    Given business lobbyists claim environmental regulation will destroy jobs
+    And present alarming economic analysis
+    When the Observer fact-checks industry projections
+    Then they see similar regulations in other states
+    And review actual employment impacts versus predicted job losses
+    And identify which industries comply without job losses
+    And understand costs of inaction (health impacts, environmental damage)
+    And resist fear-mongering with evidence-based policy analysis

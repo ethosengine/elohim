@@ -1,0 +1,7 @@
+Scenario: Building family care resilience across generations
+    Given family care needs span generations
+    When family members support each other across life stages
+    Then the protocol should coordinate intergenerational care
+    And recognize contributions from all generations
+    And facilitate sustainable care distribution
+    And support family care economy across time

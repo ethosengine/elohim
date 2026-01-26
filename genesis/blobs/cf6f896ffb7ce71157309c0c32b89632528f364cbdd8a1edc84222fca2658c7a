@@ -1,0 +1,9 @@
+Scenario: Community care tokens enable resource access based on contribution
+    Given Sarah has accumulated care tokens through community participation
+    And community resources are allocated based on care contributions
+    When Sarah needs community support
+    Then her care tokens should give her access to resources
+    And community mutual aid should be available
+    And support should be based on demonstrated contribution
+    And care economy should function as community resource system
+    And Sarah's care work should have tangible value

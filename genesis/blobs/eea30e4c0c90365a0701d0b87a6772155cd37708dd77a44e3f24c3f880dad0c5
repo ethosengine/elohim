@@ -1,0 +1,10 @@
+Scenario: Teen co-workers coordinate through care economy networks
+    Given Jasmine works with other teens and young adults
+    And worker solidarity improves conditions for all
+    When teen workers coordinate through care economy
+    Then workplace_elohim should facilitate peer worker networks
+    And support information sharing about workplace conditions
+    And enable collective advocacy for better treatment
+    And help young workers recognize common interests
+    And build understanding that workers have power through solidarity
+    And demonstrate care economy principles in workplace organizing

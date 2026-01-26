@@ -1,0 +1,11 @@
+Scenario: Household technology adapted for accessibility
+    Given Helen has difficulty with complex technology
+    And her home includes various devices and systems
+    When household technology is configured
+    Then all systems should be simplified for her access
+    And voice control should be available throughout
+    And large, simple controls should replace complex interfaces
+    And emergency systems should be easily accessible
+    And technology should serve her, not frustrate her
+    And assistive devices should integrate seamlessly
+    And the household should be adapted to her capabilities

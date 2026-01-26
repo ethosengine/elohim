@@ -1,0 +1,9 @@
+Scenario: Family care legacy planning as David's condition progresses
+    Given David's condition will continue to worsen
+    And James may eventually need institutional care support
+    When family plans for David's future care
+    Then the family_elohim should facilitate family care planning
+    And it should help family discuss difficult future scenarios
+    And it should coordinate family resources for potential needs
+    And family should plan together for multiple care scenarios
+    And care legacy planning should involve whole family

@@ -1,0 +1,11 @@
+Scenario: Learning from financial mistakes with safety nets
+    Given Jasmine overspent her monthly budget by $40
+    And she used her college savings to cover the shortfall
+    When her personal_agent analyzes the situation
+    Then it should provide non-judgmental feedback about the pattern
+    And help her understand the long-term impact on her college savings goal
+    And support her learning from the mistake
+    And suggest strategies for getting back on track
+    And not shame or guilt her about the decision
+    And recognize that learning requires room for mistakes
+    And ensure the mistake isn't catastrophic to her future

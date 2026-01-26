@@ -1,0 +1,10 @@
+Scenario: Building workplace relationships with colleagues
+    Given Jordan works alongside several other library staff
+    And workplace friendships enhance job satisfaction
+    When Jordan interacts with colleagues during work
+    Then coworkers engage with Jordan as a peer employee
+    And conversations are genuine, not patronizing
+    And Jordan participates in workplace social interactions (break room chat)
+    And colleagues see Jordan's personality, humor, and contributions
+    And workplace relationships are authentic and mutual
+    And Jordan experiences workplace belonging and friendship

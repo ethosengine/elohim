@@ -1,0 +1,9 @@
+Scenario: Manager coordinates supply chain logistics while workers govern relationships
+    Given workers democratically selected Johnson Farm as supplier
+    And day-to-day ordering and logistics needs coordination
+    When supply chain operations continue
+    Then Marcus manages ordering logistics and inventory tracking
+    And Marcus coordinates deliveries and quality checks
+    But workers govern supplier relationship and strategic decisions
+    And Marcus cannot unilaterally change suppliers or negotiate major terms
+    And his coordination role enables worker governance, not replaces it

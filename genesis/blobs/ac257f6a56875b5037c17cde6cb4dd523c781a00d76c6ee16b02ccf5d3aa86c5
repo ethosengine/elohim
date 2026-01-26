@@ -1,0 +1,11 @@
+Scenario: Accessible neighborhood events enable Alex's participation
+    Given neighborhood events are often inaccessible
+    And inaccessibility equals exclusion from community
+    When neighborhood events are planned
+    Then the neighborhood_elohim should prompt organizers about accessibility
+    And it should provide checklist of access considerations
+    And Alex should be consulted as accessibility expert
+    And venues should be verified for wheelchair access, sensory accommodations
+    And accessible events should become neighborhood norm
+    And Alex should be able to participate fully in neighborhood life
+    And inclusion should be proactive, not reactive

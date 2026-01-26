@@ -1,0 +1,10 @@
+Scenario: Family shopping as collaborative care experience
+    Given Emma and Sarah shop together
+    And they both use the Value Scanner
+    When they coordinate on family purchasing decisions
+    Then Emma should be learning from Sarah's modeling
+    And Sarah should be teaching through real decision-making
+    And the family_elohim should coordinate their different roles
+    And Emma's contributions should be recognized alongside Sarah's
+    And shopping should be experienced as family care work
+    And collaborative decision-making should strengthen relationship

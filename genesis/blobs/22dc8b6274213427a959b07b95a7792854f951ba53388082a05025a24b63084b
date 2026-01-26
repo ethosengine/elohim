@@ -1,0 +1,9 @@
+Scenario: Parent exposes systematic school funding inequities
+    Given the parent's child attends an eastside elementary school
+    And suspects their school gets fewer resources than westside schools
+    When the parent reviews Observer's district funding analysis
+    Then they see westside schools spend $2,400 more per student
+    And westside schools have experienced teachers and enrichment programs
+    And eastside schools have newer teachers and cut arts programs
+    And pattern of inequity becomes documented and undeniable
+    And parent advocacy shifts from suspicion to evidence-based demands

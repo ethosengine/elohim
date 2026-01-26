@@ -1,0 +1,10 @@
+Scenario: Manager responds to community concerns about operations
+    Given community member complains about noise from early morning deliveries
+    And legitimate community concern requires operational adjustment
+    When Marcus receives the complaint
+    Then Marcus investigates the noise issue objectively
+    And Marcus proposes delivery schedule modification to worker council
+    And workers deliberate balancing operational needs with community impact
+    And workers vote on delivery schedule change
+    And Marcus implements worker decision and communicates to community
+    And community_elohim facilitates community-worker dialogue

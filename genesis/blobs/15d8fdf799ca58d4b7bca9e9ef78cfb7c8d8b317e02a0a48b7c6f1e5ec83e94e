@@ -1,0 +1,12 @@
+Scenario: Municipal sustainability and care economy integration
+    Given care economy and ecological sustainability are connected
+    And Robert's care practices affect environmental sustainability
+    And municipal sustainability policy should include care economy
+    When municipal_elohim connects care and sustainability
+    Then it should help Robert see connections between care economy and ecological sustainability
+    And support advocacy for municipal policy that integrates both
+    And recognize that care for people and care for planet are linked
+    And build municipal sustainability that includes care economy principles
+    And demonstrate that sustainable communities require care economy
+    And create municipalities that support both human and ecological flourishing
+    And recognize that his generation can integrate these priorities

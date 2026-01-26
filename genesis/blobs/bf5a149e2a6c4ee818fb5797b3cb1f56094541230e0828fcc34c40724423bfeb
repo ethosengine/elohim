@@ -1,0 +1,9 @@
+Scenario: Council member tracks accountability commitments systematically
+    Given the politician made campaign promises to constituents
+    And committed to specific actions in community meetings
+    When the Observer monitors commitment tracking
+    Then they receive alerts when deadlines approach
+    And see status of all promises made across forums
+    And get nudges to follow through on community pledges
+    And build constituent trust through documented delivery
+    And maintain integrity against overwhelming office demands

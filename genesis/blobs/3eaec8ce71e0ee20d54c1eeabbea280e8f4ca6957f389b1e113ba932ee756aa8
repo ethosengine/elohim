@@ -1,0 +1,9 @@
+Scenario: Manager facilitates worker council meetings without controlling agenda
+    Given worker councils meet weekly for governance decisions
+    And corporate model had Marcus control meeting agenda and outcomes
+    When worker council convenes
+    Then workers set meeting agenda, not Marcus
+    And Marcus facilitates discussion to keep meeting productive
+    And Marcus ensures all voices are heard but doesn't dominate discussion
+    And workers make decisions through democratic process Marcus facilitates
+    And workplace_elohim monitors for subtle manipulation or agenda control

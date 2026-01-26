@@ -1,0 +1,233 @@
+<!-- Generic Alert Banner Component -->
+
+<ng-container *ngIf="hasAlerts">
+  <!-- Banner Mode -->
+  <div
+    *ngIf="displayMode === 'banner'"
+    class="alert-banner"
+    [ngClass]="getSeverityClass(primaryAlert!.severity)"
+    [class.expanded]="isExpanded"
+    role="alert"
+    aria-live="polite"
+  >
+    <!-- Summary Row -->
+    <div
+      class="banner-row"
+      (click)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null"
+    >
+      <!-- Icon -->
+      <ng-container *ngIf="iconTemplate; else defaultIcon">
+        <ng-container
+          *ngTemplateOutlet="iconTemplate; context: { $implicit: primaryAlert }"
+        ></ng-container>
+      </ng-container>
+      <ng-template #defaultIcon>
+        <span class="alert-icon">{{ getIcon(primaryAlert!) }}</span>
+      </ng-template>
+
+      <!-- Content -->
+      <ng-container *ngIf="contentTemplate; else defaultContent">
+        <ng-container
+          *ngTemplateOutlet="contentTemplate; context: { $implicit: primaryAlert }"
+        ></ng-container>
+      </ng-container>
+      <ng-template #defaultContent>
+        <div class="alert-content">
+          <span class="alert-title">{{ primaryAlert!.title }}</span>
+          <span class="alert-subtitle" *ngIf="primaryAlert!.subtitle || primaryAlert!.duration">
+            {{ primaryAlert!.subtitle || primaryAlert!.duration }}
+          </span>
+          <span class="alert-count" *ngIf="activeAlerts.length > 1">
+            +{{ activeAlerts.length - 1 }} more
+          </span>
+        </div>
+      </ng-template>
+
+      <!-- Actions -->
+      <div class="alert-actions">
+        <ng-container *ngIf="actionsTemplate; else defaultActions">
+          <ng-container
+            *ngTemplateOutlet="actionsTemplate; context: { $implicit: primaryAlert }"
+          ></ng-container>
+        </ng-container>
+        <ng-template #defaultActions>
+          <ng-container *ngFor="let action of primaryAlert!.actions">
+            <a
+              *ngIf="action.href"
+              [href]="action.href"
+              [class]="getActionClass(action)"
+              [attr.aria-label]="action.ariaLabel"
+            >
+              <span *ngIf="action.icon">{{ action.icon }}</span>
+              {{ action.label }}
+            </a>
+            <button
+              *ngIf="!action.href"
+              [class]="getActionClass(action)"
+              (click)="onActionClick(primaryAlert!, action, $event)"
+              [attr.aria-label]="action.ariaLabel"
+            >
+              <span *ngIf="action.icon">{{ action.icon }}</span>
+              {{ action.label }}
+            </button>
+          </ng-container>
+        </ng-template>
+
+        <!-- Dismiss Button -->
+        <button
+          *ngIf="primaryAlert!.dismissible !== false"
+          class="btn-dismiss"
+          (click)="dismissAlert(primaryAlert!, $event)"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
+
+        <!-- Expand Button -->
+        <button
+          *ngIf="expandable && activeAlerts.length > 1"
+          class="btn-expand"
+          [attr.aria-expanded]="isExpanded"
+          aria-label="Expand alerts"
+        >
+          {{ isExpanded ? '▲' : '▼' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Expanded List -->
+    <div class="banner-details" *ngIf="isExpanded && activeAlerts.length > 1">
+      <div class="alert-list">
+        <div
+          *ngFor="let alert of visibleAlerts"
+          class="alert-item"
+          [ngClass]="getSeverityClass(alert.severity)"
+        >
+          <span class="item-icon">{{ getIcon(alert) }}</span>
+          <div class="item-content">
+            <span class="item-title">{{ alert.title }}</span>
+            <span class="item-message" *ngIf="alert.message">{{ alert.message }}</span>
+          </div>
+          <div class="item-actions">
+            <ng-container *ngFor="let action of alert.actions?.slice(0, 2)">
+              <button class="btn-small" (click)="onActionClick(alert, action, $event)">
+                {{ action.label }}
+              </button>
+            </ng-container>
+            <button
+              *ngIf="alert.dismissible !== false"
+              class="btn-dismiss-small"
+              (click)="dismissAlert(alert, $event)"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="show-more" *ngIf="hasHiddenAlerts">
+        <button class="btn-show-more" (click)="toggleExpanded()">
+          Show {{ hiddenCount }} more alerts
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Mode -->
+  <div *ngIf="displayMode === 'card'" class="alert-cards">
+    <div
+      *ngFor="let alert of visibleAlerts"
+      class="alert-card"
+      [ngClass]="getSeverityClass(alert.severity)"
+      role="alert"
+    >
+      <div class="card-header">
+        <span class="card-icon">{{ getIcon(alert) }}</span>
+        <div class="card-title-group">
+          <h4 class="card-title">{{ alert.title }}</h4>
+          <span class="card-subtitle" *ngIf="alert.subtitle">{{ alert.subtitle }}</span>
+        </div>
+        <button
+          *ngIf="alert.dismissible !== false"
+          class="btn-dismiss"
+          (click)="dismissAlert(alert, $event)"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div class="card-body" *ngIf="alert.message">
+        <p class="card-message">{{ alert.message }}</p>
+      </div>
+
+      <div class="card-footer" *ngIf="alert.actions && alert.actions.length > 0">
+        <ng-container *ngFor="let action of alert.actions">
+          <a *ngIf="action.href" [href]="action.href" [class]="getActionClass(action)">
+            {{ action.label }}
+          </a>
+          <button
+            *ngIf="!action.href"
+            [class]="getActionClass(action)"
+            (click)="onActionClick(alert, action, $event)"
+          >
+            {{ action.label }}
+          </button>
+        </ng-container>
+      </div>
+    </div>
+
+    <div class="show-more-cards" *ngIf="hasHiddenAlerts">
+      <button class="btn-show-more" (click)="toggleExpanded()">
+        Show {{ hiddenCount }} more alerts
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Mode -->
+  <div *ngIf="displayMode === 'toast'" class="alert-toast-container">
+    <div
+      *ngFor="let alert of visibleAlerts"
+      class="alert-toast"
+      [ngClass]="getSeverityClass(alert.severity)"
+      role="alert"
+    >
+      <span class="toast-icon">{{ getIcon(alert) }}</span>
+      <div class="toast-content">
+        <span class="toast-title">{{ alert.title }}</span>
+        <span class="toast-message" *ngIf="alert.message">{{ alert.message }}</span>
+      </div>
+      <button
+        *ngIf="alert.dismissible !== false"
+        class="btn-dismiss"
+        (click)="dismissAlert(alert, $event)"
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
+  </div>
+
+  <!-- Inline Mode -->
+  <div
+    *ngIf="displayMode === 'inline'"
+    class="alert-inline"
+    [ngClass]="getSeverityClass(primaryAlert!.severity)"
+    role="alert"
+  >
+    <span class="inline-icon">{{ getIcon(primaryAlert!) }}</span>
+    <div class="inline-content">
+      <span class="inline-title">{{ primaryAlert!.title }}</span>
+      <span class="inline-message" *ngIf="primaryAlert!.message">{{ primaryAlert!.message }}</span>
+    </div>
+    <button
+      *ngIf="primaryAlert!.dismissible !== false"
+      class="btn-dismiss"
+      (click)="dismissAlert(primaryAlert!, $event)"
+      aria-label="Dismiss"
+    >
+      ✕
+    </button>
+  </div>
+</ng-container>

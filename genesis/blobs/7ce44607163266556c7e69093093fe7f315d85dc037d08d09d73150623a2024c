@@ -1,0 +1,9 @@
+Scenario: Community supported agriculture integrated with care economy
+    Given Sarah's bioregion has CSA (Community Supported Agriculture) programs
+    And CSA supports local farmers and environmental health
+    When Sarah considers food purchasing options
+    Then the bioregional_elohim should highlight CSA opportunities
+    And it should coordinate CSA participation with household budget
+    And it should track CSA contributions as care work
+    And Sarah should support farmers while feeding family
+    And care economy should strengthen community-farmer relationships

@@ -1,0 +1,9 @@
+Scenario: Community investment supports municipal affordable housing development
+    Given housing is major community need and investment opportunity
+    And Patricia wants to invest in affordable housing with democratic governance
+    When community investment expands to housing cooperatives
+    Then her capital supports converting apartment buildings to resident ownership
+    And affordable housing is preserved through democratic governance
+    And housing investment provides returns while addressing municipal affordability crisis
+    And community wealth-building extends to housing alongside businesses
+    And municipality_elohim coordinates housing cooperative investment and development

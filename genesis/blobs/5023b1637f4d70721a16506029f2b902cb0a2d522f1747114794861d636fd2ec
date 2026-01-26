@@ -1,0 +1,9 @@
+Scenario: Responsible developer demonstrates subsidy effectiveness
+    Given a responsible developer builds genuinely affordable housing
+    And uses state subsidies to serve low-income residents
+    When the Observer tracks development outcomes against state investment
+    Then analysis shows: 180 units meet affordability criteria from $8M subsidy
+    And residents are actually low-income workforce families
+    And units remain affordable through long-term deed restrictions
+    And state investment created genuine community benefit
+    And responsible development gains advantage in subsidy allocation

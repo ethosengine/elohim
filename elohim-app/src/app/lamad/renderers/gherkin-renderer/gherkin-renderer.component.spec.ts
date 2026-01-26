@@ -16,12 +16,12 @@ describe('GherkinRendererComponent', () => {
     content,
     tags: ['gherkin'],
     relatedNodeIds: [],
-    metadata: {}
+    metadata: {},
   });
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GherkinRendererComponent]
+      imports: [GherkinRendererComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(GherkinRendererComponent);
@@ -39,7 +39,7 @@ describe('GherkinRendererComponent', () => {
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature).toBeTruthy();
@@ -53,7 +53,7 @@ describe('GherkinRendererComponent', () => {
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.description).toContain('This is the description');
@@ -65,7 +65,7 @@ Feature: Tagged Feature`;
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.tags).toContain('@wip');
@@ -83,7 +83,7 @@ Scenario: Basic scenario
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios.length).toBe(1);
@@ -99,7 +99,7 @@ Scenario: Tagged scenario
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].tags).toContain('@smoke');
@@ -116,7 +116,7 @@ Scenario: Second
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios.length).toBe(2);
@@ -133,7 +133,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].steps[0].keyword.trim()).toBe('Given');
@@ -147,7 +147,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].steps[0].keyword.trim()).toBe('When');
@@ -160,7 +160,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].steps[0].keyword.trim()).toBe('Then');
@@ -174,7 +174,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].steps[1].keyword.trim()).toBe('And');
@@ -188,7 +188,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].steps[1].keyword.trim()).toBe('But');
@@ -201,7 +201,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].steps[0].keyword.trim()).toBe('*');
@@ -219,7 +219,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.background).toBeTruthy();
@@ -242,7 +242,7 @@ Scenario Outline: Test with examples
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].type).toBe('scenario_outline');
@@ -261,7 +261,7 @@ Scenario Template: Test with examples
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].type).toBe('scenario_outline');
@@ -279,7 +279,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       const step = component.feature!.scenarios[0].steps[0];
@@ -302,7 +302,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       const step = component.feature!.scenarios[0].steps[0];
@@ -320,7 +320,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       const step = component.feature!.scenarios[0].steps[0];
@@ -336,7 +336,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].collapsed).toBeFalse();
@@ -373,7 +373,7 @@ Scenario: Test
     it('should handle empty content', () => {
       component.node = createContentNode('');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature).toBeNull();
@@ -384,7 +384,7 @@ Scenario: Test
       (node as any).content = { invalid: 'object' };
       component.node = node;
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.content).toBe('');
@@ -396,7 +396,7 @@ Scenario: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature).toBeTruthy();
@@ -417,7 +417,7 @@ Scenario: Second
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.totalSteps).toBe(4); // 1 background + 3 scenario steps
@@ -427,7 +427,7 @@ Scenario: Second
       component.embedded = true;
       component.node = createContentNode('Feature: Test\nScenario: Test Scenario\n  Given a step');
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
       fixture.detectChanges();
 
@@ -459,7 +459,7 @@ Scenario Outline: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].examples![0].name).toBe('Valid cases');
@@ -480,7 +480,7 @@ Scenario Outline: Test
 
       component.node = createContentNode(gherkin);
       component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
+        node: new SimpleChange(null, component.node, true),
       });
 
       expect(component.feature!.scenarios[0].examples!.length).toBe(2);

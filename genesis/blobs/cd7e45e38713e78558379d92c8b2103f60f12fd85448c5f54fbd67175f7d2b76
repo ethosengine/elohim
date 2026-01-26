@@ -1,0 +1,9 @@
+Scenario: Moderator protects child while educating peer
+    Given a teenage member posts content inappropriate for younger children
+    And the guardian agent prevents younger children from seeing it
+    When Alex is notified of the age-appropriateness issue
+    Then Alex reaches out to the teenager with education, not punishment
+    And explains how to gauge age-appropriateness
+    And the teenager learns and adjusts future contributions
+    And younger children were protected without the teenager being shamed
+    And restorative education prevented future issues

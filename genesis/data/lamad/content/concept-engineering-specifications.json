@@ -1,0 +1,29 @@
+{
+  "id": "concept-engineering-specifications",
+  "contentType": "concept",
+  "title": "Engineering Specifications",
+  "description": "These aren't utopian dreams—they're proven patterns that can be encoded into digital infrastructure. We have blueprints for building technology that supports rather than undermines human flourishing.",
+  "content": "These aren't utopian dreams—they're proven patterns that can be encoded into digital infrastructure. We have blueprints for building technology that supports rather than undermines human flourishing.",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/learning-success/concept-engineering-specifications.json",
+  "tags": [
+    "models",
+    "engineering",
+    "implementation",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "lamad-reference-implementation",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "learning-success",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.002423",
+  "updatedAt": "2025-12-24T03:05:25.852Z"
+}

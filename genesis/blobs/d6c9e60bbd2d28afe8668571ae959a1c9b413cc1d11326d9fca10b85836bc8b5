@@ -1,0 +1,11 @@
+Scenario: Escalated appeal reaches Regional Constitutional Council
+    Given my appeal couldn't be resolved at community layer
+    And I escalated to peer agent review which affirmed the decision
+    When I request Constitutional Council review at regional level
+    Then randomly-selected citizens from across the region review my case
+    And They include Sarah Martinez, a nurse serving her 3-month term
+    And They deliberate for substantive time (2+ hours for complex cases)
+    And They have access to technical experts to explain complex aspects
+    And They create precedent that affects multiple communities in the region
+    And I receive judgment within one month of reaching this layer
+    And The decision includes detailed constitutional reasoning

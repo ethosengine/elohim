@@ -13,7 +13,7 @@ describe('AppComponent', () => {
     routerEventsSubject = new Subject();
     mockRouter = {
       events: routerEventsSubject.asObservable(),
-      url: '/'
+      url: '/',
     };
 
     await TestBed.configureTestingModule({
@@ -21,8 +21,8 @@ describe('AppComponent', () => {
       providers: [
         provideHttpClient(),
         provideRouter([]),
-        { provide: Router, useValue: mockRouter }
-      ]
+        { provide: Router, useValue: mockRouter },
+      ],
     }).compileComponents();
   });
 

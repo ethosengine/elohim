@@ -1,0 +1,10 @@
+Scenario: Climate impact of dietary choices
+    Given food production contributes to climate change
+    And individual choices aggregate to systemic impact
+    When Aisha evaluates food options
+    Then the bioregional_elohim should show carbon footprint
+    And it should explain climate impact of different choices
+    And it should help her make lower-impact selections
+    And climate literacy should inform dietary decisions
+    And she should understand individual contribution to climate crisis
+    And climate-conscious choices should be supported

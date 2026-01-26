@@ -1,0 +1,11 @@
+Scenario: Ecological care integrated with personal purchasing decisions
+    Given Helen uses Value Scanner for shopping
+    And her choices have environmental impact
+    When Helen makes purchasing decisions
+    Then ecological impact should be surfaced at appropriate cognitive level
+    And her personal_agent should support environmentally conscious choices
+    And information should be presented simply: "Local tomatoes from nearby farm"
+    And ecological care should be framed as care for community
+    And Helen should be supported in environmental stewardship within her capabilities
+    And the protocol should enable ecological values in daily decisions
+    And sustainability should be accessible regardless of cognitive limitations

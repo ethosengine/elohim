@@ -1,0 +1,12 @@
+Scenario: Learning essential neighborhood resources while in crisis
+    Given I have just moved to this neighborhood in crisis circumstances
+    And I need to quickly learn where essential services are located
+    When I explore my new neighborhood
+    Then the Value Scanner maps critical local resources
+    And identifies nearest food assistance, medical care, schools, childcare
+    And surfaces public transportation routes and walkability
+    And locates free/low-cost resources for children (parks, libraries, activities)
+    And provides information about neighborhood safety and character
+    And my personal_agent creates personalized neighborhood resource guide
+    And updates information as I discover new resources
+    And helps me build neighborhood knowledge efficiently

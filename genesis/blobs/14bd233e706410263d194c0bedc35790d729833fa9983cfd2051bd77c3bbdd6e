@@ -1,0 +1,9 @@
+Scenario: Citizen evaluates development proposal affecting neighborhood
+    Given a developer proposes new construction in their neighborhood
+    And claims it will "bring community benefits"
+    When the citizen reviews the Observer analysis
+    Then they see actual value flows (who benefits, who pays)
+    And view the developer's track record from past projects
+    And understand infrastructure impacts (traffic, services, green space)
+    And can challenge claims with evidence not just emotion
+    And make informed decisions about supporting or opposing

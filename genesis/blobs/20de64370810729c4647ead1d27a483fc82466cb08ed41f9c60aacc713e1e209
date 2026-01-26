@@ -1,0 +1,11 @@
+Scenario: Personal agent serves Alex with dignity and respect
+    Given Alex's personal_agent is configured for their specific needs
+    And Alex has full autonomy over their life decisions
+    When the personal_agent provides support
+    Then it should respect Alex's expertise about their own needs
+    And it should never be patronizing or pitying in tone
+    And it should support Alex's decision-making without manipulation
+    And Alex should maintain complete authority over choices
+    And the agent should feel like a genuine partner
+    And Alex's disability should be accommodated, not pathologized
+    And every interaction should center dignity and autonomy

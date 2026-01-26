@@ -1,0 +1,10 @@
+Scenario: Parent emotional labor in supporting children's learning
+    Given Sarah manages Tommy's frustration with difficult tasks
+    And she builds Emma's confidence and motivation
+    When the educational_elohim tracks educational emotional labor
+    Then it should recognize emotional support as teaching work
+    And it should value Sarah's work maintaining children's love of learning
+    And emotional scaffolding should be recognized as pedagogical skill
+    And the full scope of educational work should be visible
+    And the system should value affective dimensions of teaching
+    And parent emotional labor should be recognized as essential to learning

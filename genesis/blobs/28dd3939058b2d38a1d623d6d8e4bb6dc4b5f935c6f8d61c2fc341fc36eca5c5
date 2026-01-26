@@ -1,0 +1,10 @@
+Scenario: Bulk buying coordination with neighborhood families
+    Given multiple families buy similar groceries and supplies
+    And bulk purchasing reduces costs
+    When Sarah participates in neighborhood bulk buying
+    Then the neighborhood_elohim should coordinate group purchases
+    And it should manage logistics of ordering and distribution
+    And it should track cost savings for participating families
+    And care tokens should reflect coordination labor
+    And neighborhood cooperation should create economic benefit
+    And the system should enable collective resource efficiency

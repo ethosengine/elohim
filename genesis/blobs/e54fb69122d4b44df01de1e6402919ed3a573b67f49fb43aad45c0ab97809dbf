@@ -1,0 +1,10 @@
+Scenario: Neighborhood parent skill and knowledge sharing
+    Given different parents have different expertise
+    And Sarah has teaching skills while others have different capabilities
+    When the neighborhood_elohim facilitates knowledge exchange
+    Then it should connect parents for skill sharing
+    And Sarah could teach value literacy while learning car repair
+    And knowledge exchange should be tracked and valued
+    And diverse parent expertise should strengthen whole community
+    And neighborhood care economy should be knowledge-rich
+    And the system should enable parent-to-parent education

@@ -1,0 +1,10 @@
+Scenario: Making invisible household labor distribution visible to partner
+    Given Sarah performs 75% of household care labor
+    And her partner believes he "helps around the house"
+    When the household_elohim generates labor distribution report
+    Then it should show precise breakdown of who does what
+    And it should quantify "Sarah: 75%, Partner: 25%"
+    And the data should be undeniable and specific
+    And the partner should see his contribution is not equitable
+    And visibility should enable reality-based conversation
+    And the system should make invisible labor undeniably visible

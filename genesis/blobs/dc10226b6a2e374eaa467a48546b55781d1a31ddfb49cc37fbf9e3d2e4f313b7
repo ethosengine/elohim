@@ -1,0 +1,12 @@
+Scenario: Making major life decisions under extreme stress
+    Given I need to make important decisions about housing, employment, or children's needs
+    And I am traumatized, exhausted, and overwhelmed
+    When I need to evaluate my options
+    Then my personal_agent helps me process complex information
+    And breaks down overwhelming decisions into manageable steps
+    And provides decision support without making decisions for me
+    And helps me identify my priorities and values
+    And surfaces relevant information at the right time
+    And prevents decision paralysis without overriding my agency
+    And validates that my stress is reasonable given my circumstances
+    And trusts that I can make good decisions with appropriate support

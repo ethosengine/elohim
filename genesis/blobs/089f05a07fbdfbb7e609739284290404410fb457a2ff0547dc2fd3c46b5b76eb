@@ -1,0 +1,12 @@
+Scenario: Climate adaptation planning for multigenerational family resilience
+    Given climate change affects bioregional systems
+    And Robert's family will navigate climate impacts across generations
+    And adaptation planning protects family and bioregional resilience
+    When bioregional_elohim supports climate adaptation
+    Then it should help Robert plan for climate impacts on family
+    And surface bioregional climate risks: drought, flooding, extreme weather
+    And support household adaptation: water conservation, emergency preparedness, resilient food systems
+    And connect adaptation to care economy principles
+    And recognize that climate adaptation is care for family and bioregion
+    And build resilience that serves current and future generations
+    And demonstrate that ecological care is practical family responsibility

@@ -1,0 +1,11 @@
+Scenario: Coordinating between Margaret's household and Sarah's household
+    Given Margaret has her own household with Robert
+    And Sarah has her household with her own governance
+    When the family_elohim coordinates across households
+    Then it should respect both household autonomies
+    And it should help negotiate care arrangements between households
+    And it should coordinate schedules, logistics, and expectations
+    And boundaries between households should be clear and respected
+    And neither household should dominate the other
+    And care coordination should serve both households' needs
+    And multigenerational care should work across household boundaries

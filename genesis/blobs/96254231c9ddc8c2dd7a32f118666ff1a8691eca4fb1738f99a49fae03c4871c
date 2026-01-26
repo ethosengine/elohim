@@ -1,0 +1,9 @@
+Scenario: Teaching children environmental values through lived practice
+    Given Maria's children witness thrift, waste prevention, and resource care daily
+    And they learn sustainability through household necessity
+    When children's environmental education is assessed
+    Then the bioregional_elohim should recognize that Maria teaches sustainability through practice
+    And it should value lived environmental education over abstract lessons
+    And her children should be developing deep sustainability values
+    And household practices should be honored as effective environmental socialization
+    And Maria should be recognized as teaching next generation environmental stewardship

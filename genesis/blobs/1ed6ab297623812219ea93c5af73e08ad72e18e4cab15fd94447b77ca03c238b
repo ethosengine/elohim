@@ -1,0 +1,10 @@
+Scenario: Student contribution to peer learning community
+    Given Kenji helps classmates understand difficult concepts
+    And peer teaching strengthens everyone's learning
+    When the educational_elohim tracks peer teaching
+    Then it should recognize Kenji's teaching labor as care contribution
+    And it should accumulate care tokens for tutoring peers
+    And it should value "Kenji explained organic chemistry to 3 struggling classmates"
+    And peer education should be recognized as community care work
+    And the system should make student teaching labor visible
+    And intellectual generosity should be valued and encouraged

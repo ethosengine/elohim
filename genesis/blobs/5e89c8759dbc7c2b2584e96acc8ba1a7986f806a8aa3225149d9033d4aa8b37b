@@ -1,0 +1,11 @@
+Scenario: Maintaining independence through effective resource management
+    Given Frank values his independence and self-sufficiency
+    And he wants to continue contributing without becoming "a burden"
+    When Frank uses the Value Scanner over time
+    Then it should help him maintain self-sufficiency and capability
+    And it should optimize his resources for maximum independence
+    And it should connect him to community resources without stigma
+    And it should make his care contributions visible and valued
+    And Frank should experience continued agency and autonomy
+    And the system should support him in aging on his own terms
+    And his continued productivity should be recognized and celebrated

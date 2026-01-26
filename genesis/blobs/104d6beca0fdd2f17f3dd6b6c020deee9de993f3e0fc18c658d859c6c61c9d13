@@ -1,0 +1,9 @@
+Scenario: Organizer tracks accountability for special education commitments
+    Given district promised improved special education services
+    And the organizer's coalition of parents won the commitment
+    When the Observer tracks implementation progress
+    Then the organizer monitors hiring of promised support staff
+    And sees resource allocation to special education programs
+    And receives alerts when implementation lags behind timeline
+    And documents wins to show parents their advocacy worked
+    And district learns parent organizing demands follow-through

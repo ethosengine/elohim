@@ -1,0 +1,9 @@
+Scenario: Extreme budget management with $42k for four people
+    Given Maria supports four people on $42k annual income
+    And this requires maximizing every dollar
+    When Maria makes purchasing decisions
+    Then the household_elohim should track spending against severe constraints
+    And it should help her find the efficiency frontier for every category
+    And it should identify savings opportunities across housing, food, utilities, necessities
+    And it should help her make informed trade-offs between competing needs
+    And Maria should have sophisticated support for household economics under constraint

@@ -1,0 +1,10 @@
+Scenario: Learning from mistakes without shame or judgment
+    Given Aisha will make errors as she learns
+    And learning requires safe failure
+    When Aisha makes suboptimal decisions
+    Then the personal_agent should provide constructive feedback
+    And it should explain what happened and why
+    And it should suggest better approaches for future
+    And feedback should be educational, never judgmental
+    And mistakes should be treated as learning opportunities
+    And the system should create psychologically safe learning environment

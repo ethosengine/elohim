@@ -1,0 +1,8 @@
+Scenario: Moderator coordinates with other moderators on cross-community issue
+    Given a coordinated harassment campaign targets multiple communities
+    And the pattern detection agent identifies the coordinated nature
+    When Alex and moderators from affected communities are alerted
+    Then they can coordinate response while respecting local autonomy
+    And each community handles the issue according to their standards
+    And patterns are shared to protect other communities
+    And the coordinated attack is neutralized through cooperation

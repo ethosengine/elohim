@@ -1,0 +1,9 @@
+Scenario: Food system workforce development includes democratic governance training
+    Given food service and agriculture training focuses on technical skills only
+    And democratic enterprises need workers skilled in collaboration and governance
+    When industry sector develops democratic food system training programs
+    Then workers learn technical skills (cooking, cultivation) plus democratic governance
+    And training includes cooperative business, facilitation, and consensus decision-making
+    And educational institutions incorporate democratic food system curriculum
+    And workforce is prepared for democratic enterprise participation
+    And industry_sector_elohim develops training curriculum and coordinates educational partnerships

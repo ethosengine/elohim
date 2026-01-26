@@ -1,5 +1,5 @@
 /**
- * SessionHuman - A temporary traveler identity for MVP.
+ * SessionHuman - A temporary traveler identity with upgrade path.
  *
  * Philosophy:
  * - Everyone can explore immediately without friction (open content)
@@ -14,6 +14,11 @@
  * - 'member': Holochain identity, can access gated content
  * - 'attested': Member with specific attestations, can access sensitive content
  *
+ * Session State:
+ * - A session can exist independently (pure visitor)
+ * - A session can be linked to a Holochain identity (hybrid state)
+ * - A session can be in the process of upgrading (migrating state)
+ *
  * Holochain migration path:
  * - Session: localStorage with generated sessionId
  * - Holochain: AgentPubKey from conductor, source chain storage
@@ -27,26 +32,80 @@
  * migrating their session progress to their permanent identity.
  */
 export interface SessionHuman {
-  // Temporary identity (generated UUID for session)
+  // =========================================================================
+  // Core Identity
+  // =========================================================================
+
+  /** Temporary identity (generated UUID for session) */
   sessionId: string;
 
-  // Display name (optional, can be set later)
+  /** Display name (optional, can be set later) */
   displayName: string;
 
-  // Session state
-  isAnonymous: true;  // Always true for session humans
-
-  // Access level - visitors can only access open content
-  accessLevel: 'visitor';
-
-  // When the session was created
+  /** When the session was created */
   createdAt: string;
 
-  // Last activity timestamp
+  /** Last activity timestamp */
   lastActiveAt: string;
 
-  // Session statistics (computed)
+  /** Session statistics */
   stats: SessionStats;
+
+  // =========================================================================
+  // Session State (flexible for hybrid scenarios)
+  // =========================================================================
+
+  /**
+   * Whether this is a pure anonymous session.
+   * False if linked to a Holochain identity (hybrid mode).
+   */
+  isAnonymous: boolean;
+
+  /**
+   * Current access level.
+   * Can upgrade beyond 'visitor' if linked to Holochain identity.
+   */
+  accessLevel: SessionAccessLevel;
+
+  /**
+   * Current session state.
+   * - 'active': Normal session operation
+   * - 'upgrading': In process of migrating to Holochain
+   * - 'linked': Session exists alongside Holochain identity
+   * - 'migrated': Session has been migrated (kept for reference)
+   */
+  sessionState: SessionState;
+
+  // =========================================================================
+  // Holochain Link (for hybrid state)
+  // =========================================================================
+
+  /**
+   * Linked Holochain agent public key.
+   * Set when user has both session AND Holochain identity.
+   * Enables offline session to sync when connection restored.
+   */
+  linkedAgentPubKey?: string;
+
+  /**
+   * Linked Human ID in Holochain.
+   * Allows session to reference the permanent identity.
+   */
+  linkedHumanId?: string;
+
+  /**
+   * When the link was established.
+   */
+  linkedAt?: string;
+
+  // =========================================================================
+  // Upgrade Tracking
+  // =========================================================================
+
+  /**
+   * Upgrade intent - tracks if user has started upgrade process.
+   */
+  upgradeIntent?: UpgradeIntent;
 
   // =========================================================================
   // Social Graph / Profile Metadata (Open Graph protocol - platform-agnostic)
@@ -72,12 +131,158 @@ export interface SessionHuman {
 }
 
 /**
+ * Session state machine.
+ */
+export type SessionState =
+  | 'active' // Normal session operation
+  | 'upgrading' // In process of migrating to Holochain
+  | 'linked' // Session exists alongside Holochain identity
+  | 'migrated'; // Session has been fully migrated
+
+/**
+ * Access levels for session humans.
+ * Expanded to support hybrid scenarios.
+ */
+export type SessionAccessLevel =
+  | 'visitor' // Pure session, open content only
+  | 'pending' // Upgrade in progress
+  | 'linked'; // Has linked Holochain identity
+
+/**
+ * Tracks upgrade intent for users who start but don't complete upgrade.
+ */
+export interface UpgradeIntent {
+  /** Target sovereignty stage */
+  targetStage: 'hosted' | 'app-user' | 'node-operator';
+  /** When upgrade process started */
+  startedAt: string;
+  /** Current step in upgrade process */
+  currentStep: string;
+  /** Steps completed */
+  completedSteps: string[];
+  /** Whether user explicitly paused the upgrade */
+  paused: boolean;
+  /** Reason for pause/abandonment if any */
+  pauseReason?: string;
+}
+
+// =============================================================================
+// Hosting Economics (Shefa Integration)
+// =============================================================================
+
+/**
+ * Tracks hosting costs and coverage for hosted humans.
+ *
+ * Philosophy:
+ * - Hosted humans have real infrastructure costs (storage, compute, bandwidth)
+ * - Until they migrate to their own device, someone covers these costs
+ * - Cost coverage can come from: commons fund, steward, sponsor, or self-pay
+ * - Transparent cost tracking incentivizes migration to self-sovereignty
+ */
+export interface HostingCostStatus {
+  /**
+   * Current hosting cost coverage source.
+   * - 'commons': Covered by the Elohim commons fund (default for new users)
+   * - 'steward': Covered by a steward who sponsors this human
+   * - 'sponsor': Covered by a specific sponsor (org, grant, etc.)
+   * - 'self': Human pays their own hosting (before migration)
+   * - 'migrated': No hosting costs (data on user's device)
+   */
+  coverageSource: HostingCoverageSource;
+
+  /** Steward or sponsor ID if applicable */
+  coveredById?: string;
+
+  /** Steward or sponsor display name */
+  coveredByName?: string;
+
+  /** Current monthly hosting cost in smallest unit (e.g., microcents) */
+  monthlyHostingCost: number;
+
+  /** Total hosting costs accumulated since account creation */
+  totalHostingCostAccumulated: number;
+
+  /** Currency/unit for costs (e.g., 'USD-microcents', 'HOLO-fuel') */
+  costUnit: string;
+
+  /** When hosting started (for cost calculation) */
+  hostingStartedAt: string;
+
+  /** Estimated storage used in bytes */
+  storageUsedBytes: number;
+
+  /** Whether user has been notified about hosting costs */
+  costTransparencyAcknowledged: boolean;
+
+  /** Grace period end date (if applicable) */
+  gracePeriodEndsAt?: string;
+}
+
+/**
+ * Who covers hosting costs for a hosted human.
+ */
+export type HostingCoverageSource =
+  | 'commons' // Elohim commons fund covers costs
+  | 'steward' // A steward sponsors this human
+  | 'sponsor' // External sponsor (org, grant)
+  | 'self' // Human pays own costs
+  | 'migrated'; // No costs - data on user's device
+
+/**
+ * Hosting cost tier for transparent pricing.
+ */
+export interface HostingTier {
+  /** Tier identifier */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Description of what's included */
+  description: string;
+  /** Storage limit in bytes */
+  storageLimitBytes: number;
+  /** Monthly cost in cost units */
+  monthlyCost: number;
+  /** Features included */
+  features: string[];
+}
+
+/**
+ * Default hosting tiers.
+ */
+export const HOSTING_TIERS: HostingTier[] = [
+  {
+    id: 'explorer',
+    name: 'Explorer',
+    description: 'Basic hosting for new community members',
+    storageLimitBytes: 100 * 1024 * 1024, // 100 MB
+    monthlyCost: 0, // Covered by commons
+    features: ['Learning progress', 'Basic profile', 'Community participation'],
+  },
+  {
+    id: 'contributor',
+    name: 'Contributor',
+    description: 'Enhanced hosting for active contributors',
+    storageLimitBytes: 1024 * 1024 * 1024, // 1 GB
+    monthlyCost: 100, // 100 microcents = $0.001/month
+    features: ['All Explorer features', 'Content creation', 'Extended history'],
+  },
+  {
+    id: 'steward',
+    name: 'Steward',
+    description: 'Full hosting for community stewards',
+    storageLimitBytes: 10 * 1024 * 1024 * 1024, // 10 GB
+    monthlyCost: 500, // 500 microcents = $0.005/month
+    features: ['All Contributor features', 'Presence stewardship', 'Attestation issuance'],
+  },
+];
+
+/**
  * SessionStats - Aggregated session activity.
  */
 export interface SessionStats {
   // Content engagement
   nodesViewed: number;
-  nodesWithAffinity: number;  // Nodes where human set affinity > 0
+  nodesWithAffinity: number; // Nodes where human set affinity > 0
 
   // Path engagement
   pathsStarted: number;
@@ -85,7 +290,7 @@ export interface SessionStats {
   stepsCompleted: number;
 
   // Time tracking
-  totalSessionTime: number;  // Milliseconds
+  totalSessionTime: number; // Milliseconds
   averageSessionLength: number;
   sessionCount: number;
 }
@@ -158,10 +363,10 @@ export interface HolochainUpgradePrompt {
  * UpgradeTrigger - Events that trigger upgrade prompts.
  */
 export type UpgradeTrigger =
-  | 'first-affinity'      // Human marks first content as resonant
-  | 'path-started'        // Human begins their first path
-  | 'path-completed'      // Human completes a learning path
-  | 'notes-saved'         // Human saves personal notes
-  | 'return-visit'        // Human returns after session expires
-  | 'progress-at-risk'    // localStorage nearing quota
-  | 'network-feature';    // Human tries a network-only feature
+  | 'first-affinity' // Human marks first content as resonant
+  | 'path-started' // Human begins their first path
+  | 'path-completed' // Human completes a learning path
+  | 'notes-saved' // Human saves personal notes
+  | 'return-visit' // Human returns after session expires
+  | 'progress-at-risk' // localStorage nearing quota
+  | 'network-feature'; // Human tries a network-only feature

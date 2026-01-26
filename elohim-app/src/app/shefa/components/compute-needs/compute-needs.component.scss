@@ -1,0 +1,658 @@
+/**
+ * Compute Needs Component Styles
+ *
+ * Help-flow styling for guiding users through compute assessment
+ */
+
+// Colors
+$color-primary: #3b82f6;
+$color-success: #10b981;
+$color-warning: #f59e0b;
+$color-danger: #ef4444;
+$color-text: #1f2937;
+$color-text-muted: #6b7280;
+$color-border: #e5e7eb;
+$color-bg: #ffffff;
+$color-bg-subtle: #f9fafb;
+
+// =============================================================================
+// CONTAINER
+// =============================================================================
+
+.compute-needs {
+  background: $color-bg;
+  border-radius: 0.5rem;
+  border: 1px solid $color-border;
+  overflow: hidden;
+
+  &.mode-card {
+    .needs-header {
+      padding: 0.75rem 1rem;
+    }
+
+    section {
+      padding: 0.75rem 1rem;
+    }
+
+    .gaps-list,
+    .recommendations-list {
+      gap: 0.5rem;
+    }
+  }
+}
+
+// =============================================================================
+// HEADER
+// =============================================================================
+
+.needs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid $color-border;
+  background: $color-bg-subtle;
+
+  .header-content {
+    h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: $color-text;
+    }
+
+    .subtitle {
+      margin: 0.25rem 0 0;
+      font-size: 0.85rem;
+      color: $color-text-muted;
+    }
+  }
+}
+
+.health-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+
+  &.health-none {
+    background: rgba($color-success, 0.1);
+    color: $color-success;
+  }
+
+  &.health-minor {
+    background: rgba($color-primary, 0.1);
+    color: $color-primary;
+  }
+
+  &.health-moderate {
+    background: rgba($color-warning, 0.1);
+    color: darken($color-warning, 10%);
+  }
+
+  &.health-critical {
+    background: rgba($color-danger, 0.1);
+    color: $color-danger;
+  }
+
+  .health-icon {
+    font-size: 1rem;
+  }
+}
+
+// =============================================================================
+// HEALTHY STATE
+// =============================================================================
+
+.healthy-state {
+  text-align: center;
+  padding: 2rem 1.5rem;
+
+  .healthy-icon {
+    width: 4rem;
+    height: 4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba($color-success, 0.1);
+    color: $color-success;
+    font-size: 2rem;
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+  }
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+    color: $color-text;
+  }
+
+  p {
+    margin: 0 0 1.5rem;
+    color: $color-text-muted;
+  }
+}
+
+.capacity-summary {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+
+  .capacity-item {
+    text-align: center;
+
+    .label {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: $color-text-muted;
+      margin-bottom: 0.25rem;
+    }
+
+    .value {
+      display: block;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: $color-text;
+    }
+  }
+}
+
+// =============================================================================
+// SECTIONS
+// =============================================================================
+
+section {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid $color-border;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  .section-subtitle {
+    margin: 0 0 1rem;
+    font-size: 0.85rem;
+    color: $color-text-muted;
+  }
+}
+
+// =============================================================================
+// GAPS LIST
+// =============================================================================
+
+.gaps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.gap-card {
+  border: 1px solid $color-border;
+  border-radius: 0.5rem;
+  overflow: hidden;
+
+  &.severity-critical {
+    border-left: 4px solid $color-danger;
+
+    .gap-header {
+      background: rgba($color-danger, 0.05);
+    }
+
+    .severity-badge {
+      color: $color-danger;
+    }
+  }
+
+  &.severity-moderate {
+    border-left: 4px solid $color-warning;
+
+    .gap-header {
+      background: rgba($color-warning, 0.05);
+    }
+
+    .severity-badge {
+      color: $color-warning;
+    }
+  }
+
+  &.severity-minor {
+    border-left: 4px solid $color-primary;
+
+    .gap-header {
+      background: rgba($color-primary, 0.05);
+    }
+
+    .severity-badge {
+      color: $color-primary;
+    }
+  }
+}
+
+.gap-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid $color-border;
+
+  .gap-icon {
+    font-size: 1.5rem;
+  }
+
+  .gap-info {
+    flex: 1;
+
+    .gap-resource {
+      display: block;
+      font-weight: 600;
+      color: $color-text;
+    }
+
+    .gap-severity {
+      display: block;
+      font-size: 0.75rem;
+      color: $color-text-muted;
+    }
+  }
+
+  .severity-badge {
+    font-size: 1.25rem;
+  }
+}
+
+.gap-body {
+  padding: 0.75rem 1rem;
+
+  .gap-description {
+    margin: 0 0 0.375rem;
+    font-size: 0.9rem;
+    color: $color-text;
+  }
+
+  .gap-impact {
+    margin: 0;
+    font-size: 0.85rem;
+    color: $color-text-muted;
+    font-style: italic;
+  }
+}
+
+.gap-metrics {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: $color-bg-subtle;
+  border-top: 1px solid $color-border;
+
+  .metric {
+    text-align: center;
+
+    .metric-label {
+      display: block;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: $color-text-muted;
+    }
+
+    .metric-value {
+      display: block;
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: $color-text;
+    }
+
+    &.gap-percent .metric-value {
+      color: $color-danger;
+    }
+  }
+
+  .metric-arrow {
+    color: $color-text-muted;
+    font-size: 1.25rem;
+  }
+}
+
+// =============================================================================
+// RECOMMENDATIONS
+// =============================================================================
+
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recommendation-card {
+  border: 1px solid $color-border;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: $color-primary;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  &.selected {
+    border-color: $color-primary;
+    box-shadow: 0 4px 12px rgba($color-primary, 0.15);
+  }
+
+  &.priority-recommended {
+    border-left: 4px solid $color-success;
+
+    .rec-priority {
+      color: $color-success;
+    }
+  }
+
+  &.priority-optional {
+    border-left: 4px solid $color-primary;
+
+    .rec-priority {
+      color: $color-primary;
+    }
+  }
+
+  &.priority-future {
+    border-left: 4px solid $color-text-muted;
+
+    .rec-priority {
+      color: $color-text-muted;
+    }
+  }
+}
+
+.rec-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: $color-bg-subtle;
+  border-bottom: 1px solid $color-border;
+
+  .rec-icon {
+    font-size: 1.5rem;
+  }
+
+  .rec-title {
+    flex: 1;
+
+    .rec-name {
+      display: block;
+      font-weight: 600;
+      color: $color-text;
+    }
+
+    .rec-priority {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  }
+
+  .rec-cost {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: $color-text;
+  }
+}
+
+.rec-body {
+  padding: 0.75rem 1rem;
+
+  .rec-description {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    color: $color-text;
+    line-height: 1.5;
+  }
+}
+
+.rec-addresses {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+
+  .addresses-label {
+    font-size: 0.75rem;
+    color: $color-text-muted;
+    margin-right: 0.25rem;
+  }
+
+  .address-tag {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.5rem;
+    background: rgba($color-success, 0.1);
+    color: $color-success;
+    border-radius: 0.25rem;
+    font-weight: 500;
+  }
+}
+
+.rec-improvement {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  .improvement-bar {
+    flex: 1;
+    height: 6px;
+    background: $color-border;
+    border-radius: 3px;
+    overflow: hidden;
+
+    .improvement-fill {
+      height: 100%;
+      background: $color-success;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+  }
+
+  .improvement-text {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: $color-success;
+    white-space: nowrap;
+  }
+}
+
+.rec-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: $color-bg-subtle;
+  border-top: 1px solid $color-border;
+
+  .btn-primary,
+  .btn-secondary {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    text-align: center;
+  }
+
+  .btn-primary {
+    flex: 1;
+    background: $color-primary;
+    color: white;
+    border: none;
+
+    &:hover {
+      background: darken($color-primary, 10%);
+    }
+  }
+
+  .btn-secondary {
+    background: $color-bg;
+    color: $color-text;
+    border: 1px solid $color-border;
+
+    &:hover {
+      background: $color-bg-subtle;
+    }
+  }
+}
+
+// =============================================================================
+// CTA SECTION
+// =============================================================================
+
+.cta-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, rgba($color-primary, 0.05), rgba($color-success, 0.05));
+}
+
+.cta-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  .cta-icon {
+    font-size: 1.5rem;
+  }
+
+  .cta-text {
+    .cta-title {
+      display: block;
+      font-weight: 600;
+      color: $color-text;
+    }
+
+    .cta-subtitle {
+      display: block;
+      font-size: 0.85rem;
+      color: $color-text-muted;
+    }
+  }
+}
+
+.cta-button {
+  padding: 0.625rem 1.25rem;
+  background: $color-primary;
+  color: white;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: darken($color-primary, 10%);
+  }
+}
+
+// =============================================================================
+// CARD MODE FOOTER
+// =============================================================================
+
+.capacity-footer {
+  padding: 0.75rem 1rem;
+  background: $color-bg-subtle;
+  border-top: 1px solid $color-border;
+  font-size: 0.8rem;
+
+  .capacity-label {
+    color: $color-text-muted;
+    margin-right: 0.375rem;
+  }
+
+  .capacity-values {
+    color: $color-text;
+    font-weight: 500;
+  }
+}
+
+// =============================================================================
+// LOADING & ERROR
+// =============================================================================
+
+.loading,
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: $color-text-muted;
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid $color-border;
+  border-top-color: $color-primary;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  color: $color-danger;
+
+  .icon {
+    font-size: 1.25rem;
+  }
+}
+
+// =============================================================================
+// RESPONSIVE
+// =============================================================================
+
+@media (max-width: 640px) {
+  .needs-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .capacity-summary {
+    gap: 1rem;
+  }
+
+  .gap-metrics {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .cta-section {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+
+    .cta-content {
+      flex-direction: column;
+    }
+  }
+}

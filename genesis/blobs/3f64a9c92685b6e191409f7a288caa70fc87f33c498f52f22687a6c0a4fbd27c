@@ -1,0 +1,10 @@
+Scenario: Safety and well-being observation for neighborhood children
+    Given Margaret is often outside with grandchildren
+    And she observes neighborhood children's activities and safety
+    When the neighborhood_elohim tracks child safety contributions
+    Then it should recognize Margaret's informal supervision
+    And it should value her care for neighborhood children's well-being
+    And her presence should contribute to collective childcare
+    And neighborhood children should benefit from elder attention
+    And Margaret's observation should be recognized as care work
+    And neighborhood should be safer because of engaged elders

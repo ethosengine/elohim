@@ -1,0 +1,10 @@
+Scenario: Setting personal goals with supported decision-making
+    Given Jordan wants to learn a new skill
+    And Jordan's support worker is available to help
+    When Jordan explores the goal-setting feature
+    Then the interface shows potential goals as visual options
+    And the support worker helps Jordan understand each option
+    But Jordan makes the final choice of which goal to pursue
+    And the system breaks the goal into simple, achievable steps
+    And Jordan's personal_agent provides encouragement and progress tracking
+    And Jordan experiences ownership of their own growth

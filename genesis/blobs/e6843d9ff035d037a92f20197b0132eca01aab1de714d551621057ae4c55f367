@@ -1,0 +1,10 @@
+Scenario: Worker controls their own REA (Resource-Event-Agent) profile data
+    Given Maria has worked at ChickenMax for 8 years
+    And her REA profile documents her contributions across multiple dimensions
+    When Maria requests to view her complete REA profile
+    Then she sees her documented expertise (847 perfect fryer batches, 47 hours training given)
+    And she sees her care work (comforting customers, mentoring colleagues)
+    And she sees her efficiency improvements ($3,400 waste eliminated)
+    And she controls what portions of her profile to share externally
+    And she can export her profile if she changes jobs
+    And no corporate entity can access her data without her consent

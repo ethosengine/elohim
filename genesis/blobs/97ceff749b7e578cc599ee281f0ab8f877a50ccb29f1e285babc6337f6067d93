@@ -1,0 +1,10 @@
+Scenario: Personal growth and learning opportunities in retirement
+    Given Margaret is in early retirement with decades of life ahead
+    And she values continued learning and development
+    When the personal_agent tracks Margaret's activities
+    Then it should encourage and support continued education
+    And it should suggest learning opportunities aligned with her interests
+    And it should recognize that retirement is not the end of growth
+    And it should help her balance caregiving with personal development
+    And Margaret should experience retirement as liberation for new pursuits
+    And the system should affirm her capacity for continued growth and contribution

@@ -1,0 +1,11 @@
+Scenario: Mentoring younger neighbors in practical skills and neighborhood knowledge
+    Given Frank has construction expertise and decades of neighborhood knowledge
+    And younger neighbors are establishing themselves in the community
+    When the neighborhood_elohim facilitates mentoring
+    Then it should connect Frank to younger neighbors seeking skills
+    And coordinate skill-sharing for home repairs and maintenance
+    And facilitate neighborhood history and culture transmission
+    And recognize teaching and mentoring as care contributions
+    And build intergenerational neighborhood relationships
+    And value Frank's role in acculturating new residents
+    And strengthen neighborhood cohesion through knowledge sharing

@@ -1,0 +1,9 @@
+Scenario: Neighborhood care economy builds social capital and relationships
+    Given Sarah is new to neighborhood
+    And social isolation is common in modern life
+    When Sarah participates in neighborhood care economy
+    Then the neighborhood_elohim should connect her to other parents
+    And it should facilitate relationship-building through care exchanges
+    And it should help Sarah build local support network
+    And social capital should grow through care participation
+    And neighborhood should become genuine community, not just proximity

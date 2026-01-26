@@ -1,0 +1,9 @@
+Scenario: Category formation applied to understanding value dimensions
+    Given Emma is developing ability to categorize and classify
+    And she can understand multiple attributes simultaneously
+    When Emma evaluates products
+    Then the personal_agent should help her categorize value types
+    And the agent should present: nutritional value, environmental impact, care labor, price
+    And Emma should learn to organize complexity through categories
+    And cognitive development should support multi-dimensional analysis
+    And value literacy should build on natural categorization abilities

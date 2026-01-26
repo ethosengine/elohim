@@ -1,0 +1,11 @@
+Scenario: Personal values clarified through complex care decisions
+    Given Robert makes difficult decisions about care allocation
+    And he must choose between competing legitimate needs
+    When he faces value conflicts through his personal_agent
+    Then it should help him articulate his core values
+    And surface patterns in his decisions
+    And recognize: "You've consistently prioritized parent care over children's wants"
+    And support him in examining whether his choices align with his values
+    And provide space for reflection on what matters most
+    And help him develop coherent personal philosophy about care responsibilities
+    And respect his authority to define his own values

@@ -4,8 +4,6 @@ import { Component } from '@angular/core';
   selector: 'app-vision',
   imports: [],
   templateUrl: './vision.component.html',
-  styleUrl: './vision.component.css'
+  styleUrl: './vision.component.css',
 })
-export class VisionComponent {
-
-}
+export class VisionComponent {}

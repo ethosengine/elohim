@@ -1,0 +1,9 @@
+Scenario: Developer faces accountability for greenwashing
+    Given a developer claims "sustainable development" in marketing materials
+    But environmental review shows minimal actual sustainability
+    When the Observer compares sustainability claims to actual practices
+    Then analysis reveals: LEED certification was "certified" not "platinum"
+    And green features are minimal required by code not additional commitment
+    And environmental impact study understated habitat destruction
+    And sustainability marketing exceeds actual environmental performance
+    And greenwashing faces uncomfortable transparency

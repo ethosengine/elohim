@@ -1,0 +1,9 @@
+Scenario: Child learns from elder mentor in safe context
+    Given Emma has been active in the manga community for 6 months
+    And she shows dedication and growing skill
+    When an elder community artist offers mentorship
+    Then the matching agent verifies the elder's background and trustworthiness
+    And the mentorship is structured with appropriate boundaries
+    And Emma's parents are notified and can approve the arrangement
+    And mentorship interactions are visible to community moderators
+    And Emma receives valuable guidance in a safe learning relationship

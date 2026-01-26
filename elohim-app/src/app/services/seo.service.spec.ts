@@ -22,7 +22,7 @@ describe('SeoService', () => {
     mockActivatedRoute = {
       firstChild: null,
       outlet: 'primary',
-      data: of({})
+      data: of({}),
     };
 
     // Create a mock document
@@ -37,12 +37,12 @@ describe('SeoService', () => {
           provide: Router,
           useValue: {
             events: routerEventsSubject.asObservable(),
-            url: '/test-path'
-          }
+            url: '/test-path',
+          },
         },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
-        { provide: DOCUMENT, useValue: mockDocument }
-      ]
+        { provide: DOCUMENT, useValue: mockDocument },
+      ],
     });
 
     titleService = TestBed.inject(Title) as jasmine.SpyObj<Title>;
@@ -80,7 +80,7 @@ describe('SeoService', () => {
       service.updateMetaDescription('Test description');
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'description',
-        content: 'Test description'
+        content: 'Test description',
       });
     });
   });
@@ -94,7 +94,7 @@ describe('SeoService', () => {
       service.updateMetaKeywords(['keyword1', 'keyword2', 'keyword3']);
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'keywords',
-        content: 'keyword1, keyword2, keyword3'
+        content: 'keyword1, keyword2, keyword3',
       });
     });
   });
@@ -108,20 +108,20 @@ describe('SeoService', () => {
       service.updateOpenGraphTags({
         ogTitle: 'Test Title',
         ogDescription: 'Test Description',
-        ogUrl: 'https://example.com/page'
+        ogUrl: 'https://example.com/page',
       });
 
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:title',
-        content: 'Test Title'
+        content: 'Test Title',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:description',
-        content: 'Test Description'
+        content: 'Test Description',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:url',
-        content: 'https://example.com/page'
+        content: 'https://example.com/page',
       });
     });
 
@@ -129,17 +129,17 @@ describe('SeoService', () => {
       service.updateOpenGraphTags({});
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:image',
-        content: 'https://elohim.host/images/elohim_logo_light.png'
+        content: 'https://elohim.host/images/elohim_logo_light.png',
       });
     });
 
     it('should set custom image when provided', () => {
       service.updateOpenGraphTags({
-        ogImage: 'https://example.com/image.png'
+        ogImage: 'https://example.com/image.png',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:image',
-        content: 'https://example.com/image.png'
+        content: 'https://example.com/image.png',
       });
     });
 
@@ -147,7 +147,7 @@ describe('SeoService', () => {
       service.updateOpenGraphTags({});
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:type',
-        content: 'website'
+        content: 'website',
       });
     });
 
@@ -155,7 +155,7 @@ describe('SeoService', () => {
       service.updateOpenGraphTags({});
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:site_name',
-        content: 'Elohim Protocol'
+        content: 'Elohim Protocol',
       });
     });
 
@@ -164,24 +164,24 @@ describe('SeoService', () => {
         ogType: 'article',
         articlePublishedTime: '2025-01-01T00:00:00.000Z',
         articleModifiedTime: '2025-01-02T00:00:00.000Z',
-        articleSection: 'Learning'
+        articleSection: 'Learning',
       });
 
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:type',
-        content: 'article'
+        content: 'article',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'article:published_time',
-        content: '2025-01-01T00:00:00.000Z'
+        content: '2025-01-01T00:00:00.000Z',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'article:modified_time',
-        content: '2025-01-02T00:00:00.000Z'
+        content: '2025-01-02T00:00:00.000Z',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'article:section',
-        content: 'Learning'
+        content: 'Learning',
       });
     });
 
@@ -190,20 +190,20 @@ describe('SeoService', () => {
         ogType: 'profile',
         profileUsername: 'testuser',
         profileFirstName: 'Test',
-        profileLastName: 'User'
+        profileLastName: 'User',
       });
 
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'profile:username',
-        content: 'testuser'
+        content: 'testuser',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'profile:first_name',
-        content: 'Test'
+        content: 'Test',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'profile:last_name',
-        content: 'User'
+        content: 'User',
       });
     });
   });
@@ -217,7 +217,7 @@ describe('SeoService', () => {
       const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'Article',
-        name: 'Test Article'
+        name: 'Test Article',
       };
 
       service.updateJsonLd(jsonLd);
@@ -230,7 +230,11 @@ describe('SeoService', () => {
 
     it('should replace existing JSON-LD script', () => {
       service.updateJsonLd({ '@context': 'https://schema.org', '@type': 'Article', name: 'First' });
-      service.updateJsonLd({ '@context': 'https://schema.org', '@type': 'Article', name: 'Second' });
+      service.updateJsonLd({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        name: 'Second',
+      });
 
       const scripts = mockDocument.querySelectorAll('#seo-json-ld');
       expect(scripts.length).toBe(1);
@@ -280,7 +284,7 @@ describe('SeoService', () => {
       service.setNoIndex();
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'robots',
-        content: 'noindex, nofollow'
+        content: 'noindex, nofollow',
       });
     });
   });
@@ -304,8 +308,8 @@ describe('SeoService', () => {
         keywords: ['key1', 'key2'],
         canonicalUrl: 'https://example.com/test',
         openGraph: {
-          ogType: 'article'
-        }
+          ogType: 'article',
+        },
       };
 
       service.updateSeo(config);
@@ -313,11 +317,11 @@ describe('SeoService', () => {
       expect(titleService.setTitle).toHaveBeenCalledWith('Test Page | Elohim Protocol');
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'description',
-        content: 'Test description'
+        content: 'Test description',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'keywords',
-        content: 'key1, key2'
+        content: 'key1, key2',
       });
     });
 
@@ -325,12 +329,12 @@ describe('SeoService', () => {
       service.updateSeo({
         title: 'Private Page',
         description: 'Private content',
-        noIndex: true
+        noIndex: true,
       });
 
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'robots',
-        content: 'noindex, nofollow'
+        content: 'noindex, nofollow',
       });
     });
 
@@ -338,7 +342,7 @@ describe('SeoService', () => {
       service.updateSeo({
         title: 'Public Page',
         description: 'Public content',
-        noIndex: false
+        noIndex: false,
       });
 
       expect(metaService.removeTag).toHaveBeenCalledWith('name="robots"');
@@ -348,13 +352,13 @@ describe('SeoService', () => {
       const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'Article',
-        name: 'Test'
+        name: 'Test',
       };
 
       service.updateSeo({
         title: 'Test',
         description: 'Test',
-        jsonLd
+        jsonLd,
       });
 
       const script = mockDocument.getElementById('seo-json-ld');
@@ -366,7 +370,7 @@ describe('SeoService', () => {
 
       service.updateSeo({
         title: 'Test',
-        description: 'Test'
+        description: 'Test',
         // No jsonLd
       });
 
@@ -385,7 +389,7 @@ describe('SeoService', () => {
       expect(titleService.setTitle).toHaveBeenCalledWith('Elohim Protocol');
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'description',
-        content: 'Digital guardians for human flourishing. Technology organized around love.'
+        content: 'Digital guardians for human flourishing. Technology organized around love.',
       });
     });
   });
@@ -399,13 +403,13 @@ describe('SeoService', () => {
       service.updateForPath({
         id: 'path-123',
         title: 'Test Learning Path',
-        description: 'A great learning path'
+        description: 'A great learning path',
       });
 
       expect(titleService.setTitle).toHaveBeenCalledWith('Test Learning Path | Elohim Protocol');
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'description',
-        content: 'A great learning path'
+        content: 'A great learning path',
       });
 
       // Check JSON-LD
@@ -420,7 +424,7 @@ describe('SeoService', () => {
         title: 'Test Path',
         description: 'Description',
         difficulty: 'beginner',
-        estimatedDuration: 'PT2H'
+        estimatedDuration: 'PT2H',
       });
 
       const script = mockDocument.getElementById('seo-json-ld');
@@ -435,13 +439,13 @@ describe('SeoService', () => {
         id: 'content-123',
         title: 'Test Content',
         contentType: 'concept',
-        summary: 'A test concept'
+        summary: 'A test concept',
       });
 
       expect(titleService.setTitle).toHaveBeenCalledWith('Test Content | Elohim Protocol');
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'description',
-        content: 'A test concept'
+        content: 'A test concept',
       });
     });
 
@@ -449,12 +453,12 @@ describe('SeoService', () => {
       service.updateForContent({
         id: 'content-123',
         title: 'Test Content',
-        contentType: 'feature'
+        contentType: 'feature',
       });
 
       expect(metaService.updateTag).toHaveBeenCalledWith({
         name: 'description',
-        content: 'Test Content - feature content'
+        content: 'Test Content - feature content',
       });
     });
 
@@ -464,16 +468,16 @@ describe('SeoService', () => {
         title: 'Test',
         contentType: 'epic',
         createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-02T00:00:00.000Z'
+        updatedAt: '2025-01-02T00:00:00.000Z',
       });
 
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'article:published_time',
-        content: '2025-01-01T00:00:00.000Z'
+        content: '2025-01-01T00:00:00.000Z',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'article:modified_time',
-        content: '2025-01-02T00:00:00.000Z'
+        content: '2025-01-02T00:00:00.000Z',
       });
     });
   });
@@ -483,23 +487,23 @@ describe('SeoService', () => {
       service.updateForProfile({
         username: 'testuser',
         displayName: 'Test User',
-        bio: 'A great learner'
+        bio: 'A great learner',
       });
 
       expect(titleService.setTitle).toHaveBeenCalledWith('Test User | Elohim Protocol');
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'og:type',
-        content: 'profile'
+        content: 'profile',
       });
       expect(metaService.updateTag).toHaveBeenCalledWith({
         property: 'profile:username',
-        content: 'testuser'
+        content: 'testuser',
       });
     });
 
     it('should use username as title when no displayName', () => {
       service.updateForProfile({
-        username: 'testuser'
+        username: 'testuser',
       });
 
       expect(titleService.setTitle).toHaveBeenCalledWith('testuser | Elohim Protocol');
@@ -515,8 +519,8 @@ describe('SeoService', () => {
       mockActivatedRoute.data = of({
         seo: {
           title: 'Route Title',
-          description: 'Route description'
-        }
+          description: 'Route description',
+        },
       });
 
       routerEventsSubject.next(new NavigationEnd(1, '/test', '/test'));
@@ -527,7 +531,7 @@ describe('SeoService', () => {
 
     it('should use simple title from route data', fakeAsync(() => {
       mockActivatedRoute.data = of({
-        title: 'Simple Title'
+        title: 'Simple Title',
       });
 
       routerEventsSubject.next(new NavigationEnd(1, '/test', '/test'));

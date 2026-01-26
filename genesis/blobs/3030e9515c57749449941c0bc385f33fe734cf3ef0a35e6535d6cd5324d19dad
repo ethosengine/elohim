@@ -1,0 +1,11 @@
+Scenario: Defending legislation against corporate capture testimony
+    Given corporate lobbyists testify against my legislation
+    And they claim it "stifles innovation"
+    When I respond in committee hearing
+    Then I present: evidence from Riverside and research
+    And I show: protocol improves community outcomes
+    And I demonstrate: constitutional oversight working
+    And I compare: to corporate AI failures (surveillance, discrimination, no recourse)
+    And I argue: we're stifling extraction, enabling flourishing
+    And I maintain: that democracy deserves support
+    And committee votes: 8-5 in favor despite lobbying

@@ -1,0 +1,7 @@
+Scenario: Advocating for industry training and skill development
+    Given food service work involves significant skill but is undervalued
+    When workers advocate for professional development and advancement paths
+    Then the protocol should support advocacy for industry training programs
+    And help workers demand investment in skill development
+    And push for career pathways and mobility within industry
+    And challenge perception of food service as unskilled disposable labor

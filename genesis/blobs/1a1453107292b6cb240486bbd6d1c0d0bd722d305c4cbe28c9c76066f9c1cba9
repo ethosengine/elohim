@@ -1,0 +1,9 @@
+Scenario: Franchise menu constraints are lifted enabling local adaptation
+    Given corporate mandated standardized menu prohibiting innovation
+    And community requested options (vegan, healthier choices) were impossible to offer
+    When menu control transfers to democratic worker governance
+    Then workers add menu items responding to neighborhood preferences
+    And seasonal offerings use Johnson Farm's available produce
+    And cultural preferences of diverse community are reflected in menu
+    And innovation serves local needs rather than distant corporate standardization
+    And workplace_elohim tracks customer satisfaction with democratized menu

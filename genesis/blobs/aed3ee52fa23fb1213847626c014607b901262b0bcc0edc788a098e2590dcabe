@@ -1,0 +1,11 @@
+Scenario: Accessing community cultural opportunities
+    Given the local theater offers sensory-friendly performances
+    And Jordan loves musicals
+    When Jordan attends a sensory-friendly show
+    Then the personal_agent helps Jordan select and prepare for the show
+    And the theater environment is adapted for accessibility (lights, volume)
+    And Jordan can enjoy cultural experience without barriers
+    And Jordan's cultural participation contributes to diverse audiences
+    And the theater benefits from inclusive programming
+    And Jordan experiences full community cultural citizenship
+    And accessibility allows Jordan's flourishing and joy

@@ -1,0 +1,10 @@
+Scenario: Understanding ecological impact of consumption choices
+    Given Aisha's food choices affect environmental systems
+    And she wants to minimize negative impacts
+    When Aisha selects items in the Value Scanner
+    Then the bioregional_elohim should show environmental impact
+    And it should explain ecological consequences of different options
+    And it should make invisible environmental costs visible
+    And she should understand how consumption affects ecosystems
+    And ecological literacy should inform decision-making
+    And environmental impact should be transparent

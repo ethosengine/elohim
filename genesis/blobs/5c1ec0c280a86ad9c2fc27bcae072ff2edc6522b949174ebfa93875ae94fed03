@@ -1,0 +1,9 @@
+Scenario: Watershed protection becomes shared bioregional responsibility
+    Given agricultural runoff affects water quality throughout watershed
+    And individual farms lack resources or incentives to protect water comprehensively
+    When bioregional democratic network coordinates watershed stewardship
+    Then farms across watershed implement water protection practices (buffer strips, reduced chemicals)
+    And water quality monitoring shows improvement from coordinated stewardship
+    And downstream communities benefit from agricultural water protection
+    And watershed health becomes collective responsibility with visible benefits
+    And bioregional_elohim monitors watershed health and coordinates protection efforts

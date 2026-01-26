@@ -1,0 +1,10 @@
+Scenario: Personal agent serves as sophisticated decision support system
+    Given Jasmine has complex scheduling and coordination needs
+    And she balances school, work, family responsibilities, and social life
+    When Jasmine uses her personal_agent for planning
+    Then the agent should function as financial advisor, schedule coordinator, and career counselor
+    And provide information, analysis, and memory support
+    And help her see connections: "Your work schedule affects family dinner planning"
+    And surface opportunities: "Your community volunteering builds skills for your intended career"
+    And never make decisions for her
+    And model healthy AI-human partnership where AI amplifies human capability

@@ -1,0 +1,10 @@
+Scenario: Coordinating shared household spaces
+    Given Jordan shares the living room with three housemates
+    And conflicts sometimes arise about TV use or noise
+    When Jordan wants to watch their favorite show
+    Then the household schedule shows shared space availability
+    And Jordan can book TV time using the visual scheduling interface
+    And the system helps housemates negotiate conflicts fairly
+    And Jordan's preferences matter as much as other housemates
+    And the household_elohim facilitates respectful conflict resolution
+    And Jordan learns about shared space cooperation

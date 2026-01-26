@@ -1,0 +1,11 @@
+Scenario: Research on national appeal patterns informs my case
+    Given Dr. Chen has analyzed thousands of national appeals
+    And his research identifies patterns I should know about
+    When I prepare my national-level appeal
+    Then I can access research findings about success factors
+    And I understand which constitutional arguments have prevailed
+    And I see where protocol improvements emerged from appeals
+    And I learn from anonymized cases similar to mine
+    And Research democratizes knowledge of how to appeal effectively
+    And My appeal benefits from collective learning across appellants
+    And Individual justice and systemic knowledge work together

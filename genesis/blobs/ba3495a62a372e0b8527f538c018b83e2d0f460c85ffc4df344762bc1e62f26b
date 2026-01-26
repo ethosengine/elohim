@@ -1,0 +1,12 @@
+Scenario: Channeling construction expertise to community benefit
+    Given Frank has decades of construction knowledge and skills
+    And he's now free from employer profit constraints
+    And his skills are valuable to community
+    When the personal_agent connects Frank to opportunities
+    Then it should identify community needs matching his construction expertise
+    And it should coordinate Habitat projects utilizing his specific skills
+    And it should suggest neighborhood repair opportunities
+    And it should facilitate mentoring younger workers
+    And it should help him teach construction workshops
+    And Frank should experience his knowledge as community asset
+    And retirement should feel like liberation to use skills for community good

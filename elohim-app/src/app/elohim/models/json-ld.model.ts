@@ -41,7 +41,7 @@ export interface JsonLdMetadata {
    * - Object: { '@vocab': 'https://schema.org/', 'lamad': 'https://...' }
    * - Array: ['https://schema.org/', { 'custom': '...' }]
    */
-  '@context'?: string | Record<string, string> | Array<string | Record<string, string>>;
+  '@context'?: string | Record<string, string> | (string | Record<string, string>)[];
 
   /**
    * Type from Schema.org or custom vocabulary

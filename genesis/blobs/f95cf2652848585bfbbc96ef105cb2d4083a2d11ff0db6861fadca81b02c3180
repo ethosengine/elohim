@@ -1,0 +1,9 @@
+Scenario: Manager transitions operational knowledge to worker collective over time
+    Given Marcus holds tacit knowledge from years of operations management
+    And democratic model requires distributing this knowledge to workers
+    When knowledge transfer process begins
+    Then Marcus documents operational procedures and decision frameworks
+    And Marcus trains workers in business operations through structured learning
+    And workers gradually take on tasks previously Marcus's sole domain
+    And after 18 months, workers govern operations with Marcus in purely advisory role
+    And workplace_elohim tracks knowledge distribution preventing re-concentration

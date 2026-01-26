@@ -1,0 +1,11 @@
+Scenario: Recognition of care contributions across multiple life contexts
+    Given Jasmine contributes care work in multiple domains
+    And she works 15 hours/week at her part-time job
+    And she does substantial household labor
+    And she volunteers 4 hours/week at community center
+    When her personal_agent aggregates her care contributions
+    Then all contexts should be recognized: household, paid work, volunteering, civic engagement
+    And care tokens should reflect her substantial contributions
+    And her work should be made visible as genuine economic participation
+    And she should see herself as a productive member of society
+    And her care contributions should give her standing in care economy discussions

@@ -1,0 +1,9 @@
+Scenario: Customer connects to community through democratic business gathering spaces
+    Given neighborhood lacks accessible community gathering spaces
+    And Ms. Johnson experiences isolation common to many residents
+    When democratic businesses serve as community hubs beyond commercial function
+    Then she attends community events at Maria's Kitchen (harvest dinners, neighborhood meetings)
+    And meets neighbors at senior meal program building social networks
+    And participates in community organizing using business space after hours
+    And democratic business becomes social infrastructure combating isolation
+    And community_elohim coordinates community programming at democratic business spaces

@@ -1,0 +1,12 @@
+Scenario: Accessing employment support services and job training programs
+    Given various programs offer employment support for vulnerable populations
+    And these programs vary widely in quality and appropriateness
+    When I seek employment support services
+    Then the workplace_elohim identifies quality employment support programs
+    And helps me access job training, resume support, interview coaching
+    And evaluates whether programs are genuinely helpful vs. bureaucratic
+    And connects me to programs that respect my dignity and capability
+    And validates that I deserve quality employment support
+    And my personal_agent tracks program applications and requirements
+    And recognizes that navigating employment services is labor
+    And ensures employment support actually supports rather than burdens me

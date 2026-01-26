@@ -1,0 +1,11 @@
+Scenario: Balancing speed and deliberation quality under time pressure
+    Given regional crisis creates many urgent appeals
+    And we must review decisions quickly
+    When we convene emergency sessions for crisis appeals
+    Then we maintain: deliberation quality despite urgency
+    And we evaluate: if emergency protocols were properly invoked
+    And we examine: if crisis justified departures from normal process
+    And we provide: expedited review within 48-72 hours
+    And we avoid: rubber-stamping under pressure
+    And we create: precedent for crisis governance
+    And we ensure: democratic accountability even in emergencies

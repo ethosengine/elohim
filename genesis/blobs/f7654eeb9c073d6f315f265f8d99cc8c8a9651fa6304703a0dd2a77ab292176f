@@ -1,0 +1,11 @@
+Scenario: Making both partners' retirement care contributions visible
+    Given Frank volunteers 20 hours/week with Habitat for Humanity
+    And his wife contributes different care labor to family and community
+    And both provide substantial unpaid care work
+    When the household_elohim tracks contributions
+    Then both partners' care work should be quantified specifically
+    And volunteer labor, family care, and community participation should be valued
+    And invisible labor imbalances should become visible
+    And both Frank and his wife should see who's doing what
+    And data should support equitable distribution conversations
+    And both partners' contributions should be recognized and celebrated

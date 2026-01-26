@@ -1,0 +1,9 @@
+Scenario: Elder stays connected to grandchild's daily life
+    Given Emma shares her school activities and achievements
+    When Emma posts about her science fair project
+    And she shares photos of her display
+    Then Rose sees Emma's contribution in family stream
+    And Rose can respond with encouragement and pride
+    And Emma feels her grandmother's support despite distance
+    And the family bond strengthens through regular positive interaction
+    And Rose remains engaged with grandchildren's lives

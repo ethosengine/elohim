@@ -1,0 +1,10 @@
+Scenario: Planning commissioner understands community concerns beyond testimony
+    Given commission considers rezoning to allow commercial development in residential area
+    And supporters include business owners and economic development advocates who testified
+    And only 8 residents attended meeting to oppose
+    When the commissioner seeks community accountability data from Observer
+    Then they see survey data from neighborhood residents showing strong opposition
+    And discover working families couldn't attend evening meeting to testify
+    And access analysis showing traffic and noise impacts on residential area
+    And understand broader community concerns beyond who had time to testify
+    And community accountability helps commissioner serve constituent interests

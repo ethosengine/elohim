@@ -1,0 +1,9 @@
+Scenario: Investor builds direct relationships with workers her capital supports
+    Given stock market investment is anonymous and extractive
+    And Patricia never met workers her capital exploited
+    When community investment creates relationship opportunities
+    Then she knows Maria, DeShawn, Emma—workers her investment helped liberate
+    And attends stakeholder meetings learning about challenges and successes
+    And workers appreciate her support without surrendering governance autonomy
+    And relationship is asymmetric but not extractive (she has capital, they create value, both benefit fairly)
+    And community_elohim facilitates investor-worker relationships protecting democratic governance

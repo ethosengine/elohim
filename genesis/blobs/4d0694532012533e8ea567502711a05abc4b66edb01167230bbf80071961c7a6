@@ -1,0 +1,9 @@
+Scenario: Organizer builds coalition for climate adaptation investment
+    Given low-income neighborhoods face worst climate impacts
+    But climate funding flows to wealthy areas
+    When the organizer uses Observer to identify alignment
+    Then they connect communities facing flooding, heat islands, poor air quality
+    And document systematic disinvestment in climate resilience
+    And coordinate coalition demanding equitable climate spending
+    And facilitate testimony from diverse affected communities
+    And climate justice becomes redistributive investment campaign

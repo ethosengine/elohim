@@ -1,0 +1,10 @@
+Scenario: Waste reduction and circular economy practices tracked
+    Given Jasmine practices waste reduction and composting
+    And she chooses products with minimal packaging
+    When bioregional_elohim tracks her waste and resource patterns
+    Then it should recognize waste reduction as bioregional care work
+    And calculate diversion from landfill and resource conservation
+    And value her participation in circular economy practices
+    And connect individual waste choices to bioregional resource flows
+    And demonstrate that waste reduction is care for ecosystem health
+    And support transition from linear to circular economic thinking

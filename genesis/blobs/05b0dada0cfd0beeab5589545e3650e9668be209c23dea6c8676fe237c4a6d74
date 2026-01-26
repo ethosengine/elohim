@@ -1,0 +1,12 @@
+Scenario: Accessing educational support services for children experiencing trauma
+    Given my children are exhibiting trauma responses affecting learning
+    And schools have support services (counseling, IEPs, 504 plans, trauma-informed support)
+    When I advocate for educational support for my children
+    Then the Value Scanner helps me identify appropriate educational interventions
+    And provides information about my children's rights to services
+    And helps me navigate IEP or 504 plan processes
+    And coordinates with school counselors and support staff
+    And tracks children's educational support needs and services received
+    And my personal_agent reminds me of educational meetings and deadlines
+    And recognizes educational advocacy as sophisticated parenting work
+    And validates that trauma affects learning and requires support

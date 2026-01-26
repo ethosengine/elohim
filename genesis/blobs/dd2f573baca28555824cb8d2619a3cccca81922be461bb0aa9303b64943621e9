@@ -1,0 +1,10 @@
+Scenario: Teaching and sharing skills in community education
+    Given Margaret has skills in health, crafts, traditional knowledge
+    And community members want to learn these skills
+    When Margaret teaches classes or workshops
+    Then the community_elohim should recognize teaching as care work
+    And it should facilitate skill-sharing opportunities
+    And it should connect Margaret with learners
+    And community education should be valued and supported
+    And Margaret's teaching should accumulate care tokens
+    And community should benefit from skill transmission

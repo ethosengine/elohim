@@ -1,0 +1,10 @@
+Scenario: Individual autonomy expanding based on demonstrated capability
+    Given Emma has shown good stewardship decisions over time
+    And parents can adjust autonomy levels in the system
+    When Emma's decision-making patterns are reviewed
+    Then her boundaries should expand to reflect capability
+    And she should earn more freedom through demonstrated judgment
+    And the system should track maturity indicators
+    And Emma should understand that autonomy grows with responsibility
+    And her increasing capability should be recognized
+    And freedom should be matched to demonstrated stewardship

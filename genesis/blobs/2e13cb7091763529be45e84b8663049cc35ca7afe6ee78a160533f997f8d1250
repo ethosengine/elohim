@@ -1,0 +1,10 @@
+Scenario: Preventing roommate conflict through proactive visibility
+    Given household labor imbalances breed resentment
+    And students often avoid difficult conversations
+    When the household_elohim detects emerging conflict patterns
+    Then it should surface issues before they become conflicts
+    And it should show data: "Jordan hasn't contributed household labor in 3 weeks"
+    And it should facilitate constructive conversation with neutral framing
+    And it should help roommates renegotiate responsibilities
+    And preventive intervention should maintain household harmony
+    And the system should support healthy household dynamics

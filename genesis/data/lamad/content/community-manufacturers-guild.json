@@ -1,0 +1,24 @@
+{
+  "id": "community-manufacturers-guild",
+  "did": "did:web:elohim.host:community:manufacturers-guild",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Manufacturers Guild",
+  "description": "Community with 1 members",
+  "content": "# Manufacturers Guild\n\n**Members:** 1\n\n## Member List\n\n- human-manny-manufacturer",
+  "contentFormat": "markdown",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-manny-manufacturer"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-26T21:04:01.763Z"
+}

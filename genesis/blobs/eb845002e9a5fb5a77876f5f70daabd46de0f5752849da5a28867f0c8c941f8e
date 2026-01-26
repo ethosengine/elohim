@@ -1,0 +1,10 @@
+Scenario: Foraging and wild food knowledge
+    Given Margaret may know local wild and foraged foods
+    And foraging connects people to bioregion and reduces food costs
+    When the bioregional_elohim coordinates wild food knowledge
+    Then Margaret's foraging knowledge should be recognized
+    And safe foraging practices should be shared
+    And wild food resources should be sustainably utilized
+    And bioregional food diversity should be enhanced
+    And Margaret's knowledge should strengthen food security
+    And connection to land should be deepened through foraging

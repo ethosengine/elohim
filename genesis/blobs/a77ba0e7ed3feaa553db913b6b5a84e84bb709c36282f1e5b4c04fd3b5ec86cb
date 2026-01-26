@@ -1,0 +1,10 @@
+Scenario: Neighborhood mutual aid networks recognize preteen contributions
+    Given Marcus's family both needs and provides care
+    And neighborhood mutual aid operates on reciprocity
+    When neighborhood care networks are coordinated
+    Then Marcus's household labor should be visible to mutual aid networks
+    And his contributions should qualify family for receiving support
+    And the framing should be reciprocal care, not charity
+    And Marcus gives care (household management); community gives care (support)
+    And the neighborhood_elohim should coordinate these exchanges
+    And dignity should be preserved through reciprocity framework

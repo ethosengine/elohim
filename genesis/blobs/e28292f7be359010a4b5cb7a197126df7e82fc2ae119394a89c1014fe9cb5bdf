@@ -1,0 +1,12 @@
+Scenario: Work-life boundaries protected to prevent burnout
+    Given Robert manages intense professional and care demands
+    And work can expand to consume all available time
+    And sustainable performance requires work-life boundaries
+    When workplace_elohim monitors work-life balance
+    Then it should track whether Robert maintains healthy boundaries
+    And flag when work demands prevent care responsibilities
+    And recognize when he's working excessive hours despite care needs
+    And support him in setting professional boundaries
+    And advocate for organizational norms that respect whole life
+    And prevent burnout that would harm him, his family, and employer
+    And demonstrate that sustainable high performance requires balance

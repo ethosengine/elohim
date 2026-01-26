@@ -1,0 +1,11 @@
+Scenario: Activist coordinates rapid response across network
+    Given Indigenous land defenders face immediate threat of eviction
+    And the situation requires urgent solidarity action
+    When the land defenders' community issues call for support
+    And the call is verified through network trust relationships
+    Then rapid response protocol activates across affinity network
+    And each community determines its capacity to respond
+    And coordination happens in real-time across time zones
+    And actions are culturally appropriate and locally determined
+    And the network mobilizes pressure while preventing burnout
+    And the land defenders receive coordinated solidarity support

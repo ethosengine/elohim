@@ -1,0 +1,10 @@
+Scenario: Teaching children ecological responsibility through food choices
+    Given Sarah manages family food system
+    And food has enormous environmental impact
+    When Sarah teaches Tommy and Emma about food ecology
+    Then the educational_elohim should recognize ecological education
+    And teaching about local food, seasonal eating, food waste should be valued
+    And Sarah's work to build children's food literacy should accumulate tokens
+    And the system should recognize ecological food education as care work
+    And next generation should learn food as ecological relationship
+    And Sarah's teaching should be valued as environmental stewardship

@@ -1,0 +1,9 @@
+Scenario: Activist opposes new polluting facility with evidence
+    Given a company applies for permit to build polluting facility
+    And claims it will have minimal environmental impact
+    When the Observer analyzes company's environmental track record
+    Then the activist shows violations at their other facilities
+    And calculates health impacts on nearby residents
+    And demonstrates existing pollution burden in target neighborhood
+    And organizes affected community for testimony
+    And corporate claims meet community evidence

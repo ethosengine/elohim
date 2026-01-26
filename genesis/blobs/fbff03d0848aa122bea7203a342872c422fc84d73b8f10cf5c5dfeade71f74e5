@@ -1,0 +1,10 @@
+Scenario: Mathematical skills developed through budget management
+    Given Marcus manages $75 weekly budget across multiple constraints
+    And budgeting requires sophisticated mathematical thinking
+    When Marcus allocates resources across needs
+    Then he should be learning applied mathematics
+    And he should practice percentage calculations, unit pricing, budgeting
+    And math should be learned through authentic application
+    And his mathematical capabilities should exceed typical age-level expectations
+    And the personal_agent should reinforce mathematical concepts
+    And care economy should provide rich mathematical learning environment

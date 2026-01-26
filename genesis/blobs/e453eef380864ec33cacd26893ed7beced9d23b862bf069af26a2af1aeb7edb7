@@ -1,0 +1,10 @@
+Scenario: Maintaining household independence and self-sufficiency
+    Given Frank and his wife value their independence
+    And they want to age in place as long as possible
+    When the household_elohim supports independence
+    Then it should help household maintain self-sufficiency
+    And it should optimize resources for maximum autonomy
+    And it should coordinate with family without creating dependence
+    And it should surface when external support is truly needed
+    And household should experience agency and dignity in aging
+    And independence should be supported as long as safe and sustainable

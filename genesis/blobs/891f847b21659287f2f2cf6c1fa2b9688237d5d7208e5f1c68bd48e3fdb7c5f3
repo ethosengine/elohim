@@ -1,0 +1,9 @@
+Scenario: Parent challenges school boundary changes
+    Given the district proposes "boundary realignment for efficiency"
+    And the parent's child would be moved to a different school
+    When the parent reviews Observer's impact analysis
+    Then they see which neighborhoods are most affected
+    And understand this separates siblings between different schools
+    And view maps showing longer commutes for certain families
+    And connect with other parents facing same disruption
+    And coordinate testimony about family impacts at boundary hearing

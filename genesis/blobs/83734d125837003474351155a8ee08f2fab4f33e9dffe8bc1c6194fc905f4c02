@@ -1,0 +1,10 @@
+Scenario: Sharing traditional skills and knowledge with neighbors
+    Given Margaret has skills from her generation (cooking, gardening, crafts)
+    And neighbors might benefit from this knowledge
+    When the neighborhood_elohim tracks knowledge sharing
+    Then it should recognize Margaret's teaching as care work
+    And it should facilitate skill-sharing opportunities
+    And it should connect Margaret with neighbors wanting to learn
+    And traditional knowledge should be valued and transmitted
+    And neighborhood should benefit from elder skills and wisdom
+    And Margaret's teaching should accumulate care tokens

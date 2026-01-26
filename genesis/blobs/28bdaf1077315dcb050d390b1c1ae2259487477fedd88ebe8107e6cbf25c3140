@@ -1,0 +1,9 @@
+Scenario: Ecosystem services from regenerative agriculture are measured and valued
+    Given regenerative farms provide ecosystem services (water filtration, carbon storage, biodiversity)
+    And these services traditionally went uncompensated despite community benefit
+    When bioregional network documents and values ecosystem services
+    Then water quality improvements from agricultural practices are measured and compensated
+    And habitat provision for wildlife and pollinators is documented and valued
+    And carbon sequestration generates revenue supporting regenerative practices
+    And ecosystem service value enables regenerative agriculture to outcompete extractive industrial model
+    And bioregional_elohim measures ecosystem services and facilitates compensation mechanisms

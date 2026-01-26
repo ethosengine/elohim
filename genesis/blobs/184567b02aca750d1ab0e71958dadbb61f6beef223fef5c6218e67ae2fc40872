@@ -1,0 +1,9 @@
+Scenario: Teaching value literacy to own children through Value Scanner
+    Given Sarah is raising Tommy (5) and Emma (8)
+    And she wants them to learn care economy principles
+    When Sarah uses the Value Scanner with her children
+    Then she should model value literacy through her actions
+    And Tommy should learn at developmentally appropriate level (wonder-preservation)
+    And Emma should learn at her developmental stage (guided autonomy)
+    And the educational_elohim should support Sarah's teaching
+    And children should internalize care creates value through family practice

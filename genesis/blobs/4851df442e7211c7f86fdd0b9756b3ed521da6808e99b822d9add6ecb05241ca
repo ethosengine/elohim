@@ -1,0 +1,10 @@
+Scenario: Teen climate activism recognized as care for future generations
+    Given Jasmine participates in climate action organizing
+    And she attends climate strikes and advocates for environmental policy
+    When bioregional_elohim tracks her environmental engagement
+    Then it should recognize climate activism as care work
+    And value her labor for intergenerational justice
+    And understand that fighting for climate action is care for future
+    And track civic environmental engagement alongside other care contributions
+    And demonstrate that ecological advocacy is essential care economy work
+    And support her generation's environmental leadership

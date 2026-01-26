@@ -1,0 +1,12 @@
+Scenario: Neighborhood boundaries prevent over-commitment
+    Given Robert has limited capacity amid other demands
+    And neighborhood participation could expand indefinitely
+    And sustainable participation requires boundaries
+    When neighborhood_elohim monitors Robert's neighborhood engagement
+    Then it should recognize when neighborhood demands exceed his capacity
+    And help him set healthy boundaries on neighborhood participation
+    And surface when he's taking on too much neighborhood responsibility
+    And support him in saying no to additional commitments
+    And ensure neighborhood participation enhances rather than depletes him
+    And protect him from burnout through over-commitment
+    And help him maintain sustainable neighborhood engagement

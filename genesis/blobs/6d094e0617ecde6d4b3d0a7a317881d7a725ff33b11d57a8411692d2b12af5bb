@@ -1,0 +1,9 @@
+Scenario: Bedtime routine for three different ages managed solo
+    Given Maria manages three different bedtime routines alone
+    And she handles 6-year-old's needs, 9-year-old's independence, and teen's later schedule
+    When evening household operations occur
+    Then the household_elohim should coordinate efficient bedtime sequences
+    And it should help Maria provide age-appropriate attention to each child
+    And it should prevent exhaustion from serial one-on-one bedtime needs
+    And it should preserve connection time with each child despite time constraints
+    And Maria should manage impossible evening demands with better coordination

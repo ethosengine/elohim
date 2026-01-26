@@ -1,0 +1,10 @@
+Scenario: Connecting grocery shopping to ecological care economy
+    Given Kenji shops for food on $50/week budget
+    And food choices have ecological impact
+    When the bioregional_elohim helps Kenji make food decisions
+    Then it should show ecological impact of different food choices
+    And it should help him identify low-impact foods within budget
+    And it should recognize "Choosing dried beans over beef reduces ecological impact"
+    And it should show how budget constraint can align with ecological care
+    And the system should connect personal shopping to planetary stewardship
+    And Kenji should see grocery choices as ecological care work

@@ -1,0 +1,10 @@
+Scenario: Journalist investigates developer environmental impact claims
+    Given a major development project claims environmental sustainability
+    And the journalist evaluates environmental impact claims
+    When the Observer analyzes developer's environmental track record
+    Then the journalist finds developer's past projects harmed ecosystems
+    And verifies sustainability claims contradict actual development plans
+    And identifies wetland destruction despite mitigation promises
+    And shows developer has outstanding violations in other states
+    And publishes investigation challenging project approval
+    And instant research exposes developer deception

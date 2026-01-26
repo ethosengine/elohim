@@ -1,0 +1,10 @@
+Scenario: Nutritional science learned through responsibility for health
+    Given Marcus is responsible for his and Keisha's nutrition
+    And adequate nutrition requires scientific understanding
+    When Marcus makes food choices
+    Then he should be learning applied nutritional science
+    And the personal_agent should teach nutrition in context
+    And he should understand macronutrients, vitamins, balanced diet
+    And learning should be motivated by real care responsibility
+    And nutritional education should be deeper than typical age 12 curriculum
+    And his care work should accelerate domain-specific learning

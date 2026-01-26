@@ -1,0 +1,10 @@
+Scenario: Equitable decision-making based on care contribution
+    Given Sarah contributes 75% of household labor
+    And household decisions affect everyone
+    When major household decisions need to be made
+    Then the household_elohim should weight input by care contribution
+    And Sarah's voice should carry appropriate weight
+    And care tokens should give her standing in decisions
+    And those who do the work should have power over the work
+    And household governance should be based on care economy equity
+    And Sarah should have decision authority matching her labor

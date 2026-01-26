@@ -1,0 +1,134 @@
+{
+  "id": "know-thyself-path",
+  "version": "2.0.0",
+  "title": "Know Thyself: Self-Discovery Journey",
+  "description": "A guided journey of self-discovery using validated assessments",
+  "purpose": "Build self-knowledge through scientifically-grounded reflection",
+  "createdBy": "elohim-curriculum",
+  "contributors": [],
+  "createdAt": "2025-11-23T00:09:03.478464",
+  "updatedAt": "2025-12-26T00:00:00.000Z",
+  "chapters": [
+    {
+      "id": "chapter-1-foundations",
+      "title": "Foundations of Self-Knowledge",
+      "description": "Understanding the value and methods of self-discovery",
+      "order": 1,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "content-self-knowledge-intro",
+          "stepTitle": "The Value of Self-Knowledge",
+          "stepNarrative": "Understand why 'know thyself' remains timeless wisdom",
+          "learningObjectives": [
+            "Appreciate the value of self-knowledge",
+            "Learn about validated assessment instruments"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Read introduction"
+          ],
+          "estimatedTime": "10-15 minutes"
+        }
+      ],
+      "estimatedDuration": "10-15 minutes"
+    },
+    {
+      "id": "chapter-2-values",
+      "title": "Discovering Your Values",
+      "description": "Identify and prioritize what matters most to you",
+      "order": 2,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "assess",
+          "resourceId": "assessment-values-hierarchy",
+          "stepTitle": "Values Hierarchy Assessment",
+          "stepNarrative": "Discover what you truly value most",
+          "learningObjectives": [
+            "Identify your core values",
+            "Understand how values guide decisions"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Complete values assessment"
+          ],
+          "estimatedTime": "20-30 minutes"
+        }
+      ],
+      "attestationGranted": "values-examined",
+      "estimatedDuration": "20-30 minutes"
+    },
+    {
+      "id": "chapter-3-relationships",
+      "title": "Understanding Relationships",
+      "description": "Explore your attachment patterns and relationship dynamics",
+      "order": 3,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "assess",
+          "resourceId": "assessment-attachment-style",
+          "stepTitle": "Attachment Style Exploration",
+          "stepNarrative": "Understand your relationship patterns",
+          "learningObjectives": [
+            "Identify attachment patterns",
+            "Understand impact on relationships"
+          ],
+          "optional": true,
+          "completionCriteria": [
+            "Complete attachment assessment"
+          ],
+          "estimatedTime": "25-35 minutes"
+        }
+      ],
+      "attestationGranted": "attachment-aware",
+      "estimatedDuration": "25-35 minutes"
+    },
+    {
+      "id": "chapter-4-strengths",
+      "title": "Recognizing Your Strengths",
+      "description": "Discover and leverage your character strengths",
+      "order": 4,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "assess",
+          "resourceId": "assessment-strengths-finder",
+          "stepTitle": "Character Strengths",
+          "stepNarrative": "Discover your signature strengths",
+          "learningObjectives": [
+            "Identify top character strengths",
+            "Learn to apply strengths intentionally"
+          ],
+          "optional": true,
+          "completionCriteria": [
+            "Complete strengths assessment"
+          ],
+          "estimatedTime": "20-30 minutes"
+        }
+      ],
+      "attestationGranted": "strengths-aware",
+      "estimatedDuration": "20-30 minutes"
+    }
+  ],
+  "tags": [
+    "self-knowledge",
+    "assessment",
+    "imago-dei",
+    "growth"
+  ],
+  "difficulty": "intermediate",
+  "estimatedDuration": "2-3 hours",
+  "visibility": "public",
+  "pathType": "journey",
+  "prerequisitePaths": [
+    "elohim-protocol"
+  ],
+  "attestationsGranted": [
+    "values-examined",
+    "attachment-aware",
+    "strengths-aware"
+  ]
+}

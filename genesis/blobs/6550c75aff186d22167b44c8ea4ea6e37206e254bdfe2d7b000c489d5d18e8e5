@@ -1,0 +1,9 @@
+Scenario: Bioregional investment reduces fossil fuel dependence across sectors
+    Given fossil fuel dependence threatens climate stability
+    And Patricia's investments can support energy transition
+    When democratic businesses across bioregion prioritize renewable energy
+    Then local food systems eliminate long-haul transportation fossil fuel use
+    And businesses invest in renewable energy through community investment support
+    And bioregional fossil fuel consumption decreases measurably
+    And investment accelerates just energy transition
+    And bioregional_elohim tracks energy transition and coordinates renewable investment

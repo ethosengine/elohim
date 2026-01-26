@@ -1,0 +1,10 @@
+Scenario: Moral development supported through care-based choices
+    Given Emma is at conventional morality stage (ages 7-11)
+    And she is developing sense of right and wrong
+    When Emma makes choices that affect others
+    Then the personal_agent should highlight moral dimensions
+    And the agent should ask "How will this choice affect Tommy?"
+    And care ethics should be made explicit in decisions
+    And Emma should develop moral reasoning through practice
+    And value decisions should be framed as care decisions
+    And moral development should be integrated with economic learning

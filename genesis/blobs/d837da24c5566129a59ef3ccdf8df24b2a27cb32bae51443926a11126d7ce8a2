@@ -1,0 +1,9 @@
+Scenario: Community legal aid for caregiver navigation needs
+    Given James needs advance directives, power of attorney, possibly guardianship
+    And legal services are expensive and complex
+    When the community_elohim connects to legal resources
+    Then legal aid should be accessible based on care contributions
+    And attorneys should understand caregiver-specific needs
+    And legal navigation should be supported through care economy
+    And community should ensure caregivers access legal protections
+    And legal complexity should not be impossible barrier

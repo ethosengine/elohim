@@ -1,0 +1,11 @@
+Scenario: Contributing to community through volunteer work
+    Given the local food bank needs volunteers
+    And Jordan wants to help community members in need
+    When Jordan volunteers at the food bank
+    Then tasks are adapted to Jordan's capabilities (sorting, carrying)
+    And volunteer coordinators provide clear, accessible instructions
+    And Jordan's work genuinely contributes to food bank operations
+    And Jordan accumulates care tokens for volunteer service
+    And Jordan is recognized as a valued volunteer, not as someone being helped
+    And Jordan experiences being a community care provider
+    And Jordan's contributions are celebrated authentically

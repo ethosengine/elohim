@@ -1,0 +1,9 @@
+Scenario: Protect appellant rights as universal constitutional minimum
+    Given authoritarian government attempts to suppress appeals
+    And the government wants agents to operate without oversight
+    When global Constitutional Council evaluates the attempt
+    Then the council reaffirms appeal rights as universal minimum
+    And the council declares that human dignity requires recourse
+    And no jurisdiction can eliminate appellant rights while claiming protocol alignment
+    And international community recognizes council authority
+    And appellants worldwide are protected by global constitutional floor

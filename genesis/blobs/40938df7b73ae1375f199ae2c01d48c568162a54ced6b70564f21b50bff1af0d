@@ -1,0 +1,7 @@
+Scenario: Creating household care agreements
+    Given household members need clear expectations
+    When we establish how we'll manage shared living
+    Then the protocol should help us create care agreements
+    And document who does what and when
+    And include flexibility for my irregular schedule
+    And provide framework for fair and sustainable cooperation

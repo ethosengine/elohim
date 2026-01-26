@@ -1,0 +1,9 @@
+Scenario: Parent challenges state funding formula
+    Given the parent learns state funding shortchanges their district
+    And wonders why their child's school lacks basic resources
+    When the parent reviews Observer's state funding analysis
+    Then they see their district receives $3,000 less per student
+    And understand state formula creates massive inequities
+    And learn this explains overcrowded classes and cut programs
+    And connect with parents in other underfunded districts statewide
+    And parent advocacy expands to state-level funding reform

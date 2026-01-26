@@ -1,0 +1,11 @@
+Scenario: Workplace conditions monitored to prevent teen labor exploitation
+    Given Jasmine is vulnerable as a young worker
+    And young workers often face exploitation
+    When workplace_elohim tracks her work conditions
+    Then it should monitor whether she's fairly compensated for her labor
+    And flag if hours exceed healthy limits
+    And recognize if she's asked to work in unsafe conditions
+    And track if she's getting required breaks
+    And identify if she's experiencing harassment or discrimination
+    And surface resources about her rights as a worker
+    And provide support if workplace becomes exploitative

@@ -1,0 +1,10 @@
+Scenario: Emergency work flexibility for student crises
+    Given students face emergencies (illness, family crisis, housing instability)
+    And rigid work schedules can worsen crises
+    When Kenji experiences emergency situation
+    Then the workplace_elohim should help him communicate need for emergency time off
+    And it should advocate for employer flexibility during crisis
+    And it should recognize emergency accommodation as care economy practice
+    And employers should support workers through crises
+    And the system should help Kenji access emergency workplace support
+    And care economy workplaces respond to worker emergencies with flexibility

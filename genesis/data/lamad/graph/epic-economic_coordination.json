@@ -1,0 +1,29 @@
+{
+  "id": "graph-epic-economic-coordination",
+  "title": "Economic Coordination Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Economic Coordination epic",
+  "lastUpdated": "2025-11-28T21:09:48.369313",
+  "zoomLevel": 1,
+  "parentId": "economic-coordination-epic",
+  "epicKey": "economic_coordination",
+  "nodes": [
+    {
+      "id": "economic-coordination-epic",
+      "title": "Economic Coordination",
+      "contentType": "epic",
+      "description": "REA-based value flows, creator recognition, and network economics",
+      "hasChildren": true,
+      "childCount": 0,
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "level": 1,
+      "isParent": true
+    }
+  ],
+  "edges": [],
+  "totalNodes": 1,
+  "totalEdges": 0
+}

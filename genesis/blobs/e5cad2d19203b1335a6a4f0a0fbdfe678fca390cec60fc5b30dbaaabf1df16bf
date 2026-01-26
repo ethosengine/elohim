@@ -1,0 +1,10 @@
+Scenario: Household participation in multigenerational care coordination
+    Given Margaret provides care both to grandchildren and her elderly mother
+    And Robert provides support to his own aging family
+    When the household coordinates all care obligations
+    Then the household_elohim should track all family care commitments
+    And it should help balance multiple care responsibilities
+    And it should prevent household care burden from becoming excessive
+    And both partners should understand total household care load
+    And household should be able to set sustainable boundaries
+    And care obligations should be manageable and sustainable

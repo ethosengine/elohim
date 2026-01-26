@@ -1,0 +1,10 @@
+Scenario: Pension board member evaluates investment strategy balancing returns and values
+    Given pension fund considers divesting from fossil fuel investments
+    And staff analysis emphasizes fiduciary duty and projected investment returns
+    And some beneficiaries advocate for climate-conscious investing
+    When the board member requests Observer independent analysis
+    Then they receive comparison of fossil fuel versus clean energy investment performance
+    And see examples from peer pension funds that divested with outcome data
+    And access analysis of climate risk to long-term portfolio value
+    And understand fiduciary duty in context of environmental and social factors
+    And independent analysis helps board balance competing considerations

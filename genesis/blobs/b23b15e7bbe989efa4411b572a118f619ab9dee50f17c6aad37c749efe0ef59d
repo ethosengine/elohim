@@ -1,0 +1,10 @@
+Scenario: Property tax relief and housing support for fixed-income seniors
+    Given Margaret lives on fixed income
+    And property taxes or rent can threaten housing stability
+    When the municipality_elohim identifies housing assistance
+    Then senior property tax relief programs should be communicated
+    And rental assistance should be accessible if applicable
+    And Margaret should be able to age in place affordably
+    And housing stability should be protected for seniors
+    And municipal housing policy should recognize fixed-income constraints
+    And aging in community should be economically feasible

@@ -1,0 +1,7 @@
+Scenario: Identifying unsafe or harmful workplace conditions
+    Given restaurant work involves physical demands and potential hazards
+    When I experience unsafe conditions or health risks
+    Then the workplace_elohim should help me identify hazards
+    And provide information about workplace safety rights
+    And support me in reporting unsafe conditions
+    And advocate for conditions that protect workers' health

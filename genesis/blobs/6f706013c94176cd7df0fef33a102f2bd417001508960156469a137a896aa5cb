@@ -1,0 +1,11 @@
+Scenario: Building relationships with neighbors over time
+    Given Jordan lives on the same block as many families
+    And Jordan walks past neighbors' homes daily
+    When Jordan encounters neighbors during daily activities
+    Then Jordan greets neighbors with friendliness
+    And the personal_agent might provide name reminders if Jordan forgets
+    And neighbors increasingly see Jordan as a person, not just disability
+    And Jordan develops reputation as the "friendly neighbor"
+    And simple conversations build relationship over time
+    And Jordan's social contribution to neighborhood is real and valued
+    And Jordan experiences genuine community connection

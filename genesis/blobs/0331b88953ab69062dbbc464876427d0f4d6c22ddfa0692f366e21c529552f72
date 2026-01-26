@@ -1,0 +1,10 @@
+Scenario: Teen's civic engagement recognized as care contribution
+    Given Jasmine participates in community service projects
+    And she attends city council meetings about youth issues
+    When her civic engagement is tracked
+    Then it should be recognized as care work for the community
+    And political participation should be valued in care economy
+    And she should learn that civic engagement is care labor
+    And her generation should understand that democracy requires active care work
+    And community_elohim should make visible that youth civic participation matters
+    And her care tokens should reflect her contribution to democratic governance

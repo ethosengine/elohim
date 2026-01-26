@@ -1,0 +1,11 @@
+Scenario: Explaining limitations of explainability for complex reasoning
+    Given National Council considers requiring perfect explainability
+    And I must clarify technical feasibility
+    When I testify about explainability tradeoffs
+    Then I explain: perfect explainability may be impossible for superintelligent reasoning
+    And I clarify: tradeoff between transparency and capability
+    And I present: current state of explainability research
+    And I acknowledge: we don't know if problem is solvable
+    And I avoid: either dismissing explainability importance or promising impossibility
+    And I enable: council to make informed choice despite uncertainty
+    And delegates decide: values given technical constraints

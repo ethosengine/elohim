@@ -1,0 +1,10 @@
+Scenario: Transitioning from child to adult in family system
+    Given Jordan turned 26 and family dynamics are shifting
+    And parents are learning to see Jordan as an adult
+    When family interactions reveal old patterns (treating Jordan as child)
+    Then the family_elohim surfaces the pattern respectfully
+    And the system provides education about adult autonomy for IDD people
+    And Jordan can express feelings about wanting adult treatment
+    And the family receives support for the transition
+    And Jordan's growth toward greater autonomy is celebrated
+    And the family system evolves to honor Jordan's adult status

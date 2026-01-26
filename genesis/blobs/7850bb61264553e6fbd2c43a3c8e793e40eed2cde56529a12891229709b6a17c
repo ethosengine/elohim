@@ -1,0 +1,11 @@
+Scenario: Mediating between community members and agents
+    Given Community Elohim makes decisions affecting Riverside residents
+    And some residents don't understand or disagree with decisions
+    When I serve as bridge between residents and agent governance
+    Then I explain: how protocol works in accessible language
+    And I facilitate: residents filing appeals when appropriate
+    And I provide: context to Constitutional Council about local culture
+    And I advocate: for residents when agents miss local knowledge
+    And I maintain: boundary where I don't control agents but collaborate
+    And I enable: democratic participation in AI governance
+    And I am accountable: to residents through elections

@@ -1,0 +1,10 @@
+Scenario: Care token accumulation for self-care and household contributions
+    Given Kenji prepares nutritious meals for himself
+    And he manages his space, does laundry, and maintains basic self-care
+    When the Value Scanner tracks Kenji's individual care contributions
+    Then it should accumulate care tokens for self-care labor
+    And it should recognize that caring for himself is care economy work
+    And it should track his development of adult life skills
+    And self-maintenance should be valued, not invisible
+    And the system should make visible the work of sustaining himself
+    And Kenji should see that taking care of himself is productive

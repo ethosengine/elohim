@@ -1,0 +1,10 @@
+Scenario: Celebrating holidays and traditions as adult participant
+    Given Jordan's family celebrates holidays together
+    And Jordan has their own traditions in the group home
+    When Thanksgiving approaches
+    Then Jordan decides where to spend the holiday
+    And the interface helps Jordan weigh options (family vs. housemates)
+    And Jordan's choice is honored by both family and household
+    And if Jordan chooses family, they participate as an adult guest
+    And Jordan's preferences about holiday activities are considered
+    And Jordan experiences adult autonomy in family traditions

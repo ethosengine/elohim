@@ -1,0 +1,9 @@
+Scenario: Organizer tracks accountability for green space investment promise
+    Given city committed to park improvements in underserved neighborhoods
+    And the organizer's coalition won the commitment through campaign
+    When the Observer tracks implementation progress
+    Then the organizer monitors park renovation timeline and budget
+    And receives alerts when spending lags or shifts to other areas
+    And documents completion showing community organizing created change
+    And has evidence to pressure officials if promises aren't kept
+    And environmental justice organizing includes accountability for implementation

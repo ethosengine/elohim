@@ -1,0 +1,11 @@
+Scenario: Household privacy maintained despite care coordination needs
+    Given multiple people enter Helen's home to provide care
+    And care coordination requires information sharing
+    When household privacy is managed
+    Then Helen should control what information is shared with whom
+    And her personal spaces should remain private
+    And intimate care should be provided with maximum dignity
+    And she should have privacy in her own home
+    And surveillance should be minimized to necessity
+    And her home should not feel like an institution
+    And the protocol should preserve the privacy of home life

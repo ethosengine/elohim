@@ -1,0 +1,11 @@
+Scenario: Quantifying grandparent care contributions at individual level
+    Given Margaret provides 25 hours/week of active childcare
+    And market rate for professional childcare is ~$1,500/month
+    When the personal_agent tracks Margaret's care labor
+    Then it should quantify all hours spent in active childcare
+    And it should calculate economic value of her contributions
+    And it should accumulate care tokens for her labor
+    And it should recognize developmental benefits beyond market value
+    And Margaret should see that her work is substantial and valuable
+    And the data should counter narrative of "just spending time with grandkids"
+    And her contributions should be visible and quantified

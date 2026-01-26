@@ -1,0 +1,9 @@
+Scenario: Municipal economic development includes care economy
+    Given traditional economic development ignores care work
+    And Sarah's care contributions create substantial value
+    When municipal economic development is planned
+    Then care economy should be recognized as economic sector
+    And care work should be counted in municipal GDP calculations
+    And economic development should support care economy infrastructure
+    And municipal prosperity should reflect care creates value
+    And economic planning should include invisible care labor

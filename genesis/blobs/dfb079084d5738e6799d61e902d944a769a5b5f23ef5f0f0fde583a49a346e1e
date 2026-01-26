@@ -1,0 +1,375 @@
+---
+epic: value_scanner
+user_type: young_child
+governance_layer: family
+scene: morning_routine_participation
+related_users: [parent, child, partner]
+related_layers: [individual, neighborhood]
+interacts_with: [personal_agent, family_elohim]
+---
+
+# Family Layer Scenario - Young Child
+
+## Context
+
+Wednesday morning, 7:15 AM. Six-year-old Emma wakes up to her personal_agent's gentle alarm—a song she chose yesterday. Today feels different though. On her kid-sized tablet, a special message appears:
+
+**🌟 Good morning, Emma! Today is a family teamwork day. Want to see your mission?**
+
+Emma, still sleepy but curious, taps yes.
+
+**Emma's Family Mission:**
+1. 🐱 Feed the cats (you can do this!)
+2. 📚 Find your library books (they're due today!)
+3. 👗 Choose school clothes (remember: comfy clothes on school days!)
+
+This isn't a parent nagging her. This is family_elohim coordinating the Parker household's morning, and Emma is a real participant—not just a child being managed, but a family member contributing to collective success.
+
+This is the **family layer** for a young child: where she learns she's part of something bigger than herself, where family values shape her choices, and where her contributions actually matter.
+
+## The Story
+
+**7:20 AM - Emma's First Mission: Feed the Cats**
+
+Emma pads downstairs in her pajamas. The cats, Pepper and Sage, are already meowing. Her tablet shows a simple checklist:
+
+**Feeding Pepper and Sage:**
+- ✓ Use the measuring cup (1 scoop each)
+- ✓ Fill water bowls
+- ✓ Tell family_elohim when done!
+
+Emma has done this before, but today she notices something: when she finishes, her tablet shows not just a gold star for her, but something new:
+
+**Parker Family Progress:**
+- Emma: Cats fed! ✓
+- Tommy: Making breakfast! ✓
+- Mom: Getting ready for work...
+- Dad: Packing lunches...
+
+Emma realizes: **Everyone has jobs. Everyone is helping.** She's not just being good—she's part of the family's morning success.
+
+**7:30 AM - Emma's Second Mission: Library Books**
+
+Emma's tablet vibrates gently: *"Next mission: Find your library books. They're due today! Where did you leave them?"*
+
+Emma thinks. She remembers reading in the living room yesterday. She runs to check—yes! Two books under the couch cushions.
+
+But when she scans them with her tablet's camera, her personal_agent says:
+
+*"Good finding! But wait—this book has one more day until it's due. The other one is due today. Want to return both, or keep one more day?"*
+
+This is a teaching moment. Emma could return both (easier for Mom), or keep one (she's not done reading it).
+
+She chooses: **Return the due one, keep the other one day.**
+
+Her agent responds: *"Smart thinking! You're following the family rule: 'Return library books on time.' And you're also thinking about what YOU need. Mom will be proud."*
+
+Family values (return things on time) + Individual needs (Emma's reading) = Balanced decision.
+
+**7:40 AM - Emma's Third Mission: The Clothes Choice**
+
+Emma opens her closet. She immediately reaches for her princess dress—the sparkly one she loves.
+
+But her tablet gently reminds her:
+
+*"Today is a school day. Remember our family rule?"*
+
+Emma pouts. She WANTS to wear the princess dress. Her tablet shows two choices:
+
+**What do you want to do?**
+1. 👗 Wear comfy clothes today (family rule), princess dress this weekend
+2. 😢 Tell Mom you really want to wear the dress today
+
+Emma thinks. She really, really wants the dress. She taps option 2.
+
+Her tablet responds: *"Okay! I'll tell Mom you have strong feelings about this. She's the family rule-keeper. Let's see what she says."*
+
+**The Family Governance Moment:**
+
+Downstairs, Sarah's phone buzzes: *"Emma really wants to wear her princess dress today. Family rule says school days = comfy clothes. Do you want to:*
+1. *Stick to the family rule (teach consistency)*
+2. *Make an exception today (acknowledge Emma's feelings)*
+3. *Talk with Emma about why the rule exists"*
+
+Sarah chooses option 3. She comes upstairs and kneels next to Emma.
+
+"I see you really love that dress," Sarah says gently. "Can you tell me why you want to wear it today?"
+
+Emma: "Because it makes me feel pretty and special."
+
+Sarah: "You ARE special. Every day. You know what? On Friday, we can have 'special dress day' where everyone wears something fancy. Would that work?"
+
+Emma thinks. Friday is two days away. But the idea of EVERYONE wearing fancy clothes sounds fun. She nods.
+
+Sarah: "So today, comfy clothes. Friday, princess dress. Deal?"
+
+Emma: "Deal. But can I wear my sparkly shoes today?"
+
+Sarah laughs. "Sparkly shoes are definitely comfy-clothes approved."
+
+**What Just Happened (Governance in Action):**
+
+1. **Family rule was maintained** (school days = comfy clothes)
+2. **Emma's feelings were acknowledged** (she wanted to feel special)
+3. **A compromise was negotiated** (sparkly shoes + Friday dress-up day)
+4. **Emma participated in the decision** (she had voice, not just obedience)
+5. **Family values were taught, not forced** (Emma understands WHY the rule exists)
+
+This is family-layer governance for a young child: **boundaries with respect, rules with relationship, authority with love.**
+
+**8:00 AM - Family Morning Celebration**
+
+The kitchen hub display shows the Parker family's morning achievements:
+
+**Parker Family Wednesday Morning:**
+
+**EVERYONE CONTRIBUTED!**
+- Emma: 🐱 Fed cats, 📚 Found library books, 👗 Made good clothing choice
+- Tommy: 🍳 Made breakfast for Emma and himself
+- Mom: 📋 Organized everyone's schedules, 🚗 Ready to drive everyone
+- Dad: 🥪 Packed healthy lunches, ☕ Made coffee for Mom
+
+**Family Wins:**
+- ✓ No one is late!
+- ✓ Cats are happy
+- ✓ Library books ready to return
+- ✓ Everyone ate breakfast
+- ✓ Family worked together
+
+Emma sees her name on the display with her contributions. She feels proud. Not because an adult praised her, but because she sees herself as part of a team that succeeded.
+
+Tommy high-fives her. "Good job feeding Pepper and Sage, Emma!"
+
+Emma beams. Her care work was seen. Her contribution mattered.
+
+## Governance Mechanics
+
+**Family Layer for Young Children:**
+
+At ages 5-7, the family layer is about **learning to be part of a collective** while respecting the child's developing autonomy:
+
+**Family Sovereignty Over Child (within constitutional bounds):**
+- Parents set family rules (school clothes, bedtime, safety)
+- Family values apply to all members, including Emma
+- Parents have final authority on decisions affecting child's welfare
+- But Emma's voice and feelings are heard and considered
+
+**Constitutional Constraints on Family Authority:**
+- Cannot violate Emma's fundamental rights (dignity, safety, emotional wellbeing)
+- Must respect Emma's developmental autonomy (age-appropriate choices)
+- Cannot use coercion or manipulation (gentle guidance, not force)
+- Subject to community norms about child welfare
+
+**How Family Authority Works for Young Child:**
+
+1. **Family Rules (established by parents, applied consistently):**
+   - "Comfy clothes on school days" (practical safety and comfort)
+   - "Return library books on time" (teaching responsibility)
+   - "Everyone contributes to family care work" (collective values)
+
+2. **Emma's Voice Within Family Bounds:**
+   - Emma can express desire to break rule (princess dress request)
+   - Parents listen and negotiate (sparkly shoes compromise)
+   - Emma's feelings matter, even when rule is maintained
+   - She learns: rules have reasons, and she can question respectfully
+
+3. **Age-Appropriate Contribution:**
+   - Emma CAN feed cats independently (builds competence)
+   - Emma CANNOT make complex family decisions (developmentally inappropriate)
+   - Her contributions are real and valued (not busywork)
+   - She sees herself as family member, not just child being managed
+
+**Subsidiarity for Young Children:**
+- Some decisions belong to Emma (what to draw, how to feel)
+- Some decisions belong to family (clothing rules, safety boundaries)
+- Some decisions are negotiated (sparkly shoes compromise)
+- Emma is learning WHERE decisions belong (governance literacy)
+
+## Protocol Interactions
+
+**Family_elohim Coordinating Young Child:**
+
+```
+family_elohim (Parker household)
+├── Tracks Emma's capabilities (can feed cats independently)
+├── Generates age-appropriate missions (simple, achievable)
+├── Coordinates Emma's contributions with family needs
+├── Escalates to parents when Emma needs help or has conflict
+└── Celebrates Emma's participation (she's part of family team)
+
+Morning Coordination:
+family_elohim identifies family needs:
+├── Cats need feeding (Emma can do this)
+├── Library books due (Emma knows where they are)
+├── Emma needs to get dressed (requires guidance, family rule)
+└── Generates Emma's mission list (appropriate to her capacity)
+
+Emma's personal_agent receives mission from family_elohim:
+├── Presents in Emma-friendly format (pictures, simple language)
+├── Guides Emma through tasks (checklist, encouragement)
+├── Reports completion back to family_elohim
+└── Escalates when Emma faces decision beyond her authority
+```
+
+**The Princess Dress Negotiation:**
+
+```
+7:40 AM - Emma wants princess dress
+
+Emma's personal_agent:
+├── Detects: Emma's choice conflicts with family rule
+├── Presents options: follow rule OR express strong feeling to parent
+├── Emma chooses: express feeling
+└── personal_agent escalates to family_elohim
+
+family_elohim:
+├── Recognizes: Family rule conflict requiring parent decision
+├── Notifies Sarah (parent) with context and options
+├── Sarah chooses: talk with Emma (relationship approach)
+└── Facilitates conversation (doesn't force decision)
+
+Sarah and Emma negotiate:
+├── Sarah acknowledges Emma's feelings (emotional validation)
+├── Sarah explains rule rationale (teaching, not commanding)
+├── Together find compromise (sparkly shoes + Friday dress-up)
+└── Emma accepts voluntarily (not coerced compliance)
+
+Outcome:
+├── Family rule maintained (consistency)
+├── Emma's voice heard (respect)
+├── Relationship strengthened (connection)
+└── Emma learns negotiation and governance (civic education)
+```
+
+**Privacy Within Family:**
+
+```
+What Emma's personal_agent knows (private to Emma):
+├── Emma really loves the princess dress (strong preference)
+├── Emma can follow rules even when disappointed (emotional regulation)
+├── Emma responds well to explanation + compromise (learning style)
+
+What family_elohim knows (family-level coordination):
+├── Emma completed morning missions (yes)
+├── Emma needed parent help with clothing decision (appropriate escalation)
+├── Emma is contributing to family care work (participation tracked)
+
+What parents can see:
+├── Emma's task completion (cats fed, books found)
+├── Emma's challenges (wanted princess dress, negotiated)
+├── Emma's care contributions (quantified and celebrated)
+
+What Emma can keep private:
+├── How she felt about the decision (unless she shares)
+├── What she drew or played after (individual layer)
+├── Her internal reasoning (developing autonomy)
+```
+
+## Care Made Visible
+
+**What Was Invisible:**
+
+Before this morning, Emma's family contributions were invisible or taken for granted:
+- Feeding cats was "just what Emma does" (not recognized as care work)
+- Finding library books was "her responsibility" (not seen as helping the family)
+- Following family rules was "good behavior" (not understood as family governance participation)
+
+**How the Family Layer Makes It Visible:**
+
+1. **Emma Sees Her Contributions Matter:**
+   - Family dashboard shows her work alongside everyone else's
+   - Tommy high-fives her (peer recognition)
+   - She understands: the family succeeded BECAUSE everyone contributed
+   - Her care work has value, not just compliance
+
+2. **Parents See Emma as Participant:**
+   - Not just child to be managed, but family member who contributes
+   - Her care work (feeding cats) is quantified and celebrated
+   - Her voice in decisions (princess dress) is respected
+   - She's capable of more than they might assume
+
+3. **Emma Learns Family Governance:**
+   - Rules exist for reasons, not arbitrary adult power
+   - She can question rules and be heard (democratic participation)
+   - Compromise is possible when everyone's needs are considered
+   - She has responsibilities AND rights within the family
+
+**How Visibility Creates Value:**
+
+1. **Developmental Value:**
+   - Emma is learning collective responsibility (family teamwork)
+   - She's developing voice and negotiation skills (civic capacity)
+   - She understands that her actions affect others (relational awareness)
+   - She sees herself as capable and contributing (self-efficacy)
+
+2. **Relational Value:**
+   - Sibling bond with Tommy strengthened (mutual recognition)
+   - Parent-child relationship deepened (respectful negotiation)
+   - Family cohesion increased (everyone on the same team)
+   - Trust built through consistent, respectful governance
+
+3. **Educational Value:**
+   - Emma is learning governance by experiencing it
+   - She understands rules, voice, negotiation, compromise
+   - She's preparing for community participation (practice at home)
+   - Early civic education through family democracy
+
+**Who Benefits:**
+
+- **Emma:** Competence, voice, belonging, early civic education
+- **Parker family:** Smoother mornings, shared responsibility, stronger relationships
+- **Future Emma:** Foundation for civic participation and democratic engagement
+
+## Connections
+
+### Upward from Individual Layer
+
+Emma's individual autonomy informed family participation:
+
+- **Yesterday (individual):** Emma chose to save strawberries for Tommy
+- **Today (family):** Emma is trusted with cat-feeding responsibility
+- **Individual capacity → Family contribution:** Her autonomy enables collective success
+
+### Upward to Neighborhood Layer (future)
+
+Emma's family participation prepares for neighborhood engagement:
+
+- **Today (age 6):** Emma feeds family cats, learns family rules
+- **Future (age 8):** Emma might feed neighbor's cats, participate in pet care network
+- **Family care work → Neighborhood care network:** Skills transfer across layers
+
+### Sideways to Sibling (Tommy)
+
+Emma and Tommy both contribute at family layer:
+
+- **Tommy's work:** Makes breakfast (helps everyone, including Emma)
+- **Emma's work:** Feeds cats (helps family)
+- **Mutual recognition:** High-five moment (peers celebrating each other's care)
+- **Sibling solidarity:** Both are family team members, not competing
+
+### Downward to Individual Layer
+
+Family participation doesn't erase individual autonomy:
+
+- **Family rule:** Comfy clothes on school days (collective value)
+- **Individual choice:** Emma chooses WHICH comfy clothes (autonomy)
+- **Family creates space for individual expression:** Sparkly shoes compromise
+
+Family layer **enables** individual flourishing by providing structure, safety, and belonging.
+
+---
+
+**This scenario demonstrates:**
+- Family layer as young child's introduction to collective governance
+- Age-appropriate participation in family care work
+- Family rules taught with respect, not force
+- Child voice within family authority structure
+- Care work made visible and celebrated for even youngest members
+- How family coordination prepares for future civic participation
+
+**Developmental progression:**
+- **Age 6 (Emma):** Family rules, basic contributions, learning voice
+- **Age 10 (Tommy):** More complex tasks, neighborhood participation begins
+- **Age 14+:** Community engagement, policy awareness, full civic participation
+
+**The family layer is where democracy is learned first. Emma is becoming a citizen, starting at home.**

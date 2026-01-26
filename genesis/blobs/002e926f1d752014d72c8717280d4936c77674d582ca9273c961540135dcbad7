@@ -1,0 +1,8 @@
+Scenario: Activist connects local environmental struggle to regional climate justice
+    Given the activist fights pollution in their neighborhood
+    When the Observer reveals regional climate adaptation patterns
+    Then the activist sees climate resilience investments favor wealthy areas
+    And flood vulnerability concentrates in communities of color
+    And urban heat island effects exacerbate environmental injustice
+    And local environmental fight connects to climate justice movement
+    And climate policy must address environmental equity

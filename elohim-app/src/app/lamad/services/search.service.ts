@@ -1,11 +1,15 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+
 import { map, catchError } from 'rxjs/operators';
+
+import { Observable, of, forkJoin } from 'rxjs';
+
+import { TrustLevel, calculateTrustLevel } from '@app/elohim/models/trust-badge.model';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
+
 import { ContentType, ContentReach } from '../models/content-node.model';
-import { TrustLevel, calculateTrustLevel } from '@app/elohim/models/trust-badge.model';
-import { ContentIndexEntry } from './content.service';
+import { LearningPath } from '../models/learning-path.model';
 import {
   SearchQuery,
   SearchResult,
@@ -20,8 +24,10 @@ import {
   SEARCH_MATCH_BONUSES,
   DEFAULT_SEARCH_CONFIG,
   createEmptyResults,
-  extractSnippet
+  extractSnippet,
 } from '../models/search.model';
+
+import { ContentIndexEntry } from './content.service';
 
 /**
  * SearchService - Enhanced content search with relevance scoring and facets.
@@ -62,23 +68,40 @@ export class SearchService {
   ) {}
 
   /**
-   * Search content with relevance scoring, filtering, and facets.
+   * Search content AND paths with relevance scoring, filtering, and facets.
+   *
+   * Searches both:
+   * - Content nodes (documents, articles, videos, etc.)
+   * - Learning paths (curated journeys)
+   *
+   * Results are merged and sorted by relevance.
    */
   search(query: SearchQuery): Observable<SearchResults> {
     const startTime = Date.now();
 
-    return this.dataLoader.getContentIndex().pipe(
-      map(index => {
-        const nodes = index.nodes ?? [];
+    // Search both content and paths in parallel
+    return forkJoin({
+      contentIndex: this.dataLoader.getContentIndex().pipe(catchError(() => of({ nodes: [] }))),
+      pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] }))),
+    }).pipe(
+      map(({ contentIndex, pathIndex }) => {
+        const contentNodes = contentIndex.nodes ?? [];
+        const paths = pathIndex.paths ?? [];
 
-        // Score and filter all nodes
-        const scoredResults = this.scoreAndFilter(nodes, query);
+        // Score and filter content nodes
+        const scoredContentResults = this.scoreAndFilter(contentNodes, query);
+
+        // Score and filter paths (converted to search result format)
+        const scoredPathResults = this.scoreAndFilterPaths(paths, query);
+
+        // Merge results
+        const allResults = [...scoredContentResults, ...scoredPathResults];
 
         // Compute facets from ALL matching results (before pagination)
-        const facets = this.computeFacets(scoredResults, query);
+        const facets = this.computeFacets(allResults, query);
 
         // Sort results
-        const sortedResults = this.sortResults(scoredResults, query);
+        const sortedResults = this.sortResults(allResults, query);
 
         // Paginate
         const page = query.page ?? 1;
@@ -100,35 +123,105 @@ export class SearchService {
           totalPages,
           hasMore: page < totalPages,
           facets,
-          executionTimeMs: Date.now() - startTime
+          executionTimeMs: Date.now() - startTime,
         };
       }),
       catchError(err => {
         console.error('[SearchService] Search failed:', err);
         return of({
           ...createEmptyResults(query),
-          executionTimeMs: Date.now() - startTime
+          executionTimeMs: Date.now() - startTime,
         });
       })
     );
   }
 
   /**
-   * Get autocomplete suggestions for partial query.
+   * Score and filter paths, converting them to SearchResult format.
    */
-  suggest(partialQuery: string, limit: number = 10): Observable<SearchSuggestions> {
+  private scoreAndFilterPaths(paths: any[], query: SearchQuery): SearchResult[] {
+    const results: SearchResult[] = [];
+    const searchText = (query.text ?? '').toLowerCase().trim();
+    const searchWords = searchText.split(/\s+/).filter(w => w.length > 0);
+
+    // If filtering by content type and 'path' is not included, skip paths
+    if (
+      query.contentTypes &&
+      query.contentTypes.length > 0 &&
+      !query.contentTypes.includes('path')
+    ) {
+      return [];
+    }
+
+    for (const path of paths) {
+      // Convert path to a node-like format for filtering
+      const pathAsNode = {
+        id: path.id,
+        title: path.title,
+        description: path.description ?? '',
+        contentType: 'path' as ContentType,
+        tags: path.tags ?? [],
+        reach: 'commons' as ContentReach, // Paths are typically commons
+        trustScore: 1.0,
+        createdAt: path.createdAt,
+        updatedAt: path.updatedAt,
+      };
+
+      // Apply filters (reuse existing filter logic)
+      if (!this.passesFilters(pathAsNode, query)) {
+        continue;
+      }
+
+      // Score the path
+      const { score, matchedFields, highlights } = this.scoreNode(pathAsNode, searchWords);
+
+      // If there's search text, require a minimum score
+      if (searchText && score === 0) {
+        continue;
+      }
+
+      results.push({
+        id: path.id,
+        title: path.title,
+        description: path.description ?? '',
+        contentType: 'path',
+        tags: path.tags ?? [],
+        reach: 'commons',
+        trustScore: 1.0,
+        trustLevel: 'trusted' as TrustLevel,
+        hasFlags: false,
+        relevanceScore: score,
+        matchedFields,
+        highlights,
+        createdAt: path.createdAt,
+        updatedAt: path.updatedAt,
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Get autocomplete suggestions for partial query.
+   * Includes suggestions from both content nodes and learning paths.
+   */
+  suggest(partialQuery: string, limit = 10): Observable<SearchSuggestions> {
     if (!partialQuery || partialQuery.trim().length < 2) {
       return of({ query: partialQuery, suggestions: [] });
     }
 
-    return this.dataLoader.getContentIndex().pipe(
-      map(index => {
-        const nodes = index.nodes ?? [];
+    return forkJoin({
+      contentIndex: this.dataLoader.getContentIndex().pipe(catchError(() => of({ nodes: [] }))),
+      pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] }))),
+    }).pipe(
+      map(({ contentIndex, pathIndex }) => {
+        const nodes = contentIndex.nodes ?? [];
+        const paths = pathIndex.paths ?? [];
         const query = partialQuery.toLowerCase().trim();
         const suggestions: SearchSuggestion[] = [];
         const seen = new Set<string>();
 
-        // Suggest matching titles
+        // Suggest matching content titles
         for (const node of nodes) {
           if (suggestions.length >= limit) break;
 
@@ -138,15 +231,37 @@ export class SearchService {
             suggestions.push({
               text: node.title,
               type: 'title',
-              highlight: this.highlightMatch(node.title, query)
+              highlight: this.highlightMatch(node.title, query),
             });
           }
         }
 
-        // Suggest matching tags
+        // Suggest matching path titles
+        for (const path of paths) {
+          if (suggestions.length >= limit) break;
+
+          const titleLower = path.title.toLowerCase();
+          if (titleLower.includes(query) && !seen.has(titleLower)) {
+            seen.add(titleLower);
+            suggestions.push({
+              text: path.title,
+              type: 'path',
+              highlight: this.highlightMatch(path.title, query),
+            });
+          }
+        }
+
+        // Suggest matching tags (from both content and paths)
         const tagCounts = new Map<string, number>();
         for (const node of nodes) {
           for (const tag of node.tags ?? []) {
+            if (tag.toLowerCase().includes(query)) {
+              tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+            }
+          }
+        }
+        for (const path of paths) {
+          for (const tag of path.tags ?? []) {
             if (tag.toLowerCase().includes(query)) {
               tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
             }
@@ -165,7 +280,7 @@ export class SearchService {
               text: tag,
               type: 'tag',
               resultCount: count,
-              highlight: this.highlightMatch(tag, query)
+              highlight: this.highlightMatch(tag, query),
             });
           }
         }
@@ -179,7 +294,7 @@ export class SearchService {
   /**
    * Get all unique tags with counts.
    */
-  getTagCloud(): Observable<Array<{ tag: string; count: number }>> {
+  getTagCloud(): Observable<{ tag: string; count: number }[]> {
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
         const tagCounts = new Map<string, number>();
@@ -240,7 +355,7 @@ export class SearchService {
         matchedFields,
         highlights,
         createdAt: (node as any).createdAt,
-        updatedAt: (node as any).updatedAt
+        updatedAt: (node as any).updatedAt,
       });
     }
 
@@ -251,12 +366,14 @@ export class SearchService {
    * Check if node passes all query filters.
    */
   private passesFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
-    return this.passesContentTypeFilter(node, query) &&
-           this.passesReachLevelFilter(node, query) &&
-           this.passesTrustLevelFilter(node, query) &&
-           this.passesTagFilters(node, query) &&
-           this.passesTrustScoreFilter(node, query) &&
-           this.passesFlaggedFilter(node, query);
+    return (
+      this.passesContentTypeFilter(node, query) &&
+      this.passesReachLevelFilter(node, query) &&
+      this.passesTrustLevelFilter(node, query) &&
+      this.passesTagFilters(node, query) &&
+      this.passesTrustScoreFilter(node, query) &&
+      this.passesFlaggedFilter(node, query)
+    );
   }
 
   private passesContentTypeFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
@@ -316,7 +433,7 @@ export class SearchService {
     const nodeText = {
       title: node.title.toLowerCase(),
       description: (node.description ?? '').toLowerCase(),
-      tags: (node.tags ?? []).map(t => t.toLowerCase())
+      tags: (node.tags ?? []).map(t => t.toLowerCase()),
     };
 
     const totalScore = this.calculateFieldScores(searchWords, nodeText, matchedFields);
@@ -342,7 +459,12 @@ export class SearchService {
     return totalScore;
   }
 
-  private scoreFieldMatch(field: 'title' | 'description', text: string, word: string, matchedFields: MatchedField[]): number {
+  private scoreFieldMatch(
+    field: 'title' | 'description',
+    text: string,
+    word: string,
+    matchedFields: MatchedField[]
+  ): number {
     const matchType = this.getMatchType(text, word);
     if (!matchType) return 0;
 
@@ -364,15 +486,19 @@ export class SearchService {
   }
 
   private normalizeScore(totalScore: number, wordCount: number): number {
-    const maxPossibleScore = wordCount * (
-      SEARCH_FIELD_WEIGHTS.title * SEARCH_MATCH_BONUSES.exactMatch +
-      SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES.exactMatch +
-      SEARCH_FIELD_WEIGHTS.description * SEARCH_MATCH_BONUSES.exactMatch
-    );
+    const maxPossibleScore =
+      wordCount *
+      (SEARCH_FIELD_WEIGHTS.title * SEARCH_MATCH_BONUSES.exactMatch +
+        SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES.exactMatch +
+        SEARCH_FIELD_WEIGHTS.description * SEARCH_MATCH_BONUSES.exactMatch);
     return Math.round((totalScore / maxPossibleScore) * 100);
   }
 
-  private generateHighlights(node: ContentIndexEntry, searchWords: string[], matchedFields: MatchedField[]): SearchHighlight[] {
+  private generateHighlights(
+    node: ContentIndexEntry,
+    searchWords: string[],
+    matchedFields: MatchedField[]
+  ): SearchHighlight[] {
     const highlights: SearchHighlight[] = [];
     const queryText = searchWords.join(' ');
 
@@ -471,7 +597,16 @@ export class SearchService {
    * Convert reach level to numeric for sorting.
    */
   private reachToNumber(reach: ContentReach): number {
-    const levels: ContentReach[] = ['private', 'invited', 'local', 'neighborhood', 'municipal', 'bioregional', 'regional', 'commons'];
+    const levels: ContentReach[] = [
+      'private',
+      'invited',
+      'local',
+      'neighborhood',
+      'municipal',
+      'bioregional',
+      'regional',
+      'commons',
+    ];
     return levels.indexOf(reach);
   }
 
@@ -492,19 +627,13 @@ export class SearchService {
 
     for (const result of results) {
       // Content type
-      byContentType.set(
-        result.contentType,
-        (byContentType.get(result.contentType) ?? 0) + 1
-      );
+      byContentType.set(result.contentType, (byContentType.get(result.contentType) ?? 0) + 1);
 
       // Reach
       byReach.set(result.reach, (byReach.get(result.reach) ?? 0) + 1);
 
       // Trust level
-      byTrustLevel.set(
-        result.trustLevel,
-        (byTrustLevel.get(result.trustLevel) ?? 0) + 1
-      );
+      byTrustLevel.set(result.trustLevel, (byTrustLevel.get(result.trustLevel) ?? 0) + 1);
 
       // Tags
       for (const tag of result.tags) {
@@ -520,15 +649,12 @@ export class SearchService {
     }
 
     // Convert maps to sorted arrays
-    const toFacetArray = <T>(
-      map: Map<T, number>,
-      selectedValues?: T[]
-    ): FacetCount<T>[] => {
+    const toFacetArray = <T>(map: Map<T, number>, selectedValues?: T[]): FacetCount<T>[] => {
       return Array.from(map.entries())
         .map(([value, count]) => ({
           value,
           count,
-          selected: selectedValues?.includes(value) ?? false
+          selected: selectedValues?.includes(value) ?? false,
         }))
         .sort((a, b) => b.count - a.count);
     };
@@ -538,7 +664,7 @@ export class SearchService {
       byReach: toFacetArray(byReach, query.reachLevels),
       byTrustLevel: toFacetArray(byTrustLevel, query.trustLevels),
       byTag: toFacetArray(byTag, query.tags).slice(0, DEFAULT_SEARCH_CONFIG.maxFacetTags),
-      byFlagStatus: { flagged, unflagged }
+      byFlagStatus: { flagged, unflagged },
     };
   }
 
@@ -552,11 +678,7 @@ export class SearchService {
   private computeTrustLevel(node: ContentIndexEntry): TrustLevel {
     const attestationTypes = (node as any).attestationTypes ?? [];
     const hasFlags = ((node as any).flags ?? []).length > 0;
-    return calculateTrustLevel(
-      (node as any).reach ?? 'commons',
-      attestationTypes,
-      hasFlags
-    );
+    return calculateTrustLevel((node as any).reach ?? 'commons', attestationTypes, hasFlags);
   }
 
   /**

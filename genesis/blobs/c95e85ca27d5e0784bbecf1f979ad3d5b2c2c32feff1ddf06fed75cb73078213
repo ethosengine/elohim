@@ -1,0 +1,9 @@
+Scenario: Municipal workforce development integrates democratic business training
+    Given city workforce programs train workers for traditional employment
+    And democratic governance requires different skills (facilitation, collaboration, shared decision-making)
+    When municipality recognizes democratic businesses need prepared workers
+    Then workforce development programs include cooperative business training
+    And workers learn democratic governance skills alongside technical skills
+    And community colleges offer worker ownership and democratic management courses
+    And municipal investment in workforce development supports democratic economy growth
+    And municipality_elohim develops democratic business curriculum for workforce programs

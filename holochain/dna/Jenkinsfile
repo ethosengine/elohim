@@ -1,0 +1,392 @@
+/**
+ * Elohim DNA Pipeline (elohim-holochain)
+ *
+ * Builds DNA/hApp artifacts only - NO container images, NO deployments.
+ * Triggered by orchestrator when holochain/dna/ or holochain/holochain-cache-core/ change.
+ *
+ * Artifacts produced:
+ *   - elohim.happ (multi-DNA bundle: lamad + imagodei + infrastructure)
+ *   - holochain-cache-core WASM module (for elohim-app)
+ *
+ * Downstream consumers:
+ *   - elohim-edge (fetches hApp for container images)
+ *   - elohim-app (fetches holochain-cache-core WASM)
+ *   - genesis (requires hApp to be deployed before seeding)
+ *   - steward (fetches hApp for desktop builds)
+ *
+ * Direct webhook triggers are ignored - use orchestrator or manual trigger.
+ */
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+def loadBuildVars() {
+    def rootEnv = "${env.WORKSPACE}/build.env"
+    def path = fileExists(rootEnv) ? rootEnv : 'build.env'
+
+    if (!fileExists(path)) {
+        echo "WARNING: build.env not found at ${path}, using defaults"
+        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+        return [
+            BASE_VERSION: 'dev',
+            GIT_COMMIT_HASH: gitHash,
+            IMAGE_TAG: "dev-${sanitizedBranch}-${gitHash}",
+            BRANCH_NAME: env.BRANCH_NAME
+        ]
+    }
+
+    return readProperties(file: path)
+}
+
+def withBuildVars(props, Closure body) {
+    withEnv([
+        "BASE_VERSION=${props.BASE_VERSION ?: ''}",
+        "GIT_COMMIT_HASH=${props.GIT_COMMIT_HASH ?: ''}",
+        "IMAGE_TAG=${props.IMAGE_TAG ?: ''}",
+        "BRANCH_NAME=${props.BRANCH_NAME ?: env.BRANCH_NAME}"
+    ]) {
+        body()
+    }
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  nodeSelector:
+    node-type: operations
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  volumes:
+    - name: nix-store
+      persistentVolumeClaim:
+        claimName: nix-cache-holochain
+    - name: cargo-cache
+      persistentVolumeClaim:
+        claimName: cargo-cache-holochain
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      command: [cat]
+      tty: true
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "2"
+          ephemeral-storage: "5Gi"
+        limits:
+          memory: "8Gi"
+          cpu: "4"
+          ephemeral-storage: "10Gi"
+      volumeMounts:
+        - name: cargo-cache
+          mountPath: /root/.cargo
+'''
+        }
+    }
+
+    environment {
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+        PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+    }
+
+    parameters {
+        booleanParam(
+            name: 'FORCE_BUILD',
+            defaultValue: false,
+            description: 'Force rebuild of DNA even without code changes'
+        )
+    }
+
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        preserveStashes(buildCount: 5)
+    }
+
+    // No triggers - orchestrator handles all webhook events
+    // triggers { }
+
+    stages {
+        stage('Check Trigger') {
+            steps {
+                script {
+                    // Only allow manual triggers or orchestrator triggers
+                    def validTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UserIdCause') ||      // Manual trigger
+                        cause._class.contains('UpstreamCause')       // Triggered by orchestrator
+                    }
+
+                    if (!validTrigger) {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        ⏭️ PIPELINE SKIPPED - USE ORCHESTRATOR
+                        ═══════════════════════════════════════════════════════════
+                        This pipeline is managed by elohim-orchestrator.
+                        Direct webhook triggers are disabled.
+
+                        To trigger this pipeline:
+                        1. Push to GitHub → orchestrator analyzes → triggers this
+                        2. Or manually: Build with Parameters
+
+                        Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+                        currentBuild.result = 'NOT_BUILT'
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                    }
+                }
+            }
+        }
+
+        stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+                        checkout scm
+                        sh 'git clean -fdx'
+                        sh 'git reset --hard HEAD'
+
+                        echo "Building Holochain DNA for branch: ${env.BRANCH_NAME}"
+                    }
+                }
+            }
+        }
+
+        stage('Setup Version') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+
+                        def baseVersion = readFile('VERSION').trim()
+                        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+
+                        def imageTag = (env.BRANCH_NAME == 'main')
+                            ? baseVersion
+                            : "${baseVersion}-${sanitizedBranch}-${gitHash}"
+
+                        def buildEnvContent = """BASE_VERSION=${baseVersion}
+GIT_COMMIT_HASH=${gitHash}
+IMAGE_TAG=${imageTag}
+BRANCH_NAME=${env.BRANCH_NAME}"""
+
+                        writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
+                        archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
+                    }
+                }
+            }
+        }
+
+        stage('Setup Nix Cache') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        echo 'Configuring Nix with Holochain Cachix...'
+
+                        sh '''
+                            nix --version
+                            echo "Nix config:"
+                            nix show-config | grep -E "(substituters|trusted-public-keys)" || true
+
+                            echo ""
+                            echo "Testing cache connectivity..."
+                            nix-store --query --requisites /nix/store/*.drv 2>/dev/null | head -5 || echo "Cache ready"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Build WASM Cache Core') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    dir('holochain/dna/elohim') {
+                        script {
+                            echo 'Building holochain-cache-core WASM module...'
+
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                echo "[safe]" > "$HOME/.gitconfig"
+                                echo "    directory = *" >> "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                echo "=== Entering Nix development shell for WASM build ==="
+
+                                nix develop --accept-flake-config --command bash -c '
+                                    set -euo pipefail
+
+                                    echo "=== Rust toolchain ready ==="
+                                    rustc --version
+                                    cargo --version
+                                    wasm-pack --version
+
+                                    echo ""
+                                    echo "=== Building holochain-cache-core WASM ==="
+                                    cd ../../holochain-cache-core
+                                    wasm-pack build --target web --release
+
+                                    echo ""
+                                    echo "=== WASM Build artifacts ==="
+                                    ls -lh pkg/
+                                '
+                            '''
+                        }
+                    }
+                    dir('holochain/holochain-cache-core') {
+                        archiveArtifacts artifacts: 'pkg/**', allowEmptyArchive: false
+                        stash name: 'wasm-cache-core', includes: 'pkg/**'
+                        echo "holochain-cache-core WASM module built and archived"
+                    }
+                }
+            }
+        }
+
+        stage('Build DNA') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    dir('holochain/dna/elohim') {
+                        script {
+                            echo 'Building Holochain DNA with Nix...'
+                            echo 'First build may take 20-40 minutes. Subsequent builds use cache.'
+
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                echo "[safe]" > "$HOME/.gitconfig"
+                                echo "    directory = *" >> "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                echo "=== Entering Nix development shell ==="
+                                echo "This will download/build Holochain toolchain from Cachix..."
+
+                                nix develop --accept-flake-config --command bash -c '
+                                    set -euo pipefail
+
+                                    echo "=== Holochain toolchain ready ==="
+                                    hc --version
+                                    rustc --version
+                                    cargo --version
+
+                                    echo ""
+                                    echo "=== Building lamad DNA (elohim) ==="
+                                    cargo build --release --target wasm32-unknown-unknown
+                                    hc dna pack . -o workdir/lamad.dna
+                                    echo "   ✅ lamad.dna"
+
+                                    echo ""
+                                    echo "=== Building imagodei DNA ==="
+                                    cd ../imagodei
+                                    cargo build --release --target wasm32-unknown-unknown
+                                    hc dna pack . -o ../elohim/workdir/imagodei.dna
+                                    echo "   ✅ imagodei.dna"
+
+                                    echo ""
+                                    echo "=== Building infrastructure DNA ==="
+                                    cd ../infrastructure
+                                    cargo build --release --target wasm32-unknown-unknown
+                                    hc dna pack . -o ../elohim/workdir/infrastructure.dna
+                                    echo "   ✅ infrastructure.dna"
+
+                                    echo ""
+                                    echo "=== Packaging hApp (all 3 DNAs) ==="
+                                    cd ../elohim
+                                    hc app pack workdir -o elohim.happ
+
+                                    echo ""
+                                    echo "=== Build artifacts ==="
+                                    ls -lh elohim.happ workdir/*.dna
+                                '
+                            '''
+
+                            archiveArtifacts artifacts: 'elohim.happ,workdir/*.dna', allowEmptyArchive: false
+                            stash name: 'happ-bundle', includes: 'elohim.happ'
+
+                            def props = loadBuildVars()
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            hApp ARTIFACT ARCHIVED
+                            ═══════════════════════════════════════════════════════════
+
+                            Artifact URL (for downstream consumers):
+                            ${env.BUILD_URL}artifact/elohim.happ
+
+                            Build Details:
+                            - Version: ${props.IMAGE_TAG ?: 'unknown'}
+                            - Branch: ${env.BRANCH_NAME}
+                            - Commit: ${props.GIT_COMMIT_HASH ?: 'unknown'}
+
+                            Downstream pipelines can fetch this artifact:
+                            - elohim-edge: Container images
+                            - elohim-app: WASM cache core
+                            - steward: Desktop app builds
+                            ═══════════════════════════════════════════════════════════
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo """
+            ═══════════════════════════════════════════════════════════
+            DNA BUILD SUCCEEDED
+            ═══════════════════════════════════════════════════════════
+            Branch: ${env.BRANCH_NAME}
+            Build: ${env.BUILD_NUMBER}
+
+            Artifacts available at:
+            ${env.BUILD_URL}artifact/
+
+            To trigger infrastructure rebuild:
+            - Push to holochain/doorway/**, holochain/edgenode/**, or holochain/manifests/**
+            - Or run elohim-edge with FORCE_BUILD=true
+            ═══════════════════════════════════════════════════════════
+            """
+        }
+        failure {
+            echo """
+            ═══════════════════════════════════════════════════════════
+            DNA BUILD FAILED
+            ═══════════════════════════════════════════════════════════
+            Check the build logs for errors.
+
+            Common issues:
+            - Nix cache unavailable (retry)
+            - Rust compilation errors (check DNA code)
+            - Out of disk space (check ephemeral-storage limits)
+            ═══════════════════════════════════════════════════════════
+            """
+        }
+        // Note: No cleanWs needed - k8s pod agents are ephemeral
+    }
+}

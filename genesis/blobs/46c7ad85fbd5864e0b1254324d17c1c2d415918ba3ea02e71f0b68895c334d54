@@ -1,0 +1,9 @@
+Scenario: Municipal food security programs integrate with care economy
+    Given municipal food assistance programs exist
+    And many residents participate in care economy food cooperatives
+    When municipal food security is addressed
+    Then the municipal_elohim should coordinate with existing programs
+    And care economy food cooperatives should receive municipal support
+    And care tokens should integrate with food assistance
+    And municipal food policy should recognize cooperative models
+    And care economy should enhance, not replace, public food security

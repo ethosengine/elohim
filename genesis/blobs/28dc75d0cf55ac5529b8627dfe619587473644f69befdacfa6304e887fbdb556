@@ -1,0 +1,9 @@
+Scenario: Politician understands worker constituent economic conditions
+    Given the politician represents working-class district
+    And hears business community claim workers are thriving
+    When the Observer analyzes local economic and wage patterns
+    Then they see median wages insufficient for local housing costs
+    And identify workers holding multiple jobs to survive
+    And understand constituent economic stress beyond unemployment numbers
+    And learn which industries pay poverty wages requiring public assistance
+    And champion worker-centered economic policy with evidence

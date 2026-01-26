@@ -1,0 +1,11 @@
+Scenario: Preteen's care work made visible with appropriate recognition
+    Given Marcus has completed weekly grocery shopping
+    And he has managed budget, nutrition, and meal planning
+    When the family_elohim processes Marcus's contributions
+    Then his care work should be visible on family dashboard
+    And Sarah should receive specific recognition prompts
+    And the prompt should detail "Marcus managed $75 budget, maintained 92% nutrition, planned 21 meals"
+    And care tokens should reflect genuine economic value of his work
+    And recognition should communicate that this is substantial labor
+    And Sarah should be prompted to acknowledge his capability
+    And Marcus should feel valued as major family contributor

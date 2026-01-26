@@ -1,0 +1,9 @@
+Scenario: Municipal crisis response coordinates with care economy networks
+    Given municipal emergency management systems exist
+    And care economy has created mutual aid networks
+    When municipal crises occur (natural disasters, economic shocks, health emergencies)
+    Then the municipal_elohim should coordinate with emergency response
+    And existing care networks should be activated for crisis support
+    And municipal response should leverage community care capacity
+    And care economy should strengthen municipal resilience
+    And crisis response should be more effective through coordination

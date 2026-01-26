@@ -1,0 +1,9 @@
+Scenario: Creating sunset provisions and mandatory review
+    Given laws should be evaluated not permanent
+    And I want to prevent ossification
+    When I include sunset clauses in legislation
+    Then laws expire: after 5-7 years unless renewed
+    And I force: regular review of whether laws serve purpose
+    And I create: opportunities to correct mistakes
+    And I prevent: captured legislation persisting forever
+    And democratic accountability: includes ability to reverse decisions

@@ -1,0 +1,9 @@
+Scenario: Income replacement through care economy when employment impossible
+    Given James's income dropped from $80k to $40k due to caregiving
+    And he may eventually be unable to work at all
+    When employment becomes impossible
+    Then the workplace_elohim should document care work value
+    And care token accumulation should provide income replacement
+    And care economy should recognize professional-grade family care
+    And James should have economic support if employment ends
+    And care contributions should provide economic standing

@@ -1,0 +1,50 @@
+{
+  "id": "fct-module-05-respecting-human-nature-application",
+  "contentType": "practice",
+  "title": "Application: Respecting Human Nature",
+  "description": "Practical application and action steps",
+  "content": "**Instructions:** \\*The Messages we get on a Sunday are filtered through what we the audience want to hear, Preachers are subject to audience capture, conflict of interest, and bias. Consider balancing career-preaching with traveling ministers of the Word, who can have independence from our congregation to be honest with our community when we need to hear hard truths existentially important to our successful formation of a faith community.   \n\n\\* The Structure of our Church collaborations should respect the Dunbar Number for each individual member to optimize for our capacity for relationship:  \n\\--150 Aquaintances  \n\\-- 50 Casual   \n\\-- 15 Close  \n\\-- 5 Intimate\n**PracticeType:** application",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "application",
+    "practice",
+    "fct",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "fct-practice",
+    "sourceModule": "fct-module-05-respecting-human-nature"
+  },
+  "createdAt": "2025-11-28T21:10:19.201021",
+  "updatedAt": "2025-12-26T21:04:01.829Z",
+  "did": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Respecting Human Nature",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-05-respecting-human-nature-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Respecting Human Nature - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-05-respecting-human-nature-application",
+    "identifier": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+    "name": "Application: Respecting Human Nature",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.201021",
+    "dateModified": "2025-11-28T21:10:19.201022",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

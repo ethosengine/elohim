@@ -1,0 +1,8 @@
+Scenario: Recognizing workplace exploitation patterns
+    Given my employer demands maximum flexibility with minimal compensation
+    And I experience unpredictable scheduling, low wages, and poor conditions
+    When the workplace_elohim analyzes my employment situation
+    Then it should identify exploitation patterns
+    And help me recognize when conditions violate standards or norms
+    And provide information about my legal rights and protections
+    And empower me to name what I am experiencing

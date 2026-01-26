@@ -1,0 +1,10 @@
+Scenario: Board member tracks implementation of previous transportation policy
+    Given board voted two years ago to optimize bus routes for efficiency
+    And transportation director promised improved reliability and cost savings
+    And parents increasingly complain about late buses and long routes
+    When the board member checks Observer implementation tracking
+    Then they see on-time performance has actually declined since policy change
+    And discover cost savings didn't materialize as promised
+    And find low-income neighborhoods disproportionately affected by route changes
+    And access parent feedback data showing systematic reliability problems
+    And impact tracking reveals staff promises diverged from actual outcomes

@@ -1,0 +1,11 @@
+Scenario: Cognitive support enables continued learning despite limitations
+    Given Helen's dementia affects learning and memory
+    And cognitive support can enable continued engagement
+    When Helen participates in educational activities
+    Then her personal_agent should provide cognitive scaffolding
+    And material should be adapted to her cognitive capabilities
+    And she should experience success, not frustration
+    And limitations should be accommodated, not treated as disqualification
+    And the protocol should enable learning despite cognitive changes
+    And Helen should remain engaged with intellectual life
+    And dementia should not end her identity as learner

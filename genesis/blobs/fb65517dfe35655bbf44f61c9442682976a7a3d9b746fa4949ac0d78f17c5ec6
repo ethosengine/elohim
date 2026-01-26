@@ -1,0 +1,9 @@
+Scenario: Community resource directory tailored to single parent needs
+    Given Maria needs to know about available resources but has no time to research
+    And single parents have specific resource needs different from partnered families
+    When Maria seeks community resources
+    Then the community_elohim should provide tailored resource directory
+    And it should highlight programs specifically supporting single parents
+    And it should filter for her family size, income level, and location
+    And resource discovery should be efficient, not an exhausting research project
+    And Maria should easily find help available to her without extensive searching

@@ -1,0 +1,10 @@
+Scenario: Economic development board member evaluates community benefits agreement
+    Given board considers approving development incentives with community benefits terms
+    And developer proposes hiring commitments, affordable housing, and public space
+    And board wants to understand if benefits are meaningful and enforceable
+    When the board member requests Observer community benefits analysis
+    Then they receive assessment of whether proposed benefits serve community needs
+    And see track record of similar agreements in other jurisdictions
+    And discover many community benefits agreements not enforced or delivered
+    And access specific enforcement mechanisms that make agreements effective
+    And independent analysis helps board negotiate stronger accountability

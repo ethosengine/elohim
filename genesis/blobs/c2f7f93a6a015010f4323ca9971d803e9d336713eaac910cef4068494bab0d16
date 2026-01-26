@@ -1,0 +1,10 @@
+Scenario: Economic development board member detects conflicts in incentive recommendation
+    Given staff recommends tax incentives for company relocating to municipality
+    And presentation emphasizes economic benefits and competitive pressure
+    And board will vote on multi-year incentive package at next meeting
+    When the board member uses Observer capture protection analysis
+    Then they discover company executives donated to city officials who appoint board
+    And see consultant hired to evaluate deal previously worked for the company
+    And find incentive terms more generous than peer municipalities offered similar companies
+    And access independent economic analysis showing marginal public benefit
+    And capture protection makes conflicts of interest and manipulation visible

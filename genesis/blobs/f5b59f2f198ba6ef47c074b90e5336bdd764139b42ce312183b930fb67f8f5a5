@@ -1,0 +1,11 @@
+Scenario: Presenting competing technical interpretations to council
+    Given technical experts disagree about transparency method adequacy
+    And council needs to understand the disagreement
+    When I present both my view and Dr. Chen's alternative
+    Then I explain: his argument fairly and completely
+    And I articulate: where we agree and where we differ
+    And I present: his evidence alongside mine
+    And I avoid: dismissing his perspective unfairly
+    And I let: council judge which interpretation is more constitutionally aligned
+    And I demonstrate: intellectual humility and respect for disagreement
+    And council sees: that expertise involves uncertainty

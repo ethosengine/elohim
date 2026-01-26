@@ -1,0 +1,9 @@
+Scenario: Customer gains optional participation pathway in stakeholder processes
+    Given corporate businesses treat customers as transaction data, not community members
+    And Ms. Johnson wants deeper engagement but had no pathway
+    When democratic governance offers optional customer stakeholder participation
+    Then she's invited to stakeholder meetings providing input on community programs
+    And her suggestion (senior meal program) is seriously considered and implemented
+    And participation is optional—she can remain simple customer or engage more deeply
+    And voice is advisory not controlling (workers maintain final decision authority)
+    And community_elohim facilitates stakeholder participation while protecting worker autonomy

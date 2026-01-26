@@ -1,0 +1,11 @@
+Scenario: Appeal of community surveillance or monitoring practices
+    Given I believe Community Elohim monitors community members too intrusively
+    And I am concerned about surveillance overreach
+    When I appeal the monitoring practices
+    Then Constitutional Council evaluates if surveillance exceeds constitutional minimums
+    And They examine if monitoring serves legitimate care purposes
+    And They consider if less invasive methods could achieve same goals
+    And They assess if community members have visibility into what's monitored
+    And They evaluate if appeal and recourse mechanisms are working properly
+    And The appeal protects community from surveillance creep
+    And Privacy boundaries are actively defended not passively eroded

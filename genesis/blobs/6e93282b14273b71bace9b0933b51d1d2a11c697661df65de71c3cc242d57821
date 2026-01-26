@@ -1,0 +1,12 @@
+Scenario: Building community care economy capital that will serve me beyond crisis
+    Given my care contributions during crisis are tracked and recognized
+    And care economy capital could support me after crisis resolves
+    When I accumulate care tokens through ongoing care contributions
+    Then the Value Scanner tracks my comprehensive care economy participation
+    And recognizes parenting, peer support, mutual aid, knowledge sharing, and other contributions
+    And builds care economy standing that will endure beyond temporary vulnerability
+    And validates that my crisis period contributions are valuable
+    And creates basis for future community support if needed
+    And my personal_agent helps me understand my care economy capital
+    And documents that vulnerability doesn't erase contribution
+    And ensures my care work is recognized long-term

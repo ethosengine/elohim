@@ -1,0 +1,9 @@
+Scenario: Parent connects municipal budget to school funding
+    Given the municipality is finalizing annual budget priorities
+    And the parent doesn't understand how city budget affects schools
+    When the parent reviews Observer's municipal-education analysis
+    Then they see how city tax decisions impact school district funding
+    And understand library budget cuts reduce children's book access
+    And learn recreation spending affects afterschool program availability
+    And municipal decisions connect to children's educational resources
+    And parent advocacy expands to city-level budget priorities

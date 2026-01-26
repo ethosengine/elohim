@@ -9,7 +9,7 @@ describe('LearnerDashboardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [LearnerDashboardComponent, RouterTestingModule]
+      imports: [LearnerDashboardComponent, RouterTestingModule],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LearnerDashboardComponent);
@@ -28,7 +28,7 @@ describe('LearnerDashboardComponent', () => {
 
   it('should display subtitle', () => {
     const subtitle = fixture.debugElement.query(By.css('.subtitle'));
-    expect(subtitle.nativeElement.textContent).toBe('Track your progress and discover what\'s next');
+    expect(subtitle.nativeElement.textContent).toBe("Track your progress and discover what's next");
   });
 
   it('should display active paths placeholder', () => {

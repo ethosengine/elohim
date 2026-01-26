@@ -1,0 +1,10 @@
+Scenario: Manager's facilitation effectiveness is democratically evaluated
+    Given workers want accountability for coordinator role
+    And corporate model had no worker input on manager performance
+    When quarterly facilitation review occurs
+    Then workers provide feedback on Marcus's coordination effectiveness
+    And workers rate his facilitation skills, transparency, and respect for autonomy
+    And feedback informs Marcus's continued development
+    And poor evaluations trigger support and training, not immediate termination
+    And sustained poor performance enables democratic recall
+    And workplace_elohim ensures fair evaluation process

@@ -1,0 +1,10 @@
+Scenario: Coordinating care work with younger sibling
+    Given Emma's brother Tommy is 5 years old
+    And Emma sometimes helps Tommy make choices
+    When Emma assists Tommy in the Value Scanner
+    Then her teaching and support should be recognized as care work
+    And the family_elohim should track sibling care patterns
+    And Emma should learn that helping others is valuable contribution
+    And Tommy should benefit from Emma's greater capability
+    And cross-generational care should be made visible
+    And Emma should build identity as both care receiver and care provider

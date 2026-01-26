@@ -1,0 +1,9 @@
+Scenario: Personal nutrition maintained despite overwhelming demands
+    Given James often skips meals while caring for David
+    And his nutrition suffers under caregiving pressure
+    When the personal_agent monitors James's eating patterns
+    Then it should recognize inadequate nutrition
+    And it should prompt meal planning that includes James
+    And it should ensure James maintains basic nutrition
+    And his well-being should be prioritized alongside David's
+    And the protocol should prevent James's health decline

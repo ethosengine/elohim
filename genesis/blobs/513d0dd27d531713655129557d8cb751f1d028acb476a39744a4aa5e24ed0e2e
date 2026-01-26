@@ -1,0 +1,11 @@
+Scenario: Personal data privacy under Alex's complete control
+    Given Alex's data includes sensitive disability and medical information
+    And this data reveals intimate details about Alex's body and needs
+    When data is collected about Alex's care patterns
+    Then Alex must have absolute control over all data sharing
+    And medical information should never be shared without explicit consent
+    And disability status should be shared only when Alex chooses
+    And support coordinators should access only what Alex permits
+    And employers should never see medical or disability data without authorization
+    And Alex's privacy must be protected with highest standards
+    And data governance should respect Alex's autonomy completely

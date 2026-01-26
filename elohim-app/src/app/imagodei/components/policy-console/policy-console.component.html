@@ -1,0 +1,440 @@
+<div class="policy-console">
+  <!-- Header -->
+  <header class="console-header">
+    <div class="header-content">
+      <h1>{{ subjectDisplayName() }}</h1>
+      @if (grant()) {
+        <div class="grant-info">
+          <span class="tier-badge">{{ getStewardTierLabel(myTier()) }}</span>
+          <span class="authority">{{ getAuthorityBasisLabel(grant()!.authorityBasis) }}</span>
+        </div>
+      }
+    </div>
+  </header>
+
+  <!-- Messages -->
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span class="icon">&#9888;</span>
+      <span class="message">{{ error() }}</span>
+      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+    </div>
+  }
+
+  @if (successMessage()) {
+    <div class="success-banner" role="status">
+      <span class="icon">&#10003;</span>
+      <span class="message">{{ successMessage() }}</span>
+      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading policy...</p>
+    </div>
+  }
+
+  <!-- Main Content -->
+  @if (!isLoading()) {
+    <!-- Policy Chain -->
+    @if (policyChain().length > 0) {
+      <section class="policy-chain">
+        <h2>Policy Inheritance</h2>
+        <div class="chain-visual">
+          @for (link of policyChain(); track link.policyId; let last = $last) {
+            <div class="chain-link" [class.active]="link.layerOrder === policyChain().length - 1">
+              <span class="link-tier">{{ getStewardTierLabel(link.authorTier) }}</span>
+              <span class="link-label">
+                @switch (link.layerOrder) {
+                  @case (0) {
+                    Organization
+                  }
+                  @case (1) {
+                    Guardian
+                  }
+                  @case (2) {
+                    Elohim
+                  }
+                  @case (3) {
+                    Personal
+                  }
+                  @default {
+                    Layer {{ link.layerOrder }}
+                  }
+                }
+              </span>
+            </div>
+            @if (!last) {
+              <span class="chain-arrow">&#8594;</span>
+            }
+          }
+        </div>
+        <p class="chain-note">
+          Each layer can only
+          <strong>add</strong>
+          restrictions, never remove them.
+        </p>
+      </section>
+    }
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'content'"
+        (click)="setActiveTab('content')"
+      >
+        <span class="icon">🚫</span>
+        Content
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'time'"
+        (click)="setActiveTab('time')"
+      >
+        <span class="icon">⏰</span>
+        Time
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'features'"
+        (click)="setActiveTab('features')"
+      >
+        <span class="icon">🔒</span>
+        Features
+      </button>
+      @if (canViewMonitoring()) {
+        <button
+          class="tab-btn"
+          [class.active]="activeTab() === 'monitoring'"
+          (click)="setActiveTab('monitoring')"
+        >
+          <span class="icon">👁</span>
+          Monitoring
+        </button>
+      }
+    </nav>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Content Tab -->
+      @if (activeTab() === 'content') {
+        <section class="tab-panel">
+          <h2>Content Filtering</h2>
+          <p class="tab-description">Control what types of content are accessible.</p>
+
+          <!-- Blocked Categories -->
+          <div class="rule-group">
+            <h3>Blocked Categories</h3>
+            <div class="category-grid">
+              @for (cat of availableCategories; track cat) {
+                <label
+                  class="category-item"
+                  [class.inherited]="isCategoryInherited(cat)"
+                  [class.blocked]="isCategoryBlocked(cat)"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="isCategoryBlocked(cat) || isCategoryInherited(cat)"
+                    [disabled]="!canEditContent() || isCategoryInherited(cat)"
+                    (change)="toggleCategory(cat)"
+                  />
+                  <span class="category-name">{{ formatCategory(cat) }}</span>
+                  @if (isCategoryInherited(cat)) {
+                    <span class="inherited-badge" title="Set by parent policy">inherited</span>
+                  }
+                </label>
+              }
+            </div>
+          </div>
+
+          <!-- Age Rating -->
+          <div class="rule-group">
+            <h3>Maximum Age Rating</h3>
+            <p class="rule-description">Content above this rating will be filtered.</p>
+            <select
+              class="age-select"
+              [disabled]="!canEditContent()"
+              [ngModel]="editingContentRules().ageRatingMax"
+              (ngModelChange)="setAgeRating($event)"
+            >
+              <option [ngValue]="undefined">No limit</option>
+              @for (rating of availableAgeRatings; track rating.value) {
+                <option [ngValue]="rating.value">{{ rating.label }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Reach Level -->
+          <div class="rule-group">
+            <h3>Maximum Reach Level</h3>
+            <p class="rule-description">
+              Content with reach above this level will be filtered (0-7 scale).
+            </p>
+            <div class="reach-slider">
+              <input
+                type="range"
+                min="0"
+                max="7"
+                [disabled]="!canEditContent()"
+                [ngModel]="editingContentRules().reachLevelMax ?? 7"
+                (ngModelChange)="setReachLevel($event)"
+              />
+              <span class="reach-value">
+                @if (editingContentRules().reachLevelMax !== undefined) {
+                  {{ editingContentRules().reachLevelMax }}
+                } @else {
+                  No limit
+                }
+              </span>
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- Time Tab -->
+      @if (activeTab() === 'time') {
+        <section class="tab-panel">
+          <h2>Time Limits</h2>
+          <p class="tab-description">Set session and daily usage limits.</p>
+
+          <!-- Session Limit -->
+          <div class="rule-group">
+            <h3>Session Time Limit</h3>
+            <p class="rule-description">Maximum minutes per session before a break is required.</p>
+            <div class="time-input-group">
+              <input
+                type="number"
+                min="5"
+                max="480"
+                step="5"
+                placeholder="No limit"
+                [disabled]="!canEditTime()"
+                [ngModel]="editingTimeRules().sessionMaxMinutes"
+                (ngModelChange)="setSessionLimit($event)"
+              />
+              <span class="unit">minutes</span>
+            </div>
+          </div>
+
+          <!-- Daily Limit -->
+          <div class="rule-group">
+            <h3>Daily Time Limit</h3>
+            <p class="rule-description">Maximum total minutes per day.</p>
+            <div class="time-input-group">
+              <input
+                type="number"
+                min="5"
+                max="1440"
+                step="5"
+                placeholder="No limit"
+                [disabled]="!canEditTime()"
+                [ngModel]="editingTimeRules().dailyMaxMinutes"
+                (ngModelChange)="setDailyLimit($event)"
+              />
+              <span class="unit">minutes</span>
+            </div>
+          </div>
+
+          <!-- Cooldown -->
+          <div class="rule-group">
+            <h3>Break Duration</h3>
+            <p class="rule-description">Required break time after session limit is reached.</p>
+            <div class="time-input-group">
+              <input
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                placeholder="No break"
+                [disabled]="!canEditTime()"
+                [ngModel]="editingTimeRules().cooldownMinutes"
+                (ngModelChange)="setCooldown($event)"
+              />
+              <span class="unit">minutes</span>
+            </div>
+          </div>
+
+          <!-- Time Windows -->
+          <div class="rule-group">
+            <h3>Allowed Time Windows</h3>
+            <p class="rule-description">
+              Restrict access to specific hours. Leave empty for any time.
+            </p>
+
+            <div class="time-windows">
+              @for (window of editingTimeRules().timeWindows; track $index; let i = $index) {
+                <div class="time-window-card">
+                  <div class="window-times">
+                    <label>
+                      <span>From</span>
+                      <input
+                        type="time"
+                        [value]="formatTime(window.startHour, window.startMinute)"
+                        [disabled]="!canEditTime()"
+                        (change)="
+                          updateTimeWindow(
+                            i,
+                            'startHour',
+                            +$any($event.target).value.split(':')[0]
+                          );
+                          updateTimeWindow(
+                            i,
+                            'startMinute',
+                            +$any($event.target).value.split(':')[1]
+                          )
+                        "
+                      />
+                    </label>
+                    <label>
+                      <span>To</span>
+                      <input
+                        type="time"
+                        [value]="formatTime(window.endHour, window.endMinute)"
+                        [disabled]="!canEditTime()"
+                        (change)="
+                          updateTimeWindow(i, 'endHour', +$any($event.target).value.split(':')[0]);
+                          updateTimeWindow(i, 'endMinute', +$any($event.target).value.split(':')[1])
+                        "
+                      />
+                    </label>
+                  </div>
+
+                  <div class="window-days">
+                    @for (day of [0, 1, 2, 3, 4, 5, 6]; track day) {
+                      <label class="day-toggle" [class.active]="window.daysOfWeek.includes(day)">
+                        <input
+                          type="checkbox"
+                          [checked]="window.daysOfWeek.includes(day)"
+                          [disabled]="!canEditTime()"
+                        />
+                        {{ getDayName(day) }}
+                      </label>
+                    }
+                  </div>
+
+                  @if (canEditTime()) {
+                    <button
+                      class="remove-window-btn"
+                      (click)="removeTimeWindow(i)"
+                      title="Remove window"
+                    >
+                      &times;
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (canEditTime()) {
+                <button class="add-window-btn" (click)="addTimeWindow()">
+                  <span class="icon">+</span>
+                  Add Time Window
+                </button>
+              }
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- Features Tab -->
+      @if (activeTab() === 'features') {
+        <section class="tab-panel">
+          <h2>Feature Restrictions</h2>
+          <p class="tab-description">Control which features and sections are accessible.</p>
+
+          <!-- Disabled Features -->
+          <div class="rule-group">
+            <h3>Disabled Features</h3>
+            <div class="feature-grid">
+              @for (feat of availableFeatures; track feat) {
+                <label
+                  class="feature-item"
+                  [class.inherited]="isFeatureInherited(feat)"
+                  [class.disabled]="isFeatureDisabled(feat)"
+                  [class.inalienable]="isFeatureInalienable(feat)"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="isFeatureDisabled(feat) || isFeatureInherited(feat)"
+                    [disabled]="
+                      !canEditFeatures() || isFeatureInherited(feat) || isFeatureInalienable(feat)
+                    "
+                    (change)="toggleFeature(feat)"
+                  />
+                  <span class="feature-name">{{ formatFeature(feat) }}</span>
+                  @if (isFeatureInherited(feat)) {
+                    <span class="inherited-badge">inherited</span>
+                  }
+                  @if (isFeatureInalienable(feat)) {
+                    <span class="inalienable-badge" title="This feature cannot be disabled">
+                      protected
+                    </span>
+                  }
+                </label>
+              }
+            </div>
+          </div>
+
+          <!-- Inalienable Rights Notice -->
+          <div class="inalienable-notice">
+            <h4>🔒 Protected Features</h4>
+            <p>
+              These features can
+              <strong>never</strong>
+              be disabled, regardless of stewardship level:
+            </p>
+            <ul>
+              @for (feat of inalienableFeatures; track feat) {
+                <li>{{ formatFeature(feat) }}</li>
+              }
+            </ul>
+          </div>
+        </section>
+      }
+
+      <!-- Monitoring Tab -->
+      @if (activeTab() === 'monitoring' && canViewMonitoring()) {
+        <section class="tab-panel">
+          <h2>Activity Monitoring</h2>
+          <p class="tab-description">Configure what activity is logged and for how long.</p>
+
+          @if (!canEditMonitoring()) {
+            <div class="view-only-notice">
+              <span class="icon">👁</span>
+              <p>
+                As a
+                <strong>guide</strong>
+                , you can view monitoring settings but cannot change them.
+              </p>
+            </div>
+          }
+
+          <!-- Monitoring options would go here -->
+          <div class="rule-group">
+            <h3>Logging Options</h3>
+            <p class="coming-soon">Monitoring configuration coming soon.</p>
+          </div>
+        </section>
+      }
+    </div>
+
+    <!-- Save Bar -->
+    <div class="save-bar">
+      @if (!isEditingSelf() || canEditContent() || canEditTime() || canEditFeatures()) {
+        <button class="save-btn" [disabled]="isSaving()" (click)="savePolicy()">
+          @if (isSaving()) {
+            <span class="spinner-small"></span>
+            Saving...
+          } @else {
+            Save Changes
+          }
+        </button>
+      }
+
+      <a routerLink="../capabilities" class="view-capabilities-link">View resulting capabilities</a>
+    </div>
+  }
+</div>

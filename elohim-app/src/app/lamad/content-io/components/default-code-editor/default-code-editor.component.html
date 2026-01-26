@@ -12,15 +12,12 @@
         class="btn btn-primary"
         (click)="onSave()"
         [disabled]="readonly || isSaving"
-        title="Save (Ctrl+S)">
+        title="Save (Ctrl+S)"
+      >
         <span *ngIf="isSaving">Saving...</span>
         <span *ngIf="!isSaving">Save</span>
       </button>
-      <button
-        type="button"
-        class="btn btn-secondary"
-        (click)="onCancel()"
-        title="Cancel (Escape)">
+      <button type="button" class="btn btn-secondary" (click)="onCancel()" title="Cancel (Escape)">
         Cancel
       </button>
     </div>
@@ -114,7 +111,11 @@
       <span class="stat">{{ content.length }} characters</span>
     </div>
     <div class="footer-hint" *ngIf="!readonly">
-      Press <kbd>Ctrl+S</kbd> to save, <kbd>Escape</kbd> to cancel
+      Press
+      <kbd>Ctrl+S</kbd>
+      to save,
+      <kbd>Escape</kbd>
+      to cancel
     </div>
   </footer>
 </div>

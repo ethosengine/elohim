@@ -1,0 +1,10 @@
+Scenario: Understanding agent reasoning through appeal process
+    Given I have filed an appeal against a Family Elohim decision
+    And I don't understand why the agent made its choice
+    When I request detailed explanation through the appeal interface
+    Then I receive layered explanations from plain language to technical detail
+    And I can see the constitutional principles the agent applied
+    And I can view counterfactual scenarios showing what would change the outcome
+    And I can access the cryptographic proof trail
+    And Technical experts are available to explain complex aspects if needed
+    And all explanations are in accessible language without jargon

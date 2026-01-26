@@ -1,0 +1,10 @@
+Scenario: Coordinating between nuclear and extended family boundaries
+    Given Sarah's household has its own governance
+    And extended family has legitimate interests in children
+    When boundaries between household and extended family are negotiated
+    Then the family_elohim should help navigate appropriate boundaries
+    And it should support Sarah's household autonomy
+    And it should also recognize extended family relationships
+    And boundary negotiations should be care-informed
+    And the system should prevent both isolation and intrusion
+    And healthy multigenerational boundaries should be maintained

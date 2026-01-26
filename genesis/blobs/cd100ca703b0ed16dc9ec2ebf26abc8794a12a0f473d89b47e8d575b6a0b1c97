@@ -1,0 +1,10 @@
+Scenario: Community advocacy for senior issues and care economy
+    Given Margaret understands both care economy and senior needs
+    And community policy affects senior quality of life
+    When the community_elohim supports advocacy efforts
+    Then Margaret should be connected to senior advocacy
+    And her voice should inform policy on retirement, care, and aging
+    And care economy principles should be advanced through advocacy
+    And seniors should organize for systemic change
+    And Margaret's generation could reshape retirement policy
+    And political power should be built through care economy visibility

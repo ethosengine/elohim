@@ -1,0 +1,10 @@
+Scenario: Sibling care relationships built through mutual recognition
+    Given Emma cares for Tommy and Tommy cares for Emma
+    And both children make care contributions
+    When the family_elohim tracks sibling interactions
+    Then reciprocal care patterns should be highlighted
+    And Emma should be prompted to recognize Tommy's care for her
+    And Tommy should be prompted to recognize Emma's help
+    And the family should see mutual care, not hierarchy
+    And positive feedback loops should strengthen sibling bonds
+    And care economy should build family relationships

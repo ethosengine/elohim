@@ -1,0 +1,9 @@
+Scenario: Schools recognize single-parent families in forms and communications
+    Given school forms typically ask for "mother and father" information
+    And communications assume two-parent household availability
+    When schools collect family information
+    Then the educational_elohim should advocate for single-parent-inclusive forms
+    And forms should acknowledge diverse family structures respectfully
+    And communications should not assume two parents are available
+    And schools should recognize single parents manage everything alone
+    And Maria should not have to repeatedly explain or defend her family structure

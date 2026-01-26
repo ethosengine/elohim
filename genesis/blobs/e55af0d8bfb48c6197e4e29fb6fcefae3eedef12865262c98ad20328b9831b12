@@ -1,0 +1,7 @@
+Scenario: Organizing around food worker food insecurity
+    Given food service workers often cannot afford adequate food despite preparing food
+    When this contradiction becomes visible
+    Then the protocol should help organize around food worker food security
+    And advocate for meal provisions as standard for food workers
+    And push for wages that enable workers to afford quality food
+    And make visible the injustice of hungry people feeding others

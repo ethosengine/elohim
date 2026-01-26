@@ -1,0 +1,11 @@
+Scenario: Community governance voice weighted by care contributions
+    Given Robert has made substantial care contributions over decades
+    And his care work demonstrates community investment
+    When community_elohim supports governance participation
+    Then his accumulated care contributions should give him standing
+    And his voice in community decisions should reflect his investment
+    And governance processes should actively solicit his input
+    And his experience managing complexity should be valued in community planning
+    And care tokens should connect to community governance participation
+    And demonstrate that care economy participation creates civic voice
+    And prevent governance dominated by those without care experience

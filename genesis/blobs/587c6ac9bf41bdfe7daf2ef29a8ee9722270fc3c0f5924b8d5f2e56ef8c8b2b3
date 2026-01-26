@@ -1,0 +1,11 @@
+Scenario: Managing children's school participation despite resource constraints
+    Given school requires fees, supplies, or resources I cannot afford
+    And children need to participate fully in educational activities
+    When resource constraints threaten children's school participation
+    Then the Value Scanner identifies school assistance programs and resources
+    And helps me access fee waivers, supply assistance, scholarship programs
+    And connects me to community resources for school needs
+    And validates that lack of resources shouldn't exclude children
+    And my personal_agent tracks school financial requirements and deadlines
+    And recognizes resource navigation as substantial invisible labor
+    And ensures children's educational participation despite poverty

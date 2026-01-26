@@ -4,6 +4,8 @@ REA-based economic coordination, recognition flows, contributor presence.
 
 *Shefa (שפע) = Hebrew for abundance/flow*
 
+**Architecture:** `elohim/ELOHIM_PROTOCOL_ARCHITECTURE.md`
+
 ## Models
 
 | Model | Purpose |

@@ -1,0 +1,10 @@
+Scenario: Workplace recognition that parenting is parallel full-time work
+    Given Sarah works 40 hours weekly as teacher
+    And she also performs 60+ hours weekly of parenting labor
+    When the workplace_elohim analyzes Sarah's total work
+    Then it should recognize she's working two full-time jobs
+    And it should make visible the dual burden she carries
+    And workplace should understand why flexibility is essential
+    And the system should demonstrate that working parents need support
+    And professional expectations should account for parenting responsibilities
+    And Sarah's full workload should be undeniably visible

@@ -1,0 +1,11 @@
+Scenario: Coordinating household care labor in retirement
+    Given Frank and his wife both have time freedom from employment
+    And household labor needs to be distributed equitably
+    And traditional gender patterns may persist despite retirement
+    When the household_elohim monitors labor distribution
+    Then it should track household tasks performed by each partner
+    And it should identify unfair distributions early
+    And it should surface imbalances: "Frank's wife handles 75% of meal preparation"
+    And both partners should receive prompts about equity
+    And adjustments should be negotiated from data, not resentment
+    And retirement should enable more equitable household partnerships

@@ -1,0 +1,10 @@
+Scenario: Participating in financial literacy education
+    Given Jordan is learning to manage money independently
+    And the support organization offers financial skills classes
+    When Jordan attends financial literacy sessions
+    Then concepts are taught using concrete examples and visual aids
+    And Jordan practices skills with real-world simulations
+    And the personal_agent reinforces learning in daily situations
+    And Jordan's financial understanding grows over time
+    And Jordan gains confidence in money management
+    And Jordan's increasing financial autonomy is supported through education

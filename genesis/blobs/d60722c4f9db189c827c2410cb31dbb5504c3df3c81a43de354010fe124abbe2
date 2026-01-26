@@ -1,0 +1,9 @@
+Scenario: Community resource sharing reduces individual costs at scale
+    Given community members have complementary needs and resources
+    And collective action can reduce costs significantly
+    When community organizes resource sharing
+    Then the community_elohim should coordinate tool libraries
+    And it should facilitate skill sharing networks
+    And it should organize bulk purchasing cooperatives
+    And community members should benefit economically from cooperation
+    And care economy should provide material benefits, not just recognition

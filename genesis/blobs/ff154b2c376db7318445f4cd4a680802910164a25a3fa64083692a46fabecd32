@@ -1,0 +1,11 @@
+Scenario: Volunteer care networks prevent institutional warehousing
+    Given institutional care strips autonomy and dignity
+    And community care networks can enable aging in place
+    When volunteers provide support for Helen
+    Then the community_elohim should coordinate volunteer schedules
+    And volunteer care work should be recognized with care tokens
+    And Helen should remain in her home and community
+    And care should be provided with dignity and respect
+    And the protocol should demonstrate alternative to institutional model
+    And community care economy should prove that dignified elder care is possible at scale
+    And success should show that we can care for our elders without warehousing them

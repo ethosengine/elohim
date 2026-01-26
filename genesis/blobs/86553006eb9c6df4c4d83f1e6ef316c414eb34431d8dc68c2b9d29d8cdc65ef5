@@ -1,0 +1,11 @@
+Scenario: Snow removal and sidewalk maintenance advocacy
+    Given Alex uses a wheelchair and inaccessible sidewalks trap Alex at home
+    And snow removal is often inadequate
+    When winter weather creates accessibility barriers
+    Then Alex should be able to document sidewalk problems systematically
+    And the neighborhood_elohim should coordinate snow removal advocacy
+    And Alex's mobility needs should be recognized as legitimate priority
+    And neighbors should understand that sidewalk access is essential infrastructure
+    And collective action should demand better municipal services
+    And Alex's advocacy should improve conditions for all residents
+    And the neighborhood should support Alex's right to mobility

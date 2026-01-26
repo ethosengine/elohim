@@ -1,0 +1,9 @@
+Scenario: Workers develop confidence in collective decision-making
+    Given workers have never governed a business democratically
+    And they may doubt their capability initially
+    When early democratic decisions succeed
+    Then workers see their collective wisdom produces good outcomes
+    And small decisions (schedule adjustments, supply orders) build confidence
+    And larger decisions (pricing strategy, service expansion) follow as capacity grows
+    And workplace_elohim documents successful democratic decision patterns
+    And worker self-governance becomes normalized, not exceptional

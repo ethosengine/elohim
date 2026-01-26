@@ -1,0 +1,11 @@
+Scenario: Teen makes independent financial decisions with real consequences
+    Given Jasmine is shopping with money from her part-time job
+    And she is saving for college expenses
+    And she has set a monthly budget of $150 for discretionary spending
+    When Jasmine considers purchasing a $60 jacket
+    Then her personal_agent should provide decision support without controlling her choice
+    And the agent should surface relevant information: "This is 40% of your monthly discretionary budget"
+    And the agent should connect to her goals: "You're saving $200/month for college"
+    And Jasmine should retain full authority to make the decision
+    And the choice should have real economic consequences
+    And the system should support learning from mistakes without catastrophic outcomes

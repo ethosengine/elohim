@@ -1,0 +1,10 @@
+Scenario: Peer reviewing global expert testimony across cultures
+    Given experts from diverse technical traditions advise convention
+    And peer review must work across different epistemologies
+    When I review testimony from non-Western technical expert
+    Then I respect: different approaches to technical knowledge
+    And I identify: complementary insights from diverse perspectives
+    And I avoid: dismissing unfamiliar technical traditions
+    And I learn: from different ways of understanding AI systems
+    And I strengthen: testimony through cross-cultural dialogue
+    And I demonstrate: epistemic humility and global collaboration

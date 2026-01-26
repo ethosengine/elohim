@@ -1,0 +1,10 @@
+Scenario: Coordinating Margaret's mother's care among siblings
+    Given Margaret has siblings who also have responsibilities to their mother
+    And Margaret currently does most hands-on care
+    When the family_elohim coordinates elder care among siblings
+    Then all siblings' contributions should be visible
+    And disparities in care burden should be evident
+    And fair distribution conversations should be supported by data
+    And Margaret should not bear disproportionate burden invisibly
+    And sibling care economy should operate on transparency
+    And family equity should be maintained across distance and circumstance

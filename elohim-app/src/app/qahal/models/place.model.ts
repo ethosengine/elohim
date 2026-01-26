@@ -21,10 +21,15 @@
  */
 
 // Import content types from lamad (content pillar)
-import type { ContentReach, ContentMetadata, ContentFlag } from '../../lamad/models/content-node.model';
-// Import infrastructure types from elohim (canonical location)
-import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+
+import type {
+  ContentReach,
+  ContentMetadata,
+  ContentFlag,
+} from '../../lamad/models/content-node.model';
+// Import infrastructure types from elohim (canonical location)
 
 // ============================================================================
 // PLACE TYPE CLASSIFICATION
@@ -38,63 +43,63 @@ import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
  */
 export type PlaceType =
   // Human-constructed administrative places
-  | 'neighborhood'          // Hyper-local human settlement
-  | 'municipality'          // City, town, village
-  | 'county'                // County, district
-  | 'province'              // State, province, region
-  | 'nation-state'          // Country
-  | 'supranational'         // EU, ASEAN, etc.
+  | 'neighborhood' // Hyper-local human settlement
+  | 'municipality' // City, town, village
+  | 'county' // County, district
+  | 'province' // State, province, region
+  | 'nation-state' // Country
+  | 'supranational' // EU, ASEAN, etc.
 
   // Bioregional / ecological places (boundary enforcers)
-  | 'watershed'             // River basin, drainage area
-  | 'forest'                // Forest ecosystem
-  | 'grassland'             // Prairie, savanna
-  | 'wetland'               // Marsh, swamp, bog
-  | 'coastal'               // Coastal zone, estuary
-  | 'mountain-range'        // Mountain ecosystem
-  | 'desert'                // Arid ecosystem
-  | 'urban-ecosystem'       // Urban green infrastructure
+  | 'watershed' // River basin, drainage area
+  | 'forest' // Forest ecosystem
+  | 'grassland' // Prairie, savanna
+  | 'wetland' // Marsh, swamp, bog
+  | 'coastal' // Coastal zone, estuary
+  | 'mountain-range' // Mountain ecosystem
+  | 'desert' // Arid ecosystem
+  | 'urban-ecosystem' // Urban green infrastructure
 
   // Cultural / spiritual places
-  | 'sacred-site'           // Places of spiritual significance
-  | 'cultural-landscape'    // UNESCO-style cultural landscapes
-  | 'indigenous-territory'  // Traditional territories
+  | 'sacred-site' // Places of spiritual significance
+  | 'cultural-landscape' // UNESCO-style cultural landscapes
+  | 'indigenous-territory' // Traditional territories
 
   // Functional places
-  | 'learning-hub'          // Physical learning space
-  | 'gathering-place'       // Community meeting space
-  | 'commons'               // Shared resource area
-  | 'custom';               // User-defined place type
+  | 'learning-hub' // Physical learning space
+  | 'gathering-place' // Community meeting space
+  | 'commons' // Shared resource area
+  | 'custom'; // User-defined place type
 
 /**
  * PlaceTypeCategory - Grouping of place types for governance routing
  */
 export type PlaceTypeCategory =
-  | 'administrative'        // Human political boundaries
-  | 'bioregional'           // Ecological boundaries (boundary enforcers)
-  | 'cultural'              // Cultural/spiritual significance
-  | 'functional';           // Purpose-defined places
+  | 'administrative' // Human political boundaries
+  | 'bioregional' // Ecological boundaries (boundary enforcers)
+  | 'cultural' // Cultural/spiritual significance
+  | 'functional'; // Purpose-defined places
 
 /**
  * Helper to categorize place types
  */
 export const PLACE_TYPE_CATEGORIES: Record<PlaceType, PlaceTypeCategory> = {
   // Administrative
-  'neighborhood': 'administrative',
-  'municipality': 'administrative',
-  'county': 'administrative',
-  'province': 'administrative',
+  neighborhood: 'administrative',
+  municipality: 'administrative',
+  county: 'administrative',
+  province: 'administrative',
   'nation-state': 'administrative',
-  'supranational': 'administrative',
+  supranational: 'administrative',
 
   // Bioregional (boundary enforcers)
-  'watershed': 'bioregional',
-  'forest': 'bioregional',
-  'grassland': 'bioregional',
-  'wetland': 'bioregional',
-  'coastal': 'bioregional',
+  watershed: 'bioregional',
+  forest: 'bioregional',
+  grassland: 'bioregional',
+  wetland: 'bioregional',
+  coastal: 'bioregional',
   'mountain-range': 'bioregional',
-  'desert': 'bioregional',
+  desert: 'bioregional',
   'urban-ecosystem': 'bioregional',
 
   // Cultural
@@ -105,8 +110,8 @@ export const PLACE_TYPE_CATEGORIES: Record<PlaceType, PlaceTypeCategory> = {
   // Functional
   'learning-hub': 'functional',
   'gathering-place': 'functional',
-  'commons': 'functional',
-  'custom': 'functional'
+  commons: 'functional',
+  custom: 'functional',
 };
 
 // ============================================================================
@@ -120,22 +125,22 @@ export const PLACE_TYPE_CATEGORIES: Record<PlaceType, PlaceTypeCategory> = {
  * This acknowledges that naming is political and contested.
  */
 export type PlaceNameType =
-  | 'official'              // Government-recognized name
-  | 'traditional'           // Long-standing community name
-  | 'indigenous'            // Name from indigenous peoples
-  | 'colloquial'            // Common informal name
-  | 'historical'            // Former name (for context)
-  | 'contested';            // Name under governance dispute
+  | 'official' // Government-recognized name
+  | 'traditional' // Long-standing community name
+  | 'indigenous' // Name from indigenous peoples
+  | 'colloquial' // Common informal name
+  | 'historical' // Former name (for context)
+  | 'contested'; // Name under governance dispute
 
 /**
  * PlaceNameDisputeStatus - Governance state of a name
  */
 export type PlaceNameDisputeStatus =
-  | 'undisputed'            // No active challenges
-  | 'contested'             // Under active dispute
-  | 'pending-governance'    // Awaiting deliberation outcome
-  | 'resolved-coexist'      // Multiple names officially coexist
-  | 'deprecated';           // Name formally deprecated (historical only)
+  | 'undisputed' // No active challenges
+  | 'contested' // Under active dispute
+  | 'pending-governance' // Awaiting deliberation outcome
+  | 'resolved-coexist' // Multiple names officially coexist
+  | 'deprecated'; // Name formally deprecated (historical only)
 
 /**
  * PlaceName - A name for a place
@@ -187,11 +192,11 @@ export interface PlaceName {
  * Contested places may have multiple claimed boundaries.
  */
 export type BoundaryType =
-  | 'precise'               // Clear, well-defined boundary
-  | 'approximate'           // General area, not precisely defined
-  | 'fluid'                 // Boundaries shift (seasonal, ecological)
-  | 'contested'             // Multiple competing boundary claims
-  | 'fractal';              // Boundaries exist at multiple scales
+  | 'precise' // Clear, well-defined boundary
+  | 'approximate' // General area, not precisely defined
+  | 'fluid' // Boundaries shift (seasonal, ecological)
+  | 'contested' // Multiple competing boundary claims
+  | 'fractal'; // Boundaries exist at multiple scales
 
 /**
  * GeoJSONGeometry - Standard GeoJSON geometry types
@@ -239,7 +244,13 @@ export interface PlaceGeography {
 
   /** Data source for geographic information */
   dataSource?: {
-    source: 'openstreetmap' | 'government' | 'community' | 'scientific' | 'indigenous-mapping' | 'custom';
+    source:
+      | 'openstreetmap'
+      | 'government'
+      | 'community'
+      | 'scientific'
+      | 'indigenous-mapping'
+      | 'custom';
     sourceId?: string;
     lastUpdated: string;
     confidence: 'high' | 'medium' | 'low';
@@ -254,15 +265,15 @@ export interface PlaceGeography {
  * EcologicalRelationshipType - How places relate ecologically
  */
 export type EcologicalRelationshipType =
-  | 'drains-to'             // Water flows to (watershed hierarchy)
-  | 'feeds-from'            // Water source
-  | 'habitat-corridor'      // Wildlife movement pathway
-  | 'ecotone'               // Transition zone between ecosystems
-  | 'depends-on'            // Ecological dependency
-  | 'supports'              // Provides ecological services to
+  | 'drains-to' // Water flows to (watershed hierarchy)
+  | 'feeds-from' // Water source
+  | 'habitat-corridor' // Wildlife movement pathway
+  | 'ecotone' // Transition zone between ecosystems
+  | 'depends-on' // Ecological dependency
+  | 'supports' // Provides ecological services to
   | 'climate-influenced-by' // Climate relationship
-  | 'fire-regime-shared'    // Shared fire ecology
-  | 'migration-route';      // Animal migration pathway
+  | 'fire-regime-shared' // Shared fire ecology
+  | 'migration-route'; // Animal migration pathway
 
 /**
  * EcologicalRelationship - How this place relates to other places ecologically
@@ -302,7 +313,7 @@ export interface CulturalContext {
   spiritualSignificance?: {
     traditions: string[];
     description?: string;
-    restrictions?: string[];   // Access/behavior restrictions
+    restrictions?: string[]; // Access/behavior restrictions
   };
 
   /** Historical significance */
@@ -310,7 +321,7 @@ export interface CulturalContext {
     summary: string;
     periodStart?: string;
     periodEnd?: string;
-    eventIds?: string[];       // Related historical content
+    eventIds?: string[]; // Related historical content
   };
 
   /** Learning traditions associated with this place */
@@ -339,24 +350,24 @@ export interface CulturalContext {
  * - GeographicReach: 'watershed' (only meaningful in that watershed)
  */
 export type GeographicReach =
-  | 'hyperlocal'            // Single building, block, or POI
-  | 'neighborhood'          // Immediate geographic community
-  | 'municipal'             // City/town level
-  | 'regional'              // Province, state, bioregion
-  | 'national'              // Country-level
-  | 'continental'           // Continental relevance
-  | 'global'                // Universally relevant
-  | 'place-specific';       // Tied to specific named place(s)
+  | 'hyperlocal' // Single building, block, or POI
+  | 'neighborhood' // Immediate geographic community
+  | 'municipal' // City/town level
+  | 'regional' // Province, state, bioregion
+  | 'national' // Country-level
+  | 'continental' // Continental relevance
+  | 'global' // Universally relevant
+  | 'place-specific'; // Tied to specific named place(s)
 
 /**
  * GeographicDeterminationMethod - How geographic context was assigned
  */
 export type GeographicDeterminationMethod =
-  | 'author-declared'       // Content author specified
-  | 'elohim-inferred'       // Elohim analyzed and assigned
-  | 'community-assigned'    // Community governance decided
-  | 'bioregional-enforcement'// Bioregional Elohim required this
-  | 'inherited';            // Inherited from parent content/path
+  | 'author-declared' // Content author specified
+  | 'elohim-inferred' // Elohim analyzed and assigned
+  | 'community-assigned' // Community governance decided
+  | 'bioregional-enforcement' // Bioregional Elohim required this
+  | 'inherited'; // Inherited from parent content/path
 
 /**
  * GeographicDetermination - How geographic context was determined
@@ -418,28 +429,28 @@ export interface GeographicContext {
  * The watershed doesn't care about municipal boundaries.
  */
 export type EcologicalLimitType =
-  | 'carrying-capacity'     // Population/resource limit
-  | 'water-availability'    // Watershed capacity
-  | 'carbon-budget'         // Emissions limit for this place
-  | 'biodiversity-threshold'// Minimum species/habitat requirements
-  | 'pollution-threshold'   // Maximum contamination levels
-  | 'land-use-boundary'     // Development/use restrictions
-  | 'seasonal-restriction'  // Time-based restrictions (breeding season, etc.)
-  | 'sacred-boundary'       // Cultural/spiritual protection (also constitutional)
-  | 'fire-regime'           // Fire management requirements
-  | 'flood-plain'           // Flood risk management
-  | 'erosion-control'       // Soil protection requirements
-  | 'aquifer-protection'    // Groundwater limits
-  | 'custom';               // Other ecological limits
+  | 'carrying-capacity' // Population/resource limit
+  | 'water-availability' // Watershed capacity
+  | 'carbon-budget' // Emissions limit for this place
+  | 'biodiversity-threshold' // Minimum species/habitat requirements
+  | 'pollution-threshold' // Maximum contamination levels
+  | 'land-use-boundary' // Development/use restrictions
+  | 'seasonal-restriction' // Time-based restrictions (breeding season, etc.)
+  | 'sacred-boundary' // Cultural/spiritual protection (also constitutional)
+  | 'fire-regime' // Fire management requirements
+  | 'flood-plain' // Flood risk management
+  | 'erosion-control' // Soil protection requirements
+  | 'aquifer-protection' // Groundwater limits
+  | 'custom'; // Other ecological limits
 
 /**
  * EnforcementLevel - What happens when a limit is exceeded
  */
 export type EnforcementLevel =
-  | 'warning'               // Alert but no action
-  | 'restrict-reach'        // Limit content/activity reach
-  | 'require-governance'    // Require deliberation before proceeding
-  | 'hard-block';           // Constitutional prohibition, cannot proceed
+  | 'warning' // Alert but no action
+  | 'restrict-reach' // Limit content/activity reach
+  | 'require-governance' // Require deliberation before proceeding
+  | 'hard-block'; // Constitutional prohibition, cannot proceed
 
 /**
  * EcologicalLimit - A specific ecological boundary
@@ -532,14 +543,14 @@ export interface BioregionalAuthority {
  * PlaceCapability - Elohim capabilities for place-awareness
  */
 export type PlaceCapability =
-  | 'place-attestation'           // Attest to place existence/boundaries
-  | 'place-naming-governance'     // Participate in naming deliberation
+  | 'place-attestation' // Attest to place existence/boundaries
+  | 'place-naming-governance' // Participate in naming deliberation
   | 'geographic-reach-assignment' // Assign geographic reach to content
-  | 'bioregional-enforcement'     // Enforce ecological limits
-  | 'cultural-context-mediation'  // Mediate cultural place disputes
-  | 'place-relationship-mapping'  // Map place relationships
+  | 'bioregional-enforcement' // Enforce ecological limits
+  | 'cultural-context-mediation' // Mediate cultural place disputes
+  | 'place-relationship-mapping' // Map place relationships
   | 'ecological-limit-assessment' // Assess ecological limits
-  | 'place-stewardship';          // General place stewardship
+  | 'place-stewardship'; // General place stewardship
 
 /**
  * PlaceAwareElohim - Extensions to ElohimAgent for place-awareness
@@ -737,13 +748,19 @@ export interface PlaceServiceInterface {
   proposePlaceName(placeId: string, name: PlaceName): Promise<string>; // Returns deliberation ID
 
   /** Get content geographically relevant to a place */
-  getContentForPlace(placeId: string, options?: {
-    geographicReach?: GeographicReach;
-    includeBioregional?: boolean;
-  }): Promise<string[]>; // Returns content IDs
+  getContentForPlace(
+    placeId: string,
+    options?: {
+      geographicReach?: GeographicReach;
+      includeBioregional?: boolean;
+    }
+  ): Promise<string[]>; // Returns content IDs
 
   /** Check if an ecological limit would be exceeded */
-  checkEcologicalLimits(placeId: string, action: string): Promise<{
+  checkEcologicalLimits(
+    placeId: string,
+    action: string
+  ): Promise<{
     wouldExceed: boolean;
     limits: EcologicalLimit[];
     enforcement: EnforcementLevel;

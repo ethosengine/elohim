@@ -1,0 +1,12 @@
+Scenario: Lifecycle consumption awareness from birth through end-of-life
+    Given Robert has observed full lifecycle from grandchildren to aging parents
+    And he recognizes consumption patterns across lifespan
+    And lifecycle awareness can inform sustainable choices
+    When bioregional_elohim supports lifecycle consumption awareness
+    Then it should help Robert understand consumption across full lifecycle
+    And surface how current choices affect future generations' ecological inheritance
+    And recognize: "Reducing consumption now preserves resources for grandchildren's future"
+    And connect present choices to long-term bioregional health
+    And support sustainable consumption motivated by intergenerational care
+    And demonstrate that ecological stewardship is care for future generations
+    And build consumption patterns that serve lifecycle sustainability

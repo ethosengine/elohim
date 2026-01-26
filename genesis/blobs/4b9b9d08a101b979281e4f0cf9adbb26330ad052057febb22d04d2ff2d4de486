@@ -1,0 +1,9 @@
+Scenario: Refugee protected from human trafficking scheme
+    Given Amira is seeking employment in Germany
+    When traffickers posing as employers try to contact her
+    And they offer suspiciously lucrative jobs requiring isolation
+    Then the protection agent identifies trafficking patterns
+    And the fraudulent messages never reach Amira
+    And she is protected without knowing she was targeted
+    And legitimate employment resources continue to reach her
+    And vulnerable refugees are protected from exploitation

@@ -1,0 +1,12 @@
+Scenario: Managing children's trauma responses and behavioral challenges
+    Given my children are exhibiting trauma responses from abuse and instability
+    And I am also traumatized and resource-depleted
+    When challenging behaviors arise in household
+    Then the Value Scanner helps me track patterns and triggers
+    And surfaces trauma-informed parenting strategies
+    And connects me to appropriate support services for children
+    And validates that these challenges are normal responses to abnormal circumstances
+    And helps me maintain patience and compassion despite stress
+    And my personal_agent provides in-the-moment coaching when I'm struggling
+    And documents my sophisticated trauma-responsive parenting
+    And recognizes this emotional labor as substantial care contribution

@@ -1,0 +1,11 @@
+Scenario: Participating in community decision-making processes
+    Given the city is planning a new accessible park
+    And community input is being gathered
+    When Jordan participates in the planning process
+    Then the personal_agent helps Jordan access the input process
+    And Jordan's preferences about park features are gathered accessibly
+    And Jordan's input is valued equally with other community members
+    And the community_elohim ensures Jordan's voice is heard
+    And park design reflects input from diverse community members including IDD
+    And Jordan experiences being an active citizen shaping community
+    And Jordan's participation strengthens democratic processes

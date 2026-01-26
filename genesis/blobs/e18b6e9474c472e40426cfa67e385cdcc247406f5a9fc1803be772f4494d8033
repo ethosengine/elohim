@@ -1,0 +1,10 @@
+Scenario: Learning resource management as life skill
+    Given Marcus manages complex household resources
+    And resource stewardship is critical life skill
+    When Marcus practices resource management
+    Then he should be learning sophisticated stewardship
+    And he should understand budgeting, planning, optimization
+    And he should develop skills most people don't learn until adulthood
+    And his education should include practical life competencies
+    And resource management should be recognized as valuable learning
+    And care economy should teach skills for thriving under constraint

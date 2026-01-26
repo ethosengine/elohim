@@ -1,0 +1,12 @@
+Scenario: Building neighborhood connections that might endure beyond crisis
+    Given I might move to permanent housing in this neighborhood or elsewhere
+    And relationships I build now could become long-term community
+    When I invest in neighborhood relationships
+    Then the Value Scanner helps me identify connections worth developing
+    And supports authentic relationship-building despite uncertainty
+    And validates that building community is valuable regardless of housing permanence
+    And helps me maintain connections if I move within neighborhood
+    And facilitates staying connected if I move to different neighborhood
+    And my personal_agent tracks meaningful neighborhood relationships
+    And recognizes community-building as important social infrastructure work
+    And celebrates relationships that provide support and belonging

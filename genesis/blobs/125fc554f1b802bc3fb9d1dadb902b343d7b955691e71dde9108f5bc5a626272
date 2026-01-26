@@ -1,0 +1,10 @@
+Scenario: Workplace care economy recognizes all organizational contributions
+    Given organizational success depends on many forms of labor
+    And Aisha contributes in multiple ways
+    When the workplace_elohim tracks organizational care
+    Then it should recognize diverse contributions
+    And it should value mentoring, knowledge sharing, and culture building
+    And it should make invisible organizational care visible
+    And all work supporting collective flourishing should count
+    And comprehensive care accounting should inform organizational decisions
+    And she should understand the full value she provides

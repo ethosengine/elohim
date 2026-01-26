@@ -1,0 +1,117 @@
+@epic:public_observer
+@user_type:board_member
+@governance_layer:ecological
+@related_users:citizen,developer_interests,activist,politician,community_organizer
+@related_layers:district,municipality,community
+@elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim
+
+Feature: Environmental and Planning Governance for Board Member
+  As a board member serving on planning commission or environmental board in the public_observer system
+  Operating at the ecological functional layer
+  I want independent environmental analysis and sustainability expertise
+  So that I can make informed decisions on development and environmental impacts despite lacking technical expertise
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the board_member user is registered in the system
+    And the ecological governance context is active
+    And I am a volunteer serving on planning commission, environmental commission, or conservation board
+
+  Scenario: Planning commissioner evaluates environmental impacts of large development
+    Given developer proposes major commercial development on vacant land
+    And environmental impact report prepared by developer's consultants
+    And staff recommendation supports approval with mitigation measures
+    When the planning commissioner requests Observer independent analysis
+    Then they receive assessment of impact report methodology and limitations
+    And see comparison to development impacts documented in peer jurisdictions
+    And access air quality, water, and habitat impact analysis independent of developer framing
+    And discover mitigation measures less effective than presented
+    And independent analysis reveals environmental impacts developer report minimized
+
+  Scenario: Parks commissioner learns accessible expertise on green infrastructure
+    Given parks department proposes converting traditional landscaping to green infrastructure
+    And proposal includes technical concepts like bioswales, permeable pavement, native plantings
+    And commissioner has no environmental engineering background but must approve plan
+    When the commissioner uses Observer accessible expertise
+    Then they receive plain-language explanation of green infrastructure approaches
+    And see examples from peer cities with implementation outcomes and costs
+    And access key questions to ask staff about maintenance and performance
+    And understand climate adaptation and water quality benefits
+    And accessible expertise enables informed judgment on technical proposal
+
+  Scenario: Planning commissioner tracks developer's environmental commitments from past project
+    Given same developer seeking approval for new project
+    And past project approved with environmental mitigation commitments
+    And commissioner wants to know if developer followed through on previous promises
+    When the commissioner uses Observer implementation tracking
+    Then they see developer's past project mitigation commitments versus implementation
+    And discover tree planting and habitat restoration commitments not fully delivered
+    And find stormwater management systems performing below promised levels
+    And access documentation showing enforcement gaps by municipality
+    And impact tracking reveals developer's track record diverged from promises
+
+  Scenario: Environmental commissioner evaluates watershed protection policy
+    Given commission considers strengthening regulations on development near waterways
+    And staff presents complex hydrology analysis and regulatory considerations
+    And development interests argue restrictions are excessive
+    When the commissioner requests Observer environmental policy analysis
+    Then they receive comparison of proposed protections to peer jurisdictions' standards
+    And see water quality trend data showing current protections insufficient
+    And access analysis of development impacts on downstream water quality
+    And get examples of how other communities balanced development and protection
+    And independent analysis helps commissioner evaluate competing claims
+
+  Scenario: Planning commissioner understands environmental justice dimensions of industrial permit
+    Given commission evaluates permit for industrial facility citing pollution
+    And facility meets regulatory standards according to staff analysis
+    And community members testify about existing pollution burden but lack data
+    When the commissioner seeks environmental justice analysis from Observer
+    Then they receive cumulative pollution exposure data for affected neighborhood
+    And see demographics showing low-income community of color already overburdened
+    And access health outcome data correlating with pollution exposure
+    And discover neighborhood has multiple polluting facilities unlike affluent areas
+    And environmental justice analysis reveals disparate impacts standard permitting ignores
+
+  Scenario: Conservation board member detects greenwashing in sustainability initiative
+    Given municipality proposes sustainability plan with ambitious climate goals
+    And plan emphasizes renewable energy targets and green building standards
+    And board wants to understand if plan will achieve meaningful emissions reductions
+    When the board member uses Observer sustainability analysis
+    Then they see plan's projected emissions reductions compared to climate science needs
+    And discover plan excludes transportation sector responsible for largest emissions
+    And find renewable energy targets rely on questionable carbon offset accounting
+    And access comparison to peer cities with more comprehensive climate action
+    And independent analysis distinguishes authentic sustainability from greenwashing
+
+  Scenario: Planning commissioner evaluates sprawl versus infill development trade-offs
+    Given commission faces pressure to approve suburban expansion development
+    And developers argue expansion provides affordable housing opportunities
+    And environmentalists advocate for urban infill to reduce sprawl
+    When the commissioner requests Observer growth pattern analysis
+    Then they receive comparison of infrastructure costs for sprawl versus infill
+    And see environmental impacts analysis including habitat, emissions, and water use
+    And access true affordability analysis accounting for transportation costs
+    And understand fiscal impacts on municipality over time
+    And accessible expertise helps commissioner evaluate complex growth trade-offs
+
+  Scenario: Environmental commissioner tracks city's climate action plan implementation
+    Given city adopted climate action plan with specific reduction targets and timelines
+    And annual progress reports from staff emphasize achievements
+    And commissioner wants objective assessment of whether city is on track
+    When the commissioner uses Observer accountability tracking
+    Then they see actual emissions reductions versus plan targets over time
+    And discover city is not on track to meet 2030 goals
+    And find some action items completed while highest-impact measures delayed
+    And access comparison showing peer cities making faster progress
+    And accountability tracking reveals gap between plan commitments and implementation
+
+  Scenario: Planning commissioner prepares for climate adaptation zoning update
+    Given commission must update zoning to address climate risks like flooding and heat
+    And staff proposes complex amendments addressing sea level rise and extreme weather
+    And commissioner wants to make informed decisions on technical requirements
+    When the commissioner uses Observer decision support
+    Then they receive executive summary of climate risks and proposed zoning responses
+    And see examples of climate adaptation zoning from vulnerable communities
+    And access analysis of which properties and populations most affected by requirements
+    And get questions to ask staff about implementation feasibility and equity
+    And accessible expertise enables informed judgment on climate adaptation policy

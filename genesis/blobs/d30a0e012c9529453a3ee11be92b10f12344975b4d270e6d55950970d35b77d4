@@ -1,0 +1,9 @@
+Scenario: Franchise operator mental health and wellbeing improves across converted locations
+    Given franchise operation causes severe stress from dual extraction and moral injury
+    And operators suffer isolation, anxiety, and health problems from franchise burden
+    When conversions liberate operators from extraction trap
+    Then operator mental health improves measurably (reduced anxiety, better sleep, lower stress)
+    And peer support network among converted operators provides community
+    And health outcomes are documented showing franchise model's human cost
+    And sector awareness grows about franchise operation's psychological toll
+    And industry_sector_elohim documents wellbeing improvements advocating for conversion support

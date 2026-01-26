@@ -1,0 +1,9 @@
+Scenario: Refugee connects with cultural community in diaspora
+    Given Amira wants to maintain Syrian cultural connections
+    When she joins the Syrian diaspora cultural community
+    And the community includes refugees across multiple countries
+    Then she finds others who share her language and culture
+    And cultural practices, recipes, and traditions are preserved
+    And she participates in Arabic language maintenance
+    And her children can learn their cultural heritage
+    And the community provides mutual support across diaspora

@@ -1,0 +1,10 @@
+Scenario: Teen develops sophisticated understanding of consumption impacts
+    Given Jasmine makes daily purchasing decisions
+    And each choice has ecological consequences
+    When she uses the Value Scanner to evaluate options
+    Then her personal_agent should surface ecological information
+    And explain water usage, carbon footprint, and ecosystem impacts
+    And connect choices to bioregional effects: "This produce is local and seasonal"
+    And help her understand that consumption is participation in ecological systems
+    And build sophisticated ecological literacy through daily practice
+    And develop her capability to make environmentally informed decisions

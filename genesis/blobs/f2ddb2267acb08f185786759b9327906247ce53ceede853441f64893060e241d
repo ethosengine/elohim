@@ -1,0 +1,10 @@
+Scenario: Child learns community economic power through collective action
+    Given neighborhood families make coordinated choices
+    And Emma participates in community economic patterns
+    When Emma sees collective neighborhood impact
+    Then she should learn about community economic agency
+    And her personal_agent should explain collective power age-appropriately
+    And the agent should say "When families choose together, stores listen"
+    And she should understand communities can shape markets
+    And care economy includes collective organizing dimension
+    And she should learn early about community economic power

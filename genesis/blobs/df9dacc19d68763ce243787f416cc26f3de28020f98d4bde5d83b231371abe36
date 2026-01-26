@@ -1,0 +1,123 @@
+# REA Accounting: Tracking Value Without Markets
+
+## Beyond Double-Entry Bookkeeping
+
+Traditional accounting was designed for businesses: track assets, liabilities, and equity. Double-entry bookkeeping, invented in 15th-century Italy, revolutionized commerce.
+
+But it can't see:
+- Value that doesn't have a price
+- Flows that don't involve ownership transfer
+- Contributions that benefit communities, not individuals
+
+## What is REA?
+
+REA stands for **Resources, Events, and Agents**. It's an accounting ontology developed for enterprise systems, now extended for the care economy.
+
+### Resources
+Things of value—not just money, but:
+- Skills, knowledge, expertise
+- Attention, presence, care
+- Physical goods and spaces
+- Ecological assets
+- Reputation and trust
+
+### Events
+Things that happen to resources:
+- Creation, consumption, transformation
+- Transfer, commitment, sharing
+- Degradation, restoration
+
+### Agents
+Who or what participates:
+- Individuals, families, communities
+- Organizations, networks, ecosystems
+- AI systems (including Elohim)
+
+## How It Works
+
+### Traditional Accounting
+```
+Transaction: Alice pays Bob $50 for babysitting
+Record: 
+  - Alice: -$50 cash
+  - Bob: +$50 cash
+```
+This misses: the care provided, the trust built, the child's development, the relationship strengthened.
+
+### REA Accounting
+```
+Event: Bob provides 4 hours of childcare to Alice's family
+Records:
+  - Bob: -4 hours attention/care (resource flow)
+  - Alice's family: +4 hours childcare received
+  - Alice's child: developmental benefit (resource increment)
+  - Bob-Alice relationship: trust increment
+  - Bob: +$50 (if paid) OR +recognition (if unpaid)
+  - Community: +social capital (spillover)
+```
+
+## Why This Matters
+
+### For Policy Makers
+REA makes the care economy visible to policy analysis:
+- What would happen if we invested in childcare infrastructure?
+- How do caregiver support programs affect health outcomes?
+- Where are the gaps in community resilience?
+
+### For Developers
+REA provides a data model for care-aware platforms:
+- Recognition systems that track non-monetary contribution
+- Reciprocity networks that enable mutual aid
+- Analytics that measure wellbeing, not just engagement
+
+### For Everyone
+REA helps you see your own invisible contributions:
+- That mentoring you do? It has value.
+- The community you build? It's real economic activity.
+- The care you provide? It deserves recognition.
+
+## The ValueFlows Vocabulary
+
+The Elohim Protocol uses [ValueFlows](https://valueflo.ws/), an open vocabulary for economic networks based on REA:
+
+### Core Concepts
+- **EconomicResource**: Anything of value (skills, goods, care, attention)
+- **EconomicEvent**: Something that happened (transfer, use, production)
+- **Process**: A transformation (teaching session, caregiving episode)
+- **Agent**: A participant (person, organization, AI)
+- **Intent**: A planned action (offer, request, commitment)
+
+### Why Open Standards Matter
+- **Interoperability**: Different systems can share value data
+- **Portability**: Your contribution history travels with you
+- **Transparency**: No proprietary black boxes
+- **Collaboration**: Community-developed, not corporate-controlled
+
+## Practical Applications
+
+### Mutual Aid Networks
+Track who helped whom, enable reciprocity without money:
+- Time banking that works across communities
+- Skill sharing with visible contribution histories
+- Care coordination that respects relationship
+
+### Community Currencies
+REA-based tokens that represent real value:
+- Local currencies backed by community capacity
+- Care credits that recognize invisible work
+- Reputation systems with verifiable history
+
+### Impact Measurement
+Move beyond vanity metrics:
+- Track wellbeing outcomes, not just activities
+- Measure relationship quality, not just engagement
+- Value ecological regeneration, not just extraction
+
+## The Connection to Holochain
+
+The Elohim Protocol implements REA accounting on Holochain—a distributed system where:
+- Each community controls its own value data
+- No central authority defines what counts
+- Privacy and transparency are balanced by design
+
+The next unit explores how value recognition works in practice.

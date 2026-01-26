@@ -1,0 +1,11 @@
+Scenario: Resisting corporate lobbying for regulatory capture
+    Given tech companies lobby for regulations favoring incumbents
+    And they push: backdoor mandates, centralization requirements, licensing barriers
+    When I defend protocol sovereignty against capture
+    Then I use: cryptographic impossibility arguments (backdoors break verification)
+    And I present: evidence that regulation would harm innovation
+    And I coalition: with community leaders showing grassroots opposition
+    And I reference: international examples of protocol sovereignty working
+    And I require: transparency about lobbying and funding
+    And I resist: well-funded pressure through political courage
+    And I protect: democratic governance from corporate control

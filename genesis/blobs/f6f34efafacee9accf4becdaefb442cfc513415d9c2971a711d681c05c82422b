@@ -1,0 +1,12 @@
+Scenario: Participating in neighborhood decision-making and collective action
+    Given my neighborhood faces issues that affect residents
+    And I have stake in neighborhood decisions despite housing temporariness
+    When neighborhood collective action or decision-making occurs
+    Then the Value Scanner connects me to neighborhood organizing
+    And validates my right to participate in neighborhood governance
+    And helps me contribute despite time and energy constraints
+    And facilitates my voice in decisions affecting my household
+    And tracks neighborhood issues and actions
+    And my personal_agent surfaces opportunities matching my capacity
+    And recognizes community organizing as valuable civic labor
+    And supports my participation as full neighborhood member

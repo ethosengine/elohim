@@ -1,0 +1,9 @@
+Scenario: Developer coordinates multi-jurisdictional project transparently
+    Given a developer is planning development spanning three municipalities
+    And wants to navigate regional coordination requirements
+    When the Observer provides regional process navigation
+    Then the developer sees: county planning requirements affect all three jurisdictions
+    And identifies regional coordination bodies and approval pathways
+    And understands environmental review at regional scale
+    And accesses precedents for similar multi-jurisdictional projects
+    And navigates complexity transparently not through manipulation

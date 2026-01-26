@@ -1,0 +1,10 @@
+Scenario: Journalist exposes developer's regional exploitation pattern
+    Given a development firm proposes controversial project locally
+    And uses familiar tactics the journalist suspects are standardized
+    When the Observer tracks developer across regional jurisdictions
+    Then the journalist sees same firm operating in 8 municipalities
+    And documents pattern of community promises never fulfilled
+    And identifies political contributions across region
+    And finds environmental violations in 3 other states
+    And publishes investigation warning other communities
+    And regional surveillance exposes systematic bad actor

@@ -1,0 +1,9 @@
+Scenario: Workers participate in neighborhood economic development planning
+    Given municipality is developing economic revitalization plan
+    And workers represent community institution through democratic ownership
+    When neighborhood planning meetings occur
+    Then Maria attends as ChickenMax worker-owner representative
+    And Maria shares experience of democratic business model
+    And Maria advocates for policies supporting worker ownership
+    And community recognizes workers as stakeholders, not just employees
+    And worker voice shapes community economic development

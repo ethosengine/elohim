@@ -1,5 +1,13 @@
 import { Injectable } from '@angular/core';
+
 import { BehaviorSubject, Observable } from 'rxjs';
+
+import {
+  ContentAccessMetadata,
+  AccessCheckResult,
+  AccessLevel,
+  AccessAction,
+} from '../../lamad/models/content-access.model';
 import {
   SessionHuman,
   SessionStats,
@@ -8,14 +16,12 @@ import {
   SessionMigration,
   HolochainUpgradePrompt,
   UpgradeTrigger,
+  SessionState,
+  SessionAccessLevel,
+  UpgradeIntent,
+  HostingCostStatus,
 } from '../models/session-human.model';
 // Content access models from lamad pillar
-import {
-  ContentAccessMetadata,
-  AccessCheckResult,
-  AccessLevel,
-  AccessAction,
-} from '../../lamad/models/content-access.model';
 
 /**
  * SessionHumanService - Manages temporary session identity for MVP.
@@ -40,13 +46,14 @@ import {
 @Injectable({ providedIn: 'root' })
 export class SessionHumanService {
   private readonly STORAGE_KEY = 'lamad-session';
-  private readonly ACTIVITY_LIMIT = 1000;  // Max activities to store
+  private readonly ACTIVITY_LIMIT = 1000; // Max activities to store
 
   private readonly sessionSubject = new BehaviorSubject<SessionHuman | null>(null);
   private readonly upgradePromptsSubject = new BehaviorSubject<HolochainUpgradePrompt[]>([]);
 
   public readonly session$: Observable<SessionHuman | null> = this.sessionSubject.asObservable();
-  public readonly upgradePrompts$: Observable<HolochainUpgradePrompt[]> = this.upgradePromptsSubject.asObservable();
+  public readonly upgradePrompts$: Observable<HolochainUpgradePrompt[]> =
+    this.upgradePromptsSubject.asObservable();
 
   constructor() {
     this.initializeSession();
@@ -97,8 +104,6 @@ export class SessionHumanService {
     return {
       sessionId,
       displayName: 'Traveler',
-      isAnonymous: true,
-      accessLevel: 'visitor',
       createdAt: now,
       lastActiveAt: now,
       stats: {
@@ -111,6 +116,19 @@ export class SessionHumanService {
         averageSessionLength: 0,
         sessionCount: 1,
       },
+
+      // Session state - active visitor by default
+      isAnonymous: true,
+      accessLevel: 'visitor',
+      sessionState: 'active',
+
+      // No Holochain link initially
+      linkedAgentPubKey: undefined,
+      linkedHumanId: undefined,
+      linkedAt: undefined,
+
+      // No upgrade in progress
+      upgradeIntent: undefined,
     };
   }
 
@@ -204,9 +222,7 @@ export class SessionHumanService {
     const session = this.sessionSubject.value;
     if (session) {
       // Filter empty strings and trim each interest
-      session.interests = interests
-        .map(i => i.trim())
-        .filter(i => i.length > 0);
+      session.interests = interests.map(i => i.trim()).filter(i => i.length > 0);
 
       if (session.interests.length === 0) {
         session.interests = undefined;
@@ -224,9 +240,7 @@ export class SessionHumanService {
    */
   getStorageKeyPrefix(): string {
     const session = this.sessionSubject.value;
-    return session
-      ? `lamad-session-${session.sessionId}`
-      : 'lamad-session-anonymous';
+    return session ? `lamad-session-${session.sessionId}` : 'lamad-session-anonymous';
   }
 
   /**
@@ -553,7 +567,8 @@ export class SessionHumanService {
           id,
           trigger,
           title: 'Save Your Progress',
-          message: 'You\'re building a personal knowledge map! Install the Elohim app to save it permanently.',
+          message:
+            "You're building a personal knowledge map! Install the Elohim app to save it permanently.",
           benefits: [
             'Your progress syncs across devices',
             'Join a network of learners',
@@ -566,8 +581,9 @@ export class SessionHumanService {
         return {
           id,
           trigger,
-          title: 'You\'ve Started a Journey',
-          message: 'Your learning path is stored in your browser. Install Elohim to make it permanent.',
+          title: "You've Started a Journey",
+          message:
+            'Your learning path is stored in your browser. Install Elohim to make it permanent.',
           benefits: [
             'Resume from any device',
             'Get updates to your paths',
@@ -596,11 +612,7 @@ export class SessionHumanService {
           trigger,
           title: 'Your Notes Are Valuable',
           message: 'Personal notes enrich your learning. Install Elohim to keep them safe.',
-          benefits: [
-            'Notes stored securely',
-            'Searchable across all content',
-            'Export anytime',
-          ],
+          benefits: ['Notes stored securely', 'Searchable across all content', 'Export anytime'],
           dismissed: false,
         };
 
@@ -610,11 +622,7 @@ export class SessionHumanService {
           trigger,
           title: 'Welcome Back!',
           message: 'Good to see you again. Install Elohim to never worry about losing progress.',
-          benefits: [
-            'Automatic progress backup',
-            'Sync between devices',
-            'Join the community',
-          ],
+          benefits: ['Automatic progress backup', 'Sync between devices', 'Join the community'],
           dismissed: false,
         };
 
@@ -623,12 +631,9 @@ export class SessionHumanService {
           id,
           trigger,
           title: 'Storage Running Low',
-          message: 'Your browser storage is filling up. Install Elohim to safely store your progress.',
-          benefits: [
-            'Unlimited progress storage',
-            'Automatic backups',
-            'Secure and private',
-          ],
+          message:
+            'Your browser storage is filling up. Install Elohim to safely store your progress.',
+          benefits: ['Unlimited progress storage', 'Automatic backups', 'Secure and private'],
           dismissed: false,
         };
 
@@ -649,6 +654,154 @@ export class SessionHumanService {
       default:
         return null;
     }
+  }
+
+  // =========================================================================
+  // Hybrid State Management (Session + Holochain)
+  // =========================================================================
+
+  /**
+   * Link this session to a Holochain identity.
+   * Used when user creates Holochain identity but wants to keep session for offline use.
+   */
+  linkToHolochainIdentity(agentPubKey: string, humanId: string): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.linkedAgentPubKey = agentPubKey;
+    session.linkedHumanId = humanId;
+    session.linkedAt = new Date().toISOString();
+    session.sessionState = 'linked';
+    session.isAnonymous = false;
+    session.accessLevel = 'linked';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Check if session is linked to a Holochain identity.
+   */
+  isLinkedToHolochain(): boolean {
+    const session = this.sessionSubject.value;
+    return session?.sessionState === 'linked' && !!session.linkedAgentPubKey;
+  }
+
+  /**
+   * Get linked Holochain agent pubkey.
+   */
+  getLinkedAgentPubKey(): string | null {
+    return this.sessionSubject.value?.linkedAgentPubKey ?? null;
+  }
+
+  /**
+   * Get linked Human ID.
+   */
+  getLinkedHumanId(): string | null {
+    return this.sessionSubject.value?.linkedHumanId ?? null;
+  }
+
+  // =========================================================================
+  // Upgrade Intent Tracking
+  // =========================================================================
+
+  /**
+   * Start an upgrade intent (user begins but hasn't completed upgrade).
+   */
+  startUpgradeIntent(targetStage: 'hosted' | 'app-user' | 'node-operator'): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.upgradeIntent = {
+      targetStage,
+      startedAt: new Date().toISOString(),
+      currentStep: 'initiated',
+      completedSteps: [],
+      paused: false,
+    };
+    session.sessionState = 'upgrading';
+    session.accessLevel = 'pending';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Update upgrade progress.
+   */
+  updateUpgradeProgress(currentStep: string, completedStep?: string): void {
+    const session = this.sessionSubject.value;
+    if (!session?.upgradeIntent) return;
+
+    session.upgradeIntent.currentStep = currentStep;
+    if (completedStep) {
+      session.upgradeIntent.completedSteps.push(completedStep);
+    }
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Pause upgrade (user abandons temporarily).
+   */
+  pauseUpgrade(reason?: string): void {
+    const session = this.sessionSubject.value;
+    if (!session?.upgradeIntent) return;
+
+    session.upgradeIntent.paused = true;
+    session.upgradeIntent.pauseReason = reason;
+    session.sessionState = 'active';
+    session.accessLevel = 'visitor';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Resume a paused upgrade.
+   */
+  resumeUpgrade(): void {
+    const session = this.sessionSubject.value;
+    if (!session?.upgradeIntent) return;
+
+    session.upgradeIntent.paused = false;
+    session.upgradeIntent.pauseReason = undefined;
+    session.sessionState = 'upgrading';
+    session.accessLevel = 'pending';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Cancel upgrade intent entirely.
+   */
+  cancelUpgrade(): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.upgradeIntent = undefined;
+    session.sessionState = 'active';
+    session.accessLevel = 'visitor';
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Get current upgrade intent.
+   */
+  getUpgradeIntent(): UpgradeIntent | null {
+    return this.sessionSubject.value?.upgradeIntent ?? null;
+  }
+
+  /**
+   * Check if upgrade is in progress.
+   */
+  isUpgrading(): boolean {
+    const session = this.sessionSubject.value;
+    return session?.sessionState === 'upgrading' && !session.upgradeIntent?.paused;
   }
 
   // =========================================================================
@@ -687,7 +840,28 @@ export class SessionHumanService {
   }
 
   /**
-   * Clear session after successful migration.
+   * Mark session as migrated (keeps reference but data moves to Holochain).
+   * Use this when you want to preserve the session for fallback/offline.
+   */
+  markAsMigrated(agentPubKey: string, humanId: string): void {
+    const session = this.sessionSubject.value;
+    if (!session) return;
+
+    session.sessionState = 'migrated';
+    session.linkedAgentPubKey = agentPubKey;
+    session.linkedHumanId = humanId;
+    session.linkedAt = new Date().toISOString();
+    session.isAnonymous = false;
+    session.accessLevel = 'linked';
+    session.upgradeIntent = undefined;
+
+    this.saveSession(session);
+    this.sessionSubject.next({ ...session });
+  }
+
+  /**
+   * Clear session completely after migration.
+   * Use this when user wants to fully delete session data.
    */
   clearAfterMigration(): void {
     const session = this.sessionSubject.value;
@@ -707,6 +881,13 @@ export class SessionHumanService {
     keysToRemove.forEach(key => localStorage.removeItem(key));
 
     this.sessionSubject.next(null);
+  }
+
+  /**
+   * Get session state.
+   */
+  getSessionState(): SessionState | null {
+    return this.sessionSubject.value?.sessionState ?? null;
   }
 
   // =========================================================================
@@ -867,7 +1048,7 @@ export class SessionHumanService {
       type: 'install-holochain',
       label: 'Join Network',
       description,
-      installUrl: '/install',  // Future: actual Holochain install page
+      installUrl: '/install', // Future: actual Holochain install page
     };
   }
 

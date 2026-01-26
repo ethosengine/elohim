@@ -1,0 +1,11 @@
+Scenario: Participating in personal health decisions
+    Given Jordan has a doctor's appointment coming up
+    And the doctor wants to discuss treatment options
+    When Jordan's support worker helps prepare for the appointment
+    Then the personal_agent provides simple health information with pictures
+    And Jordan learns about their options in accessible language
+    And Jordan can express preferences and concerns
+    And the doctor speaks directly to Jordan, not just support worker
+    And Jordan participates in health decisions at their capability level
+    And supported decision-making principles guide the process
+    And Jordan's personhood is fully respected

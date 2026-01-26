@@ -1,0 +1,9 @@
+Scenario: Making personal choices with accessible interface
+    Given Jordan wants to choose their outfit for a community event
+    When Jordan opens the Value Scanner wardrobe feature
+    Then the interface displays clothing options with large pictures
+    And each option uses simple labels ("Blue shirt", "Red sweater")
+    And the interface uses step-by-step guidance ("First pick a shirt")
+    And Jordan can make their own choice without support worker intervention
+    And the system celebrates Jordan's choice with positive feedback
+    And Jordan's preference is recorded for future suggestions

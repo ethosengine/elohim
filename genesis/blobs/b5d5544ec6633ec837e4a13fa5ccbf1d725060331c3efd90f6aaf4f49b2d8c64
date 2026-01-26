@@ -1,0 +1,10 @@
+Scenario: Teen's work schedule coordinated with other life contexts
+    Given Jasmine balances work, school, family responsibilities, and social life
+    And her work schedule changes weekly
+    When workplace_elohim communicates her schedule
+    Then it should coordinate with her personal_agent
+    And flag conflicts with school, family needs, or personal commitments
+    And help her negotiate schedule that allows balanced life
+    And prevent work from overwhelming other essential contexts
+    And support her learning to set healthy work boundaries
+    And demonstrate that work is one part of life, not life itself

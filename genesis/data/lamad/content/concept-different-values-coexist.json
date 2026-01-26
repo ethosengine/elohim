@@ -1,0 +1,29 @@
+{
+  "id": "concept-different-values-coexist",
+  "contentType": "concept",
+  "title": "Different values coexist",
+  "description": "without forcing conformity through graduated intimacy and consent boundaries",
+  "content": "without forcing conformity through graduated intimacy and consent boundaries",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/vision/concept-different-values-coexist.json",
+  "tags": [
+    "vision",
+    "diversity",
+    "coexistence",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "social-medium-epic",
+    "concept-graduated-intimacy"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "vision",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001546",
+  "updatedAt": "2025-12-24T03:05:25.851Z"
+}

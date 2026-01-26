@@ -1,0 +1,9 @@
+Scenario: Farm financial transparency builds trust and informed decision-making
+    Given farmworkers previously had no visibility into farm finances
+    And lack of transparency created distrust and uninformed compensation discussions
+    When democratic governance requires financial transparency
+    Then farmworkers see complete financial picture: revenue, costs, margins, investments
+    And compensation decisions are informed by transparent profit distribution
+    And financial education is provided helping workers understand farm economics
+    And trust builds through transparency replacing suspicion from opacity
+    And workplace_elohim provides financial transparency dashboards for democratic governance

@@ -1,0 +1,10 @@
+Scenario: Food waste reduction as ecological care work
+    Given Kenji cannot afford to waste food
+    And food waste has significant ecological cost
+    When the bioregional_elohim tracks food waste reduction
+    Then it should recognize Kenji's waste prevention as ecological care
+    And it should accumulate care tokens for using all ingredients
+    And it should value creative cooking with leftovers
+    And it should show "Zero food waste this week = ecological contribution"
+    And waste reduction should be recognized as care economy work
+    And Kenji's efficient resource use should be valued ecologically

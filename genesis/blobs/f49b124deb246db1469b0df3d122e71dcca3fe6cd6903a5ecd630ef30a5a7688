@@ -1,0 +1,9 @@
+Scenario: Organizer builds cross-school parent coalition for equity
+    Given parents at five underfunded schools face similar challenges
+    And most parents don't know the pattern is district-wide
+    When the organizer uses Observer to document resource inequities
+    Then they show per-pupil spending gaps across schools
+    And map distribution of enrichment programs and experienced teachers
+    And connect parents from different schools around shared interests
+    And facilitate coalition demanding equitable resource formula
+    And individual school struggles become district equity campaign

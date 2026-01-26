@@ -1,0 +1,24 @@
+{
+  "id": "community-rideshare-drivers",
+  "did": "did:web:elohim.host:community:rideshare-drivers",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Rideshare Drivers",
+  "description": "Community with 1 members",
+  "content": "# Rideshare Drivers\n\n**Members:** 1\n\n## Member List\n\n- human-ginny-gigworker",
+  "contentFormat": "markdown",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-ginny-gigworker"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-26T21:04:01.764Z"
+}

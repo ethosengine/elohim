@@ -1,0 +1,10 @@
+Scenario: Receiving fair compensation for real work
+    Given Jordan works 15 hours per week at the library
+    And Jordan's work contributes genuine value to library operations
+    When Jordan receives their paycheck
+    Then Jordan is paid at least minimum wage for all hours worked
+    And the Value Scanner shows Jordan's earnings and care token accumulation
+    And Jordan's work is compensated fairly, not exploited as "therapy"
+    And Jordan experiences being a valued worker earning real wages
+    And Jordan's economic contribution is recognized through fair pay
+    And Jordan's worker status is authentic, not symbolic

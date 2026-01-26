@@ -1,0 +1,10 @@
+Scenario: Local material sourcing reduces transportation impact
+    Given Frank's construction work requires materials
+    And material transportation has significant carbon footprint
+    When the bioregional_elohim coordinates material sourcing
+    Then it should facilitate use of locally-sourced materials
+    And connect Frank to local salvage and reclaimed material sources
+    And reduce transportation impact through bioregional supply chains
+    And recognize local sourcing as ecological care contribution
+    And strengthen bioregional material economies
+    And Frank's work should demonstrate local material viability

@@ -1,0 +1,8 @@
+Scenario: Connecting with local food producers and farmers
+    Given local farmers are doing care work to grow food
+    And I am doing care work to prepare food
+    When I want to connect with bioregional food producers
+    Then the protocol should facilitate connections between workers and farmers
+    And support relationships that strengthen local food systems
+    And help me understand farming as care labor deserving dignity and fair compensation
+    And build solidarity between farm workers and food service workers

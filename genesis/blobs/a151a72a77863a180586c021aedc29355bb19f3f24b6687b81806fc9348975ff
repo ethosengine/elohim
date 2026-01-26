@@ -1,0 +1,9 @@
+Scenario: Food service workers across sector gain conversion knowledge and power
+    Given workers at non-converted franchises observe democratic locations thriving
+    And word spreads about $18/hour wages, ownership, and democratic voice
+    When worker organizing across food service sector references democratic conversions
+    Then workers demand democratic conversion or equivalent improvements at their locations
+    And franchise operators face worker pressure to convert or match democratic conditions
+    And worker power increases sector-wide through demonstration effect
+    And sector-wide organizing becomes possible through democratic model inspiration
+    And industry_sector_elohim supports cross-location worker organizing and education

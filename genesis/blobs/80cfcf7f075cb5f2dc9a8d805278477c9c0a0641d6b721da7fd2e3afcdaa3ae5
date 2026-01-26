@@ -1,0 +1,9 @@
+Scenario: Manager ensures operational transparency builds community trust
+    Given community wants to understand how democratic business actually functions
+    And operational transparency is key to community confidence
+    When Marcus prepares quarterly community report
+    Then Marcus provides honest data on operations, challenges, and successes
+    And Marcus doesn't hide operational difficulties or failures
+    And Marcus celebrates worker governance achievements transparently
+    And Marcus's operational honesty builds community trust in democratic model
+    And community_elohim ensures reporting is accurate and accessible

@@ -1,0 +1,10 @@
+Scenario: Care contributions during family visits
+    Given Aisha visits her family home periodically
+    And she provides substantial care labor during visits
+    When Aisha cooks, shops, and helps with household tasks
+    Then the family_elohim should track her visit contributions
+    And cooking, shopping, and household help should all be valued
+    And her care work should be visible to the family
+    And recognition should validate her adult contributions
+    And family visits should be understood as care labor, not just leisure
+    And care tokens should reflect the value she provides

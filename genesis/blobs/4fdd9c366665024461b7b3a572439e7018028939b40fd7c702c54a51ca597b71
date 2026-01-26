@@ -1,0 +1,10 @@
+Scenario: Temporary community building as lifelong skill
+    Given Kenji's college community is temporary
+    And he will leave after graduation
+    When the personal_agent reflects on community participation
+    Then it should help Kenji see community building as transferable skill
+    And it should validate that temporary communities are still real
+    And it should teach him that community is built through care relationships
+    And the agent should help him understand he'll build community wherever he goes
+    And the system should frame student community as practice for lifelong participation
+    And Kenji should learn that community is created, not just inherited

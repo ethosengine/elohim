@@ -1,0 +1,9 @@
+Scenario: Elder protected from health fraud in wellness network
+    Given Rose participates in a seniors wellness affinity network
+    When a scammer tries to promote miracle cure products
+    And they attempt to contact network members with fraudulent claims
+    Then the guardian agent detects the scam pattern
+    And the fraudulent messages are blocked before reaching Rose
+    And legitimate health information continues to flow
+    And wellness discussions remain safe and evidence-based
+    And Rose and peers are protected while maintaining autonomy

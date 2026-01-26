@@ -1,0 +1,10 @@
+Scenario: Career planning integrated with care economy principles
+    Given Jasmine is exploring career pathways
+    And her personal_agent serves as career counselor
+    When she researches potential careers
+    Then the agent should help her analyze careers through care economy lens
+    And surface how different careers contribute to collective flourishing
+    And explore: "How does this work serve others? What care does it provide?"
+    And connect her care economy values to career choices
+    And help her identify careers aligned with her demonstrated care patterns
+    And support her finding work that is meaningful, not just remunerative

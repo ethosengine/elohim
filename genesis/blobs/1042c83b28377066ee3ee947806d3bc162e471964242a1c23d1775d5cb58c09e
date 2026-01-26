@@ -1,0 +1,9 @@
+Scenario: Council member understands constituent priorities across diverse neighborhoods
+    Given the politician represents economically and ethnically diverse district
+    And different communities have different needs
+    When the Observer aggregates constituent sentiment
+    Then they see working parents prioritize after-school programs
+    And learn seniors need meal delivery and transit access
+    And understand immigrant communities face language barriers in services
+    And identify disabled residents struggle with accessibility
+    And balance diverse constituent needs in policy positions

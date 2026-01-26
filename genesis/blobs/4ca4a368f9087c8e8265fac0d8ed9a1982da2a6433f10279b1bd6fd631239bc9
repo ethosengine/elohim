@@ -1,0 +1,9 @@
+Scenario: Neighborhood childcare coordination supports working parents
+    Given Sarah works full-time as a teacher
+    And childcare is expensive and inflexible
+    When neighborhood coordinates childcare sharing
+    Then the neighborhood_elohim should match schedules and needs
+    And it should track reciprocal childcare exchanges
+    And it should help parents like Sarah support each other
+    And childcare costs should be reduced through cooperation
+    And quality care should be accessible to working families

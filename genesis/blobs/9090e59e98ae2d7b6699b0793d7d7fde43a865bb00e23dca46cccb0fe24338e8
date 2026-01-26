@@ -1,0 +1,11 @@
+Scenario: Household care economy visible to counter narrative of burden
+    Given society often frames disabled people as burdens on households
+    And Alex contributes substantial household labor
+    When household care contributions are displayed
+    Then Alex's management, coordination, and decision-making should be visible
+    And the household_elohim should quantify Alex's cognitive and emotional labor
+    And data should counter the narrative that Alex is dependent burden
+    And Alex should see themselves as household contributor
+    And visibility should shift cultural understanding of disability and contribution
+    And the protocol should make Alex's care work undeniable
+    And Alex should experience affirmation of their household value

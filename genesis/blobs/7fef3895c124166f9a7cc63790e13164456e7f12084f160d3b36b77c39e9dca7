@@ -1,0 +1,10 @@
+Scenario: Teaching that care work is valuable begins at age 5
+    Given traditional economics makes care work invisible
+    And Tommy is forming foundational understanding of value
+    When Tommy performs care labor in the scanner
+    Then the system should explicitly teach that care creates value
+    And Tommy should learn "You helped. Your care matters."
+    And his care contributions should be recognized immediately
+    And he should understand that caring for others is valuable work
+    And foundational belief that care has worth should be established
+    And this teaching should precede any exposure to market economics

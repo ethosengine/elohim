@@ -1,0 +1,9 @@
+Scenario: Parent coordinates opposition to program cuts
+    Given the board proposes eliminating elementary music programs
+    And the parent's child participates in school band
+    When the Observer connects parents across district whose children affected
+    Then 230 families from 8 schools form coordinated coalition
+    And present unified testimony on music education benefits
+    And propose alternative budget cuts that preserve student programs
+    And district-wide parent power prevents program elimination
+    And children's enrichment programs are preserved

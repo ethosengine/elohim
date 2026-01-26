@@ -1,0 +1,9 @@
+Scenario: Parent tracks board accountability for promises
+    Given the school board promised to address transportation by Q2
+    And the parent's child still has unreliable dangerous bus service
+    When three months pass without action on the commitment
+    Then the Observer alerts parent about broken promise
+    And provides exact quote from February board meeting
+    And shows which board members made the commitment
+    And parent raises specific accountability question publicly
+    And board commitments to families persist despite turnover

@@ -1,0 +1,9 @@
+Scenario: Developer faces accountability for environmental justice impacts
+    Given a developer's projects concentrate in communities of color
+    And environmental impacts burden already over-polluted neighborhoods
+    When the Observer analyzes environmental justice patterns
+    Then analysis shows: development increases pollution in Black neighborhoods
+    And environmental benefits (parks, trees) go to white affluent areas
+    And cumulative environmental burden violates environmental justice principles
+    And pattern reveals extraction from vulnerable communities
+    And environmental justice analysis demands equitable development

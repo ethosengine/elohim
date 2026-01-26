@@ -1,0 +1,8 @@
+Scenario: Politician exposes education funding inequities across schools
+    Given the politician suspects resource distribution creates outcome gaps
+    When the Observer analyzes education funding patterns
+    Then they see experienced teachers concentrated in affluent schools
+    And identify per-student spending disparities within districts
+    And understand how funding formulas create systematic inequities
+    And calculate impact of equitable funding on underserved schools
+    And champion funding reforms with evidence of current harms

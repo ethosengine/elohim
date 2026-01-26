@@ -1,0 +1,10 @@
+Scenario: Planning commissioner prepares for climate adaptation zoning update
+    Given commission must update zoning to address climate risks like flooding and heat
+    And staff proposes complex amendments addressing sea level rise and extreme weather
+    And commissioner wants to make informed decisions on technical requirements
+    When the commissioner uses Observer decision support
+    Then they receive executive summary of climate risks and proposed zoning responses
+    And see examples of climate adaptation zoning from vulnerable communities
+    And access analysis of which properties and populations most affected by requirements
+    And get questions to ask staff about implementation feasibility and equity
+    And accessible expertise enables informed judgment on climate adaptation policy

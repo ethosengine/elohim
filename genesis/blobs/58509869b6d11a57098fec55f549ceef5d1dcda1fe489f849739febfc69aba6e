@@ -1,0 +1,11 @@
+Scenario: Multigenerational household coordination when elderly live with family
+    Given some families have Helen living with adult children
+    And multigenerational households have complex dynamics
+    When household governance includes elderly family member
+    Then the family_elohim should mediate competing needs
+    And Helen's needs should be balanced with other household members
+    And her voice should be heard in household decisions
+    And privacy should be maintained for all generations
+    And care should be coordinated without overwhelming household
+    And the protocol should support healthy multigenerational living
+    And all family members' flourishing should be considered

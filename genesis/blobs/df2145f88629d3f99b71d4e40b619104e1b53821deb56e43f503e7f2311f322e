@@ -1,0 +1,11 @@
+Scenario: Resolving conflict between neighborhood protocol calibrations
+    Given different Riverside neighborhoods calibrated privacy differently
+    And this creates friction when residents move between areas
+    When I facilitate resolution of calibration conflicts
+    Then we convene: representatives from affected neighborhoods
+    And we deliberate: on whether harmonization is needed
+    And we consider: if diversity should be preserved or reduced
+    And we respect: neighborhood sovereignty within city context
+    And we find: pragmatic accommodation of differences
+    And we demonstrate: subsidiarity working across scales
+    And democratic negotiation: resolves conflicts algorithm cannot

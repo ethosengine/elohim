@@ -1,0 +1,11 @@
+Scenario: Term limits protect me from capture while preserving learning
+    Given I have served my 3-month community council term
+    And I have developed constitutional literacy and deliberation skills
+    When my term ends and I return to nursing work
+    Then I cannot: serve consecutive terms or be reappointed
+    And I cannot: build career in council governance
+    And I am protected: from lobbying, corruption, or capture
+    And I carry forward: constitutional understanding into community life
+    And I remain: engaged citizen with enhanced democratic capacity
+    And my institutional knowledge: is preserved through documentation
+    And fresh perspectives: replace mine to prevent ossification

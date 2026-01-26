@@ -1,0 +1,11 @@
+Scenario: Appealing community conflict mediation outcome
+    Given Community Elohim mediated a conflict between me and neighbors
+    And I believe the proposed resolution is unjust
+    When I appeal the mediation outcome
+    Then Constitutional Council reviews if mediation process was fair
+    And They evaluate if all parties had meaningful voice
+    And They examine if constitutional principles guided the resolution
+    And They consider if community harmony was balanced with individual justice
+    And They assess if cultural conflict resolution norms were respected
+    And The appeal can modify the resolution or offer alternative mediation
+    And Community learns how to balance harmony with individual rights

@@ -1,0 +1,12 @@
+Scenario: Household labor distribution made visible and equitable
+    Given Robert and Jennifer both work full-time
+    And they share household management, parent care, and child support
+    And household labor distribution can become inequitable invisibly
+    When household_elohim tracks care contributions
+    Then it should make all household labor visible
+    And surface patterns: "Jennifer has managed 78% of parent care coordination this month"
+    And prompt discussion when distribution becomes unbalanced
+    And help them negotiate equitable distribution
+    And recognize that both partners carry substantial care burden
+    And support them in maintaining partnership equity
+    And prevent resentment from invisible labor imbalances

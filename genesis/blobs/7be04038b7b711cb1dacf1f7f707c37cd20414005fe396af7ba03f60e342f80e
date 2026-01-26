@@ -1,0 +1,9 @@
+Scenario: Community care economy demonstrates alternative to extraction economics
+    Given Sarah's community has adopted care economy practices
+    And mainstream economics devalue care work
+    When community care economy becomes visible
+    Then it should demonstrate that alternatives to capitalism are viable
+    And it should show care work creates real value
+    And it should inspire other communities to adopt similar practices
+    And Sarah's community should serve as model
+    And care economy transformation should spread through demonstrated success

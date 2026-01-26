@@ -1,0 +1,9 @@
+Scenario: Teacher exposes gap between policy rhetoric and classroom reality
+    Given administrators promote new "personalized learning" initiative
+    And claim technology will revolutionize teaching
+    When teachers document actual implementation through Observer
+    Then teachers show "personalized learning" means students on computers alone
+    And reduced human interaction and teacher-student relationships
+    And technology substitutes for reduced staffing
+    And student engagement declining not improving
+    And teacher evidence reveals policy rhetoric vs learning reality

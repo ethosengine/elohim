@@ -1,0 +1,10 @@
+Scenario: Family financial support coordinated through care economy
+    Given Aisha's family sometimes needs financial help
+    And Aisha wants to contribute within her means
+    When Aisha provides financial support to family
+    Then the contribution should be recognized as care work
+    And it should be coordinated through family_elohim
+    And the system should help her determine sustainable amounts
+    And family financial support should be visible care contribution
+    And her limited resources should be acknowledged
+    And financial care should strengthen rather than strain relationships

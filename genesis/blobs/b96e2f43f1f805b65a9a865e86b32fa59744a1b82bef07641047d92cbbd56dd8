@@ -1,0 +1,10 @@
+Scenario: Municipal emergency preparedness utilizes retired residents' availability
+    Given Frank has daytime availability and construction skills
+    And municipalities need emergency response capacity
+    When the municipal_elohim coordinates emergency preparedness
+    Then it should include retired residents in emergency planning
+    And utilize their skills and availability for emergency response
+    And coordinate community-level resilience with municipal systems
+    And recognize retired residents as municipal emergency resource
+    And Frank should contribute meaningfully to collective safety
+    And municipal preparedness should leverage care economy networks

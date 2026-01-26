@@ -1,0 +1,10 @@
+Scenario: Workplace emotional labor while managing parenting stress
+    Given Sarah performs emotional labor with students and colleagues
+    And she's also managing intense parenting emotional demands
+    When the workplace_elohim tracks total emotional labor
+    Then it should recognize dual emotional work burden
+    And it should flag when emotional demands are unsustainable
+    And it should recognize that parents carry compounded emotional labor
+    And the system should help Sarah manage total emotional load
+    And workplace should understand parents' emotional labor reality
+    And Sarah's complete emotional work should be visible and valued

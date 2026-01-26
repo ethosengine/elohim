@@ -1,0 +1,11 @@
+Scenario: Home health aide coordination respects household authority
+    Given Helen receives visits from home health aides
+    And multiple aides may rotate through her schedule
+    When aides enter Helen's household
+    Then Helen should remain the authority in her space
+    And her household_elohim should communicate her preferences to aides
+    And aides should be briefed on Helen's routines and wishes
+    And consistency should be maintained across different workers
+    And Helen should not have to repeatedly assert her preferences
+    And care should be provided on her terms in her space
+    And the protocol should establish Helen's household sovereignty

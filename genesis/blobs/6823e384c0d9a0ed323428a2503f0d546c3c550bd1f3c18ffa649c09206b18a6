@@ -1,0 +1,91 @@
+# Constitutional Councils: Multi-Stakeholder AI Oversight
+
+## The Core Idea
+
+What if AI systems had boards of directors—but for ethics, not profits?
+
+Constitutional Councils are multi-stakeholder bodies that provide ongoing oversight of AI systems. They don't replace technical teams; they complement them with perspectives those teams lack.
+
+## Why "Constitutional"?
+
+The term is deliberate. Like a constitution:
+- **Sets boundaries** on what the system can do
+- **Protects rights** of affected parties
+- **Evolves through process**, not unilateral decision
+- **Binds everyone**, including the creators
+
+Unlike corporate boards, Constitutional Councils aren't accountable to shareholders. They're accountable to stakeholders—everyone affected by the AI system's decisions.
+
+## Council Composition
+
+Effective oversight requires diverse perspectives:
+
+### Technical Representatives
+- Understand what the system can and cannot do
+- Can evaluate proposed constraints for feasibility
+- Translate between technical and policy language
+
+### Domain Experts
+- Deep knowledge of the field where AI is applied
+- Understand context that data can't capture
+- Identify edge cases and failure modes
+
+### Affected Community Members
+- Direct experience of AI decisions
+- Perspectives often invisible to designers
+- Legitimacy that expertise alone can't provide
+
+### Ethics and Rights Advocates
+- Focus on dignity and fairness
+- Long-term and systemic thinking
+- Protection of minority interests
+
+## How Councils Work
+
+### Ongoing Oversight, Not One-Time Approval
+- Regular review of system behavior
+- Access to performance data and incident reports
+- Authority to request changes
+
+### Clear Decision Authority
+- What requires council approval vs. notification
+- Escalation paths for disagreements
+- Emergency intervention powers
+
+### Transparent Deliberation
+- Public minutes (with appropriate confidentiality)
+- Stated reasoning for decisions
+- Accessible to affected parties
+
+## Different Scales, Different Councils
+
+Constitutional governance scales fractally:
+
+### Individual AI Assistants (Elohim)
+Each user's AI has constitutional constraints set by higher councils, but the user has customization rights within those bounds.
+
+### Community-Level Systems
+Local councils for systems serving specific communities (neighborhoods, workplaces, interest groups).
+
+### Domain-Level Systems
+Industry or sector councils for widely-deployed systems (healthcare AI, financial AI, educational AI).
+
+### Global Commons
+High-level councils for AI systems with planetary impact.
+
+## For Policy Makers: Implementation Considerations
+
+- **Legal status**: Councils can be statutory, contractual, or voluntary
+- **Liability**: Clear allocation of responsibility when things go wrong
+- **Resources**: Councils need staff, expertise, and independence
+- **Enforcement**: Meaningful consequences for violations
+
+## For Developers: What This Means for You
+
+Constitutional Councils aren't obstacles—they're collaborators:
+- Early feedback prevents costly redesigns
+- Stakeholder buy-in reduces deployment friction
+- Documented oversight protects against liability
+- Diversity of perspective improves system quality
+
+The next unit explains what happens when the system fails: the appeals process.

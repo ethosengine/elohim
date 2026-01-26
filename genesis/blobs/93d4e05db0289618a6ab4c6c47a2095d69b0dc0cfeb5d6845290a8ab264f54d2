@@ -1,0 +1,10 @@
+Scenario: Household schedule coordination across four people
+    Given Sarah coordinates schedules for herself, partner, Tommy, and Emma
+    And everyone has different needs, activities, and constraints
+    When Sarah manages the family calendar
+    Then the household_elohim should recognize this as complex coordination
+    And it should track the cognitive labor of schedule management
+    And it should value the dozens of micro-decisions required
+    And Sarah's coordination work should be made visible
+    And schedule management should accumulate significant care tokens
+    And this invisible orchestration should be recognized as skilled work

@@ -1,0 +1,10 @@
+Scenario: Senior knowledge of waste reduction valued as ecological wisdom
+    Given Margaret's generation learned to minimize waste
+    And reducing waste is both budget necessity and ecological imperative
+    When the bioregional_elohim tracks waste reduction practices
+    Then Margaret's waste minimization should be recognized
+    And her knowledge of using everything should be valued
+    And practices like saving containers, composting scraps should be tracked
+    And generational wisdom should inform community sustainability
+    And frugality should be reframed as ecological stewardship
+    And Margaret's practices should be teaching resource for younger generations

@@ -1,0 +1,10 @@
+Scenario: Learning neighborhood as governance unit
+    Given Kenji is learning how communities function
+    And neighborhood is often invisible as governance layer
+    When the personal_agent teaches Kenji about neighborhood governance
+    Then it should help him see neighborhood as care coordination unit
+    And it should show how neighborhoods make collective decisions
+    And it should teach him that geography creates shared stakes
+    And neighborhood should be understood as governance layer
+    And the system should build Kenji's civic literacy
+    And students should learn that neighborhoods govern local flourishing

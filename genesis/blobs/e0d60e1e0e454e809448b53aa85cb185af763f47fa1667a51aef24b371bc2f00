@@ -1,0 +1,9 @@
+Scenario: Creator covers local civic issue with evidence-based reporting
+    Given the city council is voting on a controversial development
+    When Sam creates content investigating the proposal's impacts
+    And includes verified facts, stakeholder interviews, and documentation
+    Then the verification agent validates factual claims
+    And the content reaches community members affected by the decision
+    And evidence-based reporting earns trust and wider reach
+    And community makes better-informed decision
+    And Sam builds reputation for quality local journalism

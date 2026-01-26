@@ -1,0 +1,10 @@
+Scenario: Appeal reveals need for community-specific calibration
+    Given I appeal a privacy threshold that feels too low for my community
+    And multiple community members have filed similar appeals
+    When Community Constitutional Council reviews the pattern
+    Then they recognize this as community-wide concern not individual complaint
+    And They recommend community-specific calibration of privacy thresholds
+    And Community leader facilitates deliberation on local preferences
+    And Community residents participate in calibrating the protocol
+    And My appeal contributes to community self-governance
+    And Local sovereignty is exercised within constitutional bounds

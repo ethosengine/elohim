@@ -1,0 +1,10 @@
+Scenario: Neighborhood resource sharing facilitated by retired residents' coordination
+    Given Frank has time to coordinate neighborhood resource sharing
+    And tool libraries, skill exchanges, and mutual aid require coordination
+    When the neighborhood_elohim supports resource sharing
+    Then it should enable Frank to help coordinate shared resources
+    And facilitate tool borrowing, skill trades, and favor exchanges
+    And recognize coordination labor as valuable care contribution
+    And reduce neighborhood consumption through effective sharing
+    And Frank's coordination work should build neighborhood resilience
+    And his time availability should serve collective resource efficiency

@@ -1,0 +1,10 @@
+Scenario: Participating in household emergency preparedness
+    Given the household practices emergency procedures
+    And everyone needs to know safety protocols
+    When the household conducts a fire drill
+    Then Jordan receives emergency instructions in accessible format
+    And the interface shows evacuation steps with pictures and arrows
+    And Jordan can practice the procedures with support
+    And Jordan's understanding is verified in accessible ways
+    And Jordan's safety capability is enhanced through practice
+    And Jordan experiences being an active participant in household safety

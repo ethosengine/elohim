@@ -1,0 +1,31 @@
+{
+  "id": "concept-value-generative-economics",
+  "contentType": "concept",
+  "title": "Value-Generative Economics",
+  "description": "Autonomously maintain economic systems that create wealth through circulation rather than extraction. Reward care work, stewardship, and community contribution while preventing wealth concentration that threatens coordination.",
+  "content": "Autonomously maintain economic systems that create wealth through circulation rather than extraction. Reward care work, stewardship, and community contribution while preventing wealth concentration that threatens coordination.",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/elohim-host/concept-value-generative-economics.json",
+  "tags": [
+    "economics",
+    "care-economy",
+    "wealth",
+    "elohim",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "economic-coordination-epic",
+    "value-scanner-epic",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "elohim-host",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001983",
+  "updatedAt": "2025-12-24T03:05:25.893Z"
+}

@@ -1,0 +1,10 @@
+Scenario: Elder's institutional memory aids community decision
+    Given the neighborhood is debating a proposed development
+    And there are questions about past flooding patterns
+    When Rose contributes her memory of the 1995 flood
+    And she describes how the proposed site was underwater
+    Then her historical knowledge is valued in the discussion
+    And her contribution earns reach based on relevance and credibility
+    And the community makes better-informed decisions
+    And Rose experiences being an essential community asset
+    And institutional memory is preserved and utilized

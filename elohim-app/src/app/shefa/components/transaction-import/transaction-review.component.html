@@ -1,0 +1,325 @@
+<!-- Transaction Review Component Template -->
+
+<div class="transaction-review-container">
+  <!-- Header -->
+  <div class="review-header">
+    <h2>Review & Approve Transactions</h2>
+    <div class="batch-info" *ngIf="batch">
+      <span class="batch-number">{{ batch.batchNumber }}</span>
+      <span class="institution">{{ batch.stewardId }}</span>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner">Loading transactions...</div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!isLoading && stagedTransactions.length === 0">
+    <p>No staged transactions to review</p>
+  </div>
+
+  <!-- Main Review Area -->
+  <div class="review-content" *ngIf="!isLoading && currentTransaction">
+    <!-- Progress Bar -->
+    <div class="progress-section">
+      <div class="progress-bar" [style.width.%]="getCompletionPercent()"></div>
+      <div class="progress-text">
+        {{ currentIndex + 1 }} of {{ stagedTransactions.length }} |
+        {{ getRemainingCount() }} remaining
+      </div>
+    </div>
+
+    <!-- Transaction Card -->
+    <div class="transaction-card">
+      <!-- Transaction Summary -->
+      <div class="transaction-summary">
+        <div class="amount-section">
+          <div class="amount-main">
+            {{ formatCurrency(currentTransaction.amount.value, currentTransaction.amount.unit) }}
+          </div>
+          <div class="transaction-type">
+            <span [ngClass]="getTransactionTypeBadgeClass()" class="badge">
+              {{ getTransactionTypeBadge() }}
+            </span>
+          </div>
+        </div>
+
+        <div class="transaction-details">
+          <div class="merchant-name">
+            {{ currentTransaction.merchantName || 'Unknown Merchant' }}
+          </div>
+          <div class="description">{{ currentTransaction.description }}</div>
+          <div class="transaction-date">{{ formatDate(currentTransaction.timestamp) }}</div>
+        </div>
+      </div>
+
+      <!-- Category & Confidence -->
+      <div class="categorization-section">
+        <div class="category-label">Category</div>
+
+        <div class="category-selection">
+          <div class="current-category">
+            <div class="category-name">
+              {{ currentTransaction.category }}
+              <button
+                class="btn-edit-category"
+                (click)="showCategoryDropdown = !showCategoryDropdown"
+                title="Press E to edit"
+              >
+                ✎
+              </button>
+            </div>
+            <span [ngClass]="getConfidenceBadgeClass()" class="confidence-badge">
+              {{ getConfidenceBadgeText() }} ({{ currentTransaction.categoryConfidence }}%)
+            </span>
+          </div>
+
+          <!-- Category Dropdown -->
+          <div class="category-dropdown" *ngIf="showCategoryDropdown">
+            <input
+              type="text"
+              class="category-search"
+              placeholder="Search categories..."
+              #categorySearch
+            />
+            <div class="category-options">
+              <button
+                *ngFor="let cat of budgetCategories"
+                class="category-option"
+                (click)="updateCategory(cat.name)"
+              >
+                <strong>{{ cat.name }}</strong>
+                <span class="category-desc" *ngIf="cat.description">
+                  {{ cat.description }}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Suggestions -->
+        <div class="suggestions" *ngIf="allSuggestions && allSuggestions.length > 0">
+          <div class="suggestions-label">AI Suggestions</div>
+          <div class="suggestion-chips">
+            <button
+              *ngFor="let suggestion of allSuggestions"
+              class="suggestion-chip"
+              (click)="acceptSuggestion(suggestion)"
+              title="Click to accept"
+            >
+              {{ suggestion.category }}
+              <span class="confidence-small">({{ suggestion.confidence }}%)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duplicate Warning -->
+      <div class="duplicate-warning" *ngIf="showDuplicateWarning">
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-content">
+          <strong>Possible Duplicate</strong>
+          <p>
+            This transaction appears to be a duplicate of another transaction.
+            <button class="btn-link" (click)="markAsNotDuplicate()">Override</button>
+          </p>
+        </div>
+      </div>
+
+      <!-- Budget Impact (if linked) -->
+      <div class="budget-impact" *ngIf="currentTransaction.budgetId">
+        <div class="impact-label">Budget Impact</div>
+        <div class="impact-info">
+          <strong>{{ currentTransaction._budgetName || currentTransaction.budgetId }}</strong>
+          <span class="impact-amount">
+            +{{
+              formatCurrency(
+                currentTransaction._varianceImpact || 0,
+                currentTransaction.amount.unit
+              )
+            }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <button
+        class="btn btn-approve"
+        (click)="approveTransaction()"
+        [disabled]="isSaving"
+        title="Approve (Ctrl+Enter)"
+      >
+        <span *ngIf="!isSaving">✓ Approve</span>
+        <span *ngIf="isSaving">Saving...</span>
+      </button>
+
+      <button
+        class="btn btn-flag"
+        (click)="markAsNeedsAttention()"
+        [disabled]="isSaving"
+        title="Flag for attention (F)"
+      >
+        🚩 Needs Attention
+      </button>
+
+      <button
+        class="btn btn-reject"
+        (click)="rejectTransaction()"
+        [disabled]="isSaving"
+        title="Reject (Ctrl+Delete)"
+      >
+        <span *ngIf="!isSaving">✕ Reject</span>
+        <span *ngIf="isSaving">Saving...</span>
+      </button>
+    </div>
+
+    <!-- Navigation -->
+    <div class="navigation">
+      <button
+        class="btn-nav prev"
+        (click)="prevTransaction()"
+        [disabled]="currentIndex === 0"
+        title="Previous (←)"
+      >
+        ← Previous
+      </button>
+
+      <div class="nav-counter">{{ currentIndex + 1 }} / {{ stagedTransactions.length }}</div>
+
+      <button
+        class="btn-nav next"
+        (click)="nextTransaction()"
+        [disabled]="currentIndex === stagedTransactions.length - 1"
+        title="Next (→)"
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+
+  <!-- Sidebar: Bulk Actions & Filters -->
+  <div class="review-sidebar">
+    <!-- Bulk Actions -->
+    <div class="bulk-actions section">
+      <h3>Bulk Actions</h3>
+      <button
+        class="btn btn-small btn-outline"
+        (click)="selectAll()"
+        [disabled]="stagedTransactions.length === 0"
+      >
+        Select All ({{ stagedTransactions.length }})
+      </button>
+      <button
+        class="btn btn-small btn-outline"
+        (click)="clearSelection()"
+        [disabled]="selectedIds.size === 0"
+      >
+        Clear Selection
+      </button>
+      <button
+        class="btn btn-small btn-success"
+        (click)="approveBulk()"
+        [disabled]="selectedIds.size === 0 || isSaving"
+      >
+        Approve Selected ({{ selectedIds.size }})
+      </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters section">
+      <h3>Filters</h3>
+
+      <div class="filter-group">
+        <label>Status</label>
+        <select [(ngModel)]="filterStatus" (change)="applyFilters()">
+          <option value="pending">Pending</option>
+          <option value="needs-attention">Needs Attention</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Min Confidence</label>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          [(ngModel)]="filterConfidenceMin"
+          (change)="applyFilters()"
+        />
+        <span class="value">{{ filterConfidenceMin }}%</span>
+      </div>
+
+      <div class="filter-group">
+        <label>Search</label>
+        <input
+          type="text"
+          placeholder="Merchant, description..."
+          [(ngModel)]="searchText"
+          (keyup)="applyFilters()"
+        />
+      </div>
+    </div>
+
+    <!-- Transaction List -->
+    <div class="transaction-list section">
+      <h3>Transactions ({{ stagedTransactions.length }})</h3>
+      <div class="list-items">
+        <button
+          *ngFor="let txn of stagedTransactions; let i = index"
+          class="list-item"
+          [class.active]="currentIndex === i"
+          [class.selected]="txn._isSelected"
+          [class.approved]="txn.reviewStatus === 'approved'"
+          [class.rejected]="txn.reviewStatus === 'rejected'"
+          (click)="jumpToTransaction(i)"
+          (click.stop)="$event.stopPropagation()"
+        >
+          <input
+            type="checkbox"
+            [(ngModel)]="txn._isSelected"
+            (change)="toggleSelection()"
+            (click)="$event.stopPropagation()"
+          />
+          <div class="list-item-content">
+            <div class="amount">
+              {{ formatCurrency(txn.amount.value, txn.amount.unit) }}
+            </div>
+            <div class="merchant">{{ txn.merchantName || 'Unknown' }}</div>
+            <div class="category-small">{{ txn.category }}</div>
+          </div>
+          <div class="status-icon">
+            <span *ngIf="txn.reviewStatus === 'approved'" class="icon-approved">✓</span>
+            <span *ngIf="txn.reviewStatus === 'rejected'" class="icon-rejected">✕</span>
+            <span *ngIf="txn.reviewStatus === 'pending'" class="icon-pending">●</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Help -->
+  <div class="keyboard-shortcuts">
+    <details>
+      <summary>Keyboard Shortcuts</summary>
+      <dl>
+        <dt>Ctrl+Enter</dt>
+        <dd>Approve current transaction</dd>
+        <dt>Ctrl+Delete</dt>
+        <dd>Reject current transaction</dd>
+        <dt>→ / ←</dt>
+        <dd>Navigate between transactions</dd>
+        <dt>E</dt>
+        <dd>Edit category</dd>
+        <dt>F</dt>
+        <dd>Mark as needs attention</dd>
+        <dt>Escape</dt>
+        <dd>Close dropdown</dd>
+      </dl>
+    </details>
+  </div>
+</div>

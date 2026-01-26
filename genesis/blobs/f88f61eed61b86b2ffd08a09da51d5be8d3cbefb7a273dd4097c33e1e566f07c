@@ -1,0 +1,10 @@
+Scenario: Right to disconnect maintained throughout system
+    Given Frank participates in the Value Scanner
+    And constitutional constraints apply at all layers
+    When Frank chooses to disconnect from the system
+    Then his choice must be honored immediately and completely
+    And all data retention must follow minimal legal requirements
+    And no manipulative patterns to retain usage should be employed
+    And Frank's right to not participate must be absolute
+    And his autonomy over technology use must be respected
+    And disconnection should be simple, clear, and complete

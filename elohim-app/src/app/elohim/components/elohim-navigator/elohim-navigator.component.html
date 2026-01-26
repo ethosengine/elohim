@@ -17,7 +17,16 @@
           aria-haspopup="true"
           title="Switch context"
         >
-          <svg class="dropdown-arrow" [class.open]="showContextSwitcher" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            class="dropdown-arrow"
+            [class.open]="showContextSwitcher"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
@@ -67,7 +76,15 @@
           class="search-input"
         />
         <button type="submit" class="search-button" aria-label="Search">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            class="search-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
@@ -75,81 +92,132 @@
       </form>
     </div>
 
-    <!-- Right: Profile Bubble (Imago Dei / Traveler) -->
-    <div class="profile-bubble-container">
-      <button
-        class="profile-bubble"
-        (click)="toggleProfileTray($event)"
-        [attr.aria-expanded]="showProfileTray"
-        aria-haspopup="true"
-        title="Your profile and settings"
-      >
-        <span class="profile-avatar">{{ getInitials() }}</span>
-      </button>
+    <!-- Right: Auth Section -->
+    @if (isAuthenticated()) {
+      <!-- Connection Status Indicator -->
+      <app-connection-indicator></app-connection-indicator>
 
-      <!-- Profile Tray Dropdown -->
-      <div class="profile-tray" *ngIf="showProfileTray" role="menu">
-        <!-- Identity Header -->
-        <div class="profile-header">
-          <div class="profile-avatar-large">{{ getInitials() }}</div>
-          <div class="profile-info">
-            <span class="profile-name">{{ getDisplayName() }}</span>
-            <span class="profile-stats">{{ getStatsSummary() }}</span>
-          </div>
-        </div>
+      <!-- Authenticated: Show Profile Bubble -->
+      <div class="profile-bubble-container">
+        <button
+          class="profile-bubble"
+          (click)="toggleProfileTray($event)"
+          [attr.aria-expanded]="showProfileTray"
+          aria-haspopup="true"
+          title="Your profile and settings"
+        >
+          <span class="profile-avatar">{{ getInitials() }}</span>
+        </button>
 
-        <div class="scrollable-content-wrapper">
-          <!-- Actions -->
-          <div class="profile-actions">
-            <button class="profile-action" (click)="goToProfile()" role="menuitem">
-              <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <span class="action-label">View Profile</span>
-            </button>
-            <button class="profile-action" (click)="onJoinNetwork()" role="menuitem">
-              <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-              </svg>
-              <span class="action-label">Join Network</span>
-            </button>
-          </div>
-
-          <!-- Settings Section -->
-          <div class="settings-section">
-            <div class="settings-header">Settings</div>
-            <div class="settings-row">
-              <span class="settings-label">Theme</span>
-              <app-theme-toggle></app-theme-toggle>
+        <!-- Profile Tray Dropdown -->
+        <div class="profile-tray" *ngIf="showProfileTray" role="menu">
+          <!-- Identity Header -->
+          <div class="profile-header">
+            <div class="profile-avatar-large">{{ getInitials() }}</div>
+            <div class="profile-info">
+              <span class="profile-name">{{ authenticatedDisplayName() }}</span>
+              <span class="profile-stats">
+                {{ identityMode() === 'hosted' ? 'Hosted Identity' : 'Steward' }}
+              </span>
             </div>
           </div>
 
-          <!-- Footer -->
-          <div class="profile-footer">
-            <span class="session-indicator">Session-based identity</span>
+          <div class="scrollable-content-wrapper">
+            <!-- Actions -->
+            <div class="profile-actions">
+              <button class="profile-action" (click)="goToProfile()" role="menuitem">
+                <svg
+                  class="action-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span class="action-label">View Profile</span>
+              </button>
+              <button class="profile-action logout-action" (click)="onLogout()" role="menuitem">
+                <svg
+                  class="action-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span class="action-label">Log Out</span>
+              </button>
+            </div>
+
+            <!-- Settings Section -->
+            <div class="settings-section">
+              <div class="settings-header">Settings</div>
+              <div class="settings-row">
+                <span class="settings-label">Theme</span>
+                <app-theme-toggle></app-theme-toggle>
+              </div>
+            </div>
+
+            <!-- Sovereignty Badge - At-a-glance sovereignty status -->
+            <app-sovereignty-badge></app-sovereignty-badge>
+
+            <!-- Footer -->
+            <div class="profile-footer">
+              <span class="session-indicator">
+                {{ identityMode() === 'hosted' ? 'Hosted on Edge Node' : 'Steward Identity' }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    } @else {
+      <!-- Theme Toggle for visitors (Lamad only) -->
+      @if (context === 'lamad') {
+        <app-theme-toggle [inline]="true"></app-theme-toggle>
+      }
+      <!-- Visitor: Show Login/Register Buttons -->
+      <div class="auth-buttons">
+        <button class="auth-btn auth-btn-link" (click)="goToLogin()">Log In</button>
+        <button class="auth-btn auth-btn-primary" (click)="goToRegister()">Sign Up</button>
+      </div>
+    }
   </div>
 </header>
 
 <!-- Mobile Menu Backdrop -->
-<div class="mobile-menu-backdrop"
-     *ngIf="showContextSwitcher || showProfileTray"
-     (click)="closeAllTrays()"
-     (keydown.enter)="closeAllTrays()"
-     (keydown.space)="closeAllTrays()"
-     aria-hidden="true">
-</div>
+<div
+  class="mobile-menu-backdrop"
+  *ngIf="showContextSwitcher || showProfileTray"
+  (click)="closeAllTrays()"
+  (keydown.enter)="closeAllTrays()"
+  (keydown.space)="closeAllTrays()"
+  aria-hidden="true"
+></div>
 
 <!-- Upgrade Prompt Banner -->
 <div *ngIf="activeUpgradePrompt && !showUpgradeModal" class="upgrade-banner">
   <div class="upgrade-banner-content">
-    <svg class="upgrade-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+    <svg
+      class="upgrade-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <polygon
+        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+      ></polygon>
     </svg>
     <div class="upgrade-text">
       <strong>{{ activeUpgradePrompt.title }}</strong>
@@ -158,7 +226,16 @@
     <div class="upgrade-actions">
       <button class="btn-upgrade" (click)="onJoinNetwork()">Learn More</button>
       <button class="btn-dismiss" (click)="dismissUpgradePrompt()" aria-label="Dismiss">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
@@ -168,7 +245,7 @@
 </div>
 
 <!-- Main Content Area -->
-<main class="elohim-main">
+<main class="elohim-main" id="main-content">
   <ng-content></ng-content>
 </main>
 
@@ -181,9 +258,22 @@
   open
   aria-labelledby="upgrade-modal-title"
 >
-  <div class="upgrade-modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+  <div
+    class="upgrade-modal"
+    (click)="$event.stopPropagation()"
+    (keydown)="$event.stopPropagation()"
+  >
     <button class="modal-close" (click)="closeUpgradeModal()" aria-label="Close">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <line x1="18" y1="6" x2="6" y2="18"></line>
         <line x1="6" y1="6" x2="18" y2="18"></line>
       </svg>
@@ -200,7 +290,16 @@
         <ul>
           <li>
             <span class="benefit-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
                 <polyline points="17 21 17 13 7 13 7 21"></polyline>
                 <polyline points="7 3 7 8 15 8"></polyline>
@@ -213,10 +312,21 @@
           </li>
           <li>
             <span class="benefit-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M23 4v6h-6"></path>
                 <path d="M1 20v-6h6"></path>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                <path
+                  d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                ></path>
               </svg>
             </span>
             <div>
@@ -226,7 +336,16 @@
           </li>
           <li>
             <span class="benefit-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                 <circle cx="9" cy="7" r="4"></circle>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -240,7 +359,16 @@
           </li>
           <li>
             <span class="benefit-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <circle cx="12" cy="8" r="7"></circle>
                 <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
               </svg>
@@ -252,10 +380,21 @@
           </li>
           <li>
             <span class="benefit-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                <path
+                  d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                ></path>
               </svg>
             </span>
             <div>
@@ -297,9 +436,7 @@
 
     <div class="modal-footer">
       <button class="btn-secondary" (click)="closeUpgradeModal()">Continue as Visitor</button>
-      <button class="btn-primary" disabled title="Coming soon!">
-        Get Notified When Available
-      </button>
+      <button class="btn-primary" disabled title="Coming soon!">Get Notified When Available</button>
     </div>
   </div>
 </dialog>

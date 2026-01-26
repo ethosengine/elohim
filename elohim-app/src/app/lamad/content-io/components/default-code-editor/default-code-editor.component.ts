@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   Input,
@@ -6,12 +7,14 @@ import {
   OnInit,
   OnDestroy,
   ViewChild,
-  ElementRef
+  ElementRef,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subject } from 'rxjs';
+
 import { debounceTime, takeUntil } from 'rxjs/operators';
+
+import { Subject } from 'rxjs';
+
 import { ContentNode } from '../../../models/content-node.model';
 import {
   ContentEditorComponent,
@@ -19,7 +22,7 @@ import {
   ContentSaveEvent,
   EditorValidationResult,
   EditorConfig,
-  DEFAULT_EDITOR_CONFIG
+  DEFAULT_EDITOR_CONFIG,
 } from '../../interfaces/content-format-plugin.interface';
 import { ContentIOExportInput } from '../../interfaces/content-io-plugin.interface';
 
@@ -45,7 +48,7 @@ import { ContentIOExportInput } from '../../interfaces/content-io-plugin.interfa
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './default-code-editor.component.html',
-  styleUrls: ['./default-code-editor.component.css']
+  styleUrls: ['./default-code-editor.component.css'],
 })
 export class DefaultCodeEditorComponent implements ContentEditorComponent, OnInit, OnDestroy {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -137,7 +140,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
     return {
       valid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
@@ -151,7 +154,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
       contentType: this.node?.contentType,
       tags: this.parseTags(this.tagsInput),
       metadata: this.node?.metadata ?? {},
-      relatedNodeIds: this.node?.relatedNodeIds ?? []
+      relatedNodeIds: this.node?.relatedNodeIds ?? [],
     };
   }
 
@@ -186,7 +189,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
 
     // Emit save event - parent handles actual persistence
     this.save.emit({
-      content: this.getContent()
+      content: this.getContent(),
     });
 
     // Note: Parent should call markSaved() on success
@@ -255,9 +258,10 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
     if (this.node) {
       this.title = this.node.title ?? '';
       this.description = this.node.description ?? '';
-      this.content = typeof this.node.content === 'string'
-        ? this.node.content
-        : JSON.stringify(this.node.content, null, 2);
+      this.content =
+        typeof this.node.content === 'string'
+          ? this.node.content
+          : JSON.stringify(this.node.content, null, 2);
       this.tagsInput = (this.node.tags ?? []).join(', ');
 
       // Store originals for dirty checking
@@ -270,10 +274,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
   }
 
   private setupContentDebounce(): void {
-    this.contentInput$.pipe(
-      debounceTime(300),
-      takeUntil(this.destroy$)
-    ).subscribe(() => {
+    this.contentInput$.pipe(debounceTime(300), takeUntil(this.destroy$)).subscribe(() => {
       this.emitChange('content');
     });
   }
@@ -297,7 +298,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
     this.contentChange.emit({
       content: this.getContent(),
       changeType,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -315,10 +316,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
 
-    this.content =
-      this.content.substring(0, start) +
-      text +
-      this.content.substring(end);
+    this.content = this.content.substring(0, start) + text + this.content.substring(end);
 
     // Restore cursor position
     setTimeout(() => {

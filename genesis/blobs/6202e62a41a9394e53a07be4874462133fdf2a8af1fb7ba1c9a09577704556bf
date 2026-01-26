@@ -1,0 +1,10 @@
+Scenario: Citizen forms coalition across municipal issue areas
+    Given 230 families are losing time to bus delays
+    And 47 teachers are concerned about school overcrowding
+    And both issues stem from municipal transportation budget
+    When the Observer detects the pattern connection
+    Then citizens see the larger civic context
+    And can coordinate with teachers and other affected groups
+    And build more powerful coalition across stakeholder types
+    And isolated concerns become coordinated advocacy
+    And cross-issue patterns surface organically

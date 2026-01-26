@@ -1,0 +1,9 @@
+Scenario: Adult's complex scheduling requires sophisticated coordination
+    Given Sarah manages professional schedule, children's schedules, household tasks, community commitments
+    And conflicts arise constantly
+    When Sarah plans her week
+    Then the personal_agent should integrate with calendars, school systems, work tools
+    And it should identify scheduling conflicts automatically
+    And it should suggest realistic solutions within constraints
+    And it should coordinate across family members' needs
+    And scheduling should support Sarah's effectiveness, not overwhelm her

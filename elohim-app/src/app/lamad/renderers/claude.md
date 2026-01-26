@@ -1,32 +1,34 @@
 # Lamad Renderers
 
-Content rendering system using registry pattern.
+Content rendering system using unified plugin architecture.
 
-## Renderers
+## Unified Plugin System (Preferred)
+
+Quiz/assessment content uses the ContentFormatPlugin system in `content-io/`.
+
+| Format | Plugin | Renderer |
+|--------|--------|----------|
+| `perseus-quiz-json` | PerseusFormatPlugin | PerseusRendererComponent |
+| `markdown` | MarkdownFormatPlugin | MarkdownRendererComponent |
+| `gherkin` | GherkinFormatPlugin | GherkinRendererComponent |
+
+See `content-io.module.ts` for plugin registration and format aliases.
+
+## Legacy Registry (Deprecated)
 
 | Format | Renderer | Priority |
 |--------|----------|----------|
 | `markdown` | MarkdownRendererComponent | 10 |
 | `html5-app` | IframeRendererComponent | 10 |
 | `video-embed` | IframeRendererComponent | 10 |
-| `quiz-json` | QuizRendererComponent | 10 |
 | `gherkin` | GherkinRendererComponent | 5 |
 
 ## Architecture
 
 ```
 ContentViewerComponent
-    → RendererRegistryService.getRenderer(node)
+    → ContentFormatRegistryService.getRenderer(node)  // Unified system
     → ViewContainerRef.createComponent(renderer)
-```
-
-## Adding a Renderer
-
-1. Create component with `@Input() node: ContentNode`
-2. Register in `renderer-initializer.service.ts`:
-
-```typescript
-this.registry.register(['my-format'], MyRendererComponent, 10);
 ```
 
 ## CSS with innerHTML

@@ -1,0 +1,10 @@
+Scenario: Practical neighborhood support for isolated caregiver
+    Given James cannot easily leave David alone
+    And small practical tasks become difficult
+    When neighbors offer practical support
+    Then the neighborhood_elohim should coordinate helpful offers
+    And neighbors could pick up groceries or prescriptions
+    And they could help with yard work or home maintenance
+    And they could check in and provide human connection
+    And practical support should reduce James's isolation
+    And neighborhood mutual aid should serve caregivers actively

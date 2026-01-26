@@ -1,0 +1,10 @@
+Scenario: Shared grocery shopping with roommates
+    Given Aisha and her roommates share food costs
+    And they have different dietary preferences
+    When they use the Value Scanner for shared shopping
+    Then the household_elohim should track individual contributions
+    And it should manage the shared household budget
+    And it should accommodate different preferences within budget
+    And care tokens should reflect each person's shopping labor
+    And the system should prevent household conflicts over resources
+    And equitable cost-sharing should be transparent

@@ -1,0 +1,49 @@
+{
+  "id": "human-traveler",
+  "did": "did:web:elohim.host:human:traveler",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Traveler",
+  "description": "Anonymous explorer. Just passing through, learning about this place.",
+  "content": "# Traveler\n\nAnonymous explorer. Just passing through, learning about this place.\n\n**Profile Reach:** hidden\n\n**Is Pseudonymous:** true\n\n**Accepting Connections:** false\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/traveler/profile.json",
+  "tags": [
+    "pseudonymous",
+    "visitor",
+    "reach-hidden",
+    "human-graph",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "visitor",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [],
+    "designNotes": "Represents anonymous/visitor user experience."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Traveler",
+    "ogDescription": "Anonymous explorer. Just passing through, learning about this place.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-traveler",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-traveler.jpg",
+    "ogImageAlt": "Traveler's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-traveler",
+    "identifier": "did:web:elohim.host:human:traveler",
+    "name": "Traveler",
+    "description": "Anonymous explorer. Just passing through, learning about this place.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328574",
+  "updatedAt": "2025-12-24T03:05:26.354Z"
+}

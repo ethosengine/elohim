@@ -1,0 +1,9 @@
+Scenario: Workers transition from corporate extraction to democratic ownership progressively
+    Given ChickenMax has just converted to EAE ownership
+    And workers are learning democratic governance practices
+    When workers hold their first month of democratic operations
+    Then early decisions are worker-proposed, coordinator-advised, worker-approved
+    And workers gradually take on more complex governance decisions
+    And training is provided for business operations, bookkeeping, and strategy
+    And workplace_elohim facilitates learning democratic skills
+    And after 6 months, workers govern fully with coordinator in support role only

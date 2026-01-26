@@ -1,0 +1,10 @@
+Scenario: Community supports teen's transition to adult independence
+    Given Jasmine is preparing for college and adult life
+    And she has accumulated care contributions and care tokens
+    When she needs support for transition to adulthood
+    Then the community_elohim should surface relevant resources
+    And her care tokens should be convertible to educational resources
+    And community institutions should support her based on demonstrated contribution
+    And mentorship, skill-building, and educational opportunities should be accessible
+    And the community should invest in her success as she invested in community wellbeing
+    And care economy should support intergenerational care and lifecycle transitions

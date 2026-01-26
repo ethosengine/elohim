@@ -1,0 +1,8 @@
+Scenario: Participating in neighborhood mutual aid despite time limits
+    Given my neighborhood has mutual aid networks
+    And I have minimal time due to work demands
+    When I want to participate in neighborhood care economy
+    Then the protocol should identify micro-opportunities for contribution
+    And help me participate in ways that fit my schedule
+    And recognize that small contributions matter
+    And connect me to neighborhood resources when I need support

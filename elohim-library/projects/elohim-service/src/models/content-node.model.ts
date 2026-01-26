@@ -36,8 +36,18 @@ export type ContentFormat =
   | 'plaintext'
   | 'video-embed'
   | 'external-link'
-  | 'quiz-json'
-  | 'assessment-json';
+  | 'perseus-quiz-json';  // Khan Academy Perseus quiz format
+
+/**
+ * Content reach level - visibility scope
+ */
+export type ContentReach =
+  | 'private'
+  | 'invited'
+  | 'local'
+  | 'community'
+  | 'federated'
+  | 'commons';
 
 /**
  * Relationship types between content nodes
@@ -159,7 +169,7 @@ export interface ContentNode {
   authorId?: string;
 
   /** Reach level (defaults to 'commons' for imported content) */
-  reach?: 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons';
+  reach?: ContentReach;
 
   /** Creation timestamp (ISO 8601) */
   createdAt: string;

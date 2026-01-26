@@ -1,0 +1,12 @@
+Scenario: Neighborhood care economy includes middle-aged leadership
+    Given Robert has decades of life experience
+    And he has accumulated professional and personal capabilities
+    And he's positioned to contribute neighborhood leadership
+    When neighborhood_elohim recognizes his leadership potential
+    Then it should surface leadership opportunities appropriate to his capacity
+    And connect him to neighborhood governance roles
+    And recognize his care contributions as qualifying him for leadership
+    And help him balance leadership with his existing demands
+    And prevent overcommitment that would overwhelm him
+    And channel his capabilities toward neighborhood improvement
+    And build neighborhood leadership from accumulated care experience

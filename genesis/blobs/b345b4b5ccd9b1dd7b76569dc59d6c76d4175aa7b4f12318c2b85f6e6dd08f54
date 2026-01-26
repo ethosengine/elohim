@@ -1,0 +1,10 @@
+Scenario: Participating in workplace decision-making processes
+    Given the library is deciding new operating hours
+    And scheduling changes affect all employees
+    When staff input is gathered about the proposed changes
+    Then Jordan's schedule preferences are solicited accessibly
+    And Jordan can express how changes would affect them
+    And Jordan's input is weighted equally with other staff
+    And the workplace_elohim ensures Jordan's voice is heard
+    And final decisions consider Jordan's needs and preferences
+    And Jordan experiences democratic workplace participation

@@ -1,0 +1,11 @@
+Scenario: Random selection to serve on community Constitutional Council
+    Given I am a nurse and mother living in my community
+    And I have never been politically active
+    When I receive notification of sortition selection for Constitutional Council
+    Then I am randomly selected via cryptographic sortition
+    And I am offered 3-month term serving 20 hours per week
+    And I receive compensation matching local median income
+    And I am provided childcare support and accessibility accommodations
+    And I can accept or decline without penalty
+    And Selection cannot be lobbied or manipulated
+    And My service brings ordinary citizen wisdom to AI governance

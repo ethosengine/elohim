@@ -1,0 +1,11 @@
+Scenario: Career development opportunities accessible to Alex
+    Given disabled workers often face barriers to advancement
+    And Alex has professional ambitions and development goals
+    When career development opportunities arise
+    Then the workplace_elohim should help Alex access training and advancement
+    And it should track whether Alex receives equal access to opportunities
+    And it should document if disability limits Alex's career progression unfairly
+    And Alex should be supported in pursuing professional goals
+    And the protocol should help Alex advocate for inclusive career paths
+    And advancement should be possible for disabled workers
+    And Alex's professional growth should be supported systematically

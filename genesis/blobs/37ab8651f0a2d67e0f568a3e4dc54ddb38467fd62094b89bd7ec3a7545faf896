@@ -1,0 +1,10 @@
+Scenario: Local food systems provide better value and freshness
+    Given Marcus shops in specific geographic region
+    And locally grown food can be cheaper and fresher
+    When Marcus compares food options
+    Then the personal_agent should identify local sources
+    And it should help him access farmers' markets and local growers
+    And it should explain benefits of shorter supply chains
+    And local food should be framed as both economic and ecological win
+    And he should learn that bioregional food systems serve his needs
+    And connection to local land and farmers should develop

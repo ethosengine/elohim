@@ -1,0 +1,9 @@
+Scenario: Teaching children value literacy through family care participation
+    Given Sarah is raising Tommy and Emma in care economy
+    And she wants them to learn value literacy
+    When children participate in family care activities
+    Then the family_elohim should recognize their age-appropriate contributions
+    And Sarah should model care economy principles
+    And children should learn by doing within family context
+    And family should be primary site of care economy education
+    And next generation should assume care economy is normal

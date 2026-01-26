@@ -1,0 +1,9 @@
+Scenario: Activist identifies developer's cross-jurisdiction pattern
+    Given a developer is proposing controversial project
+    And uses familiar tactics from other campaigns
+    When the Observer tracks developer across municipalities
+    Then the activist sees the same firm using identical playbook in 8 cities
+    And views track record of community promises vs delivery
+    And identifies political relationships and campaign donations
+    And systematic exploitation becomes undeniable
+    And activists coordinate across jurisdictions

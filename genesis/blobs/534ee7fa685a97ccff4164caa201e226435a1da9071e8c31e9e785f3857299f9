@@ -1,0 +1,10 @@
+Scenario: Board member prepares for teacher contract negotiation
+    Given board must negotiate collective bargaining agreement with teachers union
+    And superintendent provides analysis emphasizing district's budget constraints
+    And board wants to balance fiscal responsibility with teacher retention and quality
+    When the board member uses Observer labor relations context
+    Then they receive comparison of district's teacher compensation to regional market
+    And see teacher turnover and vacancy data by school showing retention challenges
+    And access analysis of contract proposals' impact on recruitment and budget
+    And get examples of creative solutions from peer district negotiations
+    And accessible expertise helps board negotiate effectively

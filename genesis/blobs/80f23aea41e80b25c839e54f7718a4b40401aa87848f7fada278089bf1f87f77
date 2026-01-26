@@ -1,0 +1,9 @@
+Scenario: Educational resources for parents teaching value literacy
+    Given Sarah wants to teach value literacy effectively
+    And she needs pedagogical support for home education
+    When Sarah accesses educational resources
+    Then the educational_elohim should provide parent education materials
+    And resources should be developmentally appropriate for different ages
+    And guidance should help Sarah teach Tommy differently than Emma
+    And Sarah should have tools to be effective value literacy educator
+    And parent education should be supported systematically

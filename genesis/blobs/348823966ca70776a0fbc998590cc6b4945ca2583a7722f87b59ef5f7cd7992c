@@ -1,0 +1,11 @@
+Scenario: Disability justice education transforms community culture
+    Given Alex teaches community about disability justice frameworks
+    And education shifts how community understands disability
+    When Alex provides training, workshops, or consultation
+    Then this educational labor should be valued as care work
+    And the community_elohim should track Alex's teaching contributions
+    And cultural transformation work should accumulate care tokens
+    And Alex's expertise should be compensated appropriately
+    And education that reduces ableism is high-value care work
+    And the protocol should recognize teaching as care labor
+    And Alex's intellectual contributions should be properly valued

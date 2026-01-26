@@ -1,17 +1,28 @@
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, Router, NavigationEnd } from '@angular/router';
+import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Subject } from 'rxjs';
+import { RouterLink, Router, NavigationEnd } from '@angular/router';
+
 import { filter, takeUntil } from 'rxjs/operators';
-import { SessionHumanService } from '../../../imagodei/services/session-human.service';
-import { SessionHuman, HolochainUpgradePrompt } from '../../../imagodei/models/session-human.model';
+
+import { Subject } from 'rxjs';
+
+import { RunningContextService } from '@app/doorway/services/running-context.service';
+import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
+import { SessionHuman, HolochainUpgradePrompt } from '@app/imagodei/models/session-human.model';
+import { AuthService } from '@app/imagodei/services/auth.service';
+import { IdentityService } from '@app/imagodei/services/identity.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { SovereigntyBadgeComponent } from '@app/lamad/components/sovereignty-badge/sovereignty-badge.component';
+
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 
 /**
  * Context app identifiers for the Elohim Protocol
  */
-export type ContextApp = 'lamad' | 'community' | 'shefa';
+export type ContextApp = 'lamad' | 'community' | 'shefa' | 'doorway';
 
 /**
  * Context app configuration
@@ -37,9 +48,16 @@ export interface ContextAppConfig {
 @Component({
   selector: 'app-elohim-navigator',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ThemeToggleComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    FormsModule,
+    ThemeToggleComponent,
+    SovereigntyBadgeComponent,
+    ConnectionIndicatorComponent,
+  ],
   templateUrl: './elohim-navigator.component.html',
-  styleUrls: ['./elohim-navigator.component.css']
+  styleUrls: ['./elohim-navigator.component.css'],
 })
 export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   /** Current context app */
@@ -60,15 +78,21 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   showContextSwitcher = false;
   showUpgradeModal = false;
 
-  /** Available context apps */
-  readonly contextApps: ContextAppConfig[] = [
+  /** Edge Node section state */
+  edgeNodeExpanded = false;
+
+  /** Copy feedback state */
+  copiedField: string | null = null;
+
+  /** Base context apps (always available) */
+  private readonly baseContextApps: ContextAppConfig[] = [
     {
       id: 'lamad',
       name: 'Lamad',
       icon: '📚',
       route: '/lamad',
       tagline: 'Learning & Content',
-      available: true
+      available: true,
     },
     {
       id: 'community',
@@ -76,7 +100,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       icon: '👥',
       route: '/community',
       tagline: 'Community & Governance',
-      available: true
+      available: true,
     },
     {
       id: 'shefa',
@@ -84,18 +108,81 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       icon: '✨',
       route: '/shefa',
       tagline: 'Economics of Flourishing',
-      available: true
-    }
+      available: true,
+    },
   ];
+
+  /** Doorway context app (only for always-on nodes with web hosting) */
+  private readonly doorwayApp: ContextAppConfig = {
+    id: 'doorway',
+    name: 'Doorway',
+    icon: '🌐',
+    route: '/doorway',
+    tagline: 'Web Hosting Configuration',
+    available: true,
+  };
+
+  /** Running context service - determines if operator mode is available */
+  private readonly runningContext = inject(RunningContextService);
+
+  /** Auth service for immediate auth state feedback */
+  private readonly authService = inject(AuthService);
+
+  /**
+   * Available context apps - includes Doorway when user has web-hosting capable nodes
+   */
+  readonly contextApps = computed(() => {
+    const apps = [...this.baseContextApps];
+    if (this.runningContext.hasDoorwayCapableNode()) {
+      apps.push(this.doorwayApp);
+    }
+    return apps;
+  });
 
   private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly sessionHumanService: SessionHumanService,
-    private readonly router: Router
+    private readonly router: Router,
+    readonly holochainService: HolochainClientService,
+    private readonly identityService: IdentityService
   ) {}
 
+  // =========================================================================
+  // Authentication State
+  // =========================================================================
+
+  /**
+   * Whether the user is authenticated (hosted or self-sovereign mode)
+   * Also checks AuthService for immediate feedback after login (before IdentityService updates)
+   */
+  readonly isAuthenticated = computed(() => {
+    const mode = this.identityService.mode();
+    // Check identity mode first (full identity state)
+    if (mode === 'hosted' || mode === 'self-sovereign') {
+      return true;
+    }
+    // Fallback: check auth service for immediate feedback after login
+    // This handles the race condition where auth succeeds but identity state hasn't updated yet
+    return this.authService.isAuthenticated();
+  });
+
+  /**
+   * Get display name - from identity service if authenticated, session otherwise
+   */
+  readonly authenticatedDisplayName = computed(() => {
+    return this.identityService.displayName() ?? 'User';
+  });
+
+  /**
+   * Get identity mode for display
+   */
+  readonly identityMode = computed(() => this.identityService.mode());
+
   ngOnInit(): void {
+    // Start context detection to determine if operator mode is available
+    this.runningContext.startPeriodicDetection();
+
     // Subscribe to session human state
     this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
       this.session = session;
@@ -107,12 +194,14 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     });
 
     // Close trays on navigation
-    this.router.events.pipe(
-      filter(event => event instanceof NavigationEnd),
-      takeUntil(this.destroy$)
-    ).subscribe(() => {
-      this.closeAllTrays();
-    });
+    this.router.events
+      .pipe(
+        filter(event => event instanceof NavigationEnd),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => {
+        this.closeAllTrays();
+      });
 
     // Close trays on click outside
     document.addEventListener('click', this.handleOutsideClick.bind(this));
@@ -121,6 +210,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.runningContext.stopPeriodicDetection();
     document.removeEventListener('click', this.handleOutsideClick.bind(this));
   }
 
@@ -132,14 +222,15 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    * Get the current context app config
    */
   get currentApp(): ContextAppConfig {
-    return this.contextApps.find(app => app.id === this.context) || this.contextApps[0];
+    const apps = this.contextApps();
+    return apps.find(app => app.id === this.context) || apps[0];
   }
 
   /**
    * Get other available context apps
    */
   get otherApps(): ContextAppConfig[] {
-    return this.contextApps.filter(app => app.id !== this.context);
+    return this.contextApps().filter(app => app.id !== this.context);
   }
 
   /**
@@ -222,7 +313,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   onSearch(): void {
     if (this.searchQuery.trim()) {
       this.router.navigate([`/${this.context}/search`], {
-        queryParams: { q: this.searchQuery }
+        queryParams: { q: this.searchQuery },
       });
     }
   }
@@ -263,6 +354,42 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   }
 
   // =========================================================================
+  // Authentication Actions
+  // =========================================================================
+
+  /**
+   * Navigate to login page
+   */
+  goToLogin(): void {
+    this.closeAllTrays();
+    const returnUrl = this.router.url;
+    this.router.navigate(['/identity/login'], {
+      queryParams: { returnUrl },
+    });
+  }
+
+  /**
+   * Navigate to registration page
+   */
+  goToRegister(): void {
+    this.closeAllTrays();
+    const returnUrl = this.router.url;
+    this.router.navigate(['/identity/register'], {
+      queryParams: { returnUrl },
+    });
+  }
+
+  /**
+   * Logout the current user
+   */
+  async onLogout(): Promise<void> {
+    this.closeAllTrays();
+    await this.identityService.logout();
+    // Navigate to home after logout
+    this.router.navigate(['/']);
+  }
+
+  // =========================================================================
   // Private Methods
   // =========================================================================
 
@@ -279,8 +406,106 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   private handleOutsideClick(event: Event): void {
     const target = event.target as HTMLElement;
-    if (!target.closest('.profile-bubble-container') && !target.closest('.context-switcher-container')) {
+    if (
+      !target.closest('.profile-bubble-container') &&
+      !target.closest('.context-switcher-container')
+    ) {
       this.closeAllTrays();
     }
+  }
+
+  // =========================================================================
+  // Edge Node Methods
+  // =========================================================================
+
+  /**
+   * Toggle Edge Node section visibility
+   */
+  toggleEdgeNode(): void {
+    this.edgeNodeExpanded = !this.edgeNodeExpanded;
+  }
+
+  /**
+   * Get Edge Node display info (from service)
+   */
+  get edgeNodeInfo(): EdgeNodeDisplayInfo {
+    return this.holochainService.getDisplayInfo();
+  }
+
+  /**
+   * Get status indicator CSS class
+   */
+  getStatusClass(): string {
+    const state = this.holochainService.state();
+    switch (state) {
+      case 'connected':
+        return 'status-connected';
+      case 'connecting':
+      case 'authenticating':
+        return 'status-connecting';
+      case 'error':
+        return 'status-error';
+      default:
+        return 'status-disconnected';
+    }
+  }
+
+  /**
+   * Get human-readable status text
+   */
+  getStatusText(): string {
+    const state = this.holochainService.state();
+    switch (state) {
+      case 'connected':
+        return 'Connected';
+      case 'connecting':
+        return 'Connecting...';
+      case 'authenticating':
+        return 'Authenticating...';
+      case 'error':
+        return 'Error';
+      default:
+        return 'Disconnected';
+    }
+  }
+
+  /**
+   * Copy value to clipboard with feedback
+   */
+  async copyToClipboard(value: string, fieldName: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+      this.copiedField = fieldName;
+      setTimeout(() => {
+        this.copiedField = null;
+      }, 2000);
+    } catch (err) {
+      console.warn('Failed to copy to clipboard:', err);
+    }
+  }
+
+  /**
+   * Format date for display
+   */
+  formatConnectedTime(date: Date | null): string {
+    if (!date) return 'N/A';
+    return date.toLocaleString();
+  }
+
+  /**
+   * Truncate hash for display (first 8 + last 4 chars)
+   */
+  truncateHash(hash: string | null): string {
+    if (!hash) return 'N/A';
+    if (hash.length <= 16) return hash;
+    return `${hash.substring(0, 8)}...${hash.substring(hash.length - 4)}`;
+  }
+
+  /**
+   * Manually trigger reconnect
+   */
+  async reconnect(): Promise<void> {
+    await this.holochainService.disconnect();
+    await this.holochainService.connect();
   }
 }

@@ -1,0 +1,10 @@
+Scenario: Neighborhood events integrate child into care economy
+    Given the neighborhood holds community gatherings or shared resources
+    And Emma participates in neighborhood activities
+    When Emma attends community events
+    Then her care contributions should carry across contexts
+    And neighborhood_elohim should coordinate recognition
+    And Emma should experience community as extension of family
+    And she should learn care economy scales beyond household
+    And community belonging should be built through participation
+    And she should see herself as valued neighborhood member

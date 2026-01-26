@@ -257,7 +257,8 @@ export function loadHumansData(filePath: string): HumansData {
 
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as HumansData;
-  } catch {
+  } catch (err) {
+    console.warn(`Failed to parse humans file '${filePath}', returning empty data: ${err}`);
     return { humans: [], relationships: [] };
   }
 }
@@ -428,7 +429,8 @@ export async function importHumansToLamad(
   if (fs.existsSync(relPath)) {
     try {
       existingRels = JSON.parse(fs.readFileSync(relPath, 'utf-8'));
-    } catch {
+    } catch (err) {
+      console.warn(`Failed to parse existing relationships '${relPath}', starting fresh: ${err}`);
       existingRels = [];
     }
   }

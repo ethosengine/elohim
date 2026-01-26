@@ -1,0 +1,9 @@
+Scenario: Parent challenges development affecting school capacity
+    Given a developer proposes 300-unit residential development
+    And claims it will "strengthen the community and tax base"
+    When the parent reviews Observer's school capacity analysis
+    Then they see 180 new students projected from the development
+    And learn the nearest elementary school is already over capacity
+    And understand no new school facilities are planned
+    And view developer's track record on past school impact promises
+    And can challenge development approval with child-impact data

@@ -1,0 +1,10 @@
+Scenario: Board member learns accessible expertise on complex water infrastructure decision
+    Given water district faces decision on $50M infrastructure upgrade
+    And engineering staff presentation uses technical jargon and assumptions
+    And board member has no engineering background but must vote responsibly
+    When the board member uses Observer to understand the decision
+    Then they receive plain-language explanation of technical trade-offs
+    And see comparison of infrastructure approaches used by similar districts
+    And access key questions to ask staff about cost estimates and alternatives
+    And get context on long-term maintenance and rate impacts
+    And accessible expertise enables informed decision without full-time study

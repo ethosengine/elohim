@@ -1,0 +1,23 @@
+# Lenny
+
+Lineman for the power company. Keeping the lights on through storms, heat, and cold. Union proud.
+
+**Profile Reach:** community
+
+**Is Pseudonymous:** false
+
+**Accepting Connections:** true
+
+**Primary Location:** {
+  "layer": "county_regional",
+  "displayName": "Valley County",
+  "reach": "community"
+}
+
+**Organizations:** [object Object], [object Object]
+
+**Communities:** community-utility-workers, community-local-church
+
+**Public Affinities:** infrastructure, electrical-work, union-labor, public-safety, grid-resilience
+
+**Public Attestations:** attestation-journeyman-lineman, attestation-high-voltage-certified

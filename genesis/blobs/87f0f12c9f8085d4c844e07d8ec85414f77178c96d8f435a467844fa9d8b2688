@@ -1,0 +1,10 @@
+Scenario: Nature education and outdoor learning experiences
+    Given Margaret takes grandchildren on nature walks and outdoor activities
+    And they learn about plants, animals, seasons, and environment
+    When the educational_elohim tracks outdoor learning
+    Then it should recognize nature education as valuable teaching
+    And it should value outdoor experiences as developmental care
+    And it should track environmental learning and wonder cultivation
+    And nature education should accumulate care tokens
+    And Margaret's outdoor teaching should be recognized and supported
+    And experiential learning should complement classroom education

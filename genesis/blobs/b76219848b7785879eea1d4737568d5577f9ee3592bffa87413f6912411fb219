@@ -1,0 +1,11 @@
+Scenario: Family privacy boundaries negotiated with Frank's control
+    Given family coordination requires some information sharing
+    And Frank has legitimate need for privacy
+    When family_elohim manages privacy
+    Then Frank must control what information he shares about himself
+    And he should determine what family knows about his health
+    And he should decide what adult children know about his finances
+    And care coordination should not violate his privacy
+    And family should respect his boundaries
+    And privacy should balance coordination needs with autonomy
+    And Frank's dignity requires control over personal information

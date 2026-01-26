@@ -1,0 +1,10 @@
+Scenario: Board member evaluates achievement gap despite test score improvements
+    Given superintendent presents improving test scores as evidence of success
+    And board wants to understand if all students are benefiting from improvements
+    And media reports question equity of district's progress
+    When the board member uses Observer educational equity analysis
+    Then they receive achievement data disaggregated by race, income, and language
+    And see average scores improved but gaps between groups widened
+    And access analysis showing advanced course access concentrated in affluent schools
+    And discover resource distribution favoring already-high-performing schools
+    And equity analysis reveals which students are and aren't being served well

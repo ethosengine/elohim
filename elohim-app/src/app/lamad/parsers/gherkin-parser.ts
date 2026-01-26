@@ -64,7 +64,11 @@ export class GherkinParser {
     const lines = content.split('\n');
     const parseContext = { currentLine: 0 };
 
-    const { tags, featureTitle, descriptionLines } = this.parseFeatureHeader(lines, parseContext, sourcePath);
+    const { tags, featureTitle, descriptionLines } = this.parseFeatureHeader(
+      lines,
+      parseContext,
+      sourcePath
+    );
     const featureId = this.generateId(sourcePath, 'feature');
     const background = this.parseBackground(lines, parseContext);
     const scenarios = this.parseScenarios(lines, parseContext, sourcePath, featureId, tags);
@@ -86,7 +90,7 @@ export class GherkinParser {
       scenarioIds: scenarios.map(s => s.id),
       featureDescription: descriptionLines.join('\n'),
       background,
-      gherkinContent: content
+      gherkinContent: content,
     };
 
     return { feature, scenarios };
@@ -152,7 +156,13 @@ export class GherkinParser {
     const scenarios: ScenarioNode[] = [];
 
     while (parseContext.currentLine < lines.length) {
-      const scenario = this.parseSingleScenario(lines, parseContext, sourcePath, featureId, featureTags);
+      const scenario = this.parseSingleScenario(
+        lines,
+        parseContext,
+        sourcePath,
+        featureId,
+        featureTags
+      );
       if (scenario) {
         scenarios.push(scenario);
       }
@@ -171,7 +181,9 @@ export class GherkinParser {
     const scenarioTags = this.extractTags(lines[parseContext.currentLine]);
     if (scenarioTags.length > 0) parseContext.currentLine++;
 
-    const scenarioMatch = /^\s*(Scenario|Scenario Outline):\s*(.+)$/.exec(lines[parseContext.currentLine] ?? '');
+    const scenarioMatch = /^\s*(Scenario|Scenario Outline):\s*(.+)$/.exec(
+      lines[parseContext.currentLine] ?? ''
+    );
     if (!scenarioMatch) {
       parseContext.currentLine++;
       return null;
@@ -202,7 +214,7 @@ export class GherkinParser {
       epicIds,
       scenarioType,
       steps,
-      examples
+      examples,
     };
   }
 
@@ -227,12 +239,18 @@ export class GherkinParser {
     parseContext: { currentLine: number },
     scenarioType: string
   ): ScenarioExamples[] | undefined {
-    if (scenarioType !== 'scenario_outline' || !/^\s*Examples:/.exec(lines[parseContext.currentLine] ?? '')) {
+    if (
+      scenarioType !== 'scenario_outline' ||
+      !/^\s*Examples:/.exec(lines[parseContext.currentLine] ?? '')
+    ) {
       return undefined;
     }
 
     const examples = this.parseExamples(lines, parseContext.currentLine);
-    while (parseContext.currentLine < lines.length && !/^\s*(Scenario|@)/.exec(lines[parseContext.currentLine])) {
+    while (
+      parseContext.currentLine < lines.length &&
+      !/^\s*(Scenario|@)/.exec(lines[parseContext.currentLine])
+    ) {
       parseContext.currentLine++;
     }
     return examples;
@@ -244,14 +262,14 @@ export class GherkinParser {
 
     return {
       keyword: stepMatch[1],
-      text: stepMatch[2].trim()
+      text: stepMatch[2].trim(),
     };
   }
 
   private static parseExamples(lines: string[], startLine: number): ScenarioExamples[] {
     const examples: ScenarioExamples = {
       headers: [],
-      rows: []
+      rows: [],
     };
 
     let currentLine = startLine + 1;
@@ -286,9 +304,7 @@ export class GherkinParser {
   }
 
   private static extractEpicIds(tags: string[]): string[] {
-    return tags
-      .filter(tag => tag.startsWith('epic:'))
-      .map(tag => tag.substring(5));
+    return tags.filter(tag => tag.startsWith('epic:')).map(tag => tag.substring(5));
   }
 
   private static generateId(sourcePath: string, type: string, title?: string): string {

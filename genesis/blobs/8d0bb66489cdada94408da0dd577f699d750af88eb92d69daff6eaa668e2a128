@@ -1,0 +1,12 @@
+Scenario: Accessing informal neighborhood support during acute crisis
+    Given I am experiencing acute crisis (no food, utility shutoff, safety emergency)
+    And I need immediate neighborhood-level support
+    When crisis requires rapid local response
+    Then the Value Scanner connects me to immediate neighborhood resources
+    And identifies neighbors who've offered emergency support
+    And facilitates rapid requests for help through care economy network
+    And helps me access emergency assistance without shame
+    And validates that asking for crisis help is appropriate
+    And my personal_agent surfaces most appropriate immediate resources
+    And recognizes that everyone experiences crises requiring community support
+    And ensures rapid connection to neighborhood mutual aid

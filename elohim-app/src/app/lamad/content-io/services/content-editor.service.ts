@@ -1,9 +1,12 @@
 import { Injectable } from '@angular/core';
+
 import { Observable, of, throwError } from 'rxjs';
+
 import { ContentNode } from '../../models/content-node.model';
-import { ContentFormatRegistryService } from './content-format-registry.service';
 import { ContentIOExportInput } from '../interfaces/content-io-plugin.interface';
 import { ValidationResult } from '../interfaces/validation-result.interface';
+
+import { ContentFormatRegistryService } from './content-format-registry.service';
 
 /**
  * ContentEditorService - High-level content editing operations.
@@ -22,15 +25,13 @@ import { ValidationResult } from '../interfaces/validation-result.interface';
  * it focuses on business logic around content editing.
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ContentEditorService {
   /** Draft storage for unsaved changes (prototype) */
   private readonly drafts = new Map<string, ContentDraft>();
 
-  constructor(
-    private readonly registry: ContentFormatRegistryService
-  ) {}
+  constructor(private readonly registry: ContentFormatRegistryService) {}
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Permissions
@@ -101,7 +102,7 @@ export class ContentEditorService {
       content: this.nodeToExportInput(node),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      isDirty: false
+      isDirty: false,
     };
 
     this.drafts.set(draft.id, draft);
@@ -126,11 +127,11 @@ export class ContentEditorService {
         contentType: initialData?.contentType ?? 'concept',
         description: initialData?.description ?? '',
         tags: initialData?.tags ?? [],
-        metadata: initialData?.metadata ?? {}
+        metadata: initialData?.metadata ?? {},
       },
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      isDirty: true
+      isDirty: true,
     };
 
     this.drafts.set(draft.id, draft);
@@ -205,11 +206,13 @@ export class ContentEditorService {
       return {
         valid: true,
         errors: [],
-        warnings: [{
-          code: 'NO_PLUGIN',
-          message: `No format plugin for "${formatId}". Content may not render correctly.`,
-          suggestion: 'Consider using a supported format like markdown or gherkin.'
-        }]
+        warnings: [
+          {
+            code: 'NO_PLUGIN',
+            message: `No format plugin for "${formatId}". Content may not render correctly.`,
+            suggestion: 'Consider using a supported format like markdown or gherkin.',
+          },
+        ],
       };
     }
 
@@ -251,7 +254,7 @@ export class ContentEditorService {
       success: true,
       nodeId: draft.originalNodeId ?? this.generateNodeId(draft.content.title),
       message: 'Content saved to draft. Holochain persistence not yet implemented.',
-      draft
+      draft,
     });
   }
 
@@ -292,7 +295,7 @@ export class ContentEditorService {
       contentType: node.contentType,
       tags: [...node.tags],
       metadata: { ...node.metadata },
-      relatedNodeIds: [...node.relatedNodeIds]
+      relatedNodeIds: [...node.relatedNodeIds],
     };
   }
 

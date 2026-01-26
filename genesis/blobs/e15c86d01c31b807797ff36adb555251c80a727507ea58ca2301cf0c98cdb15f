@@ -1,0 +1,10 @@
+Scenario: Participating in community governance as young adult
+    Given the community makes collective decisions
+    And Aisha is establishing her adult voice
+    When community governance processes occur
+    Then the community_elohim should facilitate her participation
+    And her voice should count in community decisions
+    And her contributions should give her legitimate standing
+    And the system should help her learn community governance
+    And young adults should be included as full community participants
+    And care economy should enable democratic participation

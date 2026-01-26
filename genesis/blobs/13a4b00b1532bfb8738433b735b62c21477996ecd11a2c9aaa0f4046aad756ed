@@ -1,0 +1,9 @@
+Scenario: Teacher tracks administrator promises
+    Given the principal promised to reduce paperwork burden
+    And six months have passed
+    When the Observer tracks promise implementation
+    Then teachers document paperwork actually increased 15%
+    And evidence shows gap between promise and reality
+    And teachers bring accountability data to next site council
+    And administrator either delivers on commitment or explains why not
+    And promises become enforceable through transparency

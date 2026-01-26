@@ -1,0 +1,10 @@
+Scenario: Municipal parks and recreation optimized for senior use
+    Given Margaret needs physical activity for health
+    And public spaces should serve all ages
+    When the municipality_elohim provides recreation information
+    Then parks should have senior-appropriate amenities
+    And walking paths, benches, and accessibility should be prioritized
+    And recreation programs should include senior activities
+    And public space should support active aging
+    And municipal planning should consider senior needs
+    And Margaret should have access to health-supporting public resources

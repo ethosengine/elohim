@@ -1,0 +1,155 @@
+@epic:value_scanner
+@user_type:retired
+@governance_layer:municipality
+@related_users:citizen,voter,senior,volunteer,advocate,elder
+@related_layers:community,neighborhood,individual,household
+@elohim_agents:personal_agent,community_elohim,municipal_elohim
+
+Feature: Municipality Layer Value Recognition for Retired Person
+  As a retired person in the value scanner system
+  Operating at the municipality governance layer
+  I want my civic participation valued and elder needs addressed in municipal policy
+  So that retirement is recognized as continued citizenship and municipalities serve all ages
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the retired user "Frank" is registered in the system
+    And Frank is 70 years old, retired from construction
+    And Frank participates actively in municipal civic life
+    And the municipality governance context is active
+    And the municipal_elohim coordinates civic engagement and policy
+    And Frank's volunteer work addresses needs municipal policy should handle
+
+  Scenario: Volunteer labor addressing municipal housing needs quantified
+    Given Frank volunteers 20 hours/week with Habitat for Humanity
+    And Habitat builds affordable housing the municipality fails to provide
+    And his volunteer work substitutes for municipal housing policy
+    When the municipal_elohim tracks housing care economy
+    Then Frank's volunteer construction work should be quantified
+    And aggregate volunteer labor should be calculated municipality-wide
+    And data should reveal that volunteers provide housing infrastructure
+    And municipal housing policy should recognize volunteer contributions
+    And Frank's work should demonstrate need for municipal investment
+    And volunteers should be understood as filling municipal policy gaps
+
+  Scenario: Retired residents as civic engagement resource for municipal governance
+    Given Frank has time freedom enabling substantial civic participation
+    And many retired residents can attend daytime meetings and hearings
+    When the municipal_elohim coordinates civic engagement
+    Then it should recognize retired residents as civic participation resource
+    And facilitate their attendance at municipal meetings and hearings
+    And coordinate testimony and advocacy utilizing their availability
+    And recognize civic engagement as care contribution
+    And retired residents should be understood as democracy infrastructure
+    And Frank should participate meaningfully in municipal governance
+    And elder voice should shape municipal policy
+
+  Scenario: Municipal care economy data informs retirement policy
+    Given Frank's care contributions are tracked through Value Scanner
+    And municipal data reveals aggregate retired resident contributions
+    When the municipal_elohim analyzes retirement care economy
+    Then it should quantify total volunteer labor from retired residents
+    And calculate market value of unpaid care work (~millions annually)
+    And surface that retired residents provide massive municipal value
+    And inform policy recognizing caregiving in benefit calculations
+    And demonstrate that retirement is transition to care work, not exit from contribution
+    And support municipal policy that values and supports retired residents
+
+  Scenario: Municipal services accessibility for aging residents
+    Given Frank is aging and may have mobility or transportation limitations
+    And municipal services should remain accessible to all residents
+    When the municipal_elohim coordinates service accessibility
+    Then it should ensure public buildings are physically accessible
+    And public transit should serve aging residents' mobility needs
+    And municipal services should be available in formats accessible to aging users
+    And digital services should accommodate aging-related changes
+    And Frank should access municipal services with dignity
+    And universal design should serve residents across lifespan
+
+  Scenario: Municipal food security programs recognize retired residents on fixed income
+    Given Frank lives on $28k/year fixed income
+    And food costs are significant portion of limited budget
+    When the municipal_elohim coordinates food security
+    Then Frank should access municipal food programs without stigma
+    And his care contributions should be visible in program eligibility
+    And food assistance should be framed as reciprocity, not charity
+    And municipal programs should recognize his volunteer contributions
+    And care economy should connect to food security infrastructure
+    And Frank should experience dignity in accessing food resources
+
+  Scenario: Municipal public transit serves retired residents without car access
+    Given Frank may not be able to afford car ownership
+    And he relies on public transit and walking
+    When the municipal_elohim coordinates transportation
+    Then public transit should serve Frank's mobility needs effectively
+    And routes and schedules should accommodate non-employment patterns
+    And transit should enable access to medical, social, and civic destinations
+    And affordable transit should support continued community participation
+    And Frank should maintain mobility and independence through public infrastructure
+    And municipal transportation should serve residents across lifespan
+
+  Scenario: Municipal recreation and social programs prevent elder isolation
+    Given Frank needs social connection to maintain wellbeing
+    And isolation increases with age without intentional connection
+    When the municipal_elohim coordinates social infrastructure
+    Then it should provide programs connecting retired residents
+    And senior centers should be framed as community hubs, not warehouses
+    And programs should facilitate continued contribution and purpose
+    And Frank should access social connection through municipal infrastructure
+    And elder isolation should be prevented through public programs
+    And municipal policy should recognize social connection as health infrastructure
+
+  Scenario: Municipal planning includes elder wisdom and long-term perspective
+    Given Frank has lived in the municipality for decades
+    And he's observed long-term patterns and changes
+    When the municipal_elohim facilitates planning processes
+    Then it should actively seek Frank's long-term perspective
+    And elder wisdom should inform infrastructure and policy decisions
+    And decades of observation should guide municipal adaptation
+    And Frank's experience should be valued in planning conversations
+    And municipal governance should benefit from elder knowledge
+    And intergenerational planning should integrate experienced voices
+
+  Scenario: Municipal healthcare coordination supports aging residents
+    Given Frank and his wife both have aging-related healthcare needs
+    And navigating healthcare is increasingly complex
+    When the municipal_elohim coordinates healthcare access
+    Then it should help Frank navigate Medicare and healthcare systems
+    And coordinate with municipal health services
+    And support access to preventive and chronic care
+    And connect healthcare to care economy support systems
+    And Frank should maintain health through accessible municipal infrastructure
+    And municipal health policy should serve aging residents effectively
+
+  Scenario: Municipal emergency preparedness utilizes retired residents' availability
+    Given Frank has daytime availability and construction skills
+    And municipalities need emergency response capacity
+    When the municipal_elohim coordinates emergency preparedness
+    Then it should include retired residents in emergency planning
+    And utilize their skills and availability for emergency response
+    And coordinate community-level resilience with municipal systems
+    And recognize retired residents as municipal emergency resource
+    And Frank should contribute meaningfully to collective safety
+    And municipal preparedness should leverage care economy networks
+
+  Scenario: Municipal recognition of informal care work in economic indicators
+    Given Frank provides substantial unpaid care work
+    And traditional municipal economic indicators ignore care economy
+    When the municipal_elohim tracks economic activity
+    Then it should include care work in municipal economic reporting
+    And Frank's volunteer labor should be counted in economic indicators
+    And municipal GDP should reflect care economy contributions
+    And retirement should be understood as economic participation
+    And policy should be based on complete economic picture
+    And Frank's contributions should be visible in municipal economics
+
+  Scenario: Municipal housing policy supports aging in place
+    Given Frank wants to age in his community
+    And housing costs are significant on fixed income
+    When the municipal_elohim coordinates housing policy
+    Then it should support policies enabling aging in place
+    And affordable housing should serve retired residents on fixed income
+    And Frank should not be displaced by rising housing costs
+    And municipal policy should recognize his decades of community contribution
+    And housing should be treated as right, not commodity
+    And care economy contributions should inform housing access

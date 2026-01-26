@@ -1,0 +1,10 @@
+Scenario: Planning commissioner understands environmental justice dimensions of industrial permit
+    Given commission evaluates permit for industrial facility citing pollution
+    And facility meets regulatory standards according to staff analysis
+    And community members testify about existing pollution burden but lack data
+    When the commissioner seeks environmental justice analysis from Observer
+    Then they receive cumulative pollution exposure data for affected neighborhood
+    And see demographics showing low-income community of color already overburdened
+    And access health outcome data correlating with pollution exposure
+    And discover neighborhood has multiple polluting facilities unlike affluent areas
+    And environmental justice analysis reveals disparate impacts standard permitting ignores

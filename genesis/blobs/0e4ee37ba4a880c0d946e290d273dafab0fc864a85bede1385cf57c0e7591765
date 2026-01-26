@@ -1,0 +1,11 @@
+Scenario: Local knowledge preservation through elderly memory keeping
+    Given Helen remembers 40 years of neighborhood changes
+    And this knowledge has cultural and practical value
+    When neighborhood planning and decisions occur
+    Then the neighborhood_elohim should surface Helen's historical knowledge
+    And her memory of neighborhood patterns should inform planning
+    And oral history should be captured for community archive
+    And Helen should be recognized as neighborhood historian
+    And her contribution to collective memory should be valued
+    And the protocol should preserve local knowledge through elder participation
+    And community memory should include longtime residents' perspectives

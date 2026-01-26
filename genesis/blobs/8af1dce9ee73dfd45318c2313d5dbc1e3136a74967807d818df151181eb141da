@@ -1,0 +1,9 @@
+Scenario: Developer subsidy accountability reveals actual outcomes
+    Given a developer received $10M state tax credit for "affordable housing"
+    And claimed it would produce 200 affordable units
+    When the Observer tracks subsidy outcomes
+    Then analysis shows: only 35 units meet affordability criteria
+    And most units are market-rate generating developer profit
+    And state subsidy mostly subsidized luxury development
+    And taxpayers see poor return on public investment
+    And accountability creates pressure for subsidy reform

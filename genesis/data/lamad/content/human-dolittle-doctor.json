@@ -1,0 +1,58 @@
+{
+  "id": "human-dolittle-doctor",
+  "did": "did:web:elohim.host:human:dolittle-doctor",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Dr. Dolittle",
+  "description": "Medical professional. 30 years experience. I know things they don't teach in schools anymore.",
+  "content": "# Dr. Dolittle\n\nMedical professional. 30 years experience. I know things they don't teach in schools anymore.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Public Affinities:** alternative-medicine, natural-health, medical-freedom, wellness\n\n**Claimed Attestations:** [object Object]\n\n**Flags:** [object Object], [object Object]\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/dolittle-doctor/profile.json",
+  "tags": [
+    "medical-freedom",
+    "flagged",
+    "natural-health",
+    "red-team",
+    "alternative-medicine",
+    "wellness",
+    "human-graph",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "red-team",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [],
+    "hasFlags": true,
+    "flagTypes": [
+      "unverified-credentials",
+      "medical-misinformation"
+    ],
+    "designNotes": "Credentials fraud / authority impersonation."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Dr. Dolittle",
+    "ogDescription": "Medical professional. 30 years experience. I know things they don't teach in schools anymore.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-dolittle-doctor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-dolittle-doctor.jpg",
+    "ogImageAlt": "Dr. Dolittle's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-dolittle-doctor",
+    "identifier": "did:web:elohim.host:human:dolittle-doctor",
+    "name": "Dr. Dolittle",
+    "description": "Medical professional. 30 years experience. I know things they don't teach in schools anymore.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328611",
+  "updatedAt": "2025-12-24T03:05:26.331Z"
+}

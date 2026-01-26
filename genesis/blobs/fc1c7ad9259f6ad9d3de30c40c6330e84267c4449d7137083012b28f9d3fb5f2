@@ -1,0 +1,10 @@
+Scenario: Teaching children that environmental care is care work
+    Given Sarah wants Tommy and Emma to understand ecological stewardship
+    And she's teaching them care economy principles
+    When Sarah teaches environmental practices
+    Then the ecological_elohim should recognize this as value literacy education
+    And teaching ecological care should accumulate care tokens
+    And children should learn that caring for environment is care work
+    And the system should value environmental education as parenting labor
+    And next generation should internalize ecological care as fundamental
+    And Sarah's environmental teaching should be recognized and valued

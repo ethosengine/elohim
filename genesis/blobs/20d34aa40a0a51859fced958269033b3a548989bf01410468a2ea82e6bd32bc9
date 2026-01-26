@@ -1,0 +1,9 @@
+Scenario: Parent advocates for municipal climate action affecting children
+    Given extreme heat days close schools and cancel outdoor activities
+    And the parent worries about children's future climate impacts
+    When the parent reviews municipal climate adaptation plans
+    Then they see schools lack air conditioning for heat waves
+    And learn city has no strategy for protecting children's health
+    And understand children are most vulnerable to climate impacts
+    And connect with other parents concerned about children's futures
+    And municipal climate policy centers children's wellbeing and safety

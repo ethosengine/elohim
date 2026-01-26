@@ -1,0 +1,10 @@
+Scenario: Workplace privacy from family care data
+    Given Sarah's parenting data should not be accessible to employer
+    And strict privacy boundaries are essential
+    When workplace and personal systems interact
+    Then the workplace must have zero access to family care data
+    And Sarah's personal_agent should protect her privacy absolutely
+    And the workplace_elohim should respect complete privacy boundaries
+    And the system should prevent workplace surveillance of personal life
+    And professional and family spheres should remain separate
+    And Sarah's care data should be her sovereign information

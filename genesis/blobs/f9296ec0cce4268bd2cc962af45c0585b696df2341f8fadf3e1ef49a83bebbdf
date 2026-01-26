@@ -1,0 +1,9 @@
+Scenario: After-school supervision coordination for latchkey prevention
+    Given Maria works until 5pm while school ends at 3pm
+    And she cannot afford formal after-school care for three children
+    When children need supervision between school and Maria's work end
+    Then the neighborhood_elohim should coordinate informal after-school care
+    And it should connect Maria to neighbors who are home during those hours
+    And it should track reciprocal care contributions to maintain fairness
+    And neighborhood coordination should provide affordable childcare solution
+    And Maria's children should have safe supervision despite her work schedule

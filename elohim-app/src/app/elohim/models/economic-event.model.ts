@@ -31,11 +31,7 @@
  * - The "De Beers insight": we control flow, not supply
  */
 
-import {
-  REAAction,
-  Measure,
-  ResourceClassification
-} from '@app/elohim/models/rea-bridge.model';
+import { REAAction, Measure, ResourceClassification } from '@app/elohim/models/rea-bridge.model';
 
 // ============================================================================
 // Economic Event
@@ -162,11 +158,11 @@ export interface EconomicEvent {
  * EventState - Processing state of an event.
  */
 export type EventState =
-  | 'pending'      // Created but not yet validated
-  | 'validated'    // Passed validation rules
+  | 'pending' // Created but not yet validated
+  | 'validated' // Passed validation rules
   | 'countersigned' // Both parties have signed (for transfers)
-  | 'disputed'     // Under dispute
-  | 'corrected';   // Superseded by correction event
+  | 'disputed' // Under dispute
+  | 'corrected'; // Superseded by correction event
 
 /**
  * EventSignature - Cryptographic signature on an event.
@@ -196,68 +192,125 @@ export interface EventSignature {
  */
 export type LamadEventType =
   // Attention Events
-  | 'content-view'        // Human viewed content (use + attention)
-  | 'path-step-complete'  // Human completed a step (use + attention)
-  | 'session-start'       // Human began a session (use + attention)
-  | 'session-end'         // Human ended a session (use + attention)
+  | 'content-view' // Human viewed content (use + attention)
+  | 'content-complete' // Human completed content (produce + achievement)
+  | 'path-step-complete' // Human completed a step (use + attention)
+  | 'session-start' // Human began a session (use + attention)
+  | 'session-end' // Human ended a session (use + attention)
+
+  // Assessment Events
+  | 'assessment-start' // Human started assessment (use + attention)
+  | 'assessment-complete' // Human completed assessment (produce + achievement)
+  | 'practice-attempt' // Human attempted practice (use + attention)
+  | 'quiz-submit' // Human submitted quiz (produce + achievement)
 
   // Recognition Events
-  | 'affinity-mark'       // Human marked affinity (appreciate + recognition)
-  | 'endorsement'         // Formal endorsement (appreciate + endorsement)
-  | 'citation'            // Content cited another (cite + recognition)
+  | 'affinity-mark' // Human marked affinity (appreciate + recognition)
+  | 'endorsement' // Formal endorsement (appreciate + endorsement)
+  | 'citation' // Content cited another (cite + recognition)
+  | 'recognition-given' // Recognition given to contributor (appreciate + recognition)
+  | 'recognition-received' // Recognition received (appreciate + recognition)
 
   // Achievement Events
-  | 'path-complete'       // Human completed a path (produce + credential)
-  | 'attestation-grant'   // Attestation granted (produce + attestation)
-  | 'capability-earn'     // Capability developed (produce + credential)
+  | 'path-complete' // Human completed a path (produce + credential)
+  | 'attestation-grant' // Attestation granted (produce + attestation)
+  | 'capability-earn' // Capability developed (produce + credential)
 
   // Creation Events
-  | 'content-create'      // Content created (produce + content)
-  | 'path-create'         // Path created (produce + curation)
-  | 'extension-create'    // Path extension created (produce + curation)
+  | 'content-create' // Content created (produce + content)
+  | 'path-create' // Path created (produce + curation)
+  | 'extension-create' // Path extension created (produce + curation)
 
   // Synthesis Events
-  | 'map-synthesis'       // Elohim synthesized map (deliver-service + synthesis)
-  | 'analysis-complete'   // Elohim completed analysis (deliver-service)
+  | 'map-synthesis' // Elohim synthesized map (deliver-service + synthesis)
+  | 'analysis-complete' // Elohim completed analysis (deliver-service)
 
   // Stewardship Events
-  | 'stewardship-begin'   // Elohim began stewardship (work + stewardship)
-  | 'invitation-send'     // Invitation sent (deliver-service)
-  | 'presence-claim'      // Contributor claimed presence (accept + recognition)
+  | 'stewardship-begin' // Elohim began stewardship (work + stewardship)
+  | 'invitation-send' // Invitation sent (deliver-service)
+  | 'presence-claim' // Contributor claimed presence (accept + recognition)
   | 'recognition-transfer' // Recognition transferred (transfer + recognition)
 
   // Governance Events
-  | 'attestation-revoke'  // Attestation revoked (modify + attestation)
-  | 'content-flag'        // Content flagged (modify + content)
-  | 'governance-vote'     // Governance vote cast (work + governance)
+  | 'attestation-revoke' // Attestation revoked (modify + attestation)
+  | 'content-flag' // Content flagged (modify + content)
+  | 'governance-vote' // Governance vote cast (work + governance)
 
   // Currency Events (Unyt integration)
-  | 'credit-issue'        // Mutual credit issued (produce + currency)
-  | 'credit-transfer'     // Credit transferred (transfer + currency)
-  | 'credit-retire';      // Credit retired (consume + currency)
+  | 'credit-issue' // Mutual credit issued (produce + currency)
+  | 'credit-transfer' // Credit transferred (transfer + currency)
+  | 'credit-retire' // Credit retired (consume + currency)
+
+  // Insurance Mutual Events (Elohim Mutual)
+  | 'premium-payment' // Member paid premium (transfer + currency)
+  | 'claim-filed' // Member filed claim (deliver-service + adjustment)
+  | 'claim-evidence-submitted' // Supporting docs attached (deliver-service + adjustment)
+  | 'claim-investigated' // Adjuster gathering evidence (work + adjustment)
+  | 'claim-adjusted' // Adjuster made determination (deliver-service + adjustment)
+  | 'claim-settled' // Claim paid (transfer + currency)
+  | 'claim-denied' // Claim rejected (modify + adjustment)
+  | 'claim-appealed' // Member appealed decision (work + adjustment)
+  | 'risk-reduction-verified' // Observer verified risk mitigation (raise + recognition)
+  | 'preventive-care-completed' // Member completed prevention activity (produce + stewardship)
+  | 'prevention-incentive-awarded' // Premium discount/reward for risk mitigation (raise + care-token)
+  | 'coverage-decision' // Community decided coverage (work + membership)
+  | 'claim-review-initiated' // Governance review of adjuster decision (work + membership)
+  | 'reserve-adjustment' // Regulatory reserve change (modify + currency)
+
+  // Consent & Data Economy Events (ImagoDei/Qahal Research)
+  | 'consent-grant' // Human granted consent for data use (produce + consent)
+  | 'consent-withdraw' // Human withdrew consent (modify + consent)
+  | 'data-access' // Researcher accessed data under consent (use + data)
+  | 'data-value-transfer' // Value transferred for data access (transfer + token)
+  | 'consent-audit-complete' // Periodic consent review completed (work + stewardship)
+  | 'research-response-submit'; // Research assessment response submitted (produce + data)
 
 /**
  * Event type to action+resource mapping.
  */
-export const LAMAD_EVENT_MAPPINGS: Record<LamadEventType, {
-  action: REAAction;
-  resourceType: ResourceClassification;
-  defaultUnit: string;
-}> = {
+export const LAMAD_EVENT_MAPPINGS: Record<
+  LamadEventType,
+  {
+    action: REAAction;
+    resourceType: ResourceClassification;
+    defaultUnit: string;
+  }
+> = {
   // Attention
   'content-view': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-view' },
+  'content-complete': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
   'path-step-complete': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-step' },
   'session-start': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-session' },
   'session-end': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-minute' },
 
+  // Assessment
+  'assessment-start': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-each' },
+  'assessment-complete': {
+    action: 'produce',
+    resourceType: 'credential',
+    defaultUnit: 'unit-each',
+  },
+  'practice-attempt': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-each' },
+  'quiz-submit': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
+
   // Recognition
   'affinity-mark': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-affinity' },
-  'endorsement': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-endorsement' },
-  'citation': { action: 'cite', resourceType: 'recognition', defaultUnit: 'unit-each' },
+  endorsement: { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-endorsement' },
+  citation: { action: 'cite', resourceType: 'recognition', defaultUnit: 'unit-each' },
+  'recognition-given': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-each' },
+  'recognition-received': {
+    action: 'raise',
+    resourceType: 'recognition',
+    defaultUnit: 'unit-each',
+  },
 
   // Achievement
   'path-complete': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
-  'attestation-grant': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-attestation' },
+  'attestation-grant': {
+    action: 'produce',
+    resourceType: 'credential',
+    defaultUnit: 'unit-attestation',
+  },
   'capability-earn': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
 
   // Creation
@@ -266,17 +319,37 @@ export const LAMAD_EVENT_MAPPINGS: Record<LamadEventType, {
   'extension-create': { action: 'produce', resourceType: 'curation', defaultUnit: 'unit-each' },
 
   // Synthesis
-  'map-synthesis': { action: 'deliver-service', resourceType: 'synthesis', defaultUnit: 'unit-each' },
-  'analysis-complete': { action: 'deliver-service', resourceType: 'synthesis', defaultUnit: 'unit-each' },
+  'map-synthesis': {
+    action: 'deliver-service',
+    resourceType: 'synthesis',
+    defaultUnit: 'unit-each',
+  },
+  'analysis-complete': {
+    action: 'deliver-service',
+    resourceType: 'synthesis',
+    defaultUnit: 'unit-each',
+  },
 
   // Stewardship
   'stewardship-begin': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
-  'invitation-send': { action: 'deliver-service', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'invitation-send': {
+    action: 'deliver-service',
+    resourceType: 'stewardship',
+    defaultUnit: 'unit-each',
+  },
   'presence-claim': { action: 'accept', resourceType: 'recognition', defaultUnit: 'unit-affinity' },
-  'recognition-transfer': { action: 'transfer', resourceType: 'recognition', defaultUnit: 'unit-affinity' },
+  'recognition-transfer': {
+    action: 'transfer',
+    resourceType: 'recognition',
+    defaultUnit: 'unit-affinity',
+  },
 
   // Governance
-  'attestation-revoke': { action: 'modify', resourceType: 'credential', defaultUnit: 'unit-attestation' },
+  'attestation-revoke': {
+    action: 'modify',
+    resourceType: 'credential',
+    defaultUnit: 'unit-attestation',
+  },
   'content-flag': { action: 'modify', resourceType: 'content', defaultUnit: 'unit-node' },
   'governance-vote': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
 
@@ -284,6 +357,66 @@ export const LAMAD_EVENT_MAPPINGS: Record<LamadEventType, {
   'credit-issue': { action: 'produce', resourceType: 'currency', defaultUnit: 'unit-token' },
   'credit-transfer': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
   'credit-retire': { action: 'consume', resourceType: 'currency', defaultUnit: 'unit-token' },
+
+  // Insurance Mutual Events
+  'premium-payment': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
+  'claim-filed': {
+    action: 'deliver-service',
+    resourceType: 'stewardship',
+    defaultUnit: 'unit-each',
+  },
+  'claim-evidence-submitted': {
+    action: 'deliver-service',
+    resourceType: 'stewardship',
+    defaultUnit: 'unit-each',
+  },
+  'claim-investigated': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-adjusted': {
+    action: 'deliver-service',
+    resourceType: 'stewardship',
+    defaultUnit: 'unit-each',
+  },
+  'claim-settled': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
+  'claim-denied': { action: 'modify', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-appealed': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'risk-reduction-verified': {
+    action: 'raise',
+    resourceType: 'recognition',
+    defaultUnit: 'unit-affinity',
+  },
+  'preventive-care-completed': {
+    action: 'produce',
+    resourceType: 'stewardship',
+    defaultUnit: 'unit-each',
+  },
+  'prevention-incentive-awarded': {
+    action: 'raise',
+    resourceType: 'care-token',
+    defaultUnit: 'unit-token',
+  },
+  'coverage-decision': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
+  'claim-review-initiated': {
+    action: 'work',
+    resourceType: 'membership',
+    defaultUnit: 'unit-each',
+  },
+  'reserve-adjustment': { action: 'modify', resourceType: 'currency', defaultUnit: 'unit-token' },
+
+  // Consent & Data Economy Events
+  'consent-grant': { action: 'produce', resourceType: 'consent', defaultUnit: 'unit-each' },
+  'consent-withdraw': { action: 'modify', resourceType: 'consent', defaultUnit: 'unit-each' },
+  'data-access': { action: 'use', resourceType: 'data', defaultUnit: 'unit-each' },
+  'data-value-transfer': {
+    action: 'transfer',
+    resourceType: 'data-token',
+    defaultUnit: 'unit-token',
+  },
+  'consent-audit-complete': {
+    action: 'work',
+    resourceType: 'stewardship',
+    defaultUnit: 'unit-each',
+  },
+  'research-response-submit': { action: 'produce', resourceType: 'data', defaultUnit: 'unit-each' },
 };
 
 // ============================================================================
@@ -535,12 +668,12 @@ export interface EventCorrection {
  * CorrectionReason - Why an event was corrected.
  */
 export type CorrectionReason =
-  | 'data-error'         // Wrong data entered
-  | 'duplicate'          // Duplicate event
-  | 'fraud'              // Fraudulent event
-  | 'governance-order'   // Governance decision
-  | 'agent-request'      // Agent requested correction
-  | 'system-error';      // System malfunction
+  | 'data-error' // Wrong data entered
+  | 'duplicate' // Duplicate event
+  | 'fraud' // Fraudulent event
+  | 'governance-order' // Governance decision
+  | 'agent-request' // Agent requested correction
+  | 'system-error'; // System malfunction
 
 // ============================================================================
 // Agent Perspective (REA's "Independent View")
@@ -630,7 +763,7 @@ export interface NetworkEconomicMetrics {
     totalFlowed: number;
     toContributorPresences: number;
     toClaimedContributors: number;
-    topRecipients: Array<{ agentId: string; amount: number }>;
+    topRecipients: { agentId: string; amount: number }[];
   };
 
   /** Stewardship metrics */
@@ -698,4 +831,92 @@ export interface UnytEventAdapter {
 
   /** Get credit limit for an agent */
   getCreditLimit(agentId: string): Promise<Measure>;
+}
+
+// =============================================================================
+// Wire Format (Diesel Backend)
+// =============================================================================
+
+/**
+ * EconomicEventWire - Backend wire format (camelCase).
+ * Maps to the economic_events table in elohim-storage.
+ */
+export interface EconomicEventWire {
+  id: string;
+  appId: string;
+  action: string;
+  provider: string;
+  receiver: string;
+  resourceConformsTo: string | null;
+  resourceQuantityValue: number | null;
+  resourceQuantityUnit: string | null;
+  hasPointInTime: string;
+  lamadEventType: string | null;
+  contentId: string | null;
+  contributorPresenceId: string | null;
+  pathId: string | null;
+  state: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/**
+ * Transform wire format to EconomicEvent.
+ */
+export function transformEventFromWire(wire: EconomicEventWire): EconomicEvent {
+  const metadata = wire.metadata ?? undefined;
+
+  // Extract lamad-specific metadata
+  if (metadata) {
+    metadata['lamadEventType'] = wire.lamadEventType;
+    metadata['contentId'] = wire.contentId;
+    metadata['presenceId'] = wire.contributorPresenceId;
+    metadata['pathId'] = wire.pathId;
+  }
+
+  return {
+    id: wire.id,
+    action: wire.action as REAAction,
+    provider: wire.provider,
+    receiver: wire.receiver,
+    resourceConformsTo: wire.resourceConformsTo ?? undefined,
+    resourceQuantity:
+      wire.resourceQuantityValue != null
+        ? {
+            hasNumericalValue: wire.resourceQuantityValue,
+            hasUnit: wire.resourceQuantityUnit ?? 'unit-each',
+          }
+        : undefined,
+    hasPointInTime: wire.hasPointInTime,
+    state: wire.state as EventState,
+    metadata,
+  };
+}
+
+/**
+ * Transform EconomicEvent to wire format for backend.
+ */
+export function transformEventToWire(
+  event: EconomicEvent,
+  appId = 'shefa'
+): Omit<EconomicEventWire, 'createdAt'> {
+  const metadata = event.metadata as Record<string, unknown> | undefined;
+
+  return {
+    id: event.id,
+    appId: appId,
+    action: event.action,
+    provider: event.provider,
+    receiver: event.receiver,
+    resourceConformsTo: event.resourceConformsTo ?? null,
+    resourceQuantityValue: event.resourceQuantity?.hasNumericalValue ?? null,
+    resourceQuantityUnit: event.resourceQuantity?.hasUnit ?? null,
+    hasPointInTime: event.hasPointInTime,
+    lamadEventType: (metadata?.['lamadEventType'] as string) ?? null,
+    contentId: (metadata?.['contentId'] as string) ?? null,
+    contributorPresenceId: (metadata?.['presenceId'] as string) ?? null,
+    pathId: (metadata?.['pathId'] as string) ?? null,
+    state: event.state,
+    metadata: event.metadata ?? null,
+  };
 }

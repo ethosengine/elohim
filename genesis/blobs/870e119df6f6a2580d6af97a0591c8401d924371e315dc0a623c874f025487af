@@ -1,0 +1,7 @@
+Scenario: Coordinating household care during schedule conflicts
+    Given my work schedule conflicts with household needs
+    When household tasks need completion and I am working
+    Then the protocol should help coordinate coverage
+    And enable roommates to handle urgent needs
+    And track that I contribute when available
+    And maintain fairness over time despite schedule conflicts

@@ -1,0 +1,9 @@
+Scenario: Community caregiver support networks connect isolated caregivers
+    Given James is profoundly isolated by intensive caregiving
+    And connection to other caregivers is essential for survival
+    When the community_elohim connects caregivers
+    Then James should access support groups for Alzheimer's caregivers
+    And he should connect with other sandwich generation caregivers
+    And he should find LGBTQ+ caregiver community if desired
+    And support networks should provide practical advice and emotional support
+    And community should actively prevent caregiver isolation

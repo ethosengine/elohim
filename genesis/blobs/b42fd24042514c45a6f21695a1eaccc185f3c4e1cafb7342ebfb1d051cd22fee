@@ -1,0 +1,12 @@
+Scenario: Maintaining decision-making authority during crisis intervention
+    Given I am experiencing a housing crisis
+    And multiple support agencies want to "help" me
+    When I express my preferences for how I want to resolve the situation
+    Then the Value Scanner supports MY chosen path
+    And does not override my decisions with institutional preferences
+    And tracks my decision-making as evidence of my capability
+    And connects me to resources that respect my autonomy
+    And my personal_agent advocates for my choices in institutional contexts
+    And the system recognizes that I am the expert on my own life
+    And support is offered as scaffolding, not control
+    And my agency is preserved even while I'm receiving assistance

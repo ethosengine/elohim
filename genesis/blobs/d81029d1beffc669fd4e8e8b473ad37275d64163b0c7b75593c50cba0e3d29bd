@@ -1,0 +1,9 @@
+Scenario: Access to global appeal precedent database
+    Given Marcus wants to understand how similar appeals were resolved globally
+    When Marcus searches the global constitutional precedent database
+    Then he finds anonymized cases from dozens of countries
+    And he sees how different cultures interpret privacy versus care
+    And he understands constitutional reasoning across contexts
+    And he can cite global precedent in his own appeal
+    And he learns his case is not isolated but part of human pattern
+    And the database empowers appellants worldwide with shared knowledge

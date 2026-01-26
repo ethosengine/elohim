@@ -1,0 +1,9 @@
+Scenario: Extended family care reciprocity across generations
+    Given Sarah's parents provided care for her as a child
+    And she's now providing care to them as they age
+    When multi-generational care patterns are tracked
+    Then the family_elohim should recognize reciprocal care flows
+    And care should be seen as flowing both ways across time
+    And Sarah's care for parents should be valued
+    And parents' previous care for Sarah should be acknowledged
+    And multi-generational reciprocity should be visible

@@ -1,0 +1,10 @@
+Scenario: Climate anxiety and ecological grief with children
+    Given children are aware of environmental crisis
+    And Tommy and Emma may experience climate anxiety
+    When Sarah supports children's ecological emotions
+    Then the personal_agent should recognize this as emotional care work
+    And it should help Sarah process her own climate grief
+    And it should provide resources for talking with children about climate
+    And supporting children's environmental feelings should be valued
+    And the system should recognize emotional dimension of ecological parenting
+    And Sarah's work navigating climate crisis with children should be supported

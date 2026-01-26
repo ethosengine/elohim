@@ -1,0 +1,10 @@
+Scenario: Workplace skills integrated with broader capability development
+    Given Jasmine learns customer service, inventory management, and problem-solving at work
+    And these skills transfer to other contexts
+    When her personal_agent tracks skill development
+    Then it should recognize skills gained through work
+    And surface how workplace skills apply to other life contexts
+    And connect to educational and career planning
+    And help her see work as capability building, not just income
+    And integrate workplace learning with her overall development
+    And value skills development as part of work's worth

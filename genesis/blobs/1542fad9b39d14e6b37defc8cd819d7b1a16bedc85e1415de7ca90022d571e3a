@@ -1,0 +1,9 @@
+Scenario: Municipal resource allocation reflects care economy contributions
+    Given Sarah and others contribute substantially to community care
+    And municipal budgets allocate significant resources
+    When municipal budgets are decided
+    Then care economy contributions should be visible to decision makers
+    And resource allocation should recognize care creates value
+    And neighborhoods with strong care economy should receive support
+    And municipal investment should strengthen care economy infrastructure
+    And budgets should reflect that care work is economically valuable

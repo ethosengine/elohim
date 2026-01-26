@@ -1,0 +1,11 @@
+Scenario: Accessing community recreational programs inclusively
+    Given the community rec center offers adaptive sports programs
+    And Jordan loves playing basketball
+    When Jordan joins the adaptive basketball league
+    Then registration uses accessible language and processes
+    And Jordan participates in the sport at their capability level
+    And coaches treat Jordan as an athlete, not a charity case
+    And Jordan's teammates are peers with various abilities
+    And Jordan's athletic participation contributes to team success
+    And Jordan experiences joy, competition, and physical activity
+    And Jordan's community participation is normalized, not special

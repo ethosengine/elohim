@@ -1,0 +1,11 @@
+Scenario: Remote work as disability accommodation maintains employment access
+    Given Alex works remotely as necessary accommodation
+    And remote work enables Alex's employment despite mobility limitations
+    When workplace policies change
+    Then Alex's right to remote work accommodation should be protected
+    And the workplace_elohim should document remote work as accommodation
+    And employer cannot eliminate remote work for Alex without undue hardship proof
+    And Alex's legal right to accommodation should override general policy changes
+    And the protocol should help Alex defend remote work arrangement
+    And pandemic-normalized remote work should benefit disabled workers permanently
+    And Alex should not lose employment due to return-to-office mandates

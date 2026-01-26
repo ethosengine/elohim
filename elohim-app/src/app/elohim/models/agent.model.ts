@@ -30,7 +30,7 @@
  * For Elohim agents, additional properties are available.
  */
 export interface Agent {
-  id: string;  // Future: DID or AgentPubKey in Holochain
+  id: string; // Future: DID or AgentPubKey in Holochain
   displayName: string;
   type: 'human' | 'organization' | 'ai-agent' | 'elohim';
 
@@ -125,16 +125,77 @@ export interface AgentProgress {
    * Special pathId '__global__' is used to store this field for cross-path tracking.
    */
   completedContentIds?: string[];
+
+  /**
+   * Content mastery tracking (Bloom's Taxonomy progression).
+   *
+   * Tracks mastery level per content node (by resourceId) across all paths.
+   * This enables:
+   * - Cross-path mastery views (if you're "apply" level in path A, shows in path B)
+   * - UI indicators: seen → practiced → applied → mastered
+   * - Attestation gating (require "apply" level for certain privileges)
+   *
+   * Storage: Stored as Record<resourceId, MasteryLevel>
+   * Special pathId '__global__' is used to store this field for cross-path tracking.
+   */
+  contentMastery?: Record<string, MasteryLevel>;
+}
+
+/**
+ * Simplified mastery tier for UI display.
+ * Maps Bloom's levels to user-friendly tiers.
+ */
+export type MasteryTier = 'unseen' | 'seen' | 'practiced' | 'applied' | 'mastered';
+
+/**
+ * Map MasteryLevel to simplified MasteryTier for UI.
+ */
+export function getMasteryTier(level: MasteryLevel): MasteryTier {
+  switch (level) {
+    case 'not_started':
+      return 'unseen';
+    case 'seen':
+      return 'seen';
+    case 'remember':
+    case 'understand':
+      return 'practiced';
+    case 'apply':
+      return 'applied';
+    case 'analyze':
+    case 'evaluate':
+    case 'create':
+      return 'mastered';
+    default:
+      return 'unseen';
+  }
+}
+
+/**
+ * Get numeric progress percentage for a mastery level.
+ * Useful for progress bars.
+ */
+export function getMasteryProgress(level: MasteryLevel): number {
+  const values: Record<MasteryLevel, number> = {
+    not_started: 0,
+    seen: 15,
+    remember: 30,
+    understand: 50,
+    apply: 70,
+    analyze: 85,
+    evaluate: 95,
+    create: 100,
+  };
+  return values[level] ?? 0;
 }
 
 /**
  * AttestationCategory - Types of attestations
  */
 export type AttestationCategory =
-  | 'domain-mastery'    // Earned via sustained concept mastery
-  | 'path-completion'   // All concepts at impression+ level
-  | 'role-credential'   // Granted by governance process
-  | 'achievement';      // One-time participation recognition
+  | 'domain-mastery' // Earned via sustained concept mastery
+  | 'path-completion' // All concepts at impression+ level
+  | 'role-credential' // Granted by governance process
+  | 'achievement'; // One-time participation recognition
 
 /**
  * MasteryLevel - Content mastery based on Bloom's Taxonomy.
@@ -202,13 +263,9 @@ export function isAboveGate(level: MasteryLevel): boolean {
  * Compare two mastery levels.
  * Returns negative if a < b, zero if equal, positive if a > b.
  */
-export function compareMasteryLevels(
-  a: MasteryLevel,
-  b: MasteryLevel
-): number {
+export function compareMasteryLevels(a: MasteryLevel, b: MasteryLevel): number {
   return MASTERY_LEVEL_VALUES[a] - MASTERY_LEVEL_VALUES[b];
 }
-
 
 /**
  * NewAttestation - Refined attestation model for v2
@@ -222,7 +279,7 @@ export interface NewAttestation {
 
   // What kind of attestation is this?
   category: AttestationCategory;
-  attestationType: string;        // Specific type within category
+  attestationType: string; // Specific type within category
 
   // How it was earned (depends on category)
   earnedVia: {
@@ -247,16 +304,22 @@ export interface NewAttestation {
 
   // Verification
   issuedAt: string;
-  issuedBy: string;               // System, steward, governance, or peer
-  expiresAt?: string;             // Optional expiration (for role credentials)
-  proof?: string;                 // Cryptographic signature in production
+  issuedBy: string; // System, steward, governance, or peer
+  expiresAt?: string; // Optional expiration (for role credentials)
+  proof?: string; // Cryptographic signature in production
 
   // Display metadata
   displayName: string;
   description: string;
   iconUrl?: string;
-  tier?: 'bronze' | 'silver' | 'gold' | 'platinum';  // Visual distinction
+  tier?: 'bronze' | 'silver' | 'gold' | 'platinum'; // Visual distinction
 }
+
+/**
+ * AgentAttestation - Clearer alias for attestations about agents.
+ * Distinct from ContentAttestation (trust claims about content).
+ */
+export type AgentAttestation = NewAttestation;
 
 /**
  * FrontierItem - An item on the learning frontier (what's next?)

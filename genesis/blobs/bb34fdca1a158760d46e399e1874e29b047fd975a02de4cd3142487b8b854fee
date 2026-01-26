@@ -1,0 +1,11 @@
+Scenario: Reciprocal care flows across three generations
+    Given Margaret receives some support from Sarah as she ages
+    And Margaret provides childcare for Sarah's children
+    And Margaret provides elder care for her own mother
+    When the family_elohim analyzes multigenerational care patterns
+    Then it should show care flowing in multiple directions
+    And it should ensure care is not unidirectionally extractive
+    And it should recognize reciprocity across time and generations
+    And family relationships should be based on mutual support
+    And care economy should be sustainable across generations
+    And the system should enable healthy multigenerational care patterns

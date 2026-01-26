@@ -1,0 +1,10 @@
+Scenario: Community care economy smooths young adult economic vulnerability
+    Given Aisha has adult responsibility without established resources
+    And this is a particularly vulnerable life phase
+    When Aisha participates in community care economy
+    Then the community_elohim should provide safety net
+    And it should connect her to resources during crisis
+    And it should enable access to community support
+    And the system should reduce young adult economic precarity
+    And community care should buffer individual vulnerability
+    And mutual aid should support those in transition

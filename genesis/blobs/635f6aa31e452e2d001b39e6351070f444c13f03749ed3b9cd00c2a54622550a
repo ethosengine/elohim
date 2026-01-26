@@ -1,0 +1,11 @@
+Scenario: Teen participates in family financial planning
+    Given the family is planning for the coming year
+    And Jasmine has savings goals for college
+    And she contributes to household income through her part-time work
+    When the family_elohim facilitates financial planning
+    Then Jasmine should be included in the planning process
+    And her goals should be incorporated into family financial strategy
+    And she should learn how families make long-term financial decisions
+    And her contributions (both household labor and income) should be factored into planning
+    And she should practice the financial planning skills she'll need as an adult
+    And the family should model transparent, participatory financial governance

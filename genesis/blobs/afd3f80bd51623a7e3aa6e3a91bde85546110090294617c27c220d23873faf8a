@@ -1,0 +1,9 @@
+Scenario: Workers coordinate political advocacy for democratic business policies
+    Given municipal government is considering economic development policies
+    And workers want policies supporting democratic ownership
+    When sector workers organize advocacy campaign
+    Then workers from multiple EAE entities testify at city council
+    And workers present data on democratic business benefits
+    And workers advocate for procurement preferences and tax incentives
+    And coordinated worker voice influences policy more than isolated entities
+    And sector political power protects and expands democratic economy

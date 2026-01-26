@@ -1,0 +1,7 @@
+Scenario: Coordinating care for family members I support
+    Given I may have dependents or family I support financially
+    When my care responsibilities extend beyond myself
+    Then the protocol should help me coordinate care for dependents
+    And optimize limited resources across family needs
+    And connect me to support systems for working families
+    And recognize that work-family balance requires systemic support

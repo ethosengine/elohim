@@ -1,0 +1,9 @@
+Scenario: Workplace culture shift from extraction to care economy principles
+    Given Sarah's workplace could adopt care economy principles
+    And organizational culture shapes employee well-being
+    When Sarah advocates for cultural change
+    Then the workplace_elohim should support care economy adoption
+    And workplace culture should value employee well-being
+    And success should be measured by care, not just extraction
+    And organizational culture should recognize care creates value
+    And Sarah's workplace should demonstrate care economy in employment

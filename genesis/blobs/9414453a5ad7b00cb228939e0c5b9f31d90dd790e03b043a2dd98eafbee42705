@@ -1,0 +1,12 @@
+Scenario: Creating novel constitutional precedent for new situation
+    Given an appeal presents situation never before encountered
+    And existing precedents don't clearly apply
+    When we engage in deep constitutional interpretation
+    Then we examine: fundamental principles and their application
+    And we consider: multiple interpretations and their implications
+    And we consult: technical experts about possibilities
+    And we study: similar cases from other regions for insight
+    And we deliberate: for extended time given novelty and stakes
+    And we craft: new precedent with careful reasoning
+    And we document: our constitutional analysis thoroughly
+    And we create: guidance for future similar cases

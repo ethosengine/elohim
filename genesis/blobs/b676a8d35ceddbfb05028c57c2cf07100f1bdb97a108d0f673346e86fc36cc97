@@ -1,0 +1,10 @@
+Scenario: Parenting skills recognized as professional capabilities
+    Given Sarah has professional-grade skills from parenting
+    And she manages complex logistics, conflict resolution, developmental psychology
+    When the workplace_elohim assesses Sarah's capabilities
+    Then it should recognize parenting skills as professional assets
+    And it should translate care skills to workplace context
+    And Sarah's parenting should enhance her professional value
+    And the system should make invisible skills visible to employers
+    And parenting experience should be recognized as professional development
+    And care work should be valued as capability-building

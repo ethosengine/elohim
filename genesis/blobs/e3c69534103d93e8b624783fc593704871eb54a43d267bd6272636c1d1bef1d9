@@ -1,0 +1,10 @@
+Scenario: Appealing resource allocation within family unit
+    Given Family Elohim allocated household resources in a way I believe is unfair
+    And I feel my needs were deprioritized compared to other family members
+    When I appeal the resource allocation decision
+    Then the agent must justify how it balanced competing family member needs
+    And The Constitutional Council evaluates if constitutional principles were followed
+    And They consider cultural context of family resource sharing
+    And They examine if I had meaningful input into the decision process
+    And The appeal can result in modified allocation or preference updates
+    And Family members can collaboratively set allocation principles going forward

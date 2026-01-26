@@ -1,0 +1,11 @@
+Scenario: Teen participates in family governance decisions with real voice
+    Given the family is making decisions about a major purchase (new appliance)
+    And Jasmine has accumulated significant care contributions
+    And she has relevant knowledge and preferences
+    When the family_elohim facilitates the decision process
+    Then Jasmine's voice should carry weight in the decision
+    And her input should be solicited and genuinely considered
+    And she should participate as a junior partner, not just be consulted
+    And the family should make decisions that reflect all members' input
+    And Jasmine should learn that her participation in family governance is legitimate
+    And the decision process should prepare her for adult household management

@@ -1,0 +1,10 @@
+Scenario: Expressing feelings and emotions accessibly
+    Given Jordan wants to communicate how they're feeling
+    And verbal expression might be challenging sometimes
+    When Jordan uses the feelings check-in feature
+    Then the interface shows emotion faces (happy, sad, angry, scared, etc.)
+    And Jordan can select the face that matches their feeling
+    And the system asks simple follow-up questions with visual aids
+    And Jordan's feelings are communicated to their support network
+    And Jordan's emotional expression is honored and validated
+    And support is offered if Jordan is struggling

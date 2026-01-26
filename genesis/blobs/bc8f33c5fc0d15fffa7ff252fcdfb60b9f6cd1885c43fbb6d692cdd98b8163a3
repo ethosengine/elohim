@@ -1,0 +1,9 @@
+Scenario: Transitioning household when roommate moves out
+    Given Aisha's roommate is moving out
+    And household responsibilities need redistribution
+    When the household composition changes
+    Then the household_elohim should help manage the transition
+    And it should recalculate resource allocations
+    And it should settle care token balances fairly
+    And it should help Aisha adjust to changed circumstances
+    And household transitions should be supported systematically

@@ -1,0 +1,9 @@
+Scenario: Parent evaluates school board candidates
+    Given three candidates are running for school board seats
+    And the parent has limited time to research before the election
+    When the parent reviews Observer's candidate analysis
+    Then they see each candidate's voting record on key issues
+    And view candidates' positions on class sizes and program funding
+    And understand which candidates prioritize student needs vs politics
+    And can make informed voting decision in 15 minutes
+    And democracy extends to education governance elections

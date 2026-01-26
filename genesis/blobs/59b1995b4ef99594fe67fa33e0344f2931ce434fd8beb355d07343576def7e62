@@ -1,0 +1,10 @@
+Scenario: Managing real scarcity without shame or stigma
+    Given Marcus's family has limited economic resources
+    And $75/week must feed two people adequately
+    When Marcus shops under tight budget constraints
+    Then the personal_agent should help him maximize value with dignity
+    And budget tools should be presented as capability support, not poverty markers
+    And the system should never make him feel ashamed of constraints
+    And resourcefulness should be framed as valuable skill, not deprivation
+    And his capability to manage scarcity should be recognized as sophisticated
+    And no patronizing language about "limited budgets" should be used

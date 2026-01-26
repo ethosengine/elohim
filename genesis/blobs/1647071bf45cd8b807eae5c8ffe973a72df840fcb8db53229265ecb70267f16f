@@ -1,0 +1,10 @@
+Scenario: Access to mentoring and guidance from experienced adults
+    Given Aisha can benefit from elder wisdom
+    And mentoring relationships support development
+    When Aisha seeks guidance
+    Then the system should connect her to mentors
+    And it should facilitate intergenerational knowledge transfer
+    And experienced adults should share practical wisdom
+    And mentoring should be valued as care work
+    And the educational layer should include relationship-based learning
+    And she should have access to guidance beyond peer knowledge

@@ -1,0 +1,22 @@
+---
+manifest_version: "1"
+name: node_registry
+uid: 00000000-0000-0000-0000-000000000000
+properties: ~
+origin_time: 2024-01-01T00:00:00.000000Z
+
+integrity:
+  network_seed: ~
+  properties: ~
+  origin_time: 2024-01-01T00:00:00.000000Z
+  zomes:
+    - name: node_registry_integrity
+      bundled: zomes/node_registry_integrity.wasm
+      dependencies: []
+
+coordinator:
+  zomes:
+    - name: node_registry_coordinator
+      bundled: zomes/node_registry_coordinator.wasm
+      dependencies:
+        - name: node_registry_integrity

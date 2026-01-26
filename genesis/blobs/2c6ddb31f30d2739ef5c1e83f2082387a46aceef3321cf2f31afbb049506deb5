@@ -1,0 +1,10 @@
+Scenario: Workplace serves teen's development, not just employer's profit
+    Given Jasmine's work should contribute to her flourishing
+    And employment should support her transition to adulthood
+    When workplace_elohim evaluates the work relationship
+    Then it should assess whether work supports her development
+    And flag if work interferes with education or wellbeing
+    And recognize if employer is investing in her skill development
+    And identify if work experience is building her career capability
+    And advocate that employment should serve mutual benefit
+    And help her understand that healthy employment supports worker flourishing

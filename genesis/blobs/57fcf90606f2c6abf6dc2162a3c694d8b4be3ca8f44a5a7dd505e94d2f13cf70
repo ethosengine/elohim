@@ -1,0 +1,11 @@
+Scenario: Right to disconnect maintained with full accessibility
+    Given Alex has been using the Value Scanner
+    And constitutional constraints apply to all users equally
+    When Alex chooses to disconnect from the system
+    Then disconnection process must be fully accessible
+    And Alex should receive complete data export in accessible formats
+    And no manipulative retention patterns should be employed
+    And Alex's right to not participate must be absolute
+    And data portability should work with assistive technologies
+    And exit should be as accessible as entry
+    And Alex's autonomy includes the right to leave

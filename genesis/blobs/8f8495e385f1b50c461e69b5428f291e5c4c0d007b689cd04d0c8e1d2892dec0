@@ -1,0 +1,8 @@
+Scenario: Making household contributions visible
+    Given I contribute to household care when my schedule allows
+    Including shopping, cooking, cleaning, and bills management
+    When household members want to understand contribution distribution
+    Then the protocol should make all care work visible
+    And show my contributions relative to available time
+    And recognize that my irregular schedule affects participation
+    And facilitate fair distribution accounting for work constraints

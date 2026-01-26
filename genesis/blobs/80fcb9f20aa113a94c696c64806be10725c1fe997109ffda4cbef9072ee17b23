@@ -1,0 +1,9 @@
+Scenario: Responsible developer benefits from climate adaptation standards
+    Given a developer invests in climate-resilient building practices
+    And exceeds flood protection and heat mitigation requirements
+    When the Observer documents climate adaptation performance
+    Then the developer shows: flood resilience investment prevented $2M damages
+    And urban heat island mitigation reduced cooling costs 30%
+    And climate adaptation creates long-term property value
+    And responsible practices gain competitive advantage as climate risks increase
+    And genuine adaptation distinguishes from minimal compliance

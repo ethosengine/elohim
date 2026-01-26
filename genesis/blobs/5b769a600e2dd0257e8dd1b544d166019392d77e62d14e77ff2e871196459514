@@ -1,0 +1,9 @@
+Scenario: Teacher builds solidarity across educator roles
+    Given teachers, paraprofessionals, and support staff share labor interests
+    But often lack coordination and mutual understanding
+    When the Observer facilitates cross-role working conditions analysis
+    Then educators see shared challenges (understaffing, disrespect, inadequate pay)
+    And identify how working conditions affect student support
+    And build coalition across educator roles for contract negotiations
+    And solidarity emerges from shared evidence and common interests
+    And labor advocacy becomes comprehensive not siloed

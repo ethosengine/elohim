@@ -1,0 +1,12 @@
+Scenario: Workplace culture shift through middle management advocacy
+    Given Robert has influence as mid-level manager
+    And workplace culture often penalizes care responsibilities
+    And middle managers can model care-friendly leadership
+    When workplace_elohim supports culture change
+    Then it should help Robert model care economy principles in his management
+    And support him in being transparent about his care responsibilities
+    And help him advocate for team members' care needs
+    And build workplace culture where care is normalized rather than hidden
+    And demonstrate that managers can lead cultural transformation
+    And create workplace environment where caregiving is supported
+    And leverage his position for systemic culture change

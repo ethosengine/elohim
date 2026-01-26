@@ -1,0 +1,9 @@
+Scenario: Follow Sarah Martinez's democratic development after council service
+    Given Sarah served on Constitutional Council in Year 3
+    When James interviews Sarah annually for 7 years
+    Then he documents immediate effects on her constitutional literacy
+    And he tracks how she participates differently in community afterward
+    And he observes her selection for regional council in Year 5
+    And he examines her participation in Global Convention in Year 7
+    And he captures how sortition governance transforms citizens over time
+    And individual trajectory illustrates broader pattern

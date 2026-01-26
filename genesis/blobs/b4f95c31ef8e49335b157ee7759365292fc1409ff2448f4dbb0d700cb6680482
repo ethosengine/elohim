@@ -1,0 +1,10 @@
+Scenario: Teen civic engagement shapes municipal budget priorities
+    Given the municipality uses participatory budgeting processes
+    And Jasmine has demonstrated civic engagement
+    When municipal budget decisions are made
+    Then youth voice should be included in budget priority conversations
+    And Jasmine's care contributions should give her standing in budget discussions
+    And municipal_elohim should facilitate youth participation in participatory budgeting
+    And teen input should shape allocation of public resources
+    And she should learn that civic participation means influencing resource decisions
+    And democratic governance should include all age groups in budget processes

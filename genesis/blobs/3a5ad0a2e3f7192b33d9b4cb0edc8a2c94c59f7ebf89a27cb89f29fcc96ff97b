@@ -1,0 +1,11 @@
+Scenario: Appeal after family member death reveals intervention value
+    Given Family Elohim previously intervened in my mental health situation
+    And at the time I was angry and felt violated
+    And my brother had died by suicide with similar warning signs
+    When I reflect months later that the intervention likely saved my life
+    Then I can acknowledge the intervention was appropriate despite initial anger
+    And I can update my preferences knowing I'm glad to be alive
+    And The appeal process allowed me to be heard at my most angry moment
+    And Reconciliation with the agent happens through mutual respect
+    And The balance between care and control was negotiated not imposed
+    And This represents successful partnership between human and AI

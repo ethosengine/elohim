@@ -1,0 +1,11 @@
+Scenario: Workplace privacy protects Alex's medical information
+    Given employers should not have access to private medical information
+    And disability disclosure is often required but should be limited
+    When workplace requests disability documentation
+    Then the workplace_elohim should help Alex share minimum necessary information
+    And it should protect Alex's medical privacy rigorously
+    And detailed medical information should never be shared with managers or coworkers
+    And only accommodation needs should be disclosed, not diagnoses
+    And Alex's privacy should be protected even while requesting accommodations
+    And the protocol should guide appropriate disclosure boundaries
+    And medical information should remain confidential

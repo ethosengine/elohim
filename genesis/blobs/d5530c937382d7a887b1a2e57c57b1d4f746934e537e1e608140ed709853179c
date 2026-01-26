@@ -1,0 +1,10 @@
+Scenario: Learning health and wellness information accessibly
+    Given Jordan wants to understand their own health better
+    And health literacy supports self-advocacy
+    When Jordan uses health education resources
+    Then the personal_agent provides health information in simple language
+    And medical concepts are explained with pictures and examples
+    And Jordan can ask questions and explore topics at their pace
+    And Jordan's health knowledge increases over time
+    And Jordan becomes better able to participate in health decisions
+    And Jordan's informed health participation is supported through accessible education

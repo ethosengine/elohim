@@ -1,0 +1,8 @@
+Scenario: Managing tight budget for individual needs
+    Given I earn $32k/year and have $60/week food budget
+    And I need to maximize nutritional value per dollar
+    When I plan my grocery shopping
+    Then the protocol should provide sophisticated budget optimization
+    And suggest high-value nutritious ingredients
+    And identify sales and discounts at accessible stores
+    And help me stretch limited resources without sacrificing health

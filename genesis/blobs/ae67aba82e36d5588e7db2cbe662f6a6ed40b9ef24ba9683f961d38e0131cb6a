@@ -1,0 +1,10 @@
+Scenario: Teen participates in community planning and decision-making
+    Given the community is planning a new youth recreation facility
+    And Jasmine has relevant knowledge as a current user of community spaces
+    When the community_elohim facilitates community input
+    Then Jasmine's voice should be actively solicited
+    And her input should carry weight in planning decisions
+    And her care contributions should give her standing in the conversation
+    And community planners should engage her as a legitimate stakeholder
+    And she should learn that civic participation is her right and responsibility
+    And youth voice should shape systems designed for collective flourishing

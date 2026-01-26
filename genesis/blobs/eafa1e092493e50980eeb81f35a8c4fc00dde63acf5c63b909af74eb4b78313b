@@ -1,0 +1,10 @@
+Scenario: Teacher coordinates statewide advocacy against testing mandate
+    Given state proposes expanding standardized testing requirements
+    And testing already narrows curriculum and stresses students
+    When teachers coordinate through Observer across districts statewide
+    Then 3,200 teachers sign onto collective advocacy campaign
+    And provide testimony on how testing burdens harm learning
+    And build coalition with parents experiencing test stress
+    And present evidence from states that reduced testing
+    And collective professional voice creates political pressure
+    And state testing policy becomes contested not inevitable

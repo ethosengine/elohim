@@ -1,0 +1,10 @@
+Scenario: Community learning spaces for parent education and support
+    Given parents need ongoing education and skill development
+    And Sarah both teaches and learns from other parents
+    When the community_elohim coordinates parent education
+    Then it should provide spaces for parent learning and skill-sharing
+    And it should recognize teaching labor and learning participation
+    And parent education should be accessible and valued
+    And the community should invest in parent capability-building
+    And the system should create communities of practice for parents
+    And parenting skills should be continuously developed

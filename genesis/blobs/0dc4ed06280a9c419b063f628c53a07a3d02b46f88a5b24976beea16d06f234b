@@ -1,0 +1,9 @@
+Scenario: Citizen decodes education policy jargon
+    Given the school board discusses "instructional efficiency optimization"
+    And the citizen attends or reviews the meeting
+    When the Observer translates the education-ese
+    Then the citizen learns this means cutting teaching assistants
+    And understands the impact is larger class sizes
+    And sees the real effect on children's learning
+    And can respond to actual impacts vs bureaucratic language
+    And education policy becomes accessible to non-experts

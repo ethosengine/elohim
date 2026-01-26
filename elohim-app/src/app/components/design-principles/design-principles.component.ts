@@ -4,8 +4,6 @@ import { Component } from '@angular/core';
   selector: 'app-design-principles',
   imports: [],
   templateUrl: './design-principles.component.html',
-  styleUrl: './design-principles.component.css'
+  styleUrl: './design-principles.component.css',
 })
-export class DesignPrinciplesComponent {
-
-}
+export class DesignPrinciplesComponent {}

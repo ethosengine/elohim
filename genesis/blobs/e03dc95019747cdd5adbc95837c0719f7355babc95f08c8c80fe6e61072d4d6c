@@ -1,0 +1,9 @@
+Scenario: Activist documents municipal service delivery inequities
+    Given the activist advocates for environmental justice
+    And suspects systematic discrimination in service delivery
+    When the Observer analyzes municipal operations patterns
+    Then the activist sees infrastructure investment concentrated in white neighborhoods
+    And pollution permits cluster in communities of color
+    And code enforcement disparities by neighborhood
+    And systematic racism becomes statistically undeniable
+    And legal and political action gains foundation

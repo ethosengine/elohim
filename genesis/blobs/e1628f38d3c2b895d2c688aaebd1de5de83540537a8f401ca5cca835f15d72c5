@@ -1,0 +1,77 @@
+@epic:public_observer
+@user_type:journalist
+@governance_layer:community
+@related_users:citizen,activist,community_organizer,parent
+@related_layers:municipality,neighborhood,district
+@elohim_agents:public_observer,community_elohim
+
+Feature: Hyperlocal Journalism for Journalist
+  As a journalist in the public_observer system
+  Operating at the community governance layer
+  I want comprehensive neighborhood surveillance infrastructure
+  So that hyperlocal journalism can exist despite resource constraints
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the journalist user is registered in the system
+    And the community governance context is active
+
+  Scenario: Journalist monitors all neighborhood meetings despite being one person
+    Given the journalist covers 8 neighborhood associations
+    And can only attend one meeting per week physically
+    When the Observer monitors all neighborhood meetings simultaneously
+    Then the journalist reviews transcripts of all 8 weekly meetings
+    And receives alerts for newsworthy developments
+    And identifies stories across all neighborhoods efficiently
+    And comprehensive hyperlocal coverage becomes sustainable
+    And no important neighborhood decision goes unreported
+
+  Scenario: Journalist detects gentrification pattern across neighborhoods
+    Given individual rent increases in scattered buildings
+    And the journalist suspects coordinated displacement
+    When the Observer tracks evictions and rent increases across community
+    Then the journalist sees systematic pattern of displacement
+    And identifies corporate landlord acquiring properties neighborhood-wide
+    And documents residents being priced out block by block
+    And connects individual stories to structural pattern
+    And publishes investigation exposing organized gentrification
+
+  Scenario: Journalist fact-checks developer claims about community support
+    Given a developer claims broad community backing for project
+    And the journalist investigates at community meeting
+    When the Observer analyzes community testimony and meeting history
+    Then the journalist sees only 3 community supporters (all with developer ties)
+    And finds 47 community members opposed in past meetings
+    And verifies developer hired people to testify falsely
+    And publishes real-time fact-check of developer claims
+    And astroturfing gets exposed through systematic documentation
+
+  Scenario: Journalist investigates playground neglect in underserved neighborhood
+    Given residents complain about dangerous playground conditions
+    And the journalist needs context on maintenance patterns
+    When the Observer provides hyperlocal infrastructure data
+    Then the journalist sees playground hasn't been maintained in 5 years
+    And compares to monthly maintenance in affluent neighborhoods
+    And documents injury reports and resident complaints ignored
+    And tracks city budget showing maintenance disparities
+    And publishes accountability story on infrastructure racism
+
+  Scenario: Journalist develops sources through community surveillance
+    Given the journalist needs community perspectives on proposed development
+    And doesn't know who has relevant knowledge
+    When the Observer identifies community members affected by issue
+    Then the journalist sees residents who testified at past meetings
+    And identifies homeowners on blocks facing displacement
+    And finds small business owners who will lose customers
+    And contacts informed sources with lived experience
+    And community journalism reflects actual community voices
+
+  Scenario: Journalist tracks neighborhood promises over time
+    Given city officials promised park improvements at community meeting
+    And the journalist covers 12 neighborhoods with similar promises
+    When the Observer monitors promise implementation across neighborhoods
+    Then the journalist receives alert that 18 months have passed
+    And sees park still unimproved despite promise
+    And identifies pattern of broken promises in communities of color
+    And publishes accountability story on systematic neglect
+    And institutional memory prevents promises from being forgotten

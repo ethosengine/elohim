@@ -1,0 +1,11 @@
+Scenario: Intergenerational knowledge transfer through elder mentoring
+    Given younger generations lack knowledge Helen possesses
+    And intergenerational learning benefits all participants
+    When Helen mentors grandchildren or community youth
+    Then her teaching should be facilitated by educational systems
+    And younger learners should be connected to elder mentors
+    And Helen should be recognized as educator, not just "nice grandma"
+    And care tokens should reflect her teaching work
+    And the protocol should coordinate intergenerational learning
+    And educational value should flow in both directions
+    And youth should learn to value elder wisdom

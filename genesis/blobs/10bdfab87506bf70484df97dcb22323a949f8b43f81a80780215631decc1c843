@@ -1,0 +1,12 @@
+Scenario: Genuinely accessible interface enables full participation
+    Given Alex needs to use the Value Scanner
+    And Alex has limited fine motor control
+    When Alex opens the Value Scanner
+    Then the interface should support voice commands fully
+    And it should be compatible with Alex's screen reader
+    And keyboard navigation should work for all functions
+    And visual settings should be customizable for contrast and size
+    And the interface should be forgiving with error recovery
+    And accessibility should be built-in, not retrofitted
+    And Alex should experience the system as designed for them
+    And universal design principles should be evident throughout

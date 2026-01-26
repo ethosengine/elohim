@@ -1,0 +1,12 @@
+Scenario: Exercising financial autonomy despite constrained resources
+    Given I am managing an extremely limited budget
+    And I have temporary assistance and unreliable child support
+    When I make spending decisions for my household
+    Then the Value Scanner supports MY financial choices
+    And does not impose external judgments about "proper" spending
+    And helps me track and optimize within my constraints
+    And recognizes that I understand my children's needs
+    And provides decision support without taking over decisions
+    And validates that my resource management under crisis is sophisticated work
+    And my personal_agent suggests options without prescribing choices
+    And my financial sovereignty is respected

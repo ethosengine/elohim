@@ -1,0 +1,10 @@
+Scenario: Family understanding of student financial constraints
+    Given Kenji lives on $180/week total budget
+    And family might not understand severity of his constraints
+    When the family_elohim shares appropriate financial context
+    Then it should help family understand Kenji's resource limitations
+    And it should facilitate realistic expectations for gift-giving, travel, expenses
+    And it should reduce shame around financial scarcity
+    And family should understand student economic reality
+    And the system should bridge understanding gap about student poverty
+    And realistic financial communication should strengthen family relationships

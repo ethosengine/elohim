@@ -1,0 +1,8 @@
+Scenario: Worker receives immediate safety protection from harmful incidents
+    Given DeShawn witnesses a safety violation in the kitchen
+    When he uses his observer device to document the violation
+    Then the workplace_elohim agent is immediately notified
+    And appropriate safety protocols are activated
+    And the incident is logged in the immutable safety record
+    And DeShawn is protected from retaliation
+    And management must address the violation democratically with worker input

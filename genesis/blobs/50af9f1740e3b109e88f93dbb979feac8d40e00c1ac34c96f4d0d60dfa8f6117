@@ -1,0 +1,10 @@
+Scenario: Coordinating family visits and holiday logistics
+    Given Kenji returns home for holidays and breaks
+    And visit logistics require coordination and resources
+    When the family_elohim manages visit planning
+    Then it should coordinate schedules across family members
+    And it should help plan transportation, meals, and household logistics
+    And it should recognize labor involved in maintaining connection across distance
+    And it should value family members' work hosting and traveling
+    And the system should reduce friction in cross-distance family coordination
+    And maintaining family connection should be recognized as work

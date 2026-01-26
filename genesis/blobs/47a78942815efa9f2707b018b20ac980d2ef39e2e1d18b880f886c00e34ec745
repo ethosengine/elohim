@@ -1,0 +1,10 @@
+Scenario: Professional development aligned with personal values
+    Given Aisha is building her career
+    And she wants work aligned with her values
+    When Aisha makes professional development decisions
+    Then the personal_agent should help her assess value alignment
+    And it should highlight opportunities matching her principles
+    And it should flag when work conflicts with core values
+    And professional growth should support personal integrity
+    And the system should help her build career consistent with values
+    And work should serve her flourishing, not just employment

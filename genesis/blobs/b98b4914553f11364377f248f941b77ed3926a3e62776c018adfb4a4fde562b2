@@ -1,0 +1,12 @@
+Scenario: Managing children's relationships with extended family during crisis
+    Given my children have relationships with grandparents, aunts, uncles, cousins
+    And these relationships may be supportive, complicated, or harmful
+    When I coordinate children's extended family contact
+    Then the family_elohim helps me facilitate healthy family relationships
+    And supports me in limiting or supervising problematic relationships
+    And tracks children's responses to different family members
+    And helps me explain family situations to children age-appropriately
+    And coordinates family involvement in children's lives appropriately
+    And my personal_agent alerts me to concerning family dynamics
+    And recognizes my facilitation of children's family relationships as care work
+    And validates my right to protect children from harmful family dynamics

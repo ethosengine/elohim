@@ -1,0 +1,12 @@
+Scenario: Coordinating legal family governance with abusive ex-partner
+    Given I am navigating custody, protective orders, and child support with my abuser
+    And I need to minimize contact while managing legal obligations
+    When legal family governance requires communication
+    Then the family_elohim helps me manage legally-required communication only
+    And provides templates for documented, bounded interactions
+    And tracks all communications for legal purposes
+    And helps me maintain protective boundaries while meeting legal requirements
+    And alerts me to concerning patterns or escalation
+    And my personal_agent coaches me through high-stress legal interactions
+    And recognizes this boundary management as substantial emotional labor
+    And validates that minimizing contact while co-parenting is appropriate

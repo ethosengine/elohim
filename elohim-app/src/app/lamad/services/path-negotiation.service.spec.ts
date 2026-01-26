@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { PathNegotiationService } from './path-negotiation.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
-import { HumanConsentService } from '@app/shared/services/human-consent.service';
-import { AffinityTrackingService } from '@app/shared/services/affinity-tracking.service';
+import { HumanConsentService } from '@app/elohim/services/human-consent.service';
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { HumanConsent, IntimacyLevel, ConsentState } from '@app/elohim/models/human-consent.model';
 import { NegotiationStatus, BridgingStrategy } from '../models/path-negotiation.model';
 
@@ -36,12 +36,8 @@ describe('PathNegotiationService', () => {
       'getEntriesByType',
       'createEntry',
     ]);
-    consentServiceSpy = jasmine.createSpyObj('HumanConsentService', [
-      'getConsentWith',
-    ]);
-    affinityServiceSpy = jasmine.createSpyObj('AffinityTrackingService', [
-      'getAffinities',
-    ]);
+    consentServiceSpy = jasmine.createSpyObj('HumanConsentService', ['getConsentWith']);
+    affinityServiceSpy = jasmine.createSpyObj('AffinityTrackingService', ['getAffinities']);
 
     sourceChainSpy.isInitialized.and.returnValue(true);
     sourceChainSpy.getAgentId.and.returnValue(AGENT_ID);
@@ -68,123 +64,135 @@ describe('PathNegotiationService', () => {
   });
 
   describe('proposeNegotiation', () => {
-    it('should create a negotiation with intimate consent', (done) => {
+    it('should create a negotiation with intimate consent', done => {
       consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
 
-      service.proposeNegotiation({
-        participantId: OTHER_AGENT_ID,
-        consentId: 'consent-123',
-        message: 'Let\'s create a love map!',
-      }).subscribe({
-        next: (negotiation) => {
-          expect(negotiation.initiatorId).toBe(AGENT_ID);
-          expect(negotiation.participantId).toBe(OTHER_AGENT_ID);
-          expect(negotiation.status).toBe('proposed');
-          expect(negotiation.consentId).toBe('consent-123');
-          expect(negotiation.validatingAttestationIds).toEqual(['attest-1', 'attest-2']);
-          done();
-        },
-        error: done.fail,
-      });
+      service
+        .proposeNegotiation({
+          participantId: OTHER_AGENT_ID,
+          consentId: 'consent-123',
+          message: "Let's create a love map!",
+        })
+        .subscribe({
+          next: negotiation => {
+            expect(negotiation.initiatorId).toBe(AGENT_ID);
+            expect(negotiation.participantId).toBe(OTHER_AGENT_ID);
+            expect(negotiation.status).toBe('proposed');
+            expect(negotiation.consentId).toBe('consent-123');
+            expect(negotiation.validatingAttestationIds).toEqual(['attest-1', 'attest-2']);
+            done();
+          },
+          error: done.fail,
+        });
     });
 
-    it('should error when negotiating with self', (done) => {
-      service.proposeNegotiation({
-        participantId: AGENT_ID,
-        consentId: 'consent-123',
-      }).subscribe({
-        next: () => done.fail('Should have errored'),
-        error: (err) => {
-          expect(err.message).toContain('yourself');
-          done();
-        },
-      });
+    it('should error when negotiating with self', done => {
+      service
+        .proposeNegotiation({
+          participantId: AGENT_ID,
+          consentId: 'consent-123',
+        })
+        .subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('yourself');
+            done();
+          },
+        });
     });
 
-    it('should error when no consent exists', (done) => {
+    it('should error when no consent exists', done => {
       consentServiceSpy.getConsentWith.and.returnValue(of(null));
 
-      service.proposeNegotiation({
-        participantId: OTHER_AGENT_ID,
-        consentId: 'consent-123',
-      }).subscribe({
-        next: () => done.fail('Should have errored'),
-        error: (err) => {
-          expect(err.message).toContain('No consent');
-          done();
-        },
-      });
+      service
+        .proposeNegotiation({
+          participantId: OTHER_AGENT_ID,
+          consentId: 'consent-123',
+        })
+        .subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('No consent');
+            done();
+          },
+        });
     });
 
-    it('should error when consent is not at intimate level', (done) => {
+    it('should error when consent is not at intimate level', done => {
       const connectionConsent = {
         ...mockIntimateConsent,
         intimacyLevel: 'connection' as IntimacyLevel,
       };
       consentServiceSpy.getConsentWith.and.returnValue(of(connectionConsent));
 
-      service.proposeNegotiation({
-        participantId: OTHER_AGENT_ID,
-        consentId: 'consent-123',
-      }).subscribe({
-        next: () => done.fail('Should have errored'),
-        error: (err) => {
-          expect(err.message).toContain('Intimate-level');
-          done();
-        },
-      });
+      service
+        .proposeNegotiation({
+          participantId: OTHER_AGENT_ID,
+          consentId: 'consent-123',
+        })
+        .subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('Intimate-level');
+            done();
+          },
+        });
     });
 
-    it('should error when consent is not accepted', (done) => {
+    it('should error when consent is not accepted', done => {
       const pendingConsent = {
         ...mockIntimateConsent,
         consentState: 'pending' as ConsentState,
       };
       consentServiceSpy.getConsentWith.and.returnValue(of(pendingConsent));
 
-      service.proposeNegotiation({
-        participantId: OTHER_AGENT_ID,
-        consentId: 'consent-123',
-      }).subscribe({
-        next: () => done.fail('Should have errored'),
-        error: (err) => {
-          expect(err.message).toContain('accepted');
-          done();
-        },
-      });
+      service
+        .proposeNegotiation({
+          participantId: OTHER_AGENT_ID,
+          consentId: 'consent-123',
+        })
+        .subscribe({
+          next: () => done.fail('Should have errored'),
+          error: err => {
+            expect(err.message).toContain('accepted');
+            done();
+          },
+        });
     });
   });
 
   describe('acceptNegotiation', () => {
-    it('should accept a proposed negotiation', (done) => {
+    it('should accept a proposed negotiation', done => {
       // First create a negotiation
       consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
 
-      service.proposeNegotiation({
-        participantId: OTHER_AGENT_ID,
-        consentId: 'consent-123',
-      }).subscribe({
-        next: (negotiation) => {
-          // Switch agent to participant
-          sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
+      service
+        .proposeNegotiation({
+          participantId: OTHER_AGENT_ID,
+          consentId: 'consent-123',
+        })
+        .subscribe({
+          next: negotiation => {
+            // Switch agent to participant
+            sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
 
-          service.acceptNegotiation(negotiation.id).subscribe({
-            next: (accepted) => {
-              // Should be in analyzing or negotiating state after acceptance
-              expect(['analyzing', 'negotiating']).toContain(accepted.status);
-              done();
-            },
-            error: done.fail,
-          });
-        },
-        error: done.fail,
-      });
+            service.acceptNegotiation(negotiation.id).subscribe({
+              next: accepted => {
+                // Should be in analyzing or negotiating state after acceptance
+                expect(['analyzing', 'negotiating']).toContain(accepted.status);
+                done();
+              },
+              error: done.fail,
+            });
+          },
+          error: done.fail,
+        });
     });
 
-    it('should error when negotiation not found', (done) => {
+    it('should error when negotiation not found', done => {
       service.acceptNegotiation('nonexistent').subscribe({
         next: () => done.fail('Should have errored'),
-        error: (err) => {
+        error: err => {
           expect(err.message).toContain('not found');
           done();
         },
@@ -193,34 +201,36 @@ describe('PathNegotiationService', () => {
   });
 
   describe('declineNegotiation', () => {
-    it('should decline a proposed negotiation', (done) => {
+    it('should decline a proposed negotiation', done => {
       consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
 
-      service.proposeNegotiation({
-        participantId: OTHER_AGENT_ID,
-        consentId: 'consent-123',
-      }).subscribe({
-        next: (negotiation) => {
-          // Switch agent to participant
-          sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
+      service
+        .proposeNegotiation({
+          participantId: OTHER_AGENT_ID,
+          consentId: 'consent-123',
+        })
+        .subscribe({
+          next: negotiation => {
+            // Switch agent to participant
+            sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
 
-          service.declineNegotiation(negotiation.id, 'Not ready').subscribe({
-            next: () => {
-              const negotiations = (service as any).negotiationsSubject.value;
-              const declined = negotiations.find((n: any) => n.id === negotiation.id);
-              expect(declined.status).toBe('declined');
-              done();
-            },
-            error: done.fail,
-          });
-        },
-        error: done.fail,
-      });
+            service.declineNegotiation(negotiation.id, 'Not ready').subscribe({
+              next: () => {
+                const negotiations = (service as any).negotiationsSubject.value;
+                const declined = negotiations.find((n: any) => n.id === negotiation.id);
+                expect(declined.status).toBe('declined');
+                done();
+              },
+              error: done.fail,
+            });
+          },
+          error: done.fail,
+        });
     });
   });
 
   describe('generateBridgingPath', () => {
-    it('should generate a path structure', (done) => {
+    it('should generate a path structure', done => {
       // Create mock negotiation in negotiating state
       const mockNegotiation = {
         id: 'neg-123',
@@ -243,7 +253,7 @@ describe('PathNegotiationService', () => {
       (service as any).negotiationsSubject.next([mockNegotiation]);
 
       service.generateBridgingPath('neg-123', 'maximum_overlap').subscribe({
-        next: (proposedPath) => {
+        next: proposedPath => {
           expect(proposedPath.title).toBe('Common Ground Path');
           expect(proposedPath.conceptIds).toEqual(['concept-1', 'concept-2', 'concept-3']);
           expect(proposedPath.stats.sharedConcepts).toBe(3);
@@ -253,7 +263,7 @@ describe('PathNegotiationService', () => {
       });
     });
 
-    it('should generate complementary path with teaching concepts', (done) => {
+    it('should generate complementary path with teaching concepts', done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -275,7 +285,7 @@ describe('PathNegotiationService', () => {
       (service as any).negotiationsSubject.next([mockNegotiation]);
 
       service.generateBridgingPath('neg-123', 'complementary').subscribe({
-        next: (proposedPath) => {
+        next: proposedPath => {
           expect(proposedPath.title).toBe('Mutual Learning Path');
           // Should have mix of initiator, shared, and participant concepts
           expect(proposedPath.stats.initiatorTeaching).toBeGreaterThan(0);
@@ -286,7 +296,7 @@ describe('PathNegotiationService', () => {
       });
     });
 
-    it('should error when negotiation not in negotiating state', (done) => {
+    it('should error when negotiation not in negotiating state', done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -306,7 +316,7 @@ describe('PathNegotiationService', () => {
 
       service.generateBridgingPath('neg-123', 'maximum_overlap').subscribe({
         next: () => done.fail('Should have errored'),
-        error: (err) => {
+        error: err => {
           expect(err.message).toContain('negotiating state');
           done();
         },
@@ -315,7 +325,7 @@ describe('PathNegotiationService', () => {
   });
 
   describe('acceptGeneratedPath', () => {
-    it('should accept path and finalize negotiation', (done) => {
+    it('should accept path and finalize negotiation', done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -332,7 +342,12 @@ describe('PathNegotiationService', () => {
           stepCount: 1,
           estimatedDuration: '15 minutes',
           conceptIds: ['concept-1'],
-          stats: { sharedConcepts: 1, initiatorTeaching: 0, participantTeaching: 0, novelConcepts: 0 },
+          stats: {
+            sharedConcepts: 1,
+            initiatorTeaching: 0,
+            participantTeaching: 0,
+            novelConcepts: 0,
+          },
         },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -341,23 +356,25 @@ describe('PathNegotiationService', () => {
 
       (service as any).negotiationsSubject.next([mockNegotiation]);
 
-      service.acceptGeneratedPath({
-        negotiationId: 'neg-123',
-        accept: true,
-      }).subscribe({
-        next: (negotiation) => {
-          expect(negotiation.status).toBe('accepted');
-          expect(negotiation.generatedPathId).toBeDefined();
-          expect(negotiation.resolvedAt).toBeDefined();
-          done();
-        },
-        error: done.fail,
-      });
+      service
+        .acceptGeneratedPath({
+          negotiationId: 'neg-123',
+          accept: true,
+        })
+        .subscribe({
+          next: negotiation => {
+            expect(negotiation.status).toBe('accepted');
+            expect(negotiation.generatedPathId).toBeDefined();
+            expect(negotiation.resolvedAt).toBeDefined();
+            done();
+          },
+          error: done.fail,
+        });
     });
   });
 
   describe('getMyNegotiations', () => {
-    it('should return all negotiations for current agent', (done) => {
+    it('should return all negotiations for current agent', done => {
       const negotiations = [
         {
           id: 'neg-1',
@@ -392,7 +409,7 @@ describe('PathNegotiationService', () => {
       (service as any).negotiationsSubject.next(negotiations);
 
       service.getMyNegotiations().subscribe({
-        next: (result) => {
+        next: result => {
           expect(result.length).toBe(2);
           done();
         },
@@ -400,7 +417,7 @@ describe('PathNegotiationService', () => {
       });
     });
 
-    it('should filter by status', (done) => {
+    it('should filter by status', done => {
       const negotiations = [
         {
           id: 'neg-1',
@@ -435,7 +452,7 @@ describe('PathNegotiationService', () => {
       (service as any).negotiationsSubject.next(negotiations);
 
       service.getMyNegotiations({ status: 'proposed' }).subscribe({
-        next: (result) => {
+        next: result => {
           expect(result.length).toBe(1);
           expect(result[0].id).toBe('neg-1');
           done();
@@ -446,7 +463,7 @@ describe('PathNegotiationService', () => {
   });
 
   describe('sendMessage', () => {
-    it('should add a message to active negotiation', (done) => {
+    it('should add a message to active negotiation', done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -465,7 +482,7 @@ describe('PathNegotiationService', () => {
       (service as any).negotiationsSubject.next([mockNegotiation]);
 
       service.sendMessage('neg-123', 'Hello!', 'comment').subscribe({
-        next: (negotiation) => {
+        next: negotiation => {
           expect(negotiation.negotiationLog.length).toBe(1);
           expect(negotiation.negotiationLog[0].content).toBe('Hello!');
           expect(negotiation.negotiationLog[0].type).toBe('comment');
@@ -475,7 +492,7 @@ describe('PathNegotiationService', () => {
       });
     });
 
-    it('should error on resolved negotiation', (done) => {
+    it('should error on resolved negotiation', done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -495,7 +512,7 @@ describe('PathNegotiationService', () => {
 
       service.sendMessage('neg-123', 'Hello!').subscribe({
         next: () => done.fail('Should have errored'),
-        error: (err) => {
+        error: err => {
           expect(err.message).toContain('resolved');
           done();
         },

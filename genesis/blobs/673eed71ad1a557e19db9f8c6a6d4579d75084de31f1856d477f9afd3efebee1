@@ -1,0 +1,10 @@
+Scenario: Neighborhood connection across economic differences
+    Given the neighborhood includes families at different income levels
+    And economic inequality can divide communities
+    When the neighborhood_elohim coordinates care economy
+    Then it should enable connection across economic differences
+    And care tokens should provide support to lower-income families
+    And resource sharing should reduce economic barriers
+    And neighborhood cooperation should reduce inequality impacts
+    And mixed-income community should be strengthened
+    And the system should build solidarity, not division

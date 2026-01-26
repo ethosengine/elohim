@@ -1,0 +1,9 @@
+Scenario: Organizer documents opportunity gap for education equity campaign
+    Given gifted programs concentrate in predominantly white schools
+    And advanced placement courses lack availability in low-income schools
+    When the Observer provides education equity data
+    Then the organizer sees enrichment program distribution across district
+    And maps demographic patterns showing systematic disparities
+    And calculates opportunity gaps affecting thousands of students
+    And identifies organizing base of affected families
+    And educational inequality becomes documented basis for organizing

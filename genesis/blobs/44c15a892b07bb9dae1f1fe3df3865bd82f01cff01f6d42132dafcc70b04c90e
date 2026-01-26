@@ -1,0 +1,10 @@
+Scenario: Recognition of continued contributions despite care receipt
+    Given Helen receives substantial care from family and community
+    And she also contributes through mentoring and wisdom sharing
+    When Helen shares family stories with great-grandchildren
+    Then her care contribution should be recognized and valued
+    And her personal_agent should note: "Your stories preserve our family history"
+    And care tokens should reflect her continued giving
+    And the system should make visible that care flows both directions
+    And Helen should experience herself as valued person, not burden
+    And reciprocity should be visible even when care flows are asymmetric

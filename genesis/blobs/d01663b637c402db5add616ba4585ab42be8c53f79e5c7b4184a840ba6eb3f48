@@ -1,0 +1,10 @@
+Scenario: Navigating workplace challenges with support
+    Given a patron was rude to Jordan about their disability
+    And workplace discrimination is unacceptable
+    When the incident occurs
+    Then the personal_agent helps Jordan process the experience
+    And supervisors address the patron's behavior
+    And Jordan receives support from colleagues
+    And the workplace_elohim facilitates dignity-preserving response
+    And Jordan's right to respectful treatment is defended
+    And Jordan experiences workplace protection and advocacy

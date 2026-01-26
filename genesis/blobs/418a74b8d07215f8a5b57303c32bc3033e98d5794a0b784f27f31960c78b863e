@@ -1,0 +1,9 @@
+Scenario: Activist exposes wage theft and labor violations
+    Given workers report widespread wage theft
+    And enforcement seems inadequate
+    When the Observer tracks labor violations and enforcement
+    Then the activist documents thousands of violations annually
+    And shows penalties are minimal and rarely collected
+    And identifies which employers are repeat offenders
+    And exposes regulatory capture of labor enforcement
+    And worker protection becomes political accountability issue

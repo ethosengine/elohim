@@ -1,0 +1,10 @@
+Scenario: Student labor contributions to educational institutions
+    Given Kenji might do research work, TA work, or other academic labor
+    And universities benefit from student labor beyond tuition
+    When the educational_elohim tracks student labor
+    Then it should recognize unpaid or underpaid student work for institution
+    And it should help Kenji understand fair compensation for academic labor
+    And it should accumulate care tokens for labor that benefits university
+    And student labor should be recognized and fairly compensated
+    And the system should help students identify labor exploitation
+    And educational institutions should not extract uncompensated labor

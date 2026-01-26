@@ -104,7 +104,7 @@ export function loadAttestations(attestationsPath: string): Map<string, Attestat
       }
     }
   } catch (err) {
-    console.error(`Error loading attestations: ${err}`);
+    console.error(`Failed to parse attestations file '${attestationsPath}': ${err}`);
   }
 
   return byContent;
@@ -294,6 +294,6 @@ export function updateContentIndexWithTrust(
     fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf-8');
     console.log(`Updated ${indexPath}`);
   } catch (err) {
-    console.error(`Error updating index: ${err}`);
+    console.error(`Failed to update content index '${indexPath}': ${err}`);
   }
 }

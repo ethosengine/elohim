@@ -1,0 +1,9 @@
+Scenario: Community advocacy elevates single parent issues to policy level
+    Given single parents face systemic barriers and lack political visibility
+    And policy changes could dramatically improve their circumstances
+    When Maria participates in community advocacy
+    Then the community_elohim should amplify single parent voices
+    And it should provide care economy data showing scale of solo parent contributions
+    And it should help Maria advocate for single-parent-friendly policies
+    And community should recognize single parents as care economy heroes, not broken families
+    And advocacy should push for systemic changes in housing, childcare, wages, and support

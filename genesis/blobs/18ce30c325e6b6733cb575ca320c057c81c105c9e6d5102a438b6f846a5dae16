@@ -1,0 +1,10 @@
+Scenario: Passive solar and natural ventilation in building design
+    Given Frank has construction experience with building orientation and design
+    And passive solar and ventilation reduce energy consumption
+    When the bioregional_elohim coordinates sustainable building
+    Then it should facilitate passive design elements in Habitat projects
+    And help Frank apply climate-appropriate building techniques
+    And recognize building design knowledge as ecological expertise
+    And quantify energy savings from passive design choices
+    And teach sustainable design principles to younger builders
+    And Frank's knowledge should serve low-energy building practices

@@ -1,0 +1,12 @@
+Scenario: Maintaining identity beyond crisis circumstances
+    Given I am defined by institutions as "domestic violence survivor" or "homeless person"
+    And I am much more than my current circumstances
+    When I interact with the Value Scanner
+    Then the system recognizes my full humanity and complexity
+    And documents my interests, skills, values, and dreams
+    And reflects back my identity beyond crisis labels
+    And helps me pursue aspects of life that matter to me
+    And validates that crisis is something I'm experiencing, not who I am
+    And my personal_agent knows and responds to my whole self
+    And the care economy values me as complete person
+    And my identity is not reduced to my vulnerability

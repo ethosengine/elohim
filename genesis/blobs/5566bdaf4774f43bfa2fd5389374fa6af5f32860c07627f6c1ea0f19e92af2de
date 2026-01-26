@@ -1,0 +1,10 @@
+Scenario: Responding to household maintenance needs
+    Given Jordan notices the bathroom sink is leaking
+    And household members should report maintenance issues
+    When Jordan uses the maintenance request feature
+    Then the interface allows simple issue reporting with pictures
+    And Jordan can photograph the problem or select from issue pictures
+    And the household_elohim routes the request appropriately
+    And Jordan receives confirmation and updates in accessible format
+    And Jordan's observant contribution is celebrated
+    And Jordan learns responsibility for shared home care

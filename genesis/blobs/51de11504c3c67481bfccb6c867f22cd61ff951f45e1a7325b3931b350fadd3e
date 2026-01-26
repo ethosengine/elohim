@@ -1,0 +1,9 @@
+Scenario: Community challenges single-parent stigma through visibility
+    Given society often views single-parent families as deficient or problematic
+    And this stigma harms Maria and her children
+    When community care economy makes single parents' work visible
+    Then it should demonstrate that solo parents provide extraordinary care value
+    And it should challenge deficit narratives about single-parent families
+    And it should reframe single parents as care economy heroes deserving support
+    And community should actively combat stigma through recognition and respect
+    And Maria should experience community validation, not judgment

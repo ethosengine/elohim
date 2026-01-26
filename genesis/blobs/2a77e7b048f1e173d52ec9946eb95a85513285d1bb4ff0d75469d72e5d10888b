@@ -1,0 +1,9 @@
+Scenario: Documentation of care work value for future employment
+    Given James's care work develops valuable professional skills
+    And years of family caregiving should count as experience
+    When the workplace_elohim documents James's care work
+    Then it should quantify care contributions professionally
+    And care skills should be framed as professional development
+    And documentation should support future employment applications
+    And family caregiving should be recognized as professional experience
+    And care economy should translate to employment economy value

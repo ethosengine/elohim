@@ -1,0 +1,9 @@
+Scenario: Manager's proposals can be rejected without retaliation
+    Given Marcus proposes operational change he believes is beneficial
+    And workers deliberate and vote to reject the proposal
+    When rejection occurs
+    Then Marcus accepts worker decision gracefully
+    And Marcus does not retaliate through subtle means
+    And Marcus proposes alternative approaches respecting worker concerns
+    And workers know their democratic power is real, not performative
+    And workplace_elohim ensures rejected proposals don't resurface as subtle coercion

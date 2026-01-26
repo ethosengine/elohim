@@ -1,0 +1,10 @@
+Scenario: Address climate refugee resettlement at municipal scale
+    Given climate refugees are arriving faster than housing can accommodate
+    And Municipal Elohim coordinates capacity mapping
+    When Jamal works with agent on integration strategy
+    Then agent matches refugee skills to job availability
+    And agent suggests phased integration by neighborhood
+    And agent monitors integration outcomes for adjustment
+    And Jamal ensures community voice in resettlement decisions
+    And integration succeeds better than without coordination
+    And Riverside demonstrates scalable humanitarian response

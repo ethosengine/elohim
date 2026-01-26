@@ -1,0 +1,46 @@
+Feature: Lamad Content Display
+  As a learner using Lamad
+  I want to view educational content
+  So that I can learn and grow
+
+  @smoke @lamad @api
+  Scenario: Content API returns data
+    Given the backend API is available
+    When I request the content list from the API
+    Then the response should be successful
+    And the response should contain content items
+    And each item should have required fields
+
+  @smoke @lamad @navigation
+  Scenario: Lamad section loads
+    Given I am on the home page
+    When I navigate to the Lamad section
+    Then the page should load successfully
+    And the Lamad content should load
+
+  @lamad @data
+  Scenario: Content list displays items
+    Given I am on the Lamad section
+    Then at least one learning path should be displayed
+    And each path should show a title and description
+
+  @lamad @api @data
+  Scenario: Assessments are available in content
+    Given the backend API is available
+    When I request the content list from the API
+    Then the response should contain content items
+    And at least one assessment should be present
+
+  @lamad @api @data
+  Scenario: Features are available in content
+    Given the backend API is available
+    When I request the content list from the API
+    Then the response should contain content items
+    And at least one feature should be present
+
+  @lamad @api @data
+  Scenario: Concepts are available in content
+    Given the backend API is available
+    When I request the content list from the API
+    Then the response should contain content items
+    And at least one concept should be present

@@ -1,0 +1,8 @@
+Scenario: Participating in community governance despite time constraints
+    Given community makes decisions affecting workers' lives
+    And my work schedule limits participation in governance
+    When the community needs worker perspectives in decision-making
+    Then the protocol should help me participate when possible
+    And amplify worker voices in community governance
+    And advocate for accessible participation structures for workers
+    And ensure community decisions account for workers' needs

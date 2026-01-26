@@ -1,0 +1,11 @@
+Scenario: Conducting ethnographic research in Riverside community
+    Given I have selected Riverside (population 45,000) for intensive case study
+    And I have secured ethical approval and community consent
+    When I begin multi-month observation of protocol implementation
+    Then I can attend Constitutional Council meetings as observer
+    And I can interview appellants like Marcus about their appeal experience
+    And I can participate in community deliberations about protocol
+    And I can track resource flows and wellbeing indicators
+    And I can document challenges and successes as they emerge
+    And The community retains ownership of data about themselves
+    And My research serves community improvement not just academic publication

@@ -1,0 +1,9 @@
+Scenario: Workplace privacy protects care economy data from employer access
+    Given Sarah participates in care economy
+    And this generates data about her personal life
+    When workplace wants information about employees
+    Then Sarah's personal care economy data must be completely private
+    And employers should never access household care patterns
+    And the workplace_elohim should only see work-relevant information
+    And Sarah's privacy should be absolute in personal care matters
+    And workplace participation should not require personal data sacrifice

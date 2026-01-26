@@ -1,0 +1,68 @@
+{
+  "id": "human-renold-regent",
+  "did": "did:web:elohim.host:human:renold-regent",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Renold",
+  "description": "Community leader. Protecting our values and way of life. If you're not with us, you're against us.",
+  "content": "# Renold\n\nCommunity leader. Protecting our values and way of life. If you're not with us, you're against us.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Organizations:** [object Object]\n\n**Public Affinities:** community-purity, traditional-values, exclusivity, group-loyalty\n\n**Flags:** [object Object]\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/renold-regent/profile.json",
+  "tags": [
+    "flagged",
+    "group-loyalty",
+    "red-team",
+    "role-president",
+    "traditional-values",
+    "community-purity",
+    "exclusivity",
+    "human-graph",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "red-team",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace"
+    ],
+    "organizationCount": 1,
+    "hasFlags": true,
+    "flagTypes": [
+      "exclusionary-behavior"
+    ],
+    "designNotes": "Tribal gatekeeper pattern. Exclusionary behavior visible to bridge-builders."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Renold",
+    "ogDescription": "Community leader. Protecting our values and way of life. If you're not with us, you're against us.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-renold-regent",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-renold-regent.jpg",
+    "ogImageAlt": "Renold's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-renold-regent",
+    "identifier": "did:web:elohim.host:human:renold-regent",
+    "name": "Renold",
+    "description": "Community leader. Protecting our values and way of life. If you're not with us, you're against us.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Pure Valley Community Association",
+        "@id": "org-pure-valley-association"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328604",
+  "updatedAt": "2025-12-24T03:05:26.352Z"
+}

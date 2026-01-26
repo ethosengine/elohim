@@ -1,0 +1,12 @@
+Scenario: Bioregional governance participation includes ecological voice
+    Given bioregional health requires governance that includes ecological considerations
+    And Robert participates in community and municipal governance
+    And his voice can advocate for bioregional ecological health
+    When bioregional_elohim supports ecological governance
+    Then it should help Robert bring ecological perspective to governance participation
+    And support advocacy for bioregional ecological protection
+    And connect him to watershed councils, land use planning, and environmental policy
+    And recognize his care economy participation as qualifying him for ecological governance
+    And build governance that integrates human and ecological flourishing
+    And advance bioregional policy that serves care economy and ecology
+    And demonstrate that care economy includes bioregional stewardship

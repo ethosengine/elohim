@@ -1,0 +1,9 @@
+Scenario: Responsible developer leverages positive track record
+    Given a responsible developer delivered promised benefits in three past projects
+    And competes against extractive developer with misleading claims
+    When the Observer makes track records visible
+    Then the responsible developer's history shows: jobs delivered matched projections
+    And community benefits were actually built and maintained
+    And environmental commitments were kept
+    And positive reputation becomes competitive advantage
+    And integrity creates market differentiation

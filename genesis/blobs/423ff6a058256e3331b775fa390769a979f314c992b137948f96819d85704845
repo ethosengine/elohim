@@ -1,0 +1,9 @@
+Scenario: Citizen tracks accountability for neighborhood commitments
+    Given the community council promised playground repairs in 60 days
+    And the commitment was made during a public meeting
+    When 60 days pass
+    Then the Observer alerts the citizen about the deadline
+    And tracks whether repairs were completed
+    And provides evidence for accountability conversations
+    And prevents institutional forgetting of commitments
+    And democracy includes follow-through tracking

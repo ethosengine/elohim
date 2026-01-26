@@ -1,0 +1,9 @@
+Scenario: Workers become recognized community leaders through democratic participation
+    Given Maria has been worker-owner for two years
+    And she participates actively in community institutions
+    When community organizations seek board members
+    Then Maria is invited to serve on neighborhood council
+    And Maria represents both ChickenMax and broader worker interests
+    And Maria's democratic governance experience transfers to civic participation
+    And workers transform from exploited employees to community leaders
+    And democratic workplace becomes training ground for civic democracy

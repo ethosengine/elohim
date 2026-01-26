@@ -1,0 +1,10 @@
+Scenario: Community care tokens enable resource access for families
+    Given Sarah has accumulated care tokens through parenting and civic participation
+    And community resources are allocated partially based on care economy
+    When Sarah's family needs community support
+    Then her care tokens should give standing in resource decisions
+    And the community should provide support based on her contributions
+    And care economy should enable reciprocity between family and community
+    And those who contribute care should receive care in return
+    And the system should create sustainable community mutual aid
+    And parenting contributions should translate to community support

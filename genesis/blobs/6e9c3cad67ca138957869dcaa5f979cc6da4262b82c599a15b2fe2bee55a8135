@@ -1,0 +1,9 @@
+Scenario: Workplace recognition of caregiver constraints on employment
+    Given James can only work ~20 hours/week due to caregiving
+    And his availability is constrained by care needs
+    When the workplace_elohim communicates with employers
+    Then James's caregiving situation should be visible to employer
+    And his reduced availability should be explained as care-related
+    And employer should understand caregiving constraints on capacity
+    And caregiver status should be recognized as legitimate limit
+    And workplace should accommodate caregiving realities

@@ -1,0 +1,33 @@
+{
+  "id": "product-test-doorway-hosting",
+  "did": "did:elohim:product-test-doorway-hosting",
+  "contentType": "feature",
+  "contentFormat": "gherkin",
+  "title": "Doorway Hosting Flow Product Tests",
+  "description": "BDD product tests validating the visitor to hosted user journey through Doorway",
+  "content": "Feature: Doorway Hosting Flow\n  As a visitor to Elohim\n  I want to access the platform and become a hosted user\n  So that I can participate in the community\n\n  @smoke @doorway @navigation\n  Scenario: Visitor can access the home page\n    Given I am on the home page\n    Then the page should load successfully\n    And the hero section should be visible\n    And the main navigation should be visible\n\n  @smoke @doorway @navigation\n  Scenario: Main navigation is functional\n    Given I am on the home page\n    When I click on \"Lamad\" in the navigation\n    Then I should be on the \"/lamad\" page\n    And the page should load successfully\n\n  @smoke @doorway @api\n  Scenario: Doorway API health check\n    Given the Doorway API is accessible\n    When I request content stats from the API\n    Then the response should be successful\n    And the content stats should show data exists\n\n  @doorway @workflow\n  Scenario: Footer displays build information\n    Given I am on the home page\n    Then the footer should be present\n    And the footer should display the git hash\n\n  @doorway @navigation\n  Scenario: Site logo returns to home\n    Given I am on the \"/lamad\" page\n    When I click on the site logo\n    Then I should be on the home page",
+  "tags": [
+    "product-test",
+    "doorway",
+    "smoke",
+    "navigation",
+    "category:doorway"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "doorway",
+    "testType": "product",
+    "scenarioCount": 5,
+    "priority": "critical"
+  },
+  "openGraph": {
+    "title": "Doorway Hosting Flow Product Tests",
+    "description": "BDD product tests for visitor to hosted user journey"
+  },
+  "linkedData": {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "programmingLanguage": "Gherkin",
+    "codeRepository": "https://github.com/EthosEngine/elohim"
+  }
+}

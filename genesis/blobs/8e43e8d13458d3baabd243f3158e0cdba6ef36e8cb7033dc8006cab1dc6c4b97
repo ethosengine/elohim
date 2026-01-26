@@ -1,0 +1,10 @@
+Scenario: Privacy and autonomy as emerging independent adult
+    Given Kenji is establishing adult independence
+    And he has full rights to privacy in his personal life
+    When care economy data is collected about Kenji
+    Then he must have complete control over all personal information
+    And no data should be shared with family or school without his consent
+    And his adult autonomy should be respected completely
+    And privacy should be default, not something he must request
+    And the system should support his development of adult boundaries
+    And Kenji's data sovereignty should be absolute

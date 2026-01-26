@@ -1,0 +1,11 @@
+Scenario: Analyzing Regional Constitutional Council decision patterns
+    Given Sarah Martinez's Regional Council has reviewed 500+ appeals
+    And I have anonymized data on appeals, deliberations, and outcomes
+    When I analyze patterns in regional constitutional interpretation
+    Then I examine: which types of appeals succeed vs fail
+    And I track: consistency across different council compositions
+    And I identify: whether councils reach similar conclusions for similar cases
+    And I explore: how precedent influences subsequent decisions
+    And I assess: whether councils defer too much to technical experts
+    And I investigate: demographic patterns in council member influence
+    And My analysis reveals: whether sortition governance produces coherent law

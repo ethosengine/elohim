@@ -1,0 +1,9 @@
+Scenario: Organizer builds worker-community coalition for living wage
+    Given workers can't afford housing in city where they work
+    And residents care about economic stability of their communities
+    When the organizer uses Observer to build coalition
+    Then they connect low-wage workers with community advocates
+    And show how poverty wages harm both workers and neighborhoods
+    And coordinate testimony combining worker lived experience and community impact
+    And facilitate coalition across four languages and multiple industries
+    And labor organizing becomes community economic justice campaign

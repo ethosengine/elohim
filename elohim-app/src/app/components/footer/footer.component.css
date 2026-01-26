@@ -129,7 +129,10 @@ footer {
 
 .support-btn {
   display: inline-block;
-  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    box-shadow 0.2s ease;
   border-radius: 6px;
   overflow: hidden;
 }
@@ -162,7 +165,6 @@ footer {
   font-style: normal;
 }
 
-
 .social-links {
   display: flex;
   justify-content: center;
@@ -178,7 +180,9 @@ footer {
   color: var(--leaf-light);
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.3s ease, transform 0.2s ease;
+  transition:
+    color 0.3s ease,
+    transform 0.2s ease;
   padding: 0.5rem;
   border-radius: 6px;
 }
@@ -215,54 +219,54 @@ footer {
   .main-message-transition {
     padding: 5rem 2rem 3rem;
   }
-  
+
   .main-message-transition .primary-message {
     font-size: 1.5rem;
   }
-  
+
   .main-message-transition .subtitle {
     font-size: 1.1rem;
   }
-  
+
   footer {
     padding: 3rem 2rem;
   }
-  
+
   .footer-container {
     gap: 2.5rem;
   }
-  
+
   .project-mission-section {
     gap: 2.5rem;
   }
-  
+
   .project-links {
     flex-direction: row;
     gap: 1.5rem;
     flex-wrap: wrap;
     justify-content: center;
   }
-  
+
   .separator {
     display: inline;
     opacity: 0.5;
   }
-  
+
   .support-links {
     flex-direction: row;
     gap: 1.5rem;
     justify-content: center;
   }
-  
+
   .support-btn img {
     height: 32px;
   }
-  
+
   .ethos-description {
     font-size: 0.95rem;
     text-align: center;
   }
-  
+
   .social-links {
     gap: 1.5rem;
   }
@@ -273,49 +277,49 @@ footer {
   .main-message-transition {
     padding: 6rem 2rem 4rem;
   }
-  
+
   .main-message-transition .primary-message {
     font-size: 1.7rem;
   }
-  
+
   .main-message-transition .subtitle {
     font-size: 1.2rem;
   }
-  
+
   footer {
     padding: 4rem 2rem;
   }
-  
+
   .footer-container {
     max-width: 900px;
     gap: 3rem;
   }
-  
+
   .project-mission-section {
     gap: 3rem;
   }
-  
+
   .project-links {
     gap: 2rem;
   }
-  
+
   .support-section {
     align-items: center;
   }
-  
+
   .support-links {
     gap: 2rem;
   }
-  
+
   .support-btn img {
     height: 36px;
   }
-  
+
   .ethos-description {
     font-size: 1rem;
     max-width: 800px;
   }
-  
+
   .social-links {
     gap: 2rem;
   }
@@ -326,11 +330,11 @@ footer {
   .main-message-transition .primary-message {
     font-size: 1.8rem;
   }
-  
+
   .main-message-transition .subtitle {
     font-size: 1.3rem;
   }
-  
+
   .footer-container {
     max-width: 1000px;
   }
@@ -341,7 +345,7 @@ footer {
   .support-btn {
     transition: none;
   }
-  
+
   .support-btn:hover {
     transform: none;
   }
@@ -352,18 +356,18 @@ footer {
   .main-message-transition {
     background: linear-gradient(180deg, transparent 0%, rgba(36, 49, 41, 0.9) 100%);
   }
-  
+
   footer {
     border-top: 3px solid rgba(255, 255, 255, 0.8);
   }
-  
-  .project-mission-section, 
+
+  .project-mission-section,
   .support-section {
     border-top: 2px solid rgba(255, 255, 255, 0.6);
   }
-  
+
   .project-links a:not(.social-icon) {
-    color: #93C5FD;
+    color: #93c5fd;
   }
 }
 
@@ -379,7 +383,9 @@ footer {
   font-size: 0.7rem;
   color: var(--tech-glow);
   text-decoration: none;
-  transition: color 0.3s ease, opacity 0.3s ease;
+  transition:
+    color 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .git-hash:hover {

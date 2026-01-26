@@ -1,0 +1,9 @@
+Scenario: Teacher documents personal spending on classroom supplies
+    Given teachers spend personal money on student supplies
+    And administration doesn't acknowledge this burden
+    When teachers track personal spending through Observer
+    Then district-wide data shows teachers spend average $600 annually
+    And spending patterns reveal systematic resource inadequacy
+    And teachers document impact on lower-income teachers
+    And advocate for adequate classroom budgets as equity issue
+    And working conditions transparency exposes hidden subsidies teachers provide

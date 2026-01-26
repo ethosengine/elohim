@@ -1,0 +1,10 @@
+Scenario: Intergenerational ecological responsibility and future generations
+    Given Sarah is raising children who will face climate consequences
+    And current generation's choices affect future generations
+    When the ecological_elohim assesses intergenerational care
+    Then it should recognize Sarah's work preparing children for climate future
+    And it should value her teaching of environmental responsibility
+    And raising environmentally conscious children should be recognized as service to future
+    And the system should honor intergenerational ecological care
+    And Sarah's parenting should be valued as investment in planetary future
+    And care for future generations should be fundamental care economy principle

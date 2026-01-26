@@ -1,0 +1,9 @@
+Scenario: Farm protects green space and agricultural land from development pressure
+    Given farmland faces constant development pressure for housing or commercial use
+    And community loses agricultural land, green space, and food production capacity
+    When democratic ownership with community investment protects farmland
+    Then community investment ensures land remains in agricultural use
+    And development pressure is resisted through collective commitment
+    And green space is preserved for ecological, aesthetic, and food security benefits
+    And community gains protected agricultural land as permanent institution
+    And community_elohim coordinates land protection and community land trust options

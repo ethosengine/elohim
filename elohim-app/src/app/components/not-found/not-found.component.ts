@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
+
 import { SeoService } from '../../services/seo.service';
 
 /**
@@ -17,14 +18,14 @@ import { SeoService } from '../../services/seo.service';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './not-found.component.html',
-  styleUrl: './not-found.component.css'
+  styleUrl: './not-found.component.css',
 })
 export class NotFoundComponent implements OnInit {
   private readonly seoService = inject(SeoService);
   private readonly router = inject(Router);
 
   /** The attempted URL path */
-  attemptedUrl: string = '';
+  attemptedUrl = '';
 
   ngOnInit(): void {
     this.attemptedUrl = this.router.url;
@@ -35,8 +36,8 @@ export class NotFoundComponent implements OnInit {
       description: 'The page you are looking for could not be found.',
       noIndex: true,
       openGraph: {
-        ogType: 'website'
-      }
+        ogType: 'website',
+      },
     });
   }
 

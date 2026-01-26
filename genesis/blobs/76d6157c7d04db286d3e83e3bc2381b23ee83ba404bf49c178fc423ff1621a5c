@@ -1,0 +1,9 @@
+Scenario: Mayor builds coalition for affordable housing initiative
+    Given the politician champions affordable housing policy
+    And needs support from diverse stakeholders
+    When the Observer surfaces coalition potential
+    Then they see tenant organizations share policy interest
+    And identify labor unions, faith communities, and senior advocates as allies
+    And facilitate bringing stakeholders to table for policy design
+    And track negotiation positions and evolution
+    And build multi-stakeholder coalition for policy passage

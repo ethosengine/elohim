@@ -1,0 +1,9 @@
+Scenario: Educational materials culturally responsive to diverse families
+    Given Sarah teaches students from diverse cultural backgrounds
+    And her own children are learning family cultural values
+    When educational materials are designed
+    Then the educational_elohim should provide culturally diverse resources
+    And materials should respect different care economy traditions
+    And Sarah should be able to adapt to cultural contexts
+    And value literacy should be taught in culturally responsive ways
+    And diverse approaches to care should be honored in education

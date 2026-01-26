@@ -1,0 +1,9 @@
+Scenario: Community accountability ensures democratic locations serve neighborhood needs
+    Given franchise corporate ignored community needs in pursuit of profit maximization
+    And locations had no mechanism for community input on operations
+    When democratic governance includes community stakeholder participation
+    Then neighborhood residents can attend stakeholder meetings and provide input
+    And community concerns about impacts (environmental, traffic, employment) are heard
+    And workers consider community feedback in democratic decision-making
+    And accountability flows both ways (community and workers mutually accountable)
+    And community_elohim facilitates stakeholder participation protecting worker autonomy

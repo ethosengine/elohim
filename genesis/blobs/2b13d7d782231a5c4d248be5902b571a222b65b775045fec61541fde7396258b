@@ -1,0 +1,10 @@
+Scenario: Household governance as necessary autocracy with age-appropriate child input
+    Given Maria is the only adult making every household decision
+    And children need appropriate voice based on developmental stage
+    When household decisions are made
+    Then the household_elohim should support Maria's final authority
+    And it should help her gather age-appropriate input from children
+    And her 14-year-old should have more voice than younger children
+    And her 6-year-old should have simple choices within boundaries
+    And household governance should be efficient while respecting all members
+    And Maria should maintain control without becoming authoritarian

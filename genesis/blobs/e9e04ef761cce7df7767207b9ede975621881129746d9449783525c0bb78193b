@@ -1,0 +1,10 @@
+Scenario: Employment board member evaluates public sector labor contract proposal
+    Given board negotiates collective bargaining agreement with public employees union
+    And city staff emphasizes budget constraints and fiscal sustainability
+    And board wants to balance responsible budgeting with fair compensation
+    When the board member requests Observer labor relations analysis
+    Then they receive comparison of proposed wages to regional public sector market
+    And see employee turnover and vacancy data showing retention challenges
+    And access analysis of contract cost impact on city budget over time
+    And get examples of creative solutions from peer jurisdictions' negotiations
+    And accessible expertise helps board negotiate effectively and fairly

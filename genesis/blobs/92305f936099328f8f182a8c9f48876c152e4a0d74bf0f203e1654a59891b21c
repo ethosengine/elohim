@@ -1,0 +1,10 @@
+Scenario: Economic development board member learns accessible expertise on incentive packages
+    Given business proposes expansion with request for $5M in tax incentives
+    And staff recommendation supports incentives emphasizing job creation promises
+    And board member has no economic development expertise but must vote responsibly
+    When the board member uses Observer accessible expertise
+    Then they receive plain-language explanation of incentive types and impacts
+    And see cost-benefit analysis comparing incentive cost to projected tax revenue
+    And access track record of business's job creation in other locations
+    And get key questions to ask about job quality, accountability, and alternatives
+    And accessible expertise enables informed judgment on incentive proposal

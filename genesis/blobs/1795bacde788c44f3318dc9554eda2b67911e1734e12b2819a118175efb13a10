@@ -1,0 +1,9 @@
+Scenario: Journalist detects environmental racism at regional scale
+    Given pollution facilities cluster in certain neighborhoods
+    And the journalist investigates environmental justice
+    When the Observer analyzes regional environmental patterns
+    Then the journalist sees industrial permits concentrate in communities of color
+    And maps proximity of pollution sources to schools and residences
+    And documents health outcome disparities by neighborhood and race
+    And shows pattern across county regardless of municipal boundaries
+    And publishes investigation exposing regional environmental racism

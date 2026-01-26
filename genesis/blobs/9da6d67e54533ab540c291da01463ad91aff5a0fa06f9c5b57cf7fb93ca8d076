@@ -1,0 +1,10 @@
+Scenario: Child contributes to science fair project collaboration
+    Given Emma is working on a science fair project about local ecology
+    And several classmates are working on related projects
+    When Emma creates a contribution about discovering salamanders in the creek
+    And she shares photos and observations with classmates
+    Then the contribution reaches her project team immediately
+    And her teacher can provide feedback and guidance
+    And the learning agent surfaces related educational resources
+    And Emma learns collaborative research skills
+    And the project documentation is preserved for science fair presentation

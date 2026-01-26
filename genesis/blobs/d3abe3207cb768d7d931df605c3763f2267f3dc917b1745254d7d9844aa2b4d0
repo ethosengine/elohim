@@ -1,0 +1,9 @@
+Scenario: Operator gains autonomy through liberation from franchise agreement constraints
+    Given franchise agreement prohibited innovation, local adaptation, and independent decisions
+    And James bore all risk while having no autonomy
+    When franchise termination succeeds and corporate control ends
+    Then (if staying as steward) James finally exercises local knowledge corporate ignored
+    And business responds to community needs rather than distant corporate mandates
+    And workers implement innovations he suggested but corporate prohibited
+    And autonomy is experienced after years of constrained servitude to franchise rules
+    And workplace_elohim documents operational improvements from liberation

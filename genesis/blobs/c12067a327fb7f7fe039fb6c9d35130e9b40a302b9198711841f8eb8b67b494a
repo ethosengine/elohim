@@ -1,0 +1,10 @@
+Scenario: Neighborhood connection reduces isolation for young adult
+    Given Aisha moved to a new city alone
+    And social isolation is a risk for young adults
+    When Aisha builds neighborhood care relationships
+    Then the neighborhood_elohim should facilitate meaningful connections
+    And care-based relationships should reduce loneliness
+    And practical cooperation should create authentic community
+    And the system should address isolation through care economy
+    And neighborhood bonds should provide social support
+    And belonging should emerge from reciprocal care

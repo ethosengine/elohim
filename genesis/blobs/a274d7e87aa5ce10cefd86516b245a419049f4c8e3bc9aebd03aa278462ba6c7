@@ -1,0 +1,13 @@
+Scenario: Coordinating across neighborhoods with different needs
+    Given Riverside has neighborhoods with different priorities
+    And downtown needs economic development
+    And residential areas prioritize environmental protection
+    And outskirts need infrastructure investment
+    When I facilitate municipal coordination
+    Then Municipal Elohim: helps identify resource flows and conflicts
+    And city council: deliberates on balancing neighborhood needs
+    And we ensure: each neighborhood has voice in decisions
+    And we negotiate: resource allocation serving whole city
+    And protocol enables: coordination without centralization
+    And neighborhoods retain: autonomy within municipal framework
+    And I facilitate: democratic negotiation across differences

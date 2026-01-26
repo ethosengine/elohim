@@ -1,0 +1,11 @@
+Scenario: Documenting dissenting opinion preserving minority view
+    Given our council reaches majority decision on appeal
+    And I disagree with the majority interpretation
+    When we document the precedent
+    Then my dissenting opinion: is included with full reasoning
+    And I explain: alternative constitutional reading
+    And I articulate: why majority may have missed important considerations
+    And future councils: can reference both majority and dissent
+    And constitutional evolution: can draw on minority wisdom later
+    And my disagreement: is honored as legitimate democratic deliberation
+    And precedent reflects: richness of constitutional debate

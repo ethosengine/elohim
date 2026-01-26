@@ -1,0 +1,25 @@
+{
+  "id": "community-farmers-market",
+  "did": "did:web:elohim.host:community:farmers-market",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Farmers Market",
+  "description": "Community with 2 members",
+  "content": "# Farmers Market\n\n**Members:** 2\n\n## Member List\n\n- human-frank-farmer\n- human-georgina-grocer",
+  "contentFormat": "markdown",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-frank-farmer",
+    "human-georgina-grocer"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 2
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-26T21:04:01.743Z"
+}

@@ -1,0 +1,9 @@
+Scenario: Early childhood education policies inform pedagogical approach
+    Given educational governance includes early childhood development research
+    And evidence-based practices exist for ages 5-7
+    When the personal_agent's pedagogy is configured
+    Then it should incorporate developmental psychology research
+    And it should follow evidence-based early learning principles
+    And it should respect limits of cognitive development at age 5
+    And it should support optimal development trajectories
+    And educational policy should shape how Tommy is taught

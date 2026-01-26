@@ -1,0 +1,9 @@
+Scenario: Elder protected from romance scam while maintaining real connections
+    Given Rose has been widowed for two years
+    When a scammer creates a fake profile and tries to contact her
+    And the scammer sends romantic messages requesting financial help
+    Then the guardian agent detects the fraudulent pattern
+    And the messages never reach Rose
+    And she is protected without knowing she was targeted
+    And all her genuine family and friend connections work normally
+    And her dignity and autonomy are fully preserved

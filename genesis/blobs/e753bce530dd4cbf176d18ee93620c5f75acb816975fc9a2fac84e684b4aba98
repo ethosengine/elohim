@@ -1,0 +1,9 @@
+Scenario: Parent tracks curriculum policy transparency
+    Given the school board discusses curriculum changes
+    And the parent wants to understand what their child will learn
+    When the parent reviews Observer's curriculum analysis
+    Then they see specific content being added or removed
+    And understand pedagogical approaches and their evidence base
+    And view teacher professional perspectives on the curriculum
+    And can evaluate changes based on child's learning needs
+    And curriculum decisions include parent informed input

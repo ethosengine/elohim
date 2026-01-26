@@ -1,0 +1,11 @@
+Scenario: Explaining cryptographic constitutional verification to Sarah's council
+    Given Sarah Martinez's Regional Council reviews Marcus's mental health appeal
+    And the case involves cryptographic verification questions
+    When I provide expert testimony about the technical details
+    Then I translate: cryptographic proofs into accessible language
+    And I explain: using analogies (locked box showing answer without revealing secret)
+    And I clarify: what confidence levels mean and their limitations
+    And I acknowledge: where analogies break down and complexity remains
+    And I avoid: jargon that excludes or confuses
+    And I ensure: Sarah understands enough to judge constitutionality
+    And I inform: without dictating the decision

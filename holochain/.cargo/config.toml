@@ -1,0 +1,12 @@
+# Shared target directory for all Rust projects in holochain/
+# This saves disk space and speeds up builds by sharing compiled dependencies
+#
+# How it works:
+# 1. This config tells cargo to output to holochain/target/ (relative path)
+# 2. Symlinks in each dna/* directory point target -> ../../target
+# 3. dna.yaml files use relative paths like "target/wasm32-unknown-unknown/..."
+# 4. These paths resolve correctly via the symlinks
+#
+# CI compatibility: The relative path works in any workspace location
+[build]
+target-dir = "target"

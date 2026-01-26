@@ -1,0 +1,9 @@
+Scenario: Creator receives sustainable support from communities
+    Given Jordan has consistently produced valuable climate education content
+    And multiple educational communities appreciate the work
+    When these communities decide to support Jordan's work
+    Then they can contribute to Jordan's sustainability directly
+    And support flows from communities who receive value
+    And Jordan can continue creating without platform advertising
+    And no surveillance or data extraction occurs
+    And sustainable creator economy emerges from mutual value

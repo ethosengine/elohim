@@ -1,0 +1,171 @@
+# Eclipse Che / DevWorkspaces devfile for elohim-node
+#
+# This devfile allows running elohim-node in Eclipse Che for development
+# and cluster simulation without local Docker.
+#
+# Usage:
+#   1. Open in Eclipse Che / OpenShift Dev Spaces
+#   2. The workspace will auto-provision containers
+#   3. Use the dashboard at http://localhost:8080
+#
+apiVersion: 1.0.0
+metadata:
+  name: elohim-node-dev
+  version: 0.1.0
+  description: Elohim Protocol infrastructure node development environment
+
+projects:
+  - name: elohim
+    source:
+      type: git
+      location: 'https://github.com/ethosengine/elohim.git'
+      branch: dev
+
+components:
+  # Main development container
+  - type: dockerimage
+    alias: dev
+    image: rust:1.75-bookworm
+    memoryLimit: 4Gi
+    mountSources: true
+    env:
+      - name: RUST_LOG
+        value: info,elohim_node=debug
+      - name: ELOHIM_DATA_DIR
+        value: /projects/elohim-data
+    endpoints:
+      - name: dashboard
+        port: 8080
+        attributes:
+          protocol: http
+          public: 'true'
+      - name: grpc
+        port: 9090
+        attributes:
+          protocol: grpc
+          public: 'false'
+      - name: p2p
+        port: 4001
+        attributes:
+          protocol: tcp
+          public: 'true'
+    volumes:
+      - name: elohim-data
+        containerPath: /projects/elohim-data
+      - name: cargo-cache
+        containerPath: /usr/local/cargo/registry
+
+  # Node 2 (for cluster simulation)
+  - type: dockerimage
+    alias: node-2
+    image: rust:1.75-bookworm
+    memoryLimit: 2Gi
+    mountSources: true
+    env:
+      - name: ELOHIM_NODE_ID
+        value: node-2
+      - name: ELOHIM_CLUSTER_NAME
+        value: dev-cluster
+      - name: RUST_LOG
+        value: info,elohim_node=debug
+    endpoints:
+      - name: dashboard-2
+        port: 8081
+        attributes:
+          protocol: http
+          public: 'false'
+    volumes:
+      - name: node-2-data
+        containerPath: /projects/elohim-data
+
+  # Node 3 (optional, for 3-node cluster)
+  - type: dockerimage
+    alias: node-3
+    image: rust:1.75-bookworm
+    memoryLimit: 2Gi
+    mountSources: true
+    env:
+      - name: ELOHIM_NODE_ID
+        value: node-3
+      - name: ELOHIM_CLUSTER_NAME
+        value: dev-cluster
+      - name: RUST_LOG
+        value: info,elohim_node=debug
+    volumes:
+      - name: node-3-data
+        containerPath: /projects/elohim-data
+
+commands:
+  # Build
+  - name: build
+    actions:
+      - type: exec
+        component: dev
+        command: cd /projects/elohim/elohim-node && cargo build
+        workdir: /projects/elohim/elohim-node
+
+  - name: build-release
+    actions:
+      - type: exec
+        component: dev
+        command: cd /projects/elohim/elohim-node && cargo build --release
+        workdir: /projects/elohim/elohim-node
+
+  # Run
+  - name: run-node-1
+    actions:
+      - type: exec
+        component: dev
+        command: |
+          cd /projects/elohim/elohim-node
+          ELOHIM_NODE_ID=node-1 \
+          ELOHIM_CLUSTER_NAME=dev-cluster \
+          cargo run
+        workdir: /projects/elohim/elohim-node
+
+  - name: run-node-2
+    actions:
+      - type: exec
+        component: node-2
+        command: |
+          cd /projects/elohim/elohim-node
+          cargo run
+        workdir: /projects/elohim/elohim-node
+
+  - name: run-node-3
+    actions:
+      - type: exec
+        component: node-3
+        command: |
+          cd /projects/elohim/elohim-node
+          cargo run
+        workdir: /projects/elohim/elohim-node
+
+  # Cluster simulation
+  - name: start-cluster
+    actions:
+      - type: exec
+        component: dev
+        command: |
+          echo "Starting 3-node cluster..."
+          # Node 1 runs in this terminal
+          ELOHIM_NODE_ID=node-1 cargo run &
+          sleep 2
+          echo "Node 1 started. Start node-2 and node-3 in their terminals."
+
+  # Tests
+  - name: test
+    actions:
+      - type: exec
+        component: dev
+        command: cargo test
+        workdir: /projects/elohim/elohim-node
+
+  # Dashboard
+  - name: open-dashboard
+    actions:
+      - type: exec
+        component: dev
+        command: |
+          echo "Dashboard available at: ${CHE_DASHBOARD_URL:-http://localhost:8080}"
+          echo "Or use the 'dashboard' endpoint in Che"

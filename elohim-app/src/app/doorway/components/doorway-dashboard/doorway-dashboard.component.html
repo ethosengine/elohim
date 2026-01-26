@@ -1,0 +1,463 @@
+<div class="doorway-dashboard">
+  <!-- Header -->
+  <header class="dashboard-header">
+    <div class="header-content">
+      <h1>Doorway Operator Dashboard</h1>
+      <p class="subtitle">Compute Resources & Network Health</p>
+    </div>
+    <div class="header-actions">
+      <span class="connection-status" [class]="connectionState()">
+        <span class="status-dot"></span>
+        {{ connectionState() | titlecase }}
+      </span>
+      <button class="refresh-btn" (click)="refresh()" [disabled]="loading()">
+        <span class="icon">&#8635;</span>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  @if (loading() && !cluster()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading dashboard...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error()) {
+    <div class="error-state">
+      <p>{{ error() }}</p>
+      <button (click)="refresh()">Retry</button>
+    </div>
+  }
+
+  <!-- Main Content -->
+  @if (cluster()) {
+    <!-- Quick Stats -->
+    <section class="quick-stats">
+      <div class="stat-card">
+        <div class="stat-value">{{ cluster()?.onlineNodes }}/{{ cluster()?.totalNodes }}</div>
+        <div class="stat-label">Nodes Online</div>
+        <div class="stat-bar">
+          <div
+            class="stat-bar-fill health"
+            [style.width.%]="(cluster()?.healthRatio ?? 0) * 100"
+          ></div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-value">{{ formatPercent(cluster()?.avgTrustScore ?? null) }}</div>
+        <div class="stat-label">Avg Trust Score</div>
+        <div class="stat-bar">
+          <div
+            class="stat-bar-fill trust"
+            [style.width.%]="(cluster()?.avgTrustScore ?? 0) * 100"
+          ></div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-value">{{ formatPercent(cluster()?.avgImpactScore ?? null) }}</div>
+        <div class="stat-label">Avg Impact Score</div>
+        <div class="stat-bar">
+          <div
+            class="stat-bar-fill impact"
+            [style.width.%]="(cluster()?.avgImpactScore ?? 0) * 100"
+          ></div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-value">
+          {{ formatPercent(cluster()?.clusterDeliverySuccessRate ?? null) }}
+        </div>
+        <div class="stat-label">Delivery Success</div>
+        <div class="stat-bar">
+          <div
+            class="stat-bar-fill success"
+            [style.width.%]="(cluster()?.clusterDeliverySuccessRate ?? 0) * 100"
+          ></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab" [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+        Overview
+      </button>
+      <button class="tab" [class.active]="activeTab() === 'nodes'" (click)="setTab('nodes')">
+        Nodes ({{ nodes().length }})
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'resources'"
+        (click)="setTab('resources')"
+      >
+        Resources
+      </button>
+    </nav>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Overview Tab -->
+      @if (activeTab() === 'overview') {
+        <div class="overview-grid">
+          <!-- Capacity Card -->
+          <div class="card">
+            <h3>Cluster Capacity</h3>
+            @if (totalCapacity()) {
+              <div class="capacity-grid">
+                <div class="capacity-item">
+                  <span class="capacity-value">{{ totalCapacity()?.cpu }}</span>
+                  <span class="capacity-label">CPU Cores</span>
+                </div>
+                <div class="capacity-item">
+                  <span class="capacity-value">{{ totalCapacity()?.memory }} GB</span>
+                  <span class="capacity-label">Memory</span>
+                </div>
+                <div class="capacity-item">
+                  <span class="capacity-value">
+                    {{ totalCapacity()?.storage | number: '1.1-1' }} TB
+                  </span>
+                  <span class="capacity-label">Storage</span>
+                </div>
+                <div class="capacity-item">
+                  <span class="capacity-value">{{ totalCapacity()?.bandwidth | number }} Mbps</span>
+                  <span class="capacity-label">Bandwidth</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Steward Distribution Card -->
+          <div class="card">
+            <h3>Steward Distribution</h3>
+            <div class="steward-distribution">
+              @for (tier of stewardDistribution(); track tier.tier) {
+                <div class="tier-row">
+                  <span class="tier-name">{{ tier.tier }}</span>
+                  <div class="tier-bar">
+                    <div
+                      class="tier-bar-fill"
+                      [class]="tier.tier.toLowerCase()"
+                      [style.width.%]="tier.pct * 100"
+                    ></div>
+                  </div>
+                  <span class="tier-count">{{ tier.count }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Reach Coverage Card -->
+          <div class="card">
+            <h3>Reach Coverage</h3>
+            @if (cluster()?.reachCoverage) {
+              <div class="reach-grid">
+                @for (level of [0, 1, 2, 3, 4, 5, 6, 7]; track level) {
+                  <div class="reach-item" [class.active]="getReachCount(level) > 0">
+                    <span class="reach-count">{{ getReachCount(level) }}</span>
+                    <span class="reach-name">{{ reachLevelName(level) }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Cache Performance Card -->
+          <div class="card">
+            <h3>Cache Performance</h3>
+            @if (resources()?.cache) {
+              <div class="cache-stats">
+                <div class="cache-stat">
+                  <span class="cache-value">{{ resources()?.cache?.entries | number }}</span>
+                  <span class="cache-label">Entries</span>
+                </div>
+                <div class="cache-stat">
+                  <span class="cache-value">
+                    {{ formatPercent(resources()?.cache?.hitRate ?? null) }}
+                  </span>
+                  <span class="cache-label">Hit Rate</span>
+                </div>
+                <div class="cache-stat">
+                  <span class="cache-value">{{ resources()?.cache?.hits | number }}</span>
+                  <span class="cache-label">Hits</span>
+                </div>
+                <div class="cache-stat">
+                  <span class="cache-value">{{ resources()?.cache?.misses | number }}</span>
+                  <span class="cache-label">Misses</span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Custodian Network Card -->
+          @if (custodians()) {
+            <div class="card">
+              <h3>Custodian Network</h3>
+              <div class="custodian-stats">
+                <div class="custodian-stat">
+                  <span class="value">{{ custodians()?.registeredCustodians }}</span>
+                  <span class="label">Registered</span>
+                </div>
+                <div class="custodian-stat">
+                  <span class="value">{{ custodians()?.healthyCustodians }}</span>
+                  <span class="label">Healthy</span>
+                </div>
+                <div class="custodian-stat">
+                  <span class="value">{{ custodians()?.trackedBlobs | number }}</span>
+                  <span class="label">Blobs Tracked</span>
+                </div>
+                <div class="custodian-stat">
+                  <span class="value">
+                    {{ formatPercent(custodians()?.probeSuccessRate ?? null) }}
+                  </span>
+                  <span class="label">Probe Success</span>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Human Scale Card -->
+          <div class="card human-scale">
+            <h3>Human Scale Metrics</h3>
+            <div class="human-stats">
+              <div class="human-stat">
+                <span class="value">{{ cluster()?.totalHumansServed | number }}</span>
+                <span class="label">Humans Served</span>
+              </div>
+              <div class="human-stat">
+                <span class="value">{{ cluster()?.totalContentCustodied | number }}</span>
+                <span class="label">Content Pieces</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Nodes Tab -->
+      @if (activeTab() === 'nodes') {
+        <div class="nodes-panel">
+          <!-- Filters -->
+          <div class="filters">
+            <select [value]="statusFilter()" (change)="setStatusFilter($any($event.target).value)">
+              <option value="all">All Status</option>
+              <option value="online">Online</option>
+              <option value="degraded">Degraded</option>
+              <option value="offline">Offline</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+
+          <!-- Nodes Table -->
+          <table class="nodes-table">
+            <thead>
+              <tr>
+                <th (click)="setSort('nodeId')" class="sortable">
+                  Node ID
+                  @if (sortField() === 'nodeId') {
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
+                  }
+                </th>
+                <th (click)="setSort('status')" class="sortable">
+                  Status
+                  @if (sortField() === 'status') {
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
+                  }
+                </th>
+                <th (click)="setSort('stewardTier')" class="sortable">
+                  Tier
+                  @if (sortField() === 'stewardTier') {
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
+                  }
+                </th>
+                <th (click)="setSort('trustScore')" class="sortable">
+                  Trust
+                  @if (sortField() === 'trustScore') {
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
+                  }
+                </th>
+                <th (click)="setSort('combinedScore')" class="sortable">
+                  Score
+                  @if (sortField() === 'combinedScore') {
+                    <span class="sort-icon">
+                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                    </span>
+                  }
+                </th>
+                <th>Last Heartbeat</th>
+                <th>Region</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (node of sortedNodes(); track node.nodeId) {
+                <tr [class]="node.status">
+                  <td class="node-id">{{ node.nodeId | slice: 0 : 12 }}...</td>
+                  <td>
+                    <span class="status-badge" [class]="node.status">
+                      {{ node.status | titlecase }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="tier-badge" [class]="node.stewardTier ?? 'unknown'">
+                      {{ node.stewardTier ?? '-' | titlecase }}
+                    </span>
+                  </td>
+                  <td>{{ formatPercent(node.trustScore) }}</td>
+                  <td>
+                    <div class="score-bar">
+                      <div class="score-fill" [style.width.%]="node.combinedScore * 100"></div>
+                      <span class="score-text">
+                        {{ node.combinedScore * 100 | number: '1.0-0' }}%
+                      </span>
+                    </div>
+                  </td>
+                  <td>{{ formatTime(node.lastHeartbeatSecsAgo) }}</td>
+                  <td>{{ node.region ?? '-' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="7" class="empty-state">No nodes found</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <!-- Resources Tab -->
+      @if (activeTab() === 'resources') {
+        <div class="resources-panel">
+          @if (resources()) {
+            <div class="resource-grid">
+              <!-- CPU -->
+              <div class="resource-card">
+                <h4>CPU</h4>
+                <div class="resource-gauge">
+                  <div
+                    class="gauge-fill"
+                    [style.width.%]="resources()?.cpu?.utilizationPercent ?? 0"
+                  ></div>
+                </div>
+                <div class="resource-details">
+                  <div class="detail">
+                    <span class="label">Total</span>
+                    <span class="value">{{ resources()?.cpu?.total | number }} cores</span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Available</span>
+                    <span class="value">{{ resources()?.cpu?.available | number }} cores</span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Utilization</span>
+                    <span class="value">
+                      {{ resources()?.cpu?.utilizationPercent | number: '1.1-1' }}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Memory -->
+              <div class="resource-card">
+                <h4>Memory</h4>
+                <div class="resource-gauge">
+                  <div
+                    class="gauge-fill"
+                    [style.width.%]="resources()?.memory?.utilizationPercent ?? 0"
+                  ></div>
+                </div>
+                <div class="resource-details">
+                  <div class="detail">
+                    <span class="label">Total</span>
+                    <span class="value">{{ resources()?.memory?.total | number }} GB</span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Available</span>
+                    <span class="value">{{ resources()?.memory?.available | number }} GB</span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Utilization</span>
+                    <span class="value">
+                      {{ resources()?.memory?.utilizationPercent | number: '1.1-1' }}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Storage -->
+              <div class="resource-card">
+                <h4>Storage</h4>
+                <div class="resource-gauge">
+                  <div
+                    class="gauge-fill"
+                    [style.width.%]="resources()?.storage?.utilizationPercent ?? 0"
+                  ></div>
+                </div>
+                <div class="resource-details">
+                  <div class="detail">
+                    <span class="label">Total</span>
+                    <span class="value">
+                      {{ resources()?.storage?.totalTb | number: '1.1-1' }} TB
+                    </span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Available</span>
+                    <span class="value">
+                      {{ resources()?.storage?.availableTb | number: '1.1-1' }} TB
+                    </span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Custodied Content</span>
+                    <span class="value">
+                      {{ resources()?.storage?.custodiedContentGb | number }} GB
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bandwidth -->
+              <div class="resource-card">
+                <h4>Bandwidth</h4>
+                <div class="resource-details">
+                  <div class="detail">
+                    <span class="label">Total Capacity</span>
+                    <span class="value">{{ resources()?.bandwidth?.totalMbps | number }} Mbps</span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Active Connections</span>
+                    <span class="value">
+                      {{ resources()?.bandwidth?.activeConnections | number }}
+                    </span>
+                  </div>
+                  <div class="detail">
+                    <span class="label">Avg per Connection</span>
+                    <span class="value">
+                      {{ resources()?.bandwidth?.avgBandwidthPerConnectionMbps | number: '1.1-1' }}
+                      Mbps
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <p>Resource data unavailable</p>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

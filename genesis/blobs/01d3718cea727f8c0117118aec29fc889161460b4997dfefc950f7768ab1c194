@@ -1,0 +1,11 @@
+Scenario: Choosing how to spend free time
+    Given Jordan has free time after work
+    And Jordan has multiple activity options available
+    When Jordan considers what to do
+    Then the personal_agent shows activity options with pictures
+    And each option includes simple information (location, time, who)
+    And Jordan selects their preferred activity
+    And the system helps coordinate any needed support
+    But Jordan's choice drives what happens
+    And Jordan's preferences are learned and remembered
+    And Jordan experiences agency over their own time

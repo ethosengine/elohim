@@ -1,0 +1,9 @@
+Scenario: Career trajectory protection despite reduced hours
+    Given James's career has been derailed by caregiving
+    And years of part-time work affects future employment
+    When the workplace_elohim tracks career impact
+    Then caregiving years should be recognized as valuable experience
+    And James's skills should be valued despite reduced hours
+    And career gaps should be explained as caregiving, not lack of ambition
+    And future employers should understand caregiver career patterns
+    And workplace should not permanently penalize caregiving years

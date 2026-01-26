@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, timer } from 'rxjs';
+
 import { map, switchMap } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
+
+import { Observable, of, timer } from 'rxjs';
+
 import {
   ElohimAgent,
   ElohimCapability,
@@ -14,8 +16,10 @@ import {
   ContentReviewParams,
   ContentReviewResult,
   AttestationRecommendationParams,
-  AttestationRecommendation
+  AttestationRecommendation,
 } from '../models/elohim-agent.model';
+
+import { DataLoaderService } from './data-loader.service';
 
 /**
  * ElohimAgentService - Interface to autonomous constitutional guardians.
@@ -38,7 +42,7 @@ import {
  */
 @Injectable({ providedIn: 'root' })
 export class ElohimAgentService {
-  private readonly elohimCache: Map<string, ElohimAgent> = new Map();
+  private readonly elohimCache = new Map<string, ElohimAgent>();
   private requestLog: ElohimRequest[] = [];
 
   constructor(private readonly dataLoader: DataLoaderService) {}
@@ -59,7 +63,7 @@ export class ElohimAgentService {
           displayName: e.displayName,
           layer: e.layer as ElohimLayer,
           capabilities: (e.capabilities || []) as ElohimCapability[],
-          visibility: e.visibility as 'public' | 'private'
+          visibility: e.visibility as 'public' | 'private',
         }));
       })
     );
@@ -88,7 +92,7 @@ export class ElohimAgentService {
           visibility: agent.visibility as 'public' | 'private',
           familyId: agent.familyId,
           createdAt: agent.createdAt,
-          updatedAt: agent.updatedAt
+          updatedAt: agent.updatedAt,
         };
 
         this.elohimCache.set(elohimId, elohim);
@@ -104,9 +108,7 @@ export class ElohimAgentService {
     return this.getElohimIndex().pipe(
       switchMap(elohimList => {
         // Filter by capability
-        const capable = elohimList.filter(e =>
-          e.capabilities.includes(criteria.capability)
-        );
+        const capable = elohimList.filter(e => e.capabilities.includes(criteria.capability));
 
         if (capable.length === 0) {
           return of(null);
@@ -146,35 +148,38 @@ export class ElohimAgentService {
     this.requestLog.push(request);
 
     // Resolve target Elohim
-    const targetElohim$ = request.targetElohimId === 'auto'
-      ? this.selectElohim({ capability: request.capability })
-      : this.getElohim(request.targetElohimId);
+    const targetElohim$ =
+      request.targetElohimId === 'auto'
+        ? this.selectElohim({ capability: request.capability })
+        : this.getElohim(request.targetElohimId);
 
     return targetElohim$.pipe(
       switchMap(elohim => {
         if (!elohim) {
-          return of(this.createDeclinedResponse(
-            request,
-            'unknown',
-            'No Elohim available for this capability'
-          ));
+          return of(
+            this.createDeclinedResponse(
+              request,
+              'unknown',
+              'No Elohim available for this capability'
+            )
+          );
         }
 
         // Check capability
         if (!elohim.capabilities.includes(request.capability)) {
-          return of(this.createDeclinedResponse(
-            request,
-            elohim.id,
-            `This Elohim does not have the '${request.capability}' capability`
-          ));
+          return of(
+            this.createDeclinedResponse(
+              request,
+              elohim.id,
+              `This Elohim does not have the '${request.capability}' capability`
+            )
+          );
         }
 
         // Simulate processing time based on capability
         const processingTime = this.estimateProcessingTime(request.capability);
 
-        return timer(processingTime).pipe(
-          map(() => this.processRequest(request, elohim))
-        );
+        return timer(processingTime).pipe(map(() => this.processRequest(request, elohim)));
       })
     );
   }
@@ -195,11 +200,11 @@ export class ElohimAgentService {
       params: {
         type: 'content-review',
         contentId,
-        reviewType
+        reviewType,
       } as ContentReviewParams,
       requesterId,
       priority: 'normal',
-      requestedAt: new Date().toISOString()
+      requestedAt: new Date().toISOString(),
     };
 
     return this.invoke(request);
@@ -223,11 +228,11 @@ export class ElohimAgentService {
         type: 'attestation-recommendation',
         contentId,
         requestedAttestationType: attestationType,
-        evidence
+        evidence,
       } as AttestationRecommendationParams,
       requesterId,
       priority: 'normal',
-      requestedAt: new Date().toISOString()
+      requestedAt: new Date().toISOString(),
     };
 
     return this.invoke(request);
@@ -251,8 +256,8 @@ export class ElohimAgentService {
         tokensProcessed: Math.floor(Math.random() * 1000) + 500, // NOSONAR - Demo data generation
         timeMs: this.estimateProcessingTime(request.capability),
         constitutionalChecks: Math.floor(Math.random() * 5) + 1, // NOSONAR - Demo data generation
-        precedentLookups: Math.floor(Math.random() * 3) // NOSONAR - Demo data generation
-      }
+        precedentLookups: Math.floor(Math.random() * 3), // NOSONAR - Demo data generation
+      },
     };
 
     // Route to capability-specific handlers
@@ -268,7 +273,7 @@ export class ElohimAgentService {
           ...baseResponse,
           status: 'fulfilled',
           constitutionalReasoning: this.generateDefaultReasoning(request.capability),
-          payload: undefined
+          payload: undefined,
         };
     }
   }
@@ -282,19 +287,23 @@ export class ElohimAgentService {
 
     // Simulate content review (in production: actual AI analysis)
     const approved = Math.random() > 0.1; // NOSONAR - Demo data generation (90% approval for demo)
-    const issues = approved ? [] : [{
-      severity: 'warning' as const,
-      category: 'clarity',
-      description: 'Content could benefit from additional examples',
-      suggestion: 'Consider adding concrete use cases'
-    }];
+    const issues = approved
+      ? []
+      : [
+          {
+            severity: 'warning' as const,
+            category: 'clarity',
+            description: 'Content could benefit from additional examples',
+            suggestion: 'Consider adding concrete use cases',
+          },
+        ];
 
     const payload: ContentReviewResult = {
       type: 'content-review',
       contentId: params.contentId,
       approved,
       issues,
-      trustScoreImpact: approved ? 0.1 : -0.05
+      trustScoreImpact: approved ? 0.1 : -0.05,
     };
 
     return {
@@ -302,17 +311,18 @@ export class ElohimAgentService {
       status: 'fulfilled',
       constitutionalReasoning: {
         primaryPrinciple: 'Love as committed action toward flourishing',
-        interpretation: 'Content review ensures learners receive accurate, safe information that supports their growth',
+        interpretation:
+          'Content review ensures learners receive accurate, safe information that supports their growth',
         valuesWeighed: [
           { value: 'Learner safety', weight: 0.4, direction: 'for' },
           { value: 'Knowledge access', weight: 0.3, direction: 'for' },
           { value: 'Author dignity', weight: 0.2, direction: 'for' },
-          { value: 'Community trust', weight: 0.1, direction: 'for' }
+          { value: 'Community trust', weight: 0.1, direction: 'for' },
         ],
         confidence: 0.85,
-        precedents: ['content-review-2025-001', 'safety-standard-v1.2']
+        precedents: ['content-review-2025-001', 'safety-standard-v1.2'],
       },
-      payload
+      payload,
     } as ElohimResponse;
   }
 
@@ -332,10 +342,12 @@ export class ElohimAgentService {
       recommend: recommend as 'grant' | 'deny' | 'defer',
       attestationType: params.requestedAttestationType,
       suggestedReach: recommend === 'grant' ? 'community' : undefined,
-      conditions: recommend === 'defer' ? ['Requires peer review', 'Additional evidence needed'] : undefined,
-      reasoning: recommend === 'grant'
-        ? 'Content meets quality standards and aligns with constitutional principles'
-        : 'Additional review recommended before granting attestation'
+      conditions:
+        recommend === 'defer' ? ['Requires peer review', 'Additional evidence needed'] : undefined,
+      reasoning:
+        recommend === 'grant'
+          ? 'Content meets quality standards and aligns with constitutional principles'
+          : 'Additional review recommended before granting attestation',
     };
 
     return {
@@ -343,17 +355,22 @@ export class ElohimAgentService {
       status: 'fulfilled',
       constitutionalReasoning: {
         primaryPrinciple: 'Boundaries around freedom of reach',
-        interpretation: 'Attestations expand content reach; must ensure content serves flourishing before broader distribution',
+        interpretation:
+          'Attestations expand content reach; must ensure content serves flourishing before broader distribution',
         valuesWeighed: [
-          { value: 'Content quality', weight: 0.35, direction: recommend === 'grant' ? 'for' : 'against' },
+          {
+            value: 'Content quality',
+            weight: 0.35,
+            direction: recommend === 'grant' ? 'for' : 'against',
+          },
           { value: 'Community protection', weight: 0.3, direction: 'for' },
           { value: 'Author recognition', weight: 0.2, direction: 'for' },
-          { value: 'Knowledge sharing', weight: 0.15, direction: 'for' }
+          { value: 'Knowledge sharing', weight: 0.15, direction: 'for' },
         ],
         confidence: recommend === 'grant' ? 0.8 : 0.6,
-        precedents: ['attestation-standard-v1.0']
+        precedents: ['attestation-standard-v1.0'],
       },
-      payload
+      payload,
     } as ElohimResponse;
   }
 
@@ -373,7 +390,7 @@ export class ElohimAgentService {
       'attestation-recommendation': 1200,
       'knowledge-map-synthesis': 3000,
       'spiral-detection': 800,
-      'path-analysis': 2500
+      'path-analysis': 2500,
     };
     return times[capability] ?? 1000;
   }
@@ -391,10 +408,10 @@ export class ElohimAgentService {
         primaryPrinciple: 'Capability boundaries',
         interpretation: 'Elohim may only exercise capabilities they possess',
         valuesWeighed: [],
-        confidence: 1.0
+        confidence: 1.0,
       },
       declineReason: reason,
-      respondedAt: new Date().toISOString()
+      respondedAt: new Date().toISOString(),
     };
   }
 
@@ -404,9 +421,9 @@ export class ElohimAgentService {
       interpretation: `Capability '${capability}' exercised in service of human flourishing`,
       valuesWeighed: [
         { value: 'Human dignity', weight: 0.5, direction: 'for' },
-        { value: 'Collective wellbeing', weight: 0.5, direction: 'for' }
+        { value: 'Collective wellbeing', weight: 0.5, direction: 'for' },
       ],
-      confidence: 0.75
+      confidence: 0.75,
     };
   }
 

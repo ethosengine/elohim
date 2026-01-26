@@ -1,0 +1,10 @@
+Scenario: Roommate household operates as miniature care economy
+    Given Aisha lives with roommates
+    And the household functions as a care economy unit
+    When household care tokens are calculated
+    Then all forms of household labor should be valued
+    And cooking, cleaning, shopping, and maintenance should all count
+    And emotional labor of household coordination should be recognized
+    And care tokens should enable equitable exchange
+    And the household should function as mutual support network
+    And care economy principles should prevent household exploitation

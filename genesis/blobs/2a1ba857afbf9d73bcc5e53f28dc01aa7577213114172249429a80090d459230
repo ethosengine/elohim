@@ -1,0 +1,10 @@
+Scenario: Family cultural values shape child's economic reasoning
+    Given Emma's family has specific cultural framework
+    And these values are configured in family_elohim
+    When Emma makes value decisions
+    Then guidance should align with family cultural context
+    And her personal_agent should reinforce family values
+    And economic literacy should be culturally appropriate
+    And the protocol should serve family's chosen framework
+    And diverse family cultures should be respected
+    And value formation should honor family identity

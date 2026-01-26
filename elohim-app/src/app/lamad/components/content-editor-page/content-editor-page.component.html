@@ -44,24 +44,18 @@
     <div class="error-state" *ngIf="!isLoading && error">
       <h2>Unable to load content</h2>
       <p>{{ error }}</p>
-      <button class="btn btn-primary" (click)="navigateBack()">
-        Go Back
-      </button>
+      <button class="btn btn-primary" (click)="navigateBack()">Go Back</button>
     </div>
 
     <!-- Not Editable State -->
     <div class="not-editable-state" *ngIf="!isLoading && !error && node && !canEdit">
       <h2>Cannot Edit This Content</h2>
       <p *ngIf="node.id.startsWith('path-')">
-        This content is generated from a learning path.
-        To edit, you'll need to edit the path directly.
+        This content is generated from a learning path. To edit, you'll need to edit the path
+        directly.
       </p>
-      <p *ngIf="!node.id.startsWith('path-')">
-        You don't have permission to edit this content.
-      </p>
-      <button class="btn btn-primary" (click)="navigateBack()">
-        View Content
-      </button>
+      <p *ngIf="!node.id.startsWith('path-')">You don't have permission to edit this content.</p>
+      <button class="btn btn-primary" (click)="navigateBack()">View Content</button>
     </div>
 
     <!-- Editor Host -->

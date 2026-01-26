@@ -1,0 +1,10 @@
+Scenario: Shared household inventory and waste reduction
+    Given four roommates buy food independently
+    And lack of coordination leads to duplicate purchases and waste
+    When the household_elohim manages shared inventory
+    Then it should track what's in shared pantry and refrigerator
+    And it should prevent duplicate buying: "You already have pasta, Maya bought it Tuesday"
+    And it should identify food about to expire
+    And it should suggest meals using existing ingredients
+    And the system should reduce household food waste
+    And coordination should save money and resources for all roommates

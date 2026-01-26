@@ -1,0 +1,10 @@
+Scenario: Global precedent for existential constitutional questions
+    Given an appeal raises question about superintelligence governance
+    And the question is whether humans can oversee reasoning they can't understand
+    When the case reaches global Constitutional Council
+    Then the council convenes emergency global deliberation
+    And experts like Amara explain technical constraints
+    And appellants explain dignity concerns about being governed by incomprehensible systems
+    And the council establishes global precedent on explainability requirements
+    And the precedent applies to all jurisdictions implementing protocol
+    And human dignity is preserved even as AI capabilities grow

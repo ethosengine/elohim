@@ -1,0 +1,12 @@
+Scenario: Demonstrating visible community benefit for reelection
+    Given I face reelection and need to show protocol serves Riverside
+    And residents judge me on outcomes not philosophy
+    When I present annual protocol review to community
+    Then I show: data on wellbeing improvements (loneliness down, satisfaction up)
+    And I report: crisis response effectiveness and economic resilience
+    And I acknowledge: failures and challenges honestly
+    And I demonstrate: transparent accountability
+    And I propose: continuing with recommended calibrations
+    And residents vote: 68% to continue (not consensus but democratic)
+    And I remain accountable: through normal democratic processes
+    And evidence matters: for sustaining political support

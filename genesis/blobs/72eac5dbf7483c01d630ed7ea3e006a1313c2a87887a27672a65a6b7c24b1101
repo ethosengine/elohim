@@ -1,0 +1,12 @@
+Scenario: Making retirement care contributions visible at individual level
+    Given Margaret provides 15 hours/week grandchild care
+    And she volunteers 10 hours/week in community
+    And she provides 8 hours/week elder care for her mother
+    When Margaret's care contributions are tracked
+    Then her personal_agent should quantify all care labor
+    And it should calculate market value (~$15k/year grandchild care)
+    And it should accumulate care tokens for all contributions
+    And it should make visible that she's highly productive
+    And Margaret should experience herself as valuable contributor
+    And the data should counter cultural narrative of retired as "not working"
+    And her contributions should be recognized, not invisible

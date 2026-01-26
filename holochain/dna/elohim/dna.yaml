@@ -1,0 +1,17 @@
+# Lamad DNA - Content & Learning
+---
+manifest_version: "0"
+name: lamad
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: content_store_integrity
+      path: "target/wasm32-unknown-unknown/release/content_store_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: content_store
+      path: "target/wasm32-unknown-unknown/release/content_store.wasm"
+      dependencies:
+        - name: content_store_integrity

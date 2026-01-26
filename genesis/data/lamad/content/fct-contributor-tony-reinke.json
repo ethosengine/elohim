@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-tony-reinke",
+  "contentType": "contributor",
+  "title": "Tony Reinke",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Tony Reinke\n\n**Role:** author\n\n**Works:** 12 Ways Your Phone Is Changing You\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act",
+    "fct-media-13-book-12-ways-your-phone-i"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-14-ready-to-act"
+  },
+  "createdAt": "2025-11-28T21:10:19.225373",
+  "updatedAt": "2025-12-24T03:05:26.080Z",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Tony Reinke",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-tony-reinke",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Tony Reinke - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-tony-reinke",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Tony Reinke",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.225373",
+    "dateModified": "2025-11-28T21:10:19.225374",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

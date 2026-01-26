@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "categories": {
+    "DNA_BUILD": {
+      "pipelines": ["elohim-holochain"],
+      "search": "error\\[E\\d+\\]|cargo build.*failed",
+      "ctx": 5, "max": 10,
+      "fix": "Check RUSTFLAGS, run cargo build --target wasm32-unknown-unknown locally",
+      "blocks": ["elohim-edge", "elohim-genesis"]
+    },
+    "APP_BUILD": {
+      "pipelines": ["elohim"],
+      "search": "error TS\\d+|Cannot find module",
+      "ctx": 3, "max": 20,
+      "fix": "Run npm run build locally, check model sync",
+      "blocks": ["elohim-genesis"]
+    },
+    "INFRASTRUCTURE": {
+      "pipelines": ["elohim-edge"],
+      "search": "hApp.*not found|nerdctl|denied",
+      "ctx": 5, "max": 10,
+      "fix": "Verify elohim-holochain succeeded, check Harbor creds",
+      "blocks": ["elohim-genesis"]
+    },
+    "SEEDING": {
+      "pipelines": ["elohim-genesis"],
+      "search": "PREFLIGHT|ETIMEDOUT|Cell not found",
+      "ctx": 10, "max": 5,
+      "fix": "Check doorway-dev.elohim.host/health, verify edge healthy",
+      "blocks": []
+    },
+    "DEPLOYMENT": {
+      "pipelines": ["elohim", "elohim-edge"],
+      "search": "kubectl.*failed|rollout|CrashLoopBackOff",
+      "ctx": 5, "max": 10,
+      "fix": "Check Harbor image, kubectl describe pod",
+      "blocks": ["elohim-genesis"]
+    },
+    "TEST_FAILURE": {
+      "pipelines": ["elohim", "elohim-genesis"],
+      "search": "FAILED|AssertionError",
+      "ctx": 5, "max": 15,
+      "fix": "Use getTestResults/getFlakyFailures, run npm test locally",
+      "blocks": []
+    }
+  },
+  "dependencies": {
+    "elohim-holochain": { "blocks": ["elohim-edge", "elohim-genesis"] },
+    "elohim-edge": { "blocks": ["elohim-genesis"] },
+    "elohim": { "blocks": ["elohim-genesis"] },
+    "elohim-genesis": { "blocks": [] }
+  }
+}

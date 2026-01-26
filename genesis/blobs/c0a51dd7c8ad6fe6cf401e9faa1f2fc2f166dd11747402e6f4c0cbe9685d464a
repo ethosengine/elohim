@@ -1,0 +1,12 @@
+Scenario: Bioregional economic localization supports care and ecological resilience
+    Given globalized economy increases ecological impact
+    And bioregional economic localization can reduce impact while building care economy
+    And Robert's economic choices affect regional resilience
+    When bioregional_elohim supports economic localization
+    Then it should help Robert source goods and services bioregionally
+    And connect him to regional producers, workers, and care economy networks
+    And recognize that local economic participation reduces transportation impact
+    And demonstrate that care economy and ecological sustainability align through localization
+    And build bioregional economic resilience through local exchange
+    And reduce ecological impact through regional economic relationships
+    And advance care economy through bioregional economic networks

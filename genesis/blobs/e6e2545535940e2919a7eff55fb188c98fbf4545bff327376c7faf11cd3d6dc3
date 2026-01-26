@@ -1,0 +1,9 @@
+Scenario: Protection from discrimination based on single parent status
+    Given single parents often face workplace discrimination and bias
+    And employers may view them as less committed or reliable
+    When Maria experiences workplace treatment
+    Then the workplace_elohim should monitor for single parent discrimination
+    And it should document patterns that indicate bias
+    And it should support Maria in addressing discriminatory treatment
+    And single parent status should be protected from workplace discrimination
+    And Maria should have equal opportunity regardless of family structure

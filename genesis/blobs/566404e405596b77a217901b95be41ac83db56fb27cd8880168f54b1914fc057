@@ -1,0 +1,11 @@
+Scenario: Personal agent preserves Margaret's identity beyond grandparenting
+    Given Margaret has her own interests, friendships, and development goals
+    And she is not defined solely by caregiving roles
+    When Margaret's personal_agent tracks her activities
+    Then it should recognize time spent on her own hobbies and interests
+    And it should encourage balance between caregiving and personal growth
+    And it should protect space for Margaret's continued development
+    And it should affirm that her value extends beyond utility
+    And Margaret should experience herself as a whole person
+    And the system should prevent her identity collapse into "just grandma"
+    And her autonomy and personhood should be continuously affirmed

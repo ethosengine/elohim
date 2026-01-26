@@ -1,0 +1,41 @@
+{
+  "id": "elohim-lamad",
+  "did": "did:web:elohim.host:content:elohim-lamad",
+  "contentType": "concept",
+  "activityPubType": "Article",
+  "title": "Lamad: Learning for Human Flourishing",
+  "description": "Introduction to the Lamad learning system - how the Elohim Protocol approaches education and skill development",
+  "content": "# Lamad: Learning for Human Flourishing\n\n**Lamad** (Hebrew: לָמַד) means \"to learn\" - but in Hebrew tradition, learning is never passive absorption of information. It's an active, relational process of transformation.\n\n## What Makes Lamad Different?\n\nThe Elohim Protocol's learning system is designed around several key principles:\n\n### 1. Learning is Relational\n\nTraditional education treats learners as empty vessels to be filled with content. Lamad recognizes that you bring unique experiences, values, and perspectives. Your learning journey is shaped by who you are, not just what we want to teach.\n\n### 2. Mastery Over Completion\n\nYou're not racing to \"finish\" content. The goal is genuine understanding and the ability to apply what you learn. Take the time you need. Return to concepts as your understanding deepens.\n\n### 3. Connected Knowledge\n\nEvery concept in Lamad is connected to others. As you explore, you'll discover how ideas relate across domains - how governance connects to economics, how care work relates to technology design, how individual flourishing enables community coordination.\n\n### 4. Values-Aligned Assessment\n\nOur assessments aren't just testing recall - they help you understand how concepts apply to real situations and how they connect to your own values and interests.\n\n## Your Learning Path\n\nAs you progress through the Elohim Protocol path, you'll:\n\n- **Explore** the foundational vision and understand why this matters\n- **Discover** which domains resonate most with your interests and values\n- **Develop** competency in applying principles to real scenarios\n- **Contribute** your unique perspective to the growing community of practice\n\n## The Five Epic Domains\n\nThe Elohim Protocol organizes around five interconnected domains:\n\n1. **AI Governance** - Constitutional oversight and democratic AI accountability\n2. **Value Scanner** - Recognizing and supporting invisible care work\n3. **Public Observer** - Civic participation and public oversight\n4. **Autonomous Entity** - Transforming workplace ownership and governance\n5. **Social Medium** - Building dignity-preserving digital spaces\n\nEach domain offers pathways for different roles and interests - whether you're a policy maker, caregiver, community organizer, entrepreneur, or simply someone who wants to understand how technology can serve human flourishing.\n\n## Getting Started\n\nYou're about to begin with the **Manifesto** - the foundational vision document that introduces the crisis we face and the architectural response. As you read, consider:\n\n- What problems resonate with your own experience?\n- Which solutions seem most promising or challenging?\n- Where do you see yourself contributing?\n\nThe quiz that follows will help you reflect on these questions and identify which domains align with your values and interests.\n\n---\n\n*\"The fear of the LORD is the beginning of knowledge, but fools despise wisdom and instruction.\"* - Proverbs 1:7\n\nIn the Elohim Protocol, we understand this \"fear\" not as terror, but as profound respect for the patterns of flourishing that sustain life. Learning begins with humility - recognizing that wisdom emerges through relationship, not just information.",
+  "contentFormat": "markdown",
+  "tags": [
+    "concept",
+    "lamad",
+    "introduction",
+    "learning"
+  ],
+  "sourcePath": null,
+  "relatedNodeIds": [
+    "manifesto"
+  ],
+  "metadata": {
+    "category": "foundation",
+    "domain": "lamad"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Lamad: Learning for Human Flourishing",
+    "ogDescription": "Introduction to the Lamad learning system - how the Elohim Protocol approaches education and skill development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/elohim-lamad",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/elohim-lamad",
+    "identifier": "did:web:elohim.host:content:elohim-lamad",
+    "name": "Lamad: Learning for Human Flourishing",
+    "description": "Introduction to the Lamad learning system - how the Elohim Protocol approaches education and skill development"
+  },
+  "createdAt": "2025-12-26T16:00:00Z",
+  "updatedAt": "2025-12-26T16:00:00Z"
+}

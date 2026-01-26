@@ -1,0 +1,136 @@
+# Audience Archetype: Policy-Developer-Blogger
+# Used by the pedagogical pipeline to tailor scope, sequence, and emphasis
+
+archetype:
+  name: "Policy-Developer-Blogger"
+  description: >
+    Tech-literate advocate interested in systems change. This archetype
+    represents someone who wants to understand the Elohim Protocol well
+    enough to advocate for it, contribute to it, or write about it.
+    They are not experts in all domains but have broad curiosity and
+    some technical foundation.
+
+# What the learner already knows coming in
+entry_knowledge:
+  technical:
+    - Basic understanding of distributed systems concepts
+    - Familiarity with APIs and web development
+    - Some exposure to blockchain/crypto discourse (not necessarily deep)
+    - Comfortable reading code examples but may not write Rust/Holochain
+  domain:
+    - General awareness of governance and policy processes
+    - Understanding of care economy concepts at surface level
+    - Familiarity with social media platform dynamics
+    - Basic economic literacy (not formal economics training)
+  conceptual:
+    - Systems thinking at introductory level
+    - Exposure to ideas like coordination problems, collective action
+    - Awareness of attention economy critiques (e.g., Social Dilemma)
+
+# Why they're learning this
+motivations:
+  primary:
+    - Understand enough to advocate effectively for this approach
+    - Evaluate whether to adopt/recommend these ideas
+    - Find concrete ways to contribute (code, content, community)
+  secondary:
+    - Write blog posts or articles explaining these concepts
+    - Prepare presentations for stakeholders
+    - Connect these ideas to their existing work/interests
+  intrinsic:
+    - Genuine concern about current tech/governance trajectories
+    - Hope that better systems are possible
+    - Desire to be part of meaningful change
+
+# Decisions they'll be able to make after completing the path
+decisions_enabled:
+  organizational:
+    - "Should my organization explore this approach?"
+    - "What resources would implementation require?"
+    - "Who should I connect with to learn more?"
+  communication:
+    - "How do I explain this to non-technical stakeholders?"
+    - "What analogies and examples resonate best?"
+    - "What objections should I anticipate?"
+  contribution:
+    - "Where can I contribute given my skills?"
+    - "What domain should I focus on first?"
+    - "How do I get involved in the community?"
+
+# Time and attention constraints
+time_budget:
+  total: "6-8 hours for complete path"
+  session_length: "30-60 minutes per session"
+  frequency: "2-3 sessions per week typical"
+  completion_horizon: "2-4 weeks"
+
+# Points where they might resist or struggle
+resistance_points:
+  conceptual:
+    - description: "Skepticism about 'love' as a technical principle"
+      mitigation: "Ground in concrete mechanisms, not just philosophy"
+    - description: "Concerns about feasibility at scale"
+      mitigation: "Show real-world examples of similar patterns working"
+    - description: "Questions about economic sustainability"
+      mitigation: "Explain value flows with concrete scenarios"
+  technical:
+    - description: "Holochain unfamiliarity"
+      mitigation: "Focus on what it enables, not implementation details"
+    - description: "Constitutional AI abstraction"
+      mitigation: "Use policy maker scenarios to ground concepts"
+  emotional:
+    - description: "Cynicism about tech utopian claims"
+      mitigation: "Acknowledge limitations, show incremental path"
+    - description: "Overwhelm at scope of change proposed"
+      mitigation: "Break into digestible chunks with clear entry points"
+
+# Learning style preferences for this archetype
+learning_preferences:
+  content_types:
+    preferred:
+      - Narrative explanations with concrete examples
+      - Visual diagrams of system relationships
+      - Real-world scenarios and case studies
+      - Short video explanations (5-10 min)
+    acceptable:
+      - Technical documentation (for reference)
+      - Code examples (when illustrating concepts)
+    avoid:
+      - Dense academic prose
+      - Pure theory without application
+      - Implementation details before concepts
+  assessment_style:
+    - Scenario-based questions over factual recall
+    - "What would you do if..." over "What is the definition of..."
+    - Self-assessment and reflection prompts
+    - Application exercises over memorization
+
+# How to sequence content for this archetype
+sequencing_guidance:
+  start_with:
+    - Vision and motivation (why this matters)
+    - One compelling domain to build understanding
+    - Concrete examples before abstract principles
+  build_toward:
+    - Cross-domain integration
+    - Technical depth for interested learners
+    - Contribution pathways
+  avoid_early:
+    - Implementation details
+    - Economic mechanisms without context
+    - All domains at once (overwhelm)
+
+# Success indicators for this archetype
+success_indicators:
+  knowledge:
+    - Can explain the five epic domains to a colleague
+    - Understands the constitutional layers architecture
+    - Knows the role of Elohim agents in the system
+  skill:
+    - Can identify which domain applies to a given scenario
+    - Can articulate the value proposition to different stakeholders
+    - Can find relevant documentation for deeper learning
+  disposition:
+    - Feels equipped to advocate for these ideas
+    - Has clear next steps for contribution
+    - Sees connection to their existing work/interests

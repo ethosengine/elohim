@@ -1,0 +1,10 @@
+Scenario: Recognition of unpaid care labor builds self-worth
+    Given Margaret's care contributions are substantial but unpaid
+    And traditional economics labels her as "not working"
+    When Margaret reviews her care contribution data
+    Then she should see quantified value of her labor
+    And she should understand her economic contribution is significant
+    And she should experience herself as productive member of society
+    And the narrative of retirement as obsolescence should be countered
+    And Margaret should have data to assert her value
+    And her dignity and self-worth should be affirmed

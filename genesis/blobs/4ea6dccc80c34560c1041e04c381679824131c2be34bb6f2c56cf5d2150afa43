@@ -1,0 +1,9 @@
+Scenario: Community care economy supplements for reduced household income
+    Given James's household income dropped from $80k to $40k due to caregiving
+    And caregiving prevents full-time employment
+    When the community_elohim assesses economic support needs
+    Then care token supplements should be available based on need
+    And community should provide financial support recognizing care work
+    And support should be dignified, not stigmatizing like charity
+    And care economy should function as economic justice system
+    And caregivers should not face poverty due to care contributions

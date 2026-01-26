@@ -1,0 +1,11 @@
+Scenario: Cross-municipal coordination with neighboring cities
+    Given some challenges extend beyond Riverside boundaries
+    And watershed management affects multiple municipalities
+    When I coordinate with neighboring community leaders
+    Then we convene: inter-municipal deliberative assemblies
+    And agents from: different municipalities share analysis
+    And we negotiate: agreements serving all communities
+    And we respect: each municipality's sovereignty
+    And we find: synthesis through democratic deliberation
+    And lateral coordination: addresses problems that don't respect boundaries
+    And we demonstrate: governance working across jurisdictions

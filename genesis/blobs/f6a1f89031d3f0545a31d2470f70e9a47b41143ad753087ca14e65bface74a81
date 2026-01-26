@@ -1,0 +1,11 @@
+Scenario: Tracking community wellbeing indicators over time
+    Given Riverside adopted Elohim Protocol three years ago
+    And I am measuring community outcomes longitudinally
+    When I analyze wellbeing data before and after adoption
+    Then I examine: loneliness rates (down 12%), life satisfaction (up 8%)
+    And I track: crisis response effectiveness, economic resilience
+    And I monitor: social cohesion, trust in institutions, civic participation
+    And I conduct: comparison with similar communities without protocol
+    And I use: difference-in-differences analysis to isolate protocol effects
+    And I distinguish: what's protocol impact vs what's secular trend
+    And I provide: evidence about whether democratic AI governance works

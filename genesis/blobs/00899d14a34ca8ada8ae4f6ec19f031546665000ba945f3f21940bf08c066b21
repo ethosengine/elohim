@@ -1,0 +1,9 @@
+Scenario: Sleep deprivation monitoring and intervention
+    Given Maria wakes at 5am and collapses near midnight daily
+    And chronic sleep deprivation damages health and capacity
+    When the personal_agent tracks Maria's sleep patterns
+    Then it should monitor for dangerous sleep deprivation
+    And it should advocate for more rest when possible
+    And it should help her find efficiency that creates sleep time
+    And it should alert her when sleep deprivation threatens her health
+    And Maria should have support for this basic but often impossible need

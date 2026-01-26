@@ -1,0 +1,9 @@
+Scenario: Child joins age-appropriate interest community
+    Given Emma loves drawing manga-style art
+    When she discovers a youth manga artists community in her region
+    And the community is moderated and age-appropriate (ages 10-16)
+    Then she can request to join through her parent's approval
+    And her parents see the community charter and moderator information
+    And upon approval, she gains access to the creative space
+    And she can share art, get feedback, and learn techniques
+    And all participants are age-verified and properly supervised

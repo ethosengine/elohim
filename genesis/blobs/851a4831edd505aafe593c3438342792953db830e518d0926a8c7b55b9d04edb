@@ -1,0 +1,9 @@
+Scenario: Developer luxury housing accelerates school gentrification
+    Given a developer builds high-end housing in gentrifying neighborhood
+    And displacement impacts working-class families
+    When the Observer analyzes school enrollment changes
+    Then analysis shows: low-income student enrollment dropped 40%
+    And school demographics shifted from 70% to 35% students of color
+    And affordable family housing converted to luxury units
+    And development accelerated displacement affecting educational equity
+    And gentrification impacts on schools become visible and challengeable

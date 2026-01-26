@@ -1,0 +1,9 @@
+Scenario: Elder shares traditional skill with neighborhood
+    Given Rose is an expert seamstress with 60 years experience
+    When she offers to teach mending and sewing skills
+    And she creates a contribution proposing weekly sewing circles
+    Then the contribution reaches her neighborhood
+    And community members interested in learning can respond
+    And a neighborhood sewing circle forms with Rose as mentor
+    And Rose experiences being valued for her knowledge
+    And traditional skills are preserved and transmitted

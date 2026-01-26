@@ -1,0 +1,10 @@
+Scenario: Transition from dependent child to independent adult in family
+    Given Aisha was recently a dependent family member
+    And she's now an independent adult
+    When Aisha participates in family governance
+    Then her voice should carry equal weight to other adults
+    And she should participate in family decisions as a peer
+    And her care contributions should be recognized as adult care work
+    And the family_elohim should reflect her changed status
+    And family relationships should adapt to her independence
+    And she should be valued as capable adult contributor

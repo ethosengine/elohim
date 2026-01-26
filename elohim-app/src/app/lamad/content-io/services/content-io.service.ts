@@ -1,11 +1,13 @@
 import { Injectable } from '@angular/core';
-import { ContentFormatRegistryService } from './content-format-registry.service';
+
 import {
   ContentIOImportResult,
-  ContentIOExportInput
+  ContentIOExportInput,
 } from '../interfaces/content-io-plugin.interface';
-import { ValidationResult } from '../interfaces/validation-result.interface';
 import { FormatMetadata } from '../interfaces/format-metadata.interface';
+import { ValidationResult } from '../interfaces/validation-result.interface';
+
+import { ContentFormatRegistryService } from './content-format-registry.service';
 
 /**
  * High-level service for content import/export operations.
@@ -14,7 +16,7 @@ import { FormatMetadata } from '../interfaces/format-metadata.interface';
  * Provides convenience methods for common operations like download and clipboard.
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ContentIOService {
   constructor(private readonly registry: ContentFormatRegistryService) {}
@@ -153,8 +155,10 @@ export class ContentIOService {
     if (!formatId) {
       return {
         valid: false,
-        errors: [{ code: 'UNKNOWN_FORMAT', message: `Cannot detect format for file: ${file.name}` }],
-        warnings: []
+        errors: [
+          { code: 'UNKNOWN_FORMAT', message: `Cannot detect format for file: ${file.name}` },
+        ],
+        warnings: [],
       };
     }
 
@@ -171,7 +175,7 @@ export class ContentIOService {
       return {
         valid: false,
         errors: [{ code: 'NO_PLUGIN', message: `No plugin found for format: ${formatId}` }],
-        warnings: []
+        warnings: [],
       };
     }
 
@@ -179,7 +183,9 @@ export class ContentIOService {
       return {
         valid: true,
         errors: [],
-        warnings: [{ code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` }]
+        warnings: [
+          { code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` },
+        ],
       };
     }
 
@@ -196,7 +202,7 @@ export class ContentIOService {
       return {
         valid: false,
         errors: [{ code: 'NO_PLUGIN', message: `No plugin found for format: ${formatId}` }],
-        warnings: []
+        warnings: [],
       };
     }
 
@@ -204,7 +210,9 @@ export class ContentIOService {
       return {
         valid: true,
         errors: [],
-        warnings: [{ code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` }]
+        warnings: [
+          { code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` },
+        ],
       };
     }
 
@@ -227,8 +235,8 @@ export class ContentIOService {
     const plugin = this.registry.getPlugin(formatId);
     const extension = plugin?.fileExtensions[0] ?? '';
 
-    const downloadFilename = filename ??
-      this.sanitizeFilename(node.title ?? node.id ?? 'content') + extension;
+    const downloadFilename =
+      filename ?? this.sanitizeFilename(node.title ?? node.id ?? 'content') + extension;
 
     this.downloadBlob(blob, downloadFilename);
   }
@@ -295,10 +303,7 @@ export class ContentIOService {
    * Note: For now, this downloads files sequentially.
    * Future: Could create a ZIP archive.
    */
-  async downloadMultiple(
-    nodes: ContentIOExportInput[],
-    formatId?: string
-  ): Promise<void> {
+  async downloadMultiple(nodes: ContentIOExportInput[], formatId?: string): Promise<void> {
     for (const node of nodes) {
       const targetFormat = formatId ?? node.contentFormat;
       if (this.registry.getPlugin(targetFormat)?.canExport) {

@@ -1,0 +1,9 @@
+Scenario: Sarah's care contributions give her standing in neighborhood decisions
+    Given Sarah participates actively in neighborhood care economy
+    And she contributes to collective well-being
+    When neighborhood governance decisions are made
+    Then Sarah's care contributions should be visible and valued
+    And her accumulated care work should give her voice
+    And neighborhood leadership should reflect actual contributions
+    And care economy participation should create legitimate standing
+    And neighborhood democracy should be based on demonstrated care

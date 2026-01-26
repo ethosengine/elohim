@@ -1,0 +1,9 @@
+Scenario: Politician tracks accountability for job creation commitments
+    Given the politician approved tax incentives for business expansion
+    And company promised specific job creation and wage levels
+    When the Observer monitors economic development outcomes
+    Then they see actual jobs created versus commitments
+    And track whether wages meet promised levels
+    And identify whether company hires local workers versus imports
+    And receive alerts when company fails to meet obligations
+    And enforce accountability provisions or recapture subsidies

@@ -1,0 +1,11 @@
+Scenario: Local food systems knowledge from pre-industrial era
+    Given Helen remembers more localized food systems
+    And she knows seasonal availability and regional food traditions
+    When Helen contributes to local food system planning
+    Then her knowledge should inform food sovereignty efforts
+    And bioregional food systems should learn from her memory
+    And traditional food preservation should be taught by those who practiced it
+    And Helen should be recognized as expert in local food culture
+    And the protocol should preserve pre-globalization food knowledge
+    And sustainable food systems should incorporate elder wisdom
+    And Helen's knowledge should reduce dependence on industrial food systems

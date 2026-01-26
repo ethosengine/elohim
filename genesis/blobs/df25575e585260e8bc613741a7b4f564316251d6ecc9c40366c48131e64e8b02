@@ -1,0 +1,9 @@
+Scenario: Neighborhood food cooperative reduces costs and improves access
+    Given Sarah needs to feed family on budget
+    And food costs are significant household expense
+    When neighborhood organizes food cooperative
+    Then the neighborhood_elohim should coordinate bulk purchasing
+    And it should manage cooperative logistics
+    And it should track members' contributions and access
+    And food should be more affordable through collective action
+    And Sarah's family should have better food security

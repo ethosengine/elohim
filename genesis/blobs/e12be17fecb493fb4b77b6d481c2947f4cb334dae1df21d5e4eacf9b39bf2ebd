@@ -1,0 +1,9 @@
+Scenario: Next generation grows up assuming care economy is normal
+    Given Sarah is teaching value literacy to many children
+    And children form baseline expectations from early experience
+    When children who learn care economy reach adulthood
+    Then they should assume care work creates value
+    And they should expect care to be visible and recognized
+    And they should see care economy as normal, not alternative
+    And Sarah's teaching should transform next generation's economic understanding
+    And cultural transformation should happen through education

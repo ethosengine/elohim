@@ -1,0 +1,10 @@
+Scenario: Budget crisis triggers appropriate intervention
+    Given Marcus manages $75 weekly budget
+    And unexpected expenses could create crisis
+    When budget becomes unsustainable
+    Then the family_elohim should alert Sarah immediately
+    And it should connect family to emergency resources
+    And crisis intervention should preserve Marcus's dignity
+    And the system should prevent budget failure from becoming catastrophic
+    And support should be framed through care economy, not charity
+    And Marcus should not feel responsible for systemic poverty

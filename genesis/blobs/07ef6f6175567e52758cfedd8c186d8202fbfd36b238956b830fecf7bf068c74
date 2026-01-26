@@ -1,0 +1,11 @@
+Scenario: Local business accessibility for elderly with mobility limitations
+    Given Helen needs to access local shops and services
+    And her mobility limitations make some businesses inaccessible
+    When the neighborhood_elohim assesses accessibility
+    Then it should surface which local businesses are accessible
+    And it should encourage accessibility improvements
+    And it should coordinate volunteer support for inaccessible locations
+    And Helen should be able to participate in neighborhood commerce
+    And local economy should include elderly residents
+    And the protocol should advocate for universal accessibility
+    And neighborhood should adapt to enable elder participation

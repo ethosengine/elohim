@@ -1,0 +1,9 @@
+Scenario: Personal agent adapts to individual child's developmental pace
+    Given Tommy is 5 years old
+    And his developmental pace may differ from age-based averages
+    When the personal_agent interacts with Tommy over time
+    Then it should observe Tommy's actual capabilities
+    And it should adapt guidance to his individual pace
+    And it should not enforce rigid age-based expectations
+    And it should support Tommy's unique development
+    And learning should be paced to Tommy's readiness

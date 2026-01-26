@@ -1,0 +1,11 @@
+Scenario: Income from employment integrated with disability benefits
+    Given Alex receives both part-time employment income and disability benefits
+    And benefits coordination is complex
+    When the workplace_elohim tracks Alex's income
+    Then it should help Alex understand how employment income affects benefits
+    And it should alert Alex to earnings thresholds that impact benefits
+    And it should integrate with household economics management
+    And Alex should be able to make informed decisions about work hours
+    And the protocol should support Alex in maximizing total income
+    And benefits cliffs should be navigated carefully
+    And Alex's economic stability should be optimized across income sources

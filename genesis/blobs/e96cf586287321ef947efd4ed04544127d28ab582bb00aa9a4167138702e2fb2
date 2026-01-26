@@ -1,0 +1,9 @@
+Scenario: Teacher reveals disciplinary policy impacts on students
+    Given district implements zero-tolerance discipline policy
+    And claims it improves school safety and learning environment
+    When teachers track disciplinary policy impacts through Observer
+    Then teachers document disproportionate impact on students of color
+    And show suspensions increase rather than decrease behavior issues
+    And demonstrate how exclusionary discipline harms student learning
+    And propose restorative practices as evidence-based alternative
+    And disciplinary policy becomes educational equity issue

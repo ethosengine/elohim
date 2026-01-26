@@ -1,0 +1,10 @@
+Scenario: Planning for Margaret's own future care needs
+    Given Margaret is providing care now but will need care eventually
+    And she's watching her mother's care requirements
+    When the family_elohim facilitates future care planning
+    Then Margaret's current care contributions should build future care security
+    And family should understand reciprocal care obligations
+    And Margaret's care tokens should represent future care resources
+    And conversations about her eventual needs should be normalized
+    And family should prepare for role reversal
+    And Margaret should have agency in planning her own future care

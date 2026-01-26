@@ -1,0 +1,11 @@
+Scenario: Training city staff to work alongside protocol agents
+    Given city employees need to understand protocol to do their jobs
+    And they may feel threatened by AI systems
+    When I coordinate staff training and cultural adaptation
+    Then we explain: how protocol augments not replaces their work
+    And we provide: training on working with agent information
+    And we clarify: that professional judgment remains valued
+    And we ensure: staff see agents as tools not replacements
+    And we maintain: good jobs with dignity for city workers
+    And we demonstrate: that democratic AI can strengthen not undermine labor
+    And implementation respects: people doing the work

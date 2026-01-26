@@ -1,0 +1,11 @@
+Scenario: Child's gradual reach expansion through good judgment
+    Given Emma has been using the system for 6 months
+    And she consistently makes kind, thoughtful contributions
+    And she helps her younger sibling with homework via the system
+    And she shares creative work that delights her family
+    When the guardian agent evaluates her demonstrated wisdom
+    Then her reach is expanded to include vetted neighborhood children
+    And her parents receive notification of the expanded access
+    And Emma is congratulated for earning greater trust
+    And she gains access to age-appropriate neighborhood activities
+    And safety protections remain fully active

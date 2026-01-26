@@ -1,0 +1,62 @@
+{
+  "id": "human-ronald-refugee",
+  "did": "did:web:elohim.host:human:ronald-refugee",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Ronald",
+  "description": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+  "content": "# Ronald\n\nFled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"municipality\",\n  \"displayName\": \"Metro City\",\n  \"reach\": \"community\"\n}\n\n**Communities:** community-refugee-resettlement, community-engineers-network\n\n**Public Affinities:** engineering, refugee-rights, professional-recertification, community-building\n\n**Accessibility Needs:** translation-support\n\n**Language Preferences:** {\n  \"primary\": \"ar\",\n  \"secondary\": \"en\",\n  \"learningLevel\": \"advanced\"\n}\n\n**Foreign Credentials:** [object Object]\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/ronald-refugee/profile.json",
+  "tags": [
+    "newcomer",
+    "human",
+    "refugee-rights",
+    "engineering",
+    "professional-recertification",
+    "community-building",
+    "human-graph",
+    "reach-community",
+    "layer-municipality"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "newcomer",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "community",
+      "municipality"
+    ],
+    "communityCount": 2,
+    "designNotes": "Represents legitimate foreign credentials pending verification (contrast with dolittle-doctor fraud)."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Ronald",
+    "ogDescription": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-ronald-refugee",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-ronald-refugee.jpg",
+    "ogImageAlt": "Ronald's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-ronald-refugee",
+    "identifier": "did:web:elohim.host:human:ronald-refugee",
+    "name": "Ronald",
+    "description": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Metro City",
+      "description": "municipality"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328564",
+  "updatedAt": "2025-12-24T03:05:26.352Z"
+}

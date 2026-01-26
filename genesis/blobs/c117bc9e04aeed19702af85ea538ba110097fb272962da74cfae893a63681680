@@ -1,0 +1,10 @@
+Scenario: Community emergency preparedness includes family needs
+    Given emergencies affect families with unique challenges
+    And children have specific needs during crisis
+    When the community_elohim coordinates emergency preparedness
+    Then it should ensure family needs are centered in planning
+    And Sarah's knowledge of family needs should inform planning
+    And emergency care resources should include childcare and family support
+    And parent expertise should shape community resilience
+    And the system should recognize that community safety includes child safety
+    And family preparedness should be community priority

@@ -1,0 +1,9 @@
+Scenario: Politician understands education outcome patterns across demographics
+    Given the politician governs education policy at state or district level
+    And achievement gaps persist across racial and economic lines
+    When the Observer analyzes outcome patterns systemically
+    Then they see which student populations are underserved
+    And identify specific schools with equitable outcomes despite demographics
+    And learn what successful schools do differently
+    And understand resource and practice patterns that drive equity
+    And champion evidence-based policies for all students

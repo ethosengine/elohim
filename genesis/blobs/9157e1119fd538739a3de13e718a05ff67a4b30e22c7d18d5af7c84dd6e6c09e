@@ -1,0 +1,12 @@
+Scenario: Neighborhood inclusion ensures isolated residents are connected
+    Given some neighbors are isolated due to age, disability, or circumstance
+    And Robert has capacity to reach out
+    And neighborhood care economy should include everyone
+    When neighborhood_elohim identifies isolated residents
+    Then it should surface opportunities to connect with isolated neighbors
+    And help Robert offer appropriate support
+    And recognize his outreach as valuable care contribution
+    And build inclusive neighborhood where no one is invisible
+    And prevent isolation that harms individual and neighborhood wellbeing
+    And demonstrate that care economy includes intentional inclusion
+    And strengthen neighborhood by ensuring everyone belongs

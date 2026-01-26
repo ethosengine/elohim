@@ -1,0 +1,323 @@
+<!-- Shefa Dashboard - Custodian Metrics & Health -->
+<div class="shefa-dashboard">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <div class="header-left">
+      <h1>📊 Shefa Dashboard</h1>
+      <p>Network Health & Custodian Metrics</p>
+    </div>
+    <div class="header-right">
+      <button class="btn-refresh" (click)="refreshData()" title="Refresh data">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- Network Overview Cards -->
+  <div class="overview-cards">
+    <div class="card metric-card">
+      <div class="metric-label">Healthy Custodians</div>
+      <div class="metric-value">{{ healthyCustodians() }} / {{ totalCustodians() }}</div>
+      <div class="metric-bar">
+        <div
+          class="metric-fill"
+          [style.width.%]="(healthyCustodians() / totalCustodians()) * 100"
+        ></div>
+      </div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Network Uptime</div>
+      <div class="metric-value">{{ networkUptime() | number: '1.1-1' }}%</div>
+      <div class="metric-status" [class]="getHealthClass(networkUptime())">
+        {{ getHealthLabel(networkUptime()) }}
+      </div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Avg Response Time</div>
+      <div class="metric-value">{{ avgResponseTime() }}ms</div>
+      <div class="metric-description">p95 latency</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Active Commitments</div>
+      <div class="metric-value">{{ totalCommitments() }}</div>
+      <div class="metric-description">replications running</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Total Storage</div>
+      <div class="metric-value">{{ totalStorage() }}</div>
+      <div class="metric-description">in use</div>
+    </div>
+
+    <div class="card metric-card">
+      <div class="metric-label">Total Bandwidth</div>
+      <div class="metric-value">{{ totalBandwidth() }}Mbps</div>
+      <div class="metric-description">declared capacity</div>
+    </div>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="tabs-navigation">
+    <button
+      [class.active]="activeTab() === 'overview'"
+      (click)="setActiveTab('overview')"
+      class="tab-button"
+    >
+      📈 Overview
+    </button>
+    <button
+      [class.active]="activeTab() === 'custodians'"
+      (click)="setActiveTab('custodians')"
+      class="tab-button"
+    >
+      🔗 Custodians ({{ totalCustodians() }})
+    </button>
+    <button
+      [class.active]="activeTab() === 'alerts'"
+      (click)="setActiveTab('alerts')"
+      class="tab-button"
+    >
+      ⚠️ Alerts ({{ alerts().length }})
+    </button>
+    <button
+      [class.active]="activeTab() === 'performance'"
+      (click)="setActiveTab('performance')"
+      class="tab-button"
+    >
+      📊 Performance
+    </button>
+  </div>
+
+  <!-- Overview Tab -->
+  <div *ngIf="activeTab() === 'overview'" class="tab-content">
+    <!-- Top Performers Sections -->
+    <div class="performers-grid">
+      <!-- Top by Health -->
+      <div class="card performers-card">
+        <h3>🏆 Most Reliable</h3>
+        <div class="performers-list">
+          <div *ngFor="let c of topByHealth()" class="performer-item">
+            <div class="performer-name">{{ c.custodianId.slice(0, 12) }}...</div>
+            <div class="performer-metric">
+              <span class="metric-label">Uptime:</span>
+              <span class="metric-value" [class]="getHealthClass(c.health.uptime_percent)">
+                {{ c.health.uptime_percent | number: '1.1-1' }}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top by Speed -->
+      <div class="card performers-card">
+        <h3>⚡ Fastest</h3>
+        <div class="performers-list">
+          <div *ngFor="let c of topBySpeed()" class="performer-item">
+            <div class="performer-name">{{ c.custodianId.slice(0, 12) }}...</div>
+            <div class="performer-metric">
+              <span class="metric-label">p95:</span>
+              <span class="metric-value">{{ c.health.response_time_p95_ms }}ms</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top by Reputation -->
+      <div class="card performers-card">
+        <h3>⭐ Best Reputation</h3>
+        <div class="performers-list">
+          <div *ngFor="let c of topByReputation()" class="performer-item">
+            <div class="performer-name">{{ c.custodianId.slice(0, 12) }}...</div>
+            <div class="performer-metric">
+              <span class="metric-label">Score:</span>
+              <span class="metric-value">
+                {{ c.reputation.reputation_score | number: '1.0-0' }}/100
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="card recommendations-card" *ngIf="recommendations().length > 0">
+      <h3>💡 Recommendations</h3>
+      <div class="recommendations-list">
+        <div *ngFor="let rec of recommendations().slice(0, 5)" class="recommendation-item">
+          <div class="rec-category">{{ rec.category }}</div>
+          <div class="rec-opportunity">{{ rec.opportunity }}</div>
+          <div *ngIf="rec.potential_revenue" class="rec-revenue">
+            💰 Potential: ${{ rec.potential_revenue | number: '1.0-0' }}/month
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custodians Tab -->
+  <div *ngIf="activeTab() === 'custodians'" class="tab-content">
+    <!-- Filters and Sort -->
+    <div class="filters-bar">
+      <div class="filter-group">
+        <label>Filter by Tier:</label>
+        <select (change)="filterByTier.set($any($event.target).value)" class="filter-select">
+          <option value="all">All Tiers</option>
+          <option value="1">Caretaker</option>
+          <option value="2">Curator</option>
+          <option value="3">Expert</option>
+          <option value="4">Pioneer</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Sort by:</label>
+        <select (change)="sortBy.set($any($event.target).value)" class="filter-select">
+          <option value="health">Health</option>
+          <option value="reputation">Reputation</option>
+          <option value="capacity">Capacity</option>
+          <option value="earnings">Earnings</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Custodians Table -->
+    <div class="card">
+      <table class="custodians-table">
+        <thead>
+          <tr>
+            <th>Custodian ID</th>
+            <th>Tier</th>
+            <th>Uptime</th>
+            <th>Response Time</th>
+            <th>Storage</th>
+            <th>Bandwidth</th>
+            <th>Reputation</th>
+            <th>Earnings</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of filteredCustodians()" class="custodian-row">
+            <td class="custodian-id">{{ c.custodianId.slice(0, 16) }}...</td>
+            <td class="tier-badge" [attr.data-tier]="c.economic.steward_tier">
+              {{ getTierLabel(c.economic.steward_tier) }}
+            </td>
+            <td [class]="getHealthClass(c.health.uptime_percent)">
+              {{ c.health.uptime_percent | number: '1.1-1' }}%
+            </td>
+            <td>{{ c.health.response_time_p95_ms }}ms</td>
+            <td>
+              {{ c.storage.used_bytes / 1024 / 1024 / 1024 | number: '1.0-0' }}GB /
+              {{ c.storage.total_capacity_bytes / 1024 / 1024 / 1024 | number: '1.0-0' }}GB
+            </td>
+            <td>
+              {{ c.bandwidth.current_usage_mbps | number: '1.0-0' }}/
+              {{ c.bandwidth.declared_mbps | number: '1.0-0' }} Mbps
+            </td>
+            <td class="reputation-score">
+              {{ c.reputation.reputation_score | number: '1.0-0' }}/100
+            </td>
+            <td class="earnings">${{ c.economic.monthly_earnings | number: '1.0-2' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Alerts Tab -->
+  <div *ngIf="activeTab() === 'alerts'" class="tab-content">
+    <div *ngIf="alerts().length === 0" class="no-alerts">
+      <p>✅ No alerts - network is healthy!</p>
+    </div>
+
+    <div *ngIf="alerts().length > 0" class="alerts-list">
+      <div
+        *ngFor="let alert of alerts()"
+        class="card alert-card"
+        [attr.data-severity]="alert.severity"
+      >
+        <div class="alert-header">
+          <span class="alert-icon">{{ getAlertIcon(alert.severity) }}</span>
+          <span class="alert-severity" [attr.data-severity]="alert.severity">
+            {{ alert.severity | uppercase }}
+          </span>
+          <span class="alert-category">[{{ alert.category | uppercase }}]</span>
+        </div>
+        <div class="alert-body">
+          <div class="alert-custodian">{{ alert.custodianId.slice(0, 16) }}...</div>
+          <div class="alert-message">{{ alert.message }}</div>
+          <div *ngIf="alert.suggestion" class="alert-suggestion">💡 {{ alert.suggestion }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Tab -->
+  <div *ngIf="activeTab() === 'performance'" class="tab-content">
+    <div class="performance-grid">
+      <!-- CPU Usage Distribution -->
+      <div class="card performance-card">
+        <h3>CPU Usage Distribution</h3>
+        <div class="usage-chart">
+          <div *ngFor="let c of filteredCustodians().slice(0, 10)" class="usage-bar">
+            <div class="usage-label">{{ c.custodianId.slice(0, 8) }}</div>
+            <div class="usage-bar-container">
+              <div class="usage-bar-fill" [style.width.%]="c.computation.cpu_usage_percent"></div>
+            </div>
+            <div class="usage-value">{{ c.computation.cpu_usage_percent | number: '1.0-0' }}%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Memory Usage Distribution -->
+      <div class="card performance-card">
+        <h3>Memory Usage Distribution</h3>
+        <div class="usage-chart">
+          <div *ngFor="let c of filteredCustodians().slice(0, 10)" class="usage-bar">
+            <div class="usage-label">{{ c.custodianId.slice(0, 8) }}</div>
+            <div class="usage-bar-container">
+              <div
+                class="usage-bar-fill"
+                [style.width.%]="c.computation.memory_usage_percent"
+              ></div>
+            </div>
+            <div class="usage-value">
+              {{ c.computation.memory_usage_percent | number: '1.0-0' }}%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Response Time Comparison -->
+      <div class="card performance-card">
+        <h3>Response Time (p95)</h3>
+        <div class="latency-chart">
+          <div *ngFor="let c of filteredCustodians().slice(0, 10)" class="latency-bar">
+            <div class="latency-label">{{ c.custodianId.slice(0, 8) }}</div>
+            <div class="latency-bar-container">
+              <div
+                class="latency-bar-fill"
+                [style.width.%]="Math.min(100, (c.health.response_time_p95_ms / 1000) * 100)"
+              ></div>
+            </div>
+            <div class="latency-value">{{ c.health.response_time_p95_ms }}ms</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Storage Usage Comparison -->
+      <div class="card performance-card">
+        <h3>Storage Utilization</h3>
+        <div class="storage-chart">
+          <div *ngFor="let c of filteredCustodians().slice(0, 10)" class="storage-bar">
+            <div class="storage-label">{{ c.custodianId.slice(0, 8) }}</div>
+            <div class="storage-bar-container">
+              <div class="storage-bar-fill" [style.width.%]="c.storage.utilization_percent"></div>
+            </div>
+            <div class="storage-value">{{ c.storage.utilization_percent | number: '1.0-0' }}%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

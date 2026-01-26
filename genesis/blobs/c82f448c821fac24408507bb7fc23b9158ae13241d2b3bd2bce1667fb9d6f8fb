@@ -1,0 +1,10 @@
+Scenario: Neighborhood food cooperative formation includes preteen family
+    Given a food cooperative is forming in Marcus's neighborhood
+    And cooperative buying could reduce his family's grocery costs
+    When the neighborhood_elohim identifies the opportunity
+    Then Marcus's family should be informed about the cooperative
+    And the notification should say "A food cooperative is forming—your participation would strengthen it"
+    And Marcus's care contributions should qualify family for membership
+    And cooperative participation should reduce his budget constraints
+    And neighborhood coordination should reduce individual family burden
+    And Marcus should learn that collective action creates better outcomes

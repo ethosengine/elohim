@@ -1,0 +1,10 @@
+Scenario: Scholarship eligibility based on demonstrated stewardship
+    Given Marcus demonstrates exceptional capability and commitment
+    And scholarships should go to deserving students
+    When scholarship decisions are made
+    Then Marcus's household stewardship should be powerful evidence
+    And his care contributions should qualify as exceptional achievement
+    And community should invest in young people proving their capability
+    And care economy framework should influence scholarship criteria
+    And his real-world responsibility should be valued over traditional metrics
+    And educational opportunity should flow to those demonstrating care

@@ -1,0 +1,9 @@
+Scenario: Manager coordinates customer feedback without targeting individuals
+    Given customers provide feedback about service and quality
+    And corporate model had Marcus use feedback to discipline workers
+    When customer feedback arrives
+    Then Marcus aggregates patterns without targeting individuals
+    And Marcus presents feedback trends to worker council
+    And workers discuss how to address systemic issues collaboratively
+    And individual worker incidents are handled through peer process, not manager discipline
+    And workplace_elohim prevents feedback from becoming surveillance weapon

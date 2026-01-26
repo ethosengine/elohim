@@ -1,0 +1,10 @@
+Scenario: Pedagogical approach adapts to individual learning pace
+    Given Emma's development may vary from age averages
+    And learning readiness differs across children
+    When the personal_agent teaches value concepts
+    Then instruction should adapt to Emma's actual capabilities
+    And pacing should match her individual readiness
+    And the system should observe comprehension signals
+    And no child should be pushed beyond capacity
+    And no child should be held back from what they're ready to learn
+    And personalized learning should respect individual development

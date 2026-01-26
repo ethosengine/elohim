@@ -1,0 +1,11 @@
+Scenario: Learning that personhood and growth continue until death
+    Given culture often treats elderly as finished developing
+    And Helen continues to learn and grow at 82
+    When Helen engages with educational opportunities
+    Then the protocol should affirm that learning never ends
+    And growth should be supported at all ages
+    And Helen should experience ongoing development
+    And new capabilities should be acknowledged and celebrated
+    And education should reject notion that personhood ends with productivity decline
+    And the protocol should model that humans grow throughout life
+    And Helen should learn that she remains person until death

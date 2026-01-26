@@ -1,0 +1,9 @@
+Scenario: Personal growth trajectory becomes visible and owned
+    Given Emma has demonstrated supply chain optimization genius over 6 months
+    And the REA system has documented her 23% waste reduction
+    When Emma views her growth trajectory dashboard
+    Then she sees her optimization pattern recognition abilities documented
+    And she sees skill tokens accumulating toward higher roles
+    And she discovers teaching opportunities based on her expertise
+    And she can pursue cross-training based on witnessed interests
+    And her development path is self-determined, not management-assigned

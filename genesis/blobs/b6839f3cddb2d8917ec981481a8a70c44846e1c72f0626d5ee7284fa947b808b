@@ -1,0 +1,8 @@
+Scenario: Learning about regenerative food systems
+    Given current industrial food systems are extractive
+    And regenerative agriculture can restore ecological health
+    When I want to understand alternatives to industrial food
+    Then the protocol should provide education about regenerative food systems
+    And connect me to regenerative food initiatives in bioregion
+    And help me envision food work that contributes to ecological restoration
+    And support transformation toward care-economy-aligned food systems

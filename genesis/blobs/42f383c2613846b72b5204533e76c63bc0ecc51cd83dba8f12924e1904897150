@@ -1,0 +1,10 @@
+Scenario: Household food planning for specialized care needs
+    Given David requires special nutrition for Alzheimer's care
+    And James must manage David's changing appetite and needs
+    And household food budget is constrained
+    When James plans household meals
+    Then the household_elohim should support specialized meal planning
+    And it should track David's nutritional requirements
+    And it should help James meet care needs within budget
+    And it should ensure James's own nutrition isn't neglected
+    And household food planning should serve both members

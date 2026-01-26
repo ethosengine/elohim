@@ -1,0 +1,12 @@
+Scenario: Managing boundaries with extended family members aligned with abuser
+    Given some extended family members (potentially abuser's family, some of my family) excuse or minimize abuse
+    And I need to protect myself and children from these relationships
+    When problematic family members attempt contact or involvement
+    Then the family_elohim helps me maintain firm boundaries
+    And provides language for declining contact or setting limits
+    And tracks boundary violations for safety purposes
+    And supports me in limiting children's contact when appropriate
+    And helps me navigate family pressure to reconcile or minimize abuse
+    And my personal_agent validates that protecting my household is my right
+    And recognizes boundary enforcement as essential protective labor
+    And supports me saying "no" to family expectations that endanger wellbeing

@@ -1,0 +1,10 @@
+Scenario: Teen's worker rights protected through municipal care economy
+    Given Jasmine works part-time in retail
+    And municipal labor regulations apply to her employment
+    When municipal_elohim monitors workplace conditions
+    Then it should track whether young workers are fairly treated
+    And flag systematic exploitation of teen labor
+    And surface if employers violate youth labor laws
+    And aggregate data about teen working conditions
+    And inform municipal labor policy enforcement
+    And protect young workers through care economy transparency

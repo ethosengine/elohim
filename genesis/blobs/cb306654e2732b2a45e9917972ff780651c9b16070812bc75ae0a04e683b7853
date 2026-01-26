@@ -1,0 +1,9 @@
+Scenario: Workplace childcare assistance or subsidies
+    Given Maria pays substantial portion of income for childcare
+    And childcare costs are major burden on single-parent households
+    When Maria balances childcare needs with employment
+    Then workplace should provide childcare assistance or subsidies
+    And employer-supported childcare should reduce financial burden
+    And assistance should recognize that single parents bear full childcare costs alone
+    And workplace support should enable employment sustainability
+    And Maria should receive help with care costs that make work possible

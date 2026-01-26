@@ -1,0 +1,12 @@
+Scenario: Stress and burnout monitoring with proactive intervention
+    Given Robert carries enormous care burden across contexts
+    And middle-aged adults often experience burnout
+    And he may not recognize his own exhaustion
+    When his personal_agent monitors stress indicators
+    Then it should track signs of burnout across his activities
+    And recognize patterns: "You've canceled personal activities 8 consecutive weeks"
+    And flag when burden becomes unsustainable
+    And proactively surface support resources
+    And connect him to respite care, counseling, or community support
+    And validate that asking for help is strength, not weakness
+    And intervene before burnout becomes crisis

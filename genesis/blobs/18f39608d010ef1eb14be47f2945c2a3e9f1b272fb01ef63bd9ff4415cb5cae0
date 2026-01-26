@@ -1,0 +1,10 @@
+Scenario: Appeal about generational authority and respect
+    Given Family Elohim intervened in way that undermined parental authority
+    And I believe this damages family cohesion and cultural values
+    When I appeal the intervention approach rather than the outcome
+    Then the Constitutional Council evaluates how intervention affected family structure
+    And They balance individual protection with respect for family authority
+    And They consider if the agent could achieve same care goal differently
+    And They examine if family repair mechanisms were offered
+    And The appeal establishes protocols for intervention that preserve family dignity
+    And Recognition that how care is delivered matters as much as that it's delivered

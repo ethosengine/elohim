@@ -19,9 +19,6 @@ import { Routes } from '@angular/router';
  * - /lamad/map                          → Meaning map visualization
  * - /lamad/search                       → Search interface
  *
- * Legacy (deprecated):
- * - /lamad/content/:id                  → Old direct access (redirects to resource)
- *
  * SEO Notes:
  * - Static routes have title/description in route data
  * - Dynamic routes (path/:pathId, resource/:resourceId) update SEO via component
@@ -30,9 +27,7 @@ export const LAMAD_ROUTES: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./components/lamad-layout/lamad-layout.component').then(
-        m => m.LamadLayoutComponent
-      ),
+      import('./components/lamad-layout/lamad-layout.component').then(m => m.LamadLayoutComponent),
     children: [
       // ============================================
       // PATH-CENTRIC ROUTES (Primary User Experience)
@@ -45,7 +40,7 @@ export const LAMAD_ROUTES: Routes = [
         loadComponent: () =>
           import('./components/path-navigator/path-navigator.component').then(
             m => m.PathNavigatorComponent
-          )
+          ),
       },
 
       // Path overview/landing page
@@ -55,7 +50,7 @@ export const LAMAD_ROUTES: Routes = [
         loadComponent: () =>
           import('./components/path-overview/path-overview.component').then(
             m => m.PathOverviewComponent
-          )
+          ),
       },
 
       // ============================================
@@ -68,7 +63,7 @@ export const LAMAD_ROUTES: Routes = [
         loadComponent: () =>
           import('./components/content-viewer/content-viewer.component').then(
             m => m.ContentViewerComponent
-          )
+          ),
       },
 
       // Content Editor - edit existing content
@@ -83,9 +78,9 @@ export const LAMAD_ROUTES: Routes = [
           seo: {
             title: 'Edit Content',
             description: 'Edit content in the knowledge graph.',
-            openGraph: { ogType: 'website' }
-          }
-        }
+            openGraph: { ogType: 'website' },
+          },
+        },
       },
 
       // ============================================
@@ -102,10 +97,11 @@ export const LAMAD_ROUTES: Routes = [
           title: 'My Learning Dashboard',
           seo: {
             title: 'My Learning Dashboard',
-            description: 'Track your learning progress, view completed paths, and continue your journey.',
-            openGraph: { ogType: 'website' }
-          }
-        }
+            description:
+              'Track your learning progress, view completed paths, and continue your journey.',
+            openGraph: { ogType: 'website' },
+          },
+        },
       },
 
       // Profile page - session human profile management
@@ -121,9 +117,9 @@ export const LAMAD_ROUTES: Routes = [
           seo: {
             title: 'My Profile',
             description: 'Manage your profile and preferences.',
-            openGraph: { ogType: 'profile' }
-          }
-        }
+            openGraph: { ogType: 'profile' },
+          },
+        },
       },
 
       // ============================================
@@ -141,54 +137,40 @@ export const LAMAD_ROUTES: Routes = [
           title: 'Knowledge Explorer',
           seo: {
             title: 'Knowledge Explorer',
-            description: 'Explore the knowledge graph visually. Discover connections between concepts and find your learning path.',
-            openGraph: { ogType: 'website' }
-          }
-        }
+            description:
+              'Explore the knowledge graph visually. Discover connections between concepts and find your learning path.',
+            openGraph: { ogType: 'website' },
+          },
+        },
       },
 
       // Meaning map - list/card view alternative
       {
         path: 'map',
         loadComponent: () =>
-          import('./components/meaning-map/meaning-map.component').then(
-            m => m.MeaningMapComponent
-          ),
+          import('./components/meaning-map/meaning-map.component').then(m => m.MeaningMapComponent),
         data: {
           title: 'Meaning Map',
           seo: {
             title: 'Meaning Map',
             description: 'Browse and discover learning resources organized by meaning and purpose.',
-            openGraph: { ogType: 'website' }
-          }
-        }
+            openGraph: { ogType: 'website' },
+          },
+        },
       },
 
       {
         path: 'search',
         loadComponent: () =>
-          import('./components/search/search.component').then(
-            m => m.SearchComponent
-          ),
+          import('./components/search/search.component').then(m => m.SearchComponent),
         data: {
           title: 'Search',
           seo: {
             title: 'Search',
             description: 'Search for learning paths, concepts, and resources.',
-            openGraph: { ogType: 'website' }
-          }
-        }
-      },
-
-      // ============================================
-      // LEGACY ROUTES (Deprecated, for backwards compat)
-      // ============================================
-
-      // Old direct content access - redirect to new pattern
-      {
-        path: 'content/:id',
-        redirectTo: 'resource/:id',
-        pathMatch: 'full'
+            openGraph: { ogType: 'website' },
+          },
+        },
       },
 
       // ============================================
@@ -198,17 +180,16 @@ export const LAMAD_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./components/lamad-home/lamad-home.component').then(
-            m => m.LamadHomeComponent
-          ),
+          import('./components/lamad-home/lamad-home.component').then(m => m.LamadHomeComponent),
         data: {
           title: 'Lamad',
           seo: {
             title: 'Lamad - Learning Paths',
-            description: 'Discover curated learning paths for human flourishing. Start your journey today.',
-            openGraph: { ogType: 'website' }
-          }
-        }
+            description:
+              'Discover curated learning paths for human flourishing. Start your journey today.',
+            openGraph: { ogType: 'website' },
+          },
+        },
       },
 
       // ============================================
@@ -220,8 +201,8 @@ export const LAMAD_ROUTES: Routes = [
         loadComponent: () =>
           import('./components/not-found/lamad-not-found.component').then(
             m => m.LamadNotFoundComponent
-          )
-      }
-    ]
-  }
+          ),
+      },
+    ],
+  },
 ];

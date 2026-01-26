@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-13-helping-thrive-story",
+  "contentType": "narrative",
+  "title": "Recognizing and Addressing Real Needs:",
+  "description": "Biblical story or example illustrating module concepts",
+  "content": "**Narrative:** The story of Jesus feeding of the 5000, illustrates many of the principles we're aiming for in technology design, found in all four Gospels (Matthew 14:13-21, Mark 6:30-44, Luke 9:10-17, John 6:1-14). This story encapsulates several key design principles that align with both Christian values and humane technology:\n\nRecognizing and Addressing Real Needs:  \nJesus saw the crowd's hunger and responded to their physical need, not just their spiritual one. This parallels our goal of creating technology that addresses genuine human needs rather than manufacturing artificial desires.  \nStewardship of Resources:  \nJesus used what was available (five loaves and two fish) and transformed it into abundance. This exemplifies efficient use of resources and sustainable design.  \nCommunity and Sharing:  \nThe miracle involved everyone sharing and participating in the distribution. This mirrors our aim to create technology that fosters community and collaboration rather than isolation.  \nIntentionality and Mindfulness:  \nJesus had the crowd sit down in groups, creating order and allowing for a more mindful experience of the meal. This reflects our goal of designing for intentional, focused use rather than mindless consumption.  \nAbundance Without Excess:  \nThere was enough for everyone to be satisfied, but Jesus also instructed that the leftovers be gathered, avoiding waste. This balance of abundance without excess is a key principle for sustainable, ethical technology.  \nHolistic Care:  \nJesus addressed both spiritual and physical needs, demonstrating care for the whole person. Our technology should similarly support holistic well-being, not just isolated aspects of human experience.\n\nChristian Design Principles we're trying to elevate:\n\nServant-Hearted Design: Creating technology that serves human needs rather than exploiting human vulnerabilities.  \nStewardship: Developing sustainable technologies that use resources wisely and minimize harmful environmental impact.  \nCommunity-Centric: Prioritizing features that build and strengthen real-world communities and relationships.  \nSabbath-Honoring: Incorporating rest and disconnection into the design, respecting human limits and the need for renewal.  \nTruth-Promoting: Designing systems that elevate truth and combat misinformation, reflecting God's nature as the source of truth.  \nJustice-Oriented: Creating inclusive technologies that consider the needs of all, especially the marginalized.  \nAttention-Respecting: Treating human attention as sacred, designing to enhance focus rather than fragment it.  \nVirtue-Fostering: Encouraging the development of Christian virtues (love, joy, peace, patience, kindness, etc.) through technology use.  \nCreation-Affirming: Leveraging technology to help users engage more deeply with the physical world and God's creation, not escape from it.  \nKingdom-Advancing: Aligning technological innovation with the values and goals of God's Kingdom, seeking to bring more of heaven to earth through our creations.\n\nThese principles, grounded in the story of Jesus feeding the 5000, provide a framework for developing technology that truly helps people thrive in a way that honors God and serves humanity.\n**NarrativeType:** biblical-example",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "story",
+    "narrative",
+    "fct",
+    "biblical-example",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "fct-narrative",
+    "sourceModule": "fct-module-13-helping-thrive"
+  },
+  "createdAt": "2025-11-28T21:10:19.224372",
+  "updatedAt": "2025-12-26T21:04:01.844Z",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing and Addressing Real Needs:",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-13-helping-thrive-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Recognizing and Addressing Real Needs: - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-13-helping-thrive-story",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "Recognizing and Addressing Real Needs:",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.224372",
+    "dateModified": "2025-11-28T21:10:19.224373",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

@@ -1,0 +1,341 @@
+/**
+ * Migration CLI for {{DNA_NAME}}
+ *
+ * # RNA Metaphor
+ *
+ * This is the "Polymerase" - the enzyme that catalyzes transcription.
+ * It reads from the source DNA, coordinates transformation, and
+ * synthesizes entries in the target DNA.
+ *
+ * # Usage
+ *
+ * ```bash
+ * # Full migration
+ * npx tsx migrate.ts
+ *
+ * # Dry run (preview)
+ * npx tsx migrate.ts --dry-run
+ *
+ * # Verify existing migration
+ * npx tsx migrate.ts --verify-only
+ *
+ * # Specify roles
+ * npx tsx migrate.ts --source my-dna-v1 --target my-dna-v2
+ * ```
+ *
+ * # Prerequisites
+ *
+ * 1. Both DNAs installed in the same hApp with different role names
+ * 2. Source DNA has export functions (export_for_migration, export_schema_version)
+ * 3. Target DNA has import functions (import_migrated, verify_migration)
+ */
+
+import { AdminWebsocket, AppWebsocket, CellId, encodeHashToBase64 } from '@holochain/client';
+import * as fs from 'fs';
+
+// =============================================================================
+// Configuration - Customize for your DNA
+// =============================================================================
+
+const CONFIG = {
+  // hApp configuration
+  appId: '{{APP_ID}}',
+
+  // DNA roles in happ.yaml
+  sourceRole: '{{SOURCE_ROLE}}',  // e.g., 'my-dna-previous'
+  targetRole: '{{TARGET_ROLE}}',  // e.g., 'my-dna'
+
+  // Zome names (usually same in both DNAs)
+  sourceZome: '{{ZOME_NAME}}',
+  targetZome: '{{ZOME_NAME}}',
+
+  // Function names (from migration.rs template)
+  exportFn: 'export_for_migration',
+  importFn: 'import_migrated',
+  verifyFn: 'verify_migration',
+  versionFn: 'export_schema_version',
+};
+
+// Paths
+const HC_PORTS_FILE = process.env.HC_PORTS_FILE || '.hc_ports';
+
+// =============================================================================
+// Types - Match your Rust structures
+// =============================================================================
+
+interface MigrationReport {
+  source_version: string;
+  target_version: string;
+  started_at: string;
+  completed_at: string | null;
+  entry_counts: Record<string, MigrationCounts>;
+  errors: MigrationError[];
+  verification: MigrationVerification;
+}
+
+interface MigrationCounts {
+  exported: number;
+  transformed: number;
+  imported: number;
+  skipped: number;
+  failed: number;
+}
+
+interface MigrationError {
+  entry_type: string;
+  entry_id: string | null;
+  phase: string;
+  message: string;
+}
+
+interface MigrationVerification {
+  passed: boolean;
+  count_checks: Record<string, CountCheck>;
+  reference_integrity: boolean;
+  notes: string[];
+}
+
+interface CountCheck {
+  expected: number;
+  actual: number;
+  passed: boolean;
+}
+
+interface MigrationExport {
+  schema_version: string;
+  exported_at: string;
+  // Add your entry types here:
+  // my_entries: MyEntryOutput[];
+}
+
+// =============================================================================
+// Utilities
+// =============================================================================
+
+function readPorts(): { adminPort: number; appPort: number } {
+  try {
+    const content = fs.readFileSync(HC_PORTS_FILE, 'utf-8');
+    const adminMatch = content.match(/admin_port=(\d+)/);
+    const appMatch = content.match(/app_port=(\d+)/);
+    if (!adminMatch || !appMatch) throw new Error('Parse error');
+    return {
+      adminPort: parseInt(adminMatch[1], 10),
+      appPort: parseInt(appMatch[1], 10),
+    };
+  } catch {
+    console.warn(`Could not read ${HC_PORTS_FILE}, using defaults`);
+    return { adminPort: 4444, appPort: 4445 };
+  }
+}
+
+function resolveAppUrl(adminUrl: string, port: number): string {
+  if (!adminUrl.includes('localhost') && !adminUrl.includes('127.0.0.1')) {
+    const url = new URL(adminUrl);
+    const baseUrl = `${url.protocol}//${url.host}`;
+    const apiKey = url.searchParams.get('apiKey');
+    const apiKeyParam = apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : '';
+    return `${baseUrl}/app/${port}${apiKeyParam}`;
+  }
+  return `ws://localhost:${port}`;
+}
+
+function extractCellId(cellInfo: unknown): CellId | null {
+  if (Array.isArray(cellInfo)) {
+    for (const info of cellInfo) {
+      if (info?.provisioned) return info.provisioned.cell_id;
+      if (info?.cloned) return info.cloned.cell_id;
+    }
+  }
+  return null;
+}
+
+function parseArgs(): { dryRun: boolean; verifyOnly: boolean; sourceRole: string; targetRole: string } {
+  const args = process.argv.slice(2);
+  return {
+    dryRun: args.includes('--dry-run'),
+    verifyOnly: args.includes('--verify-only'),
+    sourceRole: args.find(a => a.startsWith('--source='))?.split('=')[1] || CONFIG.sourceRole,
+    targetRole: args.find(a => a.startsWith('--target='))?.split('=')[1] || CONFIG.targetRole,
+  };
+}
+
+function formatReport(report: MigrationReport): string {
+  const lines = [
+    '='.repeat(60),
+    '  Migration Report',
+    '='.repeat(60),
+    `Source: ${report.source_version} -> Target: ${report.target_version}`,
+    `Started: ${report.started_at}`,
+    `Completed: ${report.completed_at || 'In progress'}`,
+    '',
+    'Entry Counts:',
+  ];
+
+  for (const [type, counts] of Object.entries(report.entry_counts)) {
+    lines.push(`  ${type}: ${counts.imported} imported, ${counts.skipped} skipped, ${counts.failed} failed`);
+  }
+
+  if (report.errors.length > 0) {
+    lines.push('', 'Errors:');
+    for (const err of report.errors.slice(0, 10)) {
+      const id = err.entry_id ? ` (${err.entry_id})` : '';
+      lines.push(`  [${err.phase}] ${err.entry_type}${id}: ${err.message}`);
+    }
+    if (report.errors.length > 10) lines.push(`  ... and ${report.errors.length - 10} more`);
+  }
+
+  lines.push('', `Verification: ${report.verification.passed ? 'PASSED' : 'FAILED'}`);
+  for (const note of report.verification.notes) lines.push(`  - ${note}`);
+  lines.push('='.repeat(60));
+
+  return lines.join('\n');
+}
+
+// =============================================================================
+// Main Migration Logic
+// =============================================================================
+
+async function main() {
+  const options = parseArgs();
+
+  console.log('='.repeat(60));
+  console.log('  {{DNA_NAME}} Migration Tool');
+  console.log('='.repeat(60));
+  console.log(`Source: ${options.sourceRole}`);
+  console.log(`Target: ${options.targetRole}`);
+  console.log(`Dry Run: ${options.dryRun}`);
+  console.log(`Verify Only: ${options.verifyOnly}`);
+  console.log('='.repeat(60));
+
+  // Connect to admin
+  const ports = readPorts();
+  const adminUrl = process.env.HOLOCHAIN_ADMIN_URL || `ws://localhost:${ports.adminPort}`;
+  console.log(`\nConnecting to admin: ${adminUrl}`);
+
+  const adminWs = await AdminWebsocket.connect({ url: new URL(adminUrl) });
+
+  // Find app
+  const apps = await adminWs.listApps({});
+  const app = apps.find(a => a.installed_app_id === CONFIG.appId);
+  if (!app) {
+    console.error(`App "${CONFIG.appId}" not found`);
+    process.exit(1);
+  }
+
+  // Get cell IDs
+  const sourceCell = app.cell_info[options.sourceRole];
+  const targetCell = app.cell_info[options.targetRole];
+
+  if (!sourceCell) {
+    console.error(`Source role "${options.sourceRole}" not found`);
+    console.log('Available roles:', Object.keys(app.cell_info).join(', '));
+    process.exit(1);
+  }
+  if (!targetCell) {
+    console.error(`Target role "${options.targetRole}" not found`);
+    process.exit(1);
+  }
+
+  const sourceCellId = extractCellId(sourceCell)!;
+  const targetCellId = extractCellId(targetCell)!;
+
+  console.log(`Source cell: ${encodeHashToBase64(sourceCellId[0]).slice(0, 12)}...`);
+  console.log(`Target cell: ${encodeHashToBase64(targetCellId[0]).slice(0, 12)}...`);
+
+  // Get auth token and app interface
+  const token = await adminWs.issueAppAuthenticationToken({
+    installed_app_id: CONFIG.appId,
+    single_use: false,
+    expiry_seconds: 3600,
+  });
+  await adminWs.authorizeSigningCredentials(targetCellId);
+
+  const interfaces = await adminWs.listAppInterfaces();
+  const appPort = interfaces.length > 0
+    ? interfaces[0].port
+    : (await adminWs.attachAppInterface({ allowed_origins: '*' })).port;
+
+  const appWsUrl = process.env.HOLOCHAIN_APP_URL || resolveAppUrl(adminUrl, appPort);
+  const appWs = await AppWebsocket.connect({
+    url: new URL(appWsUrl),
+    wsClientOptions: { origin: 'http://localhost' },
+    token: token.token,
+  });
+
+  // Helper functions
+  const callSource = async <T>(fn: string, payload: unknown): Promise<T> =>
+    appWs.callZome({ cell_id: sourceCellId, zome_name: CONFIG.sourceZome, fn_name: fn, payload });
+
+  const callTarget = async <T>(fn: string, payload: unknown): Promise<T> =>
+    appWs.callZome({ cell_id: targetCellId, zome_name: CONFIG.targetZome, fn_name: fn, payload });
+
+  // Step 1: Export
+  console.log('\n[1/4] Exporting from source...');
+  const schemaVersion = await callSource<string>(CONFIG.versionFn, null);
+  console.log(`Source schema: ${schemaVersion}`);
+
+  const exportData = await callSource<MigrationExport>(CONFIG.exportFn, null);
+  console.log(`Exported at: ${exportData.exported_at}`);
+
+  // Log export counts
+  for (const [key, value] of Object.entries(exportData)) {
+    if (Array.isArray(value)) console.log(`  ${key}: ${value.length} items`);
+  }
+
+  // Verify-only mode
+  if (options.verifyOnly) {
+    console.log('\n[VERIFY ONLY] Checking target...');
+    const counts: Record<string, number> = {};
+    for (const [key, value] of Object.entries(exportData)) {
+      if (Array.isArray(value)) counts[`${key.replace('_', ' ')}_count`] = value.length;
+    }
+    const verification = await callTarget<MigrationVerification>(CONFIG.verifyFn, counts);
+    console.log(`\nVerification: ${verification.passed ? 'PASSED' : 'FAILED'}`);
+    for (const note of verification.notes) console.log(`  - ${note}`);
+    await appWs.client.close();
+    await adminWs.client.close();
+    return;
+  }
+
+  // Dry-run mode
+  if (options.dryRun) {
+    console.log('\n[DRY RUN] No changes will be made');
+    await appWs.client.close();
+    await adminWs.client.close();
+    return;
+  }
+
+  // Step 2: Transform (in this template, done by zome)
+  console.log('\n[2/4] Transform handled by target zome...');
+
+  // Step 3: Import
+  console.log('\n[3/4] Importing into target...');
+  const report = await callTarget<MigrationReport>(CONFIG.importFn, exportData);
+
+  // Step 4: Verify
+  console.log('\n[4/4] Verifying...');
+  const counts: Record<string, number> = {};
+  for (const [key, value] of Object.entries(exportData)) {
+    if (Array.isArray(value)) counts[`${key.replace('_', ' ')}_count`] = value.length;
+  }
+  report.verification = await callTarget<MigrationVerification>(CONFIG.verifyFn, counts);
+
+  // Complete
+  report.completed_at = new Date().toISOString();
+  console.log('\n' + formatReport(report));
+
+  // Save report
+  const reportFile = `/tmp/migration-${Date.now()}.json`;
+  fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
+  console.log(`\nReport saved: ${reportFile}`);
+
+  await appWs.client.close();
+  await adminWs.client.close();
+
+  process.exit(report.verification.passed ? 0 : 1);
+}
+
+main().catch(err => {
+  console.error('Migration failed:', err);
+  process.exit(1);
+});

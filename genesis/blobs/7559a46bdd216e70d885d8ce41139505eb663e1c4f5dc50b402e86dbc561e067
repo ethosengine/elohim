@@ -1,0 +1,10 @@
+Scenario: Parent's care work visible across extended family
+    Given Sarah provides care to her children and aging parents
+    And she coordinates between generations
+    When the family_elohim tracks Sarah's care contributions
+    Then her work should be visible to entire extended family
+    And grandparents should see Sarah's parenting labor
+    And siblings should see her coordination work
+    And the full family should recognize her care contributions
+    And visibility should enable family-wide appreciation
+    And Sarah's labor should be valued across all family relationships

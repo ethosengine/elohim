@@ -1,0 +1,11 @@
+Scenario: Neighborhood care tokens value Alex's substantial contributions
+    Given Alex contributes significantly to neighborhood care economy
+    And traditional metrics don't capture accessibility advocacy value
+    When neighborhood care tokens are calculated
+    Then Alex's barrier documentation should accumulate tokens
+    And Alex's mutual aid participation should be valued appropriately
+    And Alex's disability expertise shared with neighbors should count
+    And Alex's organizing work should generate care economy standing
+    And care tokens should position Alex as neighborhood contributor
+    And Alex should be able to access neighborhood resources based on contributions
+    And the protocol should make Alex's neighborhood value undeniable

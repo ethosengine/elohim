@@ -1,0 +1,10 @@
+Scenario: Learning across contexts builds coherent knowledge
+    Given Jasmine learns in school, at work, in family, and in community
+    And knowledge fragments across contexts
+    When her personal_agent integrates learning from all contexts
+    Then she should see connections: "Your work customer service builds communication skills valuable in all contexts"
+    And understand how different learning experiences reinforce each other
+    And develop coherent knowledge rather than fragmented skills
+    And learn to translate capabilities across contexts
+    And build sophisticated understanding through integrated experience
+    And maintain coherent identity while navigating multiple learning environments

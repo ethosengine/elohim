@@ -1,0 +1,10 @@
+Scenario: After-school programs for Keisha accessed through care tokens
+    Given Marcus's sister Keisha needs care while Marcus shops
+    And after-school programs exist in the community
+    When care coordination needs are identified
+    Then Marcus's family should access programs through care token economy
+    And his care contributions should subsidize Keisha's program costs
+    And care economy should coordinate care needs across community
+    And Marcus's burden should be reduced through community support
+    And reciprocity should frame the exchange, not charity
+    And community care should support his family's flourishing

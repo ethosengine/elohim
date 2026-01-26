@@ -1,0 +1,11 @@
+Scenario: Presenting research at Global Constitutional Convention
+    Given convention delegates need evidence to inform constitutional decisions
+    And I am invited to present research on sortition effectiveness
+    When I address 10,000 randomly-selected citizens from around the world
+    Then I summarize: what research shows about democratic AI governance
+    And I present: honestly about successes, failures, and uncertainties
+    And I explain: the superintelligence governance legitimacy question
+    And I acknowledge: the limits of my knowledge and research
+    And I clarify: that delegates must make values choices research cannot resolve
+    And I serve: democracy by informing not replacing citizen judgment
+    And My scholarship demonstrates: how expertise serves rather than dominates democracy

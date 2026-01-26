@@ -1,0 +1,9 @@
+Scenario: Developmental stage appropriate learning through concrete experience
+    Given Tommy is learning value literacy
+    And he is at the concrete operational stage
+    When Tommy makes a care decision in the scanner
+    Then the personal_agent should frame choices as care adventures
+    And complex economic concepts should not be presented
+    And learning should happen through story and relationship
+    And the agent should ask "What will make Emma smile?" not "What's the best value?"
+    And Tommy should build neural pathways around care-based decision making

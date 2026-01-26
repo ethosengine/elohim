@@ -1,0 +1,9 @@
+Scenario: Journalist investigates charter school performance claims
+    Given charter schools claim superior outcomes for disadvantaged students
+    And receive public funding based on performance claims
+    When the Observer analyzes charter outcomes versus district schools
+    Then the journalist sees charters are more racially segregated
+    And finds test gains disappear when controlling for selective enrollment
+    And documents higher suspension rates for students of color
+    And shows charter expansion drains resources from district
+    And publishes investigation questioning charter expansion policy

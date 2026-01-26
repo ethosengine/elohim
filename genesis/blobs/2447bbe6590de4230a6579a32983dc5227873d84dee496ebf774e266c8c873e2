@@ -1,0 +1,9 @@
+Scenario: Citizen accesses community resources without attending meetings
+    Given the citizen works evening shifts
+    And cannot attend 7 PM community meetings in person
+    When community decisions are being made
+    Then they can review asynchronous meeting summaries
+    And submit positions via the app during lunch break
+    And join key decision moments virtually
+    And participate meaningfully in 15 minutes vs 3 hours
+    And working-class participation barriers are reduced

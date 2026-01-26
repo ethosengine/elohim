@@ -1,0 +1,9 @@
+Scenario: Neighborhood walking companionship for caregiver well-being
+    Given James needs exercise and fresh air for his own health
+    And he cannot leave David alone for walks
+    When neighbors offer companionship
+    Then the neighborhood_elohim should coordinate walking support
+    And neighbors could stay with David while James walks
+    And they could accompany James and David together
+    And regular walks should be protected for James's well-being
+    And neighborhood should actively support caregiver health

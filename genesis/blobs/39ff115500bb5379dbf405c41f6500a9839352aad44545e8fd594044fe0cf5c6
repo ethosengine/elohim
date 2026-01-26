@@ -1,0 +1,11 @@
+Scenario: Professional-grade care labor quantified and made visible
+    Given James provides skilled care equivalent to professional nursing
+    And he manages medications with precision
+    And he provides cognitive support and emotional care
+    And this work would be valued at $50k+/year for a stranger
+    When the personal_agent tracks James's care contributions
+    Then his care labor should be quantified as professional-grade work
+    And care tokens should reflect the true value of his skills
+    And his contributions should be valued at professional nursing rates
+    And invisible care work should become economically visible
+    And society should see he's performing skilled professional care

@@ -1,0 +1,10 @@
+Scenario: Community economic support recognizes parenting as work
+    Given Sarah performs enormous care labor essential to community
+    And traditional economy renders this work unpaid
+    When the community implements care economy principles
+    Then parenting should be recognized as valuable economic contribution
+    And care tokens could translate to community currency or benefits
+    And Sarah should have economic support for her care work
+    And the community should invest in parents as essential workers
+    And care economy should provide material support, not just recognition
+    And the system should enable economic justice for caregivers

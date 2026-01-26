@@ -1,0 +1,11 @@
+Scenario: Recognition that grandparenting is care work, not leisure activity
+    Given traditional culture frames grandparenting as "fun" and "spoiling"
+    And Margaret's labor is often invisible as work
+    When the personal_agent characterizes Margaret's activities
+    Then it should frame grandparenting as sophisticated care labor
+    And it should recognize developmental care, emotional support, practical childcare
+    And it should distinguish between leisure time with grandkids and care work
+    And it should make visible that Margaret is providing essential services
+    And the narrative should shift from "babysitting" to care provision
+    And Margaret's work should be taken seriously as economic contribution
+    And her care labor should be recognized as valuable work

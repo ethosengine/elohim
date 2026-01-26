@@ -1,0 +1,11 @@
+Scenario: National research infrastructure enabling cumulative knowledge
+    Given sustainable research requires ongoing data access and funding
+    And I advocate for long-term research infrastructure
+    When national research program is established with public funding
+    Then independent researchers gain: anonymized data access with privacy protection
+    And longitudinal tracking becomes: possible across decades
+    And replication and extension: of findings is enabled
+    And peer review and quality control: maintain scientific standards
+    And research independence from: protocol developers is preserved
+    And Knowledge accumulates: rather than being rediscovered each generation
+    And Democratic AI governance becomes: evidence-based rather than ideological

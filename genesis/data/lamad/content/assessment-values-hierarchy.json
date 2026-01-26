@@ -1,0 +1,393 @@
+{
+  "id": "assessment-values-hierarchy",
+  "contentType": "assessment",
+  "title": "Personal Values Hierarchy Assessment",
+  "description": "Discover your core values and how they guide your decisions",
+  "content": [
+    {
+      "id": "val-q1",
+      "question": {
+        "content": "CREATIVITY - uniqueness, imagination, independent thinking\n\n[[☃ widget 1]]",
+        "images": {},
+        "widgets": {
+          "widget 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Important",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Supreme Importance",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "openness"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "val-q2",
+      "question": {
+        "content": "SECURITY - safety, harmony, stability of society and relationships\n\n[[☃ widget 2]]",
+        "images": {},
+        "widgets": {
+          "widget 2": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Important",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Supreme Importance",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "conservation"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "val-q3",
+      "question": {
+        "content": "BENEVOLENCE - preserving and enhancing the welfare of people close to you\n\n[[☃ widget 3]]",
+        "images": {},
+        "widgets": {
+          "widget 3": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Important",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Supreme Importance",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "self-transcendence"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "val-q4",
+      "question": {
+        "content": "ACHIEVEMENT - personal success through demonstrating competence\n\n[[☃ widget 4]]",
+        "images": {},
+        "widgets": {
+          "widget 4": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Important",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Supreme Importance",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "self-enhancement"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "val-q5",
+      "question": {
+        "content": "UNIVERSALISM - understanding, tolerance, and protection for all people\n\n[[☃ widget 5]]",
+        "images": {},
+        "widgets": {
+          "widget 5": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                {
+                  "content": "1 - Not Important",
+                  "correct": true
+                },
+                {
+                  "content": "2",
+                  "correct": true
+                },
+                {
+                  "content": "3",
+                  "correct": true
+                },
+                {
+                  "content": "4",
+                  "correct": true
+                },
+                {
+                  "content": "5",
+                  "correct": true
+                },
+                {
+                  "content": "6",
+                  "correct": true
+                },
+                {
+                  "content": "7 - Supreme Importance",
+                  "correct": true
+                }
+              ],
+              "randomize": false,
+              "multipleSelect": false,
+              "displayCount": null,
+              "hasNoneOfTheAbove": false,
+              "deselectEnabled": false
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "self-transcendence"
+        ],
+        "scaleType": "likert-7",
+        "reverseScored": false
+      }
+    },
+    {
+      "id": "val-rank",
+      "question": {
+        "content": "Rank the following values:\n\n*Rank these in order of importance to you:*\n\n[[☃ widget 6]]",
+        "images": {},
+        "widgets": {
+          "widget 6": {
+            "type": "sorter",
+            "options": {
+              "correct": [
+                "Family and close relationships",
+                "Personal achievement and success",
+                "Service to others and community",
+                "Personal growth and learning",
+                "Security and stability"
+              ],
+              "layout": "vertical",
+              "padding": true
+            },
+            "graded": false,
+            "version": {
+              "major": 0,
+              "minor": 0
+            }
+          }
+        }
+      },
+      "hints": [],
+      "metadata": {
+        "instrumentType": "discovery",
+        "subscales": [
+          "priorities"
+        ]
+      }
+    }
+  ],
+  "contentFormat": "perseus-quiz-json",
+  "tags": [
+    "assessment",
+    "values",
+    "self-knowledge",
+    "psychometric"
+  ],
+  "sourcePath": "generated/assessment-values-hierarchy.json",
+  "relatedNodeIds": [
+    "know-thyself-path"
+  ],
+  "metadata": {
+    "instrumentType": "discovery",
+    "domain": "values",
+    "estimatedTime": "20-30 minutes",
+    "attestationId": "values-examined",
+    "validation": {
+      "inspired_by": "Schwartz Values Survey",
+      "reliability": "Adapted for educational purposes"
+    },
+    "sourceFormat": "assessment-json",
+    "migratedAt": "2025-12-26T05:45:22.690Z",
+    "questionCount": 6,
+    "interpretation": {
+      "method": "profile",
+      "dimensions": [
+        "openness",
+        "conservation",
+        "self-transcendence",
+        "self-enhancement"
+      ]
+    }
+  },
+  "createdAt": "2025-11-28T00:09:03.479929",
+  "updatedAt": "2025-11-28T00:09:03.479932"
+}

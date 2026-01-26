@@ -1,0 +1,9 @@
+Scenario: Municipal procurement policies prioritize democratically-owned businesses
+    Given city purchases goods and services from private vendors
+    And public procurement can support democratic economy development
+    When investors advocate for democratic business procurement preferences
+    Then municipal contracts give priority to worker-owned businesses
+    And Patricia's investments benefit from stable public sector demand
+    And taxpayer money supports living wages and democratic governance
+    And procurement policy demonstrates municipal commitment to economic democracy
+    And municipality_elohim tracks democratic business procurement and impacts

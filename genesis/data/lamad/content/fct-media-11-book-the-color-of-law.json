@@ -1,0 +1,56 @@
+{
+  "id": "fct-media-11-book-the-color-of-law",
+  "contentType": "book",
+  "title": "The Color of Law",
+  "description": "Book by Richard Rothstein",
+  "content": "# The Color of Law\n\n**Author:** Richard Rothstein\n**Format:** book",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "mediaType": "book",
+    "author": "Richard Rothstein"
+  },
+  "_contributor": "Richard Rothstein",
+  "createdAt": "2025-11-28T21:10:19.219745",
+  "updatedAt": "2025-12-26T21:04:01.800Z",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Color of Law",
+    "ogDescription": "Book by Richard Rothstein",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-the-color-of-law",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Color of Law - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-the-color-of-law",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "The Color of Law",
+    "description": "Book by Richard Rothstein",
+    "dateCreated": "2025-11-28T21:10:19.219745",
+    "dateModified": "2025-11-28T21:10:19.219746",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Richard Rothstein"
+    }
+  }
+}

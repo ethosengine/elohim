@@ -1,0 +1,9 @@
+Scenario: School board member surfaces parent and teacher concerns at scale
+    Given the politician hears from vocal parents at board meetings
+    But suspects broader community has different priorities
+    When the Observer aggregates parent and teacher input
+    Then they see working parents can't attend evening meetings
+    And learn teachers face classroom supply shortages systematically
+    And identify parent concerns about mental health resources
+    And understand transportation reliability affects family schedules
+    And align policy with broader community needs beyond meeting attendees

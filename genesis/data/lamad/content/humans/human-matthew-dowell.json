@@ -1,0 +1,75 @@
+{
+  "id": "human-matthew-dowell",
+  "did": "did:web:elohim.host:human:matthew-dowell",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Matthew Dowell",
+  "description": "Doorway operator and admin at Ethos Engine. Oversees infrastructure, deployment, and network operations for the Elohim Protocol.",
+  "content": "# Matthew Dowell\n\nDoorway operator and admin at Ethos Engine. Oversees infrastructure, deployment, and network operations for the Elohim Protocol.\n\n**Profile Reach:** public\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"municipality\",\n  \"displayName\": \"Metro City\",\n  \"reach\": \"community\"\n}\n\n**Organizations:** [object Object]\n\n**Communities:** community-holochain-devs, community-infrastructure-ops\n\n**Public Affinities:** infrastructure, holochain, devops, distributed-systems, network-operations\n\n**Public Attestations:** attestation-holochain-basics, attestation-doorway-operator\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/matthew-dowell/profile.json",
+  "tags": [
+    "holochain",
+    "workplace",
+    "infrastructure",
+    "human",
+    "reach-public",
+    "devops",
+    "distributed-systems",
+    "network-operations",
+    "human-graph",
+    "role-operator",
+    "role-admin",
+    "layer-municipality"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "workplace",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "municipality"
+    ],
+    "organizationCount": 1,
+    "communityCount": 2,
+    "roles": ["doorway-operator", "doorway-admin", "test-user"]
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Matthew Dowell",
+    "ogDescription": "Doorway operator and admin at Ethos Engine. Oversees infrastructure, deployment, and network operations for the Elohim Protocol.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-matthew-dowell",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-matthew-dowell.jpg",
+    "ogImageAlt": "Matthew Dowell's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-matthew-dowell",
+    "identifier": "did:web:elohim.host:human:matthew-dowell",
+    "name": "Matthew Dowell",
+    "description": "Doorway operator and admin at Ethos Engine. Oversees infrastructure, deployment, and network operations for the Elohim Protocol.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Metro City",
+      "description": "municipality"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "EthosEngine",
+        "@id": "org-ethosengine"
+      }
+    ],
+    "jobTitle": "Doorway Operator"
+  },
+  "createdAt": "2026-01-11T00:00:00.000Z",
+  "updatedAt": "2026-01-11T00:00:00.000Z"
+}

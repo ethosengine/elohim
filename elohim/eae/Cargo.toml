@@ -1,0 +1,30 @@
+[package]
+name = "eae"
+description = "Elohim Autonomous Entity - autonomous agent framework"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+# Concurrent data structures
+dashmap.workspace = true
+
+# Internal
+constitution.workspace = true
+elohim-agent.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

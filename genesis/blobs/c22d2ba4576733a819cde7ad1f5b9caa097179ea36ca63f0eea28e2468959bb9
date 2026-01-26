@@ -1,0 +1,9 @@
+Scenario: Parent opposes standardized testing overload
+    Given the parent's child faces excessive standardized testing
+    And tests create stress without improving learning
+    When the parent reviews Observer's testing policy context
+    Then they see how many instructional days lost to testing
+    And understand which tests are federally required vs optional
+    And learn about opt-out policies and parent rights
+    And discover other parents concerned about testing burden
+    And parent coalition advocates for reducing unnecessary testing

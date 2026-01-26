@@ -1,0 +1,9 @@
+Scenario: Parent advocates for safe routes to school infrastructure
+    Given the parent's child walks to school along unsafe streets
+    And lacks sidewalks and safe crossings for two blocks
+    When the parent reviews municipal transportation budget
+    Then they see $4M allocated for downtown streetscape improvements
+    And learn zero dollars budgeted for school route safety
+    And connect with other parents whose children walk same routes
+    And present coordinated testimony at city council meeting
+    And municipal infrastructure priorities include children's safety

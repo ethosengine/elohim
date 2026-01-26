@@ -1,0 +1,10 @@
+Scenario: Municipal recreation and social programs prevent elder isolation
+    Given Frank needs social connection to maintain wellbeing
+    And isolation increases with age without intentional connection
+    When the municipal_elohim coordinates social infrastructure
+    Then it should provide programs connecting retired residents
+    And senior centers should be framed as community hubs, not warehouses
+    And programs should facilitate continued contribution and purpose
+    And Frank should access social connection through municipal infrastructure
+    And elder isolation should be prevented through public programs
+    And municipal policy should recognize social connection as health infrastructure

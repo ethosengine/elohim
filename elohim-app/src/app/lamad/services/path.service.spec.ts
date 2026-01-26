@@ -3,7 +3,8 @@ import { of, throwError } from 'rxjs';
 import { PathService, AccessCheckResult } from './path.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from '@app/elohim/services/agent.service';
-import { LearningPath, PathStep, PathStepView, PathIndex, ContentNode, AgentProgress } from '../models';
+import { LearningPath, PathStep, PathStepView, PathIndex, ContentNode } from '../models';
+import { AgentProgress } from '@app/elohim/models/agent.model';
 
 describe('PathService', () => {
   let service: PathService;
@@ -32,7 +33,7 @@ describe('PathService', () => {
         stepNarrative: 'First step',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 1,
@@ -41,7 +42,7 @@ describe('PathService', () => {
         stepNarrative: 'Second step',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 2,
@@ -50,7 +51,7 @@ describe('PathService', () => {
         stepNarrative: 'Third step',
         learningObjectives: [],
         optional: true,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 3,
@@ -59,7 +60,7 @@ describe('PathService', () => {
         stepNarrative: 'Fourth step',
         learningObjectives: [],
         optional: false,
-        completionCriteria: []
+        completionCriteria: [],
       },
       {
         order: 4,
@@ -69,9 +70,9 @@ describe('PathService', () => {
         learningObjectives: [],
         optional: false,
         completionCriteria: [],
-        attestationRequired: 'test-attestation'
-      }
-    ]
+        attestationRequired: 'test-attestation',
+      },
+    ],
   };
 
   const mockContent: ContentNode = {
@@ -83,7 +84,7 @@ describe('PathService', () => {
     content: '# Test Content',
     tags: [],
     relatedNodeIds: [],
-    metadata: {}
+    metadata: {},
   };
 
   const mockProgress: AgentProgress = {
@@ -96,7 +97,7 @@ describe('PathService', () => {
     stepAffinity: { 0: 0.8 },
     stepNotes: { 0: 'Great intro!' },
     reflectionResponses: {},
-    attestationsEarned: []
+    attestationsEarned: [],
   };
 
   const mockPathIndex: PathIndex = {
@@ -110,28 +111,28 @@ describe('PathService', () => {
         difficulty: 'beginner',
         estimatedDuration: '1 hour',
         stepCount: 4,
-        tags: ['test']
-      }
-    ]
+        tags: ['test'],
+      },
+    ],
   };
 
   beforeEach(() => {
     const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
       'getPath',
       'getContent',
-      'getPathIndex'
+      'getPathIndex',
     ]);
     const agentServiceSpyObj = jasmine.createSpyObj('AgentService', [
       'getProgressForPath',
-      'getAttestations'
+      'getAttestations',
     ]);
 
     TestBed.configureTestingModule({
       providers: [
         PathService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: AgentService, useValue: agentServiceSpyObj }
-      ]
+        { provide: AgentService, useValue: agentServiceSpyObj },
+      ],
     });
 
     service = TestBed.inject(PathService);
@@ -151,7 +152,7 @@ describe('PathService', () => {
   });
 
   describe('getPath', () => {
-    it('should get path metadata', (done) => {
+    it('should get path metadata', done => {
       service.getPath('test-path').subscribe(path => {
         expect(path).toEqual(mockPath);
         expect(dataLoaderSpy.getPath).toHaveBeenCalledWith('test-path');
@@ -159,20 +160,20 @@ describe('PathService', () => {
       });
     });
 
-    it('should handle path load error', (done) => {
+    it('should handle path load error', done => {
       dataLoaderSpy.getPath.and.returnValue(throwError(() => new Error('Load error')));
 
       service.getPath('test-path').subscribe({
         error: err => {
           expect(err.message).toBe('Load error');
           done();
-        }
+        },
       });
     });
   });
 
   describe('getPathStep', () => {
-    it('should get step with resolved content', (done) => {
+    it('should get step with resolved content', done => {
       service.getPathStep('test-path', 0).subscribe(stepView => {
         expect(stepView.step).toEqual(mockPath.steps[0]);
         expect(stepView.content).toEqual(mockContent);
@@ -187,7 +188,7 @@ describe('PathService', () => {
       });
     });
 
-    it('should handle middle step navigation', (done) => {
+    it('should handle middle step navigation', done => {
       service.getPathStep('test-path', 1).subscribe(stepView => {
         expect(stepView.hasPrevious).toBe(true);
         expect(stepView.hasNext).toBe(true);
@@ -198,7 +199,7 @@ describe('PathService', () => {
       });
     });
 
-    it('should handle last step navigation', (done) => {
+    it('should handle last step navigation', done => {
       service.getPathStep('test-path', 4).subscribe(stepView => {
         expect(stepView.hasPrevious).toBe(true);
         expect(stepView.hasNext).toBe(false);
@@ -208,7 +209,7 @@ describe('PathService', () => {
       });
     });
 
-    it('should handle step with no progress', (done) => {
+    it('should handle step with no progress', done => {
       agentServiceSpy.getProgressForPath.and.returnValue(of(null as any));
 
       service.getPathStep('test-path', 0).subscribe(stepView => {
@@ -219,25 +220,25 @@ describe('PathService', () => {
       });
     });
 
-    it('should throw error for invalid step index (negative)', (done) => {
+    it('should throw error for invalid step index (negative)', done => {
       service.getPathStep('test-path', -1).subscribe({
         error: err => {
           expect(err.message).toContain('out of range');
           done();
-        }
+        },
       });
     });
 
-    it('should throw error for invalid step index (too large)', (done) => {
+    it('should throw error for invalid step index (too large)', done => {
       service.getPathStep('test-path', 10).subscribe({
         error: err => {
           expect(err.message).toContain('out of range');
           done();
-        }
+        },
       });
     });
 
-    it('should load correct content for step', (done) => {
+    it('should load correct content for step', done => {
       service.getPathStep('test-path', 1).subscribe(() => {
         expect(dataLoaderSpy.getContent).toHaveBeenCalledWith('content-2');
         done();
@@ -246,7 +247,7 @@ describe('PathService', () => {
   });
 
   describe('listPaths', () => {
-    it('should list all available paths', (done) => {
+    it('should list all available paths', done => {
       service.listPaths().subscribe(index => {
         expect(index).toEqual(mockPathIndex);
         expect(dataLoaderSpy.getPathIndex).toHaveBeenCalled();
@@ -304,7 +305,7 @@ describe('PathService', () => {
       const progressAtStep4: AgentProgress = {
         ...mockProgress,
         currentStepIndex: 4,
-        completedStepIndices: [0, 1, 2, 3]
+        completedStepIndices: [0, 1, 2, 3],
       };
       const result = service.isStepAccessible(mockPath, 4, progressAtStep4, []);
       expect(result.accessible).toBe(false);
@@ -315,7 +316,7 @@ describe('PathService', () => {
       const progressAtStep4: AgentProgress = {
         ...mockProgress,
         currentStepIndex: 4,
-        completedStepIndices: [0, 1, 2, 3]
+        completedStepIndices: [0, 1, 2, 3],
       };
       const result = service.isStepAccessible(mockPath, 4, progressAtStep4, ['test-attestation']);
       expect(result.accessible).toBe(true);
@@ -323,7 +324,7 @@ describe('PathService', () => {
   });
 
   describe('checkStepAccess', () => {
-    it('should check step access using current agent state', (done) => {
+    it('should check step access using current agent state', done => {
       service.checkStepAccess('test-path', 0).subscribe(result => {
         expect(result.accessible).toBe(true);
         expect(agentServiceSpy.getProgressForPath).toHaveBeenCalledWith('test-path');
@@ -332,7 +333,7 @@ describe('PathService', () => {
       });
     });
 
-    it('should deny access to locked step', (done) => {
+    it('should deny access to locked step', done => {
       service.checkStepAccess('test-path', 3).subscribe(result => {
         expect(result.accessible).toBe(false);
         done();
@@ -341,14 +342,14 @@ describe('PathService', () => {
   });
 
   describe('getAccessibleSteps', () => {
-    it('should return all accessible step indices', (done) => {
+    it('should return all accessible step indices', done => {
       service.getAccessibleSteps('test-path').subscribe(steps => {
         expect(steps).toEqual([0, 1, 2]);
         done();
       });
     });
 
-    it('should return only step 0 with no progress', (done) => {
+    it('should return only step 0 with no progress', done => {
       agentServiceSpy.getProgressForPath.and.returnValue(of(null as any));
 
       service.getAccessibleSteps('test-path').subscribe(steps => {
@@ -357,10 +358,10 @@ describe('PathService', () => {
       });
     });
 
-    it('should include step with attestation if agent has it', (done) => {
+    it('should include step with attestation if agent has it', done => {
       const fullProgress: AgentProgress = {
         ...mockProgress,
-        completedStepIndices: [0, 1, 2, 3]
+        completedStepIndices: [0, 1, 2, 3],
       };
       agentServiceSpy.getProgressForPath.and.returnValue(of(fullProgress));
       agentServiceSpy.getAttestations.and.returnValue(['test-attestation']);
@@ -371,10 +372,10 @@ describe('PathService', () => {
       });
     });
 
-    it('should exclude step with attestation if agent lacks it', (done) => {
+    it('should exclude step with attestation if agent lacks it', done => {
       const fullProgress: AgentProgress = {
         ...mockProgress,
-        completedStepIndices: [0, 1, 2, 3]
+        completedStepIndices: [0, 1, 2, 3],
       };
       agentServiceSpy.getProgressForPath.and.returnValue(of(fullProgress));
       agentServiceSpy.getAttestations.and.returnValue([]);
@@ -387,7 +388,7 @@ describe('PathService', () => {
   });
 
   describe('getStepCount', () => {
-    it('should return total number of steps', (done) => {
+    it('should return total number of steps', done => {
       service.getStepCount('test-path').subscribe(count => {
         expect(count).toBe(5);
         done();
@@ -396,7 +397,7 @@ describe('PathService', () => {
   });
 
   describe('getCompletionPercentage', () => {
-    it('should calculate completion percentage', (done) => {
+    it('should calculate completion percentage', done => {
       service.getCompletionPercentage('test-path').subscribe(percentage => {
         // 1 completed out of 4 required steps (step 2 is optional) = 25%
         expect(percentage).toBe(25);
@@ -404,7 +405,7 @@ describe('PathService', () => {
       });
     });
 
-    it('should return 0 with no progress', (done) => {
+    it('should return 0 with no progress', done => {
       agentServiceSpy.getProgressForPath.and.returnValue(of(null as any));
 
       service.getCompletionPercentage('test-path').subscribe(percentage => {
@@ -413,10 +414,10 @@ describe('PathService', () => {
       });
     });
 
-    it('should return 100 when all required steps completed', (done) => {
+    it('should return 100 when all required steps completed', done => {
       const completeProgress: AgentProgress = {
         ...mockProgress,
-        completedStepIndices: [0, 1, 3, 4]  // All required steps (excluding optional step 2)
+        completedStepIndices: [0, 1, 3, 4], // All required steps (excluding optional step 2)
       };
       agentServiceSpy.getProgressForPath.and.returnValue(of(completeProgress));
 
@@ -426,10 +427,10 @@ describe('PathService', () => {
       });
     });
 
-    it('should return 100 for path with no required steps', (done) => {
+    it('should return 100 for path with no required steps', done => {
       const allOptionalPath: LearningPath = {
         ...mockPath,
-        steps: mockPath.steps.map(s => ({ ...s, optional: true }))
+        steps: mockPath.steps.map(s => ({ ...s, optional: true })),
       };
       dataLoaderSpy.getPath.and.returnValue(of(allOptionalPath));
 
@@ -439,10 +440,10 @@ describe('PathService', () => {
       });
     });
 
-    it('should only count required steps for percentage', (done) => {
+    it('should only count required steps for percentage', done => {
       const partialProgress: AgentProgress = {
         ...mockProgress,
-        completedStepIndices: [0, 2]  // Completed step 0 (required) and 2 (optional)
+        completedStepIndices: [0, 2], // Completed step 0 (required) and 2 (optional)
       };
       agentServiceSpy.getProgressForPath.and.returnValue(of(partialProgress));
 
@@ -453,10 +454,10 @@ describe('PathService', () => {
       });
     });
 
-    it('should handle empty path (no steps)', (done) => {
+    it('should handle empty path (no steps)', done => {
       const emptyPath: LearningPath = {
         ...mockPath,
-        steps: []
+        steps: [],
       };
       dataLoaderSpy.getPath.and.returnValue(of(emptyPath));
 
@@ -468,25 +469,25 @@ describe('PathService', () => {
   });
 
   describe('additional coverage', () => {
-    it('should handle getPath errors in getPathStep', (done) => {
+    it('should handle getPath errors in getPathStep', done => {
       dataLoaderSpy.getPath.and.returnValue(throwError(() => new Error('Path load failed')));
 
       service.getPathStep('test-path', 0).subscribe({
         error: err => {
           expect(err.message).toContain('Path load failed');
           done();
-        }
+        },
       });
     });
 
-    it('should handle getContent errors in getPathStep', (done) => {
+    it('should handle getContent errors in getPathStep', done => {
       dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Content load failed')));
 
       service.getPathStep('test-path', 0).subscribe({
         error: err => {
           expect(err.message).toContain('Content load failed');
           done();
-        }
+        },
       });
     });
   });

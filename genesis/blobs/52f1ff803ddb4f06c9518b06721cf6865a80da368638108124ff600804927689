@@ -1,0 +1,10 @@
+Scenario: Household resource allocation for grandparenting expenses
+    Given grandparenting involves costs (activities, supplies, treats, transportation)
+    And Margaret and Robert share household finances
+    When the household budgets for grandparenting expenses
+    Then the household_elohim should track all grandparenting costs
+    And it should help budget for these as household expenses
+    And it should distinguish between household costs and reimbursable family costs
+    And both partners should agree on grandparenting spending
+    And household resources should support care provision without strain
+    And financial planning should include grandparenting expenses

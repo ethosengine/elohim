@@ -1,0 +1,12 @@
+Scenario: Appeal mental health intervention with privacy concerns
+    Given my Family Elohim has alerted my partner about concerning behavioral changes
+    And I believe this is an invasion of my privacy
+    And I was not in immediate danger
+    When I file an appeal through my interface
+    And I state my complaint in my own words: "This felt like surveillance"
+    Then the appeal is immediately logged with timestamp and cryptographic proof
+    And I receive confirmation with appeal tracking number
+    And the agent provides its full reasoning transparently
+    And I can see the pattern detection logic, confidence levels, and constitutional weighting
+    And the appeal is scheduled for Community Elohim review within 24 hours
+    And I am notified of my rights including escalation options

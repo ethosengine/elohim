@@ -1,0 +1,11 @@
+Scenario: Lifetime environmental observations inform climate data
+    Given Helen has observed local environmental changes over 8+ decades
+    And her memory includes baseline data from pre-industrial era
+    When Helen shares environmental observations
+    Then her knowledge should be captured for ecological archives
+    And her observations should inform local climate understanding
+    And personal experience should be valued alongside scientific data
+    And care tokens should reflect her contribution to environmental knowledge
+    And the protocol should recognize elders as environmental historians
+    And Helen's lifetime of observation should contribute to bioregional stewardship
+    And indigenous elder knowledge methods should inform data collection

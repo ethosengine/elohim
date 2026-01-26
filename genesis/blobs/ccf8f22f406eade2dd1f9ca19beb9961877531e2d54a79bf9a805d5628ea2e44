@@ -1,0 +1,9 @@
+Scenario: Developer receives honest school capacity analysis
+    Given a developer proposes 300-unit residential development
+    And claims it will bring tax revenue benefiting schools
+    When the Observer provides independent school impact analysis
+    Then the developer sees: project will generate 180 school-age children
+    And local elementary school is already at 95% capacity
+    And district needs $12M to expand capacity for projected enrollment
+    And property tax revenue is $800K/year but school costs are $1.5M/year
+    And honest analysis reveals net burden on school system

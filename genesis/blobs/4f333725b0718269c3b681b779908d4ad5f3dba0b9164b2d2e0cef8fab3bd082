@@ -1,0 +1,8 @@
+Scenario: Organizing with co-workers for collective advocacy
+    Given individual workers have limited power
+    And collective action is more effective for workplace change
+    When I want to organize with co-workers for better conditions
+    Then the protocol should help me connect with co-workers safely
+    And facilitate coordination for collective advocacy
+    And provide information about organizing rights and strategies
+    And support building worker solidarity and collective power

@@ -1,0 +1,10 @@
+Scenario: Child learns individual choices aggregate to community patterns
+    Given Emma makes consistent purchasing choices
+    And other neighborhood families also use the Value Scanner
+    When Emma's personal_agent provides context about her choices
+    Then the agent should share age-appropriate community insights
+    And the agent should say "Five other families bought this brand this week—they're all trying to eat healthier"
+    And Emma should learn her choices are part of larger patterns
+    And she should understand individual agency connects to collective outcomes
+    And community context should expand her economic understanding
+    And she should see herself as part of care economy ecosystem

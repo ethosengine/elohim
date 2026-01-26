@@ -19,13 +19,15 @@ describe('HomeComponent', () => {
     mockAnalyticsService = jasmine.createSpyObj('AnalyticsService', ['trackEvent']);
     mockDomInteractionService = jasmine.createSpyObj('DomInteractionService', [
       'setupScrollIndicator',
-      'setupHeroTitleAnimation'
+      'setupHeroTitleAnimation',
     ]);
 
-    mockConfigService.getConfig.and.returnValue(of({
-      logLevel: 'info' as const,
-      environment: 'test'
-    }));
+    mockConfigService.getConfig.and.returnValue(
+      of({
+        logLevel: 'info' as const,
+        environment: 'test',
+      })
+    );
 
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
@@ -34,8 +36,8 @@ describe('HomeComponent', () => {
         { provide: AnalyticsService, useValue: mockAnalyticsService },
         { provide: DomInteractionService, useValue: mockDomInteractionService },
         provideRouter([]),
-        provideHttpClient()
-      ]
+        provideHttpClient(),
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(HomeComponent);
@@ -51,7 +53,7 @@ describe('HomeComponent', () => {
     expect(mockConfigService.getConfig).toHaveBeenCalled();
   });
 
-  it('should setup scroll listeners on init', (done) => {
+  it('should setup scroll listeners on init', done => {
     const scrollSpy = spyOn<any>(component, 'setupParallaxScrolling');
     const observerSpy = spyOn<any>(component, 'setupIntersectionObserver');
 
@@ -73,7 +75,7 @@ describe('HomeComponent', () => {
     // Simulate having listeners
     (component as any).scrollListener = () => {};
     (component as any).intersectionObserver = {
-      disconnect: jasmine.createSpy('disconnect')
+      disconnect: jasmine.createSpy('disconnect'),
     };
     (component as any).rafId = 123;
 

@@ -1,0 +1,11 @@
+Scenario: Age-appropriate boundaries feel like safety not surveillance
+    Given Tommy's parents have configured family boundaries
+    And allergen restrictions are active (Emma's nut allergy)
+    And budget limits are set
+    And nutritional guidelines are configured
+    When Tommy attempts to select an item outside boundaries
+    Then the system should gently redirect without explicit restriction
+    And Tommy should experience boundaries as natural limits
+    And the personal_agent should explain in care terms: "Let's find something Emma can safely eat"
+    And Tommy should not feel surveilled or controlled
+    And his autonomy should remain genuine within safe parameters

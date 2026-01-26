@@ -1,0 +1,11 @@
+Scenario: Seasonal pattern knowledge from decades of observation
+    Given Helen has observed local seasonal patterns for 82 years
+    And climate change is altering traditional seasonal cycles
+    When Helen shares knowledge of historical seasonal patterns
+    Then her observations should inform understanding of climate shifts
+    And bioregional planning should incorporate elder memory
+    And changes should be documented through personal testimony
+    And Helen should be recognized as expert on local ecology
+    And the protocol should preserve knowledge of pre-change conditions
+    And ecological governance should include elder perspectives
+    And baseline understanding should come from those who remember

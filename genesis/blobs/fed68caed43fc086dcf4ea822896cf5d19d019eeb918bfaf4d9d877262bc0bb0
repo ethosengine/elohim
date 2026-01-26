@@ -1,0 +1,11 @@
+Scenario: Building relationships with disability-competent providers
+    Given finding good disability-competent providers is challenging
+    And quality provider relationships are essential for good care
+    When Alex seeks new providers
+    Then the personal_agent should help Alex identify disability-competent providers
+    And it should maintain provider ratings from disability community
+    And it should help Alex interview potential providers about disability approach
+    And it should support Alex in building strong therapeutic relationships
+    And Alex should be able to find providers who respect disabled expertise
+    And the protocol should facilitate connection to good care
+    And disability community knowledge should be leveraged to find competent providers

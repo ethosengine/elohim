@@ -1,0 +1,10 @@
+Scenario: Family care legacy and intergenerational learning
+    Given Sarah learned caregiving from her own parents
+    And she is teaching care practices to Tommy and Emma
+    When the family_elohim tracks intergenerational patterns
+    Then it should recognize care legacy across generations
+    And it should show how care practices are transmitted
+    And it should value Sarah's role in teaching next generation
+    And intergenerational care knowledge should be recognized
+    And the system should support positive care culture transmission
+    And family care economy should build across generations

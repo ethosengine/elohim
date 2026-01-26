@@ -1,0 +1,10 @@
+Scenario: Participating in civic education and voting preparation
+    Given Jordan is a citizen with the right to vote
+    And informed voting requires accessible civic education
+    When election season approaches and Jordan wants to vote
+    Then the educational_elohim provides voter education in accessible format
+    And candidates and issues are explained with simple language and visuals
+    And Jordan learns about voting process step-by-step
+    And Jordan can make informed voting choices with support
+    And Jordan's civic participation is enabled through education
+    And Jordan experiences full citizenship through accessible learning

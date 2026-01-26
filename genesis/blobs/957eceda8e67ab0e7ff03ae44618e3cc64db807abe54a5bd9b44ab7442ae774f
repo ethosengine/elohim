@@ -1,0 +1,12 @@
+Scenario: Organizational care economy consulting based on lived experience
+    Given Robert has decades of experience managing work and care
+    And organizations need care economy expertise
+    And his experience qualifies him as organizational consultant
+    When workplace_elohim recognizes his consulting capability
+    Then it should surface opportunities to consult on care economy workplace transformation
+    And help him translate lived experience into organizational development
+    And recognize his expertise about what supports working caregivers
+    And support him in offering care economy consulting services
+    And value his consulting as professional contribution and care economy advancement
+    And build care economy profession from lived experience
+    And channel his wisdom toward organizational transformation

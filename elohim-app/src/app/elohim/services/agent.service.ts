@@ -1,17 +1,31 @@
-import { Injectable, Optional } from '@angular/core';
-import { BehaviorSubject, Observable, of } from 'rxjs';
-import { map, tap, switchMap, take } from 'rxjs/operators';
+import { Injectable, Optional, OnDestroy } from '@angular/core';
+
+import { map, tap, switchMap, take, takeUntil } from 'rxjs/operators';
+
+import { BehaviorSubject, Observable, of, Subject } from 'rxjs';
+
+import { SessionHumanService } from '../../imagodei/services/session-human.service';
+import {
+  AccessLevel,
+  ContentAccessMetadata,
+  AccessCheckResult,
+} from '../../lamad/models/content-access.model';
+import {
+  Agent,
+  AgentProgress,
+  FrontierItem,
+  MasteryLevel,
+  MASTERY_LEVEL_VALUES,
+} from '../models/agent.model';
+
 import { DataLoaderService } from './data-loader.service';
 
 // Models from elohim (local)
-import { Agent, AgentProgress, FrontierItem } from '../models/agent.model';
 
 // Models from lamad pillar (content-specific access control)
-import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../../lamad/models/content-access.model';
 
 // Services from imagodei pillar (identity)
 // Using relative import for now; will update to @app/imagodei after full migration
-import { SessionHumanService } from '../../imagodei/services/session-human.service';
 
 /**
  * AgentService - Manages the current agent (session or authenticated).
@@ -31,7 +45,8 @@ import { SessionHumanService } from '../../imagodei/services/session-human.servi
  * - Attestations tracked in session
  */
 @Injectable({ providedIn: 'root' })
-export class AgentService {
+export class AgentService implements OnDestroy {
+  private readonly destroy$ = new Subject<void>();
   private readonly agentSubject = new BehaviorSubject<Agent | null>(null);
   readonly agent$ = this.agentSubject.asObservable();
 
@@ -48,14 +63,19 @@ export class AgentService {
     this.initializeAgent();
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   /**
-   * Initialize agent based on context.
-   * For MVP, creates a session-based agent.
+   * Initialize agent based on session context.
+   * Creates agent from SessionHumanService or anonymous fallback.
    */
   private initializeAgent(): void {
     if (this.sessionHumanService) {
       // Create agent from session
-      this.sessionHumanService.session$.subscribe(session => {
+      this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
         if (session) {
           const agent: Agent = {
             id: session.sessionId,
@@ -69,20 +89,17 @@ export class AgentService {
         }
       });
     } else {
-      // Fallback to loading from data (legacy behavior)
-      this.loadCurrentAgent();
+      // No session service - create anonymous agent
+      const anonymousAgent: Agent = {
+        id: `anon-${Date.now()}`,
+        displayName: 'Anonymous',
+        type: 'human',
+        visibility: 'private',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      this.agentSubject.next(anonymousAgent);
     }
-  }
-
-  /**
-   * Load the current agent's profile from data files.
-   * Legacy behavior - used when no session service available.
-   */
-  private loadCurrentAgent(): void {
-    // Legacy fallback - load from JSON
-    this.dataLoader.getAgent('agent-matthew').subscribe(agent => {
-      this.agentSubject.next(agent);
-    });
   }
 
   /**
@@ -219,7 +236,7 @@ export class AgentService {
           stepAffinity: {},
           stepNotes: {},
           reflectionResponses: {},
-          attestationsEarned: []
+          attestationsEarned: [],
         };
 
         // Check if this is starting a new path
@@ -230,10 +247,7 @@ export class AgentService {
           progress.completedStepIndices.sort((a, b) => a - b);
         }
 
-        progress.currentStepIndex = Math.max(
-          progress.currentStepIndex,
-          stepIndex + 1
-        );
+        progress.currentStepIndex = Math.max(progress.currentStepIndex, stepIndex + 1);
         progress.lastActivityAt = now;
 
         this.progressCache.set(pathId, progress);
@@ -248,9 +262,9 @@ export class AgentService {
 
         // Track content completion globally if resourceId provided
         if (resourceId) {
-          return this.dataLoader.saveAgentProgress(progress).pipe(
-            switchMap(() => this.completeContentNode(resourceId, agentId))
-          );
+          return this.dataLoader
+            .saveAgentProgress(progress)
+            .pipe(switchMap(() => this.completeContentNode(resourceId, agentId)));
         }
 
         return this.dataLoader.saveAgentProgress(progress);
@@ -300,7 +314,7 @@ export class AgentService {
           stepAffinity: {},
           stepNotes: {},
           reflectionResponses: {},
-          attestationsEarned: []
+          attestationsEarned: [],
         };
 
         progress.stepNotes[stepIndex] = notes;
@@ -321,7 +335,11 @@ export class AgentService {
   /**
    * Save reflection responses for a step.
    */
-  saveReflectionResponses(pathId: string, stepIndex: number, responses: string[]): Observable<void> {
+  saveReflectionResponses(
+    pathId: string,
+    stepIndex: number,
+    responses: string[]
+  ): Observable<void> {
     return this.getProgressForPath(pathId).pipe(
       switchMap(existingProgress => {
         if (!existingProgress) {
@@ -390,7 +408,7 @@ export class AgentService {
           stepNotes: {},
           reflectionResponses: {},
           attestationsEarned: [],
-          completedContentIds: []
+          completedContentIds: [],
         };
 
         // Add to completed content (avoid duplicates)
@@ -444,6 +462,108 @@ export class AgentService {
   }
 
   /**
+   * Get mastery level for a specific content node.
+   *
+   * @param contentId The content resource ID
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  getContentMastery(contentId: string, _agentId?: string): Observable<MasteryLevel> {
+    return this.getProgressForPath('__global__').pipe(
+      map(progress => {
+        if (!progress?.contentMastery) {
+          return 'not_started' as MasteryLevel;
+        }
+        return progress.contentMastery[contentId] || 'not_started';
+      })
+    );
+  }
+
+  /**
+   * Get all content mastery levels as a Map.
+   *
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  getAllContentMastery(_agentId?: string): Observable<Map<string, MasteryLevel>> {
+    return this.getProgressForPath('__global__').pipe(
+      map(progress => {
+        if (!progress?.contentMastery) {
+          return new Map<string, MasteryLevel>();
+        }
+        return new Map(Object.entries(progress.contentMastery));
+      })
+    );
+  }
+
+  /**
+   * Update mastery level for a content node.
+   *
+   * Mastery only increases, never decreases (ratchet behavior).
+   * This tracks progression through: seen → practiced → applied → mastered
+   *
+   * @param contentId The content resource ID
+   * @param level The new mastery level
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  updateContentMastery(contentId: string, level: MasteryLevel, agentId?: string): Observable<void> {
+    const targetAgentId = agentId ?? this.getCurrentAgentId();
+
+    return this.getProgressForPath('__global__').pipe(
+      switchMap(existingProgress => {
+        const now = new Date().toISOString();
+
+        const progress: AgentProgress = existingProgress || {
+          agentId: targetAgentId,
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: now,
+          lastActivityAt: now,
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          completedContentIds: [],
+          contentMastery: {},
+        };
+
+        // Initialize if missing
+        if (!progress.contentMastery) {
+          progress.contentMastery = {};
+        }
+
+        // Ratchet behavior: only increase mastery level
+        const currentLevel = progress.contentMastery[contentId] || 'not_started';
+        if (MASTERY_LEVEL_VALUES[level] > MASTERY_LEVEL_VALUES[currentLevel]) {
+          progress.contentMastery[contentId] = level;
+        }
+
+        // Also mark as completed if at 'apply' or above
+        if (MASTERY_LEVEL_VALUES[level] >= MASTERY_LEVEL_VALUES['apply']) {
+          if (!progress.completedContentIds) {
+            progress.completedContentIds = [];
+          }
+          if (!progress.completedContentIds.includes(contentId)) {
+            progress.completedContentIds.push(contentId);
+          }
+        }
+
+        progress.lastActivityAt = now;
+
+        this.progressCache.set('__global__', progress);
+        return this.dataLoader.saveAgentProgress(progress);
+      })
+    );
+  }
+
+  /**
+   * Mark content as "seen" (viewed but not yet practiced).
+   * Convenience method for the most common mastery update.
+   */
+  markContentSeen(contentId: string, agentId?: string): Observable<void> {
+    return this.updateContentMastery(contentId, 'seen', agentId);
+  }
+
+  /**
    * Get the learning frontier - paths with active progress.
    * Returns the "resume" points for the learner dashboard.
    */
@@ -463,7 +583,7 @@ export class AgentService {
               frontier.push({
                 pathId: progress.pathId,
                 nextStepIndex: progress.currentStepIndex,
-                lastActivity: progress.lastActivityAt
+                lastActivity: progress.lastActivityAt,
               });
             }
           }
@@ -474,8 +594,8 @@ export class AgentService {
     }
 
     // Sort by most recent activity
-    frontier.sort((a, b) =>
-      new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+    frontier.sort(
+      (a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
     );
 
     return of(frontier);
@@ -541,11 +661,14 @@ export class AgentService {
       ...dateMetrics,
       ...pathMetrics,
       ...affinityMetrics,
-      ...attestationMetrics
+      ...attestationMetrics,
     };
   }
 
-  private calculateBasicCounts(pathProgress: AgentProgress[], globalProgress: AgentProgress | undefined): {
+  private calculateBasicCounts(
+    pathProgress: AgentProgress[],
+    globalProgress: AgentProgress | undefined
+  ): {
     totalPathsStarted: number;
     totalPathsCompleted: number;
     totalContentNodesCompleted: number;
@@ -555,7 +678,7 @@ export class AgentService {
       totalPathsStarted: pathProgress.length,
       totalPathsCompleted: pathProgress.filter(p => p.completedAt).length,
       totalContentNodesCompleted: globalProgress?.completedContentIds?.length ?? 0,
-      totalStepsCompleted: pathProgress.reduce((sum, p) => sum + p.completedStepIndices.length, 0)
+      totalStepsCompleted: pathProgress.reduce((sum, p) => sum + p.completedStepIndices.length, 0),
     };
   }
 
@@ -570,27 +693,36 @@ export class AgentService {
     let lastActivityDate = '';
 
     if (pathProgress.length > 0) {
-      const startDates = pathProgress.map(p => new Date(p.startedAt).getTime()).filter(d => !isNaN(d));
-      const endDates = pathProgress.map(p => new Date(p.lastActivityAt).getTime()).filter(d => !isNaN(d));
+      const startDates = pathProgress
+        .map(p => new Date(p.startedAt).getTime())
+        .filter(d => !isNaN(d));
+      const endDates = pathProgress
+        .map(p => new Date(p.lastActivityAt).getTime())
+        .filter(d => !isNaN(d));
 
-      if (startDates.length > 0) firstActivityDate = new Date(Math.min(...startDates)).toISOString();
+      if (startDates.length > 0)
+        firstActivityDate = new Date(Math.min(...startDates)).toISOString();
       if (endDates.length > 0) lastActivityDate = new Date(Math.max(...endDates)).toISOString();
     }
 
-    const totalLearningTime = firstActivityDate && lastActivityDate
-      ? Math.floor((new Date(lastActivityDate).getTime() - new Date(firstActivityDate).getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
+    const totalLearningTime =
+      firstActivityDate && lastActivityDate
+        ? Math.floor(
+            (new Date(lastActivityDate).getTime() - new Date(firstActivityDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        : 0;
 
-    const activityDates = Array.from(new Set(
-      pathProgress.map(p => new Date(p.lastActivityAt).toISOString().split('T')[0])
-    ));
+    const activityDates = Array.from(
+      new Set(pathProgress.map(p => new Date(p.lastActivityAt).toISOString().split('T')[0]))
+    );
 
     return {
       firstActivityDate,
       lastActivityDate,
       totalLearningTime,
       currentStreak: this.calculateCurrentStreak(activityDates),
-      longestStreak: this.calculateLongestStreak(activityDates)
+      longestStreak: this.calculateLongestStreak(activityDates),
     };
   }
 
@@ -607,11 +739,14 @@ export class AgentService {
       }
     }
 
-    const mostRecentPathId = pathProgress.length > 0
-      ? pathProgress.reduce((latest, p) =>
-          new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest, pathProgress[0]
-        ).pathId
-      : null;
+    const mostRecentPathId =
+      pathProgress.length > 0
+        ? pathProgress.reduce(
+            (latest, p) =>
+              new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest,
+            pathProgress[0]
+          ).pathId
+        : null;
 
     return { mostActivePathId, mostRecentPathId };
   }
@@ -633,7 +768,7 @@ export class AgentService {
       if (affinityValues.length > 0) {
         pathAffinities.set(p.pathId, {
           sum: affinityValues.reduce((sum, a) => sum + a, 0),
-          count: affinityValues.length
+          count: affinityValues.length,
         });
       }
     }
@@ -645,7 +780,7 @@ export class AgentService {
 
     return {
       averageAffinity: affinityCount > 0 ? totalAffinity / affinityCount : 0,
-      highAffinityPaths
+      highAffinityPaths,
     };
   }
 
@@ -661,7 +796,7 @@ export class AgentService {
     }
     return {
       totalAttestationsEarned: allAttestations.size,
-      attestationIds: Array.from(allAttestations)
+      attestationIds: Array.from(allAttestations),
     };
   }
 
@@ -673,9 +808,7 @@ export class AgentService {
     if (activityDates.length === 0) return 0;
 
     // Sort dates descending (most recent first)
-    const sorted = activityDates
-      .map(d => new Date(d))
-      .sort((a, b) => b.getTime() - a.getTime());
+    const sorted = activityDates.map(d => new Date(d)).sort((a, b) => b.getTime() - a.getTime());
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -708,9 +841,7 @@ export class AgentService {
     if (activityDates.length === 0) return 0;
 
     // Sort dates ascending
-    const sorted = activityDates
-      .map(d => new Date(d))
-      .sort((a, b) => a.getTime() - b.getTime());
+    const sorted = activityDates.map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
 
     let longestStreak = 1;
     let currentStreak = 1;

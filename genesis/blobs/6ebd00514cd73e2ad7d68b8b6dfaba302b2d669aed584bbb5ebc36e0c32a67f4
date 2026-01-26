@@ -1,0 +1,10 @@
+Scenario: Pursuing personal interest through adult education
+    Given Jordan loves art and wants to improve drawing skills
+    And the community college offers accessible art classes
+    When Jordan enrolls in the drawing class
+    Then registration process uses accessible language and support
+    And the instructor adapts teaching to Jordan's learning style
+    And Jordan creates art alongside other adult students
+    And Jordan's artistic expression is valued, not patronized
+    And Jordan experiences being a lifelong learner
+    And Jordan's creative contributions are celebrated authentically

@@ -1,0 +1,9 @@
+Scenario: Developer water quality impacts gain watershed accountability
+    Given a developer's projects increase impervious surface and runoff
+    And environmental review addressed only immediate site impacts
+    When the Observer analyzes watershed-scale water quality impacts
+    Then analysis shows: cumulative development degraded stream quality
+    And downstream communities face flooding and pollution impacts
+    And watershed perspective reveals impacts ignored in site-level review
+    And developer contribution to cumulative harm becomes visible
+    And watershed accountability demands comprehensive impact assessment

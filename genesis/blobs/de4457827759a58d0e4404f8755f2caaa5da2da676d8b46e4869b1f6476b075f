@@ -1,0 +1,9 @@
+Scenario: Journalist investigates workplace safety violations
+    Given workers report unsafe conditions at warehouse
+    And the journalist covers workplace safety
+    When the Observer analyzes employer's safety violation history
+    Then the journalist finds company has 47 OSHA violations in 5 years
+    And sees pattern of violations detected but minimally fined
+    And documents worker injuries and company's inadequate response
+    And shows same company violates safety rules at facilities in other states
+    And publishes investigation forcing regulatory accountability

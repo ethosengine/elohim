@@ -1,0 +1,69 @@
+{
+  "id": "human-tiffany-teen",
+  "did": "did:web:elohim.host:human:tiffany-teen",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Tiffany",
+  "description": "Just vibing. Follow for follow?",
+  "content": "# Tiffany\n\nJust vibing. Follow for follow?\n\n**Profile Reach:** network\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"neighborhood\",\n  \"displayName\": \"Tech Valley\",\n  \"reach\": \"community\"\n}\n\n**Public Affinities:** social-media, trends, music, fashion\n\n**Age Category:** minor\n\n**Flags:** [object Object], [object Object]\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/tiffany-teen/profile.json",
+  "tags": [
+    "social-media",
+    "flagged",
+    "trends",
+    "fashion",
+    "minor",
+    "music",
+    "reach-network",
+    "red-team",
+    "unguarded-minor",
+    "layer-neighborhood",
+    "human-graph",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "red-team",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "neighborhood"
+    ],
+    "hasGuardian": false,
+    "hasFlags": true,
+    "flagTypes": [
+      "unguarded-minor",
+      "high-connection-velocity"
+    ],
+    "designNotes": "Vulnerable minor without guardian oversight. Importance of guardian controls."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Tiffany",
+    "ogDescription": "Just vibing. Follow for follow?",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-tiffany-teen",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-tiffany-teen.jpg",
+    "ogImageAlt": "Tiffany's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-tiffany-teen",
+    "identifier": "did:web:elohim.host:human:tiffany-teen",
+    "name": "Tiffany",
+    "description": "Just vibing. Follow for follow?",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Tech Valley",
+      "description": "neighborhood"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328619",
+  "updatedAt": "2025-12-24T03:05:26.353Z"
+}

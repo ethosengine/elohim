@@ -1,0 +1,11 @@
+Scenario: Frugality as environmental practice recognized and valued
+    Given Helen's resource constraint requires careful consumption
+    And frugality reduces environmental impact
+    When Helen makes resource-conscious decisions
+    Then her frugality should be recognized as environmental stewardship
+    And poverty should not be stigmatized when it reduces consumption
+    And her low-impact lifestyle should be valued, not pitied
+    And care tokens should reflect environmental benefit of reduced consumption
+    And the protocol should challenge assumption that consumption equals flourishing
+    And Helen's economic constraint should be reframed as ecological wisdom
+    And environmental movement should learn from those who live with less by necessity

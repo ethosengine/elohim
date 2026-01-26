@@ -1,0 +1,10 @@
+Scenario: Family decision-making includes student voice
+    Given Kenji is becoming adult family member
+    And family makes decisions that affect him
+    When family discusses major decisions (moving, finances, elder care)
+    Then the family_elohim should ensure Kenji's voice is included
+    And it should recognize his emerging adult perspective as valuable
+    And it should facilitate his participation despite distance
+    And family governance should include student members as participants
+    And the system should support transition from child to adult family voice
+    And Kenji should participate in family decisions appropriately

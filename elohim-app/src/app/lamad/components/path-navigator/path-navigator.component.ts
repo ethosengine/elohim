@@ -1,61 +1,96 @@
-import { Component, OnInit, OnDestroy, ViewChild, ViewContainerRef, ComponentRef, ChangeDetectorRef, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DOCUMENT } from '@angular/common';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ChangeDetectorRef,
+  inject,
+  HostListener,
+  Inject,
+} from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject, Subscription } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
-import { PathService } from '../../services/path.service';
-import { AgentService } from '@app/elohim/services/agent.service';
-import { SeoService } from '../../../services/seo.service';
-import { PathStepView, LearningPath } from '../../models/learning-path.model';
-import { MasteryLevel } from '../../models/content-mastery.model';
-import { RendererRegistryService, ContentRenderer } from '../../renderers/renderer-registry.service';
 
-interface SidebarStep {
-  index: number;
+import { takeUntil } from 'rxjs/operators';
+
+import { Subject } from 'rxjs';
+
+import { AgentService } from '@app/elohim/services/agent.service';
+import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+
+import { SeoService } from '../../../services/seo.service';
+import { MasteryLevel } from '../../models/content-mastery.model';
+import { PathContext } from '../../models/exploration-context.model';
+import {
+  PathStepView,
+  LearningPath,
+  PathChapter,
+  PathModule,
+  PathSection,
+} from '../../models/learning-path.model';
+import { RendererCompletionEvent } from '../../renderers/renderer-registry.service';
+import { PathContextService } from '../../services/path-context.service';
+import { PathService } from '../../services/path.service';
+import { getIconForContent, inferContentTypeFromId } from '../../utils/content-icons';
+import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
+import { LessonViewComponent } from '../lesson-view/lesson-view.component';
+
+/**
+ * Concept item in the lesson sidebar - represents one concept within the current section/lesson
+ */
+interface LessonConcept {
+  conceptId: string;
   title: string;
   isCompleted: boolean;
-  isLocked: boolean;
   isCurrent: boolean;
-  isGlobalCompletion: boolean; // True if completed in another path
-  icon: string;
+  index: number; // Index within the lesson
+  icon: string; // Icon based on content type
 }
 
-interface SidebarChapter {
-  id: string;
-  title: string;
-  steps: SidebarStep[];
-  isExpanded: boolean;
+/**
+ * Current lesson context - tracks where we are in the hierarchy
+ */
+interface LessonContext {
+  chapter: PathChapter;
+  chapterIndex: number;
+  module: PathModule;
+  moduleIndex: number;
+  section: PathSection;
+  sectionIndex: number;
+  concepts: LessonConcept[];
+  currentConceptIndex: number;
 }
 
 /**
  * PathNavigatorComponent - The main learning interface.
  *
  * Implements a split-view "Course Player" layout:
- * - Left Sidebar: Contextual navigation (Chapters/Steps)
+ * - Left Sidebar: Current lesson's concepts (focused, not overwhelming)
+ * - Sidebar Header: Module/Lesson title for context
  * - Main Area: Breadcrumbs, Content, Navigation Footer
+ *
+ * Hierarchy: Path → Chapter → Module → Section (Lesson) → Concepts
+ * The sidebar shows concepts within the current Section (Lesson).
  *
  * Route: /lamad/path/:pathId/step/:stepIndex
  */
 @Component({
   selector: 'app-path-navigator',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, LessonViewComponent, FocusedViewToggleComponent],
   templateUrl: './path-navigator.component.html',
-  styleUrls: ['./path-navigator.component.css']
+  styleUrls: ['./path-navigator.component.css'],
 })
 export class PathNavigatorComponent implements OnInit, OnDestroy {
   // Route params
-  pathId: string = '';
-  stepIndex: number = 0;
+  pathId = '';
+  stepIndex = 0; // Global concept index across all sections
 
   // Data
   stepView: PathStepView | null = null;
   path: LearningPath | null = null;
-  
-  // Sidebar State
-  sidebarChapters: SidebarChapter[] = [];
-  flatSidebarSteps: SidebarStep[] = []; // Fallback for paths without chapters
-  currentChapterId: string | null = null;
+
+  // Lesson Context - where we are in the hierarchy
+  lessonContext: LessonContext | null = null;
 
   // Bloom's Mastery State (Prototype)
   currentBloomLevel: MasteryLevel = 'not_started';
@@ -67,7 +102,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     'apply',
     'analyze',
     'evaluate',
-    'create'
+    'create',
   ];
 
   // UI state
@@ -75,25 +110,26 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   error: string | null = null;
   sidebarOpen = true; // Default open, click backdrop to dismiss on mobile
 
-  // Dynamic renderer hosting
-  @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
-  rendererHost!: ViewContainerRef;
-  private rendererRef: ComponentRef<ContentRenderer> | null = null;
-  private rendererSubscription: Subscription | null = null;
-
-  /** Whether we have a registered renderer for the current content format */
-  hasRegisteredRenderer = false;
+  // Focused view (immersive mode) state
+  isFocusedView = false;
+  contentRefreshKey = 0; // Increment to trigger content reload
+  private readonly TRANSITION_DURATION = 300; // Match CSS transition duration
 
   private readonly destroy$ = new Subject<void>();
   private readonly seoService = inject(SeoService);
+
+  // Learning signal tracking
+  private contentViewStartTime: number | null = null;
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly pathService: PathService,
     private readonly agentService: AgentService,
-    private readonly rendererRegistry: RendererRegistryService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly governanceSignalService: GovernanceSignalService,
+    private readonly pathContextService: PathContextService,
+    private readonly cdr: ChangeDetectorRef,
+    @Inject(DOCUMENT) private readonly document: Document
   ) {}
 
   ngOnInit(): void {
@@ -106,60 +142,15 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Emit progress signal before destroying
+    this.emitProgressSignal();
+
     this.destroy$.next();
     this.destroy$.complete();
-    this.destroyRenderer();
-  }
-
-  /**
-   * Clean up the current renderer instance
-   */
-  private destroyRenderer(): void {
-    if (this.rendererSubscription) {
-      this.rendererSubscription.unsubscribe();
-      this.rendererSubscription = null;
-    }
-    if (this.rendererRef) {
-      this.rendererRef.destroy();
-      this.rendererRef = null;
-    }
-  }
-
-  /**
-   * Dynamically instantiate the appropriate renderer for the current content.
-   * Called after the step is loaded and the view is ready.
-   */
-  private loadRenderer(): void {
-    if (!this.stepView?.content || !this.rendererHost) {
-      this.hasRegisteredRenderer = false;
-      return;
-    }
-
-    // Clean up previous renderer
-    this.destroyRenderer();
-    this.rendererHost.clear();
-
-    // Get the renderer component for this content format
-    const rendererComponent = this.rendererRegistry.getRenderer(this.stepView.content);
-
-    if (!rendererComponent) {
-      this.hasRegisteredRenderer = false;
-      return;
-    }
-
-    this.hasRegisteredRenderer = true;
-
-    // Create the renderer component
-    this.rendererRef = this.rendererHost.createComponent(rendererComponent);
-
-    // Set the node input using setInput to trigger ngOnChanges
-    this.rendererRef.setInput('node', this.stepView.content);
-
-    // Set embedded mode if the renderer supports it (e.g., markdown renderer)
-    // This tells the renderer to adapt to the container rather than imposing its own layout
-    if ('embedded' in this.rendererRef.instance) {
-      this.rendererRef.setInput('embedded', true);
-    }
+    // Exit path context when leaving the navigator
+    this.pathContextService.exitPath();
+    // Clean up focused view mode if active
+    this.document.body.classList.remove('focused-view-mode');
   }
 
   /**
@@ -169,68 +160,179 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     this.isLoading = true;
     this.error = null;
 
-    // Load full path context for sidebar (using the efficient bulk method)
-    this.pathService.getAllStepsWithCompletionStatus(this.pathId).subscribe({
-      next: (stepsWithStatus) => {
-        // 1. Load the Path Metadata
-        this.pathService.getPath(this.pathId).pipe(takeUntil(this.destroy$)).subscribe(path => {
+    // Load path metadata first
+    this.pathService
+      .getPath(this.pathId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: path => {
           this.path = path;
-          
-          // 2. Build Sidebar Structure
-          this.buildSidebar(path, stepsWithStatus);
-          
-          // 3. Set Current Step Data
-          this.pathService.getPathStep(this.pathId, this.stepIndex).subscribe({
-            next: (stepView) => {
-              this.stepView = stepView;
 
-              // Update SEO metadata for this step
-              const stepTitle = stepView.content?.title ?? stepView.step.stepTitle;
-              const pathTitle = path.title;
-              this.seoService.updateSeo({
-                title: `${stepTitle} - ${pathTitle}`,
-                description: stepView.content?.description ?? `Step ${this.stepIndex + 1} of ${pathTitle}`,
-                openGraph: {
-                  ogType: 'article',
-                  ogImage: stepView.content?.metadata?.['thumbnailUrl'] ?? path.thumbnailUrl,
-                  articleSection: 'Learning'
-                },
-                jsonLd: {
-                  '@context': 'https://schema.org',
-                  '@type': 'LearningResource',
-                  name: stepTitle,
-                  isPartOf: {
-                    '@type': 'Course',
-                    name: pathTitle
-                  },
-                  position: this.stepIndex + 1
-                }
+          // Build lesson context (find current position in hierarchy)
+          this.buildLessonContext(path);
+
+          // Load the current concept's content
+          if (this.lessonContext) {
+            const currentConcept =
+              this.lessonContext.concepts[this.lessonContext.currentConceptIndex];
+            this.loadConceptContent(currentConcept.conceptId, path);
+          } else {
+            // Fallback for paths without hierarchical structure
+            this.pathService.getPathStep(this.pathId, this.stepIndex).subscribe({
+              next: stepView => this.handleStepLoaded(stepView, path),
+              error: err => this.handleError(err),
+            });
+          }
+        },
+        error: err => this.handleError(err),
+      });
+  }
+
+  /**
+   * Load content for a specific concept ID
+   */
+  private loadConceptContent(conceptId: string, path: LearningPath): void {
+    // Use the content service to load the concept
+    this.pathService
+      .getContentById(conceptId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: content => {
+          // Handle case where content is not found
+          if (!content) {
+            this.error = `Content not found: ${conceptId}`;
+            this.isLoading = false;
+            return;
+          }
+
+          // Build a PathStepView-like structure from the concept content
+          this.stepView = {
+            step: {
+              order: this.stepIndex,
+              resourceId: conceptId,
+              stepTitle: content.title ?? this.formatConceptTitle(conceptId),
+              stepNarrative: content.description ?? '',
+              learningObjectives: [],
+              optional: false,
+              completionCriteria: [],
+            },
+            content: content,
+            isCompleted: false,
+            hasPrevious: this.stepIndex > 0,
+            hasNext: this.stepIndex < this.getTotalConcepts() - 1,
+            previousStepIndex: this.stepIndex > 0 ? this.stepIndex - 1 : undefined,
+            nextStepIndex:
+              this.stepIndex < this.getTotalConcepts() - 1 ? this.stepIndex + 1 : undefined,
+          };
+
+          // Update SEO
+          const conceptTitle = content?.title ?? this.formatConceptTitle(conceptId);
+          const lessonTitle = this.lessonContext?.section.title ?? '';
+          this.seoService.updateSeo({
+            title: `${conceptTitle} - ${lessonTitle} - ${path.title}`,
+            description: content?.description ?? `Learning ${conceptTitle}`,
+            openGraph: {
+              ogType: 'article',
+              ogImage: content?.metadata?.['thumbnailUrl'] ?? path.thumbnailUrl,
+              articleSection: 'Learning',
+            },
+          });
+
+          // Mark content as seen and emit learning signal
+          if (content) {
+            this.agentService.markContentSeen(conceptId).pipe(takeUntil(this.destroy$)).subscribe();
+            this.agentService
+              .getContentMastery(conceptId)
+              .pipe(takeUntil(this.destroy$))
+              .subscribe(level => {
+                this.currentBloomLevel = level;
               });
 
-              // Initialize Bloom level based on completion status (Prototype)
-              if (stepView.isCompleted) {
-                // If already completed, assume at least 'apply' for demo purposes
-                // Real impl would fetch actual ContentMastery
-                this.currentBloomLevel = 'apply';
-              } else {
-                this.currentBloomLevel = 'not_started';
-              }
+            // Track view start time for learning signals
+            this.contentViewStartTime = Date.now();
 
-              this.determineCurrentChapter();
-              this.isLoading = false;
+            // Emit content viewed learning signal
+            this.governanceSignalService
+              .recordLearningSignal({
+                contentId: conceptId,
+                signalType: 'content_viewed',
+                payload: {
+                  pathId: this.pathId,
+                  stepIndex: this.stepIndex,
+                  contentType: content.contentType,
+                  chapter: this.lessonContext?.chapter.title,
+                  module: this.lessonContext?.module.title,
+                  section: this.lessonContext?.section.title,
+                },
+              })
+              .pipe(takeUntil(this.destroy$))
+              .subscribe();
+          }
 
-              // Ensure view updates so @if blocks resolve and rendererHost is available
-              this.cdr.detectChanges();
+          this.isLoading = false;
+          this.pathContextService.enterPath(this.buildPathContext());
+          this.cdr.detectChanges();
+        },
+        error: err => this.handleError(err),
+      });
+  }
 
-              // Load the appropriate renderer for this content format
-              this.loadRenderer();
-            },
-            error: (err) => this.handleError(err)
-          });
-        });
+  /**
+   * Handle step loaded (fallback for non-hierarchical paths)
+   */
+  private handleStepLoaded(stepView: PathStepView, path: LearningPath): void {
+    this.stepView = stepView;
+
+    const stepTitle = stepView.content?.title ?? stepView.step.stepTitle;
+    this.seoService.updateSeo({
+      title: `${stepTitle} - ${path.title}`,
+      description: stepView.content?.description ?? `Step ${this.stepIndex + 1} of ${path.title}`,
+      openGraph: {
+        ogType: 'article',
+        ogImage: stepView.content?.metadata?.['thumbnailUrl'] ?? path.thumbnailUrl,
+        articleSection: 'Learning',
       },
-      error: (err) => this.handleError(err)
     });
+
+    if (stepView.step.resourceId) {
+      this.agentService
+        .markContentSeen(stepView.step.resourceId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe();
+      this.agentService
+        .getContentMastery(stepView.step.resourceId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(level => {
+          this.currentBloomLevel = level;
+        });
+    }
+
+    this.isLoading = false;
+    this.pathContextService.enterPath(this.buildPathContext());
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Get total concept count across all sections.
+   * Handles both 4-level (modules) and 2-level (steps) formats.
+   */
+  getTotalConcepts(): number {
+    if (!this.path?.chapters) return 0;
+    let total = 0;
+    for (const chapter of this.path.chapters) {
+      // 2-level format: chapters with direct steps
+      if (chapter.steps && chapter.steps.length > 0) {
+        total += chapter.steps.length;
+      } else {
+        // 4-level format: modules → sections → conceptIds
+        for (const module of chapter.modules || []) {
+          for (const section of module.sections || []) {
+            total += section.conceptIds?.length || 0;
+          }
+        }
+      }
+    }
+    return total;
   }
 
   private handleError(err: any): void {
@@ -239,93 +341,218 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Construct the sidebar data structure
+   * Build the lesson context - find where we are in the hierarchy
+   * and build the concept list for the current section/lesson.
+   *
+   * Handles both:
+   * - 4-level: chapters → modules → sections → conceptIds
+   * - 2-level: chapters → steps (each step has resourceId)
    */
-  private buildSidebar(path: LearningPath, stepsWithStatus: any[]): void {
-    if (path.chapters && path.chapters.length > 0) {
-      // Structure by chapters
-      let globalStepIndex = 0;
-      this.sidebarChapters = path.chapters.map(chapter => {
-        const chapterSteps: SidebarStep[] = chapter.steps.map((step, idx) => {
-          const status = stepsWithStatus[globalStepIndex];
-          const sidebarStep: SidebarStep = {
-            index: globalStepIndex,
-            title: step.stepTitle,
-            isCompleted: status.isCompleted,
-            isLocked: false, // Locking logic can be added if needed beyond basic completion
-            isCurrent: globalStepIndex === this.stepIndex,
-            isGlobalCompletion: status.completedInOtherPath,
-            icon: this.getContentIcon(status.content?.contentType)
-          };
-          globalStepIndex++;
-          return sidebarStep;
-        });
+  private buildLessonContext(path: LearningPath): void {
+    if (!path.chapters || path.chapters.length === 0) {
+      this.lessonContext = null;
+      return;
+    }
 
-        return {
-          id: chapter.id,
-          title: chapter.title,
-          steps: chapterSteps,
-          isExpanded: true // Logic to expand current chapter later
-        };
-      });
+    // Check if we have 2-level format (chapters with direct steps)
+    const firstChapter = path.chapters[0];
+    const is2Level = firstChapter.steps && firstChapter.steps.length > 0;
+
+    if (is2Level) {
+      this.buildLessonContext2Level(path);
     } else {
-      // Flat list
-      this.flatSidebarSteps = stepsWithStatus.map((status, index) => ({
-        index: index,
-        title: path.steps[index].stepTitle,
-        isCompleted: status.isCompleted,
-        isLocked: false,
-        isCurrent: index === this.stepIndex,
-        isGlobalCompletion: status.completedInOtherPath,
-        icon: this.getContentIcon(status.content?.contentType)
-      }));
+      this.buildLessonContext4Level(path);
     }
   }
 
-  private determineCurrentChapter(): void {
-    if (!this.sidebarChapters.length) return;
+  /**
+   * Build lesson context for 2-level hierarchy (chapters → steps)
+   */
+  private buildLessonContext2Level(path: LearningPath): void {
+    let globalIndex = 0;
+    for (let ci = 0; ci < path.chapters!.length; ci++) {
+      const chapter = path.chapters![ci];
+      const chapterSteps = chapter.steps || [];
 
-    // Find which chapter contains the current step
-    for (const chapter of this.sidebarChapters) {
-      if (chapter.steps.some(s => s.index === this.stepIndex)) {
-        this.currentChapterId = chapter.id;
-        chapter.isExpanded = true;
-        break;
+      // Check if current stepIndex falls within this chapter
+      if (this.stepIndex >= globalIndex && this.stepIndex < globalIndex + chapterSteps.length) {
+        const currentConceptIndex = this.stepIndex - globalIndex;
+
+        // Build concepts list from chapter steps
+        const concepts: LessonConcept[] = chapterSteps.map((step, idx) => ({
+          conceptId: step.resourceId,
+          title: step.stepTitle || this.formatConceptTitle(step.resourceId),
+          isCompleted: false, // TODO: Load from progress
+          isCurrent: idx === currentConceptIndex,
+          index: globalIndex + idx,
+          icon: getIconForContent(step.resourceId, inferContentTypeFromId(step.resourceId)),
+        }));
+
+        // Create a synthetic section for the UI
+        const syntheticSection = {
+          id: `${chapter.id}-section`,
+          title: chapter.title,
+          order: 0,
+          conceptIds: chapterSteps.map(s => s.resourceId),
+        };
+
+        this.lessonContext = {
+          chapter,
+          chapterIndex: ci,
+          module: {
+            id: `${chapter.id}-module`,
+            title: chapter.title,
+            order: 0,
+            sections: [syntheticSection],
+          },
+          moduleIndex: 0,
+          section: syntheticSection,
+          sectionIndex: 0,
+          concepts,
+          currentConceptIndex,
+        };
+        return;
+      }
+      globalIndex += chapterSteps.length;
+    }
+
+    // Fallback: use first chapter
+    if (path.chapters!.length > 0) {
+      const chapter = path.chapters![0];
+      const chapterSteps = chapter.steps || [];
+      if (chapterSteps.length > 0) {
+        const syntheticSection = {
+          id: `${chapter.id}-section`,
+          title: chapter.title,
+          order: 0,
+          conceptIds: chapterSteps.map(s => s.resourceId),
+        };
+        this.lessonContext = {
+          chapter,
+          chapterIndex: 0,
+          module: {
+            id: `${chapter.id}-module`,
+            title: chapter.title,
+            order: 0,
+            sections: [syntheticSection],
+          },
+          moduleIndex: 0,
+          section: syntheticSection,
+          sectionIndex: 0,
+          concepts: chapterSteps.map((step, idx) => ({
+            conceptId: step.resourceId,
+            title: step.stepTitle || this.formatConceptTitle(step.resourceId),
+            isCompleted: false,
+            isCurrent: idx === 0,
+            index: idx,
+            icon: getIconForContent(step.resourceId, inferContentTypeFromId(step.resourceId)),
+          })),
+          currentConceptIndex: 0,
+        };
       }
     }
   }
 
-  private getContentIcon(contentType: string): string {
-    const icons: Record<string, string> = {
-      'epic': '📖',
-      'feature': '⚡',
-      'scenario': '✓',
-      'concept': '💡',
-      'simulation': '🎮',
-      'video': '🎥',
-      'assessment': '📝',
-      'organization': '🏢',
-      'book-chapter': '📚',
-      'tool': '🛠️'
-    };
-    return icons[contentType] || '📄';
+  /**
+   * Build lesson context for 4-level hierarchy (chapters → modules → sections → conceptIds)
+   */
+  private buildLessonContext4Level(path: LearningPath): void {
+    let globalIndex = 0;
+    for (let ci = 0; ci < path.chapters!.length; ci++) {
+      const chapter = path.chapters![ci];
+      for (let mi = 0; mi < (chapter.modules || []).length; mi++) {
+        const module = chapter.modules![mi];
+        for (let si = 0; si < (module.sections || []).length; si++) {
+          const section = module.sections[si];
+          const conceptCount = section.conceptIds?.length || 0;
+
+          // Check if current stepIndex falls within this section
+          if (this.stepIndex >= globalIndex && this.stepIndex < globalIndex + conceptCount) {
+            const currentConceptIndex = this.stepIndex - globalIndex;
+
+            // Build concepts list for this section
+            const concepts: LessonConcept[] = (section.conceptIds || []).map((conceptId, idx) => ({
+              conceptId,
+              title: this.formatConceptTitle(conceptId),
+              isCompleted: false, // TODO: Load from progress
+              isCurrent: idx === currentConceptIndex,
+              index: globalIndex + idx,
+              icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
+            }));
+
+            this.lessonContext = {
+              chapter,
+              chapterIndex: ci,
+              module,
+              moduleIndex: mi,
+              section,
+              sectionIndex: si,
+              concepts,
+              currentConceptIndex,
+            };
+            return;
+          }
+          globalIndex += conceptCount;
+        }
+      }
+    }
+
+    // Fallback: stepIndex out of range, use first section
+    if (path.chapters!.length > 0) {
+      const chapter = path.chapters![0];
+      if ((chapter.modules || []).length > 0) {
+        const module = chapter.modules![0];
+        if ((module.sections || []).length > 0) {
+          const section = module.sections[0];
+          this.lessonContext = {
+            chapter,
+            chapterIndex: 0,
+            module,
+            moduleIndex: 0,
+            section,
+            sectionIndex: 0,
+            concepts: (section.conceptIds || []).map((conceptId, idx) => ({
+              conceptId,
+              title: this.formatConceptTitle(conceptId),
+              isCompleted: false,
+              isCurrent: idx === 0,
+              index: idx,
+              icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
+            })),
+            currentConceptIndex: 0,
+          };
+        }
+      }
+    }
+  }
+
+  /**
+   * Format concept ID to display title (kebab-case to Title Case)
+   */
+  private formatConceptTitle(conceptId: string): string {
+    return conceptId
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   toggleSidebar(): void {
     this.sidebarOpen = !this.sidebarOpen;
   }
 
-  toggleChapter(chapterId: string): void {
-    const chapter = this.sidebarChapters.find(c => c.id === chapterId);
-    if (chapter) {
-      chapter.isExpanded = !chapter.isExpanded;
-    }
+  /**
+   * Navigate to a specific concept in the lesson
+   */
+  goToConcept(globalIndex: number): void {
+    this.router.navigate(['/lamad/path', this.pathId, 'step', globalIndex]);
   }
 
   /**
    * Navigation Methods
    */
   goToStep(index: number): void {
+    // Emit progress signal before navigating
+    this.emitProgressSignal();
     this.router.navigate(['/lamad/path', this.pathId, 'step', index]);
   }
 
@@ -360,8 +587,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       this.agentService.completeStep(this.pathId, this.stepIndex).subscribe({
         next: () => {
           // Refresh sidebar
-          this.loadContext(); 
-        }
+          this.loadContext();
+        },
       });
     }
   }
@@ -370,15 +597,40 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    * Helper: Get current chapter title for breadcrumbs
    */
   getCurrentChapterTitle(): string | undefined {
-    return this.sidebarChapters.find(c => c.id === this.currentChapterId)?.title;
+    return this.lessonContext?.chapter.title;
+  }
+
+  /**
+   * Helper: Get current module/lesson title for sidebar header
+   */
+  getCurrentModuleTitle(): string | undefined {
+    return this.lessonContext?.module.title;
+  }
+
+  /**
+   * Helper: Get current section title
+   */
+  getCurrentSectionTitle(): string | undefined {
+    return this.lessonContext?.section.title;
   }
 
   /**
    * Get progress percentage
    */
   getProgressPercentage(): number {
-    if (!this.path) return 0;
-    return Math.round(((this.stepIndex + 1) / this.path.steps.length) * 100);
+    const total = this.getTotalConcepts();
+    if (total === 0) return 0;
+    return Math.round(((this.stepIndex + 1) / total) * 100);
+  }
+
+  /**
+   * Get progress within current lesson (section)
+   */
+  getLessonProgressPercentage(): number {
+    if (!this.lessonContext) return 0;
+    const total = this.lessonContext.concepts.length;
+    if (total === 0) return 0;
+    return Math.round(((this.lessonContext.currentConceptIndex + 1) / total) * 100);
   }
 
   /**
@@ -388,26 +640,174 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     return this.currentBloomLevel.replace('_', ' ').toUpperCase();
   }
 
+  // =========================================================================
+  // Path Context & Exploration Methods
+  // =========================================================================
+
   /**
-   * Content Rendering Helpers
+   * Build path context for LessonView and exploration tracking.
    */
-  getContentString(): string {
-    if (!this.stepView?.content?.content) return '';
-    const content = this.stepView.content.content;
-    return typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+  buildPathContext(): PathContext {
+    return {
+      pathId: this.pathId,
+      pathTitle: this.path?.title || '',
+      stepIndex: this.stepIndex,
+      totalSteps: this.getTotalSteps(),
+      chapterTitle: this.getCurrentChapterTitle(),
+      returnRoute: ['/lamad/path', this.pathId, 'step', String(this.stepIndex)],
+    };
   }
 
-  isMarkdown(): boolean {
-    return this.stepView?.content?.contentFormat === 'markdown';
+  /**
+   * Get total step count for the path (alias for getTotalConcepts).
+   */
+  getTotalSteps(): number {
+    return this.getTotalConcepts();
   }
 
-  isQuiz(): boolean {
-    return this.stepView?.content?.contentFormat === 'quiz-json' ||
-           this.stepView?.content?.contentType === 'assessment';
+  /**
+   * Handle exploration of related content from LessonView.
+   */
+  onExploreContent(contentId: string): void {
+    // Track the detour in path context
+    this.pathContextService.startDetour({
+      fromContentId: this.stepView?.content?.id || '',
+      toContentId: contentId,
+      detourType: 'related',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Navigate to the content
+    this.router.navigate(['/lamad/resource', contentId]);
   }
 
-  isGherkin(): boolean {
-    return this.stepView?.content?.contentFormat === 'gherkin';
+  /**
+   * Handle "Explore in Full Graph" from LessonView.
+   */
+  onExploreInGraph(): void {
+    const contentId = this.stepView?.content?.id;
+    if (!contentId) return;
+
+    // Track the detour
+    this.pathContextService.startDetour({
+      fromContentId: contentId,
+      toContentId: contentId,
+      detourType: 'graph-explore',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Navigate to graph explorer with context
+    this.router.navigate(['/lamad/explore'], {
+      queryParams: {
+        focus: contentId,
+        fromPath: this.pathId,
+        returnStep: this.stepIndex,
+      },
+    });
   }
 
+  /**
+   * Handle completion event from LessonView (interactive content).
+   */
+  onLessonComplete(event: RendererCompletionEvent): void {
+    const contentId = this.stepView?.content?.id;
+    if (!contentId) return;
+
+    // Calculate time spent on this content
+    const timeSpent = this.contentViewStartTime
+      ? Math.round((Date.now() - this.contentViewStartTime) / 1000)
+      : 0;
+
+    // Emit interactive completion learning signal
+    this.governanceSignalService
+      .recordInteractiveCompletion({
+        contentId,
+        interactionType: event.type || 'interactive',
+        passed: event.passed,
+        score: event.score,
+        details: {
+          ...event.details,
+          pathId: this.pathId,
+          stepIndex: this.stepIndex,
+          timeSpentSeconds: timeSpent,
+          chapter: this.lessonContext?.chapter.title,
+          module: this.lessonContext?.module.title,
+        },
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe();
+
+    // If passed, advance mastery level
+    if (event.passed) {
+      this.markComplete();
+    }
+  }
+
+  /**
+   * Emit progress signal when navigating away (time spent tracking).
+   */
+  private emitProgressSignal(): void {
+    const contentId = this.stepView?.content?.id;
+    if (!contentId || !this.contentViewStartTime) return;
+
+    const timeSpent = Math.round((Date.now() - this.contentViewStartTime) / 1000);
+
+    // Only emit if meaningful time was spent (>5 seconds)
+    if (timeSpent > 5) {
+      this.governanceSignalService
+        .recordLearningSignal({
+          contentId,
+          signalType: 'progress_update',
+          payload: {
+            pathId: this.pathId,
+            stepIndex: this.stepIndex,
+            timeSpentSeconds: timeSpent,
+            masteryLevel: this.currentBloomLevel,
+            progressPercent: this.getProgressPercentage(),
+          },
+        })
+        .pipe(takeUntil(this.destroy$))
+        .subscribe();
+    }
+
+    this.contentViewStartTime = null;
+  }
+
+  // =========================================================================
+  // Focused View (Immersive Mode) Methods
+  // =========================================================================
+
+  /**
+   * Handle escape key to exit focused view mode.
+   */
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.isFocusedView) {
+      this.onFocusedViewToggle(false);
+    }
+  }
+
+  /**
+   * Toggle focused view mode.
+   * Waits for CSS transition to complete before reloading content
+   * so iframes can measure the new viewport dimensions correctly.
+   */
+  onFocusedViewToggle(active: boolean): void {
+    this.isFocusedView = active;
+
+    // Hide sidebar in focused view
+    if (active) {
+      this.sidebarOpen = false;
+      this.document.body.classList.add('focused-view-mode');
+    } else {
+      this.document.body.classList.remove('focused-view-mode');
+    }
+
+    // Wait for CSS transition to complete, then trigger content reload
+    // This ensures iframes get the correct viewport dimensions
+    setTimeout(() => {
+      this.contentRefreshKey = Date.now();
+      this.cdr.detectChanges();
+    }, this.TRANSITION_DURATION);
+  }
 }

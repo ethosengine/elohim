@@ -1,0 +1,11 @@
+Scenario: Intergenerational care economy makes elder value visible
+    Given care economy spans all ages and capabilities
+    And Helen both receives and gives care
+    When community care tokens are tracked
+    Then Helen's lifetime contributions should be visible to community
+    And her current contributions should be recognized alongside care receipt
+    And younger generations should see care flowing across entire lifespan
+    And the protocol should demonstrate that humans have value at all ages
+    And community should learn that care reciprocity spans generations
+    And success should prove that care economy values elders as full participants
+    And Helen should experience community standing based on lifetime of contribution

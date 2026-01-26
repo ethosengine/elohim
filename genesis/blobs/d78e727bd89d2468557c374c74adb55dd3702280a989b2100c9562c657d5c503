@@ -1,0 +1,11 @@
+Scenario: Providing congressional testimony on protocol effectiveness
+    Given Congress is considering national AI governance legislation
+    And Senator Ruiz invites me to testify as independent expert
+    When I present research findings to legislative committee
+    Then I summarize: rigorous evaluation of protocol outcomes
+    And I present: evidence about effectiveness, limitations, and unknowns
+    And I explain: what factors predict success and failure
+    And I testify: honestly about uncertainties and contested findings
+    And I respond: to questions from supportive and skeptical legislators
+    And I maintain: scientific independence over political pressure
+    And My testimony provides: evidence base for democratic policy choice

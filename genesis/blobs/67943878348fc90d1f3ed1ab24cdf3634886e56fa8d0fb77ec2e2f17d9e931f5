@@ -1,0 +1,10 @@
+Scenario: Maintaining household identity and couple time amid care work
+    Given Margaret and Robert are navigating retirement together
+    And they have their own relationship and household life
+    When Margaret provides substantial grandchild care
+    Then the household_elohim should protect couple time
+    And it should ensure grandparenting doesn't consume all household capacity
+    And it should help maintain balance between care and relationship
+    And Margaret and Robert should have time as a couple
+    And household identity should extend beyond grandparenting
+    And the system should support healthy household boundaries

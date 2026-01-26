@@ -1,0 +1,9 @@
+Scenario: Neighborhood privacy balanced with coordination needs
+    Given neighborhood care economy requires some data sharing
+    And Sarah values her household privacy
+    When Sarah participates in neighborhood coordination
+    Then she should control what information neighbors see
+    And household details should remain private unless shared
+    And the neighborhood_elohim should only share aggregated patterns
+    And Sarah's privacy should be protected while enabling coordination
+    And participation should not require sacrificing privacy

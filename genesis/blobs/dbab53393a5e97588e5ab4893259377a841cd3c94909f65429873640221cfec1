@@ -1,0 +1,9 @@
+Scenario: Workers address problematic customer behavior democratically
+    Given a customer has harassed DeShawn multiple times
+    And worker safety is constitutionally protected
+    When workers document harassment incidents through witness infrastructure
+    Then workers review harassment pattern democratically
+    And workers vote to ban the customer from ChickenMax
+    And community_elohim ensures decision is fair and documented
+    And community respects worker dignity protections
+    And customer harassment ceases without manager intervention

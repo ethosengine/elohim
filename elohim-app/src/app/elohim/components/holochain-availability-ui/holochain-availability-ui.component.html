@@ -1,0 +1,91 @@
+<!-- Holochain Availability Banner -->
+<div *ngIf="shouldShow()" class="availability-banner" [ngClass]="bannerClass()">
+  <div class="banner-container">
+    <!-- Icon and status -->
+    <div class="status-section">
+      <span class="banner-icon" [class]="'icon-' + bannerClass()">{{ bannerIcon() }}</span>
+      <div class="status-text">
+        <div class="status-message">{{ statusMessage() }}</div>
+        <div class="degradation-message" *ngIf="degradationMessage()">
+          {{ degradationMessage() }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-section">
+      <button
+        *ngIf="isError()"
+        class="btn btn-retry"
+        (click)="retryConnection()"
+        title="Attempt to reconnect to Holochain"
+      >
+        Retry
+      </button>
+
+      <button
+        *ngIf="hasQueuedOperations()"
+        class="btn btn-sync"
+        (click)="syncQueuedOperations()"
+        [disabled]="!isConnected()"
+        title="Sync queued operations when connection is restored"
+      >
+        Sync {{ queuedOperations() }}
+      </button>
+
+      <button class="btn btn-dismiss" (click)="dismissBanner()" title="Dismiss this banner">
+        ✕
+      </button>
+    </div>
+  </div>
+
+  <!-- Detailed degradation info (expanded on error) -->
+  <div class="degradation-info" *ngIf="isError() || isOffline()">
+    <details class="features-list">
+      <summary>Feature Availability</summary>
+
+      <div class="features-section">
+        <h4>Available in Offline Mode</h4>
+        <ul class="available-features">
+          <li *ngFor="let feature of getAvailableFeatures()">
+            <span class="feature-icon">✓</span>
+            {{ feature }}
+          </li>
+        </ul>
+      </div>
+
+      <div class="features-section">
+        <h4>Unavailable (Connection Required)</h4>
+        <ul class="degraded-features">
+          <li *ngFor="let feature of getDegradedFeatures()">
+            <span class="feature-icon">⊗</span>
+            {{ feature }}
+          </li>
+        </ul>
+      </div>
+
+      <div class="features-section" *ngIf="hasQueuedOperations()">
+        <h4>Queued for Sync</h4>
+        <p class="queue-info">
+          {{ queuedOperations() }} operation{{ queuedOperations() !== 1 ? 's' : '' }} waiting to
+          sync. These will be sent to Holochain when connection is restored.
+        </p>
+      </div>
+
+      <div class="help-section">
+        <h4>Troubleshooting</h4>
+        <ul class="help-steps">
+          <li>Check your internet connection</li>
+          <li>Ensure Holochain conductor is running</li>
+          <li>Verify the admin URL in your configuration</li>
+          <li>
+            Try the
+            <strong>Retry</strong>
+            button above
+          </li>
+          <li>Check browser console for detailed error messages</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+</div>

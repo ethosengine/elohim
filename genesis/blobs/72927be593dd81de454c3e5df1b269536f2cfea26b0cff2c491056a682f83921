@@ -1,0 +1,9 @@
+Scenario: Neighborhood technology support for overwhelmed caregiver
+    Given James manages complex care coordination systems
+    And technology problems become overwhelming when also caregiving
+    When the neighborhood_elohim identifies tech-skilled neighbors
+    Then neighbors should help with technology issues
+    And they should support James with care coordination tech
+    And technical support should reduce burden, not increase it
+    And neighborhood should include practical technology assistance
+    And James should access help when systems become overwhelming

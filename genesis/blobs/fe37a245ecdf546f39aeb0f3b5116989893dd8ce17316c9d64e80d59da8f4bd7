@@ -1,0 +1,10 @@
+Scenario: Building sustainable resource management patterns under constraint
+    Given Kenji manages extreme resource constraint with $180/week total budget
+    And his scarcity requires sophisticated planning and discipline
+    When the personal_agent helps Kenji develop resource management practices
+    Then it should teach budgeting, meal planning, and strategic shopping
+    And it should help him distinguish needs from wants under pressure
+    And it should validate that managing scarcity is skilled work
+    And the agent should recognize his constraint management as capability development
+    And patterns learned now should become sustainable adult habits
+    And Kenji should learn that resource stewardship is care economy skill

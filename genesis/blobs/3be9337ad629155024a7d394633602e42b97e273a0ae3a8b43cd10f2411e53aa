@@ -1,0 +1,12 @@
+Scenario: Neighborhood resource sharing reduces costs and builds connection
+    Given Robert has tools, equipment, and skills
+    And buying everything individually is expensive and wasteful
+    And neighbors have resources that Robert occasionally needs
+    When neighborhood_elohim facilitates resource sharing
+    Then it should coordinate tool libraries, equipment sharing, and skill exchange
+    And track contributions: "Robert has lent tools 12 times, borrowed 8 times"
+    And reduce household expenses through sharing
+    And build relationships through resource exchange
+    And demonstrate care economy principles at neighborhood scale
+    And reduce consumption through sharing economy
+    And strengthen neighborhood bonds through mutual support

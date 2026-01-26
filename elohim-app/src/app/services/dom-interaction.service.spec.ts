@@ -15,8 +15,8 @@ describe('DomInteractionService', () => {
     TestBed.configureTestingModule({
       providers: [
         DomInteractionService,
-        { provide: RendererFactory2, useValue: mockRendererFactory }
-      ]
+        { provide: RendererFactory2, useValue: mockRendererFactory },
+      ],
     });
 
     service = TestBed.inject(DomInteractionService);
@@ -27,7 +27,7 @@ describe('DomInteractionService', () => {
   });
 
   describe('setupScrollIndicator', () => {
-    it('should setup scroll indicator click listener', (done) => {
+    it('should setup scroll indicator click listener', done => {
       const mockElement = document.createElement('div');
       const scrollIndicator = document.createElement('div');
       scrollIndicator.className = 'scroll-indicator';
@@ -37,17 +37,23 @@ describe('DomInteractionService', () => {
       const scrollSpy = spyOn(window, 'scrollTo');
       let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.and.callFake((element: any, event: string, handler: (event: any) => void) => {
-        if (event === 'click') {
-          clickHandler = handler;
+      mockRenderer.listen.and.callFake(
+        (element: any, event: string, handler: (event: any) => void) => {
+          if (event === 'click') {
+            clickHandler = handler;
+          }
+          return () => {};
         }
-        return () => {};
-      });
+      );
 
       service.setupScrollIndicator(elementRef);
 
       setTimeout(() => {
-        expect(mockRenderer.listen).toHaveBeenCalledWith(scrollIndicator, 'click', jasmine.any(Function));
+        expect(mockRenderer.listen).toHaveBeenCalledWith(
+          scrollIndicator,
+          'click',
+          jasmine.any(Function)
+        );
 
         // Trigger the click handler
         if (clickHandler!) {
@@ -63,7 +69,7 @@ describe('DomInteractionService', () => {
       }, 10);
     });
 
-    it('should handle missing scroll indicator gracefully', (done) => {
+    it('should handle missing scroll indicator gracefully', done => {
       const mockElement = document.createElement('div');
       const elementRef = new ElementRef(mockElement);
 
@@ -77,7 +83,7 @@ describe('DomInteractionService', () => {
   });
 
   describe('setupHeroTitleAnimation', () => {
-    it('should setup hero title click animation', (done) => {
+    it('should setup hero title click animation', done => {
       const mockElement = document.createElement('div');
       const heroSection = document.createElement('div');
       heroSection.className = 'hero';
@@ -88,12 +94,14 @@ describe('DomInteractionService', () => {
       const elementRef = new ElementRef(mockElement);
       let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.and.callFake((element: any, event: string, handler: (event: any) => void) => {
-        if (event === 'click') {
-          clickHandler = handler;
+      mockRenderer.listen.and.callFake(
+        (element: any, event: string, handler: (event: any) => void) => {
+          if (event === 'click') {
+            clickHandler = handler;
+          }
+          return () => {};
         }
-        return () => {};
-      });
+      );
 
       service.setupHeroTitleAnimation(elementRef);
 
@@ -123,7 +131,7 @@ describe('DomInteractionService', () => {
       }, 10);
     });
 
-    it('should handle missing hero title gracefully', (done) => {
+    it('should handle missing hero title gracefully', done => {
       const mockElement = document.createElement('div');
       const elementRef = new ElementRef(mockElement);
 
@@ -136,7 +144,7 @@ describe('DomInteractionService', () => {
       }, 10);
     });
 
-    it('should handle hero section without h1', (done) => {
+    it('should handle hero section without h1', done => {
       const mockElement = document.createElement('div');
       const heroSection = document.createElement('div');
       heroSection.className = 'hero';

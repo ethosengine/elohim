@@ -1,0 +1,9 @@
+Scenario: Sibling coordination for mother's care to prevent overwhelming James
+    Given James's siblings also have responsibility for their mother
+    And James is already overwhelmed with David's care
+    When the family_elohim tracks sibling care contributions
+    Then it should ensure siblings share mother's care equitably
+    And it should prevent care from defaulting entirely to James
+    And it should coordinate among siblings for fair distribution
+    And James's dual burden should not excuse siblings from contributing
+    And family care should be distributed based on capacity

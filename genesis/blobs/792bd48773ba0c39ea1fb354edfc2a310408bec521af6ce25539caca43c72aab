@@ -1,0 +1,11 @@
+Scenario: Meal planning adapted to Alex's preparation capabilities
+    Given Alex has specific constraints around meal preparation
+    And some physical tasks are difficult or impossible without assistance
+    When Alex plans weekly meals
+    Then the household_elohim should suggest meals within Alex's capabilities
+    And it should account for what Alex can prepare independently
+    And it should coordinate support worker assistance for complex prep
+    And nutritional needs should be met within preparation constraints
+    And meal planning should feel empowering, not limiting
+    And Alex should maintain choice over their food and nutrition
+    And adaptations should expand options, not restrict them

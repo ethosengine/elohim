@@ -1,0 +1,10 @@
+Scenario: Workplace privacy maintained from personal life
+    Given Aisha's workplace should not access personal data
+    And she has full privacy rights
+    When workplace and personal systems interact
+    Then strict privacy boundaries must be enforced
+    And workplace should have zero access to personal life data
+    And personal_agent should protect her information
+    And workplace_elohim should respect privacy completely
+    And the system should prevent workplace surveillance
+    And professional and personal spheres should remain separate

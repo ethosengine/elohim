@@ -1,0 +1,84 @@
+---
+node_type: organization
+org_id: solutions_ecochain
+name: "Solutions - Ecochain"
+url: "https://ecochain.com/solutions/"
+gem_id: "L9bzgHQa9ZT7pW3Ssm7L"
+
+# Epic relationships (NO DUPLICATION NEEDED)
+primary_epic: social_medium
+related_epics: []
+
+epic_relationships:
+  social_medium:
+    inspiration: "[How Solutions - Ecochain inspires the social_medium epic]"
+    parallel_work: []
+
+# What they demonstrate
+demonstrates_principles: []
+
+# Who they inspire (across ALL epics)
+inspires_users: []
+
+# Where they operate
+operates_at_layers: []
+
+# Graph relationships (automatically generated from above)
+edge_types:
+  - inspires_epic
+  - demonstrates_principle
+  - aligns_with_user
+  - operates_at_layer
+---
+
+# Solutions - Ecochain
+
+## Description
+
+LCA software used to give you one footprint at a time. With our Environmental Intelligence Platform, you can generate hundreds. Try out now.
+
+**Publisher:** Ecochain
+
+## Vision Alignment
+
+How this organization's work aligns with the Elohim Protocol vision:
+
+- [Alignment point 1 - to be filled in]
+- [Alignment point 2 - to be filled in]
+
+## Multi-Epic Inspiration
+
+### Primary Epic: social_medium
+
+[Detailed explanation of how Solutions - Ecochain relates to and inspires the social_medium epic]
+
+**Parallel Work:**
+- [What they're doing that parallels this epic]
+
+## Demonstrations of Principles
+
+### [Principle 1]
+How this organization demonstrates this principle in practice
+
+### [Principle 2]  
+How this organization demonstrates this principle in practice
+
+## Key Resources
+
+- **Website:** https://ecochain.com/solutions/
+- **Key reading:** [Links to important content]
+- **People:** [Key figures]
+
+## Graph Connections
+
+### Inspires Epics
+- `social_medium` - Primary focus and location
+
+### Inspires Users
+- `[epic:user_type]` - [how/why]
+
+### Demonstrates Principles
+- `[principle_name]` - [how they demonstrate it]
+
+### Operates At Layers
+- `[layer_name]` - [what they do at this layer]

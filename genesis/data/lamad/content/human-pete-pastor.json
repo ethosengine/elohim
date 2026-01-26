@@ -1,0 +1,71 @@
+{
+  "id": "human-pete-pastor",
+  "did": "did:web:elohim.host:human:pete-pastor",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Pastor Pete",
+  "description": "Shepherd of Community Church. Committed to helping people grow in faith and community.",
+  "content": "# Pastor Pete\n\nShepherd of Community Church. Committed to helping people grow in faith and community.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"community\",\n  \"displayName\": \"Valley Community\",\n  \"reach\": \"community\"\n}\n\n**Organizations:** [object Object]\n\n**Communities:** community-local-church, community-pastoral-network\n\n**Public Affinities:** christian-theology, pastoral-care, community-building, discipleship, faith-and-technology\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/pete-pastor/profile.json",
+  "tags": [
+    "christian-theology",
+    "faith-and-technology",
+    "role-pastor",
+    "layer-community",
+    "human-graph",
+    "pastoral-care",
+    "community-building",
+    "affinity",
+    "discipleship",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "affinity",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community"
+    ],
+    "organizationCount": 1,
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Pastor Pete",
+    "ogDescription": "Shepherd of Community Church. Committed to helping people grow in faith and community.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-pete-pastor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-pete-pastor.jpg",
+    "ogImageAlt": "Pastor Pete's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-pete-pastor",
+    "identifier": "did:web:elohim.host:human:pete-pastor",
+    "name": "Pastor Pete",
+    "description": "Shepherd of Community Church. Committed to helping people grow in faith and community.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Valley Community",
+      "description": "community"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Community Church",
+        "@id": "org-community-church"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328446",
+  "updatedAt": "2025-12-24T03:05:26.352Z"
+}

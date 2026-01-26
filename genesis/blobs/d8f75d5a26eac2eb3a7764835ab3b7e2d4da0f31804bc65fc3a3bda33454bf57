@@ -1,0 +1,9 @@
+Scenario: Politician understands environmental justice patterns in jurisdiction
+    Given the politician governs environmental policy at city or state level
+    And suspects environmental burdens fall disproportionately
+    When the Observer maps environmental conditions and demographics
+    Then they see pollution sources concentrated in communities of color
+    And identify park access disparities by neighborhood income
+    And understand health impact patterns from environmental exposure
+    And learn which communities bear cumulative environmental burdens
+    And champion environmental justice policies with documented inequities

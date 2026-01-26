@@ -1,0 +1,9 @@
+Scenario: Differentiating children's developmental stages in family care
+    Given Tommy (5) needs wonder-preservation and tight boundaries
+    And Emma (8) needs guided autonomy and increasing responsibility
+    When Sarah coordinates family care activities
+    Then the family_elohim should maintain different permission levels
+    And Tommy's interactions should preserve developmental appropriateness
+    And Emma's interactions should support growing independence
+    And Sarah should manage each child's needs specifically
+    And developmental stages should be respected within family context

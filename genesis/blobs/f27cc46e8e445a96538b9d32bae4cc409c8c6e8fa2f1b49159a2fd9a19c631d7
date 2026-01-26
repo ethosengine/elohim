@@ -1,0 +1,11 @@
+Scenario: Safe practice environment with age-appropriate mistakes
+    Given Emma makes a choice that doesn't align with family needs
+    And she selected a more expensive option without considering budget
+    When the family experiences the consequence
+    Then her personal_agent should guide gentle reflection
+    And the agent should ask "How did that work out?"
+    And Emma should learn from the mistake without shame
+    And consequences should be educational, not punitive
+    And she should build judgment through safe practice
+    And mistakes should be treated as learning opportunities
+    And the stakes should be appropriately low for her age

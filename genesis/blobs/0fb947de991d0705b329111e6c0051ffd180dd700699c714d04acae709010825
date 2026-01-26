@@ -1,0 +1,10 @@
+Scenario: Coordinating household care economy with spouse
+    Given Margaret shares household with a spouse
+    And both are retired and contributing care labor
+    When the household_elohim tracks care contributions
+    Then it should recognize both partners' care work
+    And it should help distribute household labor equitably
+    And it should track who does what to prevent invisible labor
+    And it should facilitate conversations about fair distribution
+    And both partners should experience valued contributions
+    And equity should be maintained in retirement partnership

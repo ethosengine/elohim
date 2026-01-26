@@ -1,0 +1,10 @@
+Scenario: Intergenerational teaching builds community connections
+    Given Margaret has knowledge valuable to all ages
+    And intergenerational programs benefit whole community
+    When the educational_elohim facilitates cross-age teaching
+    Then Margaret should teach in intergenerational settings
+    And her contributions should bridge age segregation
+    And younger people should benefit from her wisdom
+    And Margaret should learn from younger teachers too
+    And intergenerational education should build community bonds
+    And age-diverse learning should be normalized and valued

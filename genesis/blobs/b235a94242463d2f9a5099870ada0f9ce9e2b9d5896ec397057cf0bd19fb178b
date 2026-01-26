@@ -1,0 +1,11 @@
+Scenario: Navigating medical equipment needs with dignity
+    Given Alex requires various medical equipment and devices
+    And equipment access is often bureaucratic and dehumanizing
+    When Alex needs medical equipment
+    Then the personal_agent should help Alex navigate equipment systems
+    And it should track equipment needs and maintenance schedules
+    And it should help Alex advocate for appropriate equipment
+    And it should document when insurance denies necessary equipment
+    And Alex should maintain dignity throughout equipment acquisition
+    And the protocol should reduce bureaucratic burden
+    And equipment should be framed as essential tools, not medical devices

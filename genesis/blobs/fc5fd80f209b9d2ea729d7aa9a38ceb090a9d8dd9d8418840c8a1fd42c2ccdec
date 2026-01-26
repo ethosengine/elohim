@@ -1,0 +1,9 @@
+Scenario: Manager accesses fair compensation without guilt of extraction
+    Given Marcus earned $65K as corporate manager implementing exploitation
+    And he knew he was paid partly for willingness to harm workers
+    When he becomes democratic coordinator earning $72K
+    Then his compensation reflects genuine coordination expertise
+    And workers democratically approved his salary as fair
+    And he earns more than under corporate while feeling morally justified
+    And he no longer carries guilt of being paid to extract from colleagues
+    And workplace_elohim ensures compensation transparency prevents exploitation

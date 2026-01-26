@@ -1,0 +1,10 @@
+Scenario: Community board member tracks implementation of traffic safety improvements
+    Given city committed to traffic calming measures after neighborhood advocacy
+    And board member wants to ensure promises are implemented
+    And community members ask whether improvements are actually happening
+    When the board member uses Observer implementation tracking
+    Then they see timeline of committed improvements versus actual installation
+    And discover only partial implementation despite full funding
+    And access traffic incident data showing ongoing safety concerns
+    And find other neighborhoods received promised improvements faster
+    And impact tracking holds city accountable to community commitments

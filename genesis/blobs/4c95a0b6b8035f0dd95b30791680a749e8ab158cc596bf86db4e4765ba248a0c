@@ -1,0 +1,10 @@
+Scenario: Real-world household management recognized as applied learning
+    Given Marcus manages complex household operations
+    And he applies math, nutrition science, planning, and resource management
+    When Marcus's scanner usage is analyzed educationally
+    Then his applied skills should be recognized as sophisticated learning
+    And the educational system should value real-world capability
+    And his household work should qualify for academic recognition
+    And applied learning should be weighted alongside traditional academics
+    And his competencies should be documented and credentialed
+    And practical stewardship should have educational value

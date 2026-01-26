@@ -1,0 +1,9 @@
+Scenario: Activist demands equitable school funding formula
+    Given state funding formula creates massive district disparities
+    And the activist works on statewide education justice
+    When the Observer calculates funding gaps and impacts
+    Then the activist shows low-income districts receive $3000 less per student
+    And demonstrates impact on class sizes and programs
+    And connects families in underfunded districts statewide
+    And builds coalition for funding formula reform
+    And structural inequity becomes focus of political campaign

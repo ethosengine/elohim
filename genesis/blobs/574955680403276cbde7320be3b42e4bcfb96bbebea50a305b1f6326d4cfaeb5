@@ -1,0 +1,10 @@
+Scenario: Professional schedule coordination with children's needs
+    Given Tommy and Emma have school schedules, activities, appointments
+    And Sarah's work schedule must coordinate with family needs
+    When the workplace_elohim helps coordinate scheduling
+    Then it should integrate work and family calendars
+    And it should surface conflicts between professional and parenting obligations
+    And it should help Sarah negotiate necessary flexibility
+    And the system should recognize scheduling as complex coordination work
+    And workplace should accommodate parent scheduling needs
+    And Sarah should have tools to manage impossible complexity

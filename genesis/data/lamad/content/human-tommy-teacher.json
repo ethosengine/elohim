@@ -1,0 +1,78 @@
+{
+  "id": "human-tommy-teacher",
+  "did": "did:web:elohim.host:human:tommy-teacher",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Tommy",
+  "description": "Public school teacher. 20 years in the classroom. Trying to help every kid find their potential.",
+  "content": "# Tommy\n\nPublic school teacher. 20 years in the classroom. Trying to help every kid find their potential.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"municipality\",\n  \"displayName\": \"Valley Town\",\n  \"reach\": \"community\"\n}\n\n**Organizations:** [object Object], [object Object]\n\n**Communities:** community-educators-network, community-local-church\n\n**Public Affinities:** education, youth-development, public-schools, differentiated-learning, teacher-advocacy\n\n**Public Attestations:** attestation-teaching-license, attestation-masters-education\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/tommy-teacher/profile.json",
+  "tags": [
+    "role-teacher",
+    "youth-development",
+    "differentiated-learning",
+    "human",
+    "public-schools",
+    "teacher-advocacy",
+    "role-building-rep",
+    "human-graph",
+    "education",
+    "affinity",
+    "reach-community",
+    "layer-municipality"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "affinity",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "municipality"
+    ],
+    "organizationCount": 2,
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Tommy",
+    "ogDescription": "Public school teacher. 20 years in the classroom. Trying to help every kid find their potential.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-tommy-teacher",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-tommy-teacher.jpg",
+    "ogImageAlt": "Tommy's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-tommy-teacher",
+    "identifier": "did:web:elohim.host:human:tommy-teacher",
+    "name": "Tommy",
+    "description": "Public school teacher. 20 years in the classroom. Trying to help every kid find their potential.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Valley Town",
+      "description": "municipality"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Valley School District",
+        "@id": "org-valley-school-district"
+      },
+      {
+        "@type": "Organization",
+        "name": "Valley Teachers Union",
+        "@id": "org-teachers-union"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328470",
+  "updatedAt": "2025-12-24T03:05:26.354Z"
+}

@@ -1,0 +1,11 @@
+Scenario: Great-grandchildren learn care economy through elder relationship
+    Given Helen's great-grandchildren are young children
+    And they observe family caring for Helen
+    When great-grandchildren interact with Helen
+    Then they should learn that elders deserve care and respect
+    And they should see care flowing reciprocally across generations
+    And they should experience Helen as person, not problem
+    And they should learn that humans need more care as we age
+    And they should internalize that caregiving is valuable
+    And the protocol should teach care economy through family relationships
+    And next generation should grow up assuming care reciprocity is normal

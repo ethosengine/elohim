@@ -1,0 +1,9 @@
+Scenario: Adult exercises full autonomy over life decisions
+    Given Sarah has competing demands on her time and resources
+    And she must balance professional work, parenting, partnership, and self-care
+    When Sarah makes decisions about resource allocation
+    Then she should have complete autonomy over her choices
+    And her personal_agent should provide decision support without manipulation
+    And she should maintain full decision-making authority
+    And the protocol should serve her values, not impose external priorities
+    And her agency should be respected as a competent adult

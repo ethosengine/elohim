@@ -1,0 +1,9 @@
+Scenario: Politician evaluates polluting facility permit with comprehensive analysis
+    Given company applies for permit to operate polluting facility
+    And promises economic benefits and claims minimal environmental impact
+    When the Observer analyzes facility proposal and company track record
+    Then they see company's violation history at other locations
+    And understand health impacts on nearby residential populations
+    And identify existing pollution burden in target neighborhood
+    And review economic claims against actual job creation in similar facilities
+    And make informed decision balancing economics with environmental protection

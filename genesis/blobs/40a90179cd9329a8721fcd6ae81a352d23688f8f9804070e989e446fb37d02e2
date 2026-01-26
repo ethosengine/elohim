@@ -1,0 +1,11 @@
+Scenario: Appeal reveals systematic bias across multiple communities
+    Given similar appeals have been filed across many communities in the region
+    And a pattern suggests systematic issue not isolated incidents
+    When I file my appeal as part of this broader pattern
+    Then Regional Constitutional Council treats this as systemic review
+    And Researcher provides analysis of the appeal pattern data
+    And They investigate if protocol implementation has regional bias
+    And They examine if certain demographics are disproportionately affected
+    And They may order regional protocol audit or recalibration
+    And My individual appeal becomes part of systemic justice work
+    And Constitutional accountability operates at scale not just individual cases

@@ -1,0 +1,10 @@
+Scenario: Municipal data about teen contributions informs youth policy
+    Given thousands of teens participate in care economy across the municipality
+    And their contributions generate aggregate data about youth participation
+    When municipal_elohim analyzes youth care economy patterns
+    Then it should surface insights about teen contributions to city wellbeing
+    And show that youth provide substantial unpaid household labor
+    And demonstrate economic value of youth volunteering and community engagement
+    And inform municipal policy about youth employment and education
+    And shift public understanding from "youth as problems" to "youth as contributors"
+    And support evidence-based youth policy grounded in actual participation data

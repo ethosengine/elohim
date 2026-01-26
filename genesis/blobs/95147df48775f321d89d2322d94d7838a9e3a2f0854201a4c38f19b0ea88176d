@@ -1,0 +1,10 @@
+Scenario: Privacy controls for adult financial independence
+    Given Aisha has full adult autonomy
+    And she wants to keep financial details private
+    When Aisha configures her privacy settings
+    Then she should have complete control over data sharing
+    And her financial information should remain private by default
+    And she should explicitly consent to any family visibility
+    And workplace should have no access to personal data
+    And privacy controls should be granular and transparent
+    And the system should respect her adult independence

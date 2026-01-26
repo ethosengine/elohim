@@ -1,0 +1,9 @@
+Scenario: Sick leave adequate for sole parent who must parent while ill
+    Given Maria still parents three children even when sick
+    And she has no co-parent to take over when she's unwell
+    When Maria needs sick leave
+    Then workplace should provide adequate paid sick leave
+    And leave should cover both her own illness and children's illnesses
+    And sick leave should not be punitive or risk her job security
+    And policies should recognize single parents need more sick leave than partnered workers
+    And Maria should be able to recover and care for sick children without financial penalty

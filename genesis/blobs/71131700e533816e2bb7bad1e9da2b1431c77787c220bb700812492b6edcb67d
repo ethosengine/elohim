@@ -1,0 +1,9 @@
+Scenario: Customer advocacy spreads democratic business model through community
+    Given Ms. Johnson experiences benefits of democratic business personally
+    And neighbors don't know democratic alternatives exist
+    When satisfied customers share experiences and advocate for democratic businesses
+    Then she tells neighbors about worker ownership and improved quality
+    And brings isolated elders to senior meal program
+    And word-of-mouth advocacy builds customer base for democratic businesses
+    And community awareness of economic democracy grows through customer stories
+    And community_elohim supports customer advocacy and community education

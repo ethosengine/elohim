@@ -1,0 +1,11 @@
+Scenario: Evaluating whether employment genuinely supports or undermines stability-building
+    Given some employment could undermine rather than support my rebuilding
+    And I need work that enables rather than prevents stability
+    When I evaluate employment opportunities holistically
+    Then the workplace_elohim helps me assess total impact of employment
+    And considers financial benefit, schedule compatibility, stress level, childcare impact, recovery support
+    And validates that employment should improve my situation, not worsen it
+    And helps me identify when employment costs more (financially, emotionally, practically) than it provides
+    And my personal_agent evaluates opportunities against my whole situation
+    And recognizes that not all employment serves vulnerable people
+    And supports me declining employment that would harm my rebuilding

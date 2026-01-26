@@ -1,0 +1,10 @@
+Scenario: Community recognition of parent expertise in child development
+    Given Sarah has professional-grade expertise in child development
+    And she is an experienced teacher and parent
+    When the community seeks expertise on children's issues
+    Then Sarah's knowledge should be valued and consulted
+    And parent expertise should be recognized alongside professional credentials
+    And she should be invited to community policy discussions
+    And her care tokens should reflect her knowledge contributions
+    And the community should tap parent expertise for decision-making
+    And parenting experience should be valued as legitimate expertise

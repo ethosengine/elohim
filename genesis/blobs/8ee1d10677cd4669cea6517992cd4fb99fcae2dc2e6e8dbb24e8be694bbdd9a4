@@ -1,0 +1,9 @@
+Scenario: Legislator faces donor pressure with transparency and accountability
+    Given the politician received campaign contributions from industry
+    And industry lobbyists seek favorable vote on regulation
+    When the Observer documents relationship and voting patterns
+    Then they see campaign finance connections made publicly visible
+    And understand constituents track alignment of votes with donors
+    And face accountability for voting with industry versus constituents
+    And explain votes with policy rationale not donor influence
+    And navigate pressure with transparent evidence-based decision-making

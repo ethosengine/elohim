@@ -1,0 +1,9 @@
+Scenario: Farm democratic conversion attracts younger generation to agriculture
+    Given young people avoid agriculture due to low pay and lack of ownership pathway
+    And aging farmer population threatens agricultural knowledge and capacity loss
+    When democratic farm offers ownership, dignity, and fair compensation
+    Then young people consider agricultural careers with ownership potential
+    And generational knowledge transfer occurs through young farmworkers learning from elders
+    And sustainable agriculture future is secured through attracting next generation
+    And democratic model makes farming viable and attractive livelihood
+    And workplace_elohim documents youth engagement in democratic agriculture

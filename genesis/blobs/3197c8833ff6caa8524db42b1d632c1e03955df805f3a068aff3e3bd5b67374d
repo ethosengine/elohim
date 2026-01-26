@@ -1,0 +1,10 @@
+Scenario: Work schedule flexibility for academic obligations
+    Given Kenji must attend classes and cannot work during certain hours
+    And exam periods require reduced work availability
+    When Kenji's workplace_elohim advocates for schedule flexibility
+    Then it should help Kenji communicate academic constraints to employer
+    And it should support negotiating exam week time off
+    And it should recognize that flexible scheduling is care economy practice
+    And employers should accommodate student educational needs
+    And the system should help Kenji assert right to education
+    And work should support student development, not undermine it

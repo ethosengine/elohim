@@ -1,0 +1,9 @@
+Scenario: Displaced person receives support from domestic violence network
+    Given Maria is recovering from domestic violence trauma
+    When she joins a domestic violence survivor support affinity network
+    And the network provides peer support and resources
+    Then she connects with others who understand her experience
+    And she receives practical support for rebuilding her life
+    And the network helps her access legal aid and counseling
+    And she finds strength and healing through community support
+    And her safety is maintained through privacy protections

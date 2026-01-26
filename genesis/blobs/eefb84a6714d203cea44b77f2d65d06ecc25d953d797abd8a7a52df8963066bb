@@ -1,0 +1,10 @@
+Scenario: Municipal senior center programs that recognize continued productivity
+    Given Margaret is active and engaged, not waiting to die
+    And senior centers sometimes reinforce obsolescence narratives
+    When the municipality_elohim connects Margaret to senior programs
+    Then programs should treat seniors as productive contributors
+    And opportunities should include volunteering, teaching, organizing
+    And the focus should be engagement and contribution, not entertainment
+    And Margaret should find programs that honor her capability
+    And senior centers should be care economy hubs
+    And municipal programs should support active aging

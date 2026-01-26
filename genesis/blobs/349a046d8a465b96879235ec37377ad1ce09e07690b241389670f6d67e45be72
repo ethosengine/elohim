@@ -1,0 +1,10 @@
+Scenario: Access to senior nutrition programs without stigma
+    Given Margaret manages nutrition on $32k/year fixed income
+    And municipal senior nutrition programs exist
+    When the municipality_elohim connects Margaret to food resources
+    Then she should be informed about senior meal programs
+    And Meals on Wheels or congregate dining should be accessible
+    And the framing should be senior service, not poverty relief
+    And Margaret should access programs with dignity
+    And her care contributions should be visible to counterbalance receiving
+    And municipal food resources should support senior health

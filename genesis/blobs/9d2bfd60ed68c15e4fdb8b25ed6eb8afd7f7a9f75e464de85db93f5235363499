@@ -1,0 +1,9 @@
+Scenario: Food security support accessed with dignity through care economy
+    Given Maria's $175/week grocery budget for four people is severely constrained
+    And food security is essential for family well-being
+    When Maria's economic status qualifies her for food support
+    Then the community_elohim should connect her to food assistance programs
+    And support should be framed as care economy reciprocity, not charity
+    And Maria should access help without stigmatizing means-testing processes
+    And her massive care contributions should be recognized as qualifying her for support
+    And food assistance should be dignified and adequate for family needs

@@ -1,0 +1,9 @@
+Scenario: Parent connects development pattern to school overcrowding
+    Given the parent's child attends chronically overcrowded school
+    And wonders why enrollment keeps increasing
+    When the parent reviews Observer's municipal development history
+    Then they see 5 major residential developments approved in 3 years
+    And learn developers paid minimal school impact fees
+    And understand city approved housing without ensuring school capacity
+    And systematic pattern of municipal decisions harming education becomes visible
+    And parent advocacy targets growth management policies

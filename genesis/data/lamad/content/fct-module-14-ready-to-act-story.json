@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-14-ready-to-act-story",
+  "contentType": "narrative",
+  "title": "Story: Ready To Act: Embodying Christ in the Digital Age",
+  "description": "Biblical story or example illustrating module concepts",
+  "content": "**Narrative:** The story of Noah and the Ark (Genesis 6-9) provides a powerful biblical parallel to the redwood analogy and aligns well with our learning objectives. Here's a narrative that reframes and builds on this calling:  \n\"In the days of Noah, God saw that the wickedness of humanity had grown great on the earth. The world was corrupt and filled with violence. Sound familiar? In our digital age, we too face a flood – not of water, but of information, misinformation, and technology that often seems to bring out the worst in humanity.  \nBut God didn't abandon the world. Instead, He called Noah to build an ark – a seemingly impossible task that required immense faith, patience, and perseverance. Noah's obedience in constructing the ark amidst ridicule and skepticism mirrors our calling as Christians in tech. We too are called to build – not physical arks, but digital spaces and technologies that preserve and promote human dignity, truth, and godly values.  \nJust as the flood waters eventually receded, revealing a cleansed earth ready for new life, we anticipate that current tech crises will eventually subside. And like Noah, who planted a vineyard in the new world, we are called to plant seeds of change in the post-crisis digital landscape.  \nThe olive branch brought back by the dove symbolizes hope and new beginnings. In the same way, each small win we achieve in creating more humane technology is a sign of hope, a promise that a better digital world is possible.  \nGod's covenant with Noah, symbolized by the rainbow, was a promise never to destroy the earth by flood again. It represented a new relationship between God and humanity. Similarly, we envision a new covenant for the digital age – one where technology serves humanity and honors God, rather than enslaving or diminishing us.  \nAs Noah and his family were tasked with repopulating and stewarding the renewed earth, we are called to populate the digital world with technologies, practices, and communities that reflect God's love and wisdom. We are to be digital cultivators, tending the garden of our renewed technological landscape.  \nRemember, Noah's ark wasn't just for him and his family. It preserved life for the entire planet. In the same way, our work in creating humane technology isn't just for ourselves or even just for the Church – it's for the benefit of all humanity.  \nLike Noah, we may face doubt, ridicule, or seeming impossibilities. The task before us is enormous. But also like Noah, we work in faith, knowing that our labor is not in vain. We are building for a future we may not fully see, planting seeds that may germinate long after we're gone.  \nIn this final module, as we prepare to 'disembark' from this course and step into our calling, let us embrace the spirit of Noah. Let us be ready to build, to plant, to preserve what is good, and to courageously shape a new world. For we are not just passive passengers in this digital deluge, but active co-creators with God, called to steward technology for the flourishing of all creation.\"  \nThis narrative integrates our learning objectives by emphasizing Christian stewardship of technology, the need for faith-driven action, the importance of community, the value of small wins (seeds of change), and the vision of a technology landscape transformed by Kingdom values. It encourages students to see themselves as part of a greater story and calling, much like Noah, preparing them to act boldly in shaping the future of technology.\n**NarrativeType:** biblical-example",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "story",
+    "narrative",
+    "fct",
+    "biblical-example",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "fct-narrative",
+    "sourceModule": "fct-module-14-ready-to-act"
+  },
+  "createdAt": "2025-11-28T21:10:19.225434",
+  "updatedAt": "2025-12-26T21:04:01.845Z",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Story: Ready To Act: Embodying Christ in the Digital Age",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-14-ready-to-act-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Story: Ready To Act: Embodying Christ in the Digital Age - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-14-ready-to-act-story",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Story: Ready To Act: Embodying Christ in the Digital Age",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.225434",
+    "dateModified": "2025-11-28T21:10:19.225435",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

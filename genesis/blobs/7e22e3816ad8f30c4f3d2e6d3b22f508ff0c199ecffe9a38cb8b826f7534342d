@@ -1,0 +1,11 @@
+Scenario: Neighborhood resources coordinated to support Alex's participation
+    Given Alex may need specific support to participate in neighborhood activities
+    And neighborhood has resources that could help
+    When Alex wants to engage in neighborhood events or projects
+    Then the neighborhood_elohim should coordinate needed support
+    And neighbors might provide transportation, physical assistance, or other help
+    And support should be reciprocal within mutual aid framework
+    And Alex should not experience this as charity or burden
+    And resource coordination should enable participation
+    And the protocol should facilitate Alex's full neighborhood engagement
+    And access barriers should be solved collectively, not individually

@@ -1,0 +1,11 @@
+Scenario: Alex mentors other disabled neighbors in advocacy
+    Given other disabled people live in the neighborhood
+    And many lack confidence in self-advocacy
+    When Alex supports other disabled neighbors
+    Then this peer mentoring should be recognized as care work
+    And the neighborhood_elohim should track Alex's support to disabled community
+    And Alex's disability expertise benefits other residents significantly
+    And peer support should accumulate care tokens appropriately
+    And Alex's leadership in disability community should be valued
+    And mentoring should be seen as sophisticated care labor
+    And the protocol should recognize Alex's role building disability solidarity

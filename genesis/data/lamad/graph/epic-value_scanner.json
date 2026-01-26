@@ -1,0 +1,2215 @@
+{
+  "id": "graph-epic-value-scanner",
+  "title": "Value Scanner Epic Graph",
+  "contentType": "graph",
+  "description": "Graph visualization of the Value Scanner epic",
+  "lastUpdated": "2025-11-28T21:09:48.309202",
+  "zoomLevel": 1,
+  "parentId": "value-scanner-epic",
+  "epicKey": "value_scanner",
+  "nodes": [
+    {
+      "id": "value-scanner-epic",
+      "title": "Value Scanner",
+      "contentType": "epic",
+      "description": "Supporting caregivers and recognizing invisible work",
+      "hasChildren": true,
+      "childCount": 115,
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "level": 1,
+      "isParent": true
+    },
+    {
+      "id": "feature-value-scanner-young-child-scenarios-educational",
+      "title": "Educational Layer Value Literacy for Young Child",
+      "contentType": "feature",
+      "description": "As a young child in the value scanner system Operating at the educational governance layer I want to learn value literacy through direct experience So that I understand that care creates value and my ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 150.0,
+        "y": 0.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-child-scenarios-family",
+      "title": "Family Layer Value Recognition for Young Child",
+      "contentType": "feature",
+      "description": "As a young child in the value scanner system Operating at the family governance layer I want my care contributions to be visible to my family So that I am recognized as a valued contributor to family ",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": 149.7761705224242,
+        "y": 8.191382278816503
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-child-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Young Child",
+      "contentType": "feature",
+      "description": "As a young child (ages 5-7) in the value scanner system Operating at the individual governance layer I want my personal choices and care contributions to be recognized So that I learn that my agency m",
+      "hasChildren": true,
+      "childCount": 10,
+      "position": {
+        "x": 149.10535008483055,
+        "y": 16.358318253418457
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-educational",
+      "title": "Educational Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student whose primary work is learning and development Operating at the educational governance layer I want my learning recognized as valuable work and care economy participation So that educatio",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 147.9895406790603,
+        "y": 24.47643457697132
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student living temporarily in a college neighborhood Operating at the neighborhood governance layer I want to participate in local care economy as real community member So that I build belonging ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 146.4320723189317,
+        "y": 32.5215035996671
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-family",
+      "title": "Family Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student maintaining family connection while establishing independence Operating at the family governance layer I want to participate in family care economy despite geographic distance So that fam",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 144.4375931021699,
+        "y": 40.469515673553644
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-workplace-organizational",
+      "title": "Workplace/Organizational Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student working part-time to support educational and basic needs Operating at the workplace/organizational governance layer I want fair treatment, recognition of my constraints, and care economy ",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 142.01205533865658,
+        "y": 48.29675080676075
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student learning to manage adult independence on limited resources Operating at the individual governance layer I want to develop care economy skills and build sustainable adult patterns So that ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 139.16269778639767,
+        "y": 55.97984945327871
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student studying environmental science and developing ecological awareness Operating at the ecological/bioregional governance layer I want to connect personal choices to planetary care and unders",
+      "hasChildren": true,
+      "childCount": 14,
+      "position": {
+        "x": 135.89802404822453,
+        "y": 63.495882227024666
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-community",
+      "title": "Community Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student building care networks in temporary community Operating at the community governance layer I want to participate in student mutual aid and broader community care economy So that I develop ",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 132.22777719370075,
+        "y": 70.82241833214277
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-student-scenarios-household",
+      "title": "Household Layer Value Recognition for Student",
+      "contentType": "feature",
+      "description": "As a student living with roommates and learning household coordination Operating at the household governance layer I want fair distribution of household labor and recognition of care contributions So ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 128.16291068197327,
+        "y": 77.93759250531504
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-municipality",
+      "title": "Municipal Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult engaging with municipal governance Operating at the municipal governance layer I want my care contributions to influence public policy So that municipal systems recognize and support care ",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 123.71555567234529,
+        "y": 84.82017027030088
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-educational",
+      "title": "Educational Layer Value Literacy for Adult",
+      "contentType": "feature",
+      "description": "As an adult educator and parent Operating at the educational governance layer I want to teach value literacy to the next generation So that children grow up understanding care creates value",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 118.89898482012875,
+        "y": 91.44961130996016
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult participating in neighborhood care economy Operating at the neighborhood governance layer I want to engage in resource sharing and mutual aid So that neighborhood resilience is built throu",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 113.72757266582443,
+        "y": 97.80613076663255
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-family",
+      "title": "Family Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult in the sandwich generation Operating at the family governance layer I want to coordinate care across multiple generations So that care flows effectively upward, downward, inward, and outwa",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 108.21675273584336,
+        "y": 103.87075828792885
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-workplace-organizational",
+      "title": "Workplace/Organizational Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult worker with care responsibilities Operating at the workplace/organizational governance layer I want workplace policies to recognize workers' care economy participation So that employment s",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 102.38297148279811,
+        "y": 109.6253946417186
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult in prime working/parenting years (ages 26-45) Operating at the individual governance layer I want my personal choices and care contributions to be recognized So that I can maintain my own ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 96.24363920282417,
+        "y": 115.05286573135243
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult making consumption choices Operating at the ecological/bioregional governance layer I want to balance cost, nutrition, and environmental impact So that care for people and care for planet ",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 89.81707807641338,
+        "y": 120.13697384991626
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-community",
+      "title": "Community Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult participating in community governance Operating at the community governance layer I want my care contributions to create community resilience So that community resources and leadership ref",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 83.12246748782621,
+        "y": 124.86254602055521
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-adult-scenarios-household",
+      "title": "Household Layer Value Recognition for Adult",
+      "contentType": "feature",
+      "description": "As an adult managing a household Operating at the household governance layer I want equitable care labor distribution and resource coordination So that household flourishing is built on visible, value",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 76.1797867862709,
+        "y": 129.2154792786
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-grandparent-scenarios-educational",
+      "title": "Educational Layer Value Recognition for Grandparent",
+      "contentType": "feature",
+      "description": "As a grandparent providing developmental and educational care Operating at the educational governance layer I want my teaching and learning support to be recognized as sophisticated work So that infor",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 69.00975565967283,
+        "y": 133.18278276035628
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-grandparent-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Grandparent",
+      "contentType": "feature",
+      "description": "As a retired grandparent with time and presence in the neighborhood Operating at the neighborhood governance layer I want my contributions to neighborhood care economy to be visible So that neighborho",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 61.633772298982215,
+        "y": 136.752616472948
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-grandparent-scenarios-family",
+      "title": "Family Layer Value Recognition for Grandparent",
+      "contentType": "feature",
+      "description": "As a grandparent coordinating care across three generations Operating at the family governance layer I want multigenerational care relationships to be visible and reciprocal So that family care econom",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 54.07384953756223,
+        "y": 139.91432662950953
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-grandparent-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Grandparent",
+      "contentType": "feature",
+      "description": "As a grandparent providing substantial care work across generations Operating at the individual governance layer I want my autonomy, identity, and care contributions to be recognized So that my grandp",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 46.35254915624212,
+        "y": 142.65847744427302
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Grandparent",
+      "contentType": "feature",
+      "description": "As a grandparent with traditional knowledge of sustainable living Operating at the ecological/bioregional governance layer I want my environmental wisdom and care practices to be recognized So that ec",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 38.49291455009606,
+        "y": 144.97687929266172
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-grandparent-scenarios-community",
+      "title": "Community Layer Value Recognition for Grandparent",
+      "contentType": "feature",
+      "description": "As a retired grandparent with time and skills to contribute Operating at the community governance layer I want my community care contributions to be recognized and valued So that retirement is experie",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 30.518401957895062,
+        "y": 146.86261315234844
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-grandparent-scenarios-household",
+      "title": "Household Layer Value Recognition for Grandparent",
+      "contentType": "feature",
+      "description": "As a grandparent coordinating care work within my household Operating at the household governance layer I want fair distribution of grandparenting labor and household impact So that care for grandchil",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 22.452810459471642,
+        "y": 148.3100512523377
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-preteen-scenarios-educational",
+      "title": "Educational Layer Value Literacy for Preteen",
+      "contentType": "feature",
+      "description": "As a preteen in the value scanner system Operating at the educational governance layer I want my real-world care responsibilities to be recognized as sophisticated learning So that my applied capabili",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 14.320210949911532,
+        "y": 149.3148738684463
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-preteen-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Preteen",
+      "contentType": "feature",
+      "description": "As a preteen in the value scanner system Operating at the neighborhood governance layer I want to contribute to and benefit from neighborhood-scale coordination So that my family's needs are met throu",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": 6.1448743025421315,
+        "y": 149.87408221505797
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-preteen-scenarios-family",
+      "title": "Family Layer Value Recognition for Preteen",
+      "contentType": "feature",
+      "description": "As a preteen in the value scanner system Operating at the family governance layer I want my substantial care contributions to be visible to my family So that I am recognized as a junior partner in fam",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -2.0488010648926616,
+        "y": 149.98600739467832
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-preteen-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Preteen",
+      "contentType": "feature",
+      "description": "As a preteen (ages 11-13) in the value scanner system Operating at the individual governance layer I want autonomy to manage real household responsibilities with dignity So that my substantial care co",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -10.236362004700633,
+        "y": 149.65031537858087
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Preteen",
+      "contentType": "feature",
+      "description": "As a preteen in the value scanner system Operating at the ecological/bioregional governance layer I want to understand how my food choices connect to ecological systems and care labor So that I develo",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -18.39337361704475,
+        "y": 148.86800800368022
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-preteen-scenarios-community",
+      "title": "Community Layer Value Recognition for Preteen",
+      "contentType": "feature",
+      "description": "As a preteen in the value scanner system Operating at the community governance layer I want my care contributions to connect me to community resources and support So that my family receives reciprocal",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -26.495492173288106,
+        "y": 147.6414199826567
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities participating in neighborhood life Operating at the neighborhood governance layer I want to contribute to and benefit from neighborhood care economy with full accessibili",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -34.51853776724795,
+        "y": 145.97421193625632
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+      "title": "Healthcare Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities navigating medical systems Operating at the healthcare/medical governance layer I want to maintain authority over my body and receive respectful care So that medical syst",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -42.43856647753951,
+        "y": 143.8713594685595
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-family",
+      "title": "Family Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities participating in family relationships Operating at the family governance layer I want my autonomy respected and my contributions recognized within family So that I can en",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -50.231941825647894,
+        "y": 141.33913831782309
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+      "title": "Workplace Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities employed part-time with accommodations Operating at the workplace/organizational governance layer I want my workplace rights protected and my contributions recognized So ",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -57.8754053164703,
+        "y": 138.38510562721078
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities living independently with support Operating at the individual governance layer I want my full autonomy, accessibility needs, and care contributions to be recognized So th",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -65.34614585080637,
+        "y": 135.01807739130766
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+      "title": "Ecological Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities engaging with ecological and environmental systems Operating at the ecological/bioregional governance layer I want disability justice and ecological justice recognized as",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -72.62186780264408,
+        "y": 131.2481021457274
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-community",
+      "title": "Community Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities engaging in community organizing and governance Operating at the community governance layer I want my disability advocacy and community-building recognized as essential c",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -79.68085755807047,
+        "y": 127.08643097833256
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-person-with-disabilities-scenarios-household",
+      "title": "Household Layer Value Recognition for Person with Disabilities",
+      "contentType": "feature",
+      "description": "As a person with disabilities managing an independent household with support Operating at the household governance layer I want to maintain full authority over my household while coordinating needed a",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -86.50204831723006,
+        "y": 122.54548395156631
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-elderly-scenarios-educational",
+      "title": "Educational Layer Lifelong Learning and Wisdom Sharing for Elderly",
+      "contentType": "feature",
+      "description": "As an elderly person in the value scanner system Operating at the educational governance layer I want to continue learning and sharing knowledge throughout my life So that I experience ongoing growth ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -93.06508296593515,
+        "y": 117.63881303610475
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-elderly-scenarios-neighborhood",
+      "title": "Neighborhood Layer Community Integration for Elderly",
+      "contentType": "feature",
+      "description": "As an elderly person in the value scanner system Operating at the neighborhood governance layer I want to remain embedded in my neighborhood with dignity So that I am connected to local community rath",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -99.35037482929617,
+        "y": 112.38106166644964
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-elderly-scenarios-family",
+      "title": "Family Layer Multigenerational Care Coordination for Elderly",
+      "contentType": "feature",
+      "description": "As an elderly person in the value scanner system Operating at the family governance layer I want to maintain my role as valued family member while receiving care So that I experience reciprocal care r",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -105.33916612605707,
+        "y": 106.78792103916506
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-elderly-scenarios-individual",
+      "title": "Individual Layer Autonomy Preservation for Elderly",
+      "contentType": "feature",
+      "description": "As an elderly person (ages 75+) in the value scanner system Operating at the individual governance layer I want to maintain autonomy and agency over my own life So that I remain a person with dignity ",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": -111.01358394918773,
+        "y": 100.87608328417915
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Environmental Wisdom for Elderly",
+      "contentType": "feature",
+      "description": "As an elderly person in the value scanner system Operating at the ecological/bioregional governance layer I want to contribute my accumulated environmental knowledge So that my lifetime of observation",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -116.35669360566295,
+        "y": 94.66319164890794
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-elderly-scenarios-community",
+      "title": "Community Layer Care Economy Integration for Elderly",
+      "contentType": "feature",
+      "description": "As an elderly person in the value scanner system Operating at the community governance layer I want my lifetime contributions to create legitimate claims on community support So that assistance flows ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -121.3525491562421,
+        "y": 88.16778784387098
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-elderly-scenarios-household",
+      "title": "Household Layer Dignity-Preserving Care Coordination for Elderly",
+      "contentType": "feature",
+      "description": "As an elderly person living in my own home Operating at the household governance layer I want to maintain my household with support while preserving my sense of home So that I remain in control of my ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -125.98624100441947,
+        "y": 81.40925670693925
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-educational",
+      "title": "Educational Layer Value Literacy for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult continuing my education and development Operating at the educational governance layer I want to learn practical life skills and develop capabilities So that I build competence for lif",
+      "hasChildren": true,
+      "childCount": 14,
+      "position": {
+        "x": -130.24394039252005,
+        "y": 74.40776835136025
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult new to my neighborhood Operating at the neighborhood governance layer I want to build community connections through care participation So that I establish roots and mutual support net",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -134.1129406721477,
+        "y": 67.1842179702123
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-family",
+      "title": "Family Layer Value Recognition for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult maintaining family relationships while establishing independence Operating at the family governance layer I want to contribute to family care economy across distance So that I maintai",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -137.58169522581795,
+        "y": 59.76016347693621
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+      "title": "Workplace/Organizational Layer Value Recognition for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult in my first full-time professional role Operating at the workplace/organizational governance layer I want to understand my labor's value and maintain wholeness So that I build profess",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -140.63985192660303,
+        "y": 52.157761168048346
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult (ages 18-25) in early independence Operating at the individual governance layer I want to build adult life skills and manage resources effectively So that I develop sustainable practi",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -143.2782840329472,
+        "y": 44.39969960004352
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult making independent consumption decisions Operating at the ecological/bioregional governance layer I want to understand environmental impacts and make sustainable choices So that I bal",
+      "hasChildren": true,
+      "childCount": 15,
+      "position": {
+        "x": -145.4891174264507,
+        "y": 36.509131877825354
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-community",
+      "title": "Community Layer Value Recognition for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult establishing myself in a new community Operating at the community governance layer I want to access resources and contribute to collective flourishing So that I build my position as a",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -147.2657541113338,
+        "y": 28.509606556741122
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-young-adult-scenarios-household",
+      "title": "Household Layer Value Recognition for Young Adult",
+      "contentType": "feature",
+      "description": "As a young adult managing my first independent household Operating at the household governance layer I want to coordinate shared resources and responsibilities effectively So that I build sustainable ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -148.6028919054496,
+        "y": 20.424997364436997
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-child-scenarios-educational",
+      "title": "Educational Layer Value Literacy for Child",
+      "contentType": "feature",
+      "description": "As a child in the value scanner system Operating at the educational governance layer I want to develop genuine value literacy through guided practice So that I build care-based economic thinking for l",
+      "hasChildren": true,
+      "childCount": 15,
+      "position": {
+        "x": -149.49654026407944,
+        "y": 12.27943195227195
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-child-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Child",
+      "contentType": "feature",
+      "description": "As a child in the value scanner system Operating at the neighborhood governance layer I want to understand how my choices connect to community patterns So that I learn care economy operates beyond jus",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -149.9440321892866,
+        "y": 4.097219888922911
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-child-scenarios-family",
+      "title": "Family Layer Value Recognition for Child",
+      "contentType": "feature",
+      "description": "As a child in the value scanner system Operating at the family governance layer I want to be recognized as a junior contributor to family flourishing So that I experience my role shifting from depende",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -149.9440321892866,
+        "y": -4.097219888922874
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-child-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Child",
+      "contentType": "feature",
+      "description": "As a child (ages 8-10) in guided autonomy Operating at the individual governance layer I want to make real choices with real consequences So that I develop agency and learn that I am a capable steward",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -149.49654026407944,
+        "y": -12.279431952271915
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-educational",
+      "title": "Educational Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent interfacing with educational systems Operating at the educational governance layer I want schools to recognize and accommodate single-parent family realities So that my children rec",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -148.6028919054496,
+        "y": -20.424997364436962
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent building local support networks Operating at the neighborhood governance layer I want to access backup care and mutual aid from neighbors So that I have local resilience to suppleme",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -147.2657541113338,
+        "y": -28.509606556741083
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-family",
+      "title": "Family Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent managing family relationships and decisions alone Operating at the family governance layer I want to serve each child's needs while managing family dynamics without co-parent suppor",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -145.4891174264507,
+        "y": -36.50913187782532
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+      "title": "Workplace/Organizational Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent worker managing impossible work-care conflicts Operating at the workplace/organizational governance layer I want workplace policies that recognize single parents' realities and cons",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -143.2782840329472,
+        "y": -44.39969960004355
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent managing solo household responsibilities Operating at the individual governance layer I want to maintain personal autonomy and identity despite overwhelming care demands So that I c",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -140.63985192660306,
+        "y": -52.15776116804832
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent operating under severe resource constraints Operating at the ecological/bioregional governance layer I want to recognize that my necessary thrift aligns with environmental sustainab",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -137.58169522581798,
+        "y": -59.76016347693618
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-community",
+      "title": "Community Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent participating in community care economy Operating at the community governance layer I want to access community resources based on care contributions, not charity So that I receive d",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -134.1129406721477,
+        "y": -67.18421797021227
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-single-parent-scenarios-household",
+      "title": "Household Layer Value Recognition for Single Parent",
+      "contentType": "feature",
+      "description": "As a single parent managing solo household operations Operating at the household governance layer I want efficient household management with AI support replacing missing co-parent So that my household",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -130.24394039252005,
+        "y": -74.40776835136022
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-retired-scenarios-municipality",
+      "title": "Municipality Layer Value Recognition for Retired Person",
+      "contentType": "feature",
+      "description": "As a retired person in the value scanner system Operating at the municipality governance layer I want my civic participation valued and elder needs addressed in municipal policy So that retirement is ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -125.98624100441945,
+        "y": -81.40925670693926
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-retired-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Retired Person",
+      "contentType": "feature",
+      "description": "As a retired person in the value scanner system Operating at the neighborhood governance layer I want my neighborhood contributions recognized and participation supported So that I remain embedded in ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -121.35254915624213,
+        "y": -88.16778784387095
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-retired-scenarios-family",
+      "title": "Family Layer Value Recognition for Retired Person",
+      "contentType": "feature",
+      "description": "As a retired person in the value scanner system Operating at the family governance layer I want to coordinate care flows across generations and life stages So that family care responsibilities honor m",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -116.35669360566303,
+        "y": -94.66319164890787
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-retired-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Retired Person",
+      "contentType": "feature",
+      "description": "As a retired person in post-employment life in the value scanner system Operating at the individual governance layer I want my continued care contributions and dignity to be recognized So that retirem",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -111.01358394918778,
+        "y": -100.8760832841791
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Retired Person",
+      "contentType": "feature",
+      "description": "As a retired person in the value scanner system Operating at the ecological/bioregional governance layer I want my construction knowledge applied to sustainable building and resource conservation valu",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -105.3391661260571,
+        "y": -106.78792103916504
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-retired-scenarios-community",
+      "title": "Community Layer Value Recognition for Retired Person",
+      "contentType": "feature",
+      "description": "As a retired person in the value scanner system Operating at the community governance layer I want my volunteer labor and community leadership recognized as valuable contribution So that retired peopl",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -99.3503748292962,
+        "y": -112.3810616664496
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-retired-scenarios-household",
+      "title": "Household Layer Value Recognition for Retired Person",
+      "contentType": "feature",
+      "description": "As a retired person managing a household Operating at the household governance layer I want equitable care labor distribution and coordinated aging planning So that both partners maintain dignity and ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -93.06508296593523,
+        "y": -117.63881303610468
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-municipality",
+      "title": "Municipality Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement in the value scanner system Operating at the municipality governance layer I want to access appropriate services and influence municipal policy So that municipal system",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -86.50204831723008,
+        "y": -122.5454839515663
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-educational",
+      "title": "Educational Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement in the value scanner system Operating at the educational governance layer I want to continue learning and share accumulated knowledge So that education is understood as",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -79.6808575580705,
+        "y": -127.08643097833254
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement in the value scanner system Operating at the neighborhood governance layer I want to contribute to neighborhood care economy and build local social capital So that neig",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -72.62186780264405,
+        "y": -131.2481021457274
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-family",
+      "title": "Family Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement in the value scanner system Operating at the family governance layer I want my multigenerational care contributions to be visible and valued So that family care economy",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -65.34614585080645,
+        "y": -135.0180773913076
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement (ages 65-74) in the value scanner system Operating at the individual governance layer I want my personal autonomy, dignity, and care contributions to be recognized So t",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -57.87540531647036,
+        "y": -138.38510562721075
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement in the value scanner system Operating at the ecological/bioregional governance layer I want my ecological knowledge to be valued and sustainability practices to be supp",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -50.23194182564796,
+        "y": -141.33913831782306
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-community",
+      "title": "Community Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement in the value scanner system Operating at the community governance layer I want my community contributions to be recognized and my experience to inform governance So tha",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -42.43856647753951,
+        "y": -143.8713594685595
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-senior-scenarios-household",
+      "title": "Household Layer Value Recognition for Senior",
+      "contentType": "feature",
+      "description": "As a senior in early retirement in the value scanner system Operating at the household governance layer I want to coordinate household care economy and resource management So that retirement household",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -34.518537767248084,
+        "y": -145.97421193625627
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-caregiver-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Caregiver",
+      "contentType": "feature",
+      "description": "As a caregiver needing neighborhood support and connection Operating at the neighborhood governance layer I want neighborhood care economy to provide practical support and social connection So that in",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -26.495492173288074,
+        "y": -147.64141998265674
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+      "title": "Healthcare Layer Value Recognition for Caregiver",
+      "contentType": "feature",
+      "description": "As a caregiver navigating complex medical systems Operating at the healthcare/medical governance layer I want medical system navigation support and caregiver-as-partner recognition So that care recipi",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": -18.393373617044723,
+        "y": -148.86800800368022
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-caregiver-scenarios-family",
+      "title": "Family Layer Value Recognition for Caregiver",
+      "contentType": "feature",
+      "description": "As a caregiver coordinating care across family relationships Operating at the family governance layer I want family care complexity visible and supported across generations So that family care economy",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -10.236362004700702,
+        "y": -149.65031537858087
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+      "title": "Workplace Layer Value Recognition for Caregiver",
+      "contentType": "feature",
+      "description": "As a caregiver navigating employment while providing intensive care Operating at the workplace/organizational governance layer I want workplace systems that recognize and accommodate caregiving realit",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": -2.048801064892699,
+        "y": -149.9860073946783
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-caregiver-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Caregiver",
+      "contentType": "feature",
+      "description": "As a caregiver for dependent adults Operating at the individual governance layer I want my personal well-being and identity maintained amid intensive caregiving So that I can sustain care work without",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 6.144874302542127,
+        "y": -149.87408221505797
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-caregiver-scenarios-community",
+      "title": "Community Layer Value Recognition for Caregiver",
+      "contentType": "feature",
+      "description": "As a caregiver engaging with community care economy Operating at the community governance layer I want community systems that recognize family caregiving as essential care work So that community care ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 14.320210949911393,
+        "y": -149.31487386844634
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-caregiver-scenarios-household",
+      "title": "Household Layer Value Recognition for Caregiver",
+      "contentType": "feature",
+      "description": "As a caregiver managing household for dependent adults Operating at the household governance layer I want household governance that recognizes care complexity and reduced capacity So that household fu",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 22.45281045947167,
+        "y": -148.3100512523377
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-municipality",
+      "title": "Municipal Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the municipal governance layer I want to influence municipal policy and infrastructure based on my care economy experience So that munic",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 30.518401957894994,
+        "y": -146.86261315234844
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the neighborhood governance layer I want to participate in neighborhood care economy and mutual support So that I build local resilience",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 38.49291455009599,
+        "y": -144.97687929266172
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-family",
+      "title": "Family Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the family governance layer I want to coordinate care flows across multiple households and four generations So that family care responsi",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 46.352549156242084,
+        "y": -142.65847744427305
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+      "title": "Workplace/Organizational Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the workplace/organizational governance layer I want my care responsibilities recognized as enhancing rather than hindering my professio",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 54.073849537562076,
+        "y": -139.9143266295096
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult (ages 46-64) in the value scanner system Operating at the individual governance layer I want to maintain individual autonomy and identity amid peak care demands So that I can su",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 61.633772298982244,
+        "y": -136.752616472948
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the ecological/bioregional governance layer I want to integrate care for people with care for planet through sustainable practices So th",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 69.00975565967286,
+        "y": -133.18278276035628
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-industry-sector",
+      "title": "Industry/Sector Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the industry/sector governance layer I want to influence industry standards and practices based on care economy principles So that my pr",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 76.17978678627082,
+        "y": -129.21547927860004
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-community",
+      "title": "Community Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the community governance layer I want to participate in community governance as both participant and leader So that I can leverage my ac",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 83.12246748782619,
+        "y": -124.86254602055526
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-middle-aged-scenarios-household",
+      "title": "Household Layer Value Recognition for Middle-Aged Adult",
+      "contentType": "feature",
+      "description": "As a middle-aged adult in the value scanner system Operating at the household governance layer I want sophisticated partnership with my spouse around resource management and care coordination So that ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 89.81707807641337,
+        "y": -120.13697384991627
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-educational",
+      "title": "Educational Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent who is both professional teacher and primary educator of own children Operating at the educational governance layer I want recognition that parents are children's primary educators So that",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 96.24363920282417,
+        "y": -115.05286573135243
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent needing community support beyond nuclear family Operating at the neighborhood governance layer I want connection to local parent networks and resource sharing So that parenting is collecti",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 102.38297148279814,
+        "y": -109.6253946417186
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-family",
+      "title": "Family Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent coordinating care across multiple generations Operating at the family governance layer I want multigenerational care relationships to be visible and reciprocal So that family care economy ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 108.21675273584339,
+        "y": -103.87075828792882
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-workplace-organizational",
+      "title": "Workplace/Organizational Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent balancing full-time professional work with intensive care labor Operating at the workplace/organizational governance layer I want workplace policies that recognize my parenting responsibil",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 113.72757266582437,
+        "y": -97.80613076663259
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent performing intensive care labor while working full-time Operating at the individual governance layer I want my personal identity and well-being to be preserved So that I can sustain care w",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 118.89898482012872,
+        "y": -91.44961130996022
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent preparing children to care for ecological systems Operating at the ecological/bioregional governance layer I want to teach environmental stewardship as care economy practice So that the ne",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 123.71555567234526,
+        "y": -84.8201702703009
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-community",
+      "title": "Community Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent participating in civic life while raising children Operating at the community governance layer I want my parenting recognized as community contribution So that raising citizens is valued a",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 128.16291068197327,
+        "y": -77.93759250531504
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-parent-scenarios-household",
+      "title": "Household Layer Value Recognition for Parent",
+      "contentType": "feature",
+      "description": "As a parent managing most household care labor Operating at the household governance layer I want equitable partnership and fair labor distribution So that household care is shared and all contributio",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 132.22777719370075,
+        "y": -70.82241833214276
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-municipality",
+      "title": "Municipal Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen in the value scanner system Operating at the municipal governance layer I want to engage with public systems and local policy as a constitutional participant So that I learn civic engagement",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 135.8980240482245,
+        "y": -63.49588222702475
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-educational",
+      "title": "Educational Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen in the value scanner system Operating at the educational governance layer I want my formal education to integrate with care economy learning So that I build comprehensive value literacy and ",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 139.16269778639764,
+        "y": -55.97984945327877
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-neighborhood",
+      "title": "Neighborhood Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen in the value scanner system Operating at the neighborhood governance layer I want to participate actively in neighborhood-level care patterns So that I learn how communities function and con",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 142.01205533865655,
+        "y": -48.29675080676079
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-family",
+      "title": "Family Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen in the value scanner system Operating at the family governance layer I want to participate as a junior partner moving toward equality in family governance So that my substantial care contrib",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 144.4375931021699,
+        "y": -40.46951567355366
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-workplace-organizational",
+      "title": "Workplace/Organizational Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen in the value scanner system Operating at the workplace/organizational governance layer I want my paid work recognized as care labor with fair compensation and healthy conditions So that I le",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 146.4320723189317,
+        "y": -32.5215035996671
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-individual",
+      "title": "Individual Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen (ages 14-17) in the value scanner system Operating at the individual governance layer I want adult-level economic autonomy with appropriate scaffolding So that I build real capability for fi",
+      "hasChildren": true,
+      "childCount": 11,
+      "position": {
+        "x": 147.9895406790603,
+        "y": -24.476434576971297
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+      "title": "Ecological/Bioregional Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen in the value scanner system Operating at the ecological/bioregional governance layer I want to understand how my consumption choices affect ecological systems So that I participate in bioreg",
+      "hasChildren": true,
+      "childCount": 13,
+      "position": {
+        "x": 149.10535008483055,
+        "y": -16.35831825341854
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-value-scanner-teen-scenarios-community",
+      "title": "Community Layer Value Recognition for Teen",
+      "contentType": "feature",
+      "description": "As a teen in the value scanner system Operating at the community governance layer I want to be recognized as a full participant in community care economy So that I access resources based on contributi",
+      "hasChildren": true,
+      "childCount": 12,
+      "position": {
+        "x": 149.7761705224242,
+        "y": -8.191382278816564
+      },
+      "level": 1,
+      "isParent": false
+    }
+  ],
+  "edges": [
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-child-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-child-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-child-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-student-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-adult-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-grandparent-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-grandparent-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-grandparent-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-grandparent-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-grandparent-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-grandparent-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-preteen-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-preteen-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-preteen-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-preteen-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-preteen-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-person-with-disabilities-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-elderly-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-elderly-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-elderly-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-elderly-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-elderly-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-elderly-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-young-adult-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-child-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-child-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-child-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-child-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-single-parent-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-retired-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-retired-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-retired-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-retired-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-retired-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-retired-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-senior-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-caregiver-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-caregiver-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-caregiver-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-caregiver-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-caregiver-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-industry-sector",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-middle-aged-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-parent-scenarios-household",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-municipality",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-workplace-organizational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "value-scanner-epic",
+      "target": "feature-value-scanner-teen-scenarios-community",
+      "type": "CONTAINS"
+    }
+  ],
+  "totalNodes": 116,
+  "totalEdges": 115
+}

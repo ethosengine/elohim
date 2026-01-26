@@ -1,0 +1,11 @@
+Scenario: Acknowledging uncertainty in technical analysis
+    Given appellant questions agent's 85% confidence in suicide risk pattern
+    And council asks if the confidence level is reliable
+    When I provide honest uncertainty assessment
+    Then I explain: we don't have validated ground truth for this prediction type
+    And I acknowledge: the 85% might be overconfident or underconfident
+    And I clarify: what we know and what we don't know
+    And I avoid: hiding behind expert authority to eliminate uncertainty
+    And I enable: council to make decision under acknowledged uncertainty
+    And I demonstrate: that honesty about limits builds trust
+    And citizens know: when they're governing despite deep uncertainty

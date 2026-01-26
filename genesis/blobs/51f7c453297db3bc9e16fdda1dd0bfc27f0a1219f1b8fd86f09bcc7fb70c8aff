@@ -1,0 +1,11 @@
+Scenario: Building disability community infrastructure as care economy practice
+    Given Alex works to connect disabled people to each other
+    And peer networks are essential care economy infrastructure
+    When Alex facilitates disability community connections
+    Then the community_elohim should recognize network-building as care work
+    And peer support groups Alex organizes should count as care contribution
+    And accessible events Alex coordinates should accumulate tokens
+    And disability culture-building should be valued appropriately
+    And Alex's infrastructure work strengthens entire care economy
+    And the protocol should see that disability community is care infrastructure
+    And Alex's organizing makes mutual aid possible for others

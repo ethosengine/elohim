@@ -318,10 +318,10 @@ export interface HumanNode {
  * - 'public': Globally discoverable
  */
 export type HumanReach =
-  | 'hidden'    // Not discoverable, invite only
-  | 'network'   // Friends-of-friends can discover
+  | 'hidden' // Not discoverable, invite only
+  | 'network' // Friends-of-friends can discover
   | 'community' // Community members can discover
-  | 'public';   // Anyone can discover
+  | 'public'; // Anyone can discover
 
 // =========================================================================
 // Human Relationship Edge

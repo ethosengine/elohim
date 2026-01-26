@@ -1,0 +1,10 @@
+Scenario: Experience dignity throughout appeal process
+    Given Marcus is appealing an agent decision
+    And Marcus is angry and feels violated
+    When Marcus interacts with the appeal system
+    Then the system treats his anger as legitimate data about dignity violation
+    And the system does not dismiss him as irrational or ungrateful
+    And the system provides empathetic language acknowledging his concern
+    And Constitutional Council members listen without judgment
+    And Marcus's right to appeal is honored without punishment
+    And future agent interactions are not biased by his appeal history

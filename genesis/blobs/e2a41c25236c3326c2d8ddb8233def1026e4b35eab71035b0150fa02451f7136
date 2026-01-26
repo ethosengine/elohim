@@ -1,0 +1,10 @@
+Scenario: Coordinating neighborhood childcare exchange
+    Given Sarah needs occasional childcare coverage
+    And she can provide childcare for others in exchange
+    When the neighborhood_elohim coordinates childcare sharing
+    Then it should match parents for reciprocal childcare
+    And it should track care provided and received
+    And it should ensure exchanges are equitable over time
+    And childcare cooperation should be visible and valued
+    And parents should support each other sustainably
+    And neighborhood care economy should reduce childcare costs

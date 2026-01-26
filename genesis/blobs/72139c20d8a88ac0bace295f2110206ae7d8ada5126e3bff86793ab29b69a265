@@ -1,0 +1,10 @@
+Scenario: Workers welcome community stakeholder input while maintaining decision autonomy
+    Given community investors funded the EAE acquisition
+    And investors want input on community benefit priorities
+    When annual community stakeholder meeting occurs
+    Then investors and customers share priorities and concerns
+    And workers listen to community input respectfully
+    And workers deliberate on community suggestions democratically
+    And workers maintain final decision authority on operations
+    And community_elohim ensures investors cannot override worker governance
+    And balanced stakeholder participation serves everyone

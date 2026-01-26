@@ -1,0 +1,10 @@
+Scenario: Planning commissioner evaluates sprawl versus infill development trade-offs
+    Given commission faces pressure to approve suburban expansion development
+    And developers argue expansion provides affordable housing opportunities
+    And environmentalists advocate for urban infill to reduce sprawl
+    When the commissioner requests Observer growth pattern analysis
+    Then they receive comparison of infrastructure costs for sprawl versus infill
+    And see environmental impacts analysis including habitat, emissions, and water use
+    And access true affordability analysis accounting for transportation costs
+    And understand fiscal impacts on municipality over time
+    And accessible expertise helps commissioner evaluate complex growth trade-offs

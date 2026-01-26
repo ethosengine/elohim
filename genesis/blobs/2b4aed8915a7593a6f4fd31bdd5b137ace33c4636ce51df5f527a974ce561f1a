@@ -1,0 +1,11 @@
+Scenario: Research on superintelligence governance and democratic legitimacy
+    Given my most important research question is existential
+    And I study whether sortition can govern superintelligent agents
+    When I analyze Constitutional Council confidence over time as agents advance
+    Then I measure: council member certainty declining as agent capability increases
+    And I document: increasing expert influence as complexity exceeds lay understanding
+    And I identify: warning signs of democratic theater masking technocratic rule
+    And I also find: hopeful pattern of councils resisting capture and demanding explainability
+    And I assess: whether democratic oversight of superintelligence is possible
+    And I conclude: honestly that question remains open
+    And My research frames: humanity's most important governance challenge with intellectual honesty

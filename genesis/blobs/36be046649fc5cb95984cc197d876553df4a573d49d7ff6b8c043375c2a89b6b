@@ -1,0 +1,10 @@
+Scenario: Teaching adult children care economy principles through modeling
+    Given Frank's adult children are watching his care contributions
+    And he's modeling post-employment care economy participation
+    When family_elohim surfaces care patterns
+    Then it should help Frank teach care economy to next generation
+    And adult children should see that contribution continues through retirement
+    And they should learn that care flows across generations
+    And Frank's example should prepare them for their own aging
+    And care reciprocity should be transmitted generationally
+    And family care culture should strengthen through visible modeling

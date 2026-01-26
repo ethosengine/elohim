@@ -1,0 +1,11 @@
+DROP INDEX IF EXISTS idx_event_state;
+DROP INDEX IF EXISTS idx_event_time;
+DROP INDEX IF EXISTS idx_event_path;
+DROP INDEX IF EXISTS idx_event_presence;
+DROP INDEX IF EXISTS idx_event_content;
+DROP INDEX IF EXISTS idx_event_lamad_type;
+DROP INDEX IF EXISTS idx_event_action;
+DROP INDEX IF EXISTS idx_event_receiver;
+DROP INDEX IF EXISTS idx_event_provider;
+DROP INDEX IF EXISTS idx_event_app_id;
+DROP TABLE IF EXISTS economic_events;

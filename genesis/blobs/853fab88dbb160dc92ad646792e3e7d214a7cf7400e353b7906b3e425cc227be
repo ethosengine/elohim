@@ -1,0 +1,10 @@
+Scenario: Teen volunteers recognized as substantial economic contribution
+    Given Jasmine volunteers 4 hours per week at community center
+    And this is 16 hours per month of skilled labor
+    When her volunteer work is tracked by community_elohim
+    Then it should be valued at appropriate care economy rates
+    And if professional childcare costs $15/hour, her care work should be valued accordingly
+    And her contribution of $240/month worth of care labor should be visible
+    And community institutions should recognize their dependence on her labor
+    And she should accumulate care tokens reflecting this substantial contribution
+    And the invisibility of teen volunteer labor should be corrected

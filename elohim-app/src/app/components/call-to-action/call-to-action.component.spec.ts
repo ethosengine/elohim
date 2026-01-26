@@ -8,9 +8,8 @@ describe('CallToActionComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CallToActionComponent]
-    })
-    .compileComponents();
+      imports: [CallToActionComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(CallToActionComponent);
     component = fixture.componentInstance;
@@ -32,7 +31,7 @@ describe('CallToActionComponent', () => {
     const compiled = fixture.nativeElement;
     const button = compiled.querySelector('.cta-button');
     expect(button).toBeTruthy();
-    expect(button.textContent).toBe('Join the Protocol');
+    expect(button.textContent?.trim()).toBe('Join the Protocol');
   });
 
   it('should render quotes with authors', () => {

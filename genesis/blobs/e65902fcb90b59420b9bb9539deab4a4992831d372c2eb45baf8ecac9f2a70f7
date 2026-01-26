@@ -1,0 +1,9 @@
+Scenario: Solo household management learning
+    Given Aisha lives alone in her first apartment
+    And household and individual layers largely overlap
+    When Aisha manages household resources
+    Then the personal_agent should help her establish routines
+    And it should track household maintenance tasks
+    And it should help her build sustainable practices
+    And household management should feel achievable, not overwhelming
+    And the system should scaffold her household competence development

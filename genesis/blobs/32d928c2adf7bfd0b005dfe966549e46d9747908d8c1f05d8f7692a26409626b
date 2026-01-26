@@ -1,0 +1,9 @@
+Scenario: Manager provides operational expertise without information asymmetry
+    Given Marcus has knowledge of inventory levels, supplier costs, and operational data
+    And corporate model used information asymmetry to maintain power
+    When Marcus uses operational information for coordination
+    Then all data Marcus sees is equally visible to workers
+    And Marcus cannot hoard information to manipulate outcomes
+    And workers access same dashboards, reports, and metrics
+    And Marcus's value comes from synthesizing information, not controlling it
+    And workplace_elohim ensures transparency of all operational data

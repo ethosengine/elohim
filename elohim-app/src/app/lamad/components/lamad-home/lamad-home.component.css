@@ -97,7 +97,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Error State */
@@ -118,7 +120,8 @@
 }
 
 .hero-title {
-  font-size: 3rem;
+  /* Fluid typography: scales smoothly from 2rem to 3rem */
+  font-size: clamp(2rem, 4vw + 1rem, 3rem);
   font-weight: 700;
   margin-bottom: 0.5rem;
   background: var(--lamad-accent-gradient);
@@ -128,7 +131,8 @@
 }
 
 .hero-subtitle {
-  font-size: 1.25rem;
+  /* Fluid typography: scales smoothly from 1rem to 1.25rem */
+  font-size: clamp(1rem, 1.5vw + 0.5rem, 1.25rem);
   color: var(--lamad-text-secondary);
   max-width: 600px;
   margin: 0 auto;
@@ -294,11 +298,41 @@
   margin-bottom: 2.5rem;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
 .section-title {
   font-size: 1.5rem;
   font-weight: 600;
-  margin-bottom: 1.5rem;
+  margin: 0;
   color: var(--lamad-text-primary);
+}
+
+.path-count {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--lamad-text-secondary, #6b7280);
+  margin-left: 0.5rem;
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  color: var(--lamad-accent-primary, #6366f1);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-text:hover {
+  background: var(--lamad-surface-hover, #f3f4f6);
 }
 
 .paths-grid {
@@ -414,26 +448,73 @@
   border-top: 1px solid var(--lamad-border);
 }
 
-/* Responsive */
+/* ============================================================================
+   Responsive Breakpoints
+   ============================================================================
+   Using standardized breakpoints:
+   - 480px (--bp-sm): Small mobile
+   - 768px (--bp-md): Tablet / Large mobile
+   - 1024px (--bp-lg): Desktop
+   ============================================================================ */
+
+/* Tablet (768px - 1024px) */
+@media (max-width: 1024px) {
+  .lamad-home {
+    padding: 1.5rem;
+  }
+
+  .featured-card {
+    padding: 1.75rem;
+  }
+
+  .paths-grid {
+    /* Ensure at least 2 columns on tablet */
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .view-mode-bar {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .view-tabs {
+    flex-wrap: wrap;
+  }
+
+  /* Ensure touch-friendly tab sizes */
+  .view-tab {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Mobile (max-width: 768px) */
 @media (max-width: 768px) {
   .lamad-home {
     padding: 1rem;
   }
 
-  .hero-title {
-    font-size: 2rem;
-  }
-
-  .hero-subtitle {
-    font-size: 1rem;
+  .hero-section {
+    padding: 2rem 0.5rem;
   }
 
   .featured-card {
-    padding: 1.5rem;
+    padding: 1.25rem;
   }
 
   .featured-title {
-    font-size: 1.5rem;
+    /* Fluid on mobile too */
+    font-size: clamp(1.25rem, 4vw, 1.5rem);
+  }
+
+  .featured-description {
+    font-size: 1rem;
+  }
+
+  .paths-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .quick-actions {
@@ -447,5 +528,50 @@
   .btn {
     width: 100%;
     text-align: center;
+    min-height: 44px; /* Touch target minimum */
+  }
+
+  .view-mode-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .view-tabs {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .view-actions {
+    justify-content: center;
+  }
+
+  .section-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+}
+
+/* Small mobile (max-width: 480px) */
+@media (max-width: 480px) {
+  .lamad-home {
+    padding: 0.75rem;
+  }
+
+  .path-card {
+    border-radius: 8px;
+  }
+
+  .path-content {
+    padding: 1rem;
+  }
+
+  .path-thumbnail {
+    height: 140px;
+  }
+
+  .featured-meta {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }

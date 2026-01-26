@@ -1,0 +1,10 @@
+Scenario: Multi-store price comparison supports budget optimization
+    Given Marcus has limited budget and multiple store options
+    And different stores have different prices for same items
+    When Marcus plans his shopping across stores
+    Then the personal_agent should provide multi-store price comparison
+    And it should aggregate data from neighborhood stores
+    And it should optimize shopping list across locations
+    And it should help Marcus get best value from his $75 budget
+    And neighborhood-scale data should reduce his individual burden
+    And collective price intelligence should benefit all families

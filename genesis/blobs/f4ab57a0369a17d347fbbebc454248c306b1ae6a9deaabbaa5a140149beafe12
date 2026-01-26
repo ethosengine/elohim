@@ -1,0 +1,9 @@
+Scenario: Workers adapt operations to serve community cultural needs
+    Given neighborhood has significant Latino population
+    And community expresses interest in traditional menu items
+    When workers receive customer feedback through community_elohim
+    Then workers investigate culturally appropriate menu additions
+    And workers consult community members on authentic recipes
+    And workers democratically vote to expand menu with Latino dishes
+    And workers hire bilingual staff to serve community better
+    And business becomes more deeply embedded in community culture

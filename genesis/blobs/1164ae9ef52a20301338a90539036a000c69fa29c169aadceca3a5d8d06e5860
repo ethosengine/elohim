@@ -1,0 +1,10 @@
+Scenario: Student voice in educational governance and policy
+    Given students are primary stakeholders in education
+    And educational policies directly affect student well-being
+    When students participate in educational governance
+    Then the educational_elohim should recognize advocacy as care contribution
+    And it should value student organizing for better policies
+    And it should accumulate care tokens for participating in governance
+    And student voice should be central to educational decision-making
+    And the system should amplify student participation in education policy
+    And students should govern their educational institutions democratically

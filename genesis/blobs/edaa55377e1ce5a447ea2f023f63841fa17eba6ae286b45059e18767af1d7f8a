@@ -1,0 +1,9 @@
+Scenario: Manager balances operational efficiency with community relationship priorities
+    Given workers prioritize customer relationships over transaction speed
+    And corporate model measured Marcus on speed metrics
+    When Marcus coordinates daily operations
+    Then Marcus optimizes for customer satisfaction and care, not just speed
+    And Marcus measures success by community feedback and relationship depth
+    And Marcus rejects corporate-style speedup pressure
+    And operational coordination serves worker-defined values
+    And community experiences genuine care, not performative corporate "service"

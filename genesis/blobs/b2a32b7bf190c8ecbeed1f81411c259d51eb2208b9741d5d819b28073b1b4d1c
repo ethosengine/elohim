@@ -1,0 +1,10 @@
+Scenario: Recognition of substantial care labor as economically valuable
+    Given Marcus performs household management work
+    And similar work by adults would be compensated
+    When Marcus completes weekly shopping and meal planning
+    Then his care contributions should be valued at realistic economic rates
+    And care tokens should reflect genuine value of his work
+    And the system should make explicit that his labor is valuable
+    And recognition should communicate that he's doing skilled work
+    And his contributions should qualify family for community resources
+    And his stewardship should be evidence of capability, not exploitation

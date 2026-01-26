@@ -1,0 +1,10 @@
+Scenario: Learning professional norms through care economy lens
+    Given Aisha is learning professional workplace culture
+    And she's developing professional identity
+    When the workplace_elohim guides her professional development
+    Then it should help her understand workplace care economy
+    And it should teach that her work is care labor (contributing to organizational flourishing)
+    And it should explain that she deserves care in return
+    And professional development should include care economy literacy
+    And she should learn to apply care principles to employment
+    And workplace norms should be understood through care framework

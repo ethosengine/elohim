@@ -1,0 +1,12 @@
+Scenario: Deliberating with structured process ensuring all voices heard
+    Given our council has diverse perspectives that could lead to conflict
+    And we need to reach judgment together
+    When we follow deliberation protocols
+    Then all members: share initial reactions and concerns
+    And we identify: points of agreement and disagreement
+    And we examine: constitutional principles explicitly
+    And we research: relevant precedents from previous cases
+    And we consult: experts when technical questions arise
+    And we avoid: rushed judgment or groupthink
+    And we ensure: quieter members are heard not dominated
+    And we reach: decision through genuine collective deliberation

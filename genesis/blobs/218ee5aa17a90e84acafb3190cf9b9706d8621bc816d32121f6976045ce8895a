@@ -1,0 +1,9 @@
+Scenario: Organizer tracks accountability for community park improvements
+    Given the organizer led campaign that won park renovation commitment
+    And city promised completion in six months
+    When the Observer tracks implementation progress
+    Then the organizer sees weekly updates on construction status
+    And receives alerts when timeline slips
+    And documents the victory for community to see their power
+    And has evidence to pressure officials if implementation stalls
+    And communities learn their organizing creates real change

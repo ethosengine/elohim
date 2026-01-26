@@ -1,9 +1,11 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
 import { map, switchMap, tap } from 'rxjs/operators';
 
-import { PathService } from './path.service';
-import { generateExtensionId } from '@app/shared/utils';
+import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
+
+import { generateExtensionId } from '@app/elohim/utils';
+
 import { PathStep, LearningPath } from '../models/learning-path.model';
 import {
   PathExtension,
@@ -22,8 +24,10 @@ import {
   CollaborationType,
   CollaboratorRole,
   PathProposal,
-  ProposedChange
+  ProposedChange,
 } from '../models/path-extension.model';
+
+import { PathService } from './path.service';
 
 /**
  * PathExtensionService - Learner-owned mutations to curated paths.
@@ -47,8 +51,8 @@ import {
 @Injectable({ providedIn: 'root' })
 export class PathExtensionService {
   // In-memory storage (prototype - production uses Holochain)
-  private readonly extensions: Map<string, PathExtension> = new Map();
-  private readonly collaborativePaths: Map<string, CollaborativePath> = new Map();
+  private readonly extensions = new Map<string, PathExtension>();
+  private readonly collaborativePaths = new Map<string, CollaborativePath>();
   private extensionIndex: PathExtensionIndex | null = null;
 
   // Current agent's extensions
@@ -85,7 +89,7 @@ export class PathExtensionService {
     const index: PathExtensionIndex = {
       lastUpdated: new Date().toISOString(),
       totalCount: entries.length,
-      extensions: entries
+      extensions: entries,
     };
 
     this.extensionIndex = index;
@@ -124,7 +128,7 @@ export class PathExtensionService {
     if (!this.canView(ext)) {
       return throwError(() => ({
         code: 'UNAUTHORIZED',
-        message: 'You do not have permission to view this extension'
+        message: 'You do not have permission to view this extension',
       }));
     }
 
@@ -166,7 +170,7 @@ export class PathExtensionService {
           exclusions: [],
           visibility: params.visibility ?? 'private',
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         };
 
         this.extensions.set(extensionId, newExtension);
@@ -180,10 +184,13 @@ export class PathExtensionService {
   /**
    * Fork an existing extension.
    */
-  forkExtension(extensionId: string, params?: {
-    title?: string;
-    description?: string;
-  }): Observable<PathExtension> {
+  forkExtension(
+    extensionId: string,
+    params?: {
+      title?: string;
+      description?: string;
+    }
+  ): Observable<PathExtension> {
     return this.getExtension(extensionId).pipe(
       switchMap(ext => {
         if (!ext) {
@@ -205,7 +212,7 @@ export class PathExtensionService {
           stats: undefined,
           visibility: 'private',
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         };
 
         // Update original's forks list
@@ -245,7 +252,10 @@ export class PathExtensionService {
         }
 
         if (!this.canEdit(ext)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this extension' }));
+          return throwError(() => ({
+            code: 'UNAUTHORIZED',
+            message: 'Cannot edit this extension',
+          }));
         }
 
         const insertion: PathStepInsertion = {
@@ -255,8 +265,8 @@ export class PathExtensionService {
           rationale,
           source: {
             type: 'self',
-            confidence: 1.0
-          }
+            confidence: 1.0,
+          },
         };
 
         ext.insertions.push(insertion);
@@ -289,7 +299,10 @@ export class PathExtensionService {
         }
 
         if (!this.canEdit(ext)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this extension' }));
+          return throwError(() => ({
+            code: 'UNAUTHORIZED',
+            message: 'Cannot edit this extension',
+          }));
         }
 
         const annotation: PathStepAnnotation = {
@@ -300,7 +313,7 @@ export class PathExtensionService {
           additionalResources: options?.additionalResources,
           personalDifficulty: options?.personalDifficulty,
           actualTime: options?.actualTime,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         };
 
         ext.annotations.push(annotation);
@@ -328,14 +341,17 @@ export class PathExtensionService {
         }
 
         if (!this.canEdit(ext)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this extension' }));
+          return throwError(() => ({
+            code: 'UNAUTHORIZED',
+            message: 'Cannot edit this extension',
+          }));
         }
 
         const reorder: PathStepReorder = {
           id: `reo-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic reorder ID generation
           fromIndex,
           toIndex,
-          rationale
+          rationale,
         };
 
         ext.reorderings.push(reorder);
@@ -363,14 +379,17 @@ export class PathExtensionService {
         }
 
         if (!this.canEdit(ext)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this extension' }));
+          return throwError(() => ({
+            code: 'UNAUTHORIZED',
+            message: 'Cannot edit this extension',
+          }));
         }
 
         const exclusion: PathStepExclusion = {
           id: `exc-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic exclusion ID generation
           stepIndex,
           reason,
-          notes
+          notes,
         };
 
         ext.exclusions.push(exclusion);
@@ -385,10 +404,7 @@ export class PathExtensionService {
   /**
    * Remove a modification from an extension.
    */
-  removeModification(
-    extensionId: string,
-    modificationId: string
-  ): Observable<void> {
+  removeModification(extensionId: string, modificationId: string): Observable<void> {
     return this.getExtension(extensionId).pipe(
       switchMap(ext => {
         if (!ext) {
@@ -396,7 +412,10 @@ export class PathExtensionService {
         }
 
         if (!this.canEdit(ext)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this extension' }));
+          return throwError(() => ({
+            code: 'UNAUTHORIZED',
+            message: 'Cannot edit this extension',
+          }));
         }
 
         ext.insertions = ext.insertions.filter(i => i.id !== modificationId);
@@ -464,12 +483,16 @@ export class PathExtensionService {
   }
 
   /** Check version compatibility */
-  private checkVersionCompatibility(path: LearningPath, ext: PathExtension, warnings: ExtensionWarning[]): void {
+  private checkVersionCompatibility(
+    path: LearningPath,
+    ext: PathExtension,
+    warnings: ExtensionWarning[]
+  ): void {
     if (path.version !== ext.basePathVersion) {
       warnings.push({
         type: 'version-mismatch',
         message: `Extension targets version ${ext.basePathVersion}, but path is now ${path.version}`,
-        affectedItems: [ext.id]
+        affectedItems: [ext.id],
       });
     }
   }
@@ -488,7 +511,7 @@ export class PathExtensionService {
         warnings.push({
           type: 'missing-step',
           message: `Exclusion references step ${exclusion.stepIndex} which doesn't exist`,
-          affectedItems: [exclusion.id]
+          affectedItems: [exclusion.id],
         });
       }
     }
@@ -510,7 +533,7 @@ export class PathExtensionService {
         warnings.push({
           type: 'missing-step',
           message: `Reorder references step ${reorder.fromIndex} which doesn't exist`,
-          affectedItems: [reorder.id]
+          affectedItems: [reorder.id],
         });
       }
     }
@@ -567,7 +590,7 @@ export class PathExtensionService {
         warnings.push({
           type: 'missing-step',
           message: `Insertion after step ${insertion.afterStepIndex} is out of bounds`,
-          affectedItems: [insertion.id]
+          affectedItems: [insertion.id],
         });
       }
     }
@@ -625,12 +648,15 @@ export class PathExtensionService {
         }
 
         if (!this.canEdit(ext)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot submit proposals for this extension' }));
+          return throwError(() => ({
+            code: 'UNAUTHORIZED',
+            message: 'Cannot submit proposals for this extension',
+          }));
         }
 
         const proposal: UpstreamProposal = {
           status: 'submitted',
-          submittedAt: new Date().toISOString()
+          submittedAt: new Date().toISOString(),
         };
 
         ext.upstreamProposal = proposal;
@@ -674,7 +700,7 @@ export class PathExtensionService {
         if (path.createdBy !== this.currentAgentId) {
           return throwError(() => ({
             code: 'UNAUTHORIZED',
-            message: 'Only path owner can enable collaboration'
+            message: 'Only path owner can enable collaboration',
           }));
         }
 
@@ -684,19 +710,21 @@ export class PathExtensionService {
           roles: new Map([[this.currentAgentId, 'owner']]),
           pendingProposals: [],
           settings: {
-            requireApproval: settings?.requireApproval ?? (type === 'review-required'),
+            requireApproval: settings?.requireApproval ?? type === 'review-required',
             minApprovals: settings?.minApprovals,
             approvers: settings?.approvers || [this.currentAgentId],
             allowAnonymousSuggestions: settings?.allowAnonymousSuggestions ?? false,
-            notifyOnChange: settings?.notifyOnChange ?? true
+            notifyOnChange: settings?.notifyOnChange ?? true,
           },
-          activityLog: [{
-            id: `act-${Date.now()}`,
-            type: 'member-joined',
-            actorId: this.currentAgentId,
-            details: { role: 'owner' },
-            timestamp: new Date().toISOString()
-          }]
+          activityLog: [
+            {
+              id: `act-${Date.now()}`,
+              type: 'member-joined',
+              actorId: this.currentAgentId,
+              details: { role: 'owner' },
+              timestamp: new Date().toISOString(),
+            },
+          ],
         };
 
         this.collaborativePaths.set(pathId, collab);
@@ -709,11 +737,7 @@ export class PathExtensionService {
   /**
    * Add a collaborator to a path.
    */
-  addCollaborator(
-    pathId: string,
-    agentId: string,
-    role: CollaboratorRole
-  ): Observable<void> {
+  addCollaborator(pathId: string, agentId: string, role: CollaboratorRole): Observable<void> {
     return this.getCollaborativePath(pathId).pipe(
       switchMap(collab => {
         if (!collab) {
@@ -724,7 +748,7 @@ export class PathExtensionService {
         if (!currentRole || (currentRole !== 'owner' && currentRole !== 'editor')) {
           return throwError(() => ({
             code: 'UNAUTHORIZED',
-            message: 'Only owners and editors can add collaborators'
+            message: 'Only owners and editors can add collaborators',
           }));
         }
 
@@ -734,7 +758,7 @@ export class PathExtensionService {
           type: 'member-joined',
           actorId: agentId,
           details: { role, addedBy: this.currentAgentId },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
 
         return of(undefined);
@@ -761,7 +785,7 @@ export class PathExtensionService {
         if (!role && !collab.settings.allowAnonymousSuggestions) {
           return throwError(() => ({
             code: 'UNAUTHORIZED',
-            message: 'You must be a collaborator to submit proposals'
+            message: 'You must be a collaborator to submit proposals',
           }));
         }
 
@@ -774,7 +798,7 @@ export class PathExtensionService {
           status: 'pending',
           votes: new Map(),
           comments: [],
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         };
 
         collab.pendingProposals.push(proposal);
@@ -783,7 +807,7 @@ export class PathExtensionService {
           type: 'proposal-created',
           actorId: this.currentAgentId,
           details: { proposalId: proposal.id, changeType },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
 
         return of(proposal);
@@ -829,7 +853,7 @@ export class PathExtensionService {
       annotationCount: ext.annotations.length,
       forkCount: ext.forks?.length ?? 0,
       rating: ext.stats?.averageRating,
-      updatedAt: ext.updatedAt
+      updatedAt: ext.updatedAt,
     };
   }
 
@@ -867,21 +891,21 @@ export class PathExtensionService {
           stepIndex: 0,
           type: 'insight',
           content: 'The constitutional approach reminds me of Rawlsian veil of ignorance.',
-          createdAt: now
+          createdAt: now,
         },
         {
           id: 'ann-2',
           stepIndex: 1,
           type: 'question',
           content: 'How does this scale to millions of users?',
-          createdAt: now
-        }
+          createdAt: now,
+        },
       ],
       reorderings: [],
       exclusions: [],
       visibility: 'private',
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     this.extensions.set(demoExtension.id, demoExtension);

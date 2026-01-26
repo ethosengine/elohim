@@ -1,0 +1,10 @@
+Scenario: Garden and food growing knowledge shared across generations
+    Given Margaret may grow some of her own food
+    And gardening knowledge is both ecological and practical
+    When the bioregional_elohim coordinates food growing
+    Then Margaret's gardening should be recognized as care contribution
+    And growing food reduces industrial agriculture dependence
+    And her knowledge should be shared with neighbors and family
+    And community gardens should connect seniors with others
+    And food growing should be supported as ecological practice
+    And Margaret's skills should strengthen community food security

@@ -1,0 +1,9 @@
+Scenario: Owner systematically transfers tacit business knowledge to workers
+    Given Rosa has 15 years of operational expertise workers need to succeed
+    And her knowledge includes supplier relationships, customer preferences, and workflow optimization
+    When workplace_elohim initiates knowledge transfer protocols
+    Then Rosa participates in documented teaching sessions covering key business areas
+    And her expertise is captured through video demonstrations and written guides
+    And workers learn bookkeeping, supplier negotiation, and customer relations
+    And relationship maps show supplier and customer networks with context
+    And knowledge becomes institutional memory, not dependent on Rosa's presence

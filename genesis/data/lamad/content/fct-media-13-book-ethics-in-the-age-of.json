@@ -1,0 +1,56 @@
+{
+  "id": "fct-media-13-book-ethics-in-the-age-of",
+  "contentType": "book",
+  "title": "Ethics in the Age of Technology",
+  "description": "Book by George Hunsberger",
+  "content": "# Ethics in the Age of Technology\n\n**Author:** George Hunsberger\n**Format:** book",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "mediaType": "book",
+    "author": "George Hunsberger"
+  },
+  "_contributor": "George Hunsberger",
+  "createdAt": "2025-11-28T21:10:19.225410",
+  "updatedAt": "2025-12-26T21:04:01.813Z",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Ethics in the Age of Technology",
+    "ogDescription": "Book by George Hunsberger",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-13-book-ethics-in-the-age-of",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Ethics in the Age of Technology - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-13-book-ethics-in-the-age-of",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Ethics in the Age of Technology",
+    "description": "Book by George Hunsberger",
+    "dateCreated": "2025-11-28T21:10:19.225410",
+    "dateModified": "2025-11-28T21:10:19.225411",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "George Hunsberger"
+    }
+  }
+}

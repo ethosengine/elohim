@@ -1,0 +1,550 @@
+/**
+ * Generic Alert Banner Styles
+ *
+ * Supports multiple severity levels and display modes:
+ * - banner: Sticky header alert
+ * - card: Dashboard-style cards
+ * - toast: Popup notifications
+ * - inline: Embedded in content
+ */
+
+// =============================================================================
+// VARIABLES
+// =============================================================================
+
+// Severity colors
+$severities: (
+  success: (
+    fg: #065f46,
+    bg: #ecfdf5,
+    border: #a7f3d0,
+    accent: #10b981,
+  ),
+  info: (
+    fg: #1e40af,
+    bg: #eff6ff,
+    border: #bfdbfe,
+    accent: #3b82f6,
+  ),
+  warning: (
+    fg: #92400e,
+    bg: #fffbeb,
+    border: #fde68a,
+    accent: #f59e0b,
+  ),
+  error: (
+    fg: #991b1b,
+    bg: #fef2f2,
+    border: #fecaca,
+    accent: #ef4444,
+  ),
+  critical: (
+    fg: #7f1d1d,
+    bg: #fef2f2,
+    border: #f87171,
+    accent: #dc2626,
+  ),
+);
+
+// Common colors
+$color-text: #1f2937;
+$color-text-muted: #6b7280;
+$color-border: #e5e7eb;
+$color-bg: #ffffff;
+
+// =============================================================================
+// MIXINS
+// =============================================================================
+
+@mixin severity-variant($name) {
+  $colors: map-get($severities, $name);
+
+  &.severity-#{$name} {
+    background: map-get($colors, bg);
+    border-color: map-get($colors, border);
+    color: map-get($colors, fg);
+
+    .alert-icon,
+    .card-icon,
+    .toast-icon,
+    .inline-icon,
+    .item-icon {
+      color: map-get($colors, accent);
+    }
+
+    .btn-primary {
+      background: map-get($colors, accent);
+      color: white;
+
+      &:hover {
+        background: darken(map-get($colors, accent), 10%);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// BANNER MODE
+// =============================================================================
+
+.alert-banner {
+  border-bottom: 2px solid;
+  transition: all 0.2s ease;
+
+  @each $name, $colors in $severities {
+    @include severity-variant($name);
+  }
+}
+
+.banner-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  cursor: default;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+}
+
+.alert-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.alert-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.alert-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.alert-subtitle {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.alert-count {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-text {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.btn-secondary {
+  background: $color-bg;
+  color: $color-text;
+  border: 1px solid $color-border;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+}
+
+.btn-text {
+  background: transparent;
+  color: inherit;
+  border: none;
+  padding: 0.375rem;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.btn-dismiss {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  font-size: 0.875rem;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.btn-expand {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// Expanded details
+.banner-details {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid $color-border;
+}
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: $color-bg;
+  border-radius: 0.375rem;
+  border: 1px solid $color-border;
+
+  @each $name, $colors in $severities {
+    &.severity-#{$name} {
+      border-left: 3px solid map-get($colors, accent);
+    }
+  }
+}
+
+.item-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.item-content {
+  flex: 1;
+  min-width: 0;
+
+  .item-title {
+    display: block;
+    font-weight: 500;
+    font-size: 0.8rem;
+    color: $color-text;
+  }
+
+  .item-message {
+    display: block;
+    font-size: 0.75rem;
+    color: $color-text-muted;
+    margin-top: 0.125rem;
+  }
+}
+
+.item-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 0.25rem;
+  background: $color-bg;
+  border: 1px solid $color-border;
+  color: $color-text;
+  cursor: pointer;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+}
+
+.btn-dismiss-small {
+  background: transparent;
+  border: none;
+  color: $color-text-muted;
+  cursor: pointer;
+  padding: 0.125rem 0.25rem;
+  font-size: 0.75rem;
+
+  &:hover {
+    color: $color-text;
+  }
+}
+
+.show-more {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.btn-show-more {
+  background: transparent;
+  border: 1px dashed $color-border;
+  color: $color-text-muted;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+
+  &:hover {
+    background: #f9fafb;
+    color: $color-text;
+  }
+}
+
+// =============================================================================
+// CARD MODE
+// =============================================================================
+
+.alert-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.alert-card {
+  background: $color-bg;
+  border-radius: 0.5rem;
+  border: 1px solid $color-border;
+  overflow: hidden;
+
+  @each $name, $colors in $severities {
+    &.severity-#{$name} {
+      border-top: 3px solid map-get($colors, accent);
+
+      .card-header {
+        background: map-get($colors, bg);
+      }
+
+      .card-icon {
+        color: map-get($colors, accent);
+      }
+    }
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid $color-border;
+}
+
+.card-icon {
+  font-size: 1.125rem;
+  margin-top: 0.125rem;
+}
+
+.card-title-group {
+  flex: 1;
+  min-width: 0;
+
+  .card-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  .card-subtitle {
+    display: block;
+    font-size: 0.75rem;
+    color: $color-text-muted;
+    margin-top: 0.125rem;
+  }
+}
+
+.card-body {
+  padding: 0.75rem 1rem;
+
+  .card-message {
+    margin: 0;
+    font-size: 0.85rem;
+    color: $color-text;
+    line-height: 1.5;
+  }
+}
+
+.card-footer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid $color-border;
+  background: #f9fafb;
+
+  button,
+  a {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+.show-more-cards {
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
+// =============================================================================
+// TOAST MODE
+// =============================================================================
+
+.alert-toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 360px;
+}
+
+.alert-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  background: $color-bg;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.2s ease;
+
+  @each $name, $colors in $severities {
+    &.severity-#{$name} {
+      border-left: 4px solid map-get($colors, accent);
+
+      .toast-icon {
+        color: map-get($colors, accent);
+      }
+    }
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-icon {
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+
+  .toast-title {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: $color-text;
+  }
+
+  .toast-message {
+    display: block;
+    font-size: 0.8rem;
+    color: $color-text-muted;
+    margin-top: 0.25rem;
+  }
+}
+
+// =============================================================================
+// INLINE MODE
+// =============================================================================
+
+.alert-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.375rem;
+  border: 1px solid;
+
+  @each $name, $colors in $severities {
+    @include severity-variant($name);
+  }
+}
+
+.inline-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.0625rem;
+}
+
+.inline-content {
+  flex: 1;
+  min-width: 0;
+
+  .inline-title {
+    font-weight: 500;
+    font-size: 0.85rem;
+  }
+
+  .inline-message {
+    display: block;
+    font-size: 0.8rem;
+    opacity: 0.85;
+    margin-top: 0.125rem;
+  }
+}
+
+// =============================================================================
+// RESPONSIVE
+// =============================================================================
+
+@media (max-width: 640px) {
+  .banner-row {
+    flex-wrap: wrap;
+  }
+
+  .alert-actions {
+    width: 100%;
+    margin-top: 0.5rem;
+    justify-content: flex-end;
+  }
+
+  .alert-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-toast-container {
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+  }
+}

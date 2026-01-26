@@ -1,0 +1,7 @@
+Scenario: Making visible that work schedules limit neighborhood participation
+    Given many neighborhood activities happen during work hours
+    When my work schedule prevents participation
+    Then the protocol should make visible that employment structures exclude workers
+    And advocate for neighborhood activities at accessible times
+    And help neighborhood understand workers' constraints
+    And push for inclusive neighborhood care economy design

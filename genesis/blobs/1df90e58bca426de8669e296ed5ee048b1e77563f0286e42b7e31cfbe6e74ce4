@@ -1,0 +1,9 @@
+Scenario: Teacher tracks state education legislation affecting classroom
+    Given state legislature is considering education bills
+    And teachers can't track complex legislative processes while teaching
+    When the Observer monitors state education legislation
+    Then teachers receive alerts on bills affecting their work
+    And get plain-language summaries of education policy changes
+    And see projected impact on classroom teaching and learning
+    And access advocacy pathways (testimony, legislator contact, coalition)
+    And state policy becomes visible and actionable for frontline professionals

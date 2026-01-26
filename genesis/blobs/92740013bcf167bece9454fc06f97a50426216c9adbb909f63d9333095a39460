@@ -1,0 +1,9 @@
+Scenario: Municipal policy experimentation enabled by care economy data
+    Given Sarah's municipality has care economy data unavailable elsewhere
+    And this data enables evidence-based policy innovation
+    When municipal government considers new policies
+    Then care economy data should enable experimentation
+    And policy innovations should be tested with evidence
+    And Sarah's municipality should lead in care economy policy
+    And successful experiments should be shared with other municipalities
+    And care economy should drive progressive municipal governance

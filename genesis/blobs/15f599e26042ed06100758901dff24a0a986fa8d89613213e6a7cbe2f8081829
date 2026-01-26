@@ -1,0 +1,13 @@
+Scenario: Making post-employment care contributions visible at individual level
+    Given Frank volunteers 20 hours/week with Habitat for Humanity
+    And he provides occasional grandchild care
+    And he helps maintain his mother-in-law's home
+    And he serves on his neighborhood council
+    When Frank's care contributions are tracked
+    Then his personal_agent should quantify all volunteer and care labor
+    And it should calculate market value (~$20k/year construction volunteer work)
+    And it should accumulate care tokens for all contributions
+    And it should make visible that he's highly productive post-retirement
+    And Frank should experience himself as valuable contributor, not "not working"
+    And the data should counter cultural narrative of retired as obsolete
+    And his contributions should be recognized across multiple contexts

@@ -2,22 +2,18 @@
  * Barrel export for Lamad models
  *
  * Lamad is the Content/Learning pillar of the Elohim Protocol.
- * This barrel re-exports types from other pillars for backward compatibility.
  *
- * Pillar Structure:
- * - elohim/: Protocol-core (shared primitives, agents, attestations)
- * - imagodei/: Identity (profile, session, human nodes)
- * - lamad/: Content (nodes, paths, exploration, mastery)
- * - qahal/: Community (consent, governance, affinity, places)
- * - shefa/: Economy (REA, economic events, contributor presence)
- *
- * Six-layer architecture:
+ * Architecture:
  * - Territory: ContentNode (the knowledge graph)
  * - Journey: LearningPath, PathStep (curated sequences)
  * - Traveler: Agent, AgentProgress (human state)
  * - Maps: KnowledgeMap (polymorphic: domain, self, person, collective)
- * - Economic: REA value flows and contributor recognition
- * - Governance: Constitutional moderation, deliberation, feedback profiles
+ *
+ * For models from other pillars, import directly:
+ * - @app/elohim/models/* - Protocol-core (agents, attestations, trust)
+ * - @app/imagodei/models/* - Identity (profile, session)
+ * - @app/qahal/models/* - Community (consent, governance, affinity)
+ * - @app/shefa/models/* - Economy (REA, economic events)
  */
 
 // ============================================================================
@@ -35,7 +31,7 @@ export type {
   ContentGraphMetadata,
   ContentGraphMetadata as GraphMetadata,
   ContentReach,
-  ContentFlag
+  ContentFlag,
 } from './content-node.model';
 export { ContentRelationshipType } from './content-node.model';
 
@@ -114,7 +110,7 @@ export type {
   KnowledgeMapIndexEntry,
   KnowledgeMapIndex,
   KnowledgeMapUpdate,
-  MapMergeRequest
+  MapMergeRequest,
 } from './knowledge-map.model';
 // Export RelationshipType with alias to avoid collision
 export type { RelationshipType as PersonRelationshipType } from './knowledge-map.model';
@@ -134,6 +130,15 @@ export * from './content-access.model';
 // Content Mastery models (Bloom's Taxonomy progression)
 export * from './content-mastery.model';
 
+// Practice Pool models (Khan Academy-style organic learning)
+export * from './practice.model';
+
+// Learning Points models (Shefa economic integration)
+export * from './learning-points.model';
+
+// Mastery Visualization (colors, icons, labels for UI)
+export * from './mastery-visualization';
+
 // Content Lifecycle models (refresh policies, deprecation, archival)
 export * from './content-lifecycle.model';
 
@@ -145,11 +150,7 @@ export * from './path-negotiation.model';
 
 // Human Node models (humans in the graph - stays in lamad for graph integration)
 // Export selectively to avoid collisions
-export type {
-  HumanNode,
-  HumanReach,
-  HumanRelationship
-} from './human-node.model';
+export type { HumanNode, HumanReach, HumanRelationship } from './human-node.model';
 export type { RelationshipType as HumanRelationshipType } from './human-node.model';
 export {
   RELATIONSHIP_LAYER_MAP,
@@ -158,136 +159,15 @@ export {
   getDefaultIntimacy,
   isFamilyRelationship,
   isWorkplaceRelationship,
-  isHighTrustRelationship
+  isHighTrustRelationship,
 } from './human-node.model';
 
 // ============================================================================
-// RE-EXPORTS FROM ELOHIM (Protocol-Core)
+// LAMAD STEWARD ECONOMY MODELS
 // ============================================================================
 
-// Protocol-core primitives
-export * from '@app/elohim/models/protocol-core.model';
+// Stewardship Allocation models - One-to-many content stewardship
+export * from './stewardship-allocation.model';
 
-// REA Bridge models (ValueFlows/hREA integration - canonical location)
-export * from '@app/elohim/models/rea-bridge.model';
-
-// Agent models (Traveler state)
-export * from '@app/elohim/models/agent.model';
-
-// Elohim Agent models (Autonomous constitutional guardians)
-export * from '@app/elohim/models/elohim-agent.model';
-
-// Trust Badge models (UI-ready trust display)
-// Export selectively to avoid ContentAttestationType collision
-export type {
-  TrustBadge,
-  BadgeDisplay,
-  BadgeType,
-  BadgeColor,
-  TrustLevel,
-  BadgeWarning,
-  TrustIndicator,
-  IndicatorSource,
-  TrustIndicatorSet,
-  BadgeAction,
-  CompactTrustBadge
-} from '@app/elohim/models/trust-badge.model';
-export {
-  badgeToIndicator,
-  warningToIndicator,
-  ATTESTATION_PRIORITY,
-  ATTESTATION_BADGE_CONFIG,
-  REACH_BADGE_CONFIG,
-  WARNING_CONFIG,
-  calculateTrustLevel,
-  generateTrustSummary,
-  generateAriaLabel,
-  toCompactBadge
-} from '@app/elohim/models/trust-badge.model';
-
-// Infrastructure models (JSON-LD, Open Graph, Verifiable Credentials, Source Chain)
-export * from '@app/elohim/models/json-ld.model';
-export * from '@app/elohim/models/open-graph.model';
-export * from '@app/elohim/models/verifiable-credential.model';
-export * from '@app/elohim/models/source-chain.model';
-
-// ============================================================================
-// RE-EXPORTS FROM IMAGODEI (Identity)
-// ============================================================================
-
-// Session Human models (MVP temporary identity)
-export * from '@app/imagodei/models/session-human.model';
-
-// Profile models (human-centered identity, Imago Dei aligned)
-export * from '@app/imagodei/models/profile.model';
-
-// Agent Attestation models (Credentials earned BY humans/agents)
-// Export selectively to avoid Attestation/AttestationType collision with protocol-core
-export type {
-  Attestation as ImagodeiAttestation,
-  AttestationJourney,
-  Endorsement,
-  AttestationRequirement as ImagodeiAttestationRequirement,
-  AttestationAccessRequirement,
-  UserAttestations,
-  AttestationProgress
-} from '@app/imagodei/models/attestations.model';
-
-// ============================================================================
-// RE-EXPORTS FROM ELOHIM (Economy - canonical location)
-// ============================================================================
-
-// Economic Event models
-export * from '@app/elohim/models/economic-event.model';
-
-// Contributor Presence models (stewardship lifecycle for absent contributors)
-export * from '@app/elohim/models/contributor-presence.model';
-
-// ============================================================================
-// RE-EXPORTS FROM QAHAL (Community)
-// ============================================================================
-
-// Human Affinity models (engagement depth tracking)
-export * from '@app/qahal/models/human-affinity.model';
-
-// Human Consent models (graduated intimacy) - re-exported from elohim
-// Export selectively to avoid collision with protocol-core
-export type {
-  HumanConsent,
-  ConsentRequest
-} from '@app/elohim/models/human-consent.model';
-
-// Governance & Feedback models (the protocol's immune system)
-export * from '@app/qahal/models/governance-feedback.model';
-
-// Governance Deliberation models (context-aware feedback, deliberation, sensemaking)
-export * from '@app/qahal/models/governance-deliberation.model';
-
-// Place models (bioregional awareness)
-// Export selectively to avoid collision with protocol-core GeographicContext
-export type {
-  Place,
-  PlaceType,
-  PlaceTypeCategory,
-  PlaceNameType,
-  PlaceNameDisputeStatus,
-  PlaceName,
-  BoundaryType,
-  GeoJSONGeometry,
-  PlaceGeography,
-  EcologicalRelationshipType,
-  EcologicalRelationship,
-  CulturalContext,
-  GeographicReach,
-  GeographicDeterminationMethod,
-  GeographicDetermination,
-  EcologicalLimitType,
-  EcologicalLimit,
-  BioregionalAuthority,
-  PlaceCapability,
-  PlaceAwareElohim,
-  PlaceHierarchy,
-  PlaceHierarchyNode,
-  PlaceServiceInterface
-} from '@app/qahal/models/place.model';
-export { PLACE_TYPE_CATEGORIES } from '@app/qahal/models/place.model';
+// Steward Economy models - LAMAD-NATIVE
+export * from './steward-economy.model';

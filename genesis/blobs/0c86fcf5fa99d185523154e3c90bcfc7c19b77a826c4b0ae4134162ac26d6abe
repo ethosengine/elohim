@@ -1,0 +1,9 @@
+Scenario: Workers build relationship with community through transparent sourcing
+    Given workers source produce from Johnson Farm
+    And community values local food systems and sustainability
+    When workers communicate sourcing practices publicly
+    Then customers learn their food comes from regenerative local farm
+    And community_elohim creates farm-to-table transparency dashboard
+    And customers appreciate supporting local farmer and farm workers
+    And workers invite community to visit Johnson Farm during harvest
+    And community connection deepens through transparent supply chains

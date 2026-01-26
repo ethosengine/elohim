@@ -1,0 +1,173 @@
+<div class="stewardship-dashboard">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <div class="header-content">
+      <h1>Stewardship Dashboard</h1>
+      <p class="subtitle">Content you steward and recognition you've accumulated</p>
+    </div>
+    <button class="btn btn-secondary" (click)="refresh()" [disabled]="isLoading()">
+      <span class="material-icons">refresh</span>
+      Refresh
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner-large"></div>
+      <p>Loading your stewardship portfolio...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error() && !isLoading()) {
+    <div class="error-banner" (click)="clearError()">
+      <span class="error-icon">!</span>
+      <span>{{ error() }}</span>
+      <button type="button" class="error-dismiss">Dismiss</button>
+    </div>
+  }
+
+  <!-- Main Content -->
+  @if (!isLoading() && !error()) {
+    <!-- Stats Overview -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">
+          <span class="material-icons">library_books</span>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{{ contentCount() }}</span>
+          <span class="stat-label">Content Stewarded</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon recognition">
+          <span class="material-icons">star</span>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{{ formatRecognition(totalRecognition()) }}</span>
+          <span class="stat-label">Recognition Accumulated</span>
+        </div>
+      </div>
+
+      <div class="stat-card" [class.has-disputes]="disputeCount() > 0">
+        <div class="stat-icon disputes">
+          <span class="material-icons">gavel</span>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{{ disputeCount() }}</span>
+          <span class="stat-label">Active Disputes</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Allocations List -->
+    <div class="allocations-section">
+      <div class="section-header">
+        <h2>Your Stewardship Allocations</h2>
+        @if (hasAllocations()) {
+          <span class="allocation-count">{{ allocations().length }} items</span>
+        }
+      </div>
+
+      @if (!hasAllocations()) {
+        <div class="empty-state">
+          <span class="material-icons empty-icon">inventory_2</span>
+          <h3>No Stewardship Allocations Yet</h3>
+          <p>You haven't been assigned as steward for any content yet.</p>
+          <p class="hint">Stewardship is assigned when you create or contribute to content.</p>
+        </div>
+      } @else {
+        <div class="allocations-table">
+          <div class="table-header">
+            <span class="col-content">Content</span>
+            <span class="col-ratio">Your Share</span>
+            <span class="col-recognition">Recognition</span>
+            <span class="col-state">Status</span>
+            <span class="col-actions">Actions</span>
+          </div>
+
+          @for (item of allocations(); track item.allocation.id) {
+            <div
+              class="allocation-row"
+              [class.disputed]="item.allocation.governanceState === 'disputed'"
+            >
+              <div class="col-content">
+                <a
+                  [routerLink]="['/learn/content', item.allocation.contentId]"
+                  class="content-link"
+                >
+                  {{ item.contentTitle }}
+                </a>
+                <span class="content-id">{{ item.allocation.contentId }}</span>
+              </div>
+
+              <div class="col-ratio">
+                <div class="ratio-bar">
+                  <div
+                    class="ratio-fill"
+                    [style.width.%]="item.allocation.allocationRatio * 100"
+                  ></div>
+                </div>
+                <span class="ratio-text">{{ formatRatio(item.allocation.allocationRatio) }}</span>
+              </div>
+
+              <div class="col-recognition">
+                <span class="recognition-value">
+                  {{ formatRecognition(item.allocation.recognitionAccumulated) }}
+                </span>
+              </div>
+
+              <div class="col-state">
+                <span class="state-badge" [attr.data-state]="item.stateColor">
+                  {{ item.stateLabel }}
+                </span>
+              </div>
+
+              <div class="col-actions">
+                <a
+                  [routerLink]="['/learn/content', item.allocation.contentId]"
+                  class="btn-icon"
+                  title="View content"
+                >
+                  <span class="material-icons">visibility</span>
+                </a>
+                @if (item.allocation.governanceState === 'disputed') {
+                  <button class="btn-icon warning" title="View dispute">
+                    <span class="material-icons">warning</span>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- Info Section -->
+    <div class="info-section">
+      <h3>About Stewardship</h3>
+      <p>
+        As a steward, you care for content and receive recognition for its value to the community.
+        Stewardship can be shared among multiple contributors based on their relationship to the
+        content.
+      </p>
+      <ul>
+        <li>
+          <strong>Allocation Ratio</strong>
+          - Your share of recognition for this content
+        </li>
+        <li>
+          <strong>Recognition</strong>
+          - Value accumulated from community engagement
+        </li>
+        <li>
+          <strong>Disputes</strong>
+          - Challenges to allocation that require Elohim governance
+        </li>
+      </ul>
+    </div>
+  }
+</div>

@@ -1,0 +1,197 @@
+<!-- Compute Needs Help-Flow Component -->
+
+<div class="compute-needs" [class.mode-card]="displayMode === 'card'">
+  <!-- Loading State -->
+  <div class="loading" *ngIf="isLoading">
+    <span class="spinner"></span>
+    <span>Assessing your compute needs...</span>
+  </div>
+
+  <!-- Error State -->
+  <div class="error" *ngIf="error">
+    <span class="icon">⚠️</span>
+    <span>{{ error }}</span>
+  </div>
+
+  <!-- Content -->
+  <ng-container *ngIf="!isLoading && !error && assessment">
+    <!-- Header -->
+    <header class="needs-header">
+      <div class="header-content">
+        <h2>Compute Needs Assessment</h2>
+        <p class="subtitle">Understanding and improving your infrastructure</p>
+      </div>
+      <div class="health-badge" [ngClass]="healthStatusClass">
+        <span class="health-icon" *ngIf="assessment.overallGapSeverity === 'none'">✓</span>
+        <span class="health-icon" *ngIf="assessment.overallGapSeverity !== 'none'">
+          {{ getSeverityIcon(assessment.overallGapSeverity) }}
+        </span>
+        <span class="health-text">{{ healthStatus }}</span>
+      </div>
+    </header>
+
+    <!-- Healthy State -->
+    <div class="healthy-state" *ngIf="!assessment.hasGaps">
+      <div class="healthy-icon">✓</div>
+      <h3>Your compute is healthy!</h3>
+      <p>All your nodes are online and you have adequate resources.</p>
+      <div class="capacity-summary">
+        <div class="capacity-item">
+          <span class="label">CPU Cores</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalCPUCores | number: '1.0-0' }}
+          </span>
+        </div>
+        <div class="capacity-item">
+          <span class="label">Memory</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalMemoryGB | number: '1.0-0' }} GB
+          </span>
+        </div>
+        <div class="capacity-item">
+          <span class="label">Storage</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalStorageGB | number: '1.0-0' }} GB
+          </span>
+        </div>
+        <div class="capacity-item">
+          <span class="label">Bandwidth</span>
+          <span class="value">
+            {{ assessment.currentCapacity.totalBandwidthMbps | number: '1.0-0' }} Mbps
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gaps Section -->
+    <section class="gaps-section" *ngIf="assessment.hasGaps">
+      <h3>Issues Found</h3>
+      <div class="gaps-list">
+        <div
+          class="gap-card"
+          *ngFor="let gap of assessment.gaps"
+          [ngClass]="getSeverityClass(gap.severity)"
+        >
+          <div class="gap-header">
+            <span class="gap-icon">{{ getGapIcon(gap.resource) }}</span>
+            <div class="gap-info">
+              <span class="gap-resource">{{ gap.resource | titlecase }}</span>
+              <span class="gap-severity">{{ gap.severity | titlecase }}</span>
+            </div>
+            <span class="severity-badge">{{ getSeverityIcon(gap.severity) }}</span>
+          </div>
+
+          <div class="gap-body">
+            <p class="gap-description">{{ gap.description }}</p>
+            <p class="gap-impact">{{ gap.impact }}</p>
+          </div>
+
+          <div class="gap-metrics">
+            <div class="metric">
+              <span class="metric-label">Current</span>
+              <span class="metric-value">{{ gap.currentValue | number: '1.0-0' }}</span>
+            </div>
+            <div class="metric-arrow">→</div>
+            <div class="metric">
+              <span class="metric-label">Target</span>
+              <span class="metric-value">{{ gap.targetValue | number: '1.0-0' }}</span>
+            </div>
+            <div class="metric gap-percent">
+              <span class="metric-label">Gap</span>
+              <span class="metric-value">{{ gap.gapPercent | number: '1.0-0' }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recommendations Section -->
+    <section class="recommendations-section" *ngIf="assessment.recommendations.length > 0">
+      <h3>Recommendations</h3>
+      <p class="section-subtitle">Here's what we recommend to address these issues</p>
+
+      <div class="recommendations-list">
+        <div
+          class="recommendation-card"
+          *ngFor="let rec of assessment.recommendations"
+          [ngClass]="getPriorityClass(rec.priority)"
+          [class.selected]="selectedRecommendation === rec"
+          (click)="selectRecommendation(rec)"
+        >
+          <div class="rec-header">
+            <span class="rec-icon">{{ getNodeIcon(rec.nodeType) }}</span>
+            <div class="rec-title">
+              <span class="rec-name">{{ rec.displayName }}</span>
+              <span class="rec-priority">{{ rec.priority | titlecase }}</span>
+            </div>
+            <span class="rec-cost">{{ formatCost(rec) }}</span>
+          </div>
+
+          <div class="rec-body">
+            <p class="rec-description">{{ rec.description }}</p>
+
+            <div class="rec-addresses">
+              <span class="addresses-label">Addresses:</span>
+              <span class="address-tag" *ngFor="let gap of rec.addressesGaps">
+                {{ gap | titlecase }}
+              </span>
+            </div>
+
+            <div class="rec-improvement">
+              <div class="improvement-bar">
+                <div class="improvement-fill" [style.width.%]="rec.improvementPercent"></div>
+              </div>
+              <span class="improvement-text">{{ rec.improvementPercent }}% improvement</span>
+            </div>
+          </div>
+
+          <div class="rec-actions" *ngIf="selectedRecommendation === rec">
+            <button class="btn-primary" (click)="onOrderNode(rec); $event.stopPropagation()">
+              Order {{ rec.displayName }}
+            </button>
+            <a
+              class="btn-secondary"
+              [href]="rec.orderUrl"
+              target="_blank"
+              *ngIf="rec.orderUrl"
+              (click)="$event.stopPropagation()"
+            >
+              Learn More
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+      <div class="cta-content">
+        <span class="cta-icon">💡</span>
+        <div class="cta-text">
+          <span class="cta-title">{{ assessment.helpFlowCTA }}</span>
+          <span class="cta-subtitle" *ngIf="assessment.hasGaps">
+            Expand your network to protect your digital life
+          </span>
+        </div>
+      </div>
+      <a
+        class="cta-button"
+        href="https://holo.host/holoport"
+        target="_blank"
+        *ngIf="assessment.hasGaps"
+      >
+        Browse Holoports
+      </a>
+    </section>
+
+    <!-- Current Capacity (Card Mode) -->
+    <div class="capacity-footer" *ngIf="displayMode === 'card'">
+      <span class="capacity-label">Current Capacity:</span>
+      <span class="capacity-values">
+        {{ assessment.currentCapacity.totalCPUCores | number: '1.0-0' }} cores |
+        {{ assessment.currentCapacity.totalMemoryGB | number: '1.0-0' }} GB RAM |
+        {{ assessment.currentCapacity.totalStorageGB | number: '1.0-0' }} GB storage
+      </span>
+    </div>
+  </ng-container>
+</div>

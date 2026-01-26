@@ -1,0 +1,9 @@
+Scenario: Before and after school care affordable and accessible for working single parents
+    Given Maria works 8-5 while school runs roughly 8-3
+    And she cannot afford $400+/month per child for extended care across three children
+    When Maria needs childcare for school schedule gaps
+    Then the educational_elohim should help her access affordable before/after school care
+    And schools should provide cost-effective extended care options
+    And subsidies should be available for single-income families
+    And care should cover the full gap between school and work hours
+    And Maria should be able to maintain employment through affordable school-based care

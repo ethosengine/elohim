@@ -1,0 +1,9 @@
+Scenario: Direct farmer-to-restaurant relationships replace corporate distributor extraction
+    Given corporate distributors (Sysco, US Foods) extract 400-500% markup between farmer and restaurant
+    And Tom received $0.50/lb for tomatoes distributors sold for $2.50/lb
+    When EAE network enables direct relationships
+    Then Tom receives $1.50/lb for tomatoes (3x previous payment)
+    And restaurants pay $2.00/lb (20% less than through distributor)
+    And both parties benefit massively by eliminating extractive middleman
+    And corporate distributor extraction is replaced by transparent partnership
+    And industry_sector_elohim coordinates direct supply relationships across network

@@ -422,7 +422,7 @@ export class KuzuClient {
       `);
     }
 
-    // Link step to content if resourceId exists
+    // Link step to content if resourceId exists (optional - content may be imported later)
     if (step.resourceId) {
       try {
         await conn.query(`
@@ -430,8 +430,9 @@ export class KuzuClient {
           WHERE s.id = ${escapeString(stepId)} AND c.id = ${escapeString(step.resourceId)}
           CREATE (s)-[:STEP_USES_CONTENT]->(c)
         `);
-      } catch {
-        // Content node might not exist yet, that's OK
+      } catch (err) {
+        // Expected: ContentNode may not exist yet if paths are imported before content
+        console.warn(`Step ${stepId}: ContentNode '${step.resourceId}' not found (will link when content is imported)`);
       }
     }
   }

@@ -1,0 +1,9 @@
+Scenario: Fair compensation based on witnessed value creation
+    Given Maria's 8 years of invisible contributions are now documented
+    And her REA profile shows training, conflict prevention, and optimization work
+    When the democratic workplace calculates compensation
+    Then Maria receives $28/hour instead of previous $11/hour
+    And her training contributions (47 hours) are compensated
+    And her conflict resolution (12 incidents prevented) generates recognized value
+    And her efficiency gains (2.3 hours daily saved) benefit her, not just corporate
+    And transparent algorithms show exactly how her compensation is calculated

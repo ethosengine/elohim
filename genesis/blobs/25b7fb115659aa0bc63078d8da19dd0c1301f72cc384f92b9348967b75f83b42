@@ -1,0 +1,12 @@
+Scenario: Building community care relationships that will endure beyond crisis
+    Given I am building relationships during crisis period
+    And some relationships could become long-term community connections
+    When I invest in community relationships
+    Then the Value Scanner helps me identify relationships with potential for depth
+    And supports genuine connection beyond transactional support
+    And facilitates relationship development over time
+    And tracks meaningful community relationships
+    And validates that vulnerable people build valuable friendships
+    And my personal_agent nurtures relationships that provide belonging
+    And recognizes community-building as important social infrastructure
+    And celebrates friendships that survive crisis transition

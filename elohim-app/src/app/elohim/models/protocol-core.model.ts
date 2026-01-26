@@ -48,14 +48,14 @@
  * - Imago Dei: IdentityReach (geographic scope of identity disclosure)
  */
 export type ReachLevel =
-  | 'private'      // Only the agent themselves (and their Elohim)
-  | 'invited'      // Explicitly invited individuals (regardless of location)
-  | 'local'        // Household/immediate dwelling
+  | 'private' // Only the agent themselves (and their Elohim)
+  | 'invited' // Explicitly invited individuals (regardless of location)
+  | 'local' // Household/immediate dwelling
   | 'neighborhood' // Block/building/immediate area
-  | 'municipal'    // City/town
-  | 'bioregional'  // Watershed/ecosystem boundary (crosses political lines)
-  | 'regional'     // State/province level
-  | 'commons';     // Globally public
+  | 'municipal' // City/town
+  | 'bioregional' // Watershed/ecosystem boundary (crosses political lines)
+  | 'regional' // State/province level
+  | 'commons'; // Globally public
 
 /**
  * Numeric values for reach levels for comparison operations.
@@ -89,14 +89,14 @@ export const REACH_LEVEL_VALUES: Record<ReachLevel, number> = {
  * - { reach: 'municipal', affinity: 'professional' } → nurses in my city
  */
 export type AffinityScope =
-  | 'personal'           // Just me (private affinity)
-  | 'household'          // My family unit
-  | 'congregation'       // My local faith community
-  | 'denomination'       // Broader faith affiliation network
-  | 'professional'       // Guild/trade/field community
-  | 'special_district'   // School district, water district, etc.
-  | 'interest_group'     // Topic-based community (hobby, cause, etc.)
-  | 'open';              // No affinity filter - anyone within reach
+  | 'personal' // Just me (private affinity)
+  | 'household' // My family unit
+  | 'congregation' // My local faith community
+  | 'denomination' // Broader faith affiliation network
+  | 'professional' // Guild/trade/field community
+  | 'special_district' // School district, water district, etc.
+  | 'interest_group' // Topic-based community (hobby, cause, etc.)
+  | 'open'; // No affinity filter - anyone within reach
 
 /**
  * ContentVisibility - Combined visibility specification.
@@ -143,10 +143,10 @@ export function reachEncompasses(source: ReachLevel, target: ReachLevel): boolea
  * - Shefa: Value flow permissions
  */
 export type IntimacyLevel =
-  | 'recognition'  // One-way acknowledgment
-  | 'connection'   // Mutual connection
-  | 'trusted'      // Elevated trust
-  | 'intimate';    // Full love map capability
+  | 'recognition' // One-way acknowledgment
+  | 'connection' // Mutual connection
+  | 'trusted' // Elevated trust
+  | 'intimate'; // Full love map capability
 
 /**
  * Numeric values for intimacy levels for comparison operations.
@@ -161,10 +161,7 @@ export const INTIMACY_LEVEL_VALUES: Record<IntimacyLevel, number> = {
 /**
  * Check if current intimacy meets minimum required level.
  */
-export function hasMinimumIntimacy(
-  current: IntimacyLevel,
-  required: IntimacyLevel
-): boolean {
+export function hasMinimumIntimacy(current: IntimacyLevel, required: IntimacyLevel): boolean {
   return INTIMACY_LEVEL_VALUES[current] >= INTIMACY_LEVEL_VALUES[required];
 }
 
@@ -173,10 +170,14 @@ export function hasMinimumIntimacy(
  */
 export function getNextIntimacyLevel(current: IntimacyLevel): IntimacyLevel | null {
   switch (current) {
-    case 'recognition': return 'connection';
-    case 'connection': return 'trusted';
-    case 'trusted': return 'intimate';
-    case 'intimate': return null;
+    case 'recognition':
+      return 'connection';
+    case 'connection':
+      return 'trusted';
+    case 'trusted':
+      return 'intimate';
+    case 'intimate':
+      return null;
   }
 }
 
@@ -194,12 +195,12 @@ export function getNextIntimacyLevel(current: IntimacyLevel): IntimacyLevel | nu
  * - Imago Dei: Identity disclosure permissions
  */
 export type ConsentState =
-  | 'not_required'  // No consent needed (e.g., public content)
-  | 'pending'       // Request sent, awaiting response
-  | 'accepted'      // Consent given, permission active
-  | 'declined'      // Consent refused (can retry after cooldown)
-  | 'revoked'       // Previously accepted, now withdrawn
-  | 'expired';      // Time-limited consent that has lapsed
+  | 'not_required' // No consent needed (e.g., public content)
+  | 'pending' // Request sent, awaiting response
+  | 'accepted' // Consent given, permission active
+  | 'declined' // Consent refused (can retry after cooldown)
+  | 'revoked' // Previously accepted, now withdrawn
+  | 'expired'; // Time-limited consent that has lapsed
 
 /**
  * Check if a consent state allows the permission to be used.
@@ -226,26 +227,26 @@ export function isConsentActive(state: ConsentState): boolean {
  */
 export type GovernanceLayer =
   // Intimate layers (high trust, small scale)
-  | 'self'                // Individual agency
-  | 'household'           // Family/living unit
-  | 'extended_family'     // Multi-generational family
+  | 'self' // Individual agency
+  | 'household' // Family/living unit
+  | 'extended_family' // Multi-generational family
 
   // Local layers (place-based community)
-  | 'neighborhood'        // Block, street, immediate area
-  | 'municipality'        // City, town, village
-  | 'county_regional'     // County, district, region
+  | 'neighborhood' // Block, street, immediate area
+  | 'municipality' // City, town, village
+  | 'county_regional' // County, district, region
 
   // Broader layers (identity/affinity-based)
-  | 'affinity_network'    // Interest/identity group (not place-based)
-  | 'workplace'           // Organizational context
-  | 'faith_community'     // Religious/spiritual community
+  | 'affinity_network' // Interest/identity group (not place-based)
+  | 'workplace' // Organizational context
+  | 'faith_community' // Religious/spiritual community
 
   // Wide layers (large-scale coordination)
-  | 'state_provincial'    // State, province
-  | 'national'            // Nation-state
-  | 'bioregional'         // Ecological boundaries (watershed, etc.)
-  | 'continental'         // Continental scope
-  | 'global';             // Planetary coordination
+  | 'state_provincial' // State, province
+  | 'national' // Nation-state
+  | 'bioregional' // Ecological boundaries (watershed, etc.)
+  | 'continental' // Continental scope
+  | 'global'; // Planetary coordination
 
 /**
  * Governance layer ordering (from most local to most global).
@@ -292,17 +293,17 @@ export function isMoreLocal(a: GovernanceLayer, b: GovernanceLayer): boolean {
  * Some governance layers are place-based, others are not.
  */
 export type GeographicLayer =
-  | 'point'              // Specific location (lat/lng)
-  | 'building'           // Single structure
-  | 'block'              // City block
-  | 'neighborhood'       // Neighborhood area
-  | 'municipality'       // City/town boundaries
-  | 'county'             // County/district
-  | 'state_province'     // State/province
-  | 'nation'             // Country
-  | 'continent'          // Continental
-  | 'global'             // Worldwide
-  | 'bioregion';         // Ecological boundary (watershed, etc.)
+  | 'point' // Specific location (lat/lng)
+  | 'building' // Single structure
+  | 'block' // City block
+  | 'neighborhood' // Neighborhood area
+  | 'municipality' // City/town boundaries
+  | 'county' // County/district
+  | 'state_province' // State/province
+  | 'nation' // Country
+  | 'continent' // Continental
+  | 'global' // Worldwide
+  | 'bioregion'; // Ecological boundary (watershed, etc.)
 
 /**
  * GeographicContext - Location information attached to entities.
@@ -348,13 +349,13 @@ export interface GeographicContext {
  * Agents can be humans, organizations, AI entities, or presences.
  */
 export type AgentType =
-  | 'human'                 // Individual person (embodied)
-  | 'organization'          // Group with shared identity
-  | 'community'             // Community collective
-  | 'household'             // Family/living unit
-  | 'contributor_presence'  // Unclaimed/stewarded external contributor
-  | 'elohim'                // AI agent (constitutional steward)
-  | 'system';               // Protocol infrastructure
+  | 'human' // Individual person (embodied)
+  | 'organization' // Group with shared identity
+  | 'community' // Community collective
+  | 'household' // Family/living unit
+  | 'contributor_presence' // Unclaimed/stewarded external contributor
+  | 'elohim' // AI agent (constitutional steward)
+  | 'system'; // Protocol infrastructure
 
 /**
  * ProtocolAgent - Minimal agent identity shared across pillars.
@@ -397,38 +398,38 @@ export interface ProtocolAgent {
  */
 export type AttestationType =
   // Identity attestations (Imago Dei)
-  | 'identity_verification'   // Attesting someone is who they claim
-  | 'relationship_claim'      // Attesting a relationship exists
+  | 'identity_verification' // Attesting someone is who they claim
+  | 'relationship_claim' // Attesting a relationship exists
 
   // Capability attestations (Lamad)
-  | 'skill_attestation'       // Attesting demonstrated skill
-  | 'completion_attestation'  // Attesting path completion
-  | 'authorship_attestation'  // Attesting content authorship
+  | 'skill_attestation' // Attesting demonstrated skill
+  | 'completion_attestation' // Attesting path completion
+  | 'authorship_attestation' // Attesting content authorship
 
   // Trust attestations (Qahal)
-  | 'community_membership'    // Attesting community membership
-  | 'role_attestation'        // Attesting role in organization
-  | 'endorsement'             // General endorsement
+  | 'community_membership' // Attesting community membership
+  | 'role_attestation' // Attesting role in organization
+  | 'endorsement' // General endorsement
 
   // Economic attestations (Shefa)
   | 'contribution_attestation' // Attesting value contribution
-  | 'stewardship_attestation'  // Attesting stewardship commitment
+  | 'stewardship_attestation' // Attesting stewardship commitment
 
   // Meta attestations
-  | 'attestation_revocation'   // Revoking a previous attestation
-  | 'dispute'                  // Disputing another attestation
-  | 'custom';                  // User-defined attestation type
+  | 'attestation_revocation' // Revoking a previous attestation
+  | 'dispute' // Disputing another attestation
+  | 'custom'; // User-defined attestation type
 
 /**
  * AttestationStatus - Lifecycle of an attestation.
  */
 export type AttestationStatus =
-  | 'pending'     // Awaiting verification
-  | 'active'      // Currently valid
-  | 'suspended'   // Temporarily suspended (under review)
-  | 'revoked'     // Permanently revoked
-  | 'expired'     // Time-limited and lapsed
-  | 'disputed';   // Under governance dispute
+  | 'pending' // Awaiting verification
+  | 'active' // Currently valid
+  | 'suspended' // Temporarily suspended (under review)
+  | 'revoked' // Permanently revoked
+  | 'expired' // Time-limited and lapsed
+  | 'disputed'; // Under governance dispute
 
 /**
  * Attestation - A verifiable claim in the protocol.
@@ -608,32 +609,32 @@ export interface CrossPillarLink {
  */
 export type CrossPillarLinkType =
   // Imago Dei ↔ Lamad
-  | 'identity_authors_content'    // Human authored content
-  | 'identity_attests_skill'      // Human has skill from learning
+  | 'identity_authors_content' // Human authored content
+  | 'identity_attests_skill' // Human has skill from learning
 
   // Imago Dei ↔ Qahal
   | 'identity_participates_community' // Human is community member
-  | 'identity_has_relationship'       // Human has relationship
+  | 'identity_has_relationship' // Human has relationship
 
   // Imago Dei ↔ Shefa
-  | 'identity_enables_claim'      // Identity enables value claiming
-  | 'identity_receives_value'     // Identity receives attribution
+  | 'identity_enables_claim' // Identity enables value claiming
+  | 'identity_receives_value' // Identity receives attribution
 
   // Lamad ↔ Qahal
   | 'content_shared_in_community' // Content visible in community
-  | 'path_negotiated_together'    // Humans negotiating learning path
+  | 'path_negotiated_together' // Humans negotiating learning path
 
   // Lamad ↔ Shefa
-  | 'content_generates_value'     // Content creates economic value
-  | 'learning_earns_credential'   // Learning produces credential
+  | 'content_generates_value' // Content creates economic value
+  | 'learning_earns_credential' // Learning produces credential
 
   // Qahal ↔ Shefa
-  | 'relationship_enables_flow'   // Relationship allows value transfer
-  | 'community_stewards_commons'  // Community manages commons pool
+  | 'relationship_enables_flow' // Relationship allows value transfer
+  | 'community_stewards_commons' // Community manages commons pool
 
   // Meta
-  | 'attestation_bridges'         // Attestation connects pillars
-  | 'custom';                     // Custom link type
+  | 'attestation_bridges' // Attestation connects pillars
+  | 'custom'; // Custom link type
 
 // ============================================================================
 // TOKEN TYPE - Shefa Value Types
@@ -645,14 +646,14 @@ export type CrossPillarLinkType =
  * From the Shefa whitepaper - multi-dimensional value tracking.
  */
 export type TokenType =
-  | 'care'           // Generated by caregiving acts
-  | 'time'           // Hours contributed to community
-  | 'learning'       // Skills developed and taught
-  | 'steward'        // Environmental/resource protection
-  | 'creator'        // Content that helps others
+  | 'care' // Generated by caregiving acts
+  | 'time' // Hours contributed to community
+  | 'learning' // Skills developed and taught
+  | 'steward' // Environmental/resource protection
+  | 'creator' // Content that helps others
   | 'infrastructure' // Network maintenance contribution
-  | 'recognition'    // General appreciation/endorsement
-  | 'custom';        // Community-defined token type
+  | 'recognition' // General appreciation/endorsement
+  | 'custom'; // Community-defined token type
 
 /**
  * TokenDecayRate - How quickly tokens lose value if not circulated.
@@ -660,10 +661,10 @@ export type TokenType =
  * Implements demurrage to encourage circulation.
  */
 export type TokenDecayRate =
-  | 'none'    // No decay (learning, creator tokens)
-  | 'low'     // Slow decay (time, steward tokens)
-  | 'medium'  // Moderate decay (care tokens)
-  | 'high';   // Fast decay (infrastructure tokens)
+  | 'none' // No decay (learning, creator tokens)
+  | 'low' // Slow decay (time, steward tokens)
+  | 'medium' // Moderate decay (care tokens)
+  | 'high'; // Fast decay (infrastructure tokens)
 
 /**
  * TokenSpecification - Definition of a token type.
@@ -784,31 +785,31 @@ export const TOKEN_SPECS: Record<TokenType, TokenSpecification> = {
  */
 export type ConstitutionalConstraintType =
   // Layer 1: Dignity Floor
-  | 'dignity_minimum'         // Basic needs floor
-  | 'care_recognition'        // Care labor always recognized
+  | 'dignity_minimum' // Basic needs floor
+  | 'care_recognition' // Care labor always recognized
 
   // Layer 2: Attribution
   | 'contribution_attribution' // Value flows to creators
-  | 'attribution_persistence'  // Attribution persists offline
+  | 'attribution_persistence' // Attribution persists offline
 
   // Layer 3: Circulation
-  | 'circulation_requirement'  // Tokens must circulate
-  | 'accumulation_limit'       // Hoarding triggers redistribution
-  | 'demurrage_enforcement'    // Decay on hoarding
+  | 'circulation_requirement' // Tokens must circulate
+  | 'accumulation_limit' // Hoarding triggers redistribution
+  | 'demurrage_enforcement' // Decay on hoarding
 
   // Layer 4: Sustainability
-  | 'next_community'           // Portion to next liberation
-  | 'infrastructure_funding'   // Protocol maintenance
-  | 'ecological_limit';        // Bioregional boundaries
+  | 'next_community' // Portion to next liberation
+  | 'infrastructure_funding' // Protocol maintenance
+  | 'ecological_limit'; // Bioregional boundaries
 
 /**
  * EnforcementLevel - What happens when a constraint is violated.
  */
 export type EnforcementLevel =
-  | 'warning'           // Alert but no action
-  | 'soft_limit'        // Limit with override possible
-  | 'require_governance'// Must go through deliberation
-  | 'hard_block';       // Constitutional prohibition
+  | 'warning' // Alert but no action
+  | 'soft_limit' // Limit with override possible
+  | 'require_governance' // Must go through deliberation
+  | 'hard_block'; // Constitutional prohibition
 
 /**
  * ConstitutionalConstraint - A rule that cannot be overridden.

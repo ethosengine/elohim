@@ -1,0 +1,11 @@
+Scenario: Voice interface enables hands-free shopping list creation
+    Given Alex is planning their weekly groceries
+    And Alex has difficulty with fine motor tasks
+    When Alex wants to create a shopping list
+    Then Alex should be able to use voice commands exclusively
+    And the system should accurately recognize Alex's speech patterns
+    And Alex should be able to add, remove, and modify items by voice
+    And the interface should provide clear audio feedback
+    And Alex should not be forced to use touch or keyboard if they choose voice
+    And the experience should be as efficient as visual interface
+    And Alex should have equal access to all shopping features
