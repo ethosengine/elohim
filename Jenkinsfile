@@ -65,7 +65,7 @@ def getSonarProjectConfig() {
     def targetBranch = env.CHANGE_TARGET ?: env.BRANCH_NAME
 
     if (targetBranch == 'main') {
-        return [projectKey: 'elohim-app-prod', shouldEnforce: true, env: 'prod']
+        return [projectKey: 'elohim-app', shouldEnforce: true, env: 'prod']
     } else if (targetBranch == 'staging' || targetBranch ==~ /staging-.+/) {
         return [projectKey: 'elohim-app-staging', shouldEnforce: false, env: 'staging']
     } else {
