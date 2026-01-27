@@ -151,13 +151,12 @@ describe('BlobStreamingService', () => {
       const url = 'https://example.com/probe.bin';
       const probeData = new Uint8Array(1024 * 1024); // 1 MB
 
-      // Mock performance.now() to simulate 1 second elapsed (1 MB / 1s = 8 Mbps)
+      // Mock performance.now() to simulate 1 second elapsed (1 MB / 1s = 1 MB/s)
       let callCount = 0;
-      const originalPerformanceNow = performance.now;
       spyOn(performance, 'now').and.callFake(() => {
         callCount++;
-        // First call: startTime=0, second call: latencyStartTime=0, third call: endTime=1000ms
-        return callCount <= 2 ? 0 : 1000;
+        // First call: startTime=0, second call: endTime=1000ms
+        return callCount === 1 ? 0 : 1000;
       });
 
       const probePromise = service.probeBandwidth(url);

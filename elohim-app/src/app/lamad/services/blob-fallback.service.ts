@@ -10,7 +10,7 @@
  * Also tracks URL health for future requests.
  */
 
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
 import { retry, timeout, catchError, tap, map } from 'rxjs/operators';
@@ -168,8 +168,8 @@ export class BlobFallbackService {
           })
         ),
         catchError((error: unknown) => {
-          // Record failure
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          // Record failure - handle HttpErrorResponse and other error types
+          const errorMessage = this.extractErrorMessage(error, url);
           this.recordUrlFailure(url, errorMessage);
 
           console.warn(`URL failed: ${url}. Trying next fallback...`, error);
@@ -445,5 +445,27 @@ export class BlobFallbackService {
     } catch {
       return 'unknown';
     }
+  }
+
+  /**
+   * Extract a meaningful error message from various error types.
+   *
+   * Handles HttpErrorResponse, Error objects, and unknown types.
+   *
+   * @param error The error to extract message from
+   * @param url The URL that failed (used for context)
+   * @returns Human-readable error message
+   */
+  private extractErrorMessage(error: unknown, url: string): string {
+    if (error instanceof HttpErrorResponse) {
+      return `Http failure for ${url}: ${error.status} ${error.statusText}`;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    return `Unknown error for ${url}`;
   }
 }

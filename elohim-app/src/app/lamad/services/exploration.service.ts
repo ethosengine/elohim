@@ -899,14 +899,14 @@ export class ExplorationService {
     return totalDegree / graph.nodes.size;
   }
 
-  private createError(code: ExplorationErrorCode, details?: unknown): Observable<never> {
+  private createError(code: ExplorationErrorCode, details?: ExplorationError['details']): Observable<never> {
     return throwError(() => this.buildError(code, undefined, details));
   }
 
   private buildError(
     code: ExplorationErrorCode,
     message?: string,
-    details?: unknown
+    details?: ExplorationError['details']
   ): ExplorationError {
     const messages: Record<ExplorationErrorCode, string> = {
       RESOURCE_NOT_FOUND: 'The requested resource was not found',

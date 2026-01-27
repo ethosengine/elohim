@@ -559,7 +559,7 @@ export class BlobStreamingService {
               // This is a server misconfiguration - trust Accept-Ranges header
               const acceptRanges = response.headers.get('Accept-Ranges');
               const canDoRanges = acceptRanges && acceptRanges.toLowerCase() !== 'none';
-              resolve(canDoRanges ?? false);
+              resolve(!!canDoRanges);
             } else {
               resolve(isRangeSupported);
             }
@@ -666,7 +666,7 @@ export class BlobStreamingService {
         maxSpeedMbps: speedMbps * 1.2, // Optimistic estimate
         probeDataSize: data.byteLength,
         probeDurationMs,
-        latencyMs: Math.round(latencyStartTime), // Simplified - would need more sophisticated timing
+        latencyMs: Math.round(Math.min(probeDurationMs * 0.1, 100)), // Simplified estimate - 10% of probe time, capped at 100ms
       };
 
       // Cache result
