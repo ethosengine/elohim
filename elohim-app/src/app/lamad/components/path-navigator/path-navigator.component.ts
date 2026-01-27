@@ -115,6 +115,12 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   contentRefreshKey = 0; // Increment to trigger content reload
   private readonly TRANSITION_DURATION = 300; // Match CSS transition duration
 
+  /** CSS class for focused view mode */
+  private readonly FOCUSED_VIEW_MODE_CLASS = 'focused-view-mode';
+
+  /** Base route for path navigation */
+  private readonly PATH_ROUTE = '/lamad/path';
+
   private readonly destroy$ = new Subject<void>();
   private readonly seoService = inject(SeoService);
 
@@ -150,7 +156,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Exit path context when leaving the navigator
     this.pathContextService.exitPath();
     // Clean up focused view mode if active
-    this.document.body.classList.remove('focused-view-mode');
+    this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
   }
 
   /**
@@ -454,76 +460,144 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Build lesson context for 4-level hierarchy (chapters → modules → sections → conceptIds)
+   * Build lesson context for 4-level hierarchy (chapters -> modules -> sections -> conceptIds)
    */
   private buildLessonContext4Level(path: LearningPath): void {
-    let globalIndex = 0;
-    for (let ci = 0; ci < path.chapters!.length; ci++) {
-      const chapter = path.chapters![ci];
-      for (let mi = 0; mi < (chapter.modules || []).length; mi++) {
-        const module = chapter.modules![mi];
-        for (let si = 0; si < (module.sections || []).length; si++) {
-          const section = module.sections[si];
-          const conceptCount = section.conceptIds?.length || 0;
-
-          // Check if current stepIndex falls within this section
-          if (this.stepIndex >= globalIndex && this.stepIndex < globalIndex + conceptCount) {
-            const currentConceptIndex = this.stepIndex - globalIndex;
-
-            // Build concepts list for this section
-            const concepts: LessonConcept[] = (section.conceptIds || []).map((conceptId, idx) => ({
-              conceptId,
-              title: this.formatConceptTitle(conceptId),
-              isCompleted: false, // TODO: Load from progress
-              isCurrent: idx === currentConceptIndex,
-              index: globalIndex + idx,
-              icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
-            }));
-
-            this.lessonContext = {
-              chapter,
-              chapterIndex: ci,
-              module,
-              moduleIndex: mi,
-              section,
-              sectionIndex: si,
-              concepts,
-              currentConceptIndex,
-            };
-            return;
-          }
-          globalIndex += conceptCount;
-        }
-      }
+    const context = this.findLessonContextInPath(path);
+    if (context) {
+      this.lessonContext = context;
+      return;
     }
-
     // Fallback: stepIndex out of range, use first section
-    if (path.chapters!.length > 0) {
-      const chapter = path.chapters![0];
-      if ((chapter.modules || []).length > 0) {
-        const module = chapter.modules![0];
-        if ((module.sections || []).length > 0) {
-          const section = module.sections[0];
-          this.lessonContext = {
-            chapter,
-            chapterIndex: 0,
-            module,
-            moduleIndex: 0,
-            section,
-            sectionIndex: 0,
-            concepts: (section.conceptIds || []).map((conceptId, idx) => ({
-              conceptId,
-              title: this.formatConceptTitle(conceptId),
-              isCompleted: false,
-              isCurrent: idx === 0,
-              index: idx,
-              icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
-            })),
-            currentConceptIndex: 0,
-          };
-        }
+    this.lessonContext = this.buildDefaultLessonContext(path);
+  }
+
+  /**
+   * Search through path hierarchy to find context for current stepIndex.
+   */
+  private findLessonContextInPath(path: LearningPath): LessonContext | null {
+    let globalIndex = 0;
+    const chapters = path.chapters ?? [];
+
+    for (let ci = 0; ci < chapters.length; ci++) {
+      const chapter = chapters[ci];
+      const result = this.findContextInChapter(chapter, ci, globalIndex);
+      if (result.context) {
+        return result.context;
       }
+      globalIndex = result.nextGlobalIndex;
     }
+    return null;
+  }
+
+  /**
+   * Search within a chapter for the current stepIndex context.
+   */
+  private findContextInChapter(
+    chapter: PathChapter,
+    chapterIndex: number,
+    globalIndex: number
+  ): { context: LessonContext | null; nextGlobalIndex: number } {
+    const modules = chapter.modules ?? [];
+
+    for (let mi = 0; mi < modules.length; mi++) {
+      const module = modules[mi];
+      const result = this.findContextInModule(chapter, chapterIndex, module, mi, globalIndex);
+      if (result.context) {
+        return result;
+      }
+      globalIndex = result.nextGlobalIndex;
+    }
+    return { context: null, nextGlobalIndex: globalIndex };
+  }
+
+  /**
+   * Search within a module for the current stepIndex context.
+   */
+  private findContextInModule(
+    chapter: PathChapter,
+    chapterIndex: number,
+    module: PathModule,
+    moduleIndex: number,
+    globalIndex: number
+  ): { context: LessonContext | null; nextGlobalIndex: number } {
+    const sections = module.sections ?? [];
+
+    for (let si = 0; si < sections.length; si++) {
+      const section = sections[si];
+      const conceptCount = section.conceptIds?.length ?? 0;
+
+      if (this.stepIndex >= globalIndex && this.stepIndex < globalIndex + conceptCount) {
+        const currentConceptIndex = this.stepIndex - globalIndex;
+        return {
+          context: this.buildSectionContext(
+            chapter,
+            chapterIndex,
+            module,
+            moduleIndex,
+            section,
+            si,
+            globalIndex,
+            currentConceptIndex
+          ),
+          nextGlobalIndex: globalIndex + conceptCount,
+        };
+      }
+      globalIndex += conceptCount;
+    }
+    return { context: null, nextGlobalIndex: globalIndex };
+  }
+
+  /**
+   * Build lesson context for a specific section.
+   */
+  private buildSectionContext(
+    chapter: PathChapter,
+    chapterIndex: number,
+    module: PathModule,
+    moduleIndex: number,
+    section: PathSection,
+    sectionIndex: number,
+    globalIndex: number,
+    currentConceptIndex: number
+  ): LessonContext {
+    const concepts: LessonConcept[] = (section.conceptIds ?? []).map((conceptId, idx) => ({
+      conceptId,
+      title: this.formatConceptTitle(conceptId),
+      isCompleted: false, // TODO: Load from progress
+      isCurrent: idx === currentConceptIndex,
+      index: globalIndex + idx,
+      icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
+    }));
+
+    return {
+      chapter,
+      chapterIndex,
+      module,
+      moduleIndex,
+      section,
+      sectionIndex,
+      concepts,
+      currentConceptIndex,
+    };
+  }
+
+  /**
+   * Build default lesson context using first available section.
+   */
+  private buildDefaultLessonContext(path: LearningPath): LessonContext | null {
+    const chapters = path.chapters ?? [];
+    if (chapters.length === 0) return null;
+
+    const chapter = chapters[0];
+    const modules = chapter.modules ?? [];
+    if (modules.length === 0) return null;
+
+    const module = modules[0];
+    const sections = module.sections ?? [];
+    if (sections.length === 0) return null;
+
+    return this.buildSectionContext(chapter, 0, module, 0, sections[0], 0, 0, 0);
   }
 
   /**
@@ -544,7 +618,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    * Navigate to a specific concept in the lesson
    */
   goToConcept(globalIndex: number): void {
-    this.router.navigate(['/lamad/path', this.pathId, 'step', globalIndex]);
+    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', globalIndex]);
   }
 
   /**
@@ -553,7 +627,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   goToStep(index: number): void {
     // Emit progress signal before navigating
     this.emitProgressSignal();
-    this.router.navigate(['/lamad/path', this.pathId, 'step', index]);
+    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', index]);
   }
 
   goToPrevious(): void {
@@ -569,7 +643,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   goToPathOverview(): void {
-    this.router.navigate(['/lamad/path', this.pathId]);
+    this.router.navigate([this.PATH_ROUTE, this.pathId]);
   }
 
   /**
@@ -654,7 +728,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       stepIndex: this.stepIndex,
       totalSteps: this.getTotalSteps(),
       chapterTitle: this.getCurrentChapterTitle(),
-      returnRoute: ['/lamad/path', this.pathId, 'step', String(this.stepIndex)],
+      returnRoute: [this.PATH_ROUTE, this.pathId, 'step', String(this.stepIndex)],
     };
   }
 
@@ -798,9 +872,9 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Hide sidebar in focused view
     if (active) {
       this.sidebarOpen = false;
-      this.document.body.classList.add('focused-view-mode');
+      this.document.body.classList.add(this.FOCUSED_VIEW_MODE_CLASS);
     } else {
-      this.document.body.classList.remove('focused-view-mode');
+      this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
     }
 
     // Wait for CSS transition to complete, then trigger content reload

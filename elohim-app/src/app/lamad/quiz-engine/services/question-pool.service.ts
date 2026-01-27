@@ -19,7 +19,6 @@ import type {
 } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type {
   QuestionPool,
-  QuestionPoolMetadata,
   HierarchicalQuestionSource,
   HierarchicalPoolStats,
   QuestionSelectionOptions,

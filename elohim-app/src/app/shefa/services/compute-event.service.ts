@@ -20,21 +20,19 @@
 
 import { Injectable } from '@angular/core';
 
-import { map, switchMap, tap, catchError, debounceTime, startWith } from 'rxjs/operators';
-
+import { switchMap, tap, catchError, startWith, map } from 'rxjs/operators';
 import { BehaviorSubject, Observable, Subject, interval, from, of } from 'rxjs';
 
-import { EconomicEvent } from '@app/elohim/models/economic-event.model';
+import { LamadEventType } from '@app/elohim/models/economic-event.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 import { AllocationSnapshot, ComputeMetrics } from '../models/shefa-dashboard.model';
-import { ResourceMeasure } from '../models/stewarded-resources.model';
 
 import { EconomicService, CreateEconomicEventInput } from './economic.service';
+import { ShefaComputeService } from './shefa-compute.service';
 
 // CreateEventRequest is an alias for the EconomicEvent creation input
 type CreateEventRequest = CreateEconomicEventInput;
-import { ShefaComputeService } from './shefa-compute.service';
 
 /**
  * Configuration for compute event generation
@@ -86,19 +84,19 @@ export class ComputeEventService {
   private config: ComputeEventConfig = DEFAULT_CONFIG;
 
   // Track last usage metrics to calculate delta
-  private lastMetrics$ = new BehaviorSubject<ComputeMetrics | null>(null);
-  private lastAllocations$ = new BehaviorSubject<AllocationSnapshot | null>(null);
+  private readonly lastMetrics$ = new BehaviorSubject<ComputeMetrics | null>(null);
+  private readonly lastAllocations$ = new BehaviorSubject<AllocationSnapshot | null>(null);
 
   // Emit computed events
-  private computeEvents$ = new Subject<ComputeEventPayload>();
+  private readonly computeEvents$ = new Subject<ComputeEventPayload>();
 
   // Track emission to avoid duplicates
   private lastEmissionTime = Date.now();
 
   constructor(
-    private holochain: HolochainClientService,
-    private economicService: EconomicService,
-    private shefaCompute: ShefaComputeService
+    private readonly holochain: HolochainClientService,
+    private readonly economicService: EconomicService,
+    private readonly shefaCompute: ShefaComputeService
   ) {}
 
   /**
@@ -107,21 +105,23 @@ export class ComputeEventService {
    */
   initializeEventEmission(
     operatorId: string,
-    stewardedResourceId: string
+    _stewardedResourceId: string
   ): Observable<ComputeEventPayload> {
     // Emit events on configured interval
     return interval(this.config.eventEmissionInterval).pipe(
       startWith(0), // Emit immediately
       switchMap(() => {
         const state = this.shefaCompute.getDashboardState();
-        if (!state) return [];
+        if (!state) return of<ComputeEventPayload>(null as unknown as ComputeEventPayload);
 
         return this.generateComputeEvents(operatorId, state.computeMetrics, state.allocations);
       }),
-      tap(event => this.computeEvents$.next(event)),
+      tap(event => {
+        if (event) this.computeEvents$.next(event);
+      }),
       catchError(error => {
         console.error('[ComputeEventService] Event emission failed:', error);
-        return [];
+        return of<ComputeEventPayload>(null as unknown as ComputeEventPayload);
       })
     );
   }
@@ -143,7 +143,8 @@ export class ComputeEventService {
     allocations: AllocationSnapshot
   ): Observable<ComputeEventPayload> {
     const lastMetrics = this.lastMetrics$.value;
-    const lastAllocations = this.lastAllocations$.value;
+    // Allocations baseline stored for future delta calculation
+    const _lastAllocations = this.lastAllocations$.value;
 
     // Calculate usage delta since last measurement
     const cpuCoreHours = this.calculateCpuCoreHours(lastMetrics, metrics);
@@ -201,7 +202,7 @@ export class ComputeEventService {
       map(persistedEvents => {
         // Emit each event
         persistedEvents.forEach(e => this.computeEvents$.next(e));
-        return persistedEvents[0] || ({} as ComputeEventPayload);
+        return persistedEvents[0] ?? ({} as ComputeEventPayload);
       })
     );
   }
@@ -303,7 +304,7 @@ export class ComputeEventService {
     totalCpuHours: number,
     totalStorageGBHours: number,
     totalBandwidthHours: number,
-    allocations: AllocationSnapshot
+    _allocations: AllocationSnapshot
   ): ComputeEventPayload {
     const tokensEarned = this.calculateTokensEarned(
       totalCpuHours,
@@ -354,7 +355,7 @@ export class ComputeEventService {
       })
     ).pipe(
       map(result => {
-        const results = result.success ? result.data || [] : [];
+        const results = result.success ? (result.data ?? []) : [];
         // Link persisted event IDs back to payloads
         return events.map((e, i) => ({
           ...e,
@@ -396,12 +397,12 @@ export class ComputeEventService {
     return {
       action,
       providerId: operatorId, // My node is the provider
-      receiverId: payload.usage.governanceLevel || payload.usage.custodianId || 'family-community',
+      receiverId: payload.usage.governanceLevel ?? payload.usage.custodianId ?? 'family-community',
       resourceQuantityValue: quantity,
       resourceQuantityUnit: unit,
       resourceClassifiedAs: ['compute', 'infrastructure'],
-      note: `Compute provided to ${payload.usage.governanceLevel || 'family-community'}: ${cpuHours.toFixed(2)} CPU-hours, ${storageHours.toFixed(2)} GB-hours, ${bandwidthHours.toFixed(2)} Mbps-hours`,
-      lamadEventType: lamadEventType as any,
+      note: `Compute provided to ${payload.usage.governanceLevel ?? 'family-community'}: ${cpuHours.toFixed(2)} CPU-hours, ${storageHours.toFixed(2)} GB-hours, ${bandwidthHours.toFixed(2)} Mbps-hours`,
+      lamadEventType: lamadEventType as LamadEventType,
     };
   }
 

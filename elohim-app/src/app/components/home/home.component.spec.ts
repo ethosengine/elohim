@@ -1,11 +1,14 @@
+import { provideHttpClient } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+
 import { of } from 'rxjs';
-import { HomeComponent } from './home.component';
-import { ConfigService } from '../../services/config.service';
+
 import { AnalyticsService } from '../../services/analytics.service';
+import { ConfigService } from '../../services/config.service';
 import { DomInteractionService } from '../../services/dom-interaction.service';
+
+import { HomeComponent } from './home.component';
 
 describe('HomeComponent', () => {
   let component: HomeComponent;
@@ -54,7 +57,9 @@ describe('HomeComponent', () => {
   });
 
   it('should setup scroll listeners on init', done => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
     const scrollSpy = spyOn<any>(component, 'setupParallaxScrolling');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
     const observerSpy = spyOn<any>(component, 'setupIntersectionObserver');
 
     fixture.detectChanges();
@@ -72,18 +77,22 @@ describe('HomeComponent', () => {
   it('should cleanup on destroy', () => {
     fixture.detectChanges();
 
-    // Simulate having listeners
+    // Simulate having listeners - accessing private properties for testing
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).scrollListener = () => {};
-    (component as any).intersectionObserver = {
+    const mockObserver = {
       disconnect: jasmine.createSpy('disconnect'),
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
+    (component as any).intersectionObserver = mockObserver;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).rafId = 123;
 
     const cancelSpy = spyOn(window, 'cancelAnimationFrame');
 
     component.ngOnDestroy();
 
-    expect((component as any).intersectionObserver.disconnect).toHaveBeenCalled();
+    expect(mockObserver.disconnect).toHaveBeenCalled();
     expect(cancelSpy).toHaveBeenCalledWith(123);
   });
 

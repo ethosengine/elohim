@@ -1,9 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-import { catchError, map, timeout } from 'rxjs/operators';
-
-import { of, Observable } from 'rxjs';
+import { Observable } from 'rxjs';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';

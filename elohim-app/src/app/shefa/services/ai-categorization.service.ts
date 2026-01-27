@@ -21,7 +21,6 @@ import { Observable, of } from 'rxjs';
 
 import {
   StagedTransaction,
-  CategorySuggestion,
   CategorizationResponse,
   CategorizationResult,
   CorrectionRecord,
@@ -45,12 +44,12 @@ export class AICategorizationService {
   private readonly BATCH_SIZE = 50; // Max transactions per request
 
   // Learning: store user corrections for few-shot examples
-  private corrections: CorrectionRecord[] = [];
-  private merchantPatterns = new Map<string, { category: string; confidence: number }>();
+  private readonly corrections: CorrectionRecord[] = [];
+  private readonly merchantPatterns = new Map<string, { category: string; confidence: number }>();
 
-  constructor(private elohimStub: ElohimStubService) {
+  constructor(private readonly elohimStub: ElohimStubService) {
     this.initializeDefaultPatterns();
-    console.log('[AICategories] Initialized with ElohimStubService');
+    console.warn('[AICategories] Initialized with ElohimStubService');
   }
 
   /**
@@ -128,7 +127,7 @@ export class AICategorizationService {
     return this.elohimStub.categorizeTransactions(request).pipe(
       map(results => {
         const duration = Date.now() - startTime;
-        console.log(
+        console.warn(
           `[AICategories] Categorized ${transactions.length} transactions in ${duration}ms`
         );
 
@@ -202,13 +201,15 @@ export class AICategorizationService {
     // Check if we should auto-create a TransactionRule
     const shouldCreateRule = this.checkShouldCreateRule(staged, correctedCategory);
     if (shouldCreateRule) {
-      console.log(
+      console.warn(
         `[AICategories] Would create TransactionRule for ${staged.merchantName} → ${correctedCategory}`
       );
-      // TODO: Emit event or call TransactionRuleService.createRule()
+      // Emit event or call TransactionRuleService.createRule() when available
     }
 
-    console.log(`[AICategories] Learned correction: ${staged.merchantName} → ${correctedCategory}`);
+    console.warn(
+      `[AICategories] Learned correction: ${staged.merchantName} → ${correctedCategory}`
+    );
   }
 
   /**

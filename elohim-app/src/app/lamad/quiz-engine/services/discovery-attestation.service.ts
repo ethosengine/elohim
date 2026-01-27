@@ -13,7 +13,7 @@
  * - They are visible path steps, not hidden attestation signals
  */
 
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, signal, computed } from '@angular/core';
 
 import { type Attestation } from '@app/imagodei/models/attestations.model';
 
@@ -92,7 +92,7 @@ export class DiscoveryAttestationService {
     const grouped = new Map<DiscoveryFramework, DiscoveryResult[]>();
 
     for (const result of results) {
-      const existing = grouped.get(result.framework) || [];
+      const existing = grouped.get(result.framework) ?? [];
       existing.push(result);
       grouped.set(result.framework, existing);
     }
@@ -377,7 +377,7 @@ export class DiscoveryAttestationService {
     return {
       label: result.shortDisplay,
       icon: getCategoryIcon(result.category),
-      color: result.primaryType.color || colors[result.category],
+      color: result.primaryType.color ?? colors[result.category],
     };
   }
 
@@ -387,7 +387,7 @@ export class DiscoveryAttestationService {
 
   private getCurrentHumanId(): string {
     // TODO: Get from IdentityService
-    return localStorage.getItem('elohim:session-human-id') || 'anonymous';
+    return localStorage.getItem('elohim:session-human-id') ?? 'anonymous';
   }
 
   private shouldAutoFeature(framework: DiscoveryFramework): boolean {

@@ -12,7 +12,7 @@ $color-danger: #ef4444;
 $color-text: #1f2937;
 $color-text-muted: #6b7280;
 $color-border: #e5e7eb;
-$color-bg: #ffffff;
+$color-bg: #fff;
 $color-bg-subtle: #f9fafb;
 
 // =============================================================================
@@ -346,7 +346,7 @@ section {
 
   &:hover {
     border-color: $color-primary;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 5%);
   }
 
   &.selected {
@@ -630,7 +630,7 @@ section {
 // RESPONSIVE
 // =============================================================================
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .needs-header {
     flex-direction: column;
     align-items: flex-start;

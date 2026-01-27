@@ -36,6 +36,12 @@ let loadPromise: Promise<void> | null = null;
 let isRegistered = false;
 let cssLoaded = false;
 
+/** Log prefix for Sophia loader messages */
+const LOG_PREFIX = '[Sophia]';
+
+/** Custom element tag name for Sophia questions */
+const SOPHIA_ELEMENT_TAG = 'sophia-question';
+
 // CSS URLs
 const getSophiaStylesUrl = (): string => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,7 +182,7 @@ async function ensureReactLoaded(): Promise<void> {
  */
 export async function registerSophiaElement(): Promise<void> {
   // Already registered
-  if (isRegistered || customElements.get('sophia-question')) {
+  if (isRegistered || customElements.get(SOPHIA_ELEMENT_TAG)) {
     isRegistered = true;
     return;
   }
@@ -211,7 +217,7 @@ export async function registerSophiaElement(): Promise<void> {
       console.log('[Sophia] Script loaded');
 
       // Element should be registered synchronously
-      const elementDef = customElements.get('sophia-question');
+      const elementDef = customElements.get(SOPHIA_ELEMENT_TAG);
       console.log('[Sophia] Element registered:', !!elementDef);
 
       if (!elementDef) {
@@ -251,14 +257,14 @@ export async function registerSophiaElement(): Promise<void> {
  * Check if the Sophia element is registered.
  */
 export function isSophiaElementRegistered(): boolean {
-  return isRegistered || !!customElements.get('sophia-question');
+  return isRegistered || !!customElements.get(SOPHIA_ELEMENT_TAG);
 }
 
 /**
  * Get the Sophia element by querying the DOM.
  */
 export function getSophiaElement(container: HTMLElement): SophiaQuestionElement | null {
-  return container.querySelector('sophia-question') as SophiaQuestionElement | null;
+  return container.querySelector(SOPHIA_ELEMENT_TAG) as SophiaQuestionElement | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -525,7 +531,8 @@ export function getPsycheAPI(): PsycheAPI | null {
       // Fallback: find highest scoring subscale
       const entries = Object.entries(aggregated.subscaleTotals);
       if (entries.length === 0) return undefined;
-      return entries.reduce((max, curr) => (curr[1] > max[1] ? curr : max))[0];
+      const [firstEntry, ...restEntries] = entries;
+      return restEntries.reduce((max, curr) => (curr[1] > max[1] ? curr : max), firstEntry)[0];
     },
 
     // Local implementation for data sufficiency check
@@ -542,24 +549,18 @@ export function getPsycheAPI(): PsycheAPI | null {
 
     // Stub implementations for interface completeness
     // These are not needed for basic discovery/reflection flow
-    registerInstrument: () => {
-      /* Not implemented */
-    },
-    updateInstrument: () => {
-      /* Not implemented */
-    },
+    registerInstrument: () => undefined,
+    updateInstrument: () => undefined,
     unregisterInstrument: () => false,
     getInstrument: () => undefined,
     getAllInstruments: () => [],
     hasInstrument: () => false,
-    clearInstruments: () => {
-      /* Not implemented */
-    },
+    clearInstruments: () => undefined,
     createInstrument: () => {
-      throw new Error('Not implemented');
+      throw new Error('Sophia adapter: createInstrument not implemented');
     },
     recognizeReflection: () => {
-      throw new Error('Not implemented');
+      throw new Error('Sophia adapter: recognizeReflection not implemented');
     },
     mergeAggregatedReflections: (a, b) => ({
       subscaleTotals: { ...a.subscaleTotals, ...b.subscaleTotals },

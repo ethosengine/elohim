@@ -97,7 +97,10 @@ export class DoorwayPickerComponent implements OnInit {
     );
     if (online.length === 0) return null;
     // Sort by latency and return the fastest
-    return online.sort((a, b) => (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity))[0];
+    const sorted = [...online].sort(
+      (a, b) => (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity)
+    );
+    return sorted[0];
   });
 
   /** Filtered and sorted doorways based on search, region, and sort option */
@@ -156,16 +159,14 @@ export class DoorwayPickerComponent implements OnInit {
   /** Available regions from doorways */
   readonly availableRegions = computed(() => {
     const regions = new Set(this.doorways().map(d => d.region));
-    return Array.from(regions).sort();
+    return Array.from(regions).sort((a, b) => a.localeCompare(b));
   });
 
   /** Currently selected doorway ID (for highlighting) */
   readonly selectedId = computed(() => this.selected()?.doorway.id ?? null);
 
   /** Title text based on mode */
-  readonly titleText = computed(() =>
-    this.mode() === 'login' ? 'Choose Your Gateway' : 'Choose Your Gateway'
-  );
+  readonly titleText = computed(() => 'Choose Your Gateway');
 
   /** Subtitle text based on mode */
   readonly subtitleText = computed(() =>

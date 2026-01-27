@@ -19,7 +19,7 @@
  * @see EconomicService for underlying hREA primitives
  */
 
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 import { catchError, shareReplay, tap } from 'rxjs/operators';
 
@@ -34,9 +34,7 @@ import {
   PricingModel,
   AccessGrant,
   GrantType,
-  StewardRevenue,
   StewardRevenueSummary,
-  GateRevenueSummary,
   CreateStewardCredentialInput,
   CreatePremiumGateInput,
   GrantAccessInput,

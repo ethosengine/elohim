@@ -6,4 +6,4 @@
  */
 
 export { Html5AppFormatPlugin } from './html5-app-format.plugin';
-export { Html5AppContent } from '../../../renderers/iframe-renderer/iframe-renderer.component';
+export type { Html5AppContent } from '../../../renderers/iframe-renderer/iframe-renderer.component';

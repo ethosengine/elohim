@@ -3,7 +3,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
-import { Observable, Subject, catchError, map, of, retry, timeout } from 'rxjs';
+import { Observable, Subject, catchError, of, retry, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import {

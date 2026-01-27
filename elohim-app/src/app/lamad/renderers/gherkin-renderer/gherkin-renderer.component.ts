@@ -196,9 +196,10 @@ export class GherkinRendererComponent implements OnChanges {
 
   highlightStepText(text: string): string {
     // Highlight <placeholders> and "strings"
+    // Using possessive-like patterns to avoid backtracking
     return text
-      .replace(/<([^>]+)>/g, '<span class="placeholder">&lt;$1&gt;</span>')
-      .replace(/"([^"]+)"/g, '<span class="string">"$1"</span>');
+      .replace(/<([^<>]*)>/g, '<span class="placeholder">&lt;$1&gt;</span>')
+      .replace(/"([^"]*)"/g, '<span class="string">"$1"</span>');
   }
 
   private parseGherkin(): void {
@@ -371,7 +372,8 @@ export class GherkinRendererComponent implements OnChanges {
 
   /** Handle step lines (Given/When/Then/And/But) */
   private handleStep(trimmed: string, ctx: ParseContext): boolean {
-    const stepMatch = /^(Given|When|Then|And|But|\*)\s+(.+)$/.exec(trimmed);
+    // Use atomic grouping pattern to avoid backtracking
+    const stepMatch = /^(Given|When|Then|And|But|\*)\s+(\S.*)$/.exec(trimmed);
     if (!stepMatch || !ctx.currentScenario) return false;
     ctx.currentScenario.steps.push({ keyword: stepMatch[1] + ' ', text: stepMatch[2] });
     return true;

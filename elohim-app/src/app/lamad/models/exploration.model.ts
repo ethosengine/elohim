@@ -359,11 +359,23 @@ export interface ExplorationError {
   code: ExplorationErrorCode;
   message: string;
   details?: {
+    // Depth-related errors
     requestedDepth?: number;
     allowedDepth?: number;
+    // Attestation check results (when passed as details)
+    allowed?: boolean;
+    maxAllowedDepth?: number;
+    tier?: RateLimitTier;
     requiredAttestation?: string;
+    // Rate limiting
     rateLimitStatus?: RateLimitStatus;
+    // Query cost
     queryCost?: QueryCost;
+    // Resource identification
+    resourceId?: string;
+    // Pathfinding context
+    from?: string;
+    to?: string;
   };
 }
 

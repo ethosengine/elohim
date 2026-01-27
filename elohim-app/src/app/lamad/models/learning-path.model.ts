@@ -4,6 +4,20 @@ import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 import { ContentNode } from './content-node.model';
 
 /**
+ * Difficulty level for learning paths and content.
+ */
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+
+/**
+ * Path type hint for UI rendering.
+ * - 'journey': Standard learning path (default)
+ * - 'quest': Achievement-oriented with milestones
+ * - 'expedition': Long-form deep dive
+ * - 'practice': Skill-building through repetition
+ */
+export type PathType = 'journey' | 'quest' | 'expedition' | 'practice';
+
+/**
  * LearningPath - A curated journey through Territory resources.
  *
  * Paths can be structured in two ways:
@@ -60,7 +74,7 @@ export interface LearningPath {
 
   // Classification
   tags: string[];
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: DifficultyLevel;
   estimatedDuration: string;
 
   // =========================================================================
@@ -133,14 +147,8 @@ export interface LearningPath {
   prerequisitePaths?: string[];
   attestationsGranted?: string[];
 
-  /**
-   * Path type hint for UI rendering:
-   * - 'journey': Standard learning path (default)
-   * - 'quest': Achievement-oriented with milestones
-   * - 'expedition': Long-form deep dive
-   * - 'practice': Skill-building through repetition
-   */
-  pathType?: 'journey' | 'quest' | 'expedition' | 'practice';
+  /** Path type hint for UI rendering */
+  pathType?: PathType;
 
   // =========================================================================
   // Social Graph Metadata (for sharing learning paths)
@@ -517,7 +525,7 @@ export interface PathIndexEntry {
   id: string;
   title: string;
   description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: DifficultyLevel;
   estimatedDuration: string;
   stepCount: number;
   tags: string[];
@@ -526,7 +534,7 @@ export interface PathIndexEntry {
   chapterCount?: number;
 
   /** Path type for UI hints */
-  pathType?: 'journey' | 'quest' | 'expedition' | 'practice';
+  pathType?: PathType;
 
   /** Attestations granted upon completion */
   attestationsGranted?: string[];
@@ -576,7 +584,7 @@ export interface PathContentMetadata {
   pathId: string;
 
   /** Difficulty level for filtering */
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: DifficultyLevel;
 
   /** Human-readable estimated duration (e.g., "2-3 hours") */
   estimatedDuration: string;
@@ -637,7 +645,7 @@ export interface PathContentMetadata {
   canonicalStatus?: 'draft' | 'community' | 'canonical';
 
   /** Path type hint for UI rendering */
-  pathType?: 'journey' | 'quest' | 'expedition' | 'practice';
+  pathType?: PathType;
 
   /** Attestations granted upon path completion */
   attestationsGranted?: string[];

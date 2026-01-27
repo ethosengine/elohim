@@ -24,6 +24,9 @@ import type {
 import type { FormatMetadata } from '../../interfaces/format-metadata.interface';
 import type { ValidationResult } from '../../interfaces/validation-result.interface';
 
+/** Canonical format ID for Sophia quiz content */
+const SOPHIA_FORMAT_ID = 'sophia-quiz-json';
+
 /**
  * Format plugin for Sophia psychometric assessments.
  *
@@ -36,7 +39,7 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
   // Identity
   // ═══════════════════════════════════════════════════════════════════════════
 
-  readonly formatId = 'sophia-quiz-json';
+  readonly formatId = SOPHIA_FORMAT_ID;
   readonly displayName = 'Sophia Assessment';
   readonly fileExtensions = ['.sophia.json', '.sophia-quiz.json'];
   readonly mimeTypes = ['application/vnd.sophia.assessment+json'];
@@ -125,10 +128,10 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
 
     return {
       content: content as object,
-      contentFormat: 'sophia-quiz-json',
+      contentFormat: SOPHIA_FORMAT_ID,
       title,
       metadata: {
-        format: 'sophia-quiz-json',
+        format: SOPHIA_FORMAT_ID,
         assessmentPurpose: purpose,
       },
     };

@@ -5,19 +5,13 @@ import { provideRouter } from '@angular/router';
 import { environment } from '../environments/environment';
 
 import { routes } from './app.routes';
-
-// ElohimClient - mode-aware content client (local provider to avoid Angular version mismatch)
 import { provideElohimClient, detectClientMode } from './elohim/providers/elohim-client.provider';
-
-// Content I/O module with unified format plugins
 import { CustodianCommitmentService } from './elohim/services/custodian-commitment.service';
 import { CustodianMetricsReporterService } from './elohim/services/custodian-metrics-reporter.service';
 import { CustodianSelectionService } from './elohim/services/custodian-selection.service';
 import { PerformanceMetricsService } from './elohim/services/performance-metrics.service';
 import { ShefaService } from './elohim/services/shefa.service';
 import { ContentIOModuleWithPlugins } from './lamad/content-io/content-io.module';
-
-// Shefa metrics and custodian selection services
 
 export const appConfig: ApplicationConfig = {
   providers: [

@@ -2,7 +2,24 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
-import { ShefaService } from '../../services/shefa.service';
+import { ShefaService, CustodianMetrics } from '../../services/shefa.service';
+
+/** Alert from the Shefa service */
+interface ShefaAlert {
+  readonly custodianId: string;
+  readonly severity: 'warning' | 'critical';
+  readonly category: string;
+  readonly message: string;
+  readonly suggestion?: string;
+}
+
+/** Recommendation from the Shefa service */
+interface ShefaRecommendation {
+  readonly custodianId: string;
+  readonly category: string;
+  readonly opportunity: string;
+  readonly potentialRevenue?: number;
+}
 
 /**
  * Shefa Dashboard Component
@@ -31,9 +48,9 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   readonly Math = Math;
 
   // Data signals
-  readonly allMetrics = signal<any[]>([]);
-  readonly alerts = signal<any[]>([]);
-  readonly recommendations = signal<any[]>([]);
+  readonly allMetrics = signal<CustodianMetrics[]>([]);
+  readonly alerts = signal<ShefaAlert[]>([]);
+  readonly recommendations = signal<ShefaRecommendation[]>([]);
 
   // Tab state
   readonly activeTab = signal<'overview' | 'custodians' | 'alerts' | 'performance'>('overview');
@@ -46,34 +63,34 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   readonly totalCustodians = computed(() => this.allMetrics().length);
 
   readonly healthyCustodians = computed(
-    () => this.allMetrics().filter(c => c.health.uptime_percent >= 95).length
+    () => this.allMetrics().filter(c => c.health.uptimePercent >= 95).length
   );
 
   readonly networkUptime = computed(() => {
     const metrics = this.allMetrics();
     if (metrics.length === 0) return 0;
-    const sum = metrics.reduce((acc, c) => acc + c.health.uptime_percent, 0);
+    const sum = metrics.reduce((acc, c) => acc + c.health.uptimePercent, 0);
     return sum / metrics.length;
   });
 
   readonly avgResponseTime = computed(() => {
     const metrics = this.allMetrics();
     if (metrics.length === 0) return 0;
-    const sum = metrics.reduce((acc, c) => acc + c.health.response_time_p95_ms, 0);
+    const sum = metrics.reduce((acc, c) => acc + c.health.responseTimeP95Ms, 0);
     return Math.round(sum / metrics.length);
   });
 
   readonly totalCommitments = computed(() =>
-    this.allMetrics().reduce((sum, c) => sum + c.economic.active_commitments, 0)
+    this.allMetrics().reduce((sum, c) => sum + c.economic.activeCommitments, 0)
   );
 
   readonly totalStorage = computed(() => {
-    const bytes = this.allMetrics().reduce((sum, c) => sum + c.storage.used_bytes, 0);
+    const bytes = this.allMetrics().reduce((sum, c) => sum + c.storage.usedBytes, 0);
     return this.formatBytes(bytes);
   });
 
   readonly totalBandwidth = computed(() => {
-    const sum = this.allMetrics().reduce((acc, c) => acc + c.bandwidth.declared_mbps, 0);
+    const sum = this.allMetrics().reduce((acc, c) => acc + c.bandwidth.declaredMbps, 0);
     return Math.round(sum);
   });
 
@@ -83,26 +100,26 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
 
     // Filter by tier
     if (this.filterByTier() !== 'all') {
-      custodians = custodians.filter(c => c.economic.steward_tier === this.filterByTier());
+      custodians = custodians.filter(c => c.economic.stewardTier === this.filterByTier());
     }
 
     // Sort
     switch (this.sortBy()) {
       case 'health':
-        custodians.sort((a, b) => b.health.uptime_percent - a.health.uptime_percent);
+        custodians.sort((a, b) => b.health.uptimePercent - a.health.uptimePercent);
         break;
       case 'reputation':
-        custodians.sort((a, b) => b.reputation.reputation_score - a.reputation.reputation_score);
+        custodians.sort((a, b) => b.reputation.reputationScore - a.reputation.reputationScore);
         break;
       case 'capacity':
         custodians.sort(
           (a, b) =>
-            b.bandwidth.declared_mbps - a.bandwidth.declared_mbps ||
-            b.storage.total_capacity_bytes - a.storage.total_capacity_bytes
+            b.bandwidth.declaredMbps - a.bandwidth.declaredMbps ||
+            b.storage.totalCapacityBytes - a.storage.totalCapacityBytes
         );
         break;
       case 'earnings':
-        custodians.sort((a, b) => b.economic.monthly_earnings - a.economic.monthly_earnings);
+        custodians.sort((a, b) => b.economic.monthlyEarnings - a.economic.monthlyEarnings);
         break;
     }
 
@@ -111,24 +128,24 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
 
   // Top performers
   readonly topByHealth = computed(() =>
-    this.allMetrics()
-      .sort((a, b) => b.health.uptime_percent - a.health.uptime_percent)
+    [...this.allMetrics()]
+      .sort((a, b) => b.health.uptimePercent - a.health.uptimePercent)
       .slice(0, 5)
   );
 
   readonly topBySpeed = computed(() =>
-    this.allMetrics()
-      .sort((a, b) => a.health.response_time_p95_ms - b.health.response_time_p95_ms)
+    [...this.allMetrics()]
+      .sort((a, b) => a.health.responseTimeP95Ms - b.health.responseTimeP95Ms)
       .slice(0, 5)
   );
 
   readonly topByReputation = computed(() =>
-    this.allMetrics()
-      .sort((a, b) => b.reputation.reputation_score - a.reputation.reputation_score)
+    [...this.allMetrics()]
+      .sort((a, b) => b.reputation.reputationScore - a.reputation.reputationScore)
       .slice(0, 5)
   );
 
-  private refreshInterval: any;
+  private refreshInterval: ReturnType<typeof setInterval> | null = null;
 
   async ngOnInit(): Promise<void> {
     await this.loadData();

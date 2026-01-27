@@ -102,10 +102,12 @@ interface GeographicRisk {
   providedIn: 'root',
 })
 export class FamilyCommunityProtectionService {
-  private protectionStatus$ = new BehaviorSubject<FamilyCommunityProtectionStatus | null>(null);
-  private healthCheckInterval = 30000; // Check custodian health every 30 seconds
+  private readonly protectionStatus$ = new BehaviorSubject<FamilyCommunityProtectionStatus | null>(
+    null
+  );
+  private readonly healthCheckInterval = 30000; // Check custodian health every 30 seconds
 
-  constructor(private holochain: HolochainClientService) {}
+  constructor(private readonly holochain: HolochainClientService) {}
 
   /**
    * Initialize protection monitoring for an operator

@@ -20,7 +20,6 @@ import {
   registerPerseusElement,
   type PerseusQuestionElement,
   getPerseusElement,
-  refreshPerseusDarkMode,
 } from './perseus-element-loader';
 
 import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
@@ -135,7 +134,7 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
   // View References
   // ─────────────────────────────────────────────────────────────────────────
 
-  @ViewChild('container') private container!: ElementRef<HTMLDivElement>;
+  @ViewChild('container') private readonly container!: ElementRef<HTMLDivElement>;
 
   private perseusElement: PerseusQuestionElement | null = null;
   private initialized = false;

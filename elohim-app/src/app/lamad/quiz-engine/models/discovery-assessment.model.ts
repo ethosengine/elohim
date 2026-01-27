@@ -19,7 +19,7 @@
  * - Are private by default (user controls visibility)
  */
 
-import type { ContentNode } from '../../models/content-node.model';
+// Type-only import removed - ContentNode not used in this file
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Discovery Assessment Types
@@ -422,7 +422,7 @@ export function formatDiscoveryShort(result: DiscoveryResult): string {
   switch (result.framework) {
     case 'enneagram': {
       const enneagram = result as EnneagramResult;
-      return `${enneagram.coreType}${enneagram.wing || ''}`;
+      return `${enneagram.coreType}${enneagram.wing ?? ''}`;
     }
 
     case 'mbti': {
@@ -439,7 +439,7 @@ export function formatDiscoveryShort(result: DiscoveryResult): string {
     }
 
     default:
-      return result.primaryType.shortCode || result.primaryType.name.substring(0, 4);
+      return result.primaryType.shortCode ?? result.primaryType.name.substring(0, 4);
   }
 }
 

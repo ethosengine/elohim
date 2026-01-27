@@ -116,7 +116,7 @@ export class ElohimStubService {
   };
 
   constructor() {
-    console.log('[ElohimStub] Initialized - AI calls will be logged and stubbed');
+    console.warn('[ElohimStub] Initialized - AI calls will be logged and stubbed');
   }
 
   // ============================================================================
@@ -128,8 +128,6 @@ export class ElohimStubService {
    * Logs the prompt and returns keyword-based categorization.
    */
   categorizeTransactions(request: CategorizationRequest): Observable<CategorizationResult[]> {
-    const startTime = Date.now();
-
     // Build the prompt that would be sent to the AI
     const prompt = this.buildCategorizationPrompt(request);
 
@@ -147,7 +145,7 @@ export class ElohimStubService {
         transactionCount: request.transactions.length,
         categories: request.categories,
         stewardId: request.stewardId,
-        hasHistoricalExamples: (request.historicalExamples?.length || 0) > 0,
+        hasHistoricalExamples: (request.historicalExamples?.length ?? 0) > 0,
       },
       response: results,
       latencyMs: this.SIMULATED_LATENCY_MS,
@@ -188,14 +186,14 @@ Instructions: For each transaction, determine the most appropriate category base
     txn: StagedTransaction,
     availableCategories: string[]
   ): CategorizationResult {
-    const searchText = `${txn.description} ${txn.merchantName || ''}`.toLowerCase();
+    const searchText = `${txn.description} ${txn.merchantName ?? ''}`.toLowerCase();
 
     // Try to match against patterns
     for (const [pattern, category] of Object.entries(this.DEFAULT_PATTERNS)) {
       if (searchText.includes(pattern)) {
         // Only use the category if it's in the available list
         const matchedCategory =
-          availableCategories.find(c => c.toLowerCase() === category.toLowerCase()) || category;
+          availableCategories.find(c => c.toLowerCase() === category.toLowerCase()) ?? category;
 
         return {
           transactionId: txn.id,

@@ -71,7 +71,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
   border: 1px solid var(--surface-border, #dee2e6);
   border-radius: 20px;
   font-size: 0.9rem;
@@ -91,13 +91,13 @@
 
 .filter-count {
   padding: 0.125rem 0.5rem;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgb(0 0 0 / 10%);
   border-radius: 10px;
   font-size: 0.8rem;
 }
 
 .filter-btn.active .filter-count {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(255 255 255 / 20%);
 }
 
 /* My Stewarded Section */
@@ -125,7 +125,7 @@
 
 /* Presence Card */
 .presence-card {
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
   border: 1px solid var(--surface-border, #dee2e6);
   border-radius: 12px;
   padding: 1.25rem;
@@ -136,7 +136,7 @@
 }
 
 .presence-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
 }
 
 .presence-card.stewarded-card {
@@ -261,7 +261,7 @@
 .empty-state {
   text-align: center;
   padding: 3rem;
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
   border-radius: 12px;
   border: 1px dashed var(--surface-border, #dee2e6);
 }
@@ -280,7 +280,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgb(0 0 0 / 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -289,7 +289,7 @@
 }
 
 .modal-content {
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
   border-radius: 12px;
   padding: 2rem;
   width: 100%;
@@ -355,7 +355,7 @@
 .form-group textarea:focus {
   border-color: var(--primary-400, #60a5fa);
   box-shadow: 0 0 0 3px var(--primary-100, #dbeafe);
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
 }
 
 .form-group input:disabled,
@@ -424,7 +424,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid transparent;
-  border-top-color: currentColor;
+  border-top-color: currentcolor;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -436,7 +436,7 @@
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .presence-list-container {
     padding: 1rem;
   }

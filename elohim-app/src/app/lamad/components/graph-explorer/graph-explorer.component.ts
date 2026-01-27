@@ -14,7 +14,6 @@ import {
   ClusterNode,
   ClusterEdge,
   ClusterGraphData,
-  ClusterConnection,
   CLUSTER_LEVEL_CONFIG,
   calculateClusterRadius,
 } from '../../models/cluster-graph.model';
@@ -24,6 +23,15 @@ import { HierarchicalGraphService } from '../../services/hierarchical-graph.serv
  * View mode for the graph explorer.
  */
 type ViewMode = 'path-hierarchy' | 'overview';
+
+// Cluster state constants to avoid magic strings
+const STATE_UNSEEN: ClusterNode['state'] = 'unseen';
+const STATE_PROFICIENT: ClusterNode['state'] = 'proficient';
+const STATE_IN_PROGRESS: ClusterNode['state'] = 'in-progress';
+const STATE_RECOMMENDED: ClusterNode['state'] = 'recommended';
+
+// Edge type constants
+const EDGE_TYPE_NEXT: ClusterEdge['type'] = 'NEXT';
 
 /**
  * GraphExplorerComponent - Hierarchical cluster visualization for learning paths.
@@ -93,7 +101,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       if (params['fromPath']) {
         this.returnContext = {
           pathId: params['fromPath'],
-          stepIndex: parseInt(params['returnStep'] || '0', 10),
+          stepIndex: parseInt(params['returnStep'] ?? '0', 10),
         };
       }
 
@@ -275,7 +283,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: path => {
-          if (!path || !path.chapters || path.chapters.length === 0) {
+          if (!path?.chapters || path.chapters.length === 0) {
             this.error = 'No content available for overview';
             this.isLoading = false;
             return;
@@ -333,25 +341,25 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
   /**
    * Convert a ContentNode to ClusterNode format.
    */
-  private convertToClusterNode(node: any): ClusterNode {
-    const affinityScore = this.affinityService.getAffinity(node.id);
+  private convertToClusterNode(node: Partial<ClusterNode>): ClusterNode {
+    const affinityScore = this.affinityService.getAffinity(node.id ?? '');
 
-    let state: ClusterNode['state'] = 'unseen';
+    let state: ClusterNode['state'] = STATE_UNSEEN;
     if (affinityScore > 0.66) {
-      state = 'proficient';
+      state = STATE_PROFICIENT;
     } else if (affinityScore > 0.33) {
-      state = 'in-progress';
+      state = STATE_IN_PROGRESS;
     }
 
     if (node.id === 'manifesto' && affinityScore === 0) {
-      state = 'recommended';
+      state = STATE_RECOMMENDED;
     }
 
     return {
-      id: node.id,
-      title: node.title || node.id,
-      description: node.description,
-      contentType: node.contentType || 'concept',
+      id: node.id ?? '',
+      title: node.title ?? node.id ?? '',
+      description: node.description ?? '',
+      contentType: node.contentType ?? 'concept',
       isCluster: false,
       clusterType: null,
       clusterLevel: 4,
@@ -365,8 +373,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       externalConnectionCount: 0,
       state,
       affinityScore,
-      x: node.position?.x ?? 0,
-      y: node.position?.y ?? 0,
+      x: node.x ?? 0,
+      y: node.y ?? 0,
     };
   }
 
@@ -392,7 +400,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .expandCluster(clusterId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: result => {
+        next: _result => {
           this.loadingClusters.delete(clusterId);
 
           // Update visible nodes
@@ -463,7 +471,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .force(
         'link',
         d3
-          .forceLink<ClusterNode, ClusterEdge>(edges as any)
+          // Type assertion needed for D3 force simulation compatibility
+          .forceLink<ClusterNode, ClusterEdge>(edges as ClusterEdge[])
           .id((d: ClusterNode) => d.id)
           .distance(d => this.getLinkDistance(d))
       )
@@ -478,6 +487,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       );
 
     // Draw edges first (under nodes)
+    // D3 uses standard SVG attribute names - disable string duplication for D3 fluent API
+    /* eslint-disable sonarjs/no-duplicate-string */
     const link = g
       .append('g')
       .attr('class', 'links')
@@ -487,12 +498,10 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .append('line')
       .attr('class', d => `link link-${d.type.toLowerCase()}`)
       .attr('stroke', d => this.getEdgeColor(d))
-      .attr('stroke-opacity', d => (d.type === 'NEXT' ? 0.8 : d.isAggregated ? 0.3 : 0.6))
-      .attr('stroke-width', d =>
-        d.type === 'NEXT' ? 3 : d.isAggregated ? Math.min(d.connectionCount || 1, 8) : 2
-      )
+      .attr('stroke-opacity', d => this.getEdgeOpacity(d))
+      .attr('stroke-width', d => this.getEdgeStrokeWidth(d))
       .attr('stroke-dasharray', d => (d.isAggregated ? '5,5' : 'none'))
-      .attr('marker-end', d => (d.type === 'NEXT' ? 'url(#arrow-next)' : null));
+      .attr('marker-end', d => (d.type === EDGE_TYPE_NEXT ? 'url(#arrow-next)' : null));
 
     // Draw nodes
     const node = g
@@ -627,6 +636,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
 
       node.attr('transform', d => `translate(${d.x},${d.y})`);
     });
+    /* eslint-enable sonarjs/no-duplicate-string */
   }
 
   /**
@@ -689,11 +699,11 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private getNodeColor(node: ClusterNode): string {
     switch (node.state) {
-      case 'proficient':
+      case STATE_PROFICIENT:
         return '#fbbf24';
-      case 'in-progress':
+      case STATE_IN_PROGRESS:
         return '#facc15';
-      case 'recommended':
+      case STATE_RECOMMENDED:
         return '#22c55e';
       case 'review':
         return '#f97316';
@@ -709,11 +719,11 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private getNodeStroke(node: ClusterNode): string {
     switch (node.state) {
-      case 'proficient':
+      case STATE_PROFICIENT:
         return '#3b82f6';
-      case 'in-progress':
+      case STATE_IN_PROGRESS:
         return '#3b82f6';
-      case 'recommended':
+      case STATE_RECOMMENDED:
         return '#22c55e';
       case 'review':
         return '#f97316';
@@ -729,7 +739,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private getEdgeColor(edge: ClusterEdge): string {
     switch (edge.type) {
-      case 'NEXT':
+      case EDGE_TYPE_NEXT:
         return '#6366f1'; // Indigo for progression
       case 'CONTAINS':
         return '#22c55e';
@@ -740,6 +750,24 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       default:
         return edge.isAggregated ? '#6366f1' : '#475569';
     }
+  }
+
+  /**
+   * Get edge opacity based on type and aggregation.
+   */
+  private getEdgeOpacity(edge: ClusterEdge): number {
+    if (edge.type === EDGE_TYPE_NEXT) return 0.8;
+    if (edge.isAggregated) return 0.3;
+    return 0.6;
+  }
+
+  /**
+   * Get edge stroke width based on type and aggregation.
+   */
+  private getEdgeStrokeWidth(edge: ClusterEdge): number {
+    if (edge.type === EDGE_TYPE_NEXT) return 3;
+    if (edge.isAggregated) return Math.min(edge.connectionCount ?? 1, 8);
+    return 2;
   }
 
   /**
@@ -885,10 +913,10 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   getStateLabel(state: string): string {
     const labels: Record<string, string> = {
-      unseen: 'Not Started',
-      'in-progress': 'In Progress',
-      proficient: 'Completed',
-      recommended: 'Recommended',
+      [STATE_UNSEEN]: 'Not Started',
+      [STATE_IN_PROGRESS]: 'In Progress',
+      [STATE_PROFICIENT]: 'Completed',
+      [STATE_RECOMMENDED]: 'Recommended',
       review: 'Needs Review',
       locked: 'Locked',
     };

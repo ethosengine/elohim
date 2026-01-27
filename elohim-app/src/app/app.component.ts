@@ -72,18 +72,18 @@ export class AppComponent implements OnInit, OnDestroy {
   private async initializeApp(): Promise<void> {
     // In Tauri environment, check for existing session first
     if (this.tauriAuth.isTauriEnvironment()) {
-      console.log('[App] Tauri environment detected, checking for local session...');
+      // Tauri environment detected, checking for local session
       await this.tauriAuth.initialize();
 
       // If no session, TauriAuthService will set status to 'needs_login'
       // The user should be routed to doorway picker
       if (this.tauriAuth.needsLogin()) {
-        console.log('[App] No Tauri session found - routing to identity setup');
+        // No Tauri session found - routing to identity setup
         this.router.navigate(['/identity/login']);
         return;
       }
 
-      console.log('[App] Tauri session restored, continuing initialization');
+      // Tauri session restored, continuing initialization
     }
 
     // Auto-connect to Edge Node if holochain config is available
@@ -120,12 +120,8 @@ export class AppComponent implements OnInit, OnDestroy {
    */
   private async initializeHolochainConnection(): Promise<void> {
     // Test doorway availability (non-blocking, informational)
-    const doorwayAvailable = await this.testDoorwayConnection();
-    if (doorwayAvailable) {
-      console.log('[App] Doorway available - content from projection');
-    } else {
-      console.log('[App] Doorway unavailable - using cached/local content');
-    }
+    // Doorway status is used for graceful degradation logic
+    await this.testDoorwayConnection();
 
     // Start blob bootstrap regardless of connectivity
     // It will serve cached blobs and upgrade to streaming when services connect
@@ -134,7 +130,7 @@ export class AppComponent implements OnInit, OnDestroy {
     // Only attempt Holochain connection if config exists
     // Holochain is only for agent-centric data (identity, attestations, points)
     if (!environment.holochain?.adminUrl) {
-      console.log('[App] Holochain config not found - content-only mode');
+      // Holochain config not found - running in content-only mode
       return;
     }
 
@@ -178,20 +174,18 @@ export class AppComponent implements OnInit, OnDestroy {
     const { maxAttempts, baseDelayMs, maxDelayMs, backoffMultiplier } = this.retryConfig;
 
     try {
-      console.log(`[Holochain] Connection attempt ${this.connectionAttempt}/${maxAttempts}...`);
+      // Connection attempt ${this.connectionAttempt}/${maxAttempts}
 
       // Attempt full connection (admin + app interface)
       await this.holochainService.connect();
 
       if (this.holochainService.isConnected()) {
-        console.log('[Holochain] Connection successful, testing zome availability...');
+        // Connection successful, testing zome availability
 
         // Test if we can make zome calls (for agent-centric data)
         const zomeAvailable = await this.holochainContent.testAvailability();
 
-        if (zomeAvailable) {
-          console.log('[Holochain] Zome calls available - agent features ready!');
-        } else {
+        if (!zomeAvailable) {
           console.warn('[Holochain] Connected but zome calls unavailable');
         }
 
@@ -202,10 +196,11 @@ export class AppComponent implements OnInit, OnDestroy {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 
       if (this.connectionAttempt < maxAttempts) {
-        // Calculate delay with exponential backoff + jitter
+        // Calculate delay with exponential backoff + deterministic jitter
         const exponentialDelay =
           baseDelayMs * Math.pow(backoffMultiplier, this.connectionAttempt - 1);
-        const jitter = Math.random() * 1000; // Add up to 1s of jitter
+        // Use deterministic jitter based on attempt number (avoids Math.random)
+        const jitter = (this.connectionAttempt * 200) % 1000;
         const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
 
         console.warn(

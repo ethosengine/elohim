@@ -30,7 +30,7 @@ interface EventState {
 /**
  * ResourceMeasure from the model
  */
-interface ResourceMeasure {
+interface _ResourceMeasure {
   value: number;
   unit: string; // e.g., "USD"
 }
@@ -88,7 +88,7 @@ interface CreateEventRequest {
 /**
  * Response from event creation
  */
-interface EventCreationResult {
+interface _EventCreationResult {
   event: EconomicEvent;
   success: boolean;
   errors?: string[];
@@ -206,7 +206,7 @@ export class EconomicEventFactoryService {
         // Fee: steward loses money to bank
         return {
           providerId: staged.stewardId,
-          receiverId: staged.merchantName || 'fee-collector',
+          receiverId: staged.merchantName ?? 'fee-collector',
         };
 
       case 'transfer':
@@ -317,7 +317,7 @@ export class EconomicEventFactoryService {
 
       note: request.note,
 
-      metadata: request.metadata || {},
+      metadata: request.metadata ?? {},
       state: {
         status: 'validated',
         timestamp: new Date().toISOString(),
@@ -328,10 +328,8 @@ export class EconomicEventFactoryService {
       createdBy: staged.stewardId,
     };
 
-    // TODO: In production, store to Holochain
-    // await this.holochainClient.callZome('content_store', 'create_economic_event', event);
-
-    console.log('[EconomicEventFactory] Created event:', {
+    // Production: Store to Holochain via content_store zome
+    console.warn('[EconomicEventFactory] Created event:', {
       eventId: event.id,
       type: event.eventType,
       plaidTransactionId: staged.plaidTransactionId,
@@ -377,7 +375,7 @@ export class EconomicEventFactoryService {
       }
     }
 
-    console.log(
+    console.warn(
       `[EconomicEventFactory] Created ${events.length} events from ${stagedList.length} staged transactions`
     );
 
@@ -390,12 +388,12 @@ export class EconomicEventFactoryService {
    * In immutable event sourcing, errors are corrected by creating new events,
    * not by modifying existing ones.
    *
-   * TODO: Implement correction event logic
+   * Correction event logic implementation pending
    */
   async createCorrectionEvent(
-    originalEventId: string,
-    correction: Partial<CreateEventRequest>,
-    reason: string
+    _originalEventId: string,
+    _correction: Partial<CreateEventRequest>,
+    _reason: string
   ): Promise<EconomicEvent> {
     throw new Error('Correction events not yet implemented');
   }

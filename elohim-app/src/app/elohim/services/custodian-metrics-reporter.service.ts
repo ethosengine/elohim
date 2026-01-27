@@ -42,12 +42,12 @@ export class CustodianMetricsReporterService {
   private readonly MAX_BACKOFF_MS = 30 * 60 * 1000; // 30 minutes max
 
   // Reporting state
-  private reportingEnabled = signal(false);
+  private readonly reportingEnabled = signal(false);
   private reportInterval: ReturnType<typeof setInterval> | null = null;
   private nextBackoffMs = 1000; // Start with 1 second backoff
 
   // Statistics tracking
-  private stats = signal<MetricsReportingStats>({
+  private readonly stats = signal<MetricsReportingStats>({
     reportsAttempted: 0,
     reportsSuccessful: 0,
     reportsFailed: 0,

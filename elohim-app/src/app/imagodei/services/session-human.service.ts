@@ -17,9 +17,7 @@ import {
   HolochainUpgradePrompt,
   UpgradeTrigger,
   SessionState,
-  SessionAccessLevel,
   UpgradeIntent,
-  HostingCostStatus,
 } from '../models/session-human.model';
 // Content access models from lamad pillar
 
@@ -285,7 +283,7 @@ export class SessionHumanService {
 
     // Trigger upgrade prompt on first affinity
     const session = this.sessionSubject.value;
-    if (session && session.stats.nodesWithAffinity === 0 && value > 0) {
+    if (session?.stats.nodesWithAffinity === 0 && value > 0) {
       this.triggerUpgradePrompt('first-affinity');
     }
 
@@ -308,7 +306,7 @@ export class SessionHumanService {
 
     // Trigger upgrade prompt on first path
     const session = this.sessionSubject.value;
-    if (session && session.stats.pathsStarted === 1) {
+    if (session?.stats.pathsStarted === 1) {
       this.triggerUpgradePrompt('path-started');
     }
   }
@@ -356,7 +354,7 @@ export class SessionHumanService {
   /**
    * Record notes saved.
    */
-  recordNotesSaved(pathId: string, stepIndex: number): void {
+  recordNotesSaved(_pathId: string, _stepIndex: number): void {
     this.triggerUpgradePrompt('notes-saved');
   }
 
@@ -1063,7 +1061,7 @@ export class SessionHumanService {
   /**
    * Trigger upgrade prompt when human tries to access gated content.
    */
-  onGatedContentAccess(contentId: string, contentTitle?: string): void {
+  onGatedContentAccess(_contentId: string, _contentTitle?: string): void {
     this.triggerUpgradePrompt('network-feature');
   }
 }

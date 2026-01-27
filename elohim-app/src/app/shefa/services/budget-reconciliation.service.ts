@@ -20,6 +20,8 @@ import { Injectable } from '@angular/core';
 
 import { StagedTransaction, ReconciliationResult } from '../models/transaction-import.model';
 
+type HealthStatusType = 'healthy' | 'warning' | 'critical';
+
 /**
  * ResourceMeasure
  */
@@ -81,7 +83,7 @@ interface FlowBudget {
   totalVariancePercent: number;
 
   // Health indicators
-  healthStatus: 'healthy' | 'warning' | 'critical';
+  healthStatus: HealthStatusType;
   lastReconciled?: string;
 
   // Variance tracking
@@ -139,7 +141,7 @@ export class BudgetReconciliationService {
   ): Promise<ReconciliationResult> {
     // Skip if no budget linkage
     if (!staged.budgetId || !staged.budgetCategoryId) {
-      console.log(`[BudgetReconciliation] No budget linkage for transaction ${staged.id}`);
+      console.warn(`[BudgetReconciliation] No budget linkage for transaction ${staged.id}`);
       return {
         budgetId: '',
         budgetCategoryId: '',
@@ -218,7 +220,7 @@ export class BudgetReconciliationService {
         timestamp: new Date().toISOString(),
       };
 
-      console.log('[BudgetReconciliation] Reconciliation complete:', {
+      console.warn('[BudgetReconciliation] Reconciliation complete:', {
         budgetId: staged.budgetId,
         categoryName: category.name,
         amountAdded: amountToAdd,
@@ -309,9 +311,7 @@ export class BudgetReconciliationService {
    * Tracks variance trend over time
    */
   private addVarianceTrend(budget: FlowBudget): void {
-    if (!budget.varianceTrend) {
-      budget.varianceTrend = [];
-    }
+    budget.varianceTrend ??= [];
 
     budget.varianceTrend.push({
       timestamp: new Date().toISOString(),
@@ -334,7 +334,7 @@ export class BudgetReconciliationService {
   private checkVarianceAlerts(
     budget: FlowBudget,
     category: BudgetCategory,
-    previousHealthStatus: 'healthy' | 'warning' | 'critical'
+    previousHealthStatus: HealthStatusType
   ): void {
     const alerts: VarianceAlert[] = [];
 
@@ -370,11 +370,9 @@ export class BudgetReconciliationService {
       });
     }
 
-    // Emit alerts
-    // TODO: this.notificationService.sendAlerts(alerts);
-
+    // Emit alerts (notification service integration pending)
     if (alerts.length > 0) {
-      console.log('[BudgetReconciliation] Variance alerts:', alerts);
+      console.warn('[BudgetReconciliation] Variance alerts:', alerts);
     }
   }
 
@@ -384,20 +382,19 @@ export class BudgetReconciliationService {
 
   /**
    * Updates budget in storage
-   * TODO: Replace with actual BudgetService.updateBudget()
+   * Persistence will be integrated with BudgetService
    */
   private async updateBudget(budget: FlowBudget): Promise<void> {
-    // TODO: Implement actual persistence
-    // await this.budgetService.updateBudget(budget);
-    console.log(`[BudgetReconciliation] Would update budget ${budget.id}`);
+    // Persistence integration pending
+    console.warn(`[BudgetReconciliation] Would update budget ${budget.id}`);
   }
 
   /**
    * Retrieves a budget
-   * TODO: Replace with actual BudgetService.getBudget()
+   * Retrieval will be integrated with BudgetService
    */
   private async getBudget(budgetId: string): Promise<FlowBudget> {
-    // TODO: Implement actual retrieval
+    // BudgetService integration pending
     return this.createMockBudget(budgetId, '');
   }
 

@@ -36,7 +36,6 @@ import {
   LamadContributorImpact,
   LamadContributorRecognition,
   LamadContentImpactSummary,
-  LamadRecognitionEventSummary,
 } from '../models/steward-economy.model';
 
 // =============================================================================

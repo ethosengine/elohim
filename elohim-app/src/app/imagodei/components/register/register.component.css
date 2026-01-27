@@ -10,9 +10,9 @@
 .register-card {
   width: 100%;
   max-width: 480px;
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
   border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 8%);
   padding: 2rem;
 }
 
@@ -207,7 +207,7 @@
 .form-group textarea:focus {
   border-color: var(--primary-400, #60a5fa);
   box-shadow: 0 0 0 3px var(--primary-100, #dbeafe);
-  background: var(--surface-card, #ffffff);
+  background: var(--surface-card, #fff);
 }
 
 .form-group input:disabled,
@@ -384,7 +384,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid transparent;
-  border-top-color: currentColor;
+  border-top-color: currentcolor;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -439,7 +439,7 @@
 }
 
 /* Responsive */
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .register-container {
     padding: 1rem;
   }

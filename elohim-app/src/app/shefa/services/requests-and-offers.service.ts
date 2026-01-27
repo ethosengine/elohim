@@ -60,7 +60,7 @@ import { EconomicService } from './economic.service';
   providedIn: 'root',
 })
 export class RequestsAndOffersService {
-  constructor(private economicService: EconomicService) {}
+  constructor(private readonly economicService: EconomicService) {}
 
   // ============================================================================
   // REQUEST MANAGEMENT

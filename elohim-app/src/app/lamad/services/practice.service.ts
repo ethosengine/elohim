@@ -18,7 +18,7 @@
 
 import { Injectable } from '@angular/core';
 
-import { map, tap, catchError, switchMap } from 'rxjs/operators';
+import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
 

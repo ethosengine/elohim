@@ -158,9 +158,7 @@ export class BankingStore {
   private constructor() {}
 
   static getInstance(): BankingStore {
-    if (!BankingStore.instance) {
-      BankingStore.instance = new BankingStore();
-    }
+    BankingStore.instance ??= new BankingStore();
     return BankingStore.instance;
   }
 
@@ -178,7 +176,7 @@ export class BankingStore {
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('[BankingStore] Database opened successfully');
+        console.warn('[BankingStore] Database opened successfully');
         resolve();
       };
 

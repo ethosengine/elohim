@@ -169,7 +169,7 @@ export class WriteBufferService implements OnDestroy {
   private implementation: 'wasm' | 'typescript' = 'typescript';
   private initPromise: Promise<BufferInitializationResult> | null = null;
 
-  private autoFlushInterval: number | null = null;
+  private readonly autoFlushInterval: number | null = null;
   private flushCallback: FlushCallback | null = null;
   private readonly destroy$ = new Subject<void>();
 
@@ -262,7 +262,7 @@ export class WriteBufferService implements OnDestroy {
           implementation: 'typescript',
           error: `WASM failed, using TypeScript fallback: ${errorMessage}`,
         };
-      } catch (fallbackError) {
+      } catch (_fallbackError) {
         this.stateSubject.next('error');
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return {
@@ -399,7 +399,7 @@ export class WriteBufferService implements OnDestroy {
       const result = await callback(batch);
 
       // Handle different result types
-      if (!result || result === undefined) {
+      if (!result) {
         // Legacy void callback - treat as all success
         this.buffer!.markBatchCommitted(batch.batchId);
         this.updateStats();
@@ -470,7 +470,7 @@ export class WriteBufferService implements OnDestroy {
         this.buffer!.markBatchCommitted(batch.batchId);
       } else if (failureCount === operationCount) {
         // All failed
-        const errorMsg = failedOps[0]?.error || result.error || 'All operations failed';
+        const errorMsg = failedOps[0]?.error ?? result.error ?? 'All operations failed';
         this.buffer!.markBatchFailed(batch.batchId, errorMsg);
       } else {
         // Partial success - only retry failed operations
@@ -486,7 +486,7 @@ export class WriteBufferService implements OnDestroy {
       this.updateStats();
       this.updateStateAfterFlush();
 
-      const firstError = failedOps[0]?.error || result.error;
+      const firstError = failedOps[0]?.error ?? result.error;
       return {
         success: failureCount === 0,
         batchId: batch.batchId,
@@ -499,7 +499,7 @@ export class WriteBufferService implements OnDestroy {
     }
 
     // success: false with no operationResults - all failed
-    const errorMessage = result.error || 'Batch failed';
+    const errorMessage = result.error ?? 'Batch failed';
     this.buffer!.markBatchFailed(batch.batchId, errorMessage);
     this.updateStats();
     this.stateSubject.next('ready');
@@ -519,12 +519,8 @@ export class WriteBufferService implements OnDestroy {
    * Update state after flush completes.
    */
   private updateStateAfterFlush(): void {
-    if (this.buffer!.totalQueued() === 0) {
-      this.stateSubject.next('ready');
-    } else {
-      // Still have items - stay in ready (not flushing) until next batch
-      this.stateSubject.next('ready');
-    }
+    // Return to ready state - next batch will be processed when called
+    this.stateSubject.next('ready');
   }
 
   /**

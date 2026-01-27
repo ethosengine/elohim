@@ -24,14 +24,7 @@
  * - protocol-core.model.ts - Token types
  */
 
-import {
-  Intent,
-  Proposal,
-  REAAgent,
-  ResourceSpecification,
-  Measure,
-  GovernanceLayer,
-} from '@app/elohim/models/rea-bridge.model';
+import { Intent, Measure } from '@app/elohim/models/rea-bridge.model';
 
 // ============================================================================
 // PREFERENCES & SETTINGS

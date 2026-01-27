@@ -71,5 +71,7 @@ export interface JsonLdMetadata {
    * - author: { '@type': 'Person', '@id': '...' }
    * - inLanguage: string (BCP 47 code)
    */
+  // JSON-LD requires extensibility by design - any is intentional
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }

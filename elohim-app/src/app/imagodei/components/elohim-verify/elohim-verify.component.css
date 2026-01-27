@@ -136,7 +136,7 @@
   width: 1.25rem;
   height: 1.25rem;
   border: 2px solid transparent;
-  border-top-color: currentColor;
+  border-top-color: currentcolor;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -200,6 +200,7 @@
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.6;
   }

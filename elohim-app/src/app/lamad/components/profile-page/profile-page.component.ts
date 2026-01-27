@@ -1,11 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, computed, signal, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 
 import { takeUntil, catchError } from 'rxjs/operators';
 
-import { Subject, Observable, of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { ProfileService } from '@app/elohim/services/profile.service';

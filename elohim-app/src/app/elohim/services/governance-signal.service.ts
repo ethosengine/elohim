@@ -24,7 +24,7 @@ import { LoggerService } from './logger.service';
  * When capacity is reached, evicts the least recently accessed entries.
  */
 class LruCache<K, V> {
-  private cache = new Map<K, V>();
+  private readonly cache = new Map<K, V>();
   private accessOrder: K[] = [];
 
   constructor(private readonly maxSize: number) {}
@@ -125,10 +125,10 @@ export class GovernanceSignalService {
   private readonly STORAGE_PREFIX = 'elohim-governance-signal-';
 
   // Cached signal aggregates with LRU eviction
-  private contentSignalsCache = new LruCache<string, Observable<AggregatedSignals>>(
+  private readonly contentSignalsCache = new LruCache<string, Observable<AggregatedSignals>>(
     MAX_CONTENT_CACHE_SIZE
   );
-  private pathSignalsCache = new LruCache<string, Observable<PathSignalAggregate>>(
+  private readonly pathSignalsCache = new LruCache<string, Observable<PathSignalAggregate>>(
     MAX_PATH_CACHE_SIZE
   );
 

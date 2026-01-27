@@ -18,21 +18,17 @@
  * @see ContributorService for contributor impact tracking
  */
 
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
 
-import { Observable, of, BehaviorSubject, map, catchError, tap, switchMap } from 'rxjs';
+import { Observable, of, BehaviorSubject, map, catchError, tap } from 'rxjs';
 
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 import {
   StewardshipAllocation,
-  StewardshipAllocationView,
   ContentStewardship,
-  AllocationQuery,
   CreateAllocationInput,
   UpdateAllocationInput,
-  FileDisputeInput,
-  ResolveDisputeInput,
   BulkAllocationResult,
   GovernanceState,
   ContributionType,
@@ -70,7 +66,7 @@ export interface RecognitionDistribution {
   providedIn: 'root',
 })
 export class StewardshipAllocationService {
-  private storageApi = inject(StorageApiService);
+  private readonly storageApi = inject(StorageApiService);
 
   // ============================================================================
   // Reactive State
@@ -205,11 +201,7 @@ export class StewardshipAllocationService {
    * Create a new stewardship allocation.
    */
   createAllocation(input: CreateAllocationInput): Observable<StewardshipAllocation> {
-    return this.storageApi.createStewardshipAllocation(input).pipe(
-      tap(allocation => {
-        console.log('[StewardshipAllocationService] Created allocation:', allocation.id);
-      })
-    );
+    return this.storageApi.createStewardshipAllocation(input);
   }
 
   /**
@@ -235,9 +227,6 @@ export class StewardshipAllocationService {
   bulkCreateAllocations(inputs: CreateAllocationInput[]): Observable<BulkAllocationResult> {
     return this.storageApi.bulkCreateAllocations(inputs).pipe(
       tap(result => {
-        console.log(
-          `[StewardshipAllocationService] Bulk created ${result.created}, failed ${result.failed}`
-        );
         if (result.errors.length > 0) {
           console.warn('[StewardshipAllocationService] Bulk errors:', result.errors);
         }
@@ -262,17 +251,11 @@ export class StewardshipAllocationService {
   ): Observable<StewardshipAllocation> {
     const disputeId = `dispute-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    return this.storageApi
-      .fileAllocationDispute(allocationId, {
-        disputeId,
-        disputedBy,
-        reason,
-      })
-      .pipe(
-        tap(allocation => {
-          console.log('[StewardshipAllocationService] Filed dispute:', disputeId);
-        })
-      );
+    return this.storageApi.fileAllocationDispute(allocationId, {
+      disputeId,
+      disputedBy,
+      reason,
+    });
   }
 
   /**
@@ -285,16 +268,10 @@ export class StewardshipAllocationService {
     ratifierId: string,
     newState: GovernanceState
   ): Observable<StewardshipAllocation> {
-    return this.storageApi
-      .resolveAllocationDispute(allocationId, {
-        ratifierId,
-        newState,
-      })
-      .pipe(
-        tap(allocation => {
-          console.log('[StewardshipAllocationService] Resolved dispute, new state:', newState);
-        })
-      );
+    return this.storageApi.resolveAllocationDispute(allocationId, {
+      ratifierId,
+      newState,
+    });
   }
 
   /**

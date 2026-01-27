@@ -10,7 +10,7 @@ import {
   computed,
 } from '@angular/core';
 
-import { SkipAheadResult, SkippableSection } from '../../services/path-adaptation.service';
+import { SkipAheadResult } from '../../services/path-adaptation.service';
 
 /**
  * Pre-assessment decision event.

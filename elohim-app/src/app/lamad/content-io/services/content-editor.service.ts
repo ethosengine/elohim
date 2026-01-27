@@ -301,9 +301,18 @@ export class ContentEditorService {
 
   /**
    * Generate a unique draft ID.
+   * Uses crypto.randomUUID for secure random IDs when available.
    */
   private generateDraftId(): string {
-    return `draft-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    // Use crypto.randomUUID if available (modern browsers)
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      // Remove dashes and take first 8 chars for clean alphanumeric ID
+      return `draft-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').substring(0, 8)}`;
+    }
+    // Fallback: use crypto.getRandomValues
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return `draft-${Date.now()}-${array[0].toString(36).substring(0, 8)}`;
   }
 
   /**

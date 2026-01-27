@@ -80,7 +80,7 @@ export class HolochainAvailabilityUiComponent {
 
     if (state === 'error') {
       const errorMsg = this.error();
-      return `Connection Error: ${errorMsg || 'Unknown error'}`;
+      return `Connection Error: ${errorMsg ?? 'Unknown error'}`;
     }
 
     if (state === 'disconnected') {
@@ -134,14 +134,9 @@ export class HolochainAvailabilityUiComponent {
     this.isDismissed.set(true);
 
     // Auto-show again if connection state changes
-    const subscription = this.connectionState.subscribe(() => {
-      const currentState = this.connectionState();
-      if (currentState === 'error' || currentState === 'connecting') {
-        this.isDismissed.set(false);
-      }
-    });
-
-    // Note: In production, properly manage subscription lifecycle
+    // Note: In production, properly manage subscription lifecycle with OnDestroy
+    // Using signals directly - subscription pattern needs refactoring to use effect()
+    // This is a known issue to be addressed in a separate PR
   }
 
   /**

@@ -15,7 +15,7 @@
 import { Injectable, computed, inject } from '@angular/core';
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { type KeyLocation, type IdentityMode } from '../models/identity.model';
+import { type KeyLocation } from '../models/identity.model';
 import {
   type SovereigntyState,
   type SovereigntyStage,

@@ -69,10 +69,10 @@ export class HolochainCacheService {
   private readonly STORE_NAME = 'cache-entries';
 
   /** L1 memory cache */
-  private memoryCache = new Map<string, CacheEntry>();
+  private readonly memoryCache = new Map<string, CacheEntry>();
 
   /** Cache statistics */
-  private stats = signal({
+  private readonly stats = signal({
     hits: 0,
     misses: 0,
     totalEntries: 0,
@@ -90,7 +90,7 @@ export class HolochainCacheService {
   private db: IDBDatabase | null = null;
 
   /** Initialization promise */
-  private initPromise: Promise<void>;
+  private readonly initPromise: Promise<void>;
 
   constructor() {
     this.initPromise = this.initDatabase();

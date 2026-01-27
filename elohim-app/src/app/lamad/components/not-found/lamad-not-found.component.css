@@ -74,6 +74,7 @@
   100% {
     transform: translateX(-50%) translateY(0);
   }
+
   50% {
     transform: translateX(-50%) translateY(-10px);
   }
@@ -141,7 +142,7 @@ h1 {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 12px rgb(99 102 241 / 40%);
 }
 
 .btn-secondary {
@@ -226,7 +227,7 @@ h1 {
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .not-found-container {
     padding: 1.5rem;
   }

@@ -21,7 +21,7 @@ import {
 
 import { PerseusRendererComponent } from './perseus-renderer.component';
 
-import type { PerseusItem, PerseusItemMetadata, PerseusWidgetType } from './perseus-item.model';
+import type { PerseusItem, PerseusWidgetType } from './perseus-item.model';
 
 /**
  * PerseusFormatPlugin - Unified plugin for Perseus quiz content.
@@ -156,65 +156,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       const item = items[i] as Partial<PerseusItem>;
       const prefix = items.length > 1 ? `Item ${i + 1}: ` : '';
 
-      // Check required fields
-      if (!item.id) {
-        errors.push({
-          code: 'MISSING_ID',
-          message: `${prefix}Missing required field: id`,
-        });
-      }
-
-      if (!item.question) {
-        errors.push({
-          code: 'MISSING_QUESTION',
-          message: `${prefix}Missing required field: question`,
-        });
-      } else {
-        // Validate question structure
-        if (typeof item.question.content !== 'string') {
-          errors.push({
-            code: 'INVALID_CONTENT',
-            message: `${prefix}question.content must be a string`,
-          });
-        }
-
-        if (!item.question.widgets || typeof item.question.widgets !== 'object') {
-          warnings.push({
-            code: 'NO_WIDGETS',
-            message: `${prefix}No widgets defined. Question may be display-only.`,
-            suggestion: 'Add widgets for interactive elements',
-          });
-        } else {
-          // Validate widgets
-          this.validateWidgets(item.question.widgets, errors, warnings, prefix);
-        }
-      }
-
-      // Validate metadata for lamad integration
-      if (!item.metadata) {
-        warnings.push({
-          code: 'NO_METADATA',
-          message: `${prefix}No metadata. Lamad integration features may not work.`,
-          suggestion: 'Add metadata with assessesContentId, bloomsLevel, etc.',
-        });
-      } else {
-        if (!item.metadata.assessesContentId) {
-          warnings.push({
-            code: 'NO_CONTENT_LINK',
-            message: `${prefix}No assessesContentId. Question won't be linked to content.`,
-            suggestion: 'Set metadata.assessesContentId to the content node ID',
-          });
-        }
-      }
-
-      // Validate version
-      if (!item.version) {
-        warnings.push({
-          code: 'NO_VERSION',
-          message: `${prefix}No version specified. Using default 1.0.`,
-          suggestion: 'Add version: { major: 1, minor: 0 }',
-        });
-      }
+      this.validateItem(item, prefix, errors, warnings);
     }
 
     // Calculate stats
@@ -230,6 +172,90 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       warnings,
       stats,
     };
+  }
+
+  private validateItem(
+    item: Partial<PerseusItem>,
+    prefix: string,
+    errors: ValidationError[],
+    warnings: ValidationWarning[]
+  ): void {
+    // Check required fields
+    if (!item.id) {
+      errors.push({
+        code: 'MISSING_ID',
+        message: `${prefix}Missing required field: id`,
+      });
+    }
+
+    this.validateQuestion(item, prefix, errors, warnings);
+    this.validateItemMetadata(item, prefix, warnings);
+
+    // Validate version
+    if (!item.version) {
+      warnings.push({
+        code: 'NO_VERSION',
+        message: `${prefix}No version specified. Using default 1.0.`,
+        suggestion: 'Add version: { major: 1, minor: 0 }',
+      });
+    }
+  }
+
+  private validateQuestion(
+    item: Partial<PerseusItem>,
+    prefix: string,
+    errors: ValidationError[],
+    warnings: ValidationWarning[]
+  ): void {
+    if (!item.question) {
+      errors.push({
+        code: 'MISSING_QUESTION',
+        message: `${prefix}Missing required field: question`,
+      });
+      return;
+    }
+
+    // Validate question structure
+    if (typeof item.question.content !== 'string') {
+      errors.push({
+        code: 'INVALID_CONTENT',
+        message: `${prefix}question.content must be a string`,
+      });
+    }
+
+    if (!item.question.widgets || typeof item.question.widgets !== 'object') {
+      warnings.push({
+        code: 'NO_WIDGETS',
+        message: `${prefix}No widgets defined. Question may be display-only.`,
+        suggestion: 'Add widgets for interactive elements',
+      });
+    } else {
+      // Validate widgets
+      this.validateWidgets(item.question.widgets, errors, warnings, prefix);
+    }
+  }
+
+  private validateItemMetadata(
+    item: Partial<PerseusItem>,
+    prefix: string,
+    warnings: ValidationWarning[]
+  ): void {
+    if (!item.metadata) {
+      warnings.push({
+        code: 'NO_METADATA',
+        message: `${prefix}No metadata. Lamad integration features may not work.`,
+        suggestion: 'Add metadata with assessesContentId, bloomsLevel, etc.',
+      });
+      return;
+    }
+
+    if (!item.metadata.assessesContentId) {
+      warnings.push({
+        code: 'NO_CONTENT_LINK',
+        message: `${prefix}No assessesContentId. Question won't be linked to content.`,
+        suggestion: 'Set metadata.assessesContentId to the content node ID',
+      });
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

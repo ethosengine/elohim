@@ -42,7 +42,7 @@ import { EconomicService } from './economic.service';
   providedIn: 'root',
 })
 export class InsuranceMutualService {
-  constructor(private economicService: EconomicService) {}
+  constructor(private readonly economicService: EconomicService) {}
 
   // ============================================================================
   // MEMBER ENROLLMENT & RISK ASSESSMENT
@@ -448,7 +448,7 @@ export class InsuranceMutualService {
     const coveredRisk = policy.coveredRisks?.find(
       r => r.riskName.toLowerCase() === lossDetails.lossType.toLowerCase()
     );
-    if (!coveredRisk || !coveredRisk.isCovered) {
+    if (!coveredRisk?.isCovered) {
       throw new Error(`Risk type "${lossDetails.lossType}" is not covered under this policy`);
     }
 

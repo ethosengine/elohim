@@ -5,12 +5,15 @@ import { FormsModule } from '@angular/forms';
 import { ContentNode } from '../../models/content-node.model';
 import { InteractiveRenderer, RendererCompletionEvent } from '../renderer-registry.service';
 
+type QuizQuestionType = 'multiple-choice' | 'true-false' | 'short-answer' | 'connection';
+type QuizAnswer = number | string | boolean;
+
 interface QuizQuestion {
   id: string;
-  type: 'multiple-choice' | 'true-false' | 'short-answer' | 'connection';
+  type: QuizQuestionType;
   question: string;
   options?: string[]; // For multiple-choice
-  correctAnswer?: number | string | boolean;
+  correctAnswer?: QuizAnswer;
   rubric?: string; // For manually graded
   explanation?: string; // Shown after answer
 }
@@ -39,7 +42,7 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
   @Output() quizComplete = new EventEmitter<{ passed: boolean; score: number }>();
 
   quiz: QuizContent | null = null;
-  answers = new Map<string, any>();
+  answers = new Map<string, QuizAnswer>();
   submitted = false;
   score = 0;
   passed = false;
@@ -78,7 +81,7 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
     }
   }
 
-  selectAnswer(questionId: string, answer: any): void {
+  selectAnswer(questionId: string, answer: QuizAnswer): void {
     if (this.submitted) return;
     this.answers.set(questionId, answer);
   }

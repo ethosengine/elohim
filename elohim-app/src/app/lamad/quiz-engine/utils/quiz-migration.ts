@@ -14,10 +14,8 @@
  * - question.widgets.expression: for math expressions
  */
 
-import type {
-  PerseusItem,
-  PerseusWidget,
-} from '../../content-io/plugins/sophia/sophia-moment.model';
+import type { PerseusItem } from '../../content-io/plugins/sophia/sophia-moment.model';
+import type { MasteryLevel } from '../../models/content-mastery.model';
 
 // Radio widget options type for quiz migration
 interface RadioWidgetOptions {
@@ -31,7 +29,6 @@ interface RadioWidgetOptions {
   deselectEnabled?: boolean;
   randomize?: boolean;
 }
-import type { MasteryLevel } from '../../models/content-mastery.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Legacy Format Types
@@ -103,7 +100,7 @@ export function migrateQuestion(
   question: LegacyQuizQuestion,
   sourceNode: LegacyContentNode
 ): PerseusItem {
-  const questionText = question.question || question.text || '';
+  const questionText = question.question ?? question.text ?? '';
 
   switch (question.type) {
     case 'multiple-choice':
@@ -129,7 +126,7 @@ function migrateMultipleChoice(
   questionText: string,
   sourceNode: LegacyContentNode
 ): PerseusItem {
-  const options = question.options || [];
+  const options = question.options ?? [];
   const correctIndex = typeof question.correctAnswer === 'number' ? question.correctAnswer : 0;
 
   const radioOptions: RadioWidgetOptions = {

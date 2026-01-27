@@ -48,11 +48,11 @@ export class CustodianSelectionService {
   private readonly commitments = inject(CustodianCommitmentService);
 
   // Cache selection results (2 minute TTL for stability)
-  private selectionCache = new Map<string, { score: CustodianScore; timestamp: number }>();
+  private readonly selectionCache = new Map<string, { score: CustodianScore; timestamp: number }>();
   private readonly CACHE_TTL_MS = 2 * 60 * 1000;
 
   // Statistics for monitoring
-  private statistics = signal({
+  private readonly statistics = signal({
     selectionsAttempted: 0,
     selectionsSuccessful: 0,
     cacheHits: 0,

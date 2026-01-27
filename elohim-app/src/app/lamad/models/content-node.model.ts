@@ -663,7 +663,7 @@ export interface ContentMetadata {
   keywords?: string[];
 
   /** Custom domain-specific fields */
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -674,7 +674,7 @@ export interface ContentRelationship {
   sourceNodeId: string;
   targetNodeId: string;
   relationshipType: ContentRelationshipType;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export enum ContentRelationshipType {
@@ -870,10 +870,10 @@ export interface ContentRelationshipDetailWire {
   inferenceSource: string;
   isBidirectional: number; // SQLite stores boolean as 0/1
   inverseRelationshipId: string | null;
-  provenanceChain: any | null;
+  provenanceChain: unknown | null;
   governanceLayer: string | null;
   reach: string;
-  metadata: any | null;
+  metadata: unknown | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -894,10 +894,10 @@ export function transformRelationshipDetailFromWire(
     inferenceSource: wire.inferenceSource as RelationshipInferenceSource,
     isBidirectional: wire.isBidirectional === 1,
     inverseRelationshipId: wire.inverseRelationshipId ?? undefined,
-    provenanceChain: wire.provenanceChain ?? undefined,
+    provenanceChain: (wire.provenanceChain as string[]) ?? undefined,
     governanceLayer: wire.governanceLayer ?? undefined,
     reach: wire.reach as ContentReach,
-    metadata: wire.metadata ?? undefined,
+    metadata: (wire.metadata as Record<string, unknown>) ?? undefined,
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
   };

@@ -21,11 +21,7 @@
  * - steward-economy.model.ts (premium gate system)
  */
 
-import {
-  Measure,
-  ResourceClassification,
-  GovernanceLayer,
-} from '@app/elohim/models/rea-bridge.model';
+import { Measure, GovernanceLayer } from '@app/elohim/models/rea-bridge.model';
 
 // ============================================================================
 // MEMBER RISK PROFILE

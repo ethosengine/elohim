@@ -155,70 +155,13 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
     const warnings: ValidationWarning[] = [];
 
     if (typeof input === 'string') {
-      // Validate JSON structure
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(input);
-      } catch (e) {
-        errors.push({
-          code: 'INVALID_JSON',
-          message: `Invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`,
-          line: 1,
-        });
-        return { valid: false, errors, warnings };
-      }
-
-      const content = parsed as Partial<Html5AppContent>;
-
-      if (!content.appId || typeof content.appId !== 'string') {
-        errors.push({
-          code: 'MISSING_APP_ID',
-          message: 'Missing required field: appId (string)',
-        });
-      } else if (!/^[a-z0-9-]+$/.test(content.appId)) {
-        errors.push({
-          code: 'INVALID_APP_ID',
-          message: 'appId must be lowercase alphanumeric with hyphens only',
-        });
-      }
-
-      if (!content.entryPoint || typeof content.entryPoint !== 'string') {
-        errors.push({
-          code: 'MISSING_ENTRY_POINT',
-          message: 'Missing required field: entryPoint (string)',
-        });
-      } else if (!content.entryPoint.endsWith('.html')) {
-        warnings.push({
-          code: 'ENTRY_POINT_NOT_HTML',
-          message: 'entryPoint should typically be an HTML file',
-          suggestion: 'Use index.html as the entry point',
-        });
-      }
-
-      if (!content.fallbackUrl) {
-        warnings.push({
-          code: 'NO_FALLBACK',
-          message: 'No fallbackUrl specified. App will fail if doorway is unavailable.',
-          suggestion: 'Add fallbackUrl pointing to the original source',
-        });
-      }
+      const jsonResult = this.validateJsonContent(input);
+      errors.push(...jsonResult.errors);
+      warnings.push(...jsonResult.warnings);
     } else {
-      // Validate zip file
-      if (!input.name.endsWith('.zip')) {
-        errors.push({
-          code: 'NOT_ZIP',
-          message: 'File must be a .zip archive',
-        });
-      }
-
-      if (input.size > 100 * 1024 * 1024) {
-        // 100MB limit
-        warnings.push({
-          code: 'LARGE_FILE',
-          message: 'Zip file is larger than 100MB. Consider optimizing assets.',
-          suggestion: 'Compress images, remove unused files',
-        });
-      }
+      const fileResult = this.validateZipFile(input);
+      errors.push(...fileResult.errors);
+      warnings.push(...fileResult.warnings);
     }
 
     return {
@@ -230,6 +173,105 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
         isFile: input instanceof File,
       },
     };
+  }
+
+  private validateJsonContent(input: string): {
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+  } {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(input);
+    } catch (e) {
+      errors.push({
+        code: 'INVALID_JSON',
+        message: `Invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`,
+        line: 1,
+      });
+      return { errors, warnings };
+    }
+
+    const content = parsed as Partial<Html5AppContent>;
+    this.validateAppId(content, errors);
+    this.validateEntryPoint(content, errors, warnings);
+    this.validateFallbackUrl(content, warnings);
+
+    return { errors, warnings };
+  }
+
+  private validateAppId(content: Partial<Html5AppContent>, errors: ValidationError[]): void {
+    if (!content.appId || typeof content.appId !== 'string') {
+      errors.push({
+        code: 'MISSING_APP_ID',
+        message: 'Missing required field: appId (string)',
+      });
+    } else if (!/^[a-z0-9-]+$/.test(content.appId)) {
+      errors.push({
+        code: 'INVALID_APP_ID',
+        message: 'appId must be lowercase alphanumeric with hyphens only',
+      });
+    }
+  }
+
+  private validateEntryPoint(
+    content: Partial<Html5AppContent>,
+    errors: ValidationError[],
+    warnings: ValidationWarning[]
+  ): void {
+    if (!content.entryPoint || typeof content.entryPoint !== 'string') {
+      errors.push({
+        code: 'MISSING_ENTRY_POINT',
+        message: 'Missing required field: entryPoint (string)',
+      });
+    } else if (!content.entryPoint.endsWith('.html')) {
+      warnings.push({
+        code: 'ENTRY_POINT_NOT_HTML',
+        message: 'entryPoint should typically be an HTML file',
+        suggestion: 'Use index.html as the entry point',
+      });
+    }
+  }
+
+  private validateFallbackUrl(
+    content: Partial<Html5AppContent>,
+    warnings: ValidationWarning[]
+  ): void {
+    if (!content.fallbackUrl) {
+      warnings.push({
+        code: 'NO_FALLBACK',
+        message: 'No fallbackUrl specified. App will fail if doorway is unavailable.',
+        suggestion: 'Add fallbackUrl pointing to the original source',
+      });
+    }
+  }
+
+  private validateZipFile(input: File): {
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+  } {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    if (!input.name.endsWith('.zip')) {
+      errors.push({
+        code: 'NOT_ZIP',
+        message: 'File must be a .zip archive',
+      });
+    }
+
+    const MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100MB limit
+    if (input.size > MAX_SIZE_BYTES) {
+      warnings.push({
+        code: 'LARGE_FILE',
+        message: 'Zip file is larger than 100MB. Consider optimizing assets.',
+        suggestion: 'Compress images, remove unused files',
+      });
+    }
+
+    return { errors, warnings };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -308,10 +350,13 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private slugify(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    return (
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        // eslint-disable-next-line sonarjs/slow-regex, sonarjs/anchor-precedence -- Safe: slug transformation on user input
+        .replace(/^-+|-+$/g, '')
+    );
   }
 
   private humanize(slug: string): string {

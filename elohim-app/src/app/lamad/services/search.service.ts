@@ -9,7 +9,6 @@ import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 
 import { ContentType, ContentReach } from '../models/content-node.model';
-import { LearningPath } from '../models/learning-path.model';
 import {
   SearchQuery,
   SearchResult,

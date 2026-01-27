@@ -26,7 +26,6 @@ import {
   type TimeAccessDecision,
   getStewardTierLabel,
   getAuthorityBasisLabel,
-  INALIENABLE_FEATURES,
 } from '../../models/stewardship.model';
 import { StewardshipService } from '../../services/stewardship.service';
 

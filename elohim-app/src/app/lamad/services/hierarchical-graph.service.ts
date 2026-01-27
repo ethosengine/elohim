@@ -2,13 +2,10 @@ import { Injectable } from '@angular/core';
 
 import { map, tap, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
-import { Observable, of, forkJoin } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
-import {
-  DataLoaderService,
-  ClusterConnectionSummary,
-} from '@app/elohim/services/data-loader.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 import {
   ClusterNode,
@@ -16,22 +13,19 @@ import {
   ClusterGraphData,
   ClusterExpansionResult,
   ClusterConnection,
-  ClusterConnectionSummary as GraphClusterConnectionSummary,
   createChapterCluster,
   createModuleCluster,
   createSectionCluster,
   createConceptNode,
   calculateClusterRadius,
-  CLUSTER_LEVEL_CONFIG,
 } from '../models/cluster-graph.model';
-import { ContentNode } from '../models/content-node.model';
 import { LearningPath, PathChapter, PathModule, PathSection } from '../models/learning-path.model';
 
 /**
  * LRU Cache for cluster data.
  */
 class LRUCache<K, V> {
-  private cache = new Map<K, V>();
+  private readonly cache = new Map<K, V>();
   private readonly maxSize: number;
 
   constructor(maxSize = 50) {
@@ -86,7 +80,7 @@ class LRUCache<K, V> {
 @Injectable({ providedIn: 'root' })
 export class HierarchicalGraphService {
   /** Currently expanded clusters */
-  private expandedClusters = new Set<string>();
+  private readonly expandedClusters = new Set<string>();
 
   /** Cache for expanded cluster children */
   private readonly childrenCache = new LRUCache<string, ClusterNode[]>(50);
@@ -95,7 +89,7 @@ export class HierarchicalGraphService {
   private readonly connectionsCache = new LRUCache<string, ClusterConnection[]>(100);
 
   /** Map from conceptId to containing cluster ID (for relationship aggregation) */
-  private conceptToClusterMap = new Map<string, string>();
+  private readonly conceptToClusterMap = new Map<string, string>();
 
   /** Current graph data (cached observable) */
   private currentGraph$: Observable<ClusterGraphData> | null = null;
@@ -226,7 +220,7 @@ export class HierarchicalGraphService {
     const addVisibleChildren = (parentId: string) => {
       if (!this.expandedClusters.has(parentId)) return;
 
-      const children = this.childrenCache.get(parentId) || this.getChildClusters(graph, parentId);
+      const children = this.childrenCache.get(parentId) ?? this.getChildClusters(graph, parentId);
 
       for (const child of children) {
         visible.push(child);
@@ -265,15 +259,15 @@ export class HierarchicalGraphService {
     for (const nodeId of visibleNodeIds) {
       // Get the node from cache or graph
       const node = this.findNode(nodeId);
-      if (node && node.parentClusterId) {
-        const siblings = nodesByParent.get(node.parentClusterId) || [];
+      if (node?.parentClusterId) {
+        const siblings = nodesByParent.get(node.parentClusterId) ?? [];
         siblings.push(node);
         nodesByParent.set(node.parentClusterId, siblings);
       }
     }
 
     // Create progression edges between siblings (sorted by order)
-    for (const [_parentId, siblings] of nodesByParent) {
+    for (const siblings of nodesByParent.values()) {
       // Sort by order
       const sorted = siblings.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -451,8 +445,8 @@ export class HierarchicalGraphService {
 
     if (chapter.modules) {
       for (const module of chapter.modules) {
-        for (const section of module.sections || []) {
-          totalConcepts += section.conceptIds?.length || 0;
+        for (const section of module.sections ?? []) {
+          totalConcepts += section.conceptIds?.length ?? 0;
         }
       }
     }
@@ -460,7 +454,7 @@ export class HierarchicalGraphService {
     const chapterCluster = createChapterCluster(
       chapter,
       pathId,
-      chapter.modules?.length || 0,
+      chapter.modules?.length ?? 0,
       totalConcepts
     );
 
@@ -554,8 +548,8 @@ export class HierarchicalGraphService {
 
           const conceptNode = createConceptNode(
             conceptId,
-            content?.title || conceptId,
-            content?.contentType || 'concept',
+            content?.title ?? conceptId,
+            content?.contentType ?? 'concept',
             section.id,
             this.determineNodeState(affinityScore),
             affinityScore

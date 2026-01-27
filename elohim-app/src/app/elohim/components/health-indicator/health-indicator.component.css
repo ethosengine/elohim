@@ -43,6 +43,7 @@
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -61,12 +62,15 @@
 .status-healthy .indicator-dot {
   color: var(--color-success, #22c55e);
 }
+
 .status-degraded .indicator-dot {
   color: var(--color-warning, #eab308);
 }
+
 .status-unhealthy .indicator-dot {
   color: var(--color-error, #ef4444);
 }
+
 .status-unknown .indicator-dot {
   color: var(--text-muted, #999);
 }
@@ -82,7 +86,7 @@
   background: var(--bg-surface, #fff);
   border: 1px solid var(--border-color, #e0e0e0);
   border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
   z-index: 1000;
 }
 
@@ -129,6 +133,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }

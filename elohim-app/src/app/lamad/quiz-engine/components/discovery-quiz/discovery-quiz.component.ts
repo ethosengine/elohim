@@ -50,10 +50,8 @@ import {
   EPIC_DOMAIN_SUBSCALES,
   EPIC_DOMAIN_INSTRUMENT_ID,
   EPIC_DOMAIN_INSTRUMENT_CONFIG,
-  getEpicSubscale,
   getEpicResultType,
 } from '../../instruments/epic-domain.instrument';
-import { type DiscoveryResultSummary } from '../../models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
 import { QuestionPoolService } from '../../services/question-pool.service';
 
@@ -553,7 +551,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     return sorted[0]?.key ?? 'governance';
   });
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   private lastRecognition: Recognition | null = null;
   private psycheAPI: PsycheAPI | null = null;
 
@@ -594,7 +592,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     if (!this.psycheAPI.hasInstrument(EPIC_DOMAIN_INSTRUMENT_ID)) {
       const instrument = this.psycheAPI.createInstrument(EPIC_DOMAIN_INSTRUMENT_CONFIG);
       this.psycheAPI.registerInstrument(instrument);
-      console.log('[DiscoveryQuiz] Registered Epic Domain instrument');
+      // Debug: console.log('[DiscoveryQuiz] Registered Epic Domain instrument');
     }
   }
 
@@ -715,7 +713,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
             const discoveryMoments: Moment[] = pool.questions.map(q => ({
               id: q.id,
               purpose: 'discovery' as const,
-              content: q.question,
+              content: q.content,
               hints: q.hints,
               subscaleContributions: q.subscaleContributions,
               metadata: {
@@ -763,7 +761,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
         subscales: EPIC_DOMAIN_SUBSCALES,
       });
       this.aggregated.set(aggregated);
-      console.log('[DiscoveryQuiz] Aggregated via psyche-core:', aggregated);
+      // Debug: console.log('[DiscoveryQuiz] Aggregated via psyche-core:', aggregated);
     }
   }
 
@@ -782,7 +780,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
       try {
         interp = this.psycheAPI.interpretReflection(EPIC_DOMAIN_INSTRUMENT_ID, agg);
         this.interpretation.set(interp);
-        console.log('[DiscoveryQuiz] Interpretation via psyche-core:', interp);
+        // Debug: console.log('[DiscoveryQuiz] Interpretation via psyche-core:', interp);
       } catch (err) {
         console.error('[DiscoveryQuiz] Failed to interpret:', err);
       }
@@ -790,16 +788,6 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
 
     const scores = this.subscaleScores();
     const primary = interp?.primaryType?.typeId ?? this.primarySubscale();
-
-    // Create discovery attestation
-    const primaryResult: DiscoveryResultSummary = {
-      typeId: primary,
-      name: interp?.primaryType?.typeName ?? EPIC_SUBSCALES[primary]?.name ?? primary,
-      shortCode: primary.substring(0, 3).toUpperCase(),
-      score: interp?.confidence ?? scores[primary] / this.totalQuestions(),
-      icon: EPIC_SUBSCALES[primary]?.icon,
-      color: EPIC_SUBSCALES[primary]?.color,
-    };
 
     // Emit completion event
     const event: DiscoveryQuizCompletionEvent = {

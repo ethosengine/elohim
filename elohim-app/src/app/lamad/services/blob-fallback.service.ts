@@ -83,9 +83,9 @@ export interface UrlValidationResult {
 })
 export class BlobFallbackService {
   /** Track URL health for prioritization */
-  private urlHealthMap = new Map<string, UrlHealth>();
+  private readonly urlHealthMap = new Map<string, UrlHealth>();
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   /**
    * Fetch blob with fallback URLs.
@@ -154,10 +154,9 @@ export class BlobFallbackService {
             return new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retryCount - 1)));
           },
         }),
-        tap((blob: Blob) => {
+        tap((_blob: Blob) => {
           // Record success
           this.recordUrlSuccess(url);
-          console.log(`Successfully fetched from ${url}`);
         }),
         map(
           (blob: Blob): BlobFetchResult => ({
@@ -168,9 +167,10 @@ export class BlobFallbackService {
             retryCount: context.retryCount,
           })
         ),
-        catchError((error: any) => {
-          // Record failure
-          this.recordUrlFailure(url, error.message);
+        catchError((error: unknown) => {
+          // Record failure - handle HttpErrorResponse and other error types
+          const errorMessage = this.extractErrorMessage(error, url);
+          this.recordUrlFailure(url, errorMessage);
 
           console.warn(`URL failed: ${url}. Trying next fallback...`, error);
 
@@ -210,7 +210,7 @@ export class BlobFallbackService {
    */
   getUrlHealth(url: string): UrlHealth {
     return (
-      this.urlHealthMap.get(url) || {
+      this.urlHealthMap.get(url) ?? {
         url,
         successCount: 0,
         failureCount: 0,
@@ -242,7 +242,7 @@ export class BlobFallbackService {
    * @param url The URL that succeeded
    */
   private recordUrlSuccess(url: string): void {
-    const health = this.urlHealthMap.get(url) || {
+    const health = this.urlHealthMap.get(url) ?? {
       url,
       successCount: 0,
       failureCount: 0,
@@ -263,7 +263,7 @@ export class BlobFallbackService {
    * @param errorMessage Error message
    */
   private recordUrlFailure(url: string, errorMessage: string): void {
-    const health = this.urlHealthMap.get(url) || {
+    const health = this.urlHealthMap.get(url) ?? {
       url,
       successCount: 0,
       failureCount: 0,
@@ -343,7 +343,7 @@ export class BlobFallbackService {
    * @param timeoutMs Validation timeout (default 5 seconds)
    * @returns Promise with validation result
    */
-  async validateUrl(url: string, timeoutMs = 5000): Promise<UrlValidationResult> {
+  async validateUrl(url: string, _timeoutMs = 5000): Promise<UrlValidationResult> {
     const startTime = performance.now();
 
     try {
@@ -445,5 +445,27 @@ export class BlobFallbackService {
     } catch {
       return 'unknown';
     }
+  }
+
+  /**
+   * Extract a meaningful error message from various error types.
+   *
+   * Handles HttpErrorResponse, Error objects, and unknown types.
+   *
+   * @param error The error to extract message from
+   * @param url The URL that failed (used for context)
+   * @returns Human-readable error message
+   */
+  private extractErrorMessage(error: unknown, url: string): string {
+    if (error instanceof HttpErrorResponse) {
+      return `Http failure for ${url}: ${error.status} ${error.statusText}`;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    return `Unknown error for ${url}`;
   }
 }

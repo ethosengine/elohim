@@ -23,7 +23,7 @@
   font-size: 1.75rem;
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.5rem;
 }
 
 .subtitle {
@@ -119,7 +119,7 @@
 }
 
 .stat-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
 }
 
 .stat-card.has-disputes {
@@ -216,7 +216,7 @@
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.5rem;
 }
 
 .empty-state p {
@@ -452,14 +452,14 @@
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.75rem;
 }
 
 .info-section p {
   color: var(--text-secondary, #666);
   font-size: 0.9rem;
   line-height: 1.6;
-  margin: 0 0 1rem 0;
+  margin: 0 0 1rem;
 }
 
 .info-section ul {
@@ -479,7 +479,7 @@
 }
 
 /* Responsive */
-@media (max-width: 900px) {
+@media (width <= 900px) {
   .table-header {
     display: none;
   }
@@ -524,11 +524,13 @@
     font-size: 0.8rem;
     color: var(--text-tertiary, #888);
   }
+
   .col-recognition::before {
     content: 'Recognition: ';
     font-size: 0.8rem;
     color: var(--text-tertiary, #888);
   }
+
   .col-state::before {
     content: 'Status: ';
     font-size: 0.8rem;
@@ -536,7 +538,7 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .stewardship-dashboard {
     padding: 1rem;
   }

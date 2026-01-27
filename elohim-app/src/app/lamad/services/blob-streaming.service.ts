@@ -14,9 +14,7 @@
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
-import { map, takeUntil, catchError } from 'rxjs/operators';
-
-import { Observable, Subject, interval } from 'rxjs';
+import { Observable } from 'rxjs';
 
 import { DoorwayClientService } from '../../elohim/services/doorway-client.service';
 import { ContentBlob } from '../models/content-node.model';
@@ -140,23 +138,26 @@ export class BlobStreamingService {
   maxParallelChunks = 4;
 
   /** Minimum parallel chunks (for stability) */
-  private minParallelChunks = 1;
+  private readonly minParallelChunks = 1;
 
   /** Maximum parallel chunks (limit resource usage) */
-  private maxMaxParallelChunks = 16;
+  private readonly maxMaxParallelChunks = 16;
 
   /** Cached bandwidth probes (expires after 10 minutes) */
-  private bandwidthCache = new Map<string, { result: BandwidthProbeResult; timestamp: number }>();
+  private readonly bandwidthCache = new Map<
+    string,
+    { result: BandwidthProbeResult; timestamp: number }
+  >();
 
   /** Performance metrics history for auto-tuning */
   private performanceHistory: DownloadPerformanceMetrics[] = [];
 
   /** Maximum history entries to keep */
-  private maxHistorySize = 20;
+  private readonly maxHistorySize = 20;
 
   constructor(
-    private http: HttpClient,
-    private doorway: DoorwayClientService
+    private readonly http: HttpClient,
+    private readonly doorway: DoorwayClientService
   ) {}
 
   /**
@@ -558,7 +559,7 @@ export class BlobStreamingService {
               // This is a server misconfiguration - trust Accept-Ranges header
               const acceptRanges = response.headers.get('Accept-Ranges');
               const canDoRanges = acceptRanges && acceptRanges.toLowerCase() !== 'none';
-              resolve(canDoRanges || false);
+              resolve(!!canDoRanges);
             } else {
               resolve(isRangeSupported);
             }
@@ -633,7 +634,7 @@ export class BlobStreamingService {
    */
   async probeBandwidth(
     url: string,
-    probeSizeBytes: number = 1024 * 1024
+    _probeSizeBytes: number = 1024 * 1024
   ): Promise<BandwidthProbeResult> {
     // Check cache
     const cached = this.bandwidthCache.get(url);
@@ -642,15 +643,13 @@ export class BlobStreamingService {
     }
 
     const startTime = performance.now();
-    const latencyStartTime = performance.now();
 
     try {
       // Download probe data with timing
       const data = await new Promise<ArrayBuffer>((resolve, reject) => {
         this.http.get(url, { responseType: 'arraybuffer' }).subscribe({
-          next: data => {
-            const latency = performance.now() - latencyStartTime;
-            resolve(data);
+          next: arrayBuffer => {
+            resolve(arrayBuffer);
           },
           error: reject,
         });
@@ -667,7 +666,7 @@ export class BlobStreamingService {
         maxSpeedMbps: speedMbps * 1.2, // Optimistic estimate
         probeDataSize: data.byteLength,
         probeDurationMs,
-        latencyMs: Math.round(latencyStartTime), // Simplified - would need more sophisticated timing
+        latencyMs: Math.round(Math.min(probeDurationMs * 0.1, 100)), // Simplified estimate - 10% of probe time, capped at 100ms
       };
 
       // Cache result
@@ -693,7 +692,7 @@ export class BlobStreamingService {
     if (!blob.variants || blob.variants.length === 0) {
       return {
         variant: 'default',
-        bitrateMbps: blob.bitrateMbps || 5,
+        bitrateMbps: blob.bitrateMbps ?? 5,
         reasoningScore: 1.0,
       };
     }
@@ -818,7 +817,7 @@ export class BlobStreamingService {
       '2160p': 3840,
       '4320p': 7680,
     };
-    return resolutionMap[resolution] || 1920;
+    return resolutionMap[resolution] ?? 1920;
   }
 
   /**
@@ -833,7 +832,7 @@ export class BlobStreamingService {
       '2160p': 2160,
       '4320p': 4320,
     };
-    return heightMap[resolution] || 1080;
+    return heightMap[resolution] ?? 1080;
   }
 
   /**

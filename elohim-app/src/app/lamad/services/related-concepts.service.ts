@@ -6,12 +6,7 @@ import { Observable, of, forkJoin } from 'rxjs';
 
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
-import {
-  ContentNode,
-  ContentGraph,
-  ContentRelationship,
-  ContentRelationshipType,
-} from '../models/content-node.model';
+import { ContentNode, ContentGraph, ContentRelationship } from '../models/content-node.model';
 import {
   RelatedConceptsResult,
   RelatedConceptsOptions,
@@ -32,7 +27,7 @@ import {
  * Limits memory usage while maintaining fast access to frequently-used data.
  */
 class LRUCache<K, V> {
-  private cache = new Map<K, V>();
+  private readonly cache = new Map<K, V>();
   private readonly maxSize: number;
 
   constructor(maxSize = 100) {
@@ -131,7 +126,8 @@ export class RelatedConceptsService {
     }
 
     // Use lazy loading for simple queries (no complex filters)
-    const useFullGraph = options.includeTypes?.length || options.excludeTypes?.length;
+    const useFullGraph =
+      (options.includeTypes?.length ?? 0) > 0 || (options.excludeTypes?.length ?? 0) > 0;
 
     if (useFullGraph) {
       // Complex query - needs full graph
@@ -295,7 +291,7 @@ export class RelatedConceptsService {
     const { depth = 1, maxNodes = 15, relationshipTypes } = options;
 
     // Build cache key
-    const cacheKey = `${contentId}:d${depth}:m${maxNodes}:${relationshipTypes?.join(',') || 'all'}`;
+    const cacheKey = `${contentId}:d${depth}:m${maxNodes}:${relationshipTypes?.join(',') ?? 'all'}`;
 
     // Check LRU cache first
     const cached = this.neighborhoodCache.get(cacheKey);
@@ -361,13 +357,11 @@ export class RelatedConceptsService {
    * Builds relationship index on first load for O(1) lookups.
    */
   private getGraph(): Observable<ContentGraph> {
-    if (!this.graph$) {
-      this.graph$ = this.dataLoader.getGraph().pipe(
-        take(1),
-        tap(graph => this.buildRelationshipIndex(graph)),
-        shareReplay(1)
-      );
-    }
+    this.graph$ ??= this.dataLoader.getGraph().pipe(
+      take(1),
+      tap(graph => this.buildRelationshipIndex(graph)),
+      shareReplay(1)
+    );
     return this.graph$;
   }
 
@@ -412,7 +406,7 @@ export class RelatedConceptsService {
 
       // Apply filters
       if (includeTypes && !includeTypes.includes(relType)) continue;
-      if (excludeTypes && excludeTypes.includes(relType)) continue;
+      if (excludeTypes?.includes(relType)) continue;
 
       allRelationships.push({
         id: rel.id,
@@ -447,7 +441,7 @@ export class RelatedConceptsService {
 
       // Apply filters
       if (includeTypes && !includeTypes.includes(relType)) continue;
-      if (excludeTypes && excludeTypes.includes(relType)) continue;
+      if (excludeTypes?.includes(relType)) continue;
 
       allRelationships.push({
         id: rel.id,
@@ -643,7 +637,7 @@ export class RelatedConceptsService {
         direction === 'outgoing' ? [contentId, adjacentId] : [adjacentId, contentId];
 
       const rel = this.findRelationshipBetween(graph, sourceId, targetId);
-      if (rel && rel.relationshipType === relationshipType) {
+      if (rel?.relationshipType === relationshipType) {
         results.push(rel);
       }
     }

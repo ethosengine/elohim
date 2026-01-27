@@ -48,7 +48,7 @@
 .feature-title {
   font-size: 1.75rem;
   font-weight: 600;
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.75rem;
   color: var(--lamad-text-primary, #1f2937);
 }
 
@@ -87,7 +87,7 @@
 
 .background-section .scenario-title {
   font-size: 1.125rem;
-  margin: 0 0 1rem 0;
+  margin: 0 0 1rem;
 }
 
 /* =============================================================================
@@ -103,7 +103,7 @@
 }
 
 .scenario-section:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 5%);
 }
 
 .scenario-header {
@@ -174,7 +174,7 @@
    ============================================================================= */
 
 .steps {
-  font-family: 'SF Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-family: 'SF Mono', 'Fira Code', Monaco, Consolas, monospace;
   font-size: 0.875rem;
 }
 
@@ -319,7 +319,7 @@
 .example-title {
   font-size: 0.9375rem;
   font-weight: 500;
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.75rem;
   color: var(--lamad-text-secondary, #64748b);
 }
 
@@ -340,7 +340,7 @@
 
 .gherkin-fallback pre {
   margin: 0;
-  font-family: 'SF Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-family: 'SF Mono', 'Fira Code', Monaco, Consolas, monospace;
   font-size: 0.875rem;
   line-height: 1.6;
 }
@@ -415,7 +415,7 @@
    ============================================================================= */
 
 /* Tablet (768px - 1024px) */
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
   .gherkin-container {
     padding: 0.75rem;
   }
@@ -436,7 +436,7 @@
 }
 
 /* Mobile (max-width: 768px) */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .gherkin-container {
     padding: 0.5rem;
   }
@@ -486,7 +486,7 @@
 }
 
 /* Small mobile (max-width: 480px) */
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .gherkin-container {
     padding: 0.25rem;
   }

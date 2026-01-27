@@ -10,11 +10,11 @@
   font-size: 14px;
   font-weight: 500;
   z-index: 9999;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .debug-label {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(255 255 255 / 20%);
   padding: 2px 8px;
   border-radius: 12px;
   margin-right: 12px;

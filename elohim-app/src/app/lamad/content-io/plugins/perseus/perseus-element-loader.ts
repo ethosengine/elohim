@@ -33,14 +33,22 @@ let loadPromise: Promise<void> | null = null;
 let isRegistered = false;
 let cssLoaded = false;
 
+/** Log prefix for Perseus loader messages */
+const LOG_PREFIX = '[Perseus]';
+
+/** Custom element tag name for Perseus questions */
+const PERSEUS_ELEMENT_TAG = 'perseus-question';
+
 // Configuration for CSS URLs
 const getPerseusStylesUrl = (): string => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (
     ((window as any)['__PERSEUS_STYLES_URL__'] as string) || '/assets/perseus-plugin/perseus.css'
   );
 };
 
 const getPerseusThemeOverridesUrl = (): string => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (
     ((window as any)['__PERSEUS_THEME_OVERRIDES_URL__'] as string) ||
     '/assets/perseus-plugin/perseus-theme-overrides.css'
@@ -63,7 +71,7 @@ function loadPerseusCSS(): void {
     baseLink.rel = 'stylesheet';
     baseLink.href = getPerseusStylesUrl();
     document.head.appendChild(baseLink);
-    console.log('[Perseus] Base CSS loaded from:', baseLink.href);
+    console.log(LOG_PREFIX, 'Base CSS loaded from:', baseLink.href);
   }
 
   // Load theme overrides (must come after base styles for proper cascade)
@@ -74,7 +82,7 @@ function loadPerseusCSS(): void {
     themeLink.rel = 'stylesheet';
     themeLink.href = getPerseusThemeOverridesUrl();
     document.head.appendChild(themeLink);
-    console.log('[Perseus] Theme overrides CSS loaded from:', themeLink.href);
+    console.log(LOG_PREFIX, 'Theme overrides CSS loaded from:', themeLink.href);
   }
 
   cssLoaded = true;
@@ -118,11 +126,11 @@ async function ensureReactLoaded(): Promise<void> {
   const win = window as any;
 
   if (win.React && win.ReactDOM) {
-    console.log('[Perseus] React already loaded');
+    console.log(LOG_PREFIX, 'React already loaded');
     return;
   }
 
-  console.log('[Perseus] Loading React from CDN...');
+  console.log(LOG_PREFIX, 'Loading React from CDN...');
 
   // Load React first, then ReactDOM
   await loadScript('https://unpkg.com/react@18/umd/react.production.min.js');
@@ -133,10 +141,10 @@ async function ensureReactLoaded(): Promise<void> {
   }
 
   // Verify createRoot is available (React 18)
-  console.log('[Perseus] React loaded from CDN');
-  console.log('[Perseus] React version:', win.React.version);
-  console.log('[Perseus] ReactDOM version:', win.ReactDOM.version);
-  console.log('[Perseus] ReactDOM.createRoot:', typeof win.ReactDOM.createRoot);
+  console.log(LOG_PREFIX, 'React loaded from CDN');
+  console.log(LOG_PREFIX, 'React version:', win.React.version);
+  console.log(LOG_PREFIX, 'ReactDOM version:', win.ReactDOM.version);
+  console.log(LOG_PREFIX, 'ReactDOM.createRoot:', typeof win.ReactDOM.createRoot);
 }
 
 /**
@@ -149,7 +157,7 @@ async function ensureReactLoaded(): Promise<void> {
  */
 export async function registerPerseusElement(): Promise<void> {
   // Already registered
-  if (isRegistered || customElements.get('perseus-question')) {
+  if (isRegistered || customElements.get(PERSEUS_ELEMENT_TAG)) {
     isRegistered = true;
     return;
   }
@@ -168,44 +176,50 @@ export async function registerPerseusElement(): Promise<void> {
       await ensureReactLoaded();
 
       const pluginUrl = getPerseusPluginUrl();
-      console.log('[Perseus] Loading plugin from:', pluginUrl);
+      console.log(LOG_PREFIX, 'Loading plugin from:', pluginUrl);
 
       // Double-check globals are set right before loading bundle
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g = globalThis as any;
-      console.log('[Perseus] Pre-load check - globalThis.React:', typeof g.React, g.React?.version);
       console.log(
-        '[Perseus] Pre-load check - globalThis.ReactDOM:',
+        LOG_PREFIX,
+        'Pre-load check - globalThis.React:',
+        typeof g.React,
+        g.React?.version
+      );
+      console.log(
+        LOG_PREFIX,
+        'Pre-load check - globalThis.ReactDOM:',
         typeof g.ReactDOM,
         g.ReactDOM?.version
       );
 
       // Load the UMD bundle - it auto-registers the custom element synchronously
       await loadScript(pluginUrl);
-      console.log('[Perseus] Script loaded');
+      console.log(LOG_PREFIX, 'Script loaded');
 
       // Element should be registered synchronously during script execution
-      const elementDef = customElements.get('perseus-question');
-      console.log('[Perseus] Element registered:', !!elementDef);
+      const elementDef = customElements.get(PERSEUS_ELEMENT_TAG);
+      console.log(LOG_PREFIX, 'Element registered:', !!elementDef);
 
       if (!elementDef) {
         throw new Error('Perseus custom element not registered after bundle load');
       }
 
       isRegistered = true;
-      console.log('[Perseus] Plugin loaded successfully');
+      console.log(LOG_PREFIX, 'Plugin loaded successfully');
 
       // Dark mode disabled temporarily for debugging
       // setTimeout(() => {
       //   try {
       //     initPerseusDarkMode();
       //   } catch (e) {
-      //     console.error('[Perseus] Dark mode init error:', e);
+      //     console.error(LOG_PREFIX, 'Dark mode init error:', e);
       //   }
       // }, 0);
-      console.log('[Perseus] Dark mode initialization skipped (debugging)');
+      console.log(LOG_PREFIX, 'Dark mode initialization skipped (debugging)');
     } catch (error) {
-      console.error('[Perseus] Failed to load plugin:', error);
+      console.error(LOG_PREFIX, 'Failed to load plugin:', error);
       loadPromise = null;
       throw error;
     }
@@ -218,7 +232,7 @@ export async function registerPerseusElement(): Promise<void> {
  * Check if the Perseus element is registered.
  */
 export function isPerseusElementRegistered(): boolean {
-  return isRegistered || !!customElements.get('perseus-question');
+  return isRegistered || !!customElements.get(PERSEUS_ELEMENT_TAG);
 }
 
 /**
@@ -226,7 +240,7 @@ export function isPerseusElementRegistered(): boolean {
  * Type-safe helper for Angular components.
  */
 export function getPerseusElement(container: HTMLElement): PerseusQuestionElement | null {
-  return container.querySelector('perseus-question') as PerseusQuestionElement | null;
+  return container.querySelector(PERSEUS_ELEMENT_TAG) as PerseusQuestionElement | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -254,7 +268,7 @@ export function getPerseusElement(container: HTMLElement): PerseusQuestionElemen
  * perseus-theme-overrides.css handles all theming automatically.
  */
 export function initPerseusDarkMode(): void {
-  console.log('[Perseus] Dark mode handled via CSS (perseus-theme-overrides.css)');
+  console.log(LOG_PREFIX, 'Dark mode handled via CSS (perseus-theme-overrides.css)');
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-import { catchError, tap } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, map, from, of } from 'rxjs';
 
@@ -24,7 +24,6 @@ import {
   LevelProgressionEvent,
   MasteryLevel,
   PathMasteryOverview,
-  transformMasteryFromWire,
 } from '../models';
 
 /** Result of migration from local to backend */
@@ -612,7 +611,7 @@ export class ContentMasteryService {
       return result;
     }
 
-    console.log(`[ContentMastery] Migrating ${localRecords.length} mastery records to backend`);
+    console.info(`[ContentMastery] Migrating ${localRecords.length} mastery records to backend`);
 
     // Group by contentId (keep latest per content)
     const latestByContent = new Map<string, SourceChainEntry<MasteryRecordContent>>();
@@ -653,7 +652,7 @@ export class ContentMasteryService {
     }
 
     result.success = result.failed === 0;
-    console.log(
+    console.info(
       `[ContentMastery] Migration complete: ${result.migrated} migrated, ${result.failed} failed`
     );
 

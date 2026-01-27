@@ -14,7 +14,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
-import { bankingStore, StagedTransactionLocal, ImportBatchLocal } from '../stores/banking-store';
+import { bankingStore, StagedTransactionLocal } from '../stores/banking-store';
 
 /**
  * Economic event payload for API - camelCase with parsed JSON objects.
@@ -116,7 +116,7 @@ export class EconomicEventBridgeService {
       });
 
       if (!result.success) {
-        return { success: false, error: result.error || 'Zome call failed' };
+        return { success: false, error: result.error ?? 'Zome call failed' };
       }
 
       const economicEventId = eventPayload.id;
@@ -127,7 +127,7 @@ export class EconomicEventBridgeService {
       staged.reviewStatus = 'approved'; // Stays approved, now with event link
       await bankingStore.saveStaged(staged);
 
-      console.log(
+      console.warn(
         `[EconomicEventBridge] Committed transaction ${stagedId} → event ${economicEventId}`
       );
 
@@ -207,8 +207,8 @@ export class EconomicEventBridgeService {
     // For debit: user is provider (spending), merchant is receiver
     // For credit: merchant is provider, user is receiver
     const isDebit = staged.type === 'debit' || staged.type === 'fee';
-    const provider = isDebit ? staged.stewardId : staged.merchantName || 'external';
-    const receiver = isDebit ? staged.merchantName || 'external' : staged.stewardId;
+    const provider = isDebit ? staged.stewardId : (staged.merchantName ?? 'external');
+    const receiver = isDebit ? (staged.merchantName ?? 'external') : staged.stewardId;
 
     // Resource classification from category
     const resourceClassifications = [staged.category, staged.type, 'bank-import'];

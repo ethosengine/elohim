@@ -93,7 +93,7 @@ interface ImportStats {
 })
 export class TransactionImportService {
   // Progress tracking
-  private progress$ = new BehaviorSubject<PipelineProgress>({
+  private readonly progress$ = new BehaviorSubject<PipelineProgress>({
     stage: 'created',
     progress: 0,
     message: 'Ready to import',
@@ -102,20 +102,20 @@ export class TransactionImportService {
   });
 
   // Error tracking
-  private errors$ = new Subject<{ stage: string; error: string }>();
+  private readonly errors$ = new Subject<{ stage: string; error: string }>();
 
   // Batch status tracking (in-memory, would be backed by DHT in production)
-  private batches = new Map<string, ImportBatch>();
+  private readonly batches = new Map<string, ImportBatch>();
 
   // Staged transactions (in-memory)
-  private stagedTransactions = new Map<string, StagedTransaction>();
+  private readonly stagedTransactions = new Map<string, StagedTransaction>();
 
   constructor(
-    private plaid: PlaidIntegrationService,
-    private duplicates: DuplicateDetectionService,
-    private aiCategorization: AICategorizationService,
-    private eventFactory: EconomicEventFactoryService,
-    private budgetReconciliation: BudgetReconciliationService
+    private readonly plaid: PlaidIntegrationService,
+    private readonly duplicates: DuplicateDetectionService,
+    private readonly aiCategorization: AICategorizationService,
+    private readonly eventFactory: EconomicEventFactoryService,
+    private readonly budgetReconciliation: BudgetReconciliationService
   ) {}
 
   /**

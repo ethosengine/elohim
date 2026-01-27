@@ -88,7 +88,7 @@ export class SlaMonitorService implements OnDestroy {
   ]);
 
   // Metrics
-  private metrics: SlaMetrics = {
+  private readonly metrics: SlaMetrics = {
     totalTracked: 0,
     currentActive: 0,
     breachCount: 0,

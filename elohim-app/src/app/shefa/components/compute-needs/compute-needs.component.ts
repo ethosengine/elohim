@@ -15,11 +15,7 @@ import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angu
 
 import { Subject, takeUntil } from 'rxjs';
 
-import {
-  ComputeNeedsAssessment,
-  ComputeGap,
-  NodeRecommendation,
-} from '../../models/shefa-dashboard.model';
+import { ComputeNeedsAssessment, NodeRecommendation } from '../../models/shefa-dashboard.model';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 @Component({
@@ -48,9 +44,9 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
   error: string | null = null;
   selectedRecommendation: NodeRecommendation | null = null;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
-  constructor(private shefaCompute: ShefaComputeService) {}
+  constructor(private readonly shefaCompute: ShefaComputeService) {}
 
   ngOnInit(): void {
     if (!this.operatorId) {
@@ -202,6 +198,6 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
    * Get health status class
    */
   get healthStatusClass(): string {
-    return `health-${this.assessment?.overallGapSeverity || 'unknown'}`;
+    return `health-${this.assessment?.overallGapSeverity ?? 'unknown'}`;
   }
 }

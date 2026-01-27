@@ -19,8 +19,6 @@ import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 
-import type { AuthResult } from '../../models/auth.model';
-
 type CallbackStatus = 'processing' | 'success' | 'error';
 
 @Component({

@@ -10,7 +10,7 @@ $color-danger: #ef4444;
 $color-text: #1f2937;
 $color-text-muted: #6b7280;
 $color-border: #e5e7eb;
-$color-bg: #ffffff;
+$color-bg: #fff;
 $color-bg-subtle: #f9fafb;
 
 // Content type colors
@@ -584,7 +584,7 @@ $type-colors: (
 // RESPONSIVE
 // =============================================================================
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .summary-stats {
     flex-direction: column;
     gap: 0.5rem;

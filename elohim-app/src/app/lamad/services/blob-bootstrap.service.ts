@@ -17,7 +17,6 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import {
   BlobBootstrapEngine,
   BlobBootstrapState,
-  BlobBootstrapStatus,
   HolochainConnectionChecker,
   BlobMetadataFetcher,
   CacheIntegrityVerifier,
@@ -81,7 +80,7 @@ export class BlobBootstrapService {
     const metadataFetcher: BlobMetadataFetcher = {
       getBlobsForContent: async (contentId: string) => {
         const result = await this.blobManager.getBlobsForContent(contentId).toPromise();
-        return result || [];
+        return result ?? [];
       },
     };
 
@@ -152,7 +151,7 @@ export class BlobBootstrapService {
         {
           getBlobsForContent: async id => {
             const result = await this.blobManager.getBlobsForContent(id).toPromise();
-            return result || [];
+            return result ?? [];
           },
         },
         { startIntegrityVerification: () => this.blobCache.startIntegrityVerification() },

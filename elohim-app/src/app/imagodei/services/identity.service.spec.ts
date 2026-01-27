@@ -14,7 +14,10 @@ import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { DoorwayRegistryService } from './doorway-registry.service';
 import { signal } from '@angular/core';
 import type { RegisterHumanRequest, HumanProfile } from '../models/identity.model';
-import type { EdgeNodeDisplayInfo, HolochainConnectionState } from '../../elohim/models/holochain-connection.model';
+import type {
+  EdgeNodeDisplayInfo,
+  HolochainConnectionState,
+} from '../../elohim/models/holochain-connection.model';
 
 // Helper to create mock display info matching EdgeNodeDisplayInfo interface
 function createMockDisplayInfo(): EdgeNodeDisplayInfo {
@@ -117,10 +120,24 @@ describe('IdentityService', () => {
     );
     mockAuthService.hasProvider.and.returnValue(false);
     mockAuthService.login.and.returnValue(
-      Promise.resolve({ success: true, token: 'token', humanId: 'human-123', agentPubKey: 'agent-123', expiresAt: Date.now() + 3600000, identifier: 'test@example.com' })
+      Promise.resolve({
+        success: true,
+        token: 'token',
+        humanId: 'human-123',
+        agentPubKey: 'agent-123',
+        expiresAt: Date.now() + 3600000,
+        identifier: 'test@example.com',
+      })
     );
     mockAuthService.register.and.returnValue(
-      Promise.resolve({ success: true, token: 'token', humanId: 'human-123', agentPubKey: 'agent-123', expiresAt: Date.now() + 3600000, identifier: 'test@example.com' })
+      Promise.resolve({
+        success: true,
+        token: 'token',
+        humanId: 'human-123',
+        agentPubKey: 'agent-123',
+        expiresAt: Date.now() + 3600000,
+        identifier: 'test@example.com',
+      })
     );
     mockAuthService.logout.and.returnValue(Promise.resolve());
 
@@ -150,7 +167,9 @@ describe('IdentityService', () => {
       }
     );
     mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
-    mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: false, error: 'Not connected' }));
+    mockHolochainClient.callZome.and.returnValue(
+      Promise.resolve({ success: false, error: 'Not connected' })
+    );
 
     // Create mock password provider
     mockPasswordProvider = jasmine.createSpyObj('PasswordAuthProvider', ['getCurrentUser'], {
@@ -355,12 +374,15 @@ describe('IdentityService', () => {
     it('should register via auth service', async () => {
       const profile = await service.registerHuman(registrationRequest);
 
-      expect(mockAuthService.register).toHaveBeenCalledWith('password', jasmine.objectContaining({
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
-      }));
+      expect(mockAuthService.register).toHaveBeenCalledWith(
+        'password',
+        jasmine.objectContaining({
+          identifier: 'new@example.com',
+          identifierType: 'email',
+          password: 'password123',
+          displayName: 'New User',
+        })
+      );
       expect(profile.displayName).toBe('New User');
     });
 
@@ -507,9 +529,7 @@ describe('IdentityService', () => {
 
     it('should return null on zome error', async () => {
       (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.reject(new Error('Zome error'))
-      );
+      mockHolochainClient.callZome.and.returnValue(Promise.reject(new Error('Zome error')));
 
       const result = await service.getCurrentHuman();
 
@@ -526,9 +546,9 @@ describe('IdentityService', () => {
     it('should require Holochain connection', async () => {
       (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
 
-      await expectAsync(
-        service.updateProfile({ displayName: 'New Name' })
-      ).toBeRejectedWithError('Holochain not connected');
+      await expectAsync(service.updateProfile({ displayName: 'New Name' })).toBeRejectedWithError(
+        'Holochain not connected'
+      );
     });
 
     it('should call update zome function', async () => {
@@ -537,7 +557,11 @@ describe('IdentityService', () => {
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
       mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
-      await service.registerHumanNative({ displayName: 'Test', affinities: [], profileReach: 'community' });
+      await service.registerHumanNative({
+        displayName: 'Test',
+        affinities: [],
+        profileReach: 'community',
+      });
 
       // Mock update response
       mockHolochainClient.callZome.and.returnValue(

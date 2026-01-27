@@ -102,11 +102,13 @@ export class ShefaService {
   private readonly commitments = inject(CustodianCommitmentService);
 
   // Cache custodian metrics (5 minute TTL)
-  private metricsCache = new Map<string, { data: CustodianMetrics; timestamp: number }>();
+  private readonly metricsCache = new Map<string, { data: CustodianMetrics; timestamp: number }>();
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
   // All custodians cache
-  private allMetricsCache = signal<{ data: CustodianMetrics[]; timestamp: number } | null>(null);
+  private readonly allMetricsCache = signal<{ data: CustodianMetrics[]; timestamp: number } | null>(
+    null
+  );
 
   // Reporting configuration
   private reportingInterval: any;

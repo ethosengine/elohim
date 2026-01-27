@@ -172,9 +172,9 @@ export class ContentService {
   private readonly http = inject(HttpClient);
 
   // In-memory cache for hot paths
-  private contentCache = new Map<string, Observable<ContentNode | null>>();
-  private pathCache = new Map<string, Observable<LearningPath | null>>();
-  private blobCache = new Map<string, Observable<string>>();
+  private readonly contentCache = new Map<string, Observable<ContentNode | null>>();
+  private readonly pathCache = new Map<string, Observable<LearningPath | null>>();
+  private readonly blobCache = new Map<string, Observable<string>>();
 
   // =========================================================================
   // Content Operations

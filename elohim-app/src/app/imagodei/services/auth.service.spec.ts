@@ -64,14 +64,10 @@ describe('AuthService', () => {
   beforeEach(() => {
     // Setup localStorage mock
     localStorageMock = {};
-    spyOn(localStorage, 'getItem').and.callFake(
-      (key: string) => localStorageMock[key] || null
-    );
-    spyOn(localStorage, 'setItem').and.callFake(
-      (key: string, value: string) => {
-        localStorageMock[key] = value;
-      }
-    );
+    spyOn(localStorage, 'getItem').and.callFake((key: string) => localStorageMock[key] || null);
+    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+      localStorageMock[key] = value;
+    });
     spyOn(localStorage, 'removeItem').and.callFake((key: string) => {
       delete localStorageMock[key];
     });
@@ -88,10 +84,7 @@ describe('AuthService', () => {
     );
 
     TestBed.configureTestingModule({
-      providers: [
-        AuthService,
-        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
-      ],
+      providers: [AuthService, { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry }],
     });
 
     service = TestBed.inject(AuthService);
@@ -253,9 +246,7 @@ describe('AuthService', () => {
       const provider = createMockProvider('password', {
         login: jasmine
           .createSpy('login')
-          .and.returnValue(
-            Promise.resolve({ success: false, error: 'Invalid credentials' })
-          ),
+          .and.returnValue(Promise.resolve({ success: false, error: 'Invalid credentials' })),
       });
       service.registerProvider(provider);
 
@@ -302,18 +293,9 @@ describe('AuthService', () => {
         password: 'password123',
       });
 
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        AUTH_TOKEN_KEY,
-        'test-token-123'
-      );
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        AUTH_PROVIDER_KEY,
-        'password'
-      );
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        AUTH_IDENTIFIER_KEY,
-        'test@example.com'
-      );
+      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'test-token-123');
+      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_PROVIDER_KEY, 'password');
+      expect(localStorage.setItem).toHaveBeenCalledWith(AUTH_IDENTIFIER_KEY, 'test@example.com');
     });
   });
 
@@ -385,9 +367,7 @@ describe('AuthService', () => {
       const provider = createMockProvider('password', {
         register: jasmine
           .createSpy('register')
-          .and.returnValue(
-            Promise.resolve({ success: false, error: 'User already exists' })
-          ),
+          .and.returnValue(Promise.resolve({ success: false, error: 'User already exists' })),
       });
       service.registerProvider(provider);
 
@@ -557,9 +537,7 @@ describe('AuthService', () => {
       const provider = createMockProvider('password', {
         refreshToken: jasmine
           .createSpy('refreshToken')
-          .and.returnValue(
-            Promise.reject(new Error('Refresh token expired'))
-          ),
+          .and.returnValue(Promise.reject(new Error('Refresh token expired'))),
       });
       service.registerProvider(provider);
       await service.login('password', {
@@ -737,9 +715,7 @@ describe('AuthService', () => {
       const provider = createMockProvider('password', {
         login: jasmine
           .createSpy('login')
-          .and.returnValue(
-            Promise.resolve({ success: false, error: 'Test error' })
-          ),
+          .and.returnValue(Promise.resolve({ success: false, error: 'Test error' })),
       });
       service.registerProvider(provider);
       await service.login('password', {

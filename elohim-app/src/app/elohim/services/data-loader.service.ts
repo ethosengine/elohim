@@ -1719,13 +1719,16 @@ export class DataLoaderService {
 
     return this.holochainContent.getContentByType('assessment', 500).pipe(
       map(contentNodes => {
-        const assessments: AssessmentIndexEntry[] = contentNodes.map(node => ({
-          id: node.id,
-          title: node.title,
-          domain: node.metadata?.['domain'] ?? 'general',
-          instrumentType: node.metadata?.['instrumentType'] ?? 'questionnaire',
-          estimatedTime: node.metadata?.['estimatedTime'] ?? '15 minutes',
-        }));
+        const assessments: AssessmentIndexEntry[] = contentNodes.map(node => {
+          const meta = (node.metadata ?? {}) as Record<string, unknown>;
+          return {
+            id: node.id,
+            title: node.title,
+            domain: (meta['domain'] as string) ?? 'general',
+            instrumentType: (meta['instrumentType'] as string) ?? 'questionnaire',
+            estimatedTime: (meta['estimatedTime'] as string) ?? '15 minutes',
+          };
+        });
 
         return {
           assessments,

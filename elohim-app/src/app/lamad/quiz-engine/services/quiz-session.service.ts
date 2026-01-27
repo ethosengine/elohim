@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-import { BehaviorSubject, Observable, of, map, switchMap, tap } from 'rxjs';
+import { BehaviorSubject, Observable, of, map, switchMap } from 'rxjs';
 
 import {
   QuizSession,
@@ -15,7 +15,6 @@ import {
   calculateQuizResult,
   isValidTransition,
   isTerminalState,
-  DEFAULT_CONFIGS,
 } from '../models/quiz-session.model';
 
 import { QuestionPoolService } from './question-pool.service';
@@ -313,7 +312,7 @@ export class QuizSessionService {
     scoreResult: PerseusScoreResult
   ): QuizResponse | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -406,7 +405,7 @@ export class QuizSessionService {
    */
   nextQuestion(sessionId: string): SessionQuestion | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -428,7 +427,7 @@ export class QuizSessionService {
    */
   previousQuestion(sessionId: string): SessionQuestion | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -450,7 +449,7 @@ export class QuizSessionService {
    */
   skipQuestion(sessionId: string): SessionQuestion | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return null;
     }
 
@@ -466,7 +465,7 @@ export class QuizSessionService {
    */
   useHint(sessionId: string): boolean {
     const session = this.sessions.get(sessionId);
-    if (!session || session.state !== 'in_progress') {
+    if (session?.state !== 'in_progress') {
       return false;
     }
 

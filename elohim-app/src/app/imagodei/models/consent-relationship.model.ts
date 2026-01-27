@@ -33,7 +33,6 @@
  * - Radical Markets: Posner & Weyl (2018)
  */
 
-import type { EconomicEvent, LamadEventType } from '@app/elohim/models/economic-event.model';
 import type { Measure, ResourceClassification } from '@app/elohim/models/rea-bridge.model';
 
 // =============================================================================

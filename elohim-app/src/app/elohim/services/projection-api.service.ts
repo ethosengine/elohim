@@ -367,7 +367,7 @@ export class ProjectionAPIService {
 
     return this.http
       .get<
-        ProjectionResponse<ContentNode[]>
+        ProjectionResponse<Record<string, unknown>[]>
       >(`${this.baseUrl}/content/${encodeURIComponent(nodeId)}/related`, { params })
       .pipe(
         timeout(this.defaultTimeout),
@@ -495,56 +495,57 @@ export class ProjectionAPIService {
   /**
    * Transform projected content to ContentNode model
    */
-  private transformContent(data: any): ContentNode {
+  private transformContent(data: Record<string, unknown>): ContentNode {
     // Rust API now returns parsed metadata directly
-    const metadata = data.metadata ?? {};
+    const metadata = (data['metadata'] ?? {}) as Record<string, unknown>;
 
     // Projection data may have slightly different field names
     return {
-      id: data.id || data.docId,
-      contentType: data.contentType,
-      title: data.title || '',
-      description: data.description || '',
-      content: data.content || '',
-      contentFormat: data.contentFormat || 'markdown',
-      tags: data.tags || [],
-      relatedNodeIds: data.relatedNodeIds || [],
+      id: (data['id'] ?? data['docId']) as string,
+      contentType: data['contentType'] as string,
+      title: (data['title'] ?? '') as string,
+      description: (data['description'] ?? '') as string,
+      content: (data['content'] ?? '') as string,
+      contentFormat: (data['contentFormat'] ?? 'markdown') as string,
+      tags: (data['tags'] ?? []) as string[],
+      relatedNodeIds: (data['relatedNodeIds'] ?? []) as string[],
       metadata,
-      authorId: data.authorId || data.author || data.authorId,
-      reach: data.reach || 'private',
-      trustScore: data.trustScore || data.trustScore,
-      estimatedMinutes: data.estimatedMinutes || data.estimatedMinutes,
-      thumbnailUrl: this.resolveBlobUrl(data.thumbnailUrl),
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
+      authorId: (data['authorId'] ?? data['author']) as string | undefined,
+      reach: (data['reach'] ?? 'private') as string,
+      trustScore: data['trustScore'] as number | undefined,
+      estimatedMinutes: data['estimatedMinutes'] as number | undefined,
+      thumbnailUrl: this.resolveBlobUrl(data['thumbnailUrl'] as string | null | undefined),
+      createdAt: data['createdAt'] as string | undefined,
+      updatedAt: data['updatedAt'] as string | undefined,
     } as ContentNode;
   }
 
   /**
    * Transform projected path to LearningPath model
    */
-  private transformPath(data: any): LearningPath {
+  private transformPath(data: unknown): LearningPath {
+    const d = data as Record<string, unknown>;
     return {
-      id: data.id || data.docId,
-      version: data.version || '1.0.0',
-      title: data.title || '',
-      description: data.description || '',
-      purpose: data.purpose || '',
-      difficulty: data.difficulty || 'beginner',
-      estimatedDuration: data.estimatedDuration || data.estimatedDuration,
-      visibility: data.visibility || 'public',
-      pathType: data.pathType || 'course',
-      thumbnailUrl: this.resolveBlobUrl(data.thumbnailUrl),
-      thumbnailAlt: data.thumbnailAlt,
-      tags: data.tags || [],
-      createdBy: data.createdBy || data.author || data.createdBy || '',
-      contributors: data.contributors || [],
-      steps: data.steps || [],
-      chapters: data.chapters || [],
-      stepCount: data.stepCount || data.stepCount || 0,
-      chapterCount: data.chapterCount || data.chapterCount || 0,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
+      id: (d['id'] ?? d['docId']) as string,
+      version: (d['version'] ?? '1.0.0') as string,
+      title: (d['title'] ?? '') as string,
+      description: (d['description'] ?? '') as string,
+      purpose: (d['purpose'] ?? '') as string,
+      difficulty: (d['difficulty'] ?? 'beginner') as string,
+      estimatedDuration: d['estimatedDuration'] as string | undefined,
+      visibility: (d['visibility'] ?? 'public') as string,
+      pathType: (d['pathType'] ?? 'course') as string,
+      thumbnailUrl: this.resolveBlobUrl(d['thumbnailUrl'] as string | null | undefined),
+      thumbnailAlt: d['thumbnailAlt'] as string | undefined,
+      tags: (d['tags'] ?? []) as string[],
+      createdBy: (d['createdBy'] ?? d['author'] ?? '') as string,
+      contributors: (d['contributors'] ?? []) as string[],
+      steps: (d['steps'] ?? []) as unknown[],
+      chapters: (d['chapters'] ?? []) as unknown[],
+      stepCount: (d['stepCount'] ?? 0) as number,
+      chapterCount: (d['chapterCount'] ?? 0) as number,
+      createdAt: d['createdAt'] as string | undefined,
+      updatedAt: d['updatedAt'] as string | undefined,
     } as LearningPath;
   }
 

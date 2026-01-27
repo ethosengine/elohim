@@ -29,7 +29,7 @@ import {
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-import { Subject, takeUntil } from 'rxjs';
+import { Subject } from 'rxjs';
 
 import { ContentNode } from '../../../models/content-node.model';
 import {
@@ -636,10 +636,10 @@ export class SophiaRendererComponent
   private psycheAPI: PsycheAPI | null = null;
 
   // Reflection recognitions for psyche-core aggregation
-  private reflectionRecognitions: ReflectionRecognition[] = [];
+  private readonly reflectionRecognitions: ReflectionRecognition[] = [];
 
   // Answer persistence for navigation (momentId → userInput)
-  private answersMap = new Map<string, UserInputMap>();
+  private readonly answersMap = new Map<string, UserInputMap>();
 
   // Aggregated reflection data (populated via Psyche API)
   aggregatedReflection: AggregatedReflection | null = null;
@@ -761,51 +761,66 @@ export class SophiaRendererComponent
     const recognition = this.momentComponent.getRecognition();
 
     if (recognition) {
-      this.lastRecognition = recognition;
-
-      // Store user input for answer persistence during navigation
-      if (this.currentMoment) {
-        this.answersMap.set(this.currentMoment.id, recognition.userInput);
-      }
-
-      // Update or append recognition (for cases where user changes answer on previous question)
-      const existingIndex = this.recognitions.findIndex(r => r.momentId === recognition.momentId);
-      if (existingIndex >= 0) {
-        this.recognitions[existingIndex] = recognition;
-      } else {
-        this.recognitions.push(recognition);
-      }
-
-      const isDiscoveryOrReflection =
-        this.assessmentMode === 'discovery' || this.assessmentMode === 'reflection';
-
-      if (isDiscoveryOrReflection) {
-        // Use Psyche API for aggregation
-        this.aggregateViaAPI(recognition);
-        // Auto-advance: submit AND move to next in one action (no double-click)
-        this.isSubmitting = false;
-        if (this.isLastMoment) {
-          this.finishAssessment();
-        } else {
-          this.currentMomentIndex++;
-          this.resetMomentState();
-          // Note: sophia-question now emits onAnswerChange(true) when initialUserInput
-          // restores a valid answer, so we don't need to manually set hasAnswer here
-        }
-        this.cdr.markForCheck();
-        return; // Exit early - we've already advanced
-      } else {
-        // Track mastery
-        if (recognition.mastery?.demonstrated) {
-          this.demonstratedCount++;
-        }
-        this.showFeedback = true;
-        this.showNextButton = true;
-      }
+      this.processRecognition(recognition);
     }
 
     this.isSubmitting = false;
     this.cdr.markForCheck();
+  }
+
+  private processRecognition(recognition: Recognition): void {
+    this.lastRecognition = recognition;
+
+    // Store user input for answer persistence during navigation
+    if (this.currentMoment) {
+      this.answersMap.set(this.currentMoment.id, recognition.userInput);
+    }
+
+    // Update or append recognition (for cases where user changes answer on previous question)
+    this.updateRecognitionsList(recognition);
+
+    const isDiscoveryOrReflection =
+      this.assessmentMode === 'discovery' || this.assessmentMode === 'reflection';
+
+    if (isDiscoveryOrReflection) {
+      this.handleDiscoverySubmission(recognition);
+    } else {
+      this.handleMasterySubmission(recognition);
+    }
+  }
+
+  private updateRecognitionsList(recognition: Recognition): void {
+    const existingIndex = this.recognitions.findIndex(r => r.momentId === recognition.momentId);
+    if (existingIndex >= 0) {
+      this.recognitions[existingIndex] = recognition;
+    } else {
+      this.recognitions.push(recognition);
+    }
+  }
+
+  private handleDiscoverySubmission(recognition: Recognition): void {
+    // Use Psyche API for aggregation
+    this.aggregateViaAPI(recognition);
+    // Auto-advance: submit AND move to next in one action (no double-click)
+    this.isSubmitting = false;
+    if (this.isLastMoment) {
+      this.finishAssessment();
+    } else {
+      this.currentMomentIndex++;
+      this.resetMomentState();
+      // Note: sophia-question now emits onAnswerChange(true) when initialUserInput
+      // restores a valid answer, so we don't need to manually set hasAnswer here
+    }
+    this.cdr.markForCheck();
+  }
+
+  private handleMasterySubmission(recognition: Recognition): void {
+    // Track mastery
+    if (recognition.mastery?.demonstrated) {
+      this.demonstratedCount++;
+    }
+    this.showFeedback = true;
+    this.showNextButton = true;
   }
 
   nextMoment(): void {
@@ -843,6 +858,25 @@ export class SophiaRendererComponent
   // ─────────────────────────────────────────────────────────────────────────
 
   private loadMoments(): void {
+    this.logNodeInfo();
+
+    if (!this.node?.content) {
+      console.warn('[SophiaRenderer] No content in node');
+      return;
+    }
+
+    const content = this.parseContent();
+    if (content === null) {
+      return;
+    }
+
+    this.moments = this.convertToMoments(content);
+    console.log(`[SophiaRenderer] Loaded ${this.moments.length} moment(s)`);
+
+    this.initializeAssessmentMode();
+  }
+
+  private logNodeInfo(): void {
     console.log('[SophiaRenderer] loadMoments called with node:', {
       id: this.node?.id,
       contentFormat: this.node?.contentFormat,
@@ -852,13 +886,10 @@ export class SophiaRendererComponent
       contentIsArray: Array.isArray(this.node?.content),
       contentLength: Array.isArray(this.node?.content) ? this.node.content.length : 'N/A',
     });
+  }
 
-    if (!this.node?.content) {
-      console.warn('[SophiaRenderer] No content in node');
-      return;
-    }
-
-    let content = this.node.content;
+  private parseContent(): unknown | null {
+    let content = this.node?.content;
 
     // Parse JSON string if needed
     if (typeof content === 'string') {
@@ -866,41 +897,42 @@ export class SophiaRendererComponent
         content = JSON.parse(content);
       } catch {
         console.error('[SophiaRenderer] Failed to parse content as JSON');
-        return;
+        return null;
       }
     }
 
-    // Convert content to Moments
+    return content;
+  }
+
+  private convertToMoments(content: unknown): Moment[] {
     if (Array.isArray(content)) {
-      this.moments = content.map(item => this.toMoment(item));
-    } else if (typeof content === 'object' && content !== null) {
-      this.moments = [this.toMoment(content)];
-    } else {
-      console.error('[SophiaRenderer] Invalid content format');
-      return;
+      return content.map(item => this.toMoment(item));
     }
-
-    console.log(`[SophiaRenderer] Loaded ${this.moments.length} moment(s)`);
-
-    // Detect assessment mode from first moment
-    if (this.moments.length > 0) {
-      const firstMoment = this.moments[0];
-      // Map purpose to assessment mode (discovery and reflection both use psychometric processing)
-      if (firstMoment.purpose === 'mastery') {
-        this.assessmentMode = 'mastery';
-      } else if (firstMoment.purpose === 'discovery') {
-        this.assessmentMode = 'discovery';
-      } else {
-        this.assessmentMode = 'reflection';
-      }
-      this.modeConfig = MODE_PRESETS[this.assessmentMode];
-      console.log(`[SophiaRenderer] Assessment mode: ${this.assessmentMode}`);
-
-      // Ensure Psyche API is available for discovery/reflection modes
-      if (this.assessmentMode !== 'mastery' && !this.psycheAPI) {
-        this.psycheAPI = getPsycheAPI();
-      }
+    if (typeof content === 'object' && content != null) {
+      return [this.toMoment(content)];
     }
+    console.error('[SophiaRenderer] Invalid content format');
+    return [];
+  }
+
+  private initializeAssessmentMode(): void {
+    if (this.moments.length === 0) return;
+
+    const firstMoment = this.moments[0];
+    this.assessmentMode = this.detectModeFromPurpose(firstMoment.purpose);
+    this.modeConfig = MODE_PRESETS[this.assessmentMode];
+    console.log(`[SophiaRenderer] Assessment mode: ${this.assessmentMode}`);
+
+    // Ensure Psyche API is available for discovery/reflection modes
+    if (this.assessmentMode !== 'mastery' && !this.psycheAPI) {
+      this.psycheAPI = getPsycheAPI();
+    }
+  }
+
+  private detectModeFromPurpose(purpose: string): 'mastery' | 'discovery' | 'reflection' {
+    if (purpose === 'mastery') return 'mastery';
+    if (purpose === 'discovery') return 'discovery';
+    return 'reflection';
   }
 
   /**
@@ -922,7 +954,7 @@ export class SophiaRendererComponent
           : 'mastery';
 
       return {
-        id: String(obj['id'] || `moment-${Math.random().toString(36).substr(2, 9)}`),
+        id: String(obj['id'] || this.generateMomentId()),
         purpose,
         content: obj['question'] as Moment['content'],
         hints: obj['hints'] as Moment['hints'],
@@ -933,10 +965,25 @@ export class SophiaRendererComponent
 
     // Default: treat as raw content (requires explicit cast through unknown)
     return {
-      id: `moment-${Math.random().toString(36).substr(2, 9)}`,
+      id: this.generateMomentId(),
       purpose: 'mastery',
       content: obj as unknown as Moment['content'],
     };
+  }
+
+  /**
+   * Generate a unique moment ID.
+   * Uses crypto.randomUUID for secure random IDs when available.
+   */
+  private generateMomentId(): string {
+    // Use crypto.randomUUID if available (modern browsers)
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `moment-${crypto.randomUUID().substring(0, 9)}`;
+    }
+    // Fallback: use crypto.getRandomValues for better randomness than Math.random
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return `moment-${array[0].toString(36).substring(0, 9)}`;
   }
 
   /**
@@ -1078,7 +1125,7 @@ export class SophiaRendererComponent
 
   private emitReflectionCompletion(): void {
     // Guard against null/undefined aggregatedReflection
-    if (!this.aggregatedReflection || !this.aggregatedReflection.subscaleTotals) {
+    if (!this.aggregatedReflection?.subscaleTotals) {
       console.warn('[SophiaRenderer] No aggregated reflection data available');
       // Emit basic completion event without subscale details
       const event: RendererCompletionEvent = {

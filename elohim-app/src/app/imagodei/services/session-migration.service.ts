@@ -19,7 +19,6 @@ import { HolochainClientService } from '../../elohim/services/holochain-client.s
 import { ContentMasteryService } from '../../lamad/services/content-mastery.service';
 import {
   type MigrationState,
-  type MigrationStatus,
   type MigrationResult,
   type RegisterHumanRequest,
   INITIAL_MIGRATION_STATE,
