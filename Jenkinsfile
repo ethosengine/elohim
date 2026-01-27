@@ -59,6 +59,20 @@ def withBuildVars(props, Closure body) {
     }
 }
 
+// Helper to determine SonarQube project config based on branch
+// Returns: [projectKey: String, shouldEnforce: Boolean, env: String]
+def getSonarProjectConfig() {
+    def targetBranch = env.CHANGE_TARGET ?: env.BRANCH_NAME
+
+    if (targetBranch == 'main') {
+        return [projectKey: 'elohim-app-prod', shouldEnforce: true, env: 'prod']
+    } else if (targetBranch == 'staging' || targetBranch ==~ /staging-.+/) {
+        return [projectKey: 'elohim-app-staging', shouldEnforce: false, env: 'staging']
+    } else {
+        return [projectKey: 'elohim-app-alpha', shouldEnforce: false, env: 'alpha']
+    }
+}
+
 // ============================================================================
 // STAGE HELPER METHODS (to reduce bytecode size)
 // ============================================================================
@@ -586,17 +600,30 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    anyOf { branch 'main'; branch 'staging'; changeRequest target: 'staging'; changeRequest target: 'main' }
+                    anyOf {
+                        branch 'main'
+                        branch 'staging'
+                        branch 'dev'
+                        expression { env.BRANCH_NAME ==~ /staging-.+/ }
+                        expression { env.BRANCH_NAME ==~ /feat-.+/ }
+                        expression { env.BRANCH_NAME ==~ /claude\/.+/ }
+                        changeRequest target: 'main'
+                        changeRequest target: 'staging'
+                        changeRequest target: 'dev'
+                    }
                 }
             }
             steps {
                 container('builder'){
                     dir('elohim-app') {
                         script {
+                            def sonarConfig = getSonarProjectConfig()
+                            echo "SonarQube Analysis: project=${sonarConfig.projectKey}, env=${sonarConfig.env}, enforce=${sonarConfig.shouldEnforce}"
+
                             withSonarQubeEnv('ee-sonarqube') {
-                                sh '''
+                                sh """
                                 sonar-scanner \
-                                    -Dsonar.projectKey=elohim-app \
+                                    -Dsonar.projectKey=${sonarConfig.projectKey} \
                                     -Dsonar.sources=src \
                                     -Dsonar.tests=src \
                                     -Dsonar.test.inclusions=**/*.spec.ts \
@@ -605,19 +632,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**,**/parsers/**,**/*.routes.ts \
                                     -Dsonar.qualitygate.wait=true \
                                     -Dsonar.qualitygate.timeout=240
-                                '''
+                                """
                             }
 
                             echo "Waiting for SonarQube quality gate..."
                             timeout(time: 4, unit: 'MINUTES') {
                                 def qg = waitForQualityGate()
                                 if (qg.status != 'OK') {
-                                    // Log the failure but don't block - coverage threshold managed on SonarQube server
-                                    echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
-                                    echo "Review coverage at: ${env.SONAR_HOST_URL}/dashboard?id=elohim-app"
-                                    // Uncomment to enforce: error "SonarQube Quality Gate failed: ${qg.status}"
+                                    if (sonarConfig.shouldEnforce) {
+                                        // Production: Block deployment on quality gate failure
+                                        error "❌ SonarQube Quality Gate FAILED: ${qg.status}\nReview issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                    } else {
+                                        // Alpha/Staging: Log warning but don't block
+                                        echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
+                                        echo "Review issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                        currentBuild.result = 'UNSTABLE'
+                                    }
                                 }
-                                echo "✅ SonarQube analysis complete"
+                                echo "✅ SonarQube analysis complete (${sonarConfig.env})"
                             }
                         }
                     }
