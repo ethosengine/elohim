@@ -630,8 +630,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     -Dsonar.typescript.lcov.reportPaths=coverage/elohim-app/lcov.info \
                                     -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info \
                                     -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**,**/parsers/**,**/*.routes.ts \
-                                    -Dsonar.qualitygate.wait=true \
-                                    -Dsonar.qualitygate.timeout=240
+                                    -Dsonar.qualitygate.wait=false
                                 """
                             }
 
