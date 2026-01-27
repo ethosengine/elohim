@@ -14,7 +14,7 @@
  * field names. This cannot be changed without updating the Rust zomes.
  */
 
-import { Injectable, Injector, inject } from '@angular/core';
+import { Injectable, Injector } from '@angular/core';
 
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 
@@ -168,8 +168,10 @@ export class BlobManagerService {
    */
   get connectionMode(): 'doorway' | 'direct' {
     // Connection mode is determined by the environment
-    const env = (globalThis as any).__env || {};
-    return (env.connectionMode as 'doorway' | 'direct') || 'doorway';
+    const env = (globalThis as Record<string, unknown>)['__env'] as
+      | Record<string, unknown>
+      | undefined;
+    return (env?.['connectionMode'] as 'doorway' | 'direct') ?? 'doorway';
   }
 
   /**
@@ -181,7 +183,7 @@ export class BlobManagerService {
    */
   getPriorityUrls(blobMetadata: ContentBlob): string[] {
     const strategyUrl = this.getBlobUrl(blobMetadata.hash);
-    const fallbackUrls = blobMetadata.fallbackUrls || [];
+    const fallbackUrls = blobMetadata.fallbackUrls ?? [];
 
     // Avoid duplicates: if strategy URL is already in fallbacks, don't add again
     if (fallbackUrls.includes(strategyUrl)) {
@@ -196,9 +198,7 @@ export class BlobManagerService {
    * Lazy-inject StorageClientService to avoid circular dependency.
    */
   private getStorageClient(): StorageClientService {
-    if (!this.storageClient) {
-      this.storageClient = this.injector.get(StorageClientService);
-    }
+    this.storageClient ??= this.injector.get(StorageClientService);
     return this.storageClient;
   }
 
@@ -252,7 +252,7 @@ export class BlobManagerService {
     // Fetch blob using priority URLs (strategy URL first, then fallbacks)
     const urls = this.getPriorityUrls(blobMetadata);
     return this.fallbackService.fetchWithFallback(urls).pipe(
-      tap((fetchResult: BlobFetchResult) => {
+      tap((_fetchResult: BlobFetchResult) => {
         if (progressCallback) {
           progressCallback({
             bytesDownloaded: blobMetadata.sizeBytes,
@@ -341,7 +341,7 @@ export class BlobManagerService {
    * @returns Blob if cached, null otherwise
    */
   getCachedBlob(hash: string): Blob | null {
-    return this.blobCache.get(hash) || null;
+    return this.blobCache.get(hash) ?? null;
   }
 
   /**
@@ -572,7 +572,7 @@ export class BlobManagerService {
     return this.getBlobsForContent(contentId).pipe(
       map(blobs => {
         const found = blobs.find(b => b.hash === blobHash);
-        return found || null;
+        return found ?? null;
       })
     );
   }

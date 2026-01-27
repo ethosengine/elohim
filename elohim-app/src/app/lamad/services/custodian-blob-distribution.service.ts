@@ -12,9 +12,7 @@
 
 import { Injectable } from '@angular/core';
 
-import { map, catchError } from 'rxjs/operators';
-
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 import { ContentBlob } from '../models/content-node.model';
 
@@ -121,7 +119,7 @@ export class CustodianBlobDistributionService {
         score: this.scoreCustodian(c, blob, criteria),
       }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, criteria.maxCustodians || 3)
+      .slice(0, criteria.maxCustodians ?? 3)
       .map(s => s.custodian);
 
     return of(scored);
@@ -185,7 +183,7 @@ export class CustodianBlobDistributionService {
   ): Observable<CustodianBlobCommitment> {
     // Find the commitment in storage and update it
     const key = `${commitment.contentId}_${commitment.blobHash}`;
-    const commitments = this.blobCommitments.get(key) || [];
+    const commitments = this.blobCommitments.get(key) ?? [];
     const index = commitments.findIndex(c => c.custodianId === commitment.custodianId);
 
     if (index >= 0) {
@@ -223,7 +221,7 @@ export class CustodianBlobDistributionService {
    */
   getBlobReplicationStatus(contentId: string, blobHash: string): Observable<BlobReplicationStatus> {
     const key = `${contentId}_${blobHash}`;
-    const commitments = this.blobCommitments.get(key) || [];
+    const commitments = this.blobCommitments.get(key) ?? [];
 
     const activeReplicas = commitments.filter(c => c.commitmentStatus === 'active').length;
     const avgProgress =
@@ -242,7 +240,7 @@ export class CustodianBlobDistributionService {
       blobHash,
       contentId,
       totalSize: 0, // Would come from blob metadata
-      primaryUrl: commitments[0]?.fallbackUrl || '',
+      primaryUrl: commitments[0]?.fallbackUrl ?? '',
       custodianCount: commitments.length,
       activeReplicas,
       replicationProgress: avgProgress,
@@ -263,7 +261,7 @@ export class CustodianBlobDistributionService {
    */
   getCommitmentsForBlob(contentId: string, blobHash: string): CustodianBlobCommitment[] {
     const key = `${contentId}_${blobHash}`;
-    return this.blobCommitments.get(key) || [];
+    return this.blobCommitments.get(key) ?? [];
   }
 
   /**
@@ -277,7 +275,7 @@ export class CustodianBlobDistributionService {
    */
   revokeCommitment(contentId: string, blobHash: string, custodianId: string): Observable<boolean> {
     const key = `${contentId}_${blobHash}`;
-    const commitments = this.blobCommitments.get(key) || [];
+    const commitments = this.blobCommitments.get(key) ?? [];
 
     const index = commitments.findIndex(c => c.custodianId === custodianId);
     if (index >= 0) {
@@ -373,7 +371,7 @@ export class CustodianBlobDistributionService {
    * @param custodianId Custodian ID
    * @returns Observable with health status
    */
-  probeCustodianHealth(custodianId: string): Observable<{
+  probeCustodianHealth(_custodianId: string): Observable<{
     online: boolean;
     acceptingBlobs: boolean;
     bandwidth: number;
@@ -445,7 +443,7 @@ export class CustodianBlobDistributionService {
   /**
    * Get available custodians matching criteria.
    */
-  private getAvailableCustodians(criteria: CustodianSelectionCriteria): CustodianCapability[] {
+  private getAvailableCustodians(_criteria: CustodianSelectionCriteria): CustodianCapability[] {
     // In production, would query DHT for custodians matching criteria
     // For now, return empty array (stub implementation)
     return [];
@@ -462,7 +460,7 @@ export class CustodianBlobDistributionService {
     let score = 0;
 
     // Bandwidth suitability (more bandwidth = better, up to 10x needed)
-    const bandwidthNeeded = (blob.bitrateMbps || 5) * 2; // 2x overhead
+    const bandwidthNeeded = (blob.bitrateMbps ?? 5) * 2; // 2x overhead
     const bandwidthScore = Math.min(custodian.availableBandwidthMbps / bandwidthNeeded, 1.0);
     score += bandwidthScore * 40; // 40% weight
 

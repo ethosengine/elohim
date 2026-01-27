@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-import { BehaviorSubject, Observable, of, map, switchMap, tap } from 'rxjs';
+import { BehaviorSubject, Observable, of, map, switchMap } from 'rxjs';
 
 import {
   QuizSession,
@@ -15,7 +15,6 @@ import {
   calculateQuizResult,
   isValidTransition,
   isTerminalState,
-  DEFAULT_CONFIGS,
 } from '../models/quiz-session.model';
 
 import { QuestionPoolService } from './question-pool.service';

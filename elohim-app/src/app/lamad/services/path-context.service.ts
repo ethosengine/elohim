@@ -92,9 +92,7 @@ export class PathContextService {
    */
   enterPath(context: PathContext): void {
     // Initialize detour stack if not present
-    if (!context.detourStack) {
-      context.detourStack = [];
-    }
+    context.detourStack ??= [];
 
     // Check if we're already in this path (update position)
     const existingIndex = this.contextStack.findIndex(c => c.pathId === context.pathId);
@@ -148,9 +146,7 @@ export class PathContextService {
     }
 
     // Initialize detour stack if needed
-    if (!current.detourStack) {
-      current.detourStack = [];
-    }
+    current.detourStack ??= [];
 
     current.detourStack.push(detourInfo);
     this.activeContext$.next(current);
@@ -168,7 +164,7 @@ export class PathContextService {
       return null;
     }
 
-    const detour = current.detourStack.pop();
+    current.detourStack.pop();
     this.activeContext$.next(current);
 
     // If there are more detours, return to the previous detour's content

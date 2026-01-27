@@ -18,6 +18,12 @@ import { ContentFormatRegistryService } from './services/content-format-registry
 import { ContentIOService } from './services/content-io.service';
 
 /**
+ * Canonical format ID for Sophia quiz content.
+ * Used to map various quiz format aliases to the Sophia renderer.
+ */
+const SOPHIA_QUIZ_FORMAT = 'sophia-quiz-json';
+
+/**
  * Initializer function to register unified format plugins.
  * This ensures plugins are registered before any component tries to use them.
  *
@@ -36,10 +42,10 @@ function initializeFormatPlugins(): void {
   // Register format aliases: map data formats to their renderers
   // This keeps content storage format-agnostic while providing flexible rendering
   // Sophia handles both mastery quizzes (Perseus-compatible) and discovery assessments
-  registry.registerAlias('sophia', 'sophia-quiz-json'); // Short alias → canonical
-  registry.registerAlias('perseus', 'sophia-quiz-json'); // Legacy Perseus format → Sophia renderer
-  registry.registerAlias('perseus-quiz-json', 'sophia-quiz-json'); // Perseus quiz data schema → Sophia renderer
-  registry.registerAlias('sophia-discovery', 'sophia-quiz-json'); // Discovery assessments → Sophia renderer
+  registry.registerAlias('sophia', SOPHIA_QUIZ_FORMAT); // Short alias → canonical
+  registry.registerAlias('perseus', SOPHIA_QUIZ_FORMAT); // Legacy Perseus format → Sophia renderer
+  registry.registerAlias('perseus-quiz-json', SOPHIA_QUIZ_FORMAT); // Perseus quiz data schema → Sophia renderer
+  registry.registerAlias('sophia-discovery', SOPHIA_QUIZ_FORMAT); // Discovery assessments → Sophia renderer
 }
 
 /**

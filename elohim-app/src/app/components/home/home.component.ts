@@ -82,7 +82,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private updateParallaxElements() {
-    const scrolled = window.pageYOffset;
+    const scrolled = window.scrollY;
 
     // Update CSS custom property for parallax background
     this.renderer.setStyle(

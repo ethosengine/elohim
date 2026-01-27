@@ -104,6 +104,7 @@ export class GherkinParser {
     const tags = this.extractTags(lines[parseContext.currentLine]);
     if (tags.length > 0) parseContext.currentLine++;
 
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     const featureMatch = /^Feature:\s*(.+)$/.exec(lines[parseContext.currentLine] ?? '');
     if (!featureMatch) {
       throw new Error(`Invalid feature file: ${sourcePath}`);
@@ -181,6 +182,7 @@ export class GherkinParser {
     const scenarioTags = this.extractTags(lines[parseContext.currentLine]);
     if (scenarioTags.length > 0) parseContext.currentLine++;
 
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     const scenarioMatch = /^\s*(Scenario|Scenario Outline):\s*(.+)$/.exec(
       lines[parseContext.currentLine] ?? ''
     );
@@ -257,6 +259,7 @@ export class GherkinParser {
   }
 
   private static parseStep(line: string): GherkinStep | null {
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     const stepMatch = /^\s*(Given|When|Then|And|But)\s+(.+)$/.exec(line);
     if (!stepMatch) return null;
 

@@ -33,7 +33,7 @@ import {
 
 import { BehaviorSubject, Observable, combineLatest, interval, of } from 'rxjs';
 
-import { EconomicEvent, LamadEventType } from '@app/elohim/models/economic-event.model';
+import { LamadEventType } from '@app/elohim/models/economic-event.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 import {
@@ -382,7 +382,7 @@ export class ShefaComputeService {
               .pipe(
                 map(status => ({
                   id: c.custodianId,
-                  name: c.custodianName || c.custodianId,
+                  name: c.custodianName ?? c.custodianId,
                   type: c.custodianType as
                     | 'family'
                     | 'friend'
@@ -391,14 +391,14 @@ export class ShefaComputeService {
                     | 'institution',
                   location: c.location,
                   dataStored: {
-                    totalGB: c.totalGb || 100,
-                    shardCount: c.shardCount || 3,
-                    redundancyLevel: c.redundancyLevel || 2,
+                    totalGB: c.totalGb ?? 100,
+                    shardCount: c.shardCount ?? 3,
+                    redundancyLevel: c.redundancyLevel ?? 2,
                   },
                   health: {
-                    upPercent: status?.uptimePercent || 99.5,
-                    lastHeartbeat: status?.lastHeartbeat || new Date().toISOString(),
-                    responseTime: status?.responseTimeMs || 50,
+                    upPercent: status?.uptimePercent ?? 99.5,
+                    lastHeartbeat: status?.lastHeartbeat ?? new Date().toISOString(),
+                    responseTime: status?.responseTimeMs ?? 50,
                   },
                   commitment: {
                     id: c.id,
@@ -407,8 +407,8 @@ export class ShefaComputeService {
                     expiryDate: c.expiryDate,
                     renewalStatus: c.renewalStatus as 'auto-renew' | 'manual' | 'expired',
                   },
-                  trustLevel: c.trustLevel || 75,
-                  relationship: c.relationship || 'custodian',
+                  trustLevel: c.trustLevel ?? 75,
+                  relationship: c.relationship ?? 'custodian',
                 }))
               )
           );
@@ -420,7 +420,7 @@ export class ShefaComputeService {
           const regionMap = new Map<string, RegionalPresence>();
 
           custodians.forEach(c => {
-            const region = c.location?.region || 'unknown';
+            const region = c.location?.region ?? 'unknown';
             if (!regionMap.has(region)) {
               regionMap.set(region, {
                 region,
@@ -443,7 +443,7 @@ export class ShefaComputeService {
             type: c.type === 'family' ? 'family-member' : (c.type as any),
             trustScore: c.trustLevel,
             depth: 1, // Direct relationships only
-            strength: c.trustLevel >= 80 ? 'strong' : c.trustLevel >= 50 ? 'moderate' : 'weak',
+            strength: this.getTrustStrength(c.trustLevel),
           }));
 
           // Determine redundancy strategy
@@ -749,9 +749,18 @@ export class ShefaComputeService {
   }
 
   /**
+   * Helper: Determine trust strength from trust level
+   */
+  private getTrustStrength(trustLevel: number): 'strong' | 'moderate' | 'weak' {
+    if (trustLevel >= 80) return 'strong';
+    if (trustLevel >= 50) return 'moderate';
+    return 'weak';
+  }
+
+  /**
    * Helper: Calculate uptime metrics
    */
-  private calculateUptime(metrics: ComputeMetrics): UpTimeMetrics {
+  private calculateUptime(_metrics: ComputeMetrics): UpTimeMetrics {
     return {
       upPercent: 99.5,
       downtime: {

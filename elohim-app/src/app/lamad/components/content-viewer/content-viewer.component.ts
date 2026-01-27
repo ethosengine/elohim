@@ -140,6 +140,12 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private nodeId: string | null = null;
   private readonly seoService = inject(SeoService);
 
+  /** Default feedback profile type for learning content */
+  private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
+
+  /** CSS class for focused view mode */
+  private readonly FOCUSED_VIEW_MODE_CLASS = 'focused-view-mode';
+
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -185,7 +191,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.destroy$.complete();
     this.destroyRenderer();
     // Clean up focused view mode if active
-    this.document.body.classList.remove('focused-view-mode');
+    this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
   }
 
   ngAfterViewChecked(): void {
@@ -490,13 +496,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    */
   mapContentTypeToProfileType(contentType: string): string {
     const mapping: Record<string, string> = {
-      epic: 'learning-content',
-      feature: 'learning-content',
-      scenario: 'learning-content',
-      tutorial: 'learning-content',
-      guide: 'learning-content',
-      concept: 'learning-content',
-      lesson: 'learning-content',
+      epic: this.LEARNING_CONTENT_PROFILE,
+      feature: this.LEARNING_CONTENT_PROFILE,
+      scenario: this.LEARNING_CONTENT_PROFILE,
+      tutorial: this.LEARNING_CONTENT_PROFILE,
+      guide: this.LEARNING_CONTENT_PROFILE,
+      concept: this.LEARNING_CONTENT_PROFILE,
+      lesson: this.LEARNING_CONTENT_PROFILE,
       research: 'research-content',
       paper: 'research-content',
       testimony: 'personal-testimony',
@@ -504,7 +510,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       announcement: 'community-announcement',
       proposal: 'governance-proposal',
     };
-    return mapping[contentType.toLowerCase()] || 'learning-content';
+    return mapping[contentType.toLowerCase()] || this.LEARNING_CONTENT_PROFILE;
   }
 
   /**
@@ -888,9 +894,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
     // Toggle body class for global effects (hide navigation, lock scroll)
     if (active) {
-      this.document.body.classList.add('focused-view-mode');
+      this.document.body.classList.add(this.FOCUSED_VIEW_MODE_CLASS);
     } else {
-      this.document.body.classList.remove('focused-view-mode');
+      this.document.body.classList.remove(this.FOCUSED_VIEW_MODE_CLASS);
     }
 
     // Wait for CSS transition to complete, then reload content

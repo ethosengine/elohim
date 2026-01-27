@@ -190,7 +190,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
 
     // Subscribe to upgrade prompts
     this.sessionHumanService.upgradePrompts$.pipe(takeUntil(this.destroy$)).subscribe(prompts => {
-      this.activeUpgradePrompt = prompts.find(p => !p.dismissed) || null;
+      this.activeUpgradePrompt = prompts.find(p => !p.dismissed) ?? null;
     });
 
     // Close trays on navigation
@@ -223,7 +223,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   get currentApp(): ContextAppConfig {
     const apps = this.contextApps();
-    return apps.find(app => app.id === this.context) || apps[0];
+    return apps.find(app => app.id === this.context) ?? apps[0];
   }
 
   /**

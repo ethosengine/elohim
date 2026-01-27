@@ -151,6 +151,9 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
   private readonly seoService = inject(SeoService);
 
+  /** Base route for path navigation */
+  private readonly PATH_ROUTE = '/lamad/path';
+
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -316,7 +319,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Navigate to begin the journey
    */
   beginJourney(): void {
-    this.router.navigate(['/lamad/path', this.pathId, 'step', 0]);
+    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', 0]);
   }
 
   /**
@@ -324,7 +327,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   continueJourney(): void {
     const currentStep = this.getCurrentStepIndex();
-    this.router.navigate(['/lamad/path', this.pathId, 'step', currentStep]);
+    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', currentStep]);
   }
 
   /**
@@ -333,7 +336,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   startChapter(chapterId: string): void {
     this.pathService.getChapterFirstStep(this.pathId, chapterId).subscribe(step => {
       if (step) {
-        this.router.navigate(['/lamad/path', this.pathId, 'step', step.step.order]);
+        this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.step.order]);
       }
     });
   }
@@ -343,7 +346,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   goToStep(stepIndex: number): void {
     if (this.accessibleSteps.includes(stepIndex)) {
-      this.router.navigate(['/lamad/path', this.pathId, 'step', stepIndex]);
+      this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', stepIndex]);
     }
   }
 
@@ -657,7 +660,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     // Find the step that references this concept
     const step = this.path?.steps.find(s => s.resourceId === conceptId);
     if (step) {
-      this.router.navigate(['/lamad/path', this.pathId, 'step', step.order]);
+      this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.order]);
     } else {
       // Fallback to direct resource view if no matching step found
       this.router.navigate(['/lamad/resource', conceptId]);

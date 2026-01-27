@@ -126,6 +126,8 @@ export interface VerifiableCredential {
      * - attestationType: AttestationType
      * - journey: AttestationJourney (proof of learning)
      */
+    // W3C Verifiable Credentials spec requires extensible claims - any is intentional
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
 

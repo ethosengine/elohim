@@ -18,12 +18,7 @@ import { GovernanceSignalService } from '@app/elohim/services/governance-signal.
 
 import { Moment, Recognition } from '../../../content-io/plugins/sophia/sophia-moment.model';
 import { SophiaWrapperComponent } from '../../../content-io/plugins/sophia/sophia-wrapper.component';
-import {
-  StreakState,
-  StreakProgress,
-  StreakIndicator,
-  getStreakProgress,
-} from '../../models/streak-state.model';
+import { StreakState, getStreakProgress } from '../../models/streak-state.model';
 import { QuestionPoolService } from '../../services/question-pool.service';
 import { QuizSoundService } from '../../services/quiz-sound.service';
 import { StreakTrackerService } from '../../services/streak-tracker.service';

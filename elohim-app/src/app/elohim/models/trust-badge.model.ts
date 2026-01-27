@@ -323,6 +323,24 @@ export function warningToIndicator(warning: BadgeWarning): TrustIndicator {
   };
 }
 
+// =============================================================================
+// Attestation Type Constants - Extracted to avoid duplicate string literals
+// =============================================================================
+
+/** Common attestation type identifiers */
+const ATTESTATION_TYPES = {
+  GOVERNANCE_RATIFIED: 'governance-ratified' as ContentAttestationType,
+  CURRICULUM_CANONICAL: 'curriculum-canonical' as ContentAttestationType,
+  PEER_REVIEWED: 'peer-reviewed' as ContentAttestationType,
+  STEWARD_APPROVED: 'steward-approved' as ContentAttestationType,
+  SAFETY_REVIEWED: 'safety-reviewed' as ContentAttestationType,
+  ACCURACY_VERIFIED: 'accuracy-verified' as ContentAttestationType,
+  COMMUNITY_ENDORSED: 'community-endorsed' as ContentAttestationType,
+  ACCESSIBILITY_CHECKED: 'accessibility-checked' as ContentAttestationType,
+  LICENSE_CLEARED: 'license-cleared' as ContentAttestationType,
+  AUTHOR_VERIFIED: 'author-verified' as ContentAttestationType,
+} as const;
+
 /**
  * Priority values for attestation types (higher = more prominent).
  */
@@ -380,7 +398,7 @@ export { ATTESTATION_BADGE_CONFIG, REACH_BADGE_CONFIG, WARNING_CONFIG };
  * Determine trust level from reach and attestations.
  */
 export function calculateTrustLevel(
-  reach: ContentReach,
+  _reach: ContentReach,
   attestationTypes: ContentAttestationType[],
   hasFlags: boolean
 ): TrustLevel {
@@ -389,19 +407,22 @@ export function calculateTrustLevel(
   }
 
   if (
-    attestationTypes.includes('governance-ratified') ||
-    attestationTypes.includes('curriculum-canonical')
+    attestationTypes.includes(ATTESTATION_TYPES.GOVERNANCE_RATIFIED) ||
+    attestationTypes.includes(ATTESTATION_TYPES.CURRICULUM_CANONICAL)
   ) {
     return 'verified';
   }
 
-  if (attestationTypes.includes('peer-reviewed') || attestationTypes.includes('steward-approved')) {
+  if (
+    attestationTypes.includes(ATTESTATION_TYPES.PEER_REVIEWED) ||
+    attestationTypes.includes(ATTESTATION_TYPES.STEWARD_APPROVED)
+  ) {
     return 'trusted';
   }
 
   if (
-    attestationTypes.includes('author-verified') ||
-    attestationTypes.includes('community-endorsed')
+    attestationTypes.includes(ATTESTATION_TYPES.AUTHOR_VERIFIED) ||
+    attestationTypes.includes(ATTESTATION_TYPES.COMMUNITY_ENDORSED)
   ) {
     return 'emerging';
   }
@@ -426,12 +447,12 @@ export function generateTrustSummary(
 
   // Determine top attestation by priority
   let topAttestation = attestationTypes[0];
-  if (attestationTypes.includes('governance-ratified')) {
-    topAttestation = 'governance-ratified';
-  } else if (attestationTypes.includes('peer-reviewed')) {
-    topAttestation = 'peer-reviewed';
-  } else if (attestationTypes.includes('steward-approved')) {
-    topAttestation = 'steward-approved';
+  if (attestationTypes.includes(ATTESTATION_TYPES.GOVERNANCE_RATIFIED)) {
+    topAttestation = ATTESTATION_TYPES.GOVERNANCE_RATIFIED;
+  } else if (attestationTypes.includes(ATTESTATION_TYPES.PEER_REVIEWED)) {
+    topAttestation = ATTESTATION_TYPES.PEER_REVIEWED;
+  } else if (attestationTypes.includes(ATTESTATION_TYPES.STEWARD_APPROVED)) {
+    topAttestation = ATTESTATION_TYPES.STEWARD_APPROVED;
   }
 
   const topBadge = ATTESTATION_BADGE_CONFIG[topAttestation];

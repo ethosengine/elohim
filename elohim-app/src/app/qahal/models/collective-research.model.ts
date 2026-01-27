@@ -29,7 +29,6 @@
 
 import type {
   ResearchFramework,
-  ResearchCategory,
   PersonalResearchConsent,
 } from '@app/lamad/quiz-engine/models/research-assessment.model';
 

@@ -1,14 +1,14 @@
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
+import { firstValueFrom } from 'rxjs';
+
 import {
-  NodesResponse,
   NodeDetails,
   ClusterMetrics,
   ResourceSummary,
   CustodianNetwork,
   NodeStatus,
-  StewardTier,
   statusColor,
   tierColor,
   reachLevelName,
@@ -161,10 +161,10 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
     try {
       // Load all data in parallel
       const [nodesRes, cluster, resources, custodians] = await Promise.all([
-        this.adminService.getNodes().toPromise(),
-        this.adminService.getClusterMetrics().toPromise(),
-        this.adminService.getResources().toPromise(),
-        this.adminService.getCustodians().toPromise(),
+        firstValueFrom(this.adminService.getNodes()),
+        firstValueFrom(this.adminService.getClusterMetrics()),
+        firstValueFrom(this.adminService.getResources()),
+        firstValueFrom(this.adminService.getCustodians()),
       ]);
 
       if (nodesRes) {

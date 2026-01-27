@@ -15,9 +15,9 @@
 
 import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 
-import { takeUntil, tap, debounceTime } from 'rxjs/operators';
+import { takeUntil, tap } from 'rxjs/operators';
 
-import { Observable, Subject, combineLatest } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 
 import { SheafaDashboardState } from '../../models/shefa-dashboard.model';
 import { ComputeEventService } from '../../services/compute-event.service';
@@ -159,14 +159,14 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
    * Get status text
    */
   getStatusText(): string {
-    return this.currentState?.status.toUpperCase() || 'UNKNOWN';
+    return this.currentState?.status.toUpperCase() ?? 'UNKNOWN';
   }
 
   /**
    * Get uptime percentage
    */
   getUptimePercent(): number {
-    return this.currentState?.uptime.upPercent || 0;
+    return this.currentState?.uptime.upPercent ?? 0;
   }
 
   /**
@@ -220,28 +220,28 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
    * Get CPU usage percentage
    */
   getCpuUsage(): number {
-    return this.currentState?.computeMetrics.cpu.usagePercent || 0;
+    return this.currentState?.computeMetrics.cpu.usagePercent ?? 0;
   }
 
   /**
    * Get memory usage percentage
    */
   getMemoryUsage(): number {
-    return this.currentState?.computeMetrics.memory.usagePercent || 0;
+    return this.currentState?.computeMetrics.memory.usagePercent ?? 0;
   }
 
   /**
    * Get storage usage percentage
    */
   getStorageUsage(): number {
-    return this.currentState?.computeMetrics.storage.usagePercent || 0;
+    return this.currentState?.computeMetrics.storage.usagePercent ?? 0;
   }
 
   /**
    * Get total custodians protecting data
    */
   getTotalCustodians(): number {
-    return this.currentState?.familyCommunityProtection.totalCustodians || 0;
+    return this.currentState?.familyCommunityProtection.totalCustodians ?? 0;
   }
 
   /**
@@ -265,21 +265,21 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
    * Get infrastructure token balance
    */
   getTokenBalance(): number {
-    return this.currentState?.infrastructureTokens.balance.tokens || 0;
+    return this.currentState?.infrastructureTokens.balance.tokens ?? 0;
   }
 
   /**
    * Get token earning rate (tokens/hour)
    */
   getTokenEarningRate(): number {
-    return this.currentState?.infrastructureTokens.earningRate.tokensPerHour || 0;
+    return this.currentState?.infrastructureTokens.earningRate.tokensPerHour ?? 0;
   }
 
   /**
    * Get estimated monthly token earnings
    */
   getEstimatedMonthlyEarnings(): number {
-    return this.currentState?.infrastructureTokens.earningRate.estimatedMonthly || 0;
+    return this.currentState?.infrastructureTokens.earningRate.estimatedMonthly ?? 0;
   }
 
   /**
@@ -306,7 +306,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
    */
   getAlertCount(): number {
     const limits = this.currentState?.constitutionalLimits;
-    return limits?.alerts.length || 0;
+    return limits?.alerts.length ?? 0;
   }
 
   /**
@@ -314,7 +314,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
    */
   getCriticalAlerts() {
     return (
-      this.currentState?.constitutionalLimits.alerts.filter(a => a.severity === 'critical') || []
+      this.currentState?.constitutionalLimits.alerts.filter(a => a.severity === 'critical') ?? []
     );
   }
 
@@ -360,8 +360,8 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
    * Show notification (would integrate with toast/notification service)
    */
   private showNotification(message: string): void {
-    console.log('[ShefaDashboard] Notification:', message);
-    // TODO: Integrate with NotificationService for actual toast notifications
+    // Notification service integration - warn level for visibility
+    console.warn('[ShefaDashboard] Notification:', message);
   }
 
   /**

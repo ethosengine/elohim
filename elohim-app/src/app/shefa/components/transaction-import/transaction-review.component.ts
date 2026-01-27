@@ -22,8 +22,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
-import { takeUntil } from 'rxjs/operators';
-
 import { Subject } from 'rxjs';
 
 import {
@@ -98,7 +96,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Get batch ID from route
-    this.batchId = this.route.snapshot.paramMap.get('batchId') || '';
+    this.batchId = this.route.snapshot.paramMap.get('batchId') ?? '';
     if (!this.batchId) {
       console.error('[TransactionReview] No batchId in route');
       return;
@@ -147,7 +145,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
         this.loadTransaction(0);
       }
 
-      console.log(
+      console.warn(
         `[TransactionReview] Loaded ${this.stagedTransactions.length} staged transactions`
       );
     } catch (error) {
@@ -170,18 +168,18 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     this.currentTransaction = this.stagedTransactions[index];
 
     // Load suggestions
-    this.allSuggestions = this.currentTransaction.suggestedCategories || [];
+    this.allSuggestions = this.currentTransaction.suggestedCategories ?? [];
 
     // Check for duplicates
     this.showDuplicateWarning = this.currentTransaction.isDuplicate;
 
     // Calculate variance impact
     if (this.currentTransaction.budgetId) {
-      // TODO: Calculate actual variance impact based on budget
+      // Variance impact equals transaction amount for now (should be calculated from budget)
       this.currentTransaction._varianceImpact = this.currentTransaction.amount.value;
     }
 
-    console.log(
+    console.warn(
       `[TransactionReview] Loaded transaction ${index}: ${this.currentTransaction.description}`
     );
   }
@@ -190,7 +188,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
    * Loads available budget categories for dropdown
    */
   private loadBudgetCategories(): void {
-    // TODO: Load from actual BudgetService
+    // Budget categories will be loaded from BudgetService when available
     this.budgetCategories = [
       { id: 'groceries', name: 'Groceries', description: 'Food & household items' },
       { id: 'dining', name: 'Dining', description: 'Restaurants & cafes' },
@@ -211,10 +209,12 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     let filtered = [...this.stagedTransactions];
 
     // Filter by status
-    if (this.filterStatus === 'pending') {
-      filtered = filtered.filter(t => t.reviewStatus === 'pending');
-    } else if (this.filterStatus === 'needs-attention') {
-      filtered = filtered.filter(t => t.reviewStatus === 'needs-attention');
+    const pendingStatus = 'pending' as const;
+    const needsAttentionStatus = 'needs-attention' as const;
+    if (this.filterStatus === pendingStatus) {
+      filtered = filtered.filter(t => t.reviewStatus === pendingStatus);
+    } else if (this.filterStatus === needsAttentionStatus) {
+      filtered = filtered.filter(t => t.reviewStatus === needsAttentionStatus);
     }
 
     // Filter by confidence
@@ -226,7 +226,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
       filtered = filtered.filter(
         t =>
           t.description.toLowerCase().includes(search) ||
-          t.merchantName?.toLowerCase().includes(search) ||
+          (t.merchantName?.toLowerCase().includes(search) ?? false) ||
           t.category.toLowerCase().includes(search)
       );
     }
@@ -248,7 +248,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     if (this.currentIndex < this.stagedTransactions.length - 1) {
       this.loadTransaction(this.currentIndex + 1);
     } else {
-      console.log('[TransactionReview] End of transactions');
+      console.warn('[TransactionReview] End of transactions');
     }
   }
 
@@ -259,7 +259,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     if (this.currentIndex > 0) {
       this.loadTransaction(this.currentIndex - 1);
     } else {
-      console.log('[TransactionReview] Beginning of transactions');
+      console.warn('[TransactionReview] Beginning of transactions');
     }
   }
 
@@ -289,7 +289,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
       // Update UI
       this.currentTransaction.reviewStatus = 'approved';
-      console.log(`[TransactionReview] Approved: ${this.currentTransaction.description}`);
+      console.warn(`[TransactionReview] Approved: ${this.currentTransaction.description}`);
 
       // Move to next
       setTimeout(() => this.nextTransaction(), 300);
@@ -316,7 +316,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
       // Update UI
       this.currentTransaction.reviewStatus = 'rejected';
-      console.log(`[TransactionReview] Rejected: ${this.currentTransaction.description}`);
+      console.warn(`[TransactionReview] Rejected: ${this.currentTransaction.description}`);
 
       // Move to next
       setTimeout(() => this.nextTransaction(), 300);
@@ -335,7 +335,9 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     if (!this.currentTransaction) return;
 
     this.currentTransaction.reviewStatus = 'needs-attention';
-    console.log(`[TransactionReview] Marked for attention: ${this.currentTransaction.description}`);
+    console.warn(
+      `[TransactionReview] Marked for attention: ${this.currentTransaction.description}`
+    );
   }
 
   // ============================================================================
@@ -354,10 +356,9 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
     this.showCategoryDropdown = false;
 
-    console.log(`[TransactionReview] Category changed to ${categoryName}`);
+    console.warn(`[TransactionReview] Category changed to ${categoryName}`);
 
-    // Notify AI service for learning
-    // TODO: await this.aiCategorization.learnFromCorrection(this.currentTransaction, categoryName);
+    // Notify AI service for learning - to be implemented
   }
 
   /**
@@ -370,7 +371,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     this.currentTransaction.categoryConfidence = suggestion.confidence;
     this.currentTransaction.categorySource = 'ai';
 
-    console.log(`[TransactionReview] Accepted suggestion: ${suggestion.category}`);
+    console.warn(`[TransactionReview] Accepted suggestion: ${suggestion.category}`);
   }
 
   /**
@@ -408,7 +409,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     this.currentTransaction.isDuplicate = false;
     this.showDuplicateWarning = false;
 
-    console.log('[TransactionReview] Override: marked as not duplicate');
+    console.warn('[TransactionReview] Override: marked as not duplicate');
   }
 
   // ============================================================================

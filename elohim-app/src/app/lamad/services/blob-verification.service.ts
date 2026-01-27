@@ -20,7 +20,7 @@
 
 import { Injectable } from '@angular/core';
 
-import { map, catchError, switchMap } from 'rxjs/operators';
+import { map, catchError } from 'rxjs/operators';
 
 import { Observable, from, of } from 'rxjs';
 
@@ -164,7 +164,6 @@ export class BlobVerificationService {
 
     // Try server verification (authoritative, always available online)
     try {
-      const base64 = this.arrayBufferToBase64(data);
       const response = await this.doorway.verifyBlobData(data, expectedHash).toPromise();
       if (response) {
         return {

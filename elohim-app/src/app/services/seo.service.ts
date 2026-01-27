@@ -29,6 +29,11 @@ export interface SeoConfig {
 }
 
 /**
+ * Schema.org context URL
+ */
+const SCHEMA_ORG_CONTEXT = 'https://schema.org';
+
+/**
  * Default SEO values for the site
  */
 const DEFAULTS = {
@@ -363,7 +368,7 @@ export class SeoService {
         articleSection: 'Learning',
       },
       jsonLd: {
-        '@context': 'https://schema.org',
+        '@context': SCHEMA_ORG_CONTEXT,
         '@type': 'Course',
         '@id': canonicalUrl,
         name: path.title,
@@ -408,7 +413,7 @@ export class SeoService {
         articleModifiedTime: content.updatedAt,
       },
       jsonLd: {
-        '@context': 'https://schema.org',
+        '@context': SCHEMA_ORG_CONTEXT,
         '@type': this.mapContentTypeToSchemaType(content.contentType),
         '@id': canonicalUrl,
         name: content.title,
@@ -446,7 +451,7 @@ export class SeoService {
         profileUsername: profile.username,
       },
       jsonLd: {
-        '@context': 'https://schema.org',
+        '@context': SCHEMA_ORG_CONTEXT,
         '@type': 'Person',
         '@id': canonicalUrl,
         name: title,

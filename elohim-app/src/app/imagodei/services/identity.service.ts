@@ -25,13 +25,9 @@ import {
   type RegisterHumanRequest,
   type UpdateProfileRequest,
   type ProfileReach,
-  type KeyLocation,
-  type KeyBackupStatus,
   type HostingCostSummary,
-  type NodeOperatorHostingIncome,
   INITIAL_IDENTITY_STATE,
   getInitials,
-  isStewardMode,
   isNetworkMode,
 } from '../models/identity.model';
 
@@ -41,7 +37,7 @@ import { SessionHumanService } from './session-human.service';
 import { SovereigntyService } from './sovereignty.service';
 
 // Re-export utility functions for consumers
-export { isNetworkMode, isStewardMode, getInitials } from '../models/identity.model';
+export { isNetworkMode, getInitials } from '../models/identity.model';
 
 // =============================================================================
 // Wire Format Types (internal - snake_case matches conductor response)

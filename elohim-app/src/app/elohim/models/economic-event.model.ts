@@ -265,6 +265,30 @@ export type LamadEventType =
   | 'consent-audit-complete' // Periodic consent review completed (work + stewardship)
   | 'research-response-submit'; // Research assessment response submitted (produce + data)
 
+// =============================================================================
+// Standard Constants - Extracted to avoid duplicate string literals
+// =============================================================================
+
+/** Standard unit IDs for economic events */
+const UNITS = {
+  EACH: 'unit-each',
+  VIEW: 'unit-view',
+  STEP: 'unit-step',
+  SESSION: 'unit-session',
+  MINUTE: 'unit-minute',
+  AFFINITY: 'unit-affinity',
+  ENDORSEMENT: 'unit-endorsement',
+  ATTESTATION: 'unit-attestation',
+  NODE: 'unit-node',
+  PATH: 'unit-path',
+  TOKEN: 'unit-token',
+} as const;
+
+/** Standard REA action IDs - typed as REAAction to ensure compatibility */
+const ACTIONS = {
+  DELIVER_SERVICE: 'deliver-service' as const,
+} as const;
+
 /**
  * Event type to action+resource mapping.
  */
@@ -277,146 +301,146 @@ export const LAMAD_EVENT_MAPPINGS: Record<
   }
 > = {
   // Attention
-  'content-view': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-view' },
-  'content-complete': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
-  'path-step-complete': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-step' },
-  'session-start': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-session' },
-  'session-end': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-minute' },
+  'content-view': { action: 'use', resourceType: 'attention', defaultUnit: UNITS.VIEW },
+  'content-complete': { action: 'produce', resourceType: 'credential', defaultUnit: UNITS.EACH },
+  'path-step-complete': { action: 'use', resourceType: 'attention', defaultUnit: UNITS.STEP },
+  'session-start': { action: 'use', resourceType: 'attention', defaultUnit: UNITS.SESSION },
+  'session-end': { action: 'use', resourceType: 'attention', defaultUnit: UNITS.MINUTE },
 
   // Assessment
-  'assessment-start': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-each' },
+  'assessment-start': { action: 'use', resourceType: 'attention', defaultUnit: UNITS.EACH },
   'assessment-complete': {
     action: 'produce',
     resourceType: 'credential',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
-  'practice-attempt': { action: 'use', resourceType: 'attention', defaultUnit: 'unit-each' },
-  'quiz-submit': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
+  'practice-attempt': { action: 'use', resourceType: 'attention', defaultUnit: UNITS.EACH },
+  'quiz-submit': { action: 'produce', resourceType: 'credential', defaultUnit: UNITS.EACH },
 
   // Recognition
-  'affinity-mark': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-affinity' },
-  endorsement: { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-endorsement' },
-  citation: { action: 'cite', resourceType: 'recognition', defaultUnit: 'unit-each' },
-  'recognition-given': { action: 'raise', resourceType: 'recognition', defaultUnit: 'unit-each' },
+  'affinity-mark': { action: 'raise', resourceType: 'recognition', defaultUnit: UNITS.AFFINITY },
+  endorsement: { action: 'raise', resourceType: 'recognition', defaultUnit: UNITS.ENDORSEMENT },
+  citation: { action: 'cite', resourceType: 'recognition', defaultUnit: UNITS.EACH },
+  'recognition-given': { action: 'raise', resourceType: 'recognition', defaultUnit: UNITS.EACH },
   'recognition-received': {
     action: 'raise',
     resourceType: 'recognition',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
 
   // Achievement
-  'path-complete': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
+  'path-complete': { action: 'produce', resourceType: 'credential', defaultUnit: UNITS.EACH },
   'attestation-grant': {
     action: 'produce',
     resourceType: 'credential',
-    defaultUnit: 'unit-attestation',
+    defaultUnit: UNITS.ATTESTATION,
   },
-  'capability-earn': { action: 'produce', resourceType: 'credential', defaultUnit: 'unit-each' },
+  'capability-earn': { action: 'produce', resourceType: 'credential', defaultUnit: UNITS.EACH },
 
   // Creation
-  'content-create': { action: 'produce', resourceType: 'content', defaultUnit: 'unit-node' },
-  'path-create': { action: 'produce', resourceType: 'curation', defaultUnit: 'unit-path' },
-  'extension-create': { action: 'produce', resourceType: 'curation', defaultUnit: 'unit-each' },
+  'content-create': { action: 'produce', resourceType: 'content', defaultUnit: UNITS.NODE },
+  'path-create': { action: 'produce', resourceType: 'curation', defaultUnit: UNITS.PATH },
+  'extension-create': { action: 'produce', resourceType: 'curation', defaultUnit: UNITS.EACH },
 
   // Synthesis
   'map-synthesis': {
-    action: 'deliver-service',
+    action: ACTIONS.DELIVER_SERVICE,
     resourceType: 'synthesis',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
   'analysis-complete': {
-    action: 'deliver-service',
+    action: ACTIONS.DELIVER_SERVICE,
     resourceType: 'synthesis',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
 
   // Stewardship
-  'stewardship-begin': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'stewardship-begin': { action: 'work', resourceType: 'stewardship', defaultUnit: UNITS.EACH },
   'invitation-send': {
-    action: 'deliver-service',
+    action: ACTIONS.DELIVER_SERVICE,
     resourceType: 'stewardship',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
-  'presence-claim': { action: 'accept', resourceType: 'recognition', defaultUnit: 'unit-affinity' },
+  'presence-claim': { action: 'accept', resourceType: 'recognition', defaultUnit: UNITS.AFFINITY },
   'recognition-transfer': {
     action: 'transfer',
     resourceType: 'recognition',
-    defaultUnit: 'unit-affinity',
+    defaultUnit: UNITS.AFFINITY,
   },
 
   // Governance
   'attestation-revoke': {
     action: 'modify',
     resourceType: 'credential',
-    defaultUnit: 'unit-attestation',
+    defaultUnit: UNITS.ATTESTATION,
   },
-  'content-flag': { action: 'modify', resourceType: 'content', defaultUnit: 'unit-node' },
-  'governance-vote': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
+  'content-flag': { action: 'modify', resourceType: 'content', defaultUnit: UNITS.NODE },
+  'governance-vote': { action: 'work', resourceType: 'membership', defaultUnit: UNITS.EACH },
 
   // Currency
-  'credit-issue': { action: 'produce', resourceType: 'currency', defaultUnit: 'unit-token' },
-  'credit-transfer': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
-  'credit-retire': { action: 'consume', resourceType: 'currency', defaultUnit: 'unit-token' },
+  'credit-issue': { action: 'produce', resourceType: 'currency', defaultUnit: UNITS.TOKEN },
+  'credit-transfer': { action: 'transfer', resourceType: 'currency', defaultUnit: UNITS.TOKEN },
+  'credit-retire': { action: 'consume', resourceType: 'currency', defaultUnit: UNITS.TOKEN },
 
   // Insurance Mutual Events
-  'premium-payment': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
+  'premium-payment': { action: 'transfer', resourceType: 'currency', defaultUnit: UNITS.TOKEN },
   'claim-filed': {
-    action: 'deliver-service',
+    action: ACTIONS.DELIVER_SERVICE,
     resourceType: 'stewardship',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
   'claim-evidence-submitted': {
-    action: 'deliver-service',
+    action: ACTIONS.DELIVER_SERVICE,
     resourceType: 'stewardship',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
-  'claim-investigated': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-investigated': { action: 'work', resourceType: 'stewardship', defaultUnit: UNITS.EACH },
   'claim-adjusted': {
-    action: 'deliver-service',
+    action: ACTIONS.DELIVER_SERVICE,
     resourceType: 'stewardship',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
-  'claim-settled': { action: 'transfer', resourceType: 'currency', defaultUnit: 'unit-token' },
-  'claim-denied': { action: 'modify', resourceType: 'stewardship', defaultUnit: 'unit-each' },
-  'claim-appealed': { action: 'work', resourceType: 'stewardship', defaultUnit: 'unit-each' },
+  'claim-settled': { action: 'transfer', resourceType: 'currency', defaultUnit: UNITS.TOKEN },
+  'claim-denied': { action: 'modify', resourceType: 'stewardship', defaultUnit: UNITS.EACH },
+  'claim-appealed': { action: 'work', resourceType: 'stewardship', defaultUnit: UNITS.EACH },
   'risk-reduction-verified': {
     action: 'raise',
     resourceType: 'recognition',
-    defaultUnit: 'unit-affinity',
+    defaultUnit: UNITS.AFFINITY,
   },
   'preventive-care-completed': {
     action: 'produce',
     resourceType: 'stewardship',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
   'prevention-incentive-awarded': {
     action: 'raise',
     resourceType: 'care-token',
-    defaultUnit: 'unit-token',
+    defaultUnit: UNITS.TOKEN,
   },
-  'coverage-decision': { action: 'work', resourceType: 'membership', defaultUnit: 'unit-each' },
+  'coverage-decision': { action: 'work', resourceType: 'membership', defaultUnit: UNITS.EACH },
   'claim-review-initiated': {
     action: 'work',
     resourceType: 'membership',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
-  'reserve-adjustment': { action: 'modify', resourceType: 'currency', defaultUnit: 'unit-token' },
+  'reserve-adjustment': { action: 'modify', resourceType: 'currency', defaultUnit: UNITS.TOKEN },
 
   // Consent & Data Economy Events
-  'consent-grant': { action: 'produce', resourceType: 'consent', defaultUnit: 'unit-each' },
-  'consent-withdraw': { action: 'modify', resourceType: 'consent', defaultUnit: 'unit-each' },
-  'data-access': { action: 'use', resourceType: 'data', defaultUnit: 'unit-each' },
+  'consent-grant': { action: 'produce', resourceType: 'consent', defaultUnit: UNITS.EACH },
+  'consent-withdraw': { action: 'modify', resourceType: 'consent', defaultUnit: UNITS.EACH },
+  'data-access': { action: 'use', resourceType: 'data', defaultUnit: UNITS.EACH },
   'data-value-transfer': {
     action: 'transfer',
     resourceType: 'data-token',
-    defaultUnit: 'unit-token',
+    defaultUnit: UNITS.TOKEN,
   },
   'consent-audit-complete': {
     action: 'work',
     resourceType: 'stewardship',
-    defaultUnit: 'unit-each',
+    defaultUnit: UNITS.EACH,
   },
-  'research-response-submit': { action: 'produce', resourceType: 'data', defaultUnit: 'unit-each' },
+  'research-response-submit': { action: 'produce', resourceType: 'data', defaultUnit: UNITS.EACH },
 };
 
 // ============================================================================

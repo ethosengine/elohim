@@ -46,27 +46,19 @@ describe('DoorwayRegistryService', () => {
   beforeEach(() => {
     // Setup localStorage mock
     localStorageMock = {};
-    spyOn(localStorage, 'getItem').and.callFake(
-      (key: string) => localStorageMock[key] || null
-    );
-    spyOn(localStorage, 'setItem').and.callFake(
-      (key: string, value: string) => {
-        localStorageMock[key] = value;
-      }
-    );
+    spyOn(localStorage, 'getItem').and.callFake((key: string) => localStorageMock[key] || null);
+    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+      localStorageMock[key] = value;
+    });
     spyOn(localStorage, 'removeItem').and.callFake((key: string) => {
       delete localStorageMock[key];
     });
 
     // Create mock Holochain client
     const isConnectedSignal = signal(false);
-    mockHolochainClient = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['callZome'],
-      {
-        isConnected: jasmine.createSpy().and.callFake(() => isConnectedSignal()),
-      }
-    );
+    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', ['callZome'], {
+      isConnected: jasmine.createSpy().and.callFake(() => isConnectedSignal()),
+    });
     mockHolochainClient.callZome.and.returnValue(
       Promise.resolve({ success: false, error: 'Not connected' })
     );
@@ -359,9 +351,7 @@ describe('DoorwayRegistryService', () => {
 
       // Respond to health checks
       const healthRequests = httpMock.match(req => req.url.includes('/health'));
-      healthRequests.forEach(r =>
-        r.flush({ status: 'online', registrationOpen: true })
-      );
+      healthRequests.forEach(r => r.flush({ status: 'online', registrationOpen: true }));
 
       await healthPromise;
 

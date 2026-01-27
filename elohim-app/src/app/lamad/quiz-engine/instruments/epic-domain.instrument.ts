@@ -29,6 +29,9 @@ import type {
 
 export const EPIC_DOMAIN_INSTRUMENT_ID = 'epic-domain-discovery';
 
+/** Dimension identifier for all Epic Domain subscales */
+const EPIC_DOMAIN_DIMENSION = 'epic-domain';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Subscale Definitions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,7 +42,7 @@ export const EPIC_DOMAIN_SUBSCALES: SubscaleDefinition[] = [
     name: 'AI Constitutional',
     description:
       'Interest in AI governance, constitutional frameworks, and ensuring AI serves humanity',
-    dimension: 'epic-domain',
+    dimension: EPIC_DOMAIN_DIMENSION,
     color: '#8B5CF6', // Purple
     icon: '🏛️',
   },
@@ -48,7 +51,7 @@ export const EPIC_DOMAIN_SUBSCALES: SubscaleDefinition[] = [
     name: 'Value Scanner',
     description:
       'Passion for recognizing care work, supporting caregivers, and making invisible contributions visible',
-    dimension: 'epic-domain',
+    dimension: EPIC_DOMAIN_DIMENSION,
     color: '#EC4899', // Pink
     icon: '💝',
   },
@@ -57,7 +60,7 @@ export const EPIC_DOMAIN_SUBSCALES: SubscaleDefinition[] = [
     name: 'Economic Coordination',
     description:
       'Interest in transforming workplace dynamics, worker ownership, and equitable economic systems',
-    dimension: 'epic-domain',
+    dimension: EPIC_DOMAIN_DIMENSION,
     color: '#10B981', // Green
     icon: '📊',
   },
@@ -65,7 +68,7 @@ export const EPIC_DOMAIN_SUBSCALES: SubscaleDefinition[] = [
     id: 'public',
     name: 'Public Observer',
     description: 'Commitment to democratic participation, transparency, and civic engagement',
-    dimension: 'epic-domain',
+    dimension: EPIC_DOMAIN_DIMENSION,
     color: '#3B82F6', // Blue
     icon: '🔍',
   },
@@ -74,7 +77,7 @@ export const EPIC_DOMAIN_SUBSCALES: SubscaleDefinition[] = [
     name: 'Social Medium',
     description:
       'Focus on building healthier digital spaces, fostering connection, and improving online communication',
-    dimension: 'epic-domain',
+    dimension: EPIC_DOMAIN_DIMENSION,
     color: '#F59E0B', // Amber
     icon: '💬',
   },
@@ -144,7 +147,7 @@ export const EPIC_DOMAIN_INSTRUMENT_CONFIG: CreateInstrumentOptions = {
     const entries = Object.entries(aggregated.normalizedScores);
     if (entries.length === 0) return null;
 
-    const [primaryId] = entries.sort(([, a], [, b]) => b - a)[0];
+    const [primaryId] = entries.toSorted(([, a], [, b]) => b - a)[0];
     const resultType = EPIC_DOMAIN_RESULT_TYPES.find(r => r.id === primaryId);
 
     return {

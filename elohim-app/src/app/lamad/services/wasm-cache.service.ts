@@ -22,7 +22,7 @@
 
 import { Injectable, OnDestroy } from '@angular/core';
 
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 
 // Import from framework-agnostic cache module
 import {
@@ -152,7 +152,7 @@ export class WasmCacheService implements OnDestroy {
 
       this.stateSubject.next('ready');
 
-      console.log(`[WasmCacheService] Initialized with ${this.implementation} implementation`);
+      console.info(`[WasmCacheService] Initialized with ${this.implementation} implementation`);
 
       return {
         success: true,
@@ -180,7 +180,7 @@ export class WasmCacheService implements OnDestroy {
           implementation: 'typescript',
           error: `WASM failed, using TypeScript fallback: ${errorMessage}`,
         };
-      } catch (fallbackError) {
+      } catch {
         return {
           success: false,
           implementation: 'typescript',

@@ -154,7 +154,10 @@ export class StorageApiService {
 
   constructor(private readonly http: HttpClient) {
     // Use storageUrl from environment or fall back to doorway URL
-    this.baseUrl = environment.holochain?.storageUrl || environment.client?.doorwayUrl || '';
+    this.baseUrl =
+      environment.holochain?.storageUrl ??
+      (environment as unknown as { client?: { doorwayUrl?: string } }).client?.doorwayUrl ??
+      '';
   }
 
   // ==========================================================================
@@ -791,8 +794,9 @@ export class StorageApiService {
   // Error Handling
   // ==========================================================================
 
-  private handleError(operation: string, error: any): Observable<never> {
-    console.error(`[StorageApiService] ${operation} failed:`, error);
-    return throwError(() => new Error(`${operation} failed: ${error.message || error}`));
+  private handleError(operation: string, error: unknown): Observable<never> {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[StorageApiService] ${operation} failed:`, message);
+    return throwError(() => new Error(`${operation} failed: ${message}`));
   }
 }

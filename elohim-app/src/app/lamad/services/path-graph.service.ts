@@ -391,7 +391,7 @@ export class PathGraphService {
    * @param pathNodeId - The path ContentNode ID
    * @param contentNodeIds - Content nodes to link
    */
-  linkPathToContent(pathNodeId: string, contentNodeIds: string[]): Observable<void> {
+  linkPathToContent(_pathNodeId: string, _contentNodeIds: string[]): Observable<void> {
     // In prototype mode, relationships are stored in relatedNodeIds
     // In production, this would create ContentRelationship entries
     return of(undefined);

@@ -14,16 +14,12 @@
 
 import { Injectable } from '@angular/core';
 
-import { map, switchMap } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
 
 import { ContentMasteryView } from '@app/elohim/adapters/storage-types.adapter';
-import {
-  StorageApiService,
-  CreateMasteryInput,
-  MasteryQuery,
-} from '@app/elohim/services/storage-api.service';
+import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 /**
  * Mastery level constants (Bloom's Taxonomy)

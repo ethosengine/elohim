@@ -21,7 +21,7 @@ import { environment } from '../../../environments/environment';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 
 import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
-import type { IConnectionStrategy, ConnectionConfig } from '@elohim/service/connection';
+import type { ConnectionConfig } from '@elohim/service/connection';
 
 /** Content node from storage (matches backend ContentWithTags) */
 export interface StorageContentNode {
@@ -279,8 +279,7 @@ export class StorageClientService {
   private handleError(operation: string, error: HttpErrorResponse): Observable<never> {
     const errorBody = error.error;
     // Backend returns {"error": "..."}, not {"message": "..."}
-    const message = errorBody?.error || errorBody?.message || error.message || 'Request failed';
-    console.error(`StorageClient.${operation} failed:`, message, { status: error.status });
+    const message = errorBody?.error ?? errorBody?.message ?? error.message ?? 'Request failed';
     return throwError(() => new Error(`${operation}: ${message}`));
   }
 

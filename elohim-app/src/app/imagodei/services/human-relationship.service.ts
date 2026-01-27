@@ -12,19 +12,13 @@
 
 import { Injectable } from '@angular/core';
 
-import { map, filter } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 
 import { Observable, forkJoin } from 'rxjs';
 
 import { HumanRelationshipView } from '@app/elohim/adapters/storage-types.adapter';
+import { StorageApiService } from '@app/elohim/services/storage-api.service';
 import {
-  StorageApiService,
-  CreatePresenceInput,
-  CreateMasteryInput,
-  CreateEventInput,
-} from '@app/elohim/services/storage-api.service';
-import {
-  HumanRelationshipQuery,
   CreateHumanRelationshipInput,
   IntimacyLevel,
   INTIMACY_LEVEL_ORDER,

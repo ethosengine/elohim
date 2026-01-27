@@ -420,7 +420,7 @@ export class ExplorationService {
     const nodesAtDepth: ContentNode[] = [];
 
     for (const nodeId of frontier) {
-      const adjacentIds = ctx.graph.adjacency.get(nodeId) || new Set();
+      const adjacentIds = ctx.graph.adjacency.get(nodeId) ?? new Set<string>();
       for (const adjacentId of adjacentIds) {
         ctx.edgesExamined++;
         if (this.processAdjacentNode(nodeId, adjacentId, nodesAtDepth, nextFrontier, ctx)) {
@@ -623,7 +623,7 @@ export class ExplorationService {
     ctx: PathfindingContext,
     getWeight: (rel: ContentRelationship | null, neighborId: string) => number
   ): void {
-    const neighbors = ctx.graph.adjacency.get(current) || new Set();
+    const neighbors = ctx.graph.adjacency.get(current) ?? new Set<string>();
     for (const neighborId of neighbors) {
       ctx.edgesExamined++;
       if (!ctx.unvisited.has(neighborId)) continue;
@@ -720,7 +720,7 @@ export class ExplorationService {
 
     // Run Dijkstra with semantic weights
     this.runDijkstra(ctx, rel => {
-      const baseWeight = rel ? relationshipWeights[rel.relationshipType] || 2 : 2;
+      const baseWeight = rel ? (relationshipWeights[rel.relationshipType] ?? 2) : 2;
       const relType = rel?.relationshipType;
       const preferred = relType ? query.preferredRelationships?.includes(relType) : false;
       return preferred ? baseWeight * 0.5 : baseWeight;
@@ -899,14 +899,14 @@ export class ExplorationService {
     return totalDegree / graph.nodes.size;
   }
 
-  private createError(code: ExplorationErrorCode, details?: any): Observable<never> {
+  private createError(code: ExplorationErrorCode, details?: unknown): Observable<never> {
     return throwError(() => this.buildError(code, undefined, details));
   }
 
   private buildError(
     code: ExplorationErrorCode,
     message?: string,
-    details?: any
+    details?: unknown
   ): ExplorationError {
     const messages: Record<ExplorationErrorCode, string> = {
       RESOURCE_NOT_FOUND: 'The requested resource was not found',

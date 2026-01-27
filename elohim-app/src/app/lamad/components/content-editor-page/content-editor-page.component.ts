@@ -77,6 +77,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
 
   private editorRef: ComponentRef<ContentEditorComponent> | null = null;
   private readonly destroy$ = new Subject<void>();
+  private readonly SAVE_ERROR_MSG = 'Failed to save';
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -221,17 +222,17 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
               this.saveSuccess = '';
             }, 3000);
           } else {
-            this.saveError = result.error ?? 'Failed to save';
+            this.saveError = result.error ?? this.SAVE_ERROR_MSG;
           }
         },
         error: (err: Error) => {
           this.isSaving = false;
-          this.saveError = err.message ?? 'Failed to save';
+          this.saveError = err.message ?? this.SAVE_ERROR_MSG;
         },
       });
     } catch (err) {
       this.isSaving = false;
-      this.saveError = (err as Error).message ?? 'Failed to save';
+      this.saveError = (err as Error).message ?? this.SAVE_ERROR_MSG;
     }
   }
 }

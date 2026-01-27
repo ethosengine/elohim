@@ -305,6 +305,21 @@ export interface ContentReachRequirement {
   customRequirements?: Record<string, unknown>;
 }
 
+// Attestation type constants to avoid magic strings
+const ATTESTATION_AUTHOR_VERIFIED: ContentAttestationType = 'author-verified';
+const ATTESTATION_STEWARD_APPROVED: ContentAttestationType = 'steward-approved';
+const ATTESTATION_SAFETY_REVIEWED: ContentAttestationType = 'safety-reviewed';
+const ATTESTATION_COMMUNITY_ENDORSED: ContentAttestationType = 'community-endorsed';
+const ATTESTATION_PEER_REVIEWED: ContentAttestationType = 'peer-reviewed';
+const ATTESTATION_GOVERNANCE_RATIFIED: ContentAttestationType = 'governance-ratified';
+const ATTESTATION_CURRICULUM_CANONICAL: ContentAttestationType = 'curriculum-canonical';
+const ATTESTATION_LICENSE_CLEARED: ContentAttestationType = 'license-cleared';
+
+// Flag type constants
+const FLAG_DISPUTED: ContentFlag['type'] = 'disputed';
+const FLAG_UNDER_REVIEW: ContentFlag['type'] = 'under-review';
+const FLAG_APPEAL_PENDING: ContentFlag['type'] = 'appeal-pending';
+
 /**
  * Default reach requirements - what attestations are needed for each reach level.
  */
@@ -315,41 +330,49 @@ export const DEFAULT_REACH_REQUIREMENTS: Record<ContentReach, ContentReachRequir
   },
   invited: {
     reach: 'invited',
-    requiredAttestations: ['author-verified'],
+    requiredAttestations: [ATTESTATION_AUTHOR_VERIFIED],
   },
   local: {
     reach: 'local',
-    requiredAttestations: ['author-verified'],
+    requiredAttestations: [ATTESTATION_AUTHOR_VERIFIED],
     minimumTrustScore: 0.2,
   },
   neighborhood: {
     reach: 'neighborhood',
-    requiredAttestations: ['author-verified', 'community-endorsed'],
+    requiredAttestations: [ATTESTATION_AUTHOR_VERIFIED, ATTESTATION_COMMUNITY_ENDORSED],
     minimumTrustScore: 0.3,
   },
   municipal: {
     reach: 'municipal',
-    requiredAttestations: ['steward-approved', 'community-endorsed', 'safety-reviewed'],
+    requiredAttestations: [
+      ATTESTATION_STEWARD_APPROVED,
+      ATTESTATION_COMMUNITY_ENDORSED,
+      ATTESTATION_SAFETY_REVIEWED,
+    ],
     minimumTrustScore: 0.4,
   },
   bioregional: {
     reach: 'bioregional',
-    requiredAttestations: ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
+    requiredAttestations: [
+      ATTESTATION_STEWARD_APPROVED,
+      ATTESTATION_PEER_REVIEWED,
+      ATTESTATION_SAFETY_REVIEWED,
+    ],
     minimumTrustScore: 0.5,
-    noFlags: ['disputed'],
+    noFlags: [FLAG_DISPUTED],
   },
   regional: {
     reach: 'regional',
-    requiredAttestations: ['peer-reviewed', 'governance-ratified'],
+    requiredAttestations: [ATTESTATION_PEER_REVIEWED, ATTESTATION_GOVERNANCE_RATIFIED],
     minimumTrustScore: 0.6,
-    noFlags: ['disputed', 'under-review'],
+    noFlags: [FLAG_DISPUTED, FLAG_UNDER_REVIEW],
   },
   commons: {
     reach: 'commons',
-    requiredAllAttestations: ['safety-reviewed', 'license-cleared'],
-    requiredAttestations: ['governance-ratified', 'curriculum-canonical'],
+    requiredAllAttestations: [ATTESTATION_SAFETY_REVIEWED, ATTESTATION_LICENSE_CLEARED],
+    requiredAttestations: [ATTESTATION_GOVERNANCE_RATIFIED, ATTESTATION_CURRICULUM_CANONICAL],
     minimumTrustScore: 0.8,
-    noFlags: ['disputed', 'under-review', 'appeal-pending'],
+    noFlags: [FLAG_DISPUTED, FLAG_UNDER_REVIEW, FLAG_APPEAL_PENDING],
   },
 };
 

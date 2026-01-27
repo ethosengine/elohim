@@ -243,7 +243,7 @@ export class PathService {
 
         // Only count non-optional steps for completion percentage
         const requiredSteps = path.steps.filter(s => !s.optional);
-        const completedRequired = requiredSteps.filter((s, i) =>
+        const completedRequired = requiredSteps.filter(s =>
           progress.completedStepIndices.includes(path.steps.indexOf(s))
         );
 
@@ -865,9 +865,9 @@ export class PathService {
     }
     // 4-level format: modules→sections→conceptIds
     let count = 0;
-    for (const module of chapter.modules || []) {
-      for (const section of module.sections || []) {
-        count += section.conceptIds?.length || 0;
+    for (const module of chapter.modules ?? []) {
+      for (const section of module.sections ?? []) {
+        count += section.conceptIds?.length ?? 0;
       }
     }
     return count;
@@ -884,9 +884,9 @@ export class PathService {
     }
     // 4-level format: modules→sections→conceptIds
     const conceptIds: string[] = [];
-    for (const module of chapter.modules || []) {
-      for (const section of module.sections || []) {
-        conceptIds.push(...(section.conceptIds || []));
+    for (const module of chapter.modules ?? []) {
+      for (const section of module.sections ?? []) {
+        conceptIds.push(...(section.conceptIds ?? []));
       }
     }
     return conceptIds;

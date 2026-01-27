@@ -429,7 +429,7 @@ export class KnowledgeMapService {
   /**
    * Request consent from subject of a person map.
    */
-  requestConsent(mapId: string, scope: SubjectConsent['scope']): Observable<void> {
+  requestConsent(mapId: string, _scope: SubjectConsent['scope']): Observable<void> {
     return this.getPersonMap(mapId).pipe(
       switchMap(m => {
         if (!m) {

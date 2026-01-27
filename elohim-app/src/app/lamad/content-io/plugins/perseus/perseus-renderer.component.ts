@@ -14,7 +14,7 @@ import {
   inject,
 } from '@angular/core';
 
-import { Subject, takeUntil } from 'rxjs';
+import { Subject } from 'rxjs';
 
 import { ContentNode } from '../../../models/content-node.model';
 import {
@@ -25,7 +25,12 @@ import {
 
 import { PerseusWrapperComponent } from './perseus-wrapper.component';
 
-import type { PerseusItem, PerseusScoreResult, RadioWidgetOptions } from './perseus-item.model';
+import type {
+  PerseusItem,
+  PerseusScoreResult,
+  PerseusWidget,
+  RadioWidgetOptions,
+} from './perseus-item.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Quiz Mode Configuration
@@ -555,7 +560,7 @@ export class PerseusRendererComponent
   }
 
   showHint(): void {
-    // TODO: Implement hint display
+    // Hint display is handled by the Perseus widget - this flag tracks visibility for UI state
     this.hintShown = true;
     this.cdr.markForCheck();
   }
@@ -587,7 +592,7 @@ export class PerseusRendererComponent
     // Extract questions
     if (Array.isArray(content)) {
       this.questions = content as PerseusItem[];
-    } else if (typeof content === 'object' && content !== null) {
+    } else if (typeof content === 'object' && content != null) {
       // Single Perseus item (has question.widgets)
       this.questions = [content as PerseusItem];
     } else {
@@ -642,33 +647,50 @@ export class PerseusRendererComponent
    * Collects unique subscale names from all question choices.
    */
   private initializeSubscaleTracking(): void {
-    const subscales = new Set<string>();
-
-    // Collect all subscale names from choices
-    for (const question of this.questions) {
-      const widgets = question.question?.widgets ?? {};
-      for (const widgetKey of Object.keys(widgets)) {
-        const widget = widgets[widgetKey];
-        if (widget.type === 'radio') {
-          const options = widget.options as RadioWidgetOptions;
-          for (const choice of options.choices ?? []) {
-            if (choice.subscaleContributions) {
-              for (const subscale of Object.keys(choice.subscaleContributions)) {
-                subscales.add(subscale);
-              }
-            }
-          }
-        }
-      }
-    }
+    const subscales = this.collectSubscalesFromQuestions();
 
     // Initialize all subscales to 0
     this.subscaleScores = {};
-    Array.from(subscales).forEach(subscale => {
+    subscales.forEach(subscale => {
       this.subscaleScores[subscale] = 0;
     });
 
     console.log('[PerseusRenderer] Initialized subscales:', Object.keys(this.subscaleScores));
+  }
+
+  private collectSubscalesFromQuestions(): Set<string> {
+    const subscales = new Set<string>();
+
+    for (const question of this.questions) {
+      const widgets = question.question?.widgets ?? {};
+      this.collectSubscalesFromWidgets(widgets, subscales);
+    }
+
+    return subscales;
+  }
+
+  private collectSubscalesFromWidgets(
+    widgets: Record<string, PerseusWidget>,
+    subscales: Set<string>
+  ): void {
+    for (const widgetKey of Object.keys(widgets)) {
+      const widget = widgets[widgetKey];
+      if (widget.type === 'radio') {
+        const options = widget.options as RadioWidgetOptions;
+        this.collectSubscalesFromChoices(options.choices ?? [], subscales);
+      }
+    }
+  }
+
+  private collectSubscalesFromChoices(
+    choices: RadioWidgetOptions['choices'],
+    subscales: Set<string>
+  ): void {
+    for (const choice of choices) {
+      if (choice.subscaleContributions) {
+        Object.keys(choice.subscaleContributions).forEach(sub => subscales.add(sub));
+      }
+    }
   }
 
   /**

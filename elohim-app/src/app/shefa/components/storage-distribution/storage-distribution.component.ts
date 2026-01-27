@@ -17,10 +17,11 @@ import { Subject, takeUntil } from 'rxjs';
 import {
   StorageContentDistribution,
   ContentTypeStorage,
-  ReachLevelStorage,
   NodeStorageBreakdown,
 } from '../../models/shefa-dashboard.model';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
+
+type StorageViewType = 'type' | 'reach' | 'node';
 
 @Component({
   selector: 'app-storage-distribution',
@@ -37,7 +38,7 @@ export class StorageDistributionComponent implements OnInit, OnDestroy {
   @Input() displayMode: 'summary' | 'full' = 'full';
 
   /** Which breakdown view to show initially */
-  @Input() initialView: 'type' | 'reach' | 'node' = 'type';
+  @Input() initialView: StorageViewType = 'type';
 
   /** Emits when a content type is selected */
   @Output() contentTypeSelected = new EventEmitter<ContentTypeStorage>();
@@ -49,7 +50,7 @@ export class StorageDistributionComponent implements OnInit, OnDestroy {
   distribution: StorageContentDistribution | null = null;
   isLoading = true;
   error: string | null = null;
-  activeView: 'type' | 'reach' | 'node' = 'type';
+  activeView: StorageViewType = 'type';
 
   private readonly destroy$ = new Subject<void>();
 
@@ -95,7 +96,7 @@ export class StorageDistributionComponent implements OnInit, OnDestroy {
   /**
    * Switch active view
    */
-  setActiveView(view: 'type' | 'reach' | 'node'): void {
+  setActiveView(view: StorageViewType): void {
     this.activeView = view;
   }
 

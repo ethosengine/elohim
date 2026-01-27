@@ -15,7 +15,6 @@ import { takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
 
-import { ContentNode } from '../../models/content-node.model';
 import { RelatedConceptsResult } from '../../models/exploration-context.model';
 import { RelatedConceptsService } from '../../services/related-concepts.service';
 import { ConceptCardComponent } from '../concept-card/concept-card.component';

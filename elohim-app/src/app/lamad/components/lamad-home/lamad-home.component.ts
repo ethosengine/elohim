@@ -49,6 +49,9 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   /** Number of featured paths to display initially */
   private readonly FEATURED_PATH_LIMIT = 6;
 
+  /** Base route for path navigation */
+  private readonly PATH_ROUTE = '/lamad/path';
+
   featuredPath: PathIndexEntry | null = null;
   activeFocus: CurrentFocus | null = null;
 
@@ -195,7 +198,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    * Navigate to a path overview
    */
   goToPath(pathId: string): void {
-    this.router.navigate(['/lamad/path', pathId]);
+    this.router.navigate([this.PATH_ROUTE, pathId]);
   }
 
   /**
@@ -203,7 +206,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   startFeaturedPath(): void {
     if (this.featuredPath) {
-      this.router.navigate(['/lamad/path', this.featuredPath.id, 'step', 0]);
+      this.router.navigate([this.PATH_ROUTE, this.featuredPath.id, 'step', 0]);
     }
   }
 
@@ -213,7 +216,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   continueActiveJourney(): void {
     if (this.activeFocus) {
       this.router.navigate([
-        '/lamad/path',
+        this.PATH_ROUTE,
         this.activeFocus.pathId,
         'step',
         this.activeFocus.currentStepIndex,

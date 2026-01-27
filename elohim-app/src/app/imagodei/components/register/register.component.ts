@@ -15,12 +15,10 @@ import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
-import { type RegisterCredentials } from '../../models/auth.model';
 import { type DoorwayInfo } from '../../models/doorway.model';
 import {
   type RegisterHumanRequest,
   type ProfileReach,
-  ProfileReachLevels,
   getReachLabel,
   getReachDescription,
 } from '../../models/identity.model';

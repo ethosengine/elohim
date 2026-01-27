@@ -8,6 +8,8 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { AppreciationService, AppreciationDisplay } from '../../services/appreciation.service';
 import { EconomicService } from '../../services/economic.service';
 
+const RECOGNITION_POINTS_UNIT = 'recognition-points';
+
 /**
  * ShefaHomeComponent - Economic Dashboard
  *
@@ -671,7 +673,7 @@ export class ShefaHomeComponent implements OnInit {
         receiver: 'contributor-presence-001',
         hasPointInTime: new Date(Date.now() - 10800000).toISOString(),
         state: 'validated',
-        resourceQuantity: { hasNumericalValue: 5, hasUnit: 'recognition-points' },
+        resourceQuantity: { hasNumericalValue: 5, hasUnit: RECOGNITION_POINTS_UNIT },
       },
     ];
 
@@ -683,7 +685,7 @@ export class ShefaHomeComponent implements OnInit {
         appreciatedBy: 'agent-learner-001',
         appreciationTo: 'contributor-presence-001',
         quantityValue: 10,
-        quantityUnit: 'recognition-points',
+        quantityUnit: RECOGNITION_POINTS_UNIT,
         note: 'Great explanation of REA concepts!',
         createdAt: new Date(Date.now() - 1800000).toISOString(),
       },
@@ -693,7 +695,7 @@ export class ShefaHomeComponent implements OnInit {
         appreciatedBy: 'agent-learner-002',
         appreciationTo: 'contributor-presence-002',
         quantityValue: 25,
-        quantityUnit: 'recognition-points',
+        quantityUnit: RECOGNITION_POINTS_UNIT,
         note: null,
         createdAt: new Date(Date.now() - 5400000).toISOString(),
       },
@@ -717,7 +719,7 @@ export class ShefaHomeComponent implements OnInit {
       } else {
         this.error.set('Could not connect to Holochain conductor');
       }
-    } catch (err) {
+    } catch {
       this.error.set('Connection test failed');
     } finally {
       this.loading.set(false);

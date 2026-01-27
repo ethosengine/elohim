@@ -21,9 +21,11 @@ interface CategorySection {
   expanded: boolean;
 }
 
+type AffinityLevel = 'unseen' | 'low' | 'medium' | 'high';
+
 interface ContentNodeWithAffinity extends ContentNode {
   affinity: number;
-  affinityLevel: 'unseen' | 'low' | 'medium' | 'high';
+  affinityLevel: AffinityLevel;
 }
 
 @Component({
@@ -56,7 +58,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       this.affinityService.affinity$,
     ])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([nodes, affinity]) => {
+      .subscribe(([nodes, _affinity]) => {
         if (nodes.length > 0) {
           this.buildMeaningMap(nodes);
           this.isLoading = false;

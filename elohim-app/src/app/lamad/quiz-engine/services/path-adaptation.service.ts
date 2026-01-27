@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-import { BehaviorSubject, Observable, combineLatest, map, of } from 'rxjs';
+import { BehaviorSubject, Observable, map } from 'rxjs';
 
 import { AttemptCooldownService } from './attempt-cooldown.service';
 import { QuestionPoolService } from './question-pool.service';

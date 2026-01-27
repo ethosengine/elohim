@@ -20,7 +20,6 @@ import {
   registerPerseusElement,
   type PerseusQuestionElement,
   getPerseusElement,
-  refreshPerseusDarkMode,
 } from './perseus-element-loader';
 
 import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';

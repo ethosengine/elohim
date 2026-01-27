@@ -20,7 +20,7 @@
  */
 
 import { isPlatformBrowser } from '@angular/common';
-import { InjectionToken, Provider, inject, PLATFORM_ID } from '@angular/core';
+import { InjectionToken, Provider, PLATFORM_ID } from '@angular/core';
 
 import {
   type IConnectionStrategy,
@@ -49,7 +49,7 @@ export const CONNECTION_STRATEGY = new InjectionToken<IConnectionStrategy>('Conn
     // Create strategy based on mode
     const strategy = createConnectionStrategy(mode);
 
-    console.log(`[CONNECTION_STRATEGY] Created ${strategy.name} strategy (mode: ${mode})`);
+    console.warn(`[CONNECTION_STRATEGY] Created ${strategy.name} strategy (mode: ${mode})`);
 
     return strategy;
   },
@@ -81,6 +81,8 @@ export function provideConnectionStrategy(mode: ConnectionMode = 'auto'): Provid
 /**
  * Provider that forces Doorway mode (useful for testing).
  */
+// Provider return type varies based on use; explicit return type is Provider
+// eslint-disable-next-line sonarjs/function-return-type
 export function provideDoorwayStrategy(): Provider {
   return {
     provide: CONNECTION_STRATEGY,
@@ -91,6 +93,8 @@ export function provideDoorwayStrategy(): Provider {
 /**
  * Provider that forces Direct mode (useful for testing).
  */
+// Provider return type varies based on use; explicit return type is Provider
+// eslint-disable-next-line sonarjs/function-return-type
 export function provideDirectStrategy(): Provider {
   return {
     provide: CONNECTION_STRATEGY,
@@ -102,13 +106,15 @@ export function provideDirectStrategy(): Provider {
  * Provider factory that respects SSR (server-side rendering).
  * Always uses Doorway mode on server since direct connection is not available.
  */
+// Provider return type varies based on use; explicit return type is Provider
+// eslint-disable-next-line sonarjs/function-return-type
 export function provideConnectionStrategySSR(): Provider {
   return {
     provide: CONNECTION_STRATEGY,
     useFactory: (platformId: object) => {
       // On server, always use doorway (can't detect Tauri/Node.js)
       if (!isPlatformBrowser(platformId)) {
-        console.log('[CONNECTION_STRATEGY] SSR detected, using doorway strategy');
+        console.warn('[CONNECTION_STRATEGY] SSR detected, using doorway strategy');
         return new DoorwayConnectionStrategy();
       }
 

@@ -143,11 +143,9 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
     // Simple 2D projection (simulating PCA)
     // In production: use actual PCA/t-SNE/UMAP
     const positions: ParticipantPosition[] = [];
-    let index = 0;
 
     votesByParticipant.forEach((votes, participantId) => {
-      // Create feature vector from votes
-      const vector = this.statements.map(s => votes.get(s.id) ?? 0);
+      // Create feature vector from votes (used implicitly in projection below)
 
       // Project to 2D using simplified approach
       // Split statements into two groups for x/y axes
@@ -179,8 +177,6 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
         isCurrentUser: participantId === 'current-user', // MVP: hardcoded
         voteCount: votes.size,
       });
-
-      index++;
     });
 
     this.totalParticipants = positions.length;
@@ -527,7 +523,7 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
   /**
    * Draw legend.
    */
-  private drawLegend(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  private drawLegend(ctx: CanvasRenderingContext2D, width: number, _height: number): void {
     const legendX = width - 120;
     const legendY = this.padding;
 

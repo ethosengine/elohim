@@ -22,7 +22,6 @@ import { Subject } from 'rxjs';
 import {
   MiniGraphData,
   MiniGraphNode,
-  MiniGraphEdge,
   RelationshipType,
 } from '../../models/exploration-context.model';
 import { RelatedConceptsService } from '../../services/related-concepts.service';

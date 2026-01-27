@@ -190,7 +190,7 @@ export class CreatePresenceComponent {
   /**
    * Add content to establishing content list.
    */
-  addEstablishingContent(contentId: string, title: string): void {
+  addEstablishingContent(contentId: string, _title: string): void {
     if (!this.establishingContentIds().includes(contentId)) {
       this.establishingContentIds.update(ids => [...ids, contentId]);
     }

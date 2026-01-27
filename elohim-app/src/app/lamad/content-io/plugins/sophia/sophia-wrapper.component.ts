@@ -142,66 +142,78 @@ export class SophiaWrapperComponent implements AfterViewInit, OnDestroy, OnChang
       console.log('[SophiaWrapper] Element found:', !!this.sophiaElement);
 
       if (this.sophiaElement) {
-        // Set up event callbacks
-        this.sophiaElement.onRecognition = (result: Recognition) => {
-          this.recognized.emit(result);
-          this.cdr.markForCheck();
-        };
-
-        this.sophiaElement.onAnswerChange = (hasAnswer: boolean) => {
-          this.answerChanged.emit(hasAnswer);
-          this.cdr.markForCheck();
-        };
-
-        // Set mode
-        this.sophiaElement.mode = this.mode;
-
-        // Set instrument ID if provided
-        if (this.instrumentId) {
-          this.sophiaElement.instrumentId = this.instrumentId;
-        }
-
-        // Apply pending moment
-        const momentToApply = this.hasPendingMomentChange ? this.pendingMoment : this.moment;
-        console.log('[SophiaWrapper] Applying moment:', {
-          hasPendingChange: this.hasPendingMomentChange,
-          pendingMomentId: this.pendingMoment?.id || 'null',
-          currentMomentId: this.moment?.id || 'null',
-          momentToApplyId: momentToApply?.id || 'null',
-          hasInitialUserInput: !!this.initialUserInput,
-        });
-
-        if (momentToApply) {
-          // Set initialUserInput BEFORE moment for answer restoration
-          if (this.initialUserInput) {
-            console.log('[SophiaWrapper] Setting initialUserInput before moment');
-            this.sophiaElement.initialUserInput = this.initialUserInput;
-          } else {
-            this.sophiaElement.initialUserInput = null;
-          }
-          console.log('[SophiaWrapper] Setting moment:', momentToApply.id);
-          this.sophiaElement.moment = momentToApply;
-          this.hasPendingMomentChange = false;
-        }
-
-        // Apply review mode
-        this.sophiaElement.reviewMode = this.reviewMode;
-
-        // Auto-focus if requested
-        if (this.autoFocus) {
-          setTimeout(() => {
-            this.sophiaElement?.focusInput();
-          }, 100);
-        }
-
-        this.initialized = true;
-        this.ready.emit();
-        this.cdr.markForCheck();
+        this.initializeElement();
       }
     } catch (error) {
       this.loadError = error instanceof Error ? error.message : 'Failed to load Sophia';
       console.error('[SophiaWrapper] Load error:', error);
       this.cdr.markForCheck();
+    }
+  }
+
+  private initializeElement(): void {
+    if (!this.sophiaElement) return;
+
+    // Set up event callbacks
+    this.setupEventCallbacks();
+
+    // Set mode and instrument ID
+    this.sophiaElement.mode = this.mode;
+    if (this.instrumentId) {
+      this.sophiaElement.instrumentId = this.instrumentId;
+    }
+
+    // Apply pending moment
+    this.applyPendingMoment();
+
+    // Apply review mode
+    this.sophiaElement.reviewMode = this.reviewMode;
+
+    // Auto-focus if requested
+    if (this.autoFocus) {
+      setTimeout(() => this.sophiaElement?.focusInput(), 100);
+    }
+
+    this.initialized = true;
+    this.ready.emit();
+    this.cdr.markForCheck();
+  }
+
+  private setupEventCallbacks(): void {
+    if (!this.sophiaElement) return;
+
+    this.sophiaElement.onRecognition = (result: Recognition) => {
+      this.recognized.emit(result);
+      this.cdr.markForCheck();
+    };
+
+    this.sophiaElement.onAnswerChange = (hasAnswer: boolean) => {
+      this.answerChanged.emit(hasAnswer);
+      this.cdr.markForCheck();
+    };
+  }
+
+  private applyPendingMoment(): void {
+    if (!this.sophiaElement) return;
+
+    const momentToApply = this.hasPendingMomentChange ? this.pendingMoment : this.moment;
+    console.log('[SophiaWrapper] Applying moment:', {
+      hasPendingChange: this.hasPendingMomentChange,
+      pendingMomentId: this.pendingMoment?.id || 'null',
+      currentMomentId: this.moment?.id || 'null',
+      momentToApplyId: momentToApply?.id || 'null',
+      hasInitialUserInput: !!this.initialUserInput,
+    });
+
+    if (momentToApply) {
+      // Set initialUserInput BEFORE moment for answer restoration
+      this.sophiaElement.initialUserInput = this.initialUserInput ?? null;
+      if (this.initialUserInput) {
+        console.log('[SophiaWrapper] Setting initialUserInput before moment');
+      }
+      console.log('[SophiaWrapper] Setting moment:', momentToApply.id);
+      this.sophiaElement.moment = momentToApply;
+      this.hasPendingMomentChange = false;
     }
   }
 

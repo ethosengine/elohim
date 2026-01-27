@@ -10,16 +10,14 @@
  * Lifecycle: UNCLAIMED → STEWARDED → CLAIMED
  */
 
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import {
   type ContributorPresenceView,
   type PresenceState,
   type CreatePresenceRequest,
-  type BeginStewardshipRequest,
   type InitiateClaimRequest,
-  type ExternalIdentifier,
   parseExternalIdentifiers,
   serializeExternalIdentifiers,
 } from '../models/presence.model';

@@ -10,7 +10,7 @@
  * Also tracks URL health for future requests.
  */
 
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
 import { retry, timeout, catchError, tap, map } from 'rxjs/operators';
@@ -154,10 +154,9 @@ export class BlobFallbackService {
             return new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retryCount - 1)));
           },
         }),
-        tap((blob: Blob) => {
+        tap((_blob: Blob) => {
           // Record success
           this.recordUrlSuccess(url);
-          console.log(`Successfully fetched from ${url}`);
         }),
         map(
           (blob: Blob): BlobFetchResult => ({
@@ -168,9 +167,10 @@ export class BlobFallbackService {
             retryCount: context.retryCount,
           })
         ),
-        catchError((error: any) => {
+        catchError((error: unknown) => {
           // Record failure
-          this.recordUrlFailure(url, error.message);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          this.recordUrlFailure(url, errorMessage);
 
           console.warn(`URL failed: ${url}. Trying next fallback...`, error);
 
@@ -210,7 +210,7 @@ export class BlobFallbackService {
    */
   getUrlHealth(url: string): UrlHealth {
     return (
-      this.urlHealthMap.get(url) || {
+      this.urlHealthMap.get(url) ?? {
         url,
         successCount: 0,
         failureCount: 0,
@@ -242,7 +242,7 @@ export class BlobFallbackService {
    * @param url The URL that succeeded
    */
   private recordUrlSuccess(url: string): void {
-    const health = this.urlHealthMap.get(url) || {
+    const health = this.urlHealthMap.get(url) ?? {
       url,
       successCount: 0,
       failureCount: 0,
@@ -263,7 +263,7 @@ export class BlobFallbackService {
    * @param errorMessage Error message
    */
   private recordUrlFailure(url: string, errorMessage: string): void {
-    const health = this.urlHealthMap.get(url) || {
+    const health = this.urlHealthMap.get(url) ?? {
       url,
       successCount: 0,
       failureCount: 0,
@@ -343,7 +343,7 @@ export class BlobFallbackService {
    * @param timeoutMs Validation timeout (default 5 seconds)
    * @returns Promise with validation result
    */
-  async validateUrl(url: string, timeoutMs = 5000): Promise<UrlValidationResult> {
+  async validateUrl(url: string, _timeoutMs = 5000): Promise<UrlValidationResult> {
     const startTime = performance.now();
 
     try {

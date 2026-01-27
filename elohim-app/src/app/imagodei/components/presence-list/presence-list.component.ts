@@ -15,9 +15,8 @@ import { RouterModule } from '@angular/router';
 
 import {
   type ContributorPresenceView,
-  type PresenceState,
   type CreatePresenceRequest,
-  PresenceStates,
+  type PresenceState,
   getPresenceStateLabel,
 } from '../../models/presence.model';
 import { IdentityService } from '../../services/identity.service';

@@ -1,13 +1,14 @@
-import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideRouter, Router } from '@angular/router';
-import { AppComponent } from './app.component';
-import { NavigationEnd } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router, NavigationEnd } from '@angular/router';
+
 import { Subject } from 'rxjs';
 
+import { AppComponent } from './app.component';
+
 describe('AppComponent', () => {
-  let routerEventsSubject: Subject<any>;
-  let mockRouter: any;
+  let routerEventsSubject: Subject<NavigationEnd>;
+  let mockRouter: { events: Subject<NavigationEnd>['asObservable']; url: string };
 
   beforeEach(async () => {
     routerEventsSubject = new Subject();

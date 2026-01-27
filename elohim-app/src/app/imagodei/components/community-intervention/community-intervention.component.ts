@@ -16,13 +16,12 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal, computed, input, output } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
 import {
   type CommunityIntervention,
-  type InterventionSupport,
   type RelationshipLevel,
   type InitiateInterventionInput,
   type SupportInterventionInput,
@@ -31,7 +30,6 @@ import {
   INTERVENTION_CATEGORIES,
   getRelationshipLevelLabel,
   getInterventionStatusLabel,
-  calculateInterventionWeight,
 } from '../../models/stewardship.model';
 import { StewardshipService } from '../../services/stewardship.service';
 

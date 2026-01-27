@@ -16,13 +16,8 @@ import { map } from 'rxjs/operators';
 import { Observable, forkJoin } from 'rxjs';
 
 import { RelationshipView } from '@app/elohim/adapters/storage-types.adapter';
-import {
-  StorageApiService,
-  CreatePresenceInput,
-  CreateMasteryInput,
-  CreateEventInput,
-} from '@app/elohim/services/storage-api.service';
-import { RelationshipQuery, CreateRelationshipInput } from '@app/lamad/models/content-node.model';
+import { StorageApiService } from '@app/elohim/services/storage-api.service';
+import { CreateRelationshipInput } from '@app/lamad/models/content-node.model';
 
 @Injectable({
   providedIn: 'root',
@@ -128,7 +123,7 @@ export class RelationshipService {
    * @param rootId Root content ID to start from
    * @param depth Maximum depth to traverse (default 1)
    */
-  getRelationshipGraph(rootId: string, depth = 1): Observable<Map<string, RelationshipView[]>> {
+  getRelationshipGraph(rootId: string, _depth = 1): Observable<Map<string, RelationshipView[]>> {
     const graph = new Map<string, RelationshipView[]>();
 
     // For depth 1, just get direct relationships

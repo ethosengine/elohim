@@ -6,7 +6,6 @@ import {
   StreakState,
   StreakProgress,
   StreakConfig,
-  DEFAULT_STREAK_CONFIG,
   createStreakState,
   recordAnswer,
   isStreakAchieved,

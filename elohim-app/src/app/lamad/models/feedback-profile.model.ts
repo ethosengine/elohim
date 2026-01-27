@@ -703,6 +703,18 @@ export type FeedbackProfileTemplate = Omit<
   evolution?: Partial<ProfileEvolution>;
 };
 
+// Feedback mechanism constants to avoid magic strings
+const MECHANISM_AFFINITY_MARK: FeedbackMechanism = 'affinity-mark';
+const MECHANISM_EMOTIONAL_REACTION: FeedbackMechanism = 'emotional-reaction';
+const MECHANISM_SHARE_WITH_CONTEXT: FeedbackMechanism = 'share-with-context';
+const MECHANISM_APPROVAL_VOTE: FeedbackMechanism = 'approval-vote';
+const MECHANISM_DISCUSSION_ONLY: FeedbackMechanism = 'discussion-only';
+const MECHANISM_CHALLENGE: FeedbackMechanism = 'challenge';
+
+// Profile determination method constants
+const DETERMINATION_CONTENT_TYPE_DEFAULT: ProfileDeterminationMethod = 'content-type-default';
+const DETERMINATION_GOVERNANCE_DECISION: ProfileDeterminationMethod = 'governance-decision';
+
 /**
  * Default feedback profiles by content type.
  *
@@ -713,16 +725,16 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
   // Learning content - thoughtful engagement, organic spread
   'learning-content': {
     permittedMechanisms: [
-      'affinity-mark',
+      MECHANISM_AFFINITY_MARK,
       'graduated-usefulness',
-      'emotional-reaction',
-      'share-with-context',
+      MECHANISM_EMOTIONAL_REACTION,
+      MECHANISM_SHARE_WITH_CONTEXT,
       'citation',
     ],
     prohibitedMechanisms: [],
     defaultMechanism: 'graduated-usefulness',
     determination: {
-      method: 'content-type-default',
+      method: DETERMINATION_CONTENT_TYPE_DEFAULT,
       participatingElohim: [],
       principlesCited: ['learning-benefits-thoughtful-engagement'],
       reasoning: 'Learning content benefits from thoughtful engagement over quick reactions',
@@ -734,15 +746,15 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
   // Community announcements - approval voting ok, emotional reactions appropriate
   'community-announcement': {
     permittedMechanisms: [
-      'approval-vote',
-      'emotional-reaction',
-      'affinity-mark',
-      'share-with-context',
+      MECHANISM_APPROVAL_VOTE,
+      MECHANISM_EMOTIONAL_REACTION,
+      MECHANISM_AFFINITY_MARK,
+      MECHANISM_SHARE_WITH_CONTEXT,
     ],
     prohibitedMechanisms: [],
-    defaultMechanism: 'approval-vote',
+    defaultMechanism: MECHANISM_APPROVAL_VOTE,
     determination: {
-      method: 'content-type-default',
+      method: DETERMINATION_CONTENT_TYPE_DEFAULT,
       participatingElohim: [],
       principlesCited: ['community-coordination'],
       reasoning: 'Community announcements serve coordination; approval voting helps gauge interest',
@@ -753,7 +765,11 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
 
   // Personal testimony/story - protection from viral exploitation and "tyranny of the laughing emoji"
   'personal-testimony': {
-    permittedMechanisms: ['emotional-reaction', 'affinity-mark', 'discussion-only'],
+    permittedMechanisms: [
+      MECHANISM_EMOTIONAL_REACTION,
+      MECHANISM_AFFINITY_MARK,
+      MECHANISM_DISCUSSION_ONLY,
+    ],
     prohibitedMechanisms: [],
     amplificationRequirements: {
       minimumFriction: 'reasoning-required',
@@ -768,7 +784,7 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
       criticalRequiresReasoning: true,
     },
     determination: {
-      method: 'content-type-default',
+      method: DETERMINATION_CONTENT_TYPE_DEFAULT,
       participatingElohim: [],
       principlesCited: ['human-dignity', 'imago-dei', 'protection-from-ridicule'],
       reasoning:
@@ -784,13 +800,13 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
       'peer-review',
       'citation',
       'graduated-accuracy',
-      'discussion-only',
-      'challenge',
+      MECHANISM_DISCUSSION_ONLY,
+      MECHANISM_CHALLENGE,
     ],
     prohibitedMechanisms: [],
     defaultMechanism: 'peer-review',
     determination: {
-      method: 'content-type-default',
+      method: DETERMINATION_CONTENT_TYPE_DEFAULT,
       participatingElohim: [],
       principlesCited: ['epistemic-integrity', 'intellectual-humility'],
       reasoning: 'Research requires rigorous engagement; peer review is primary mechanism',
@@ -801,23 +817,23 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
 
   // Potentially sensitive content - deliberation only, no amplification
   'sensitive-content': {
-    permittedMechanisms: ['discussion-only', 'challenge'],
+    permittedMechanisms: [MECHANISM_DISCUSSION_ONLY, MECHANISM_CHALLENGE],
     prohibitedMechanisms: [
       {
-        mechanism: 'approval-vote',
+        mechanism: MECHANISM_APPROVAL_VOTE,
         reason: 'Content requires deliberation not voting',
         prohibitedBy: 'constitutional',
         permanent: false,
       },
       {
-        mechanism: 'share-with-context',
+        mechanism: MECHANISM_SHARE_WITH_CONTEXT,
         reason: 'Requires governance review before amplification',
         prohibitedBy: 'constitutional',
         permanent: false,
       },
     ],
     determination: {
-      method: 'content-type-default',
+      method: DETERMINATION_CONTENT_TYPE_DEFAULT,
       participatingElohim: [],
       principlesCited: ['constitutional-protection', 'deliberative-democracy'],
       reasoning: 'Sensitive content requires deliberation, not quick reactions or amplification',
@@ -828,11 +844,11 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
 
   // Governance proposals - formal engagement only
   'governance-proposal': {
-    permittedMechanisms: ['proposal-vote', 'discussion-only', 'challenge'],
+    permittedMechanisms: ['proposal-vote', MECHANISM_DISCUSSION_ONLY, MECHANISM_CHALLENGE],
     prohibitedMechanisms: [],
     defaultMechanism: 'proposal-vote',
     determination: {
-      method: 'content-type-default',
+      method: DETERMINATION_CONTENT_TYPE_DEFAULT,
       participatingElohim: [],
       principlesCited: ['deliberative-democracy', 'constitutional-process'],
       reasoning: 'Governance proposals require formal, structured engagement',
@@ -846,14 +862,14 @@ export const DEFAULT_FEEDBACK_PROFILES: Record<string, FeedbackProfileTemplate> 
     permittedMechanisms: ['view-only'],
     prohibitedMechanisms: [
       {
-        mechanism: 'approval-vote',
+        mechanism: MECHANISM_APPROVAL_VOTE,
         reason: 'Content status under review',
         prohibitedBy: 'governance',
         permanent: false,
       },
     ],
     determination: {
-      method: 'governance-decision',
+      method: DETERMINATION_GOVERNANCE_DECISION,
       participatingElohim: [],
       principlesCited: ['due-process'],
       reasoning: 'Content under review or disputed; engagement restricted pending resolution',

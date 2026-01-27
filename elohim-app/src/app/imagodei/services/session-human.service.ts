@@ -17,9 +17,7 @@ import {
   HolochainUpgradePrompt,
   UpgradeTrigger,
   SessionState,
-  SessionAccessLevel,
   UpgradeIntent,
-  HostingCostStatus,
 } from '../models/session-human.model';
 // Content access models from lamad pillar
 
@@ -356,7 +354,7 @@ export class SessionHumanService {
   /**
    * Record notes saved.
    */
-  recordNotesSaved(pathId: string, stepIndex: number): void {
+  recordNotesSaved(_pathId: string, _stepIndex: number): void {
     this.triggerUpgradePrompt('notes-saved');
   }
 
@@ -1063,7 +1061,7 @@ export class SessionHumanService {
   /**
    * Trigger upgrade prompt when human tries to access gated content.
    */
-  onGatedContentAccess(contentId: string, contentTitle?: string): void {
+  onGatedContentAccess(_contentId: string, _contentTitle?: string): void {
     this.triggerUpgradePrompt('network-feature');
   }
 }

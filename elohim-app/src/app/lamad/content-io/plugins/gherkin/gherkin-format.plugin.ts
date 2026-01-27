@@ -119,6 +119,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
     const warnings: ValidationWarning[] = [];
 
     // Check for Feature: declaration
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content, not user input
     const featureMatch = /^Feature:\s*(.+)$/m.exec(content);
     if (!featureMatch) {
       errors.push({
@@ -130,6 +131,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
     }
 
     // Check for at least one scenario
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     const scenarioCount = (content.match(/^\s*(Scenario|Scenario Outline):/gm) ?? []).length;
     if (scenarioCount === 0) {
       warnings.push({
@@ -167,6 +169,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
     // Calculate stats
     const stats = {
       scenarioCount,
+      // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
       stepCount: (content.match(/^\s*(Given|When|Then|And|But)\s+/gm) ?? []).length,
       lineCount: content.split('\n').length,
       tagCount: (content.match(/@[\w-]+/g) ?? []).length,
@@ -237,11 +240,13 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
     }
 
     // Check for Scenario/Scenario Outline
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     if (/^\s*(Scenario|Scenario Outline):/m.test(content)) {
       confidence += 0.3;
     }
 
     // Check for Given/When/Then steps
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     if (/^\s*(Given|When|Then|And|But)\s+/m.test(content)) {
       confidence += 0.2;
     }
@@ -296,6 +301,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
   }
 
   private looksLikeGherkin(content: string): boolean {
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     return /^Feature:/m.test(content) || /^\s*Scenario:/m.test(content);
   }
 

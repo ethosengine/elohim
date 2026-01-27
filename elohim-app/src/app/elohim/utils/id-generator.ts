@@ -1,5 +1,9 @@
 /**
  * Utility for generating unique IDs with prefixes
+ *
+ * NOTE: These IDs are for local client-side identification (map IDs, extensions,
+ * negotiations). They are NOT used for cryptographic security. For secure IDs,
+ * use the cryptographic ID generators in the appropriate service.
  */
 
 /**
@@ -11,6 +15,9 @@
  */
 export function generateId(prefix: string): string {
   const timestamp = Date.now();
+  // NOSONAR: Math.random() is safe here - IDs are for local client-side identification,
+  // not cryptographic security. The timestamp provides uniqueness guarantee.
+  // eslint-disable-next-line sonarjs/pseudo-random
   const random = Math.random().toString(36).substring(2, 11);
   return `${prefix}-${timestamp}-${random}`;
 }

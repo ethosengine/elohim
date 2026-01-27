@@ -24,7 +24,7 @@
 
 import { Injectable, signal, computed } from '@angular/core';
 
-import { map, catchError, shareReplay } from 'rxjs/operators';
+import { catchError, shareReplay } from 'rxjs/operators';
 
 import { Observable, of, from, defer } from 'rxjs';
 

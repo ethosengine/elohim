@@ -20,7 +20,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-import { catchError, map, of, timeout, firstValueFrom } from 'rxjs';
+import { catchError, of, timeout, firstValueFrom } from 'rxjs';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 

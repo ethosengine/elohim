@@ -21,7 +21,6 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 
 import {
   type RecoveryRequest,
-  type RecoveryAttestation,
   type RecoveryProgress,
   type RecoveryInterview,
   type InterviewQuestion,
@@ -29,15 +28,11 @@ import {
   type PendingRecoveryRequest,
   type RecoveryCredential,
   type AttestationDecision,
-  type RecoveryRequestStatus,
   calculateProgress,
 } from '../models/recovery.model';
 
 import { DoorwayRegistryService } from './doorway-registry.service';
 import { IdentityService } from './identity.service';
-
-/** Recovery request expiry (7 days) */
-const RECOVERY_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Default attestation requirements */
 const DEFAULT_REQUIRED_ATTESTATIONS = 3;

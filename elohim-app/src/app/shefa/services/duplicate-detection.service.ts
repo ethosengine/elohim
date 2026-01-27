@@ -130,7 +130,7 @@ export class DuplicateDetectionService {
     }
     this.hashIndex[hash].push(staged.id);
 
-    console.log(`[DuplicateDetection] Registered transaction ${staged.plaidTransactionId}`);
+    console.warn(`[DuplicateDetection] Registered transaction ${staged.plaidTransactionId}`);
   }
 
   /**
@@ -146,7 +146,7 @@ export class DuplicateDetectionService {
   clearIndexes(): void {
     this.hashIndex = {};
     this.plaidIdSet.clear();
-    console.log('[DuplicateDetection] Indexes cleared');
+    console.warn('[DuplicateDetection] Indexes cleared');
   }
 
   // ============================================================================
@@ -254,11 +254,11 @@ export class DuplicateDetectionService {
    * - Date within ±14 days (broader initial filter)
    */
   private getCandidates(
-    accountId: string,
-    amount: number,
-    dateStr: string
+    _accountId: string,
+    _amount: number,
+    _dateStr: string
   ): TransactionCandidate[] {
-    // TODO: In production, query DHT instead of in-memory
+    // In production, query DHT instead of in-memory
     // For now, return empty (no historical transactions in memory)
     return [];
   }

@@ -185,7 +185,7 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
         : `Node "${alert.nodeName}" is ${alert.eventType.replace('-', ' ')}`,
       message: alert.message,
       subtitle: `Offline for ${alert.offlineDuration}`,
-      icon: alert.isPrimaryNode ? '🚨' : severity === 'critical' ? '⚠️' : '⚡',
+      icon: this.getAlertIcon(alert.isPrimaryNode, severity),
       timestamp: alert.detectedAt,
       duration: alert.offlineDuration,
       actions,
@@ -215,9 +215,18 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Get alert icon based on node priority and severity
+   */
+  private getAlertIcon(isPrimaryNode: boolean, severity: AlertSeverity): string {
+    if (isPrimaryNode) return '🚨';
+    if (severity === 'critical') return '⚠️';
+    return '⚡';
+  }
+
+  /**
    * Build action buttons for an alert
    */
-  private buildActions(alert: OfflineNodeAlert): AlertAction[] {
+  private buildActions(_alert: OfflineNodeAlert): AlertAction[] {
     const actions: AlertAction[] = [
       {
         id: 'view-dashboard',
@@ -229,7 +238,7 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
     if (this.computeNeeds?.hasGaps) {
       actions.push({
         id: 'help-flow',
-        label: this.computeNeeds.helpFlowCTA || 'Get Help',
+        label: this.computeNeeds.helpFlowCTA ?? 'Get Help',
         variant: 'primary',
       });
     }

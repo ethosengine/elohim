@@ -7,7 +7,11 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { PasswordAuthProvider } from './password-auth.provider';
 import { DoorwayRegistryService } from '../doorway-registry.service';
 import { environment } from '../../../../environments/environment';
-import type { PasswordCredentials, RegisterCredentials, AuthResponse } from '../../models/auth.model';
+import type {
+  PasswordCredentials,
+  RegisterCredentials,
+  AuthResponse,
+} from '../../models/auth.model';
 
 describe('PasswordAuthProvider', () => {
   let provider: PasswordAuthProvider;
@@ -97,7 +101,9 @@ describe('PasswordAuthProvider', () => {
     });
 
     it('should use selected doorway URL when available', async () => {
-      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue('https://my-doorway.example.com');
+      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue(
+        'https://my-doorway.example.com'
+      );
 
       const loginPromise = provider.login(validCredentials);
 
@@ -163,12 +169,14 @@ describe('PasswordAuthProvider', () => {
 
       const req = httpMock.expectOne(req => req.url.endsWith('/auth/register'));
       expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual(jasmine.objectContaining({
-        identifier: 'new@example.com',
-        identifierType: 'email',
-        password: 'password123',
-        displayName: 'New User',
-      }));
+      expect(req.request.body).toEqual(
+        jasmine.objectContaining({
+          identifier: 'new@example.com',
+          identifierType: 'email',
+          password: 'password123',
+          displayName: 'New User',
+        })
+      );
 
       req.flush(mockAuthResponse);
 
@@ -296,7 +304,9 @@ describe('PasswordAuthProvider', () => {
 
   describe('URL resolution', () => {
     it('should prioritize selected doorway URL', async () => {
-      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue('https://custom-doorway.com');
+      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue(
+        'https://custom-doorway.com'
+      );
 
       const loginPromise = provider.login({
         type: 'password',
@@ -385,7 +395,10 @@ describe('PasswordAuthProvider', () => {
       const loginPromise = provider.login(credentials);
 
       const req = httpMock.expectOne(req => req.url.endsWith('/auth/login'));
-      req.flush({ error: 'Custom server error', code: 'CUSTOM_CODE' }, { status: 400, statusText: 'Bad Request' });
+      req.flush(
+        { error: 'Custom server error', code: 'CUSTOM_CODE' },
+        { status: 400, statusText: 'Bad Request' }
+      );
 
       const result = await loginPromise;
       expect(result.success).toBe(false);

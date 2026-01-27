@@ -664,7 +664,7 @@ export class PathExtensionService {
         this.invalidateIndex();
 
         // In production: notify path maintainers
-        console.log(`Upstream proposal submitted for extension ${extensionId}`);
+        console.info(`Upstream proposal submitted for extension ${extensionId}`);
 
         return of(proposal);
       })
@@ -679,7 +679,7 @@ export class PathExtensionService {
    * Get collaborative path settings.
    */
   getCollaborativePath(pathId: string): Observable<CollaborativePath | null> {
-    return of(this.collaborativePaths.get(pathId) || null);
+    return of(this.collaborativePaths.get(pathId) ?? null);
   }
 
   /**
@@ -712,7 +712,7 @@ export class PathExtensionService {
           settings: {
             requireApproval: settings?.requireApproval ?? type === 'review-required',
             minApprovals: settings?.minApprovals,
-            approvers: settings?.approvers || [this.currentAgentId],
+            approvers: settings?.approvers ?? [this.currentAgentId],
             allowAnonymousSuggestions: settings?.allowAnonymousSuggestions ?? false,
             notifyOnChange: settings?.notifyOnChange ?? true,
           },

@@ -464,7 +464,7 @@ export function transformMasteryFromWire(wire: ContentMasteryWire): ContentMaste
     levelHistory: [], // Not stored in wire format
     lastEngagementAt: wire.last_engagement_at,
     lastEngagementType: wire.last_engagement_type as EngagementType,
-    contentVersionAtMastery: wire.content_version_at_mastery || '',
+    contentVersionAtMastery: wire.content_version_at_mastery ?? '',
     freshness: wire.freshness_score,
     needsRefresh: wire.needs_refresh,
     assessmentEvidence,
