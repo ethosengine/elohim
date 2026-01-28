@@ -635,8 +635,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             }
 
                             echo "Waiting for SonarQube quality gate..."
-                            timeout(time: 4, unit: 'MINUTES') {
-                                def qg = waitForQualityGate()
+                            timeout(time: 10, unit: 'MINUTES') {
+                                def qg = waitForQualityGate abortPipeline: false
                                 if (qg.status != 'OK') {
                                     if (sonarConfig.shouldEnforce) {
                                         // Production: Block deployment on quality gate failure
@@ -647,8 +647,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         echo "Review issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
                                         currentBuild.result = 'UNSTABLE'
                                     }
+                                } else {
+                                    echo "✅ SonarQube quality gate passed (${sonarConfig.env})"
                                 }
-                                echo "✅ SonarQube analysis complete (${sonarConfig.env})"
                             }
                         }
                     }
