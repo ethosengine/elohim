@@ -357,7 +357,7 @@
 }
 
 .validate-btn:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 
@@ -415,7 +415,7 @@
 
 .doorway-card.offline,
 .doorway-card:disabled {
-  opacity: 0.6;
+  opacity: 60%;
   cursor: not-allowed;
 }
 

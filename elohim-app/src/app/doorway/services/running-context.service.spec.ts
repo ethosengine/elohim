@@ -107,11 +107,9 @@ describe('RunningContextService', () => {
       expect(context.registeredNodes[0].nodeId).toBe('node-1');
     });
 
-    it('should query holochain for nodes when user is self-sovereign', async () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('self-sovereign');
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+    it('should query holochain for nodes when user is steward', async () => {
+      (mockIdentityService.mode as jasmine.Spy).and.returnValue('steward');
+      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
 
       const context = await service.detect();
 
@@ -131,9 +129,7 @@ describe('RunningContextService', () => {
 
     it('should handle empty holochain response', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: false, data: null })
-      );
+      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
 
       const context = await service.detect();
 

@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { environment } from '../../../environments/environment';
 
 @Component({

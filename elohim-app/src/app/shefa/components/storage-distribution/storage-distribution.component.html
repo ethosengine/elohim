@@ -83,6 +83,7 @@
       <!-- Tab Navigation -->
       <nav class="view-nav">
         <button
+          type="button"
           class="nav-btn"
           [class.active]="activeView === 'type'"
           (click)="setActiveView('type')"
@@ -90,6 +91,7 @@
           By Type
         </button>
         <button
+          type="button"
           class="nav-btn"
           [class.active]="activeView === 'reach'"
           (click)="setActiveView('reach')"
@@ -97,6 +99,7 @@
           By Reach
         </button>
         <button
+          type="button"
           class="nav-btn"
           [class.active]="activeView === 'node'"
           (click)="setActiveView('node')"
@@ -107,7 +110,8 @@
 
       <!-- By Content Type View -->
       <div class="view-content" *ngIf="activeView === 'type'">
-        <div
+        <button
+          type="button"
           class="type-row"
           *ngFor="let ct of distribution.byContentType"
           (click)="selectContentType(ct)"
@@ -135,7 +139,7 @@
             </span>
             <span class="avg-replicas">(avg {{ ct.averageReplicas | number: '1.1-1' }})</span>
           </div>
-        </div>
+        </button>
 
         <div class="empty-state" *ngIf="distribution.byContentType.length === 0">
           <span class="empty-icon">📭</span>
@@ -145,10 +149,11 @@
 
       <!-- By Reach Level View -->
       <div class="view-content" *ngIf="activeView === 'reach'">
-        <div
+        <section
           class="reach-row"
           *ngFor="let rl of distribution.byReachLevel"
           [ngClass]="getReplicationClass(rl.replicationStatus)"
+          [attr.aria-label]="rl.reachLabel"
         >
           <div class="reach-header">
             <span class="reach-icon">{{ getReachIcon(rl.reachLevel) }}</span>
@@ -183,7 +188,7 @@
               }}
             </span>
           </div>
-        </div>
+        </section>
 
         <div class="empty-state" *ngIf="distribution.byReachLevel.length === 0">
           <span class="empty-icon">📭</span>
@@ -193,7 +198,8 @@
 
       <!-- By Node View -->
       <div class="view-content" *ngIf="activeView === 'node'">
-        <div
+        <button
+          type="button"
           class="node-row"
           *ngFor="let node of distribution.byNode"
           [ngClass]="getNodeStatusClass(node.nodeStatus)"
@@ -248,7 +254,7 @@
           </div>
 
           <div class="node-available">{{ formatSize(node.availableGB) }} available</div>
-        </div>
+        </button>
 
         <div class="empty-state" *ngIf="distribution.byNode.length === 0">
           <span class="empty-icon">🖥️</span>

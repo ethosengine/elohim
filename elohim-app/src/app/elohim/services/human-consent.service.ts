@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 89.7% (2026-02-04)
+
 import { tap } from 'rxjs/operators';
 
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
@@ -39,6 +41,8 @@ import type { LearningPath, PathVisibility } from '@app/lamad/models/learning-pa
  */
 @Injectable({ providedIn: 'root' })
 export class HumanConsentService {
+  private static readonly ERROR_CONSENT_NOT_FOUND = 'Consent not found';
+
   private readonly consentsSubject = new BehaviorSubject<HumanConsent[]>([]);
   public consents$ = this.consentsSubject.asObservable();
 
@@ -170,7 +174,7 @@ export class HumanConsentService {
   acceptConsent(consentId: string): Observable<HumanConsent> {
     const consent = this.findConsentById(consentId);
     if (!consent) {
-      return throwError(() => new Error('Consent not found'));
+      return throwError(() => new Error(HumanConsentService.ERROR_CONSENT_NOT_FOUND));
     }
 
     const currentAgentId = this.getCurrentAgentId();
@@ -192,7 +196,7 @@ export class HumanConsentService {
   declineConsent(consentId: string, reason?: string): Observable<void> {
     const consent = this.findConsentById(consentId);
     if (!consent) {
-      return throwError(() => new Error('Consent not found'));
+      return throwError(() => new Error(HumanConsentService.ERROR_CONSENT_NOT_FOUND));
     }
 
     const currentAgentId = this.getCurrentAgentId();
@@ -216,7 +220,7 @@ export class HumanConsentService {
   revokeConsent(consentId: string, reason?: string): Observable<void> {
     const consent = this.findConsentById(consentId);
     if (!consent) {
-      return throwError(() => new Error('Consent not found'));
+      return throwError(() => new Error(HumanConsentService.ERROR_CONSENT_NOT_FOUND));
     }
 
     const currentAgentId = this.getCurrentAgentId();
@@ -241,7 +245,7 @@ export class HumanConsentService {
   proposeElevation(request: ElevationRequest): Observable<HumanConsent> {
     const consent = this.findConsentById(request.consentId);
     if (!consent) {
-      return throwError(() => new Error('Consent not found'));
+      return throwError(() => new Error(HumanConsentService.ERROR_CONSENT_NOT_FOUND));
     }
 
     if (!canElevate(consent)) {
@@ -251,7 +255,7 @@ export class HumanConsentService {
     const currentAgentId = this.getCurrentAgentId();
 
     // Verify the new level is actually higher
-    if (!hasMinimumIntimacy(request.newLevel, consent.intimacyLevel)) {
+    if (hasMinimumIntimacy(consent.intimacyLevel, request.newLevel)) {
       return throwError(() => new Error('Cannot elevate to same or lower level'));
     }
 
@@ -539,7 +543,11 @@ export class HumanConsentService {
 
   private generateConsentId(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10); // NOSONAR - Non-cryptographic ID generation
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const random = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 8);
     return `consent-${timestamp}-${random}`;
   }
 }

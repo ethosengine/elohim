@@ -19,6 +19,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, signal, computed, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+// @coverage: 28.6% (2026-02-04)
+
 /** Question from the doorway */
 interface VerificationQuestion {
   id: string;
@@ -141,20 +143,20 @@ export class ElohimVerifyComponent implements OnDestroy {
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || 'Failed to start verification');
+        throw new Error(err.error ?? 'Failed to start verification');
       }
 
       const data = await response.json();
       this.sessionId.set(data.sessionId);
-      this.questions.set(data.questions || []);
-      this.timeLimitSeconds.set(data.timeLimitSeconds || 300);
-      this.timeRemaining.set(data.timeLimitSeconds || 300);
+      this.questions.set(data.questions ?? []);
+      this.timeLimitSeconds.set(data.timeLimitSeconds ?? 300);
+      this.timeRemaining.set(data.timeLimitSeconds ?? 300);
       this.answers.set(new Map());
       this.currentQuestionIndex.set(0);
       this.currentStep.set('questions');
       this.startTimer();
     } catch (e: any) {
-      this.error.set(e.message || 'Failed to start verification');
+      this.error.set(e.message ?? 'Failed to start verification');
     } finally {
       this.isLoading.set(false);
     }
@@ -210,14 +212,14 @@ export class ElohimVerifyComponent implements OnDestroy {
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || 'Failed to submit answers');
+        throw new Error(err.error ?? 'Failed to submit answers');
       }
 
       const data = await response.json();
       this.result.set(data);
       this.currentStep.set('result');
     } catch (e: any) {
-      this.error.set(e.message || 'Failed to submit answers');
+      this.error.set(e.message ?? 'Failed to submit answers');
       this.currentStep.set('questions');
       this.startTimer(); // Resume timer on error
     } finally {
@@ -248,7 +250,7 @@ export class ElohimVerifyComponent implements OnDestroy {
       const remaining = this.timeRemaining();
       if (remaining <= 0) {
         this.stopTimer();
-        this.submitAnswers(); // Auto-submit when time runs out
+        void this.submitAnswers(); // Auto-submit when time runs out
       } else {
         this.timeRemaining.set(remaining - 1);
       }
@@ -289,7 +291,7 @@ export class ElohimVerifyComponent implements OnDestroy {
   }
 
   getAnswerForQuestion(questionId: string): string {
-    return this.answers().get(questionId) || '';
+    return this.answers().get(questionId) ?? '';
   }
 
   isQuestionAnswered(index: number): boolean {

@@ -17,6 +17,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal, computed, output, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+// @coverage: 58.4% (2026-02-04)
+
 import {
   type DoorwayInfo,
   type DoorwayRegion,
@@ -193,7 +195,7 @@ export class DoorwayPickerComponent implements OnInit {
   // ===========================================================================
 
   ngOnInit(): void {
-    this.loadDoorways();
+    void this.loadDoorways();
   }
 
   // ===========================================================================

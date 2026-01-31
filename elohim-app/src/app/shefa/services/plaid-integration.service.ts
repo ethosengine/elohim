@@ -13,11 +13,19 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
-import { catchError, retry, timeout, tap } from 'rxjs/operators';
+// @coverage: 35.1% (2026-02-04)
 
-import { Observable, Subject, throwError, of, firstValueFrom } from 'rxjs';
+import { catchError, retry, timeout } from 'rxjs/operators';
+
+import { Observable, Subject, firstValueFrom, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import {
+  PlaidConnection,
+  PlaidTransaction,
+  PlaidWebhookPayload,
+  SyncResult,
+} from '../models/transaction-import.model';
 
 // Plaid configuration (stubbed - environment.plaid not yet configured)
 const PLAID_CONFIG = {
@@ -26,14 +34,6 @@ const PLAID_CONFIG = {
   webhookUrl: undefined as string | undefined,
 };
 
-import {
-  PlaidConnection,
-  PlaidAccountLink,
-  PlaidTransaction,
-  PlaidWebhookPayload,
-  SyncResult,
-} from '../models/transaction-import.model';
-
 /**
  * Configuration for Plaid Link (client-side OAuth UI)
  */
@@ -41,23 +41,6 @@ export interface PlaidLinkConfig {
   token: string; // Public token from Plaid Link
   userId: string; // For tracking which user initiated
   redirectUrl: string; // Where to send user after OAuth
-}
-
-/**
- * OAuth callback result
- */
-interface PlaidOAuthCallback {
-  publicToken: string;
-  metadata: {
-    institution: { name: string; institutionId: string };
-    accounts: {
-      id: string;
-      name: string;
-      subtype: string;
-      type: string;
-      mask?: string;
-    }[];
-  };
 }
 
 /**
@@ -91,9 +74,9 @@ export class PlaidIntegrationService {
    * Note: Plaid integration is stubbed - environment.plaid config not yet added
    */
   private validateEnvironmentConfig(): void {
-    console.warn(
-      '[PlaidIntegration] STUB MODE: Plaid integration not configured - will use mock responses'
-    );
+    // Stub function: environment.plaid configuration is not yet integrated.
+    // When Plaid API credentials are added to environment config in the future,
+    // this method should validate presence of clientId and secret before using the service.
   }
 
   // ============================================================================
@@ -115,7 +98,6 @@ export class PlaidIntegrationService {
         redirectUrl: `${window.location.origin}/shefa/plaid-callback`,
       };
     } catch (error) {
-      console.error('[PlaidIntegration] Failed to create link token', error);
       throw new Error('Failed to initiate Plaid connection: ' + String(error));
     }
   }
@@ -166,25 +148,25 @@ export class PlaidIntegrationService {
       // Get account details
       const accountsResponse = await this.getAccounts(accessTokenResponse.accessToken);
 
-      const linkedAccounts = (accountsResponse?.accounts || []).map((account: any) => ({
+      const linkedAccounts = (accountsResponse?.accounts ?? []).map((account: any) => ({
         plaidAccountId: account.accountId,
         plaidAccountName: account.name,
         plaidAccountSubtype: account.subtype,
         financialAssetId: '', // Will be linked by user in UI
-        balanceAmount: account.balances?.current || 0,
-        currency: account.balances?.isoCurrencyCode || 'USD',
+        balanceAmount: account.balances?.current ?? 0,
+        currency: account.balances?.isoCurrencyCode ?? 'USD',
         lastLinkedAt: new Date().toISOString(),
       }));
 
       // Create PlaidConnection entity
       const connection: PlaidConnection = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`,
         connectionNumber: `PC-${this.generateSequentialId()}`,
         stewardId: '', // Will be set by calling service
         plaidItemId: accessTokenResponse.itemId,
         plaidAccessToken: encryptedToken, // Encrypted
-        plaidInstitutionId: itemResponse?.institution?.institutionId || '',
-        institutionName: itemResponse?.institution?.name || 'Unknown',
+        plaidInstitutionId: itemResponse?.institution?.institutionId ?? '',
+        institutionName: itemResponse?.institution?.name ?? 'Unknown',
         linkedAccounts,
         status: 'active',
         lastSyncedAt: new Date().toISOString(),
@@ -194,7 +176,6 @@ export class PlaidIntegrationService {
 
       return connection;
     } catch (error) {
-      console.error('[PlaidIntegration] OAuth callback failed', error);
       throw new Error('Failed to complete Plaid connection: ' + String(error));
     }
   }
@@ -207,16 +188,16 @@ export class PlaidIntegrationService {
   ): Observable<{ accessToken: string; itemId: string }> {
     const requestBody = {
       public_token: publicToken,
-      client_id: environment.plaid?.clientId,
-      secret: environment.plaid?.secret,
+      // Note: environment.plaid not in Environment type - using placeholders
+      client_id: (environment as any).plaid?.clientId ?? 'PLAID_CLIENT_ID',
+      secret: (environment as any).plaid?.secret ?? 'PLAID_SECRET',
     };
 
     return this.callPlaidAPI<{ accessToken: string; itemId: string }>(
       '/item/public_token/exchange',
       requestBody
     ).pipe(
-      catchError(error => {
-        console.error('[PlaidIntegration] Token exchange failed', error);
+      catchError(_error => {
         return throwError(() => new Error('Failed to exchange Plaid token'));
       })
     );
@@ -260,10 +241,8 @@ export class PlaidIntegrationService {
         await this.delay(100);
       } while (cursor);
 
-      console.log(`[PlaidIntegration] Fetched ${allTransactions.length} transactions`);
       return allTransactions;
     } catch (error) {
-      console.error('[PlaidIntegration] Transaction fetch failed', error);
       throw new Error('Failed to fetch transactions: ' + String(error));
     }
   }
@@ -283,13 +262,12 @@ export class PlaidIntegrationService {
       }
 
       return {
-        newTransactionsCount: response.added?.length || 0,
-        updatedTransactionsCount: response.modified?.length || 0,
+        newTransactionsCount: response.added?.length ?? 0,
+        updatedTransactionsCount: response.modified?.length ?? 0,
         syncedAt: new Date().toISOString(),
         nextCursorValue: response.nextCursor,
       };
     } catch (error) {
-      console.error('[PlaidIntegration] Transaction sync failed', error);
       throw new Error('Failed to sync transactions: ' + String(error));
     }
   }
@@ -378,10 +356,7 @@ export class PlaidIntegrationService {
 
       // Force refresh of accounts and balances
       await firstValueFrom(this.callPlaidAPI('/accounts/get', { access_token: accessToken }));
-
-      console.log(`[PlaidIntegration] Connection ${connection.connectionNumber} refreshed`);
     } catch (error) {
-      console.error('[PlaidIntegration] Connection refresh failed', error);
       throw new Error('Failed to refresh connection: ' + String(error));
     }
   }
@@ -398,11 +373,6 @@ export class PlaidIntegrationService {
    * - ITEM: Connection status changes (login required, etc.)
    */
   handleWebhook(payload: PlaidWebhookPayload): void {
-    console.log('[PlaidIntegration] Webhook received', {
-      type: payload.webhookType,
-      code: payload.webhookCode,
-    });
-
     // Validate webhook signature (TODO: implement in production)
     // if (!this.validateWebhookSignature(payload)) {
     //   console.warn('[PlaidIntegration] Invalid webhook signature');
@@ -457,9 +427,11 @@ export class PlaidIntegrationService {
       combined.set(derivedKey.salt, iv.length + new Uint8Array(encryptedData).length);
 
       // Base64 encode for storage
-      return btoa(String.fromCharCode.apply(null, Array.from(combined)));
+      return btoa(String.fromCodePoint(...Array.from(combined).map(b => b)));
     } catch (error) {
-      console.error('[PlaidIntegration] Token encryption failed', error);
+      // Encryption failure - log and re-throw with clear message
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[PlaidIntegration] Token encryption failed:', message);
       throw new Error('Failed to encrypt access token');
     }
   }
@@ -482,7 +454,7 @@ export class PlaidIntegrationService {
       const ciphertext = combined.slice(12, combined.length - 32);
 
       // Derive key using same salt
-      const derivedKey = await this.deriveEncryptionKey(salt);
+      const derivedKey = await this.deriveEncryptionKey(salt ?? undefined);
 
       // Decrypt
       const decryptedData = await crypto.subtle.decrypt(
@@ -493,7 +465,9 @@ export class PlaidIntegrationService {
 
       return new TextDecoder().decode(decryptedData);
     } catch (error) {
-      console.error('[PlaidIntegration] Token decryption failed', error);
+      // Decryption failure - log and re-throw with clear message
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[PlaidIntegration] Token decryption failed:', message);
       throw new Error('Failed to decrypt access token');
     }
   }
@@ -514,7 +488,7 @@ export class PlaidIntegrationService {
       );
 
       // Generate or use provided salt
-      const useSalt = salt || crypto.getRandomValues(new Uint8Array(32));
+      const useSalt = salt ?? crypto.getRandomValues(new Uint8Array(32));
 
       const key = await crypto.subtle.deriveKey(
         {
@@ -531,7 +505,9 @@ export class PlaidIntegrationService {
 
       return { key, salt: useSalt };
     } catch (error) {
-      console.error('[PlaidIntegration] Key derivation failed', error);
+      // Key derivation failure - log and re-throw with clear message
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[PlaidIntegration] Key derivation failed:', message);
       throw new Error('Failed to derive encryption key');
     }
   }
@@ -542,7 +518,7 @@ export class PlaidIntegrationService {
    */
   private getKeyMaterial(): string {
     // This is a placeholder - in production should use steward's actual key
-    return sessionStorage.getItem('encryption_key_material') || 'default-key-material';
+    return sessionStorage.getItem('encryption_key_material') ?? 'default-key-material';
   }
 
   // ============================================================================
@@ -562,7 +538,6 @@ export class PlaidIntegrationService {
     return this.http.post<T>(url, body, { headers }).pipe(
       timeout(10000), // 10 second timeout
       catchError(error => {
-        console.error(`[PlaidIntegration] API call failed to ${endpoint}`, error);
         return throwError(() => error);
       })
     );
@@ -571,7 +546,7 @@ export class PlaidIntegrationService {
   /**
    * Delay utility for rate limiting
    */
-  private delay(ms: number): Promise<void> {
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -582,7 +557,8 @@ export class PlaidIntegrationService {
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let result = '';
     for (let i = 0; i < 8; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+      const randomValue = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+      result += chars.charAt(Math.floor(randomValue * chars.length));
     }
     return result;
   }

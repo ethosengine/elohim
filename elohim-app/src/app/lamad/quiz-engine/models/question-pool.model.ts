@@ -28,6 +28,8 @@ import type {
   QuestionDifficulty,
 } from '../../content-io/plugins/sophia/sophia-moment.model';
 
+// @coverage: 31.0% (2026-02-04)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Question Pool
 // ─────────────────────────────────────────────────────────────────────────────
@@ -310,8 +312,8 @@ export function calculateCompleteness(pool: QuestionPool): number {
   const actualDifficulty: Record<string, number> = {};
 
   for (const q of pool.questions) {
-    const level = q.metadata?.bloomsLevel ?? 'understand';
-    const diff = q.metadata?.difficulty ?? 'medium';
+    const level = (q.metadata?.['bloomsLevel'] as string) ?? 'understand';
+    const diff = (q.metadata?.['difficulty'] as string) ?? 'medium';
     actualBlooms[level] = (actualBlooms[level] ?? 0) + 1;
     actualDifficulty[diff] = (actualDifficulty[diff] ?? 0) + 1;
   }

@@ -15,6 +15,10 @@
 
 import { Injectable, Injector } from '@angular/core';
 
+// @coverage: 67.7% (2026-02-04)
+
+import { firstValueFrom } from 'rxjs';
+
 import { ContentBlob } from '../models/content-node.model';
 
 import { WasmCacheService, ReachLevel } from './wasm-cache.service';
@@ -23,12 +27,18 @@ import { WasmCacheService, ReachLevel } from './wasm-cache.service';
 // Types
 // ============================================================================
 
+/** Cache tier eviction policy */
+export type EvictionPolicy = 'lru' | 'time-based';
+
+/** Cache tier identifier */
+export type CacheTierId = 'metadata' | 'blob' | 'chunk';
+
 /** Cache tier configuration */
 export interface CacheTierConfig {
   name: string;
   maxSizeBytes: number;
   ttlSeconds: number;
-  evictionPolicy: 'lru' | 'time-based';
+  evictionPolicy: EvictionPolicy;
 }
 
 /** Cached item with metadata */
@@ -272,7 +282,13 @@ export class BlobCacheTiersService {
   ) {
     this.startCleanupTimer();
     this.startIntegrityVerification();
-    this.initializeWasmCache();
+    this.scheduleWasmInitialization();
+  }
+
+  private scheduleWasmInitialization(): void {
+    setTimeout(() => {
+      void this.initializeWasmCache();
+    }, 0);
   }
 
   /**
@@ -281,14 +297,13 @@ export class BlobCacheTiersService {
    */
   private async initializeWasmCache(): Promise<void> {
     try {
-      const result = await this.wasmCache.initialize({
-        maxSizePerReach: BigInt(128 * 1024 * 1024), // 128MB per reach level
+      await this.wasmCache.initialize({
+        maxSizePerReach: BigInt(128 * 1024 * 1024),
         preferWasm: true,
       });
       this.wasmCacheInitialized = true;
-      console.log(`[BlobCacheTiersService] WASM cache initialized (${result.implementation})`);
-    } catch (error) {
-      console.warn('[BlobCacheTiersService] WASM cache init failed, using fallback:', error);
+    } catch {
+      // WASM initialization failed - operations will fall back to TypeScript
     }
   }
 
@@ -379,31 +394,25 @@ export class BlobCacheTiersService {
   // ==========================================================================
 
   /** Check if item exists in any/specific tier. O(1). */
-  has(hash: string, tier?: 'metadata' | 'blob' | 'chunk'): boolean {
-    if (!tier || tier === 'metadata') {
-      if (this.metadataCache.has(hash)) return true;
-    }
-    if (!tier || tier === 'blob') {
-      if (this.blobCache.has(hash)) return true;
-    }
-    if (!tier || tier === 'chunk') {
-      if (this.chunkCache.has(hash)) return true;
-    }
+  has(hash: string, tier?: CacheTierId): boolean {
+    if ((!tier || tier === 'metadata') && this.metadataCache.has(hash)) return true;
+    if ((!tier || tier === 'blob') && this.blobCache.has(hash)) return true;
+    if ((!tier || tier === 'chunk') && this.chunkCache.has(hash)) return true;
     return false;
   }
 
   /** Remove item from tier(s). O(1). */
-  remove(hash: string, tier?: 'metadata' | 'blob' | 'chunk'): boolean {
+  remove(hash: string, tier?: CacheTierId): boolean {
     let removed = false;
 
-    if (!tier || tier === 'metadata') {
-      if (this.metadataCache.delete(hash)) removed = true;
+    if ((!tier || tier === 'metadata') && this.metadataCache.delete(hash)) {
+      removed = true;
     }
-    if (!tier || tier === 'blob') {
-      if (this.blobCache.delete(hash)) removed = true;
+    if ((!tier || tier === 'blob') && this.blobCache.delete(hash)) {
+      removed = true;
     }
-    if (!tier || tier === 'chunk') {
-      if (this.chunkCache.delete(hash)) removed = true;
+    if ((!tier || tier === 'chunk') && this.chunkCache.delete(hash)) {
+      removed = true;
     }
 
     return removed;
@@ -514,7 +523,7 @@ export class BlobCacheTiersService {
     try {
       const { BlobVerificationService } = await import('./blob-verification.service');
       const verificationService = this.injector.get(BlobVerificationService);
-      const result = await verificationService.verifyBlob(blob, hash).toPromise();
+      const result = await firstValueFrom(verificationService.verifyBlob(blob, hash));
       return result?.isValid ?? false;
     } catch {
       return false;
@@ -533,7 +542,7 @@ export class BlobCacheTiersService {
       for (const [hash, item] of this.blobCache.entries()) {
         itemsChecked++;
         try {
-          const result = await verificationService.verifyBlob(item.data, hash).toPromise();
+          const result = await firstValueFrom(verificationService.verifyBlob(item.data, hash));
           if (!result?.isValid) {
             corruptedItems.push(hash);
           }
@@ -557,7 +566,8 @@ export class BlobCacheTiersService {
       };
 
       return this.lastIntegrityCheck;
-    } catch (error) {
+    } catch {
+      // Integrity verification error - return failure status with partial results
       this.lastIntegrityCheck = {
         isValid: false,
         itemsChecked,
@@ -571,18 +581,20 @@ export class BlobCacheTiersService {
   }
 
   startIntegrityVerification(): void {
-    // Every hour
     this.integrityCheckIntervalId = setInterval(
       () => {
-        this.verifyAllBlobIntegrity().catch(() => {});
+        void this.verifyAllBlobIntegrity().catch(() => {
+          // Background verification task, will retry on next interval
+        });
       },
       60 * 60 * 1000
     );
 
-    // Initial check after 5 minutes
     setTimeout(
       () => {
-        this.verifyAllBlobIntegrity().catch(() => {});
+        void this.verifyAllBlobIntegrity().catch(() => {
+          // Initial integrity check will retry on next interval
+        });
       },
       5 * 60 * 1000
     );

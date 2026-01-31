@@ -18,6 +18,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 37.9% (2026-02-04)
+
 import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
@@ -87,8 +89,7 @@ export class PracticeService {
           this.checkCooldown();
         }
       }),
-      catchError(err => {
-        console.warn('[Practice] Failed to initialize pool:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -106,8 +107,7 @@ export class PracticeService {
           this.refreshRecommendations();
         }
       }),
-      catchError(err => {
-        console.warn('[Practice] Failed to add path to pool:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -125,8 +125,7 @@ export class PracticeService {
           this.refreshRecommendations();
         }
       }),
-      catchError(err => {
-        console.warn('[Practice] Failed to refresh pool:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -152,8 +151,7 @@ export class PracticeService {
         tap(recommendations => {
           this.recommendationsSubject.next(recommendations);
         }),
-        catchError(err => {
-          console.warn('[Practice] Failed to get recommendations:', err);
+        catchError(_err => {
           return of(null);
         })
       )
@@ -184,8 +182,7 @@ export class PracticeService {
         tap(cooldown => {
           this.cooldownSubject.next(cooldown);
         }),
-        catchError(err => {
-          console.warn('[Practice] Failed to check cooldown:', err);
+        catchError(_err => {
           return of(null);
         })
       )
@@ -227,7 +224,6 @@ export class PracticeService {
     // Check cooldown first
     const cooldown = this.cooldownSubject.value;
     if (cooldown && !cooldown.can_take_challenge) {
-      console.warn('[Practice] Cannot start challenge - cooldown active');
       return of(null);
     }
 
@@ -243,8 +239,7 @@ export class PracticeService {
       tap(challenge => {
         this.currentChallengeSubject.next(challenge);
       }),
-      catchError(err => {
-        console.warn('[Practice] Failed to start challenge:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -289,8 +284,7 @@ export class PracticeService {
           }
         }
       }),
-      catchError(err => {
-        console.warn('[Practice] Failed to submit challenge:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -331,8 +325,7 @@ export class PracticeService {
       tap(history => {
         this.challengeHistorySubject.next(history);
       }),
-      catchError(err => {
-        console.warn('[Practice] Failed to load challenge history:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -355,8 +348,12 @@ export class PracticeService {
   getActiveCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    const ids = (pool.activeContentIds ?? []) as string[];
-    return ids.length;
+    try {
+      const ids = JSON.parse(pool.active_content_ids_json) as string[];
+      return ids.length;
+    } catch {
+      return 0;
+    }
   }
 
   /**
@@ -365,8 +362,12 @@ export class PracticeService {
   getRefreshCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    const ids = (pool.refreshQueueIds ?? []) as string[];
-    return ids.length;
+    try {
+      const ids = JSON.parse(pool.refresh_queue_ids_json) as string[];
+      return ids.length;
+    } catch {
+      return 0;
+    }
   }
 
   /**
@@ -375,8 +376,12 @@ export class PracticeService {
   getDiscoveryCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    const candidates = (pool.discoveryCandidates ?? []) as unknown[];
-    return candidates.length;
+    try {
+      const candidates = JSON.parse(pool.discovery_candidates_json) as unknown[];
+      return candidates.length;
+    } catch {
+      return 0;
+    }
   }
 
   /**

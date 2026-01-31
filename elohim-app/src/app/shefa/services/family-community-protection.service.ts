@@ -26,13 +26,15 @@
  * - Agent status service (heartbeat health)
  * - Geographic location service
  *
- * TODO: [HOLOCHAIN-ZOME] Zome call payloads in this service use snake_case
+ * NOTE: [HOLOCHAIN-ZOME] Zome call payloads in this service use snake_case
  * (e.g., steward_id, agent_id) because Holochain zomes are Rust and expect
  * snake_case field names. This cannot be changed without updating the Rust
  * zomes and running a DNA migration.
  */
 
 import { Injectable } from '@angular/core';
+
+// @coverage: 19.1% (2026-02-04)
 
 import { map, switchMap, catchError, shareReplay, startWith } from 'rxjs/operators';
 
@@ -48,6 +50,33 @@ import {
 } from '../models/shefa-dashboard.model';
 
 /**
+ * Custodian type classification
+ */
+type CustodianType = 'family' | 'friend' | 'community' | 'professional' | 'institution';
+
+/**
+ * Redundancy strategy type
+ */
+type RedundancyStrategy = 'full_replica' | 'threshold_split' | 'erasure_coded';
+
+/**
+ * Redundancy information
+ */
+interface RedundancyInfo {
+  strategy: RedundancyStrategy;
+  redundancyFactor: number;
+  recoveryThreshold: number;
+}
+
+/**
+ * Commitment with health status pair
+ */
+interface CommitmentHealthPair {
+  commitment: RawCustodianCommitment;
+  status: AgentStatus | null;
+}
+
+/**
  * Raw custodian commitment data from Holochain
  */
 interface RawCustodianCommitment {
@@ -55,13 +84,13 @@ interface RawCustodianCommitment {
   stewardId: string;
   custodianId: string;
   custodianName?: string;
-  custodianType: 'family' | 'friend' | 'community' | 'professional' | 'institution';
+  custodianType: CustodianType;
   dataDescription?: string;
   totalGb: number;
   shardCount: number;
   shardThreshold?: number; // Minimum shards needed to recover
   redundancyLevel: number; // 1, 2, 3, etc.
-  strategy: 'full_replica' | 'threshold_split' | 'erasure_coded';
+  strategy: RedundancyStrategy;
   status: 'active' | 'pending' | 'breached' | 'expired';
   relationship?: string;
   trustLevel?: number;
@@ -87,15 +116,6 @@ interface AgentStatus {
   lastHeartbeat: string;
   responseTimeMs: number;
   consecutiveFailures?: number;
-}
-
-/**
- * Geographic risk factors
- */
-interface GeographicRisk {
-  region: string;
-  factors: string[]; // e.g., "single-isp", "geographic-clustering", "geopolitical-risk"
-  riskScore: number; // 0-100
 }
 
 @Injectable({
@@ -150,9 +170,9 @@ export class FamilyCommunityProtectionService {
       })
     ).pipe(
       switchMap(result => {
-        const commitments = result.success ? result.data || [] : [];
+        const commitments: RawCustodianCommitment[] = result.success ? (result.data ?? []) : [];
         if (commitments.length === 0) {
-          return of(this.getEmptyProtectionStatus());
+          return of([]);
         }
 
         // Load health status for each custodian
@@ -166,7 +186,7 @@ export class FamilyCommunityProtectionService {
           ).pipe(
             map(statusResult => ({
               commitment: c,
-              status: statusResult.success ? statusResult.data : null,
+              status: statusResult.success ? (statusResult.data ?? null) : null,
             })),
             catchError(() => of({ commitment: c, status: null }))
           )
@@ -174,12 +194,13 @@ export class FamilyCommunityProtectionService {
 
         return combineLatest(healthObs);
       }),
-      map((data: any[]) => this.buildProtectionStatus(operatorId, data)),
-      catchError(error => {
-        console.error(
-          '[FamilyCommunityProtectionService] Failed to load protection status:',
-          error
-        );
+      map((data: CommitmentHealthPair[]) => {
+        if (data.length === 0) {
+          return this.getEmptyProtectionStatus();
+        }
+        return this.buildProtectionStatus(operatorId, data);
+      }),
+      catchError((_error: unknown) => {
         return of(this.getEmptyProtectionStatus());
       })
     );
@@ -190,12 +211,12 @@ export class FamilyCommunityProtectionService {
    */
   private buildProtectionStatus(
     operatorId: string,
-    commitmentHealthPairs: { commitment: RawCustodianCommitment; status: AgentStatus | null }[]
+    commitmentHealthPairs: CommitmentHealthPair[]
   ): FamilyCommunityProtectionStatus {
     // Convert to CustodianNode objects
     const custodians: CustodianNode[] = commitmentHealthPairs.map(pair => ({
       id: pair.commitment.custodianId,
-      name: pair.commitment.custodianName || pair.commitment.custodianId,
+      name: pair.commitment.custodianName ?? pair.commitment.custodianId,
       type: pair.commitment.custodianType,
       location: pair.commitment.location,
       dataStored: {
@@ -221,8 +242,8 @@ export class FamilyCommunityProtectionService {
         expiryDate: pair.commitment.expiryDate,
         renewalStatus: pair.commitment.renewalStatus,
       },
-      trustLevel: pair.commitment.trustLevel || 50,
-      relationship: pair.commitment.relationship || pair.commitment.custodianType,
+      trustLevel: pair.commitment.trustLevel ?? 50,
+      relationship: pair.commitment.relationship ?? pair.commitment.custodianType,
     }));
 
     // Calculate redundancy metrics
@@ -275,12 +296,8 @@ export class FamilyCommunityProtectionService {
    * Calculate redundancy metrics from commitments
    */
   private calculateRedundancyMetrics(
-    commitmentHealthPairs: { commitment: RawCustodianCommitment; status: AgentStatus | null }[]
-  ): {
-    strategy: 'full_replica' | 'threshold_split' | 'erasure_coded';
-    redundancyFactor: number;
-    recoveryThreshold: number;
-  } {
+    commitmentHealthPairs: CommitmentHealthPair[]
+  ): RedundancyInfo {
     if (commitmentHealthPairs.length === 0) {
       return {
         strategy: 'full_replica',
@@ -320,7 +337,7 @@ export class FamilyCommunityProtectionService {
       const avgShardThreshold =
         commitmentHealthPairs.reduce(
           (sum, pair) =>
-            sum + (pair.commitment.shardThreshold || Math.ceil(pair.commitment.shardCount / 2)),
+            sum + (pair.commitment.shardThreshold ?? Math.ceil(pair.commitment.shardCount / 2)),
           0
         ) / commitmentHealthPairs.length;
       recoveryThreshold = Math.ceil(avgShardThreshold);
@@ -343,8 +360,8 @@ export class FamilyCommunityProtectionService {
     const regionMap = new Map<string, RegionalPresence>();
 
     custodians.forEach(custodian => {
-      const region = custodian.location?.region || 'unknown';
-      const key = `${region}-${custodian.location?.country || 'unknown'}`;
+      const region = custodian.location?.region ?? 'unknown';
+      const key = `${region}-${custodian.location?.country ?? 'unknown'}`;
 
       if (!regionMap.has(key)) {
         regionMap.set(key, {
@@ -437,7 +454,7 @@ export class FamilyCommunityProtectionService {
    */
   private calculateProtectionLevel(
     custodians: CustodianNode[],
-    redundancy: { strategy: string; redundancyFactor: number; recoveryThreshold: number }
+    redundancy: RedundancyInfo
   ): 'vulnerable' | 'protected' | 'highly-protected' {
     if (custodians.length === 0) return 'vulnerable';
 
@@ -460,14 +477,8 @@ export class FamilyCommunityProtectionService {
   /**
    * Estimate data recovery time if a custodian goes down
    */
-  private estimateRecoveryTime(
-    custodians: CustodianNode[],
-    redundancy: { strategy: string; redundancyFactor: number; recoveryThreshold: number }
-  ): string {
+  private estimateRecoveryTime(custodians: CustodianNode[], redundancy: RedundancyInfo): string {
     if (custodians.length === 0) return 'unable-to-recover';
-
-    // Calculate based on number of custodians and recovery threshold
-    const minResponseTime = Math.min(...custodians.map(c => c.health.responseTime));
 
     if (custodians.length >= 3 && redundancy.recoveryThreshold <= 2) {
       // 3+ replicas, need only 2: < 1 hour (quick shard recovery)

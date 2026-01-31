@@ -11,10 +11,10 @@
 
     <!-- Error Display -->
     @if (error()) {
-      <div class="error-banner" (click)="clearError()">
+      <div class="error-banner" role="alert">
         <span class="error-icon">!</span>
         <span>{{ error() }}</span>
-        <button type="button" class="error-dismiss">Dismiss</button>
+        <button type="button" class="error-dismiss" (click)="clearError()">Dismiss</button>
       </div>
     }
 
@@ -26,7 +26,8 @@
         <input
           id="displayName"
           type="text"
-          [(ngModel)]="form.displayName"
+          [ngModel]="displayName()"
+          (ngModelChange)="displayName.set($event)"
           name="displayName"
           placeholder="e.g., Lynn Foster"
           required
@@ -39,7 +40,7 @@
 
       <!-- External Identifiers -->
       <div class="form-group">
-        <label>External Identifiers</label>
+        <span class="form-label">External Identifiers</span>
         <p class="hint">Link to external profiles for verification when claiming</p>
 
         <!-- Existing identifiers -->
@@ -69,9 +70,11 @@
 
         <!-- Add new identifier -->
         <div class="identifier-input-row">
+          <label for="provider-select" class="sr-only">Provider type</label>
           <select
+            id="provider-select"
             [value]="newIdentifier().provider"
-            (change)="setProvider($any($event.target).value)"
+            (change)="onProviderChange($event)"
             class="provider-select"
             [disabled]="isSubmitting()"
           >
@@ -79,10 +82,12 @@
               <option [value]="provider">{{ getProviderLabel(provider) }}</option>
             }
           </select>
+          <label for="identifier-value-input" class="sr-only">Identifier value</label>
           <input
+            id="identifier-value-input"
             type="text"
             [value]="newIdentifier().value"
-            (input)="setIdentifierValue($any($event.target).value)"
+            (input)="onIdentifierInput($event)"
             placeholder="Username or URL"
             class="identifier-value-input"
             [disabled]="isSubmitting()"
@@ -101,7 +106,7 @@
 
       <!-- Establishing Content -->
       <div class="form-group">
-        <label>Establishing Content</label>
+        <span class="form-label">Establishing Content</span>
         <p class="hint">Content that establishes this contributor (optional)</p>
 
         <!-- Selected content -->
@@ -141,7 +146,7 @@
                   <button
                     type="button"
                     class="content-result-item"
-                    (click)="addEstablishingContent(result.id, result.title)"
+                    (click)="addEstablishingContent(result.id)"
                   >
                     <span class="result-title">{{ result.title }}</span>
                     <span class="result-id">{{ result.id }}</span>
@@ -162,7 +167,8 @@
         <label for="note">Note</label>
         <textarea
           id="note"
-          [(ngModel)]="form.note"
+          [ngModel]="note()"
+          (ngModelChange)="note.set($event)"
           name="note"
           placeholder="Why are you creating this presence? Any context for future claimers..."
           rows="3"

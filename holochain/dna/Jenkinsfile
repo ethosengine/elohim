@@ -112,6 +112,7 @@ spec:
         timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
         preserveStashes(buildCount: 5)
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -175,7 +176,18 @@ spec:
                     script {
                         sh 'git config --global --add safe.directory "*"'
 
-                        def baseVersion = readFile('VERSION').trim()
+                        // Parse VERSION file in key-value format (APP_VERSION=x.x.x, HAPP_VERSION=x.x.x)
+                        def versionContent = readFile('VERSION').trim()
+                        def versionMap = [:]
+                        versionContent.split('\n').each { line ->
+                            def parts = line.split('=')
+                            if (parts.length == 2) {
+                                versionMap[parts[0].trim()] = parts[1].trim()
+                            }
+                        }
+                        // Use HAPP_VERSION for DNA builds, fall back to APP_VERSION
+                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
                         def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
 
@@ -346,6 +358,88 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             - elohim-edge: Container images
                             - elohim-app: WASM cache core
                             - steward: Desktop app builds
+                            ═══════════════════════════════════════════════════════════
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Push to Harbor') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    dir('holochain/dna/elohim') {
+                        script {
+                            def props = loadBuildVars()
+                            def version = props.IMAGE_TAG ?: 'dev'
+
+                            echo "Pushing artifacts to Harbor with version: ${version}"
+
+                            // Install oras CLI if not present
+                            sh '''
+                                if ! command -v oras &> /dev/null; then
+                                    echo "Installing oras CLI..."
+                                    curl -LO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
+                                    tar -xzf oras_1.1.0_linux_amd64.tar.gz
+                                    chmod +x oras
+                                    mv oras /usr/local/bin/
+                                    rm oras_1.1.0_linux_amd64.tar.gz
+                                fi
+                                oras version
+                            '''
+
+                            // Determine floating tag for K8s manifests
+                            def floatingTag = (env.BRANCH_NAME == 'main') ? 'latest' : 'dev-latest'
+
+                            // Push hApp and WASM to Harbor
+                            withCredentials([usernamePassword(
+                                credentialsId: 'harbor-robot-registry',
+                                usernameVariable: 'HARBOR_USER',
+                                passwordVariable: 'HARBOR_PASS'
+                            )]) {
+                                sh """
+                                    oras login harbor.ethosengine.com -u \$HARBOR_USER -p \$HARBOR_PASS
+
+                                    echo "Pushing hApp to Harbor..."
+                                    oras push harbor.ethosengine.com/ethosengine/elohim-happ:${version} \\
+                                        elohim.happ:application/octet-stream
+
+                                    echo "Pushing hApp floating tag: ${floatingTag}..."
+                                    oras push harbor.ethosengine.com/ethosengine/elohim-happ:${floatingTag} \\
+                                        elohim.happ:application/octet-stream
+
+                                    echo "Pushing WASM cache core to Harbor..."
+                                    cd ../../holochain-cache-core/pkg
+                                    oras push harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${version} \\
+                                        holochain_cache_core_bg.wasm:application/wasm \\
+                                        holochain_cache_core.js:application/javascript \\
+                                        holochain_cache_core.d.ts:text/plain \\
+                                        holochain_cache_core_bg.wasm.d.ts:text/plain \\
+                                        package.json:application/json
+
+                                    echo "Pushing WASM floating tag: ${floatingTag}..."
+                                    oras push harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${floatingTag} \\
+                                        holochain_cache_core_bg.wasm:application/wasm \\
+                                        holochain_cache_core.js:application/javascript \\
+                                        holochain_cache_core.d.ts:text/plain \\
+                                        holochain_cache_core_bg.wasm.d.ts:text/plain \\
+                                        package.json:application/json
+                                """
+                            }
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            ARTIFACTS PUSHED TO HARBOR
+                            ═══════════════════════════════════════════════════════════
+
+                            hApp: harbor.ethosengine.com/ethosengine/elohim-happ:${version}
+                                  harbor.ethosengine.com/ethosengine/elohim-happ:${floatingTag}
+                            WASM: harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${version}
+                                  harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${floatingTag}
+
+                            K8s manifests should use floating tag: ${floatingTag}
                             ═══════════════════════════════════════════════════════════
                             """
                         }

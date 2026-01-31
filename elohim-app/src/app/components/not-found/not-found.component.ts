@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { SeoService } from '../../services/seo.service';
 
 /**
@@ -45,14 +47,14 @@ export class NotFoundComponent implements OnInit {
    * Navigate to home page
    */
   goHome(): void {
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   /**
    * Navigate to Lamad learning platform
    */
   goToLamad(): void {
-    this.router.navigate(['/lamad']);
+    void this.router.navigate(['/lamad']);
   }
 
   /**

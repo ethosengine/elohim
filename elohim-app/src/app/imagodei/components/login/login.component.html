@@ -37,17 +37,17 @@
 
       <!-- Error Display -->
       @if (error()) {
-        <div
-          class="error-banner"
-          role="alert"
-          tabindex="0"
-          (click)="clearError()"
-          (keydown.enter)="clearError()"
-          (keydown.space)="clearError()"
-        >
+        <div class="error-banner" role="alert">
           <span class="error-icon" aria-hidden="true">✕</span>
           <span>{{ error() }}</span>
-          <button type="button" class="error-dismiss" aria-label="Dismiss error">Dismiss</button>
+          <button
+            type="button"
+            class="error-dismiss"
+            aria-label="Dismiss error"
+            (click)="clearError()"
+          >
+            Dismiss
+          </button>
         </div>
       }
 

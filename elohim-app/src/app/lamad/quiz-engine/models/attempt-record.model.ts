@@ -17,12 +17,13 @@
  *   // Start mastery quiz
  *   const newRecord = recordAttempt(record, quizResult);
  * } else {
- *   console.log(`Cooldown ends: ${canAttempt.cooldownEndsAt}`);
  * }
  * ```
  */
 
 import type { QuizResult } from './quiz-session.model';
+
+// @coverage: 66.7% (2026-02-04)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Attempt Record

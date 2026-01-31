@@ -12,6 +12,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 58.3% (2026-02-04)
+
 import {
   DuplicateResult,
   FuzzyMatch,
@@ -46,16 +48,14 @@ export class DuplicateDetectionService {
   // Set of known plaidTransactionIds
   private readonly plaidIdSet = new Set<string>();
 
-  constructor() {}
-
   /**
    * Checks if a single transaction is a duplicate.
    *
    * Returns DuplicateResult with confidence and reasoning.
    */
-  async detect(transaction: PlaidTransaction): Promise<DuplicateResult> {
+  detect(transaction: PlaidTransaction): DuplicateResult {
     // Level 1: Exact plaidTransactionId match
-    const exactMatch = await this.checkExactMatch(transaction.transactionId);
+    const exactMatch = this.checkExactMatch(transaction.transaction_id);
     if (exactMatch) {
       return {
         isDuplicate: true,
@@ -67,7 +67,7 @@ export class DuplicateDetectionService {
 
     // Level 2: Hash match (same account + amount + date + description)
     const hash = this.generateHash(transaction);
-    const hashMatch = await this.checkHashMatch(hash);
+    const hashMatch = this.checkHashMatch(hash);
     if (hashMatch) {
       return {
         isDuplicate: true,
@@ -78,7 +78,7 @@ export class DuplicateDetectionService {
     }
 
     // Level 3: Fuzzy match (similar transactions)
-    const fuzzyMatch = await this.fuzzySearch(transaction);
+    const fuzzyMatch = this.fuzzySearch(transaction);
     if (fuzzyMatch && fuzzyMatch.confidence > 75) {
       // Note: threshold can be adjusted
       return {
@@ -101,12 +101,12 @@ export class DuplicateDetectionService {
    *
    * Returns only new, non-duplicate transactions.
    */
-  async filterDuplicates(transactions: PlaidTransaction[]): Promise<PlaidTransaction[]> {
+  filterDuplicates(transactions: PlaidTransaction[]): PlaidTransaction[] {
     const uniqueTransactions: PlaidTransaction[] = [];
     const seenHashes = new Set<string>();
 
     for (const txn of transactions) {
-      const dupResult = await this.detect(txn);
+      const dupResult = this.detect(txn);
 
       if (!dupResult.isDuplicate && !seenHashes.has(this.generateHash(txn))) {
         uniqueTransactions.push(txn);
@@ -129,8 +129,6 @@ export class DuplicateDetectionService {
       this.hashIndex[hash] = [];
     }
     this.hashIndex[hash].push(staged.id);
-
-    console.warn(`[DuplicateDetection] Registered transaction ${staged.plaidTransactionId}`);
   }
 
   /**
@@ -146,7 +144,6 @@ export class DuplicateDetectionService {
   clearIndexes(): void {
     this.hashIndex = {};
     this.plaidIdSet.clear();
-    console.warn('[DuplicateDetection] Indexes cleared');
   }
 
   // ============================================================================
@@ -158,7 +155,7 @@ export class DuplicateDetectionService {
    *
    * Most reliable check - Plaid IDs are unique within an account.
    */
-  private async checkExactMatch(plaidTransactionId: string): Promise<string | null> {
+  private checkExactMatch(plaidTransactionId: string): string | null {
     if (this.plaidIdSet.has(plaidTransactionId)) {
       // In production, query DHT to get the transaction ID
       return plaidTransactionId; // Placeholder
@@ -182,7 +179,7 @@ export class DuplicateDetectionService {
    * Same transaction imported twice will have identical hash.
    */
   private generateHash(transaction: PlaidTransaction): string {
-    const data = `${transaction.accountId}|${this.roundAmount(transaction.amount)}|${transaction.date}|${transaction.name}`;
+    const data = `${transaction.account_id}|${this.roundAmount(transaction.amount)}|${transaction.date}|${transaction.name}`;
     return this.sha256Hash(data);
   }
 
@@ -197,7 +194,7 @@ export class DuplicateDetectionService {
   /**
    * Checks if hash exists in index
    */
-  private async checkHashMatch(hash: string): Promise<string | null> {
+  private checkHashMatch(hash: string): string | null {
     const matches = this.hashIndex[hash];
     if (matches && matches.length > 0) {
       return matches[0]; // Return first match
@@ -218,7 +215,7 @@ export class DuplicateDetectionService {
    *
    * All criteria must be met for a match.
    */
-  private async fuzzySearch(txn: PlaidTransaction): Promise<FuzzyMatch | null> {
+  private fuzzySearch(txn: PlaidTransaction): FuzzyMatch | null {
     // Build list of candidate transactions (same account, similar amount)
     const candidates = this.getCandidates(txn.account_id, txn.amount, txn.date);
 

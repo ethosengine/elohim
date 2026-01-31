@@ -24,6 +24,8 @@
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 
+// @coverage: 93.6% (2026-02-04)
+
 import {
   type AuthState,
   type AuthProvider,
@@ -137,7 +139,6 @@ export class AuthService {
    */
   registerProvider(provider: AuthProvider): void {
     this.providers.set(provider.type, provider);
-    console.log(`[AuthService] Registered provider: ${provider.type}`);
   }
 
   /**
@@ -265,8 +266,8 @@ export class AuthService {
       if (providerInstance) {
         try {
           await providerInstance.logout();
-        } catch (err) {
-          console.warn('[AuthService] Provider logout error:', err);
+        } catch {
+          // Provider logout failed silently
         }
       }
     }
@@ -279,8 +280,6 @@ export class AuthService {
 
     // Reset state
     this.updateState(INITIAL_AUTH_STATE);
-
-    console.log('[AuthService] Logged out');
   }
 
   /**
@@ -347,7 +346,6 @@ export class AuthService {
 
       // Check if token is expired
       if (isTokenExpiringSoon(expiresAt, 0)) {
-        console.log('[AuthService] Stored token is expired, clearing');
         this.clearPersistedAuth();
         return false;
       }
@@ -371,10 +369,9 @@ export class AuthService {
       // Schedule token refresh
       this.scheduleRefresh(expiresAt);
 
-      console.log('[AuthService] Session restored');
       return true;
-    } catch (err) {
-      console.warn('[AuthService] Failed to restore session:', err);
+    } catch {
+      // Session restore failure is non-critical - user can login again
       return false;
     }
   }
@@ -419,8 +416,6 @@ export class AuthService {
 
     // Schedule token refresh
     this.scheduleRefresh(expiresAt);
-
-    console.log('[AuthService] Authentication successful:', result.identifier);
   }
 
   /**
@@ -463,20 +458,18 @@ export class AuthService {
     if (refreshTime <= 0) {
       // Token already expiring soon - but guard against refresh loop
       if (this.isRefreshing) {
-        console.warn('[AuthService] Already refreshing, skipping to prevent loop');
         return;
       }
-      console.log('[AuthService] Token expiring soon, refreshing now');
+
       this.isRefreshing = true;
-      this.refreshToken().finally(() => {
+      void this.refreshToken().finally(() => {
         this.isRefreshing = false;
       });
       return;
     }
 
     this.refreshTimer = setTimeout(() => {
-      console.log('[AuthService] Scheduled token refresh');
-      this.refreshToken();
+      void this.refreshToken();
     }, refreshTime);
   }
 
@@ -514,10 +507,7 @@ export class AuthService {
    * @param result - Successful auth result from OAuth provider
    * @param providerType - The provider type that was used (default: oauth)
    */
-  async setAuthFromResult(
-    result: AuthResult,
-    providerType: AuthProviderType = 'oauth'
-  ): Promise<void> {
+  setAuthFromResult(result: AuthResult, providerType: AuthProviderType = 'oauth'): void {
     if (!result.success) {
       this.updateState({
         isLoading: false,
@@ -554,7 +544,5 @@ export class AuthService {
       isLoading: false,
       error: null,
     });
-
-    console.log('[AuthService] Tauri session set:', session.identifier);
   }
 }

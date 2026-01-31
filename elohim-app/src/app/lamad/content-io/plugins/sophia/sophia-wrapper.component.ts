@@ -33,6 +33,8 @@ import {
   inject,
 } from '@angular/core';
 
+// @coverage: 29.9% (2026-02-04)
+
 import {
   registerSophiaElement,
   type SophiaQuestionElement,
@@ -131,22 +133,23 @@ export class SophiaWrapperComponent implements AfterViewInit, OnDestroy, OnChang
   // Lifecycle
   // ─────────────────────────────────────────────────────────────────────────
 
-  async ngAfterViewInit(): Promise<void> {
-    console.log('[SophiaWrapper] ngAfterViewInit, moment:', this.moment?.id || 'null');
+  ngAfterViewInit(): void {
+    void this.initializeAsync();
+  }
+
+  private async initializeAsync(): Promise<void> {
     try {
       // Lazy load React and register the custom element
       await registerSophiaElement();
 
       // Get reference to the custom element
       this.sophiaElement = getSophiaElement(this.container.nativeElement);
-      console.log('[SophiaWrapper] Element found:', !!this.sophiaElement);
 
       if (this.sophiaElement) {
         this.initializeElement();
       }
     } catch (error) {
       this.loadError = error instanceof Error ? error.message : 'Failed to load Sophia';
-      console.error('[SophiaWrapper] Load error:', error);
       this.cdr.markForCheck();
     }
   }
@@ -197,59 +200,35 @@ export class SophiaWrapperComponent implements AfterViewInit, OnDestroy, OnChang
     if (!this.sophiaElement) return;
 
     const momentToApply = this.hasPendingMomentChange ? this.pendingMoment : this.moment;
-    console.log('[SophiaWrapper] Applying moment:', {
-      hasPendingChange: this.hasPendingMomentChange,
-      pendingMomentId: this.pendingMoment?.id || 'null',
-      currentMomentId: this.moment?.id || 'null',
-      momentToApplyId: momentToApply?.id || 'null',
-      hasInitialUserInput: !!this.initialUserInput,
-    });
-
     if (momentToApply) {
       // Set initialUserInput BEFORE moment for answer restoration
       this.sophiaElement.initialUserInput = this.initialUserInput ?? null;
       if (this.initialUserInput) {
-        console.log('[SophiaWrapper] Setting initialUserInput before moment');
+        // Initial user input set above for answer restoration
       }
-      console.log('[SophiaWrapper] Setting moment:', momentToApply.id);
+
       this.sophiaElement.moment = momentToApply;
       this.hasPendingMomentChange = false;
     }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    console.log('[SophiaWrapper] ngOnChanges:', {
-      hasElement: !!this.sophiaElement,
-      initialized: this.initialized,
-      momentChanged: !!changes['moment'],
-      newMoment: changes['moment']?.currentValue?.id || 'null',
-    });
-
     // Track moment changes that arrive before element is ready
     if (changes['moment']) {
-      this.pendingMoment = changes['moment'].currentValue;
+      this.pendingMoment = changes['moment'].currentValue as Moment | null;
       this.hasPendingMomentChange = true;
     }
 
     if (!this.sophiaElement || !this.initialized) {
-      console.log(
-        '[SophiaWrapper] Element not ready, storing pending moment:',
-        this.pendingMoment?.id || 'null'
-      );
       return;
     }
 
     // Handle initialUserInput changes BEFORE moment changes (important for answer restoration)
     if (changes['initialUserInput']) {
-      console.log(
-        '[SophiaWrapper] Updating initialUserInput:',
-        this.initialUserInput ? 'has value' : 'null'
-      );
       this.sophiaElement.initialUserInput = this.initialUserInput;
     }
 
     if (changes['moment'] && changes['moment'].currentValue !== changes['moment'].previousValue) {
-      console.log('[SophiaWrapper] Updating moment to:', this.moment?.id);
       this.sophiaElement.moment = this.moment;
       this.hasPendingMomentChange = false;
     }
@@ -284,7 +263,6 @@ export class SophiaWrapperComponent implements AfterViewInit, OnDestroy, OnChang
    */
   getRecognition(): Recognition | null {
     if (!this.sophiaElement) {
-      console.warn('Sophia element not initialized');
       return null;
     }
     return this.sophiaElement.getRecognition();

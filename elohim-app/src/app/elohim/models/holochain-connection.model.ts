@@ -9,6 +9,8 @@
 
 import { environment } from '../../../environments/environment';
 
+// @coverage: 100.0% (2026-02-05)
+
 import type { HolochainEnvironmentConfig } from '../../../environments/environment.types';
 import type {
   AdminWebsocket,

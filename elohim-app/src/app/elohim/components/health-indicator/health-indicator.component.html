@@ -3,8 +3,9 @@
 <div class="health-indicator" [class.expanded]="isExpanded">
   <!-- Compact indicator (always visible) -->
   <button
+    type="button"
     class="indicator-button"
-    [class]="getStatusClass(status().status)"
+    [ngClass]="getStatusClass(status().status)"
     (click)="toggleExpanded()"
     [attr.aria-expanded]="isExpanded"
     aria-label="System health status"
@@ -22,6 +23,7 @@
       <div class="details-header">
         <h4>System Health</h4>
         <button
+          type="button"
           class="refresh-button"
           (click)="refresh()"
           [disabled]="isChecking()"
@@ -33,7 +35,7 @@
 
       <div class="checks-list">
         @for (check of checksArray(); track check.key) {
-          <div class="check-item" [class]="getStatusClass(check.status)">
+          <div class="check-item" [ngClass]="getStatusClass(check.status)">
             <span class="check-icon">{{ getStatusIcon(check.status) }}</span>
             <div class="check-info">
               <span class="check-label">{{ check.label }}</span>

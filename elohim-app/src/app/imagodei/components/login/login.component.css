@@ -163,7 +163,7 @@
 }
 
 .form-group input:disabled {
-  opacity: 0.6;
+  opacity: 60%;
   cursor: not-allowed;
 }
 
@@ -234,7 +234,7 @@
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 60%;
   cursor: not-allowed;
 }
 

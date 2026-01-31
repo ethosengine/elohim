@@ -1,13 +1,11 @@
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import {
   HttpClientTestingModule,
   HttpTestingController,
-  TestRequest,
 } from '@angular/common/http/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 
 import {
   DoorwayClientService,
-  VerifyBlobRequest,
   VerifyBlobResponse,
   CustodianInfo,
   BestCustodianResponse,
@@ -18,6 +16,18 @@ import {
  *
  * Tests blob retrieval, streaming URLs, verification, custodian selection,
  * and health/status endpoints.
+ *
+ * Coverage:
+ * - Service creation and initialization
+ * - Method existence for all public methods
+ * - Observable return types
+ * - Simple input/output validation
+ * - Property initialization
+ *
+ * Future enhancements:
+ * - Add async flow tests (timeout/retry behavior)
+ * - Add comprehensive mocks for complex scenarios
+ * - Add HTTP integration tests for edge cases
  */
 describe('DoorwayClientService', () => {
   let service: DoorwayClientService;
@@ -37,8 +47,189 @@ describe('DoorwayClientService', () => {
     httpMock.verify();
   });
 
+  // ===========================================================================
+  // Service Creation & Initialization Tests
+  // ===========================================================================
+
   it('should be created', () => {
     expect(service).toBeTruthy();
+  });
+
+  it('should be provided as singleton (providedIn: root)', () => {
+    const service1 = TestBed.inject(DoorwayClientService);
+    const service2 = TestBed.inject(DoorwayClientService);
+    expect(service1).toBe(service2);
+  });
+
+  // ===========================================================================
+  // Method Existence Tests - All Public Methods
+  // ===========================================================================
+
+  describe('method existence', () => {
+    it('should have getBlob method', () => {
+      expect(typeof service.getBlob).toBe('function');
+    });
+
+    it('should have getChunk method', () => {
+      expect(typeof service.getChunk).toBe('function');
+    });
+
+    it('should have getHlsManifestUrl method', () => {
+      expect(typeof service.getHlsManifestUrl).toBe('function');
+    });
+
+    it('should have getHlsVariantUrl method', () => {
+      expect(typeof service.getHlsVariantUrl).toBe('function');
+    });
+
+    it('should have getDashManifestUrl method', () => {
+      expect(typeof service.getDashManifestUrl).toBe('function');
+    });
+
+    it('should have getChunkUrl method', () => {
+      expect(typeof service.getChunkUrl).toBe('function');
+    });
+
+    it('should have verifyBlob method', () => {
+      expect(typeof service.verifyBlob).toBe('function');
+    });
+
+    it('should have verifyBlobData method', () => {
+      expect(typeof service.verifyBlobData).toBe('function');
+    });
+
+    it('should have getCustodiansForBlob method', () => {
+      expect(typeof service.getCustodiansForBlob).toBe('function');
+    });
+
+    it('should have getBestCustodianUrl method', () => {
+      expect(typeof service.getBestCustodianUrl).toBe('function');
+    });
+
+    it('should have fetchHlsManifest method', () => {
+      expect(typeof service.fetchHlsManifest).toBe('function');
+    });
+
+    it('should have fetchDashManifest method', () => {
+      expect(typeof service.fetchDashManifest).toBe('function');
+    });
+
+    it('should have checkHealth method', () => {
+      expect(typeof service.checkHealth).toBe('function');
+    });
+
+    it('should have getStatus method', () => {
+      expect(typeof service.getStatus).toBe('function');
+    });
+
+    it('should have setBaseUrl method', () => {
+      expect(typeof service.setBaseUrl).toBe('function');
+    });
+
+    it('should have getBaseUrl method', () => {
+      expect(typeof service.getBaseUrl).toBe('function');
+    });
+
+    it('should have setDefaultTimeout method', () => {
+      expect(typeof service.setDefaultTimeout).toBe('function');
+    });
+
+    it('should have setMaxRetries method', () => {
+      expect(typeof service.setMaxRetries).toBe('function');
+    });
+  });
+
+  // ===========================================================================
+  // Observable Return Type Tests
+  // ===========================================================================
+
+  describe('observable return types', () => {
+    it('getBlob should return Observable', () => {
+      const result = service.getBlob('test-hash');
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('getChunk should return Observable', () => {
+      const result = service.getChunk('test-hash', 0);
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('verifyBlob should return Observable', () => {
+      const result = service.verifyBlob({ expectedHash: 'test' });
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('verifyBlobData should return Observable', () => {
+      const data = new Uint8Array([1, 2, 3]);
+      const result = service.verifyBlobData(data, 'test');
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('getCustodiansForBlob should return Observable', () => {
+      const result = service.getCustodiansForBlob('test-hash');
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('getBestCustodianUrl should return Observable', () => {
+      const result = service.getBestCustodianUrl('test-hash');
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('fetchHlsManifest should return Observable', () => {
+      const result = service.fetchHlsManifest('test-content');
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('fetchDashManifest should return Observable', () => {
+      const result = service.fetchDashManifest('test-content');
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('checkHealth should return Observable', () => {
+      const result = service.checkHealth();
+      expect(result.subscribe).toBeDefined();
+    });
+
+    it('getStatus should return Observable', () => {
+      const result = service.getStatus();
+      expect(result.subscribe).toBeDefined();
+    });
+  });
+
+  // ===========================================================================
+  // Property Initialization Tests
+  // ===========================================================================
+
+  describe('property initialization', () => {
+    it('should initialize with default base URL from environment', () => {
+      const baseUrl = service.getBaseUrl();
+      expect(typeof baseUrl).toBe('string');
+    });
+
+    it('should allow setting custom base URL', () => {
+      service.setBaseUrl('https://test.example.com');
+      expect(service.getBaseUrl()).toBe('https://test.example.com');
+    });
+
+    it('should allow setting timeout to positive number', () => {
+      service.setDefaultTimeout(60000);
+      // No direct getter, but method should execute without error
+      expect(() => service.setDefaultTimeout(60000)).not.toThrow();
+    });
+
+    it('should allow setting retries to positive number', () => {
+      service.setMaxRetries(5);
+      // No direct getter, but method should execute without error
+      expect(() => service.setMaxRetries(5)).not.toThrow();
+    });
+
+    it('should accept zero for retries', () => {
+      expect(() => service.setMaxRetries(0)).not.toThrow();
+    });
+
+    it('should accept zero timeout', () => {
+      expect(() => service.setDefaultTimeout(0)).not.toThrow();
+    });
   });
 
   // ===========================================================================
@@ -498,7 +689,7 @@ describe('DoorwayClientService', () => {
       service.getBestCustodianUrl('sha256-abc', 'eu-west').subscribe();
 
       const req = httpMock.expectOne(
-        (request) =>
+        request =>
           request.url.includes('/api/custodian/blob/sha256-abc/best') &&
           request.params.get('region') === 'eu-west'
       );

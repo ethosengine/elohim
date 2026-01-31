@@ -3,6 +3,8 @@ import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
 
+// @coverage: 34.2% (2026-02-04)
+
 import { filter, takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
@@ -153,13 +155,13 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   // =========================================================================
 
   /**
-   * Whether the user is authenticated (hosted or self-sovereign mode)
+   * Whether the user is authenticated (hosted or steward mode)
    * Also checks AuthService for immediate feedback after login (before IdentityService updates)
    */
   readonly isAuthenticated = computed(() => {
     const mode = this.identityService.mode();
     // Check identity mode first (full identity state)
-    if (mode === 'hosted' || mode === 'self-sovereign') {
+    if (mode === 'hosted' || mode === 'steward') {
       return true;
     }
     // Fallback: check auth service for immediate feedback after login
@@ -250,7 +252,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   switchContext(app: ContextAppConfig): void {
     if (!app.available) return;
     this.showContextSwitcher = false;
-    this.router.navigate([app.route]);
+    void this.router.navigate([app.route]);
   }
 
   // =========================================================================
@@ -300,7 +302,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   goToProfile(): void {
     this.showProfileTray = false;
-    this.router.navigate([`/${this.context}/human`]);
+    void this.router.navigate([`/${this.context}/human`]);
   }
 
   // =========================================================================
@@ -312,7 +314,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   onSearch(): void {
     if (this.searchQuery.trim()) {
-      this.router.navigate([`/${this.context}/search`], {
+      void this.router.navigate([`/${this.context}/search`], {
         queryParams: { q: this.searchQuery },
       });
     }
@@ -363,7 +365,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   goToLogin(): void {
     this.closeAllTrays();
     const returnUrl = this.router.url;
-    this.router.navigate(['/identity/login'], {
+    void this.router.navigate(['/identity/login'], {
       queryParams: { returnUrl },
     });
   }
@@ -374,7 +376,7 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   goToRegister(): void {
     this.closeAllTrays();
     const returnUrl = this.router.url;
-    this.router.navigate(['/identity/register'], {
+    void this.router.navigate(['/identity/register'], {
       queryParams: { returnUrl },
     });
   }
@@ -386,7 +388,9 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
     this.closeAllTrays();
     await this.identityService.logout();
     // Navigate to home after logout
-    this.router.navigate(['/']);
+    this.router.navigate(['/'])?.catch(() => {
+      // Navigation errors are acceptable during logout
+    });
   }
 
   // =========================================================================
@@ -479,8 +483,8 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       setTimeout(() => {
         this.copiedField = null;
       }, 2000);
-    } catch (err) {
-      console.warn('Failed to copy to clipboard:', err);
+    } catch {
+      // Clipboard write failed silently - not all browsers support this API
     }
   }
 

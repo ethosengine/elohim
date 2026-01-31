@@ -31,7 +31,7 @@
 /* Status Icon */
 .status-icon {
   font-size: 0.875rem;
-  opacity: 0.8;
+  opacity: 80%;
 }
 
 .status-icon.spinning {

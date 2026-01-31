@@ -15,6 +15,8 @@
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { map, catchError, timeout } from 'rxjs/operators';
 
 import { Observable, of } from 'rxjs';
@@ -47,7 +49,7 @@ export class DoorwayCacheService {
   /** Base URL for cache API */
   private get baseUrl(): string {
     const doorwayUrl =
-      environment.holochain?.authUrl || environment.holochain?.appUrl || 'http://localhost:8080';
+      environment.holochain?.authUrl ?? environment.holochain?.appUrl ?? 'http://localhost:8080';
 
     // Convert WebSocket URL to HTTP
     return doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
@@ -55,7 +57,7 @@ export class DoorwayCacheService {
 
   /** API key for authenticated requests */
   private get apiKey(): string | undefined {
-    return environment.holochain?.apiKey;
+    return environment.holochain?.proxyApiKey;
   }
 
   /** Default request timeout */
@@ -77,7 +79,7 @@ export class DoorwayCacheService {
 
     return this.http.get<T>(url).pipe(
       timeout(this.requestTimeout),
-      catchError(err => this.handleError<T | null>(err, `get(${type}/${id})`, null))
+      catchError((err: unknown) => this.handleError<T | null>(err, `get(${type}/${id})`, null))
     );
   }
 
@@ -102,7 +104,7 @@ export class DoorwayCacheService {
 
     return this.http.get<T[]>(url, { params }).pipe(
       timeout(this.requestTimeout),
-      catchError(err => this.handleError<T[]>(err, `query(${type})`, []))
+      catchError((err: unknown) => this.handleError<T[]>(err, `query(${type})`, []))
     );
   }
 
@@ -182,10 +184,10 @@ export class DoorwayCacheService {
   /**
    * Handle HTTP errors gracefully
    */
-  private handleError<T>(error: HttpErrorResponse, context: string, fallback: T): Observable<T> {
+  private handleError<T>(error: unknown, context: string, fallback: T): Observable<T> {
     // Only log non-404 errors (404 is expected for missing content)
-    if (error.status !== 404) {
-      console.debug(`[DoorwayCache] ${context} failed:`, error.status, error.message);
+    if (error instanceof HttpErrorResponse && error.status !== 404) {
+      // Error occurred but we're returning fallback gracefully
     }
     return of(fallback);
   }

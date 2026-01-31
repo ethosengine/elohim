@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 96.9% (2026-02-04)
+
 import { map, switchMap } from 'rxjs/operators';
 
 import { Observable, of, timer } from 'rxjs';
@@ -62,7 +64,7 @@ export class ElohimAgentService {
           id: e.id,
           displayName: e.displayName,
           layer: e.layer as ElohimLayer,
-          capabilities: (e.capabilities || []) as ElohimCapability[],
+          capabilities: (e.capabilities ?? []) as ElohimCapability[],
           visibility: e.visibility as 'public' | 'private',
         }));
       })
@@ -253,10 +255,12 @@ export class ElohimAgentService {
       elohimId: elohim.id,
       respondedAt: new Date().toISOString(),
       cost: {
-        tokensProcessed: Math.floor(Math.random() * 1000) + 500, // NOSONAR - Demo data generation
+        tokensProcessed:
+          Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 1000) + 500, // Demo data generation
         timeMs: this.estimateProcessingTime(request.capability),
-        constitutionalChecks: Math.floor(Math.random() * 5) + 1, // NOSONAR - Demo data generation
-        precedentLookups: Math.floor(Math.random() * 3), // NOSONAR - Demo data generation
+        constitutionalChecks:
+          Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 5) + 1, // Demo data generation
+        precedentLookups: Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 3), // Demo data generation
       },
     };
 
@@ -286,7 +290,7 @@ export class ElohimAgentService {
     const params = request.params as ContentReviewParams;
 
     // Simulate content review (in production: actual AI analysis)
-    const approved = Math.random() > 0.1; // NOSONAR - Demo data generation (90% approval for demo)
+    const approved = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 > 0.1; // Demo data generation (90% approval for demo)
     const issues = approved
       ? []
       : [
@@ -334,7 +338,8 @@ export class ElohimAgentService {
     const params = request.params as AttestationRecommendationParams;
 
     // Simulate attestation decision (in production: actual AI analysis)
-    const recommend = Math.random() > 0.2 ? 'grant' : 'defer'; // NOSONAR - Demo data generation
+    const recommend =
+      crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 > 0.2 ? 'grant' : 'defer'; // Demo data generation
 
     const payload: AttestationRecommendation = {
       type: 'attestation-recommendation',
@@ -379,7 +384,12 @@ export class ElohimAgentService {
   // =========================================================================
 
   private generateRequestId(): string {
-    return `req-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic request ID generation
+    const randomBytes = crypto.getRandomValues(new Uint8Array(8));
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 9);
+    return `req-${Date.now()}-${randomStr}`;
   }
 
   private estimateProcessingTime(capability: ElohimCapability): number {

@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { SeoService } from '../../../services/seo.service';
 
 /**
@@ -74,21 +76,21 @@ export class LamadNotFoundComponent implements OnInit {
    * Navigate to Lamad home
    */
   goToLamadHome(): void {
-    this.router.navigate(['/lamad']);
+    void this.router.navigate(['/lamad']);
   }
 
   /**
    * Navigate to search
    */
   goToSearch(): void {
-    this.router.navigate(['/lamad/search']);
+    void this.router.navigate(['/lamad/search']);
   }
 
   /**
    * Navigate to explorer
    */
   goToExplore(): void {
-    this.router.navigate(['/lamad/explore']);
+    void this.router.navigate(['/lamad/explore']);
   }
 
   /**

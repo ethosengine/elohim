@@ -1,5 +1,7 @@
 import { Injectable, Optional, OnDestroy } from '@angular/core';
 
+// @coverage: 62.7% (2026-02-04)
+
 import { map, tap, switchMap, take, takeUntil } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, of, Subject } from 'rxjs';
@@ -226,7 +228,7 @@ export class AgentService implements OnDestroy {
         const now = new Date().toISOString();
         const agentId = this.getCurrentAgentId();
 
-        const progress: AgentProgress = existingProgress || {
+        const progress: AgentProgress = existingProgress ?? {
           agentId,
           pathId,
           currentStepIndex: 0,
@@ -304,7 +306,7 @@ export class AgentService implements OnDestroy {
         const now = new Date().toISOString();
         const agentId = this.getCurrentAgentId();
 
-        const progress: AgentProgress = existingProgress || {
+        const progress: AgentProgress = existingProgress ?? {
           agentId,
           pathId,
           currentStepIndex: 0,
@@ -397,7 +399,7 @@ export class AgentService implements OnDestroy {
       switchMap(existingProgress => {
         const now = new Date().toISOString();
 
-        const progress: AgentProgress = existingProgress || {
+        const progress: AgentProgress = existingProgress ?? {
           agentId: targetAgentId,
           pathId: '__global__',
           currentStepIndex: 0,
@@ -473,7 +475,7 @@ export class AgentService implements OnDestroy {
         if (!progress?.contentMastery) {
           return 'not_started' as MasteryLevel;
         }
-        return progress.contentMastery[contentId] || 'not_started';
+        return progress.contentMastery[contentId] ?? 'not_started';
       })
     );
   }
@@ -511,7 +513,7 @@ export class AgentService implements OnDestroy {
       switchMap(existingProgress => {
         const now = new Date().toISOString();
 
-        const progress: AgentProgress = existingProgress || {
+        const progress: AgentProgress = existingProgress ?? {
           agentId: targetAgentId,
           pathId: '__global__',
           currentStepIndex: 0,
@@ -527,21 +529,17 @@ export class AgentService implements OnDestroy {
         };
 
         // Initialize if missing
-        if (!progress.contentMastery) {
-          progress.contentMastery = {};
-        }
+        progress.contentMastery ??= {};
 
         // Ratchet behavior: only increase mastery level
-        const currentLevel = progress.contentMastery[contentId] || 'not_started';
+        const currentLevel = progress.contentMastery[contentId] ?? 'not_started';
         if (MASTERY_LEVEL_VALUES[level] > MASTERY_LEVEL_VALUES[currentLevel]) {
           progress.contentMastery[contentId] = level;
         }
 
         // Also mark as completed if at 'apply' or above
         if (MASTERY_LEVEL_VALUES[level] >= MASTERY_LEVEL_VALUES['apply']) {
-          if (!progress.completedContentIds) {
-            progress.completedContentIds = [];
-          }
+          progress.completedContentIds ??= [];
           if (!progress.completedContentIds.includes(contentId)) {
             progress.completedContentIds.push(contentId);
           }

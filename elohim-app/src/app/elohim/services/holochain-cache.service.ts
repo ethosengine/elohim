@@ -1,5 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 
+// @coverage: 85.6% (2026-02-04)
+
 /**
  * Cache entry metadata
  */
@@ -103,7 +105,6 @@ export class HolochainCacheService {
     return new Promise((resolve, reject) => {
       // Check if IndexedDB is available
       if (!window.indexedDB) {
-        console.warn('[HolochainCache] IndexedDB not available - memory cache only');
         resolve();
         return;
       }
@@ -111,24 +112,22 @@ export class HolochainCacheService {
       const request = window.indexedDB.open(this.DB_NAME, 1);
 
       request.onerror = () => {
-        console.error('[HolochainCache] Database open failed:', request.error);
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('[HolochainCache] Database initialized');
+
         resolve();
       };
 
-      request.onupgradeneeded = event => {
-        const db = (event.target as IDBOpenDBRequest).result;
+      request.onupgradeneeded = _event => {
+        const db = (_event.target as IDBOpenDBRequest).result;
 
         // Create cache entries store
         if (!db.objectStoreNames.contains(this.STORE_NAME)) {
           const store = db.createObjectStore(this.STORE_NAME, { keyPath: 'key' });
           store.createIndex('timestamp', 'timestamp', { unique: false });
-          console.log('[HolochainCache] Created object store');
         }
       };
     });
@@ -154,7 +153,7 @@ export class HolochainCacheService {
 
     // Try L2 (IndexedDB)
     if (this.db) {
-      const entry = await this.getFromIndexedDB<T>(key);
+      const entry = await this.getFromIndexedDB(key);
       if (entry) {
         if (!this.isExpired(entry)) {
           // Load to L1 for next access
@@ -204,9 +203,8 @@ export class HolochainCacheService {
     if (this.db) {
       try {
         await this.setInIndexedDB(entry);
-      } catch (err) {
-        console.warn('[HolochainCache] Failed to save to IndexedDB:', err);
-        // Fall back to memory only
+      } catch {
+        // Fall back to memory only if IndexedDB write fails
       }
     }
 
@@ -225,8 +223,8 @@ export class HolochainCacheService {
     if (this.db) {
       try {
         await this.deleteFromIndexedDB(key);
-      } catch (err) {
-        console.warn('[HolochainCache] Failed to delete from IndexedDB:', err);
+      } catch {
+        // IndexedDB delete failure is non-critical - memory cache deletion succeeded
       }
     }
 
@@ -251,20 +249,18 @@ export class HolochainCacheService {
           request.onerror = () => reject(request.error);
           request.onsuccess = () => resolve();
         });
-      } catch (err) {
-        console.warn('[HolochainCache] Failed to clear IndexedDB:', err);
+      } catch {
+        // IndexedDB clear failure is non-critical - memory cache cleared successfully
       }
     }
 
     this.updateStats();
-    console.log('[HolochainCache] Cache cleared');
   }
 
   /**
    * Get cache statistics
    */
   getStats(): CacheStats {
-    const stats = this.stats();
     const entries = Array.from(this.memoryCache.values());
 
     return {
@@ -288,13 +284,11 @@ export class HolochainCacheService {
    * Useful for warming cache on app startup or before user accesses content.
    */
   async preload<T = any>(items: { key: string; value: T; ttlMs?: number }[]): Promise<void> {
-    console.log(`[HolochainCache] Preloading ${items.length} items...`);
-
     for (const item of items) {
       try {
         await this.set(item.key, item.value, item.ttlMs);
-      } catch (err) {
-        console.warn(`[HolochainCache] Failed to preload ${item.key}:`, err);
+      } catch {
+        // Preload of individual items can fail - continue with remaining items
       }
     }
   }
@@ -312,14 +306,17 @@ export class HolochainCacheService {
    * Get entries by tag (searches metadata)
    */
   getByTag(tag: string): CacheEntry[] {
-    return this.query(entry => entry.metadata?.tags?.includes(tag) ?? false);
+    return this.query(entry => {
+      const tags = entry.metadata?.['tags'];
+      return Array.isArray(tags) && tags.includes(tag);
+    });
   }
 
   /**
    * Get entries by domain (from metadata)
    */
   getByDomain(domain: string): CacheEntry[] {
-    return this.query(entry => entry.metadata?.domain === domain);
+    return this.query(entry => entry.metadata?.['domain'] === domain);
   }
 
   /**
@@ -362,14 +359,12 @@ export class HolochainCacheService {
     for (let i = 0; i < toRemove; i++) {
       this.memoryCache.delete(entries[i][0]);
     }
-
-    console.log(`[HolochainCache] Evicted ${toRemove} entries from memory`);
   }
 
   /**
    * Get from IndexedDB
    */
-  private getFromIndexedDB<T = any>(key: string): Promise<CacheEntry | null> {
+  private async getFromIndexedDB(key: string): Promise<CacheEntry | null> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve(null);
@@ -381,14 +376,14 @@ export class HolochainCacheService {
       const request = store.get(key);
 
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result || null);
+      request.onsuccess = () => resolve(request.result ?? null);
     });
   }
 
   /**
    * Set in IndexedDB
    */
-  private setInIndexedDB(entry: CacheEntry): Promise<void> {
+  private async setInIndexedDB(entry: CacheEntry): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve();
@@ -407,7 +402,7 @@ export class HolochainCacheService {
   /**
    * Delete from IndexedDB
    */
-  private deleteFromIndexedDB(key: string): Promise<void> {
+  private async deleteFromIndexedDB(key: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve();

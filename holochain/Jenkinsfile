@@ -61,44 +61,93 @@ def withBuildVars(props, Closure body) {
 }
 
 /**
- * Fetch hApp artifact from elohim-holochain pipeline with fallback to dev/main branches
+ * Parse VERSION file in key-value format (APP_VERSION=x.x.x, HAPP_VERSION=x.x.x)
+ * Returns a map of version keys to values
+ */
+def parseVersionFile() {
+    def versionContent = readFile('VERSION').trim()
+    def versionMap = [:]
+    versionContent.split('\n').each { line ->
+        def parts = line.split('=')
+        if (parts.length == 2) {
+            versionMap[parts[0].trim()] = parts[1].trim()
+        }
+    }
+    return versionMap
+}
+
+/**
+ * Compute the Harbor image tag using the same logic as the producer (DNA pipeline)
+ * On main branch: baseVersion (e.g., 1.0.0)
+ * On other branches: baseVersion-branch-gitHash (e.g., 1.0.0-dev-f0268fc9)
+ */
+def computeHarborTag() {
+    def versionMap = parseVersionFile()
+    def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
+    if (env.BRANCH_NAME == 'main') {
+        return baseVersion
+    } else {
+        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+        return "${baseVersion}-${sanitizedBranch}-${gitHash}"
+    }
+}
+
+/**
+ * Fetch hApp artifact from Harbor registry
  * Returns true if hApp was successfully fetched, false otherwise
  */
-def fetchHappArtifact(String destPath) {
-    // Try 1: Current branch from elohim-holochain pipeline
-    def branchUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${env.BRANCH_NAME}/lastSuccessfulBuild/artifact/elohim.happ"
-    echo "Attempting to fetch hApp from elohim-holochain/${env.BRANCH_NAME}..."
-
-    def result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${branchUrl}' 2>&1", returnStatus: true)
-    if (result == 0 && fileExists(destPath)) {
-        echo "hApp fetched from elohim-holochain/${env.BRANCH_NAME} artifacts"
-        return true
+def fetchHappFromHarbor(String destPath, String version = null) {
+    // Compute version tag using same logic as DNA pipeline producer
+    if (!version) {
+        version = computeHarborTag()
     }
 
-    // Try 2: Dev branch (fallback)
-    if (env.BRANCH_NAME != 'dev') {
-        echo "Branch artifact not found, trying elohim-holochain/dev..."
-        def devUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/elohim.happ"
-        result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${devUrl}' 2>&1", returnStatus: true)
+    echo "Fetching hApp from Harbor: harbor.ethosengine.com/ethosengine/elohim-happ:${version}"
+
+    // Install oras CLI if not present
+    sh '''
+        if ! command -v oras &> /dev/null; then
+            echo "Installing oras CLI..."
+            curl -sLO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
+            tar -xzf oras_1.1.0_linux_amd64.tar.gz
+            chmod +x oras
+            mv oras /usr/local/bin/
+            rm oras_1.1.0_linux_amd64.tar.gz
+        fi
+    '''
+
+    def success = false
+    withCredentials([usernamePassword(
+        credentialsId: 'harbor-robot-registry',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS'
+    )]) {
+        def destDir = sh(script: "dirname '${destPath}'", returnStdout: true).trim()
+        def destFile = sh(script: "basename '${destPath}'", returnStdout: true).trim()
+        def result = sh(script: """
+            oras login harbor.ethosengine.com -u \$HARBOR_USER -p \$HARBOR_PASS
+            mkdir -p '${destDir}'
+            cd '${destDir}'
+            oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${version}
+            # Rename if needed (oras downloads as elohim.happ)
+            if [ -f elohim.happ ] && [ "elohim.happ" != "${destFile}" ]; then
+                mv elohim.happ '${destFile}'
+            fi
+            ls -la
+        """, returnStatus: true)
+
         if (result == 0 && fileExists(destPath)) {
-            echo "hApp fetched from elohim-holochain/dev artifacts (fallback)"
-            return true
+            echo "✅ hApp fetched from Harbor: ${version}"
+            success = true
         }
     }
 
-    // Try 3: Main branch (last resort)
-    if (env.BRANCH_NAME != 'main') {
-        echo "Dev artifact not found, trying elohim-holochain/main..."
-        def mainUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/elohim.happ"
-        result = sh(script: "wget --timeout=30 --tries=2 -O '${destPath}' '${mainUrl}' 2>&1", returnStatus: true)
-        if (result == 0 && fileExists(destPath)) {
-            echo "hApp fetched from elohim-holochain/main artifacts (fallback)"
-            return true
-        }
+    if (!success) {
+        echo "❌ Failed to fetch hApp from Harbor"
     }
-
-    echo "Could not fetch hApp from elohim-holochain pipeline (any branch)"
-    return false
+    return success
 }
 
 /**
@@ -214,6 +263,7 @@ spec:
         timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
         preserveStashes(buildCount: 5)
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -276,7 +326,10 @@ spec:
                     script {
                         sh 'git config --global --add safe.directory "*"'
 
-                        def baseVersion = readFile('VERSION').trim()
+                        // Parse VERSION file in key-value format
+                        def versionMap = parseVersionFile()
+                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
                         def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
 
@@ -421,7 +474,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
                             echo "Fetching hApp from elohim-holochain pipeline..."
-                            def haveHapp = fetchHappArtifact('holochain/edgenode/elohim.happ')
+                            def haveHapp = fetchHappFromHarbor('holochain/edgenode/elohim.happ')
 
                             if (haveHapp) {
                                 env.HAPP_AVAILABLE = 'true'
@@ -462,7 +515,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
                             echo "Fetching hApp from elohim-holochain pipeline..."
-                            def haveHapp = fetchHappArtifact('holochain/edgenode/scripts/elohim.happ')
+                            def haveHapp = fetchHappFromHarbor('holochain/edgenode/scripts/elohim.happ')
 
                             if (haveHapp) {
                                 sh """#!/bin/bash
@@ -703,19 +756,50 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-dev.yaml > holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-dev -n ethosengine"
-                            sh "kubectl rollout status deployment/elohim-edgenode-dev -n ethosengine --timeout=300s"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-alpha.yaml > holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-alpha -n elohim-alpha"
+                            sh "kubectl rollout status deployment/elohim-edgenode-alpha -n elohim-alpha --timeout=300s"
 
                             sh 'sleep 15'
 
-                            def healthy = checkEdgeNodeHealth('https://doorway-dev.elohim.host')
+                            def healthy = checkEdgeNodeHealth('https://doorway-alpha.elohim.host')
                             if (healthy) {
                                 env.EDGE_NODE_HEALTHY = 'true'
-                                echo "Edge Node Dev deployed and healthy: https://doorway-dev.elohim.host"
+                                echo "Edge Node Alpha deployed and healthy: https://doorway-alpha.elohim.host"
                             } else {
                                 echo "Edge Node deployed but health check failed - may need more time"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Edge Node - Staging') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'staging'
+                        expression { return env.BRANCH_NAME ==~ /staging-.+/ }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying Edge Node to Staging: ${IMAGE_TAG}"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-staging.yaml > holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-staging -n elohim-staging"
+                            sh "kubectl rollout status deployment/elohim-edgenode-staging -n elohim-staging --timeout=300s"
+                            sh 'sleep 15'
+                            if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
+                                echo "Edge Node Staging deployed and healthy"
                             }
                         }
                     }
@@ -793,8 +877,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-prod.yaml > holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
                             sh "kubectl apply -f holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-prod -n ethosengine"
-                            sh "kubectl rollout status deployment/elohim-edgenode-prod -n ethosengine --timeout=300s"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-prod -n elohim-prod"
+                            sh "kubectl rollout status deployment/elohim-edgenode-prod -n elohim-prod --timeout=300s"
 
                             sh 'sleep 15'
 

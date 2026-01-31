@@ -2,9 +2,9 @@
  * Angular Router mock factories for unit testing
  */
 
-import { ActivatedRoute, ActivatedRouteSnapshot, ParamMap, Router } from '@angular/router';
+import { ActivatedRouteSnapshot, ParamMap } from '@angular/router';
 
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 
 // ============================================================================
 // Router Mock
@@ -20,6 +20,7 @@ export interface MockRouter {
 export function createMockRouter(): MockRouter {
   const mock = jasmine.createSpyObj('Router', ['navigate', 'navigateByUrl']) as MockRouter;
 
+  // Set up spy return values to simulate successful navigation
   mock.navigate.and.returnValue(Promise.resolve(true));
   mock.navigateByUrl.and.returnValue(Promise.resolve(true));
   mock.events = new BehaviorSubject<unknown>(null);
@@ -77,16 +78,14 @@ function createParamMap(params: Record<string, string>): ParamMap {
 // ============================================================================
 // Usage Example
 // ============================================================================
-
-/*
-  TestBed.configureTestingModule({
-    providers: [
-      { provide: Router, useValue: createMockRouter() },
-      { provide: ActivatedRoute, useValue: createMockActivatedRoute(
-        { id: '123' },           // route params
-        { filter: 'active' },   // query params
-        { title: 'Page Title' } // route data
-      )}
-    ]
-  });
-*/
+//
+// TestBed.configureTestingModule({
+//   providers: [
+//     { provide: Router, useValue: createMockRouter() },
+//     { provide: ActivatedRoute, useValue: createMockActivatedRoute(
+//       { id: '123' },           // route params
+//       { filter: 'active' },   // query params
+//       { title: 'Page Title' } // route data
+//     )}
+//   ]
+// });

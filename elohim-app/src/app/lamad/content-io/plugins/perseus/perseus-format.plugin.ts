@@ -110,6 +110,7 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
   // Export
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async export(node: ContentIOExportInput): Promise<string> {
     // Content should already be Perseus item(s)
     const items = node.content as PerseusItem | PerseusItem[];
@@ -124,7 +125,8 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       },
     }));
 
-    return JSON.stringify(updatedItems.length === 1 ? updatedItems[0] : updatedItems, null, 2);
+    const itemToExport = updatedItems.length === 1 ? updatedItems[0] : updatedItems;
+    return JSON.stringify(itemToExport, null, 2);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@
     <div class="error-banner">
       <span class="error-icon">warning</span>
       <span class="error-text">{{ error() }}</span>
-      <button class="error-close" (click)="clearError()">close</button>
+      <button type="button" class="error-close" (click)="clearError()">close</button>
     </div>
   }
 
@@ -31,7 +31,12 @@
           <span>Contributes up to 60% confidence</span>
         </div>
       </div>
-      <button class="primary-button" (click)="startVerification()" [disabled]="isLoading()">
+      <button
+        type="button"
+        class="primary-button"
+        (click)="startVerification()"
+        [disabled]="isLoading()"
+      >
         @if (isLoading()) {
           <span class="spinner"></span>
           <span>Starting...</span>
@@ -65,6 +70,7 @@
       <div class="question-dots">
         @for (q of questions(); track q.id; let i = $index) {
           <button
+            type="button"
             class="question-dot"
             [class.current]="i === currentQuestionIndex()"
             [class.answered]="isQuestionAnswered(i)"
@@ -89,6 +95,7 @@
             <div class="options-list">
               @for (option of question.options; track option) {
                 <button
+                  type="button"
                   class="option-button"
                   [class.selected]="getAnswerForQuestion(question.id) === option"
                   (click)="setAnswer(question.id, option)"
@@ -113,6 +120,7 @@
       <!-- Navigation buttons -->
       <div class="question-nav">
         <button
+          type="button"
           class="nav-button"
           (click)="prevQuestion()"
           [disabled]="currentQuestionIndex() === 0"
@@ -120,9 +128,14 @@
           Previous
         </button>
         @if (currentQuestionIndex() < questions().length - 1) {
-          <button class="nav-button primary" (click)="nextQuestion()">Next</button>
+          <button type="button" class="nav-button primary" (click)="nextQuestion()">Next</button>
         } @else {
-          <button class="nav-button submit" (click)="submitAnswers()" [disabled]="!canSubmit()">
+          <button
+            type="button"
+            class="nav-button submit"
+            (click)="submitAnswers()"
+            [disabled]="!canSubmit()"
+          >
             Submit Answers
           </button>
         }
@@ -194,7 +207,7 @@
 
       <div class="result-actions">
         @if (!res.passed) {
-          <button class="secondary-button" (click)="retry()">Try Again</button>
+          <button type="button" class="secondary-button" (click)="retry()">Try Again</button>
         }
       </div>
     </div>

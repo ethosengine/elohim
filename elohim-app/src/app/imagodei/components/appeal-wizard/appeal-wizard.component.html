@@ -10,7 +10,7 @@
     <div class="error-banner" role="alert">
       <span class="icon">&#9888;</span>
       <span class="message">{{ error() }}</span>
-      <button class="dismiss-btn" (click)="clearError()">&times;</button>
+      <button type="button" class="dismiss-btn" (click)="clearError()">&times;</button>
     </div>
   }
 
@@ -27,6 +27,7 @@
     <nav class="step-progress">
       @for (step of steps(); track step.id; let i = $index) {
         <button
+          type="button"
           class="step-indicator"
           [class.active]="currentStep() === step.id"
           [class.completed]="step.completed && currentStep() !== step.id"
@@ -72,6 +73,7 @@
           <div class="type-options">
             @for (option of appealTypeOptions; track option.value) {
               <button
+                type="button"
                 class="type-option"
                 [class.selected]="appealType() === option.value"
                 (click)="selectAppealType(option.value)"
@@ -245,7 +247,7 @@
     <!-- Navigation -->
     <div class="wizard-nav">
       @if (currentStepIndex() > 0) {
-        <button class="nav-btn secondary" (click)="previousStep()">
+        <button type="button" class="nav-btn secondary" (click)="previousStep()">
           <span class="icon">&#8592;</span>
           Back
         </button>
@@ -257,12 +259,22 @@
       }
 
       @if (currentStep() !== 'review') {
-        <button class="nav-btn primary" [disabled]="!canProceed()" (click)="nextStep()">
+        <button
+          type="button"
+          class="nav-btn primary"
+          [disabled]="!canProceed()"
+          (click)="nextStep()"
+        >
           Continue
           <span class="icon">&#8594;</span>
         </button>
       } @else {
-        <button class="nav-btn primary submit" [disabled]="isSubmitting()" (click)="submitAppeal()">
+        <button
+          type="button"
+          class="nav-btn primary submit"
+          [disabled]="isSubmitting()"
+          (click)="submitAppeal()"
+        >
           @if (isSubmitting()) {
             <span class="spinner-small"></span>
             Submitting...

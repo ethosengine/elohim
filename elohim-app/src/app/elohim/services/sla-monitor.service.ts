@@ -1,6 +1,8 @@
 import { Injectable, OnDestroy } from '@angular/core';
 
-import { BehaviorSubject, Observable, Subject, interval, takeUntil, filter, map } from 'rxjs';
+// @coverage: 60.8% (2026-02-04)
+
+import { BehaviorSubject, Observable, Subject, interval, takeUntil, map } from 'rxjs';
 
 /**
  * SlaMonitorService - Constitutional SLA Enforcement
@@ -510,7 +512,12 @@ export class SlaMonitorService implements OnDestroy {
   }
 
   private generateId(): string {
-    return `sla-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 7);
+    return `sla-${Date.now()}-${randomStr}`;
   }
 
   // ===========================================================================
@@ -523,8 +530,8 @@ export class SlaMonitorService implements OnDestroy {
     try {
       const data = JSON.stringify(this.activeSlas$.value);
       localStorage.setItem(this.STORAGE_KEY, data);
-    } catch (e) {
-      console.error('Failed to persist SLA items:', e);
+    } catch {
+      // localStorage write failure is non-critical
     }
   }
 
@@ -540,8 +547,8 @@ export class SlaMonitorService implements OnDestroy {
         this.activeSlas$.next(active);
         this.metrics.currentActive = active.length;
       }
-    } catch (e) {
-      console.error('Failed to load SLA items:', e);
+    } catch {
+      // localStorage read failure is non-critical - will start with empty state
     }
   }
 }

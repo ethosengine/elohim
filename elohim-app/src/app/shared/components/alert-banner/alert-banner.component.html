@@ -11,9 +11,12 @@
     aria-live="polite"
   >
     <!-- Summary Row -->
-    <div
+    <button
+      type="button"
       class="banner-row"
       (click)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null"
+      [disabled]="!expandable || activeAlerts.length <= 1"
+      [attr.aria-expanded]="isExpanded"
     >
       <!-- Icon -->
       <ng-container *ngIf="iconTemplate; else defaultIcon">
@@ -62,6 +65,7 @@
               {{ action.label }}
             </a>
             <button
+              type="button"
               *ngIf="!action.href"
               [class]="getActionClass(action)"
               (click)="onActionClick(primaryAlert!, action, $event)"
@@ -75,6 +79,7 @@
 
         <!-- Dismiss Button -->
         <button
+          type="button"
           *ngIf="primaryAlert!.dismissible !== false"
           class="btn-dismiss"
           (click)="dismissAlert(primaryAlert!, $event)"
@@ -85,6 +90,7 @@
 
         <!-- Expand Button -->
         <button
+          type="button"
           *ngIf="expandable && activeAlerts.length > 1"
           class="btn-expand"
           [attr.aria-expanded]="isExpanded"
@@ -93,7 +99,7 @@
           {{ isExpanded ? '▲' : '▼' }}
         </button>
       </div>
-    </div>
+    </button>
 
     <!-- Expanded List -->
     <div class="banner-details" *ngIf="isExpanded && activeAlerts.length > 1">
@@ -110,11 +116,16 @@
           </div>
           <div class="item-actions">
             <ng-container *ngFor="let action of alert.actions?.slice(0, 2)">
-              <button class="btn-small" (click)="onActionClick(alert, action, $event)">
+              <button
+                type="button"
+                class="btn-small"
+                (click)="onActionClick(alert, action, $event)"
+              >
                 {{ action.label }}
               </button>
             </ng-container>
             <button
+              type="button"
               *ngIf="alert.dismissible !== false"
               class="btn-dismiss-small"
               (click)="dismissAlert(alert, $event)"
@@ -127,7 +138,7 @@
       </div>
 
       <div class="show-more" *ngIf="hasHiddenAlerts">
-        <button class="btn-show-more" (click)="toggleExpanded()">
+        <button type="button" class="btn-show-more" (click)="toggleExpanded()">
           Show {{ hiddenCount }} more alerts
         </button>
       </div>
@@ -149,6 +160,7 @@
           <span class="card-subtitle" *ngIf="alert.subtitle">{{ alert.subtitle }}</span>
         </div>
         <button
+          type="button"
           *ngIf="alert.dismissible !== false"
           class="btn-dismiss"
           (click)="dismissAlert(alert, $event)"
@@ -168,6 +180,7 @@
             {{ action.label }}
           </a>
           <button
+            type="button"
             *ngIf="!action.href"
             [class]="getActionClass(action)"
             (click)="onActionClick(alert, action, $event)"
@@ -179,7 +192,7 @@
     </div>
 
     <div class="show-more-cards" *ngIf="hasHiddenAlerts">
-      <button class="btn-show-more" (click)="toggleExpanded()">
+      <button type="button" class="btn-show-more" (click)="toggleExpanded()">
         Show {{ hiddenCount }} more alerts
       </button>
     </div>
@@ -199,6 +212,7 @@
         <span class="toast-message" *ngIf="alert.message">{{ alert.message }}</span>
       </div>
       <button
+        type="button"
         *ngIf="alert.dismissible !== false"
         class="btn-dismiss"
         (click)="dismissAlert(alert, $event)"
@@ -222,6 +236,7 @@
       <span class="inline-message" *ngIf="primaryAlert!.message">{{ primaryAlert!.message }}</span>
     </div>
     <button
+      type="button"
       *ngIf="primaryAlert!.dismissible !== false"
       class="btn-dismiss"
       (click)="dismissAlert(primaryAlert!, $event)"

@@ -15,6 +15,8 @@
 
 import type { MasteryLevel, ActionHash } from './content-mastery.model';
 
+// @coverage: 100.0% (2026-02-04)
+
 // =============================================================================
 // Holochain Output Wrapper Types
 // =============================================================================
@@ -308,7 +310,6 @@ export function parseContentMix(json: string): ContentMixEntry[] {
   try {
     return JSON.parse(json) as ContentMixEntry[];
   } catch {
-    console.warn('[Practice] Failed to parse content mix JSON');
     return [];
   }
 }
@@ -320,7 +321,6 @@ export function parseLevelChanges(json: string): LevelChange[] {
   try {
     return JSON.parse(json) as LevelChange[];
   } catch {
-    console.warn('[Practice] Failed to parse level changes JSON');
     return [];
   }
 }
@@ -332,7 +332,6 @@ export function parseQuestions(json: string): ChallengeQuestion[] {
   try {
     return JSON.parse(json) as ChallengeQuestion[];
   } catch {
-    console.warn('[Practice] Failed to parse questions JSON');
     return [];
   }
 }
@@ -344,7 +343,6 @@ export function parseResponses(json: string): MasteryChallengeResponse[] {
   try {
     return JSON.parse(json) as MasteryChallengeResponse[];
   } catch {
-    console.warn('[Practice] Failed to parse responses JSON');
     return [];
   }
 }
@@ -356,7 +354,6 @@ export function parseDiscoveries(json: string): ChallengeDiscovery[] {
   try {
     return JSON.parse(json) as ChallengeDiscovery[];
   } catch {
-    console.warn('[Practice] Failed to parse discoveries JSON');
     return [];
   }
 }

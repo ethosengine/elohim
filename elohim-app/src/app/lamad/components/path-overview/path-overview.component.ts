@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
+// @coverage: 44.0% (2026-02-04)
+
 import { takeUntil } from 'rxjs/operators';
 
 import { Subject, forkJoin } from 'rxjs';
@@ -130,7 +132,11 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
   // Chapter Data
   chapters: ChapterDisplay[] = [];
-  pathCompletion: any = null; // Territory-based completion metrics
+  pathCompletion: {
+    contentCompletionPercentage: number;
+    stepCompletionPercentage: number;
+    sharedContentCompleted: number;
+  } | null = null; // Territory-based completion metrics
 
   // Concept Progress Data
   conceptProgress: {
@@ -163,7 +169,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
-      this.pathId = params['pathId'];
+      this.pathId = params['pathId'] as string;
       this.loadPath();
     });
   }
@@ -220,7 +226,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
             stepIndex: s.stepIndex,
             isCompleted: s.isCompleted,
             isGlobalCompletion: s.completedInOtherPath,
-            icon: getStepTypeIcon(s.step.stepType || 'content'), // Use stepType from utility
+            icon: getStepTypeIcon(s.step.stepType ?? 'content'), // Use stepType from utility
             isLocked: !accessible.includes(s.stepIndex),
             masteryLevel: s.masteryLevel,
             masteryTier: s.masteryTier,
@@ -263,8 +269,9 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
           this.isLoading = false;
         },
-        error: err => {
-          this.error = err.message ?? 'Failed to load path';
+        error: (err: unknown) => {
+          const errorMsg = err instanceof Error ? err.message : 'Failed to load path';
+          this.error = errorMsg;
           this.isLoading = false;
         },
       });
@@ -319,7 +326,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Navigate to begin the journey
    */
   beginJourney(): void {
-    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', 0]);
+    void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', 0]);
   }
 
   /**
@@ -327,7 +334,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   continueJourney(): void {
     const currentStep = this.getCurrentStepIndex();
-    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', currentStep]);
+    void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', currentStep]);
   }
 
   /**
@@ -336,7 +343,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   startChapter(chapterId: string): void {
     this.pathService.getChapterFirstStep(this.pathId, chapterId).subscribe(step => {
       if (step) {
-        this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.step.order]);
+        void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.step.order]);
       }
     });
   }
@@ -346,7 +353,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   goToStep(stepIndex: number): void {
     if (this.accessibleSteps.includes(stepIndex)) {
-      this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', stepIndex]);
+      void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', stepIndex]);
     }
   }
 
@@ -354,7 +361,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Go back to home
    */
   goHome(): void {
-    this.router.navigate(['/lamad']);
+    void this.router.navigate(['/lamad']);
   }
 
   /**
@@ -396,6 +403,19 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   getMasteryTierClass(tier: MasteryTier): string {
     return `mastery-tier-${tier}`;
+  }
+
+  /**
+   * Get CSS classes for step item.
+   */
+  getStepClasses(s: StepDisplay): Record<string, boolean> {
+    return {
+      completed: s.isCompleted,
+      'global-complete': s.isGlobalCompletion,
+      locked: s.isLocked,
+      accessible: !s.isLocked,
+      [this.getMasteryTierClass(s.masteryTier)]: true,
+    };
   }
 
   /**
@@ -500,7 +520,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       return this.buildModuleDisplaysFromSteps(chapter);
     }
     // Use 4-level format (modules → sections)
-    return this.buildModuleDisplays(chapter.modules || []);
+    return this.buildModuleDisplays(chapter.modules ?? []);
   }
 
   /**
@@ -508,7 +528,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Creates a single module with a single section containing all steps as concepts.
    */
   private buildModuleDisplaysFromSteps(chapter: PathChapter): ModuleDisplay[] {
-    const steps = chapter.steps || [];
+    const steps = chapter.steps ?? [];
     const conceptIds = steps.map(s => s.resourceId);
 
     // Create a synthetic section
@@ -531,17 +551,21 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       section: syntheticSection,
       concepts: steps.map(step => {
         const inferredType = inferContentTypeFromId(step.resourceId);
+        const conceptData = this.conceptProgress.find(c => c.conceptId === step.resourceId);
         return {
           conceptId: step.resourceId,
           title: step.stepTitle,
-          isCompleted: false, // TODO: Load from progress
+          isCompleted: conceptData ? conceptData.completionPercentage === 100 : false,
           isGlobalCompletion: false,
           icon: getIconForContent(step.resourceId, inferredType),
           contentType: inferredType,
         };
       }),
       totalConcepts: steps.length,
-      completedConcepts: 0, // TODO: Load from progress
+      completedConcepts: steps.filter(step => {
+        const conceptData = this.conceptProgress.find(c => c.conceptId === step.resourceId);
+        return conceptData?.completionPercentage === 100;
+      }).length,
       completionPercentage: 0,
       isExpanded: true,
     };
@@ -563,7 +587,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    */
   private buildModuleDisplays(modules: PathModule[]): ModuleDisplay[] {
     return modules.map(module => {
-      const sections = this.buildSectionDisplays(module.sections || []);
+      const sections = this.buildSectionDisplays(module.sections ?? []);
       const totalConcepts = sections.reduce((sum, s) => sum + s.totalConcepts, 0);
       const completedConcepts = sections.reduce((sum, s) => sum + s.completedConcepts, 0);
       const completionPercentage =
@@ -597,7 +621,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
         totalConcepts,
         completedConcepts,
         completionPercentage,
-        isExpanded: true, // Default expanded for detailed view
+        isExpanded: true,
       };
     });
   }
@@ -628,7 +652,6 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   private isConceptGloballyComplete(conceptId: string): boolean {
     const conceptData = this.conceptProgress.find(c => c.conceptId === conceptId);
     if (!conceptData) return false;
-    // If completed but not in this path's progress, it's global
     return conceptData.completionPercentage === 100 && !this.isConceptCompleted(conceptId);
   }
 
@@ -660,10 +683,10 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     // Find the step that references this concept
     const step = this.path?.steps.find(s => s.resourceId === conceptId);
     if (step) {
-      this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.order]);
+      void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', step.order]);
     } else {
       // Fallback to direct resource view if no matching step found
-      this.router.navigate(['/lamad/resource', conceptId]);
+      void this.router.navigate(['/lamad/resource', conceptId]);
     }
   }
 

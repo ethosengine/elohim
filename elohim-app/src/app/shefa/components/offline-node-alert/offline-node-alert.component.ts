@@ -16,6 +16,8 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 
+// @coverage: 44.8% (2026-02-04)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import {
@@ -23,8 +25,7 @@ import {
   AlertData,
   AlertAction,
   AlertSeverity,
-} from '@app/shared/components/alert-banner/alert-banner.component';
-
+} from '../../../shared/components/alert-banner/alert-banner.component';
 import {
   OfflineNodeAlert,
   NodeTopologyState,
@@ -112,7 +113,6 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (!this.operatorId) {
-      console.warn('[OfflineNodeAlert] No operatorId provided');
       this.isLoading = false;
       return;
     }
@@ -140,8 +140,7 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
           this.updateAlertData();
           this.isLoading = false;
         },
-        error: err => {
-          console.error('[OfflineNodeAlert] Failed to load topology:', err);
+        error: _err => {
           this.isLoading = false;
         },
       });
@@ -155,8 +154,8 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
           this.computeNeeds = needs;
           this.updateAlertData();
         },
-        error: err => {
-          console.error('[OfflineNodeAlert] Failed to load compute needs:', err);
+        error: _err => {
+          // Silently fail for compute needs assessment - alerts can be shown without help-flow actions
         },
       });
   }
@@ -265,14 +264,14 @@ export class OfflineNodeAlertComponent implements OnInit, OnDestroy {
     switch (event.action.id) {
       case 'view-dashboard':
         this.viewDashboard.emit();
-        this.router.navigate(['/shefa/dashboard']);
+        void this.router.navigate(['/shefa/dashboard']);
         break;
 
       case 'help-flow':
         if (this.computeNeeds) {
           this.viewHelpFlow.emit(this.computeNeeds);
         }
-        this.router.navigate(['/shefa/help-flow/compute-needs']);
+        void this.router.navigate(['/shefa/help-flow/compute-needs']);
         break;
     }
   }

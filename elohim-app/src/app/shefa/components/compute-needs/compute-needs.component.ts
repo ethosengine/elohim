@@ -13,6 +13,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 
+// @coverage: 23.5% (2026-02-04)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import { ComputeNeedsAssessment, NodeRecommendation } from '../../models/shefa-dashboard.model';
@@ -76,8 +78,7 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
           this.isLoading = false;
           this.assessmentComplete.emit(assessment);
         },
-        error: err => {
-          console.error('[ComputeNeeds] Failed to load:', err);
+        error: _err => {
           this.error = 'Failed to assess compute needs';
           this.isLoading = false;
         },

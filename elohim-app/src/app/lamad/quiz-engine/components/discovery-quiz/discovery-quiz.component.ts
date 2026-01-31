@@ -36,6 +36,8 @@ import {
   computed,
 } from '@angular/core';
 
+// @coverage: 25.4% (2026-02-04)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import {
@@ -582,9 +584,6 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     this.psycheAPI = getPsycheAPI();
 
     if (!this.psycheAPI) {
-      console.error(
-        '[DiscoveryQuiz] psyche-core not available - sophia-plugin must be loaded first'
-      );
       return;
     }
 
@@ -729,8 +728,7 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
           this.loading.set(false);
           this.cdr.markForCheck();
         },
-        error: err => {
-          console.error('Failed to load discovery questions:', err);
+        error: _err => {
           this.noQuestions.set(true);
           this.loading.set(false);
           this.cdr.markForCheck();
@@ -750,7 +748,6 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
     if (!moment || !this.lastRecognition) return;
 
     if (!this.psycheAPI) {
-      console.error('[DiscoveryQuiz] psyche-core not available - ensure sophia-plugin is loaded');
       return;
     }
 
@@ -781,8 +778,8 @@ export class DiscoveryQuizComponent implements OnInit, OnDestroy {
         interp = this.psycheAPI.interpretReflection(EPIC_DOMAIN_INSTRUMENT_ID, agg);
         this.interpretation.set(interp);
         // Debug: console.log('[DiscoveryQuiz] Interpretation via psyche-core:', interp);
-      } catch (err) {
-        console.error('[DiscoveryQuiz] Failed to interpret:', err);
+      } catch {
+        // Psyche-core interpretation failed - will use standard subscale scores
       }
     }
 

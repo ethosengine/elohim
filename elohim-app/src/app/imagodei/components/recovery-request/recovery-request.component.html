@@ -14,17 +14,19 @@
         <div class="notice-content">
           <strong>Select a Doorway First</strong>
           <p>You need to select a doorway to initiate recovery.</p>
-          <button class="btn btn-primary" (click)="selectDoorway()">Select Doorway</button>
+          <button type="button" class="btn btn-primary" (click)="selectDoorway()">
+            Select Doorway
+          </button>
         </div>
       </div>
     }
 
     <!-- Error Display -->
     @if (error()) {
-      <div class="error-banner" role="alert" (click)="clearError()">
+      <div class="error-banner" role="alert">
         <span class="material-icons">error_outline</span>
         <span>{{ error() }}</span>
-        <button type="button" class="dismiss-btn">Dismiss</button>
+        <button type="button" class="dismiss-btn" (click)="clearError()">Dismiss</button>
       </div>
     }
 
@@ -167,7 +169,7 @@
               <h3>Attestations Received</h3>
               <div class="attestations-list">
                 @for (att of request.attestations; track att.id) {
-                  <div class="attestation-item" [class]="att.decision">
+                  <div class="attestation-item" [ngClass]="att.decision">
                     <span class="material-icons">
                       {{
                         att.decision === 'affirm'
@@ -190,7 +192,12 @@
         }
 
         <div class="action-buttons">
-          <button class="btn btn-secondary" (click)="cancelRecovery()" [disabled]="isLoading()">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="cancelRecovery()"
+            [disabled]="isLoading()"
+          >
             Cancel Request
           </button>
         </div>
@@ -236,6 +243,7 @@
         }
 
         <button
+          type="button"
           class="btn btn-primary full-width"
           (click)="completeRecovery()"
           [disabled]="isLoading()"

@@ -67,6 +67,8 @@ export type AuthCredentials = PasswordCredentials | PasskeyCredentials | OAuthCr
 import type { ProfileReach } from './identity.model';
 export type { ProfileReach };
 
+// @coverage: 71.4% (2026-02-04)
+
 /** Registration credentials (for creating new auth) */
 export interface RegisterCredentials {
   identifier: string;

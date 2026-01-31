@@ -58,10 +58,10 @@
 
       <!-- Error Display -->
       @if (error()) {
-        <div class="error-banner" (click)="clearError()">
+        <div class="error-banner" role="alert">
           <span class="error-icon">✕</span>
           <span>{{ error() }}</span>
-          <button type="button" class="error-dismiss">Dismiss</button>
+          <button type="button" class="error-dismiss" (click)="clearError()">Dismiss</button>
         </div>
       }
 
@@ -129,8 +129,8 @@
 
         <!-- Profile Reach -->
         <div class="form-group">
-          <label>Profile Visibility</label>
-          <div class="reach-options">
+          <fieldset class="reach-options">
+            <legend class="form-label">Profile Visibility</legend>
             @for (option of reachOptions; track option.value) {
               <label class="reach-option" [class.selected]="form.profileReach === option.value">
                 <input
@@ -146,7 +146,7 @@
                 </div>
               </label>
             }
-          </div>
+          </fieldset>
         </div>
 
         <!-- Account Credentials Section -->
@@ -243,7 +243,7 @@
       <div class="register-footer">
         <p class="login-prompt">
           Already have an account?
-          <a (click)="goToLogin()" class="login-link">Sign in</a>
+          <button type="button" (click)="goToLogin()" class="login-link">Sign in</button>
         </p>
         <p class="terms-text">
           By joining, you agree to participate in good faith with the community.

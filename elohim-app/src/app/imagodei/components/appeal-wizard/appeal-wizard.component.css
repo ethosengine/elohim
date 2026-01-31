@@ -44,12 +44,12 @@
   line-height: 1;
   cursor: pointer;
   color: currentcolor;
-  opacity: 0.7;
+  opacity: 70%;
   margin-left: auto;
 }
 
 .dismiss-btn:hover {
-  opacity: 1;
+  opacity: 100%;
 }
 
 /* Loading State */
@@ -110,7 +110,7 @@
 
 .step-indicator:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 50%;
 }
 
 .step-number {
@@ -216,12 +216,12 @@
 
 @keyframes fadeIn {
   from {
-    opacity: 0;
+    opacity: 0%;
     transform: translateY(8px);
   }
 
   to {
-    opacity: 1;
+    opacity: 100%;
     transform: translateY(0);
   }
 }
@@ -519,7 +519,7 @@
 }
 
 .nav-btn.primary:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 

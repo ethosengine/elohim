@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: elohim-site-alpha
-  namespace: ethosengine
+  namespace: elohim-alpha
   labels:
     app: elohim-site-alpha
 spec:

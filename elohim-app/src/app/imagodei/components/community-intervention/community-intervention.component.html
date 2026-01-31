@@ -35,16 +35,16 @@
     <div class="error-banner" role="alert">
       <span class="icon">&#9888;</span>
       <span class="message">{{ error() }}</span>
-      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+      <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
     </div>
   }
 
   @if (successMessage()) {
-    <div class="success-banner" role="status">
+    <output class="success-banner">
       <span class="icon">&#10003;</span>
       <span class="message">{{ successMessage() }}</span>
-      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
-    </div>
+      <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
+    </output>
   }
 
   <!-- Loading State -->
@@ -100,7 +100,7 @@
         @if (!intervention()!.thresholdMet) {
           <div class="support-form">
             <h3>Add Your Support</h3>
-            <button class="support-btn" (click)="switchToSupport()">
+            <button type="button" class="support-btn" (click)="switchToSupport()">
               Support This Intervention
             </button>
           </div>
@@ -115,10 +115,11 @@
 
         <!-- Relationship Level -->
         <div class="form-group">
-          <label>Your relationship to this person:</label>
-          <div class="relationship-options">
+          <fieldset class="relationship-options">
+            <legend class="form-label">Your relationship to this person:</legend>
             @for (level of relationshipLevels; track level.value) {
               <button
+                type="button"
                 class="relationship-btn"
                 [class.selected]="relationshipLevel() === level.value"
                 (click)="setRelationshipLevel(level.value)"
@@ -127,7 +128,7 @@
                 <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
               </button>
             }
-          </div>
+          </fieldset>
           <p class="weight-note">
             Your support will add
             <strong>{{ currentWeight() }}</strong>
@@ -150,6 +151,7 @@
         <!-- Submit -->
         <div class="form-actions">
           <button
+            type="button"
             class="submit-btn"
             [disabled]="!canSubmit() || isSubmitting()"
             (click)="submitSupport()"
@@ -161,7 +163,7 @@
               Add Support
             }
           </button>
-          <button class="cancel-btn" (click)="mode.set('view')">Cancel</button>
+          <button type="button" class="cancel-btn" (click)="mode.set('view')">Cancel</button>
         </div>
       </section>
     }
@@ -185,10 +187,11 @@
 
         <!-- Relationship Level -->
         <div class="form-group">
-          <label>Your relationship to this person:</label>
-          <div class="relationship-options">
+          <fieldset class="relationship-options">
+            <legend class="form-label">Your relationship to this person:</legend>
             @for (level of relationshipLevels; track level.value) {
               <button
+                type="button"
                 class="relationship-btn"
                 [class.selected]="relationshipLevel() === level.value"
                 (click)="setRelationshipLevel(level.value)"
@@ -197,7 +200,7 @@
                 <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
               </button>
             }
-          </div>
+          </fieldset>
           <p class="weight-note">
             Your initial support will be
             <strong>{{ currentWeight() }}</strong>
@@ -221,8 +224,8 @@
 
         <!-- Categories -->
         <div class="form-group">
-          <label>Categories (select all that apply):</label>
-          <div class="category-options">
+          <fieldset class="category-options">
+            <legend class="form-label">Categories (select all that apply):</legend>
             @for (cat of categories; track cat.value) {
               <label class="category-option" [class.selected]="isCategorySelected(cat.value)">
                 <input
@@ -236,7 +239,7 @@
                 </div>
               </label>
             }
-          </div>
+          </fieldset>
         </div>
 
         <!-- Evidence -->
@@ -254,6 +257,7 @@
         <!-- Submit -->
         <div class="form-actions">
           <button
+            type="button"
             class="submit-btn"
             [disabled]="!canSubmit() || isSubmitting()"
             (click)="submitInitiation()"

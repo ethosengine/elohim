@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
+// @coverage: 80.7% (2026-02-04)
+
 import { environment } from '../../../../environments/environment';
 import { ContentNode } from '../../models/content-node.model';
 
@@ -102,7 +104,7 @@ export class IframeRendererComponent implements OnChanges {
     // Parse JSON string content if needed (API returns content_body as string)
     if (typeof content === 'string') {
       try {
-        content = JSON.parse(content);
+        content = JSON.parse(content) as string | object;
       } catch {
         // Not JSON, keep as string for URL mode below
       }
@@ -158,16 +160,10 @@ export class IframeRendererComponent implements OnChanges {
 
     // If no doorway URL configured, try fallback
     if (!doorwayUrl && content.fallbackUrl) {
-      console.warn(
-        '[IframeRenderer] No doorwayUrl configured, using fallbackUrl:',
-        content.fallbackUrl
-      );
       return content.fallbackUrl;
     }
 
-    const url = `${doorwayUrl}/apps/${appId}/${entryPoint}`;
-    console.log('[IframeRenderer] Built HTML5 app URL:', url);
-    return url;
+    return `${doorwayUrl}/apps/${appId}/${entryPoint}`;
   }
 
   /**
@@ -182,19 +178,17 @@ export class IframeRendererComponent implements OnChanges {
     if (this.isCheEnvironment()) {
       const cheUrl = this.getCheDevProxyUrl();
       if (cheUrl) {
-        console.log('[IframeRenderer] Using Che dev-proxy URL:', cheUrl);
         return cheUrl;
       }
     }
 
     // For localhost development, use relative URL (assumes ng serve proxy or same-origin doorway)
     if (this.isLocalDevelopment()) {
-      console.log('[IframeRenderer] Using relative URL for local dev');
       return ''; // Relative URL - /apps/... will be proxied
     }
 
     // Fallback to environment config
-    return environment.client?.doorwayUrl || environment.doorwayUrl || '';
+    return environment.client?.doorwayUrl ?? environment.doorwayUrl ?? '';
   }
 
   /**

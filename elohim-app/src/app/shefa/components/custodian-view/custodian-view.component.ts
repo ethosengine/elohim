@@ -14,6 +14,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 
+// @coverage: 25.0% (2026-02-04)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import {
@@ -76,8 +78,7 @@ export class CustodianViewComponent implements OnInit, OnDestroy {
           this.view = view;
           this.isLoading = false;
         },
-        error: err => {
-          console.error('[CustodianView] Failed to load:', err);
+        error: _err => {
           this.error = 'Failed to load custodian relationships';
           this.isLoading = false;
         },

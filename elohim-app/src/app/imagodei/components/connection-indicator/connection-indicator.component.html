@@ -1,7 +1,7 @@
 @if (isVisible()) {
-  <div
-    class="connection-indicator"
-    [class]="status().cssClass"
+  <button
+    type="button"
+    [class]="'connection-indicator ' + status().cssClass"
     [title]="status().label"
     (click)="toggleExpanded()"
   >
@@ -28,9 +28,6 @@
             @case ('steward') {
               Running on your local Holochain node. Full stewardship of your identity.
             }
-            @case ('self-sovereign') {
-              Running on your local Holochain node. Full stewardship of your identity.
-            }
             @case ('hosted') {
               Connected via {{ status().doorwayName ?? 'doorway' }}. Hosted identity.
             }
@@ -50,5 +47,5 @@
         </p>
       </div>
     }
-  </div>
+  </button>
 }

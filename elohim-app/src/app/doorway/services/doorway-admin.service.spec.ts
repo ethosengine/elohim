@@ -1,8 +1,5 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import {
-  HttpClientTestingModule,
-  HttpTestingController,
-} from '@angular/common/http/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 
 import { DoorwayAdminService, ConnectionState } from './doorway-admin.service';
 import {
@@ -331,8 +328,22 @@ describe('DoorwayAdminService', () => {
 
     it('should handle initial_state message', () => {
       const mockNodes: NodeSnapshot[] = [
-        { nodeId: 'node-1', status: 'online', combinedScore: 0.85, stewardTier: 'guardian', trustScore: 0.9, lastHeartbeatSecsAgo: 30 },
-        { nodeId: 'node-2', status: 'degraded', combinedScore: 0.7, stewardTier: 'steward', trustScore: 0.8, lastHeartbeatSecsAgo: 45 },
+        {
+          nodeId: 'node-1',
+          status: 'online',
+          combinedScore: 0.85,
+          stewardTier: 'guardian',
+          trustScore: 0.9,
+          lastHeartbeatSecsAgo: 30,
+        },
+        {
+          nodeId: 'node-2',
+          status: 'degraded',
+          combinedScore: 0.7,
+          stewardTier: 'steward',
+          trustScore: 0.8,
+          lastHeartbeatSecsAgo: 45,
+        },
       ];
       const mockCluster: ClusterSnapshot = {
         onlineNodes: 5,
@@ -355,8 +366,22 @@ describe('DoorwayAdminService', () => {
     it('should handle node_update message - update existing node', () => {
       // Set initial state
       (service as any)._nodes.set([
-        { nodeId: 'node-1', status: 'online', combinedScore: 0.85, stewardTier: 'guardian', trustScore: 0.9, lastHeartbeatSecsAgo: 30 },
-        { nodeId: 'node-2', status: 'online', combinedScore: 0.9, stewardTier: 'steward', trustScore: 0.85, lastHeartbeatSecsAgo: 25 },
+        {
+          nodeId: 'node-1',
+          status: 'online',
+          combinedScore: 0.85,
+          stewardTier: 'guardian',
+          trustScore: 0.9,
+          lastHeartbeatSecsAgo: 30,
+        },
+        {
+          nodeId: 'node-2',
+          status: 'online',
+          combinedScore: 0.9,
+          stewardTier: 'steward',
+          trustScore: 0.85,
+          lastHeartbeatSecsAgo: 25,
+        },
       ]);
 
       // Update node-1
@@ -375,7 +400,14 @@ describe('DoorwayAdminService', () => {
 
     it('should handle node_update message - node not found', () => {
       (service as any)._nodes.set([
-        { nodeId: 'node-1', status: 'online', combinedScore: 0.85, stewardTier: 'guardian', trustScore: 0.9, lastHeartbeatSecsAgo: 30 },
+        {
+          nodeId: 'node-1',
+          status: 'online',
+          combinedScore: 0.85,
+          stewardTier: 'guardian',
+          trustScore: 0.9,
+          lastHeartbeatSecsAgo: 30,
+        },
       ]);
 
       // Try to update non-existent node

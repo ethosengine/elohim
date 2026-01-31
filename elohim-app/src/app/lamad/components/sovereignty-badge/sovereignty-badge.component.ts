@@ -9,6 +9,8 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal, output, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
 
@@ -71,7 +73,7 @@ export class SovereigntyBadgeComponent {
    */
   onViewDetails(): void {
     this.viewDetails.emit();
-    this.router.navigate(['/lamad/human'], { fragment: 'network' });
+    void this.router.navigate(['/lamad/human'], { fragment: 'network' });
   }
 
   /**
@@ -97,8 +99,8 @@ export class SovereigntyBadgeComponent {
     event.stopPropagation();
     try {
       await navigator.clipboard.writeText(value);
-    } catch (err) {
-      console.warn('Failed to copy to clipboard:', err);
+    } catch {
+      // Clipboard write failed silently - not all browsers support this API
     }
   }
 

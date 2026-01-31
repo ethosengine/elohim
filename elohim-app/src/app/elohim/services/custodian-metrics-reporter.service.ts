@@ -1,5 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 
+// @coverage: 15.1% (2026-02-04)
+
 import { PerformanceMetricsService } from './performance-metrics.service';
 import { ShefaService } from './shefa.service';
 
@@ -72,19 +74,17 @@ export class CustodianMetricsReporterService {
    */
   enableReporting(): void {
     if (this.reportingEnabled()) {
-      console.log('[MetricsReporter] Reporting already enabled');
       return;
     }
 
-    console.log('[MetricsReporter] Enabling periodic metrics reporting (interval: 5 minutes)');
     this.reportingEnabled.set(true);
 
     // Do initial report immediately
-    this.reportMetrics();
+    void this.reportMetrics();
 
     // Schedule periodic reporting
     this.reportInterval = setInterval(() => {
-      this.reportMetrics();
+      void this.reportMetrics();
     }, this.REPORT_INTERVAL_MS);
   }
 
@@ -96,7 +96,6 @@ export class CustodianMetricsReporterService {
       return;
     }
 
-    console.log('[MetricsReporter] Disabling periodic metrics reporting');
     this.reportingEnabled.set(false);
 
     if (this.reportInterval) {
@@ -119,7 +118,6 @@ export class CustodianMetricsReporterService {
    */
   async reportMetrics(): Promise<boolean> {
     if (!this.reportingEnabled()) {
-      console.debug('[MetricsReporter] Reporting disabled, skipping report');
       return false;
     }
 
@@ -191,21 +189,18 @@ export class CustodianMetricsReporterService {
         // Schedule next report
         this.scheduleNextReport();
 
-        console.log('[MetricsReporter] Metrics reported successfully');
         return true;
       } else {
-        throw new Error('Report failed: ' + (result.error || 'Unknown error'));
+        throw new Error('Report failed: ' + (result.error ?? 'Unknown error'));
       }
     } catch (err) {
       s.reportsFailed++;
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage =
+        err instanceof Error ? (err.message ?? 'Unknown error') : 'Unknown error';
       s.lastError = errorMessage;
-
-      console.error('[MetricsReporter] Failed to report metrics:', errorMessage);
 
       // Exponential backoff for retries
       this.nextBackoffMs = Math.min(this.nextBackoffMs * 2, this.MAX_BACKOFF_MS);
-      console.log(`[MetricsReporter] Next retry in ${(this.nextBackoffMs / 1000).toFixed(0)}s`);
 
       // Schedule retry with backoff
       this.scheduleNextReport(this.nextBackoffMs);
@@ -218,7 +213,7 @@ export class CustodianMetricsReporterService {
    * Schedule next report
    */
   private scheduleNextReport(delayMs?: number): void {
-    const delay = delayMs || this.REPORT_INTERVAL_MS;
+    const delay = delayMs ?? this.REPORT_INTERVAL_MS;
     const nextTime = Date.now() + delay;
 
     const s = this.stats();

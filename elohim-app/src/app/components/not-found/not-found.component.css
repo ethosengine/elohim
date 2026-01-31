@@ -26,10 +26,9 @@
   font-size: 8rem;
   font-weight: 800;
   background: var(--lamad-accent-gradient);
-  background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  opacity: 0.15;
+  opacity: 15%;
   position: absolute;
   user-select: none;
 }

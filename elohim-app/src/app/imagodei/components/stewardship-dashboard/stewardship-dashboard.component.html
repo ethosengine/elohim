@@ -5,7 +5,7 @@
       <h1>Stewardship Dashboard</h1>
       <p class="subtitle">Content you steward and recognition you've accumulated</p>
     </div>
-    <button class="btn btn-secondary" (click)="refresh()" [disabled]="isLoading()">
+    <button type="button" class="btn btn-secondary" (click)="refresh()" [disabled]="isLoading()">
       <span class="material-icons">refresh</span>
       Refresh
     </button>
@@ -21,10 +21,10 @@
 
   <!-- Error State -->
   @if (error() && !isLoading()) {
-    <div class="error-banner" (click)="clearError()">
+    <div class="error-banner" role="alert">
       <span class="error-icon">!</span>
       <span>{{ error() }}</span>
-      <button type="button" class="error-dismiss">Dismiss</button>
+      <button type="button" class="error-dismiss" (click)="clearError()">Dismiss</button>
     </div>
   }
 
@@ -135,7 +135,7 @@
                   <span class="material-icons">visibility</span>
                 </a>
                 @if (item.allocation.governanceState === 'disputed') {
-                  <button class="btn-icon warning" title="View dispute">
+                  <button type="button" class="btn-icon warning" title="View dispute">
                     <span class="material-icons">warning</span>
                   </button>
                 }

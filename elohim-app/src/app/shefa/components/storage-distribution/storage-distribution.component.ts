@@ -12,6 +12,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 
+// @coverage: 47.8% (2026-02-04)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import {
@@ -85,8 +87,7 @@ export class StorageDistributionComponent implements OnInit, OnDestroy {
           this.distribution = dist;
           this.isLoading = false;
         },
-        error: err => {
-          console.error('[StorageDistribution] Failed to load:', err);
+        error: _err => {
           this.error = 'Failed to load storage distribution';
           this.isLoading = false;
         },

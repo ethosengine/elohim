@@ -23,6 +23,8 @@ import type {
   AggregatedReflection,
 } from '../../content-io/plugins/sophia/sophia-element-loader';
 
+// @coverage: 92.9% (2026-02-04)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Instrument ID
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,7 +149,8 @@ export const EPIC_DOMAIN_INSTRUMENT_CONFIG: CreateInstrumentOptions = {
     const entries = Object.entries(aggregated.normalizedScores);
     if (entries.length === 0) return null;
 
-    const [primaryId] = entries.toSorted(([, a], [, b]) => b - a)[0];
+    const sorted = [...entries].sort(([, a]: [string, number], [, b]: [string, number]) => b - a);
+    const [primaryId] = sorted[0];
     const resultType = EPIC_DOMAIN_RESULT_TYPES.find(r => r.id === primaryId);
 
     return {
@@ -238,12 +241,14 @@ export function sortEpicDomainsByScore(subscaleTotals: Record<string, number>): 
 }[] {
   const total = Object.values(subscaleTotals).reduce((sum, v) => sum + v, 0) || 1;
 
-  return EPIC_DOMAIN_SUBSCALES.map(subscale => ({
+  const mapped = EPIC_DOMAIN_SUBSCALES.map(subscale => ({
     id: subscale.id,
     name: subscale.name,
     icon: subscale.icon ?? '📌',
     color: subscale.color ?? '#888',
     score: subscaleTotals[subscale.id] || 0,
     percent: ((subscaleTotals[subscale.id] || 0) / total) * 100,
-  })).sort((a, b) => b.score - a.score);
+  }));
+
+  return mapped.sort((a, b) => b.score - a.score);
 }

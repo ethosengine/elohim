@@ -16,6 +16,8 @@
 
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 
+// @coverage: 63.5% (2026-02-04)
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 import {
@@ -158,6 +160,13 @@ function toUpdatePayload(request: UpdateProfileRequest): UpdateHumanPayload {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+/** Error message for registration failures */
+const REGISTRATION_FAILED_MESSAGE = 'Registration failed. Please try again.';
+
+// =============================================================================
 // DID Generation
 // =============================================================================
 
@@ -218,7 +227,6 @@ function generateDID(
       return null;
 
     case 'steward':
-    case 'self-sovereign': // @deprecated - use 'steward'
       // Steward DID using agent public key (cryptographic, self-custodied keys)
       // did:key uses multibase encoding - we use z prefix for base58btc
       if (agentPubKey) {
@@ -344,7 +352,7 @@ export class IdentityService {
 
       if (isConnected && currentMode === 'session') {
         // Holochain just connected - check if we have an identity there
-        this.checkHolochainIdentity();
+        void this.checkHolochainIdentity();
       } else if (!isConnected && isNetworkMode(currentMode)) {
         // Holochain disconnected - fall back to session
         this.fallbackToSession();
@@ -361,18 +369,26 @@ export class IdentityService {
         const currentMode = untracked(() => this.identitySignal().mode);
         if (currentMode === 'session' || currentMode === 'anonymous') {
           // Connect to Holochain as this authenticated user
-          this.connectAsAuthenticatedUser(auth.humanId, auth.agentPubKey);
+          void this.connectAsAuthenticatedUser(auth.humanId, auth.agentPubKey);
         }
       }
     });
 
-    // Initialize identity state
-    this.initializeIdentity();
+    // Initialize identity state (non-blocking)
+    this.init();
   }
 
   // ==========================================================================
   // Initialization
   // ==========================================================================
+
+  /**
+   * Initialize identity state asynchronously.
+   * Called after constructor to avoid async operations in constructor.
+   */
+  private init(): void {
+    void this.initializeIdentity();
+  }
 
   /**
    * Initialize identity state based on current connections.
@@ -382,8 +398,8 @@ export class IdentityService {
     const session = this.sessionHumanService.getSession();
 
     if (session) {
-      // Determine mode based on session state
-      const mode: IdentityMode = session.isAnonymous ? 'session' : 'session';
+      // Determine mode based on session state (always session for initial)
+      const mode: IdentityMode = 'session';
 
       // Generate DID for session identity
       const did = generateDID(
@@ -438,26 +454,27 @@ export class IdentityService {
       return;
     }
 
-    console.log('[IdentityService] Fetching identity for restored session...');
-
     // Use the password provider to fetch current user from /auth/me
     const provider = this.authService.getProvider('password') as PasswordAuthProvider | undefined;
     if (!provider?.getCurrentUser) {
-      console.warn('[IdentityService] No provider available to fetch identity');
       return;
     }
 
     try {
       const identity = await provider.getCurrentUser(auth.token);
       if (identity) {
-        console.log('[IdentityService] Fetched identity:', identity.humanId);
         // Now connect as the authenticated user
         await this.connectAsAuthenticatedUser(identity.humanId, identity.agentPubKey);
-      } else {
-        console.warn('[IdentityService] Failed to fetch identity from server');
       }
-    } catch (err) {
-      console.error('[IdentityService] Error fetching identity:', err);
+    } catch (error) {
+      // Expected error during app initialization when session restoration fails
+      // This can happen when: 1) token is expired, 2) server session invalidated, 3) network unavailable
+      // We intentionally handle this by allowing app to start in visitor mode
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('NetworkError') || message.includes('timeout')) {
+        console.warn('[IdentityService] Session restoration failed due to network:', message);
+      }
+      // Other errors (expired token, invalid session) are expected - no logging needed
     }
   }
 
@@ -466,13 +483,7 @@ export class IdentityService {
    * This is optional - visitors can browse without a Holochain identity.
    */
   private async checkHolochainIdentity(): Promise<void> {
-    // Prevent re-entry while already checking
-    if (this.isCheckingIdentity) {
-      return;
-    }
-
-    // Don't retry if we've already checked (successful or not)
-    if (this.hasCheckedHolochainIdentity) {
+    if (!this.shouldCheckHolochainIdentity()) {
       return;
     }
 
@@ -481,106 +492,156 @@ export class IdentityService {
     this.updateState({ isLoading: true, error: null });
 
     try {
-      // Call imagodei DNA to get current human profile
-      // Note: get_my_human returns HumanOutput { action_hash, human } not full HumanSessionResult
-      const result = await this.holochainClient.callZome<HumanSessionResult | null>({
-        zomeName: 'imagodei',
-        fnName: 'get_my_human',
-        payload: null,
-        roleName: 'imagodei', // Use imagodei DNA for identity
-      });
+      const result = await this.fetchHolochainIdentity();
 
       if (result.success && result.data) {
-        const sessionResult = result.data;
-
-        // Determine conductor type and key location
-        const conductorInfo = this.detectConductorType();
-        const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
-        const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-        const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
-
-        // Check if session exists alongside Holochain
-        const session = this.sessionHumanService.getSession();
-        const linkedSessionId = session?.sessionId ?? null;
-
-        // Generate DID for this identity
-        const did = generateDID(
-          identityMode,
-          sessionResult.human.id,
-          sessionResult.agentPubkey,
-          linkedSessionId
-        );
-
-        this.updateState({
-          mode: identityMode,
-          isAuthenticated: true,
-          humanId: sessionResult.human.id,
-          displayName: sessionResult.human.displayName,
-          agentPubKey: sessionResult.agentPubkey,
-          did,
-          profile: mapToProfile(sessionResult.human),
-          attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
-          sovereigntyStage,
-
-          // Key management
-          keyLocation,
-          canExportKeys: keyLocation === 'custodial', // Can export from hosted to device
-          keyBackup: null, // TODO: Fetch from conductor if available
-
-          // Conductor info
-          isLocalConductor: conductorInfo.isLocal,
-          conductorUrl: conductorInfo.url,
-
-          // Session link
-          linkedSessionId,
-          hasPendingMigration: session?.sessionState === 'upgrading',
-
-          // Hosting costs - TODO: Fetch from conductor
-          hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
-          nodeOperatorIncome: null, // TODO: Fetch if node-operator
-
-          isLoading: false,
-        });
-
-        // If session exists, link it to this Holochain identity
-        if (session && session.sessionState !== 'linked' && session.sessionState !== 'migrated') {
-          this.sessionHumanService.linkToHolochainIdentity(
-            sessionResult.agentPubkey,
-            sessionResult.human.id
-          );
-        }
+        this.handleHolochainIdentityFound(result.data);
       } else {
         // No Holochain identity - keep session mode
         this.updateState({ isLoading: false });
       }
-    } catch (err) {
-      // This is expected for visitors - the zome function may not exist or user may not be registered
-      // Don't treat this as an error - just stay in session mode
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      const isExpectedError =
-        errorMessage.includes("doesn't exist") ||
-        errorMessage.includes('not found') ||
-        errorMessage.includes('No human found');
-
-      if (isExpectedError) {
-        console.log('[IdentityService] No Holochain identity found, staying in session mode');
-      } else {
-        console.warn('[IdentityService] Unexpected error checking Holochain identity:', err);
-      }
-
-      // Clear loading state, don't set error for expected cases
-      this.updateState({
-        isLoading: false,
-        error: isExpectedError ? null : errorMessage,
-      });
+    } catch (error) {
+      this.handleHolochainIdentityError(error);
     } finally {
       this.isCheckingIdentity = false;
     }
   }
 
   /**
+   * Check if we should proceed with Holochain identity check.
+   * Prevents re-entry and duplicate checks.
+   */
+  private shouldCheckHolochainIdentity(): boolean {
+    // Prevent re-entry while already checking
+    if (this.isCheckingIdentity) {
+      return false;
+    }
+
+    // Don't retry if we've already checked (successful or not)
+    if (this.hasCheckedHolochainIdentity) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Fetch identity from Holochain conductor.
+   * Calls the imagodei zome to get current human profile.
+   */
+  private async fetchHolochainIdentity() {
+    // Call imagodei DNA to get current human profile
+    // Note: get_my_human returns HumanOutput { action_hash, human } not full HumanSessionResult
+    return this.holochainClient.callZome<HumanSessionResult | null>({
+      zomeName: 'imagodei',
+      fnName: 'get_my_human',
+      payload: null,
+      roleName: 'imagodei', // Use imagodei DNA for identity
+    });
+  }
+
+  /**
+   * Handle successful Holochain identity fetch.
+   * Updates state with conductor info, keys, and profile.
+   */
+  private handleHolochainIdentityFound(sessionResult: HumanSessionResult): void {
+    // Determine conductor type and key location
+    const conductorInfo = this.detectConductorType();
+    const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
+    const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
+    const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+
+    // Check if session exists alongside Holochain
+    const session = this.sessionHumanService.getSession();
+    const linkedSessionId = session?.sessionId ?? null;
+
+    // Generate DID for this identity
+    const did = generateDID(
+      identityMode,
+      sessionResult.human.id,
+      sessionResult.agentPubkey,
+      linkedSessionId
+    );
+
+    this.updateState({
+      mode: identityMode,
+      isAuthenticated: true,
+      humanId: sessionResult.human.id,
+      displayName: sessionResult.human.displayName,
+      agentPubKey: sessionResult.agentPubkey,
+      did,
+      profile: mapToProfile(sessionResult.human),
+      attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
+      sovereigntyStage,
+
+      // Key management
+      keyLocation,
+      canExportKeys: keyLocation === 'custodial', // Can export from hosted to device
+      keyBackup: null, // Key backup not yet implemented in conductor
+
+      // Conductor info
+      isLocalConductor: conductorInfo.isLocal,
+      conductorUrl: conductorInfo.url,
+
+      // Session link
+      linkedSessionId,
+      hasPendingMigration: session?.sessionState === 'upgrading',
+
+      // Hosting costs
+      hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
+      nodeOperatorIncome: null, // Node operator income tracking not yet implemented
+
+      isLoading: false,
+    });
+
+    // If session exists, link it to this Holochain identity
+    this.linkSessionIfNeeded(session, sessionResult);
+  }
+
+  /**
+   * Link existing session to Holochain identity if not already linked.
+   */
+  private linkSessionIfNeeded(
+    session: ReturnType<SessionHumanService['getSession']>,
+    sessionResult: HumanSessionResult
+  ): void {
+    if (session && session.sessionState !== 'linked' && session.sessionState !== 'migrated') {
+      this.sessionHumanService.linkToHolochainIdentity(
+        sessionResult.agentPubkey,
+        sessionResult.human.id
+      );
+    }
+  }
+
+  /**
+   * Handle errors when checking Holochain identity.
+   * Expected errors (user not registered) are silently handled.
+   */
+  private handleHolochainIdentityError(error: unknown): void {
+    // This is expected for visitors - the zome function may not exist or user may not be registered
+    // Don't treat this as an error - just stay in session mode
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isExpectedError =
+      errorMessage.includes("doesn't exist") ||
+      errorMessage.includes('not found') ||
+      errorMessage.includes('No human found');
+
+    // Log unexpected errors for debugging, but don't set error state
+    if (!isExpectedError) {
+      console.warn('[IdentityService] Unexpected error checking Holochain identity:', errorMessage);
+    }
+
+    // Clear loading state, don't set error for expected cases
+    this.updateState({
+      isLoading: false,
+      error: isExpectedError ? null : errorMessage,
+    });
+  }
+
+  /**
    * Detect whether connected to local or remote conductor.
-   * TODO: Implement proper detection via conductor metadata
+   * Uses appUrl to determine if running locally (localhost/127.0.0.1/[::1]).
+   * Future enhancement: Query conductor metadata for more reliable detection.
    */
   private detectConductorType(): { isLocal: boolean; url: string | null } {
     const displayInfo = this.holochainClient.getDisplayInfo();
@@ -613,8 +674,8 @@ export class IdentityService {
     const session = this.sessionHumanService.getSession();
 
     if (session) {
-      // Determine mode based on session state
-      const mode: IdentityMode = session.sessionState === 'linked' ? 'session' : 'session';
+      // Determine mode based on session state (always session for fallback)
+      const mode: IdentityMode = 'session';
       const isAuthenticated = session.sessionState !== 'migrated';
 
       // Generate DID for session identity
@@ -750,10 +811,9 @@ export class IdentityService {
         this.sessionHumanService.markAsMigrated(authResult.agentPubKey, authResult.humanId);
       }
 
-      console.log('[IdentityService] Registered via doorway:', authResult.humanId);
       return profile;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      const errorMessage = err instanceof Error ? err.message : REGISTRATION_FAILED_MESSAGE;
       this.updateState({ isLoading: false, error: errorMessage });
       throw err;
     }
@@ -783,7 +843,7 @@ export class IdentityService {
       });
 
       if (!result.success || !result.data) {
-        throw new Error(result.error ?? 'Registration failed');
+        throw new Error(result.error ?? REGISTRATION_FAILED_MESSAGE);
       }
 
       const sessionResult = result.data;
@@ -829,7 +889,7 @@ export class IdentityService {
 
       return profile;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      const errorMessage = err instanceof Error ? err.message : REGISTRATION_FAILED_MESSAGE;
       this.updateState({ isLoading: false, error: errorMessage });
       throw err;
     }
@@ -863,8 +923,14 @@ export class IdentityService {
       }
 
       return null;
-    } catch (err) {
-      console.error('[IdentityService] Failed to get current human:', err);
+    } catch (error) {
+      // Profile not available - return null (visitor or not yet registered)
+      // This is expected when the user hasn't created a Holochain identity yet
+      // Log only unexpected errors
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('not found') && !message.includes("doesn't exist")) {
+        console.warn('[IdentityService] Unexpected error fetching profile:', message);
+      }
       return null;
     }
   }
@@ -944,8 +1010,6 @@ export class IdentityService {
 
     // Fall back to session identity
     this.fallbackToSession();
-
-    console.log('[IdentityService] Logged out, reverted to session');
   }
 
   /**
@@ -974,7 +1038,6 @@ export class IdentityService {
           resolve(true);
         } else if (Date.now() - startTime > timeoutMs) {
           clearInterval(checkInterval);
-          console.log('[IdentityService] Timeout waiting for authenticated state');
           resolve(false);
         }
       }, 100);
@@ -989,80 +1052,76 @@ export class IdentityService {
     // For hosted mode, the edge node holds the keys
     // We need to verify the identity and load the profile
 
-    if (!this.holochainClient.isConnected()) {
-      console.log('[IdentityService] Waiting for Holochain connection...');
-
-      // Wait up to 10 seconds for connection
-      const connected = await this.waitForHolochainConnection(10000);
-      if (!connected) {
-        console.warn(
-          '[IdentityService] Timeout waiting for Holochain - setting hosted mode without profile'
-        );
-        // Still update state to show logged-in UI, just without full profile
-        this.setMinimalAuthenticatedState(humanId, agentPubKey);
-        return;
-      }
+    const isConnected = await this.ensureHolochainConnection(humanId, agentPubKey);
+    if (!isConnected) {
+      return;
     }
 
     try {
-      // Verify the identity by fetching the current human from imagodei DNA
-      const result = await this.holochainClient.callZome<HumanSessionResult | null>({
-        zomeName: 'imagodei',
-        fnName: 'get_my_human',
-        payload: null,
-        roleName: 'imagodei', // Use imagodei DNA for identity
-      });
+      const result = await this.fetchHolochainIdentity();
 
       if (result.success && result.data) {
-        const sessionResult = result.data;
-
-        // Verify the humanId matches
-        if (sessionResult.human.id !== humanId) {
-          console.warn('[IdentityService] HumanId mismatch after login');
-          // Continue anyway - the auth token is still valid
-        }
-
-        // Update identity state
-        const conductorInfo = this.detectConductorType();
-        const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
-        const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-        const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
-
-        // Generate DID for authenticated identity
-        const did = generateDID(
-          identityMode,
-          sessionResult.human.id,
-          sessionResult.agentPubkey,
-          null
-        );
-
-        this.updateState({
-          mode: identityMode,
-          isAuthenticated: true,
-          humanId: sessionResult.human.id,
-          displayName: sessionResult.human.displayName,
-          agentPubKey: sessionResult.agentPubkey,
-          did,
-          profile: mapToProfile(sessionResult.human),
-          attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
-          sovereigntyStage,
-          keyLocation,
-          canExportKeys: keyLocation === 'custodial',
-          isLocalConductor: conductorInfo.isLocal,
-          conductorUrl: conductorInfo.url,
-          hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
-          isLoading: false,
-          error: null,
-        });
-
-        console.log(
-          '[IdentityService] Connected as authenticated user:',
-          sessionResult.human.displayName
-        );
+        this.updateAuthenticatedIdentityState(result.data);
       }
-    } catch (err) {
-      console.error('[IdentityService] Failed to verify authenticated user:', err);
+    } catch (error) {
+      // Error loading full profile - fall back to minimal authenticated state
+      // This can happen if the zome call fails or the network is unstable
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn('[IdentityService] Failed to load full profile, using minimal state:', message);
+      this.setMinimalAuthenticatedState(humanId, agentPubKey);
     }
+  }
+
+  /**
+   * Ensure Holochain is connected, waiting if necessary.
+   * Sets minimal state if connection cannot be established.
+   *
+   * @returns True if connected, false if fallback state was set
+   */
+  private async ensureHolochainConnection(humanId: string, agentPubKey: string): Promise<boolean> {
+    if (!this.holochainClient.isConnected()) {
+      // Wait up to 10 seconds for connection
+      const connected = await this.waitForHolochainConnection(10000);
+      if (!connected) {
+        // Still update state to show logged-in UI, just without full profile
+        this.setMinimalAuthenticatedState(humanId, agentPubKey);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Update identity state with authenticated user profile from Holochain.
+   */
+  private updateAuthenticatedIdentityState(sessionResult: HumanSessionResult): void {
+    // Update identity state
+    const conductorInfo = this.detectConductorType();
+    const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
+    const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
+    const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+
+    // Generate DID for authenticated identity
+    const did = generateDID(identityMode, sessionResult.human.id, sessionResult.agentPubkey, null);
+
+    this.updateState({
+      mode: identityMode,
+      isAuthenticated: true,
+      humanId: sessionResult.human.id,
+      displayName: sessionResult.human.displayName,
+      agentPubKey: sessionResult.agentPubkey,
+      did,
+      profile: mapToProfile(sessionResult.human),
+      attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
+      sovereigntyStage,
+      keyLocation,
+      canExportKeys: keyLocation === 'custodial',
+      isLocalConductor: conductorInfo.isLocal,
+      conductorUrl: conductorInfo.url,
+      hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
+      isLoading: false,
+      error: null,
+    });
   }
 
   /**
@@ -1109,8 +1168,6 @@ export class IdentityService {
       isLoading: false,
       error: null,
     });
-
-    console.log('[IdentityService] Set minimal authenticated state for:', humanId);
   }
 
   // ==========================================================================

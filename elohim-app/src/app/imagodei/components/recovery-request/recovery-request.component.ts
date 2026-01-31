@@ -16,6 +16,8 @@ import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
+// @coverage: 29.8% (2026-02-04)
+
 import { getRecoveryStatusDisplay } from '../../models/recovery.model';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { RecoveryCoordinatorService } from '../../services/recovery-coordinator.service';
@@ -117,13 +119,13 @@ export class RecoveryRequestComponent implements OnInit, OnDestroy {
     const success = await this.recoveryService.completeRecovery();
     if (success) {
       // Navigate to login after recovery
-      this.router.navigate(['/identity/login']);
+      void this.router.navigate(['/identity/login']);
     }
   }
 
   selectDoorway(): void {
     // Navigate to doorway picker
-    this.router.navigate(['/identity/login'], {
+    void this.router.navigate(['/identity/login'], {
       queryParams: { step: 'doorway' },
     });
   }
@@ -141,7 +143,7 @@ export class RecoveryRequestComponent implements OnInit, OnDestroy {
 
     // Poll every 10 seconds for status updates
     this.pollInterval = setInterval(() => {
-      this.recoveryService.refreshRequestStatus();
+      void this.recoveryService.refreshRequestStatus();
 
       // Check if recovery completed or denied
       const request = this.activeRequest();
@@ -156,7 +158,7 @@ export class RecoveryRequestComponent implements OnInit, OnDestroy {
     }, 10_000);
 
     // Initial fetch
-    this.recoveryService.refreshRequestStatus();
+    void this.recoveryService.refreshRequestStatus();
   }
 
   private stopPolling(): void {

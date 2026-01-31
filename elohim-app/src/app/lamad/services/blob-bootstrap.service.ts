@@ -12,6 +12,10 @@
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 
+// @coverage: 48.0% (2026-02-04)
+
+import { firstValueFrom } from 'rxjs';
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 import {
@@ -79,7 +83,7 @@ export class BlobBootstrapService {
     // Adapter 2: Blob metadata fetcher (Angular service → engine interface)
     const metadataFetcher: BlobMetadataFetcher = {
       getBlobsForContent: async (contentId: string) => {
-        const result = await this.blobManager.getBlobsForContent(contentId).toPromise();
+        const result = await firstValueFrom(this.blobManager.getBlobsForContent(contentId));
         return result ?? [];
       },
     };
@@ -134,9 +138,8 @@ export class BlobBootstrapService {
    * Start blob bootstrap sequence (non-blocking).
    * Called from app.component.ts when Holochain is ready.
    */
-  async startBootstrap(contentIdsToPreload?: string[]): Promise<void> {
+  startBootstrap(contentIdsToPreload?: string[]): void {
     if (!this.engine) {
-      console.warn('[BlobBootstrapService] Engine not initialized');
       return;
     }
 
@@ -150,7 +153,7 @@ export class BlobBootstrapService {
         { isConnected: () => this.holochainService.isConnected() },
         {
           getBlobsForContent: async id => {
-            const result = await this.blobManager.getBlobsForContent(id).toPromise();
+            const result = await firstValueFrom(this.blobManager.getBlobsForContent(id));
             return result ?? [];
           },
         },
@@ -160,7 +163,7 @@ export class BlobBootstrapService {
       // Re-attach event listeners (simplified - in production use a helper method)
     }
 
-    await this.engine.startBootstrap();
+    this.engine.startBootstrap();
   }
 
   /**

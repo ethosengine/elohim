@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterOutlet, RouterLink } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { ElohimNavigatorComponent } from '@app/elohim/components/elohim-navigator/elohim-navigator.component';
 
 /**

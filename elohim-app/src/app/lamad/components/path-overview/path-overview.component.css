@@ -294,7 +294,6 @@
   flex: 1;
   min-width: 0; /* Prevent flex overflow */
   overflow-wrap: break-word;
-  overflow-wrap: break-word;
 }
 
 .path-thumbnail-container {
@@ -679,7 +678,6 @@
   flex: 1;
   min-width: 0; /* Prevent flex overflow */
   overflow-wrap: break-word;
-  overflow-wrap: break-word;
 }
 
 .step-content h3 {
@@ -769,7 +767,7 @@
 
 .chapter-step-item.locked {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 60%;
 }
 
 .step-status-icon {
@@ -792,7 +790,7 @@
 
 .step-status-icon .checkmark.global {
   color: var(--lamad-success, #10b981);
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .step-status-icon .lock {
@@ -1481,7 +1479,7 @@
 
 .concept-status-icon .checkmark.global {
   color: var(--lamad-success, #10b981);
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .concept-icon {
@@ -1494,7 +1492,6 @@
 .concept-name {
   flex: 1;
   min-width: 0; /* Prevent flex overflow */
-  overflow-wrap: break-word;
   overflow-wrap: break-word;
 }
 

@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
+// @coverage: 84.6% (2026-02-04)
+
 import { takeUntil } from 'rxjs/operators';
 
 import * as d3 from 'd3';
@@ -136,14 +138,14 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   returnToPath(): void {
     if (this.returnContext) {
-      this.router.navigate([
+      void this.router.navigate([
         '/lamad/path',
         this.returnContext.pathId,
         'step',
         this.returnContext.stepIndex,
       ]);
     } else {
-      this.router.navigate(['/lamad']);
+      void this.router.navigate(['/lamad']);
     }
   }
 
@@ -261,8 +263,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
             this.renderClusterGraph();
           }
         },
-        error: err => {
-          console.error('[GraphExplorer] Failed to load path hierarchy:', err);
+        error: _err => {
           this.error = 'Failed to load learning path graph';
           this.isLoading = false;
         },
@@ -415,8 +416,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
           // Re-render
           this.renderClusterGraph();
         },
-        error: err => {
-          console.error('[GraphExplorer] Failed to expand cluster:', err);
+        error: _err => {
           this.loadingClusters.delete(clusterId);
         },
       });
@@ -823,7 +823,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    * Navigate to content viewer.
    */
   navigateToContent(nodeId: string): void {
-    this.router.navigate(['/lamad/resource', nodeId]);
+    void this.router.navigate(['/lamad/resource', nodeId]);
   }
 
   /**

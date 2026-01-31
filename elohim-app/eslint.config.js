@@ -51,7 +51,9 @@ module.exports = tseslint.config(
       }
     },
     rules: {
-      // Angular recommended rules
+      // ============================================================
+      // ANGULAR RULES
+      // ============================================================
       "@angular-eslint/directive-selector": [
         "error",
         { type: "attribute", prefix: "app", style: "camelCase" }
@@ -63,43 +65,79 @@ module.exports = tseslint.config(
       "@angular-eslint/no-empty-lifecycle-method": "error",
       "@angular-eslint/use-lifecycle-interface": "error",
 
-      // TypeScript rules - relaxed for gradual adoption
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", {
+      // ============================================================
+      // TYPESCRIPT-ESLINT RULES - SonarQube Parity
+      // ============================================================
+
+      // Type safety (stricter settings)
+      "@typescript-eslint/no-explicit-any": "error",            // S6609 - "any" should not be used
+      "@typescript-eslint/no-unsafe-assignment": "warn",        // Type safety
+      "@typescript-eslint/no-unsafe-member-access": "warn",     // Type safety
+      "@typescript-eslint/no-unsafe-call": "warn",              // Type safety
+      "@typescript-eslint/no-unsafe-return": "warn",            // Type safety
+      "@typescript-eslint/no-unsafe-argument": "warn",          // Type safety
+
+      // Unused code detection
+      "@typescript-eslint/no-unused-vars": ["error", {          // S1481 - Unused local variables
         argsIgnorePattern: "^_",
-        varsIgnorePattern: "^_"
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_"
       }],
-      "@typescript-eslint/no-empty-function": "off",
-      "@typescript-eslint/consistent-type-definitions": ["warn", "interface"],
+      "@typescript-eslint/no-empty-function": "warn",           // S1186 - Empty functions
 
-      // TypeScript rules for SonarQube parity
-      "@typescript-eslint/prefer-nullish-coalescing": "warn",   // S6606
-      "@typescript-eslint/prefer-optional-chain": "warn",       // S6582
-      "@typescript-eslint/prefer-readonly": "warn",             // S2933
-      "@typescript-eslint/no-array-constructor": "error",       // S7723
+      // Code style matching SonarQube
+      "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+      "@typescript-eslint/prefer-nullish-coalescing": "error",  // S6606 - Use nullish coalescing
+      "@typescript-eslint/prefer-optional-chain": "error",      // S6582 - Use optional chaining
+      "@typescript-eslint/prefer-readonly": "error",            // S2933 - Mark fields readonly when possible
+      "@typescript-eslint/no-array-constructor": "error",       // S7723 - Use new Array()
+      "@typescript-eslint/prefer-for-of": "error",              // S4138 - Prefer for-of loops
+      "@typescript-eslint/prefer-includes": "error",            // Prefer .includes() over .indexOf()
+      "@typescript-eslint/prefer-string-starts-ends-with": "error", // S5850 - Use startsWith/endsWith
 
-      // Import rules - enforce aliases over deep relative imports crossing pillars
+      // Promise handling - matches S6544
+      "@typescript-eslint/no-misused-promises": "error",        // S6544 - Promise in void context
+      "@typescript-eslint/no-floating-promises": "error",       // Unhandled promises must be awaited
+      "@typescript-eslint/promise-function-async": "warn",      // Functions returning promises should be async
+      "@typescript-eslint/require-await": "error",              // S2486/S4123 - async functions need await
+
+      // Deprecated APIs - matches S1874
+      "@typescript-eslint/no-deprecated": "warn",               // S1874 - Deprecated API usage
+
+      // Naming conventions - matches S101
+      "@typescript-eslint/naming-convention": [
+        "error",
+        {
+          selector: "interface",
+          format: ["PascalCase"],
+          custom: {
+            regex: "^[A-Z]",
+            match: true
+          }
+        },
+        {
+          selector: "class",
+          format: ["PascalCase"]
+        },
+        {
+          selector: "typeAlias",
+          format: ["PascalCase"]
+        }
+      ],
+
+      // ============================================================
+      // IMPORT RULES
+      // ============================================================
       "no-restricted-imports": ["error", {
         patterns: [
           {
             group: ["../../../elohim/*", "../../../imagodei/*", "../../../lamad/*", "../../../qahal/*", "../../../shefa/*", "../../../doorway/*"],
             message: "Use @app/{pillar} aliases instead of deep relative imports (e.g., @app/elohim/services/...)"
           }
-          // Note: 4+ levels rule removed - catches too many false positives (environments, elohim-library)
         ]
       }],
-
-      // Import organization - auto-fixable with --fix
-      "import/order": ["warn", {
-        groups: [
-          "builtin",      // Node.js built-ins
-          "external",     // npm packages
-          "internal",     // @app/* aliases
-          "parent",       // ../
-          "sibling",      // ./
-          "index",        // ./index
-          "type"          // type imports
-        ],
+      "import/order": ["error", {
+        groups: ["builtin", "external", "internal", "parent", "sibling", "index", "type"],
         pathGroups: [
           { pattern: "@angular/**", group: "external", position: "before" },
           { pattern: "rxjs/**", group: "external", position: "before" },
@@ -110,30 +148,49 @@ module.exports = tseslint.config(
         "newlines-between": "always",
         alphabetize: { order: "asc", caseInsensitive: true }
       }],
-      "import/no-duplicates": "error",
-      "import/no-useless-path-segments": "warn",
+      "import/no-duplicates": "error",                          // S1128 - Duplicate imports
+      "import/no-useless-path-segments": "error",
 
-      // General best practices
-      "no-console": ["warn", { allow: ["warn", "error"] }],
-      "prefer-const": "error",
-      "no-var": "error",
+      // ============================================================
+      // GENERAL BEST PRACTICES
+      // ============================================================
+      "no-console": ["error", { allow: ["warn", "error"] }],    // S106 - No console.log
+      "prefer-const": "error",                                   // S3353 - Prefer const
+      "no-var": "error",                                         // S3504 - Use let/const
+      "eqeqeq": ["error", "always"],                            // S1244 - Use === instead of ==
+      "no-eval": "error",                                        // S1523 - No eval
+      "no-implied-eval": "error",                               // No implied eval
+      "no-new-func": "error",                                   // No Function constructor
+      "no-throw-literal": "error",                              // S3696 - Throw Error objects
 
-      // SonarJS overrides (recommended preset enabled in extends)
-      "sonarjs/cognitive-complexity": ["error", 15],  // Strict: error at threshold 15
+      // ============================================================
+      // SONARJS RULES - Strict Configuration
+      // ============================================================
+      "sonarjs/cognitive-complexity": ["error", 15],            // S3776 - Cognitive complexity
       "sonarjs/no-duplicate-string": ["error", { threshold: 3 }],
+      "sonarjs/no-identical-functions": "error",                // S4144 - Identical functions
+      "sonarjs/no-collapsible-if": "error",                     // S1066 - Collapsible if
+      "sonarjs/no-redundant-jump": "error",                     // S3626 - Redundant jumps
+      "sonarjs/prefer-immediate-return": "error",               // S1488 - Return immediately
+      "sonarjs/no-inverted-boolean-check": "error",             // S1940 - Inverted boolean
+      "sonarjs/no-nested-conditional": "error",                 // S3358 - Nested ternary
+      "sonarjs/no-gratuitous-expressions": "error",             // S2589 - Gratuitous expressions
+      "sonarjs/prefer-single-boolean-return": "error",          // S1126 - Prefer single boolean return
+      "sonarjs/no-ignored-exceptions": "error",                 // S2486 - Ignored exceptions
+      "sonarjs/no-unused-vars": "error",                        // S1481 - Unused variables
 
-      // Only disable rules that cause false positives in Angular/RxJS patterns
-      "sonarjs/no-nested-functions": "off",   // Arrow functions in RxJS pipes are idiomatic
+      // Keep this off - arrow functions in RxJS pipes are idiomatic
+      "sonarjs/no-nested-functions": "off",
 
-      // Prettier - auto-fix formatting (disabled in CI for performance)
+      // ============================================================
+      // PRETTIER
+      // ============================================================
       "prettier/prettier": [process.env.CI === "true" ? "off" : "error"],
-
-      // Disable rules that conflict with Prettier
       ...prettierConfig.rules
     }
   },
   {
-    // HTML templates
+    // HTML templates - with accessibility rules matching SonarQube Web rules
     files: ["**/*.html"],
     plugins: {
       "@angular-eslint/template": angularTemplate,
@@ -143,9 +200,44 @@ module.exports = tseslint.config(
       parser: angularTemplateParser
     },
     rules: {
+      // Core template rules
       "@angular-eslint/template/banana-in-box": "error",
       "@angular-eslint/template/no-negated-async": "error",
       "@angular-eslint/template/eqeqeq": "error",
+      "@angular-eslint/template/no-any": "error",               // No any in templates
+
+      // ============================================================
+      // ACCESSIBILITY RULES - Matching SonarQube Web:* rules
+      // ============================================================
+      // S6845 - tabIndex on non-interactive elements
+      "@angular-eslint/template/no-positive-tabindex": "error",
+
+      // MouseEventWithoutKeyboardEquivalentCheck - keyboard accessibility
+      "@angular-eslint/template/click-events-have-key-events": "error",
+      "@angular-eslint/template/mouse-events-have-key-events": "error",
+
+      // S6819/S6842 - Interactive roles and focus support
+      "@angular-eslint/template/interactive-supports-focus": "error",
+      "@angular-eslint/template/role-has-required-aria": "error",
+      "@angular-eslint/template/valid-aria": "error",
+
+      // S6844 - Alt text for images
+      "@angular-eslint/template/alt-text": "error",
+
+      // S6827 - Label associations
+      "@angular-eslint/template/label-has-associated-control": "warn",
+
+      // S6823 - Button types
+      "@angular-eslint/template/button-has-type": "error",
+
+      // S6828 - Table scope
+      "@angular-eslint/template/table-scope": "error",
+
+      // Additional quality rules
+      "@angular-eslint/template/no-duplicate-attributes": "error",
+      "@angular-eslint/template/no-distracting-elements": "error",
+      "@angular-eslint/template/no-autofocus": "warn",
+      "@angular-eslint/template/elements-content": "error",      // Non-empty elements
 
       // Prettier for HTML templates (disabled in CI)
       "prettier/prettier": [process.env.CI === "true" ? "off" : "error"]

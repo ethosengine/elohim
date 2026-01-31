@@ -200,7 +200,6 @@
 
   /* Text Wrapping */
   overflow-wrap: break-word;
-  overflow-wrap: break-word;
   word-break: break-word;
 }
 
@@ -329,7 +328,7 @@
 :host ::ng-deep .markdown-content .heading-anchor .anchor-link {
   position: absolute;
   left: -1.25em;
-  opacity: 0;
+  opacity: 0%;
   color: var(--lamad-text-tertiary, #656d76);
   font-weight: 400;
   text-decoration: none;
@@ -339,7 +338,7 @@
 }
 
 :host ::ng-deep .markdown-content .heading-anchor:hover .anchor-link {
-  opacity: 1;
+  opacity: 100%;
 }
 
 :host ::ng-deep .markdown-content .heading-anchor .anchor-link:hover {

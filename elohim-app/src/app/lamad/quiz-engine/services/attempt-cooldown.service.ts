@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 78.6% (2026-02-04)
+
 import { BehaviorSubject, Observable, interval, map, startWith } from 'rxjs';
 
 import {
@@ -44,7 +46,6 @@ import type { QuizResult } from '../models/quiz-session.model';
  *   // After completion
  *   cooldownService.recordAttempt('concept-123', 'human-456', result);
  * } else {
- *   console.log(check.message); // "Please wait 3h 45m..."
  * }
  *
  * // Subscribe to countdown
@@ -400,8 +401,8 @@ export class AttemptCooldownService {
   private saveToStorage(key: string, record: AttemptRecord): void {
     try {
       localStorage.setItem(key, serializeAttemptRecord(record));
-    } catch (e) {
-      console.warn('Failed to save attempt record:', e);
+    } catch {
+      // localStorage write failure is non-critical
     }
   }
 
@@ -411,8 +412,8 @@ export class AttemptCooldownService {
       if (json) {
         return deserializeAttemptRecord(json);
       }
-    } catch (e) {
-      console.warn('Failed to load attempt record:', e);
+    } catch {
+      // localStorage read failure is non-critical
     }
     return null;
   }
@@ -420,8 +421,8 @@ export class AttemptCooldownService {
   private removeFromStorage(key: string): void {
     try {
       localStorage.removeItem(key);
-    } catch (e) {
-      console.warn('Failed to remove attempt record:', e);
+    } catch {
+      // localStorage remove failure is non-critical
     }
   }
 
@@ -439,8 +440,8 @@ export class AttemptCooldownService {
           }
         }
       }
-    } catch (e) {
-      console.warn('Failed to load attempt records from storage:', e);
+    } catch {
+      // localStorage iteration failure is non-critical
     }
 
     return records;

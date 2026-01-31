@@ -30,6 +30,8 @@
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 import { type ReachLevel, type GeographicContext } from '@app/elohim/models/protocol-core.model';
 
+// @coverage: 91.7% (2026-02-05)
+
 import type { Place } from '@app/qahal/models/place.model';
 
 // Re-export GeographicContext for backward compatibility

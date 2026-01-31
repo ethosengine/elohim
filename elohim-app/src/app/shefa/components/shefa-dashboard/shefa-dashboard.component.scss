@@ -87,7 +87,7 @@ $transition-slow: 500ms ease-in-out;
   }
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 50%;
     cursor: not-allowed;
   }
 }
@@ -400,12 +400,12 @@ $transition-slow: 500ms ease-in-out;
 
 @keyframes slideDown {
   from {
-    opacity: 0;
+    opacity: 0%;
     transform: translateY(-10px);
   }
 
   to {
-    opacity: 1;
+    opacity: 100%;
     transform: translateY(0);
   }
 }
@@ -413,11 +413,11 @@ $transition-slow: 500ms ease-in-out;
 @keyframes pulse {
   0%,
   100% {
-    opacity: 1;
+    opacity: 100%;
   }
 
   50% {
-    opacity: 0.5;
+    opacity: 50%;
   }
 }
 
@@ -679,7 +679,7 @@ $transition-slow: 500ms ease-in-out;
 
       .custodian-count {
         font-size: 0.875rem;
-        opacity: 0.9;
+        opacity: 90%;
       }
     }
 

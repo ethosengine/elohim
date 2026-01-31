@@ -15,6 +15,8 @@ import {
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { Subject, Subscription } from 'rxjs';
 
 import { ContentNode } from '../../models/content-node.model';

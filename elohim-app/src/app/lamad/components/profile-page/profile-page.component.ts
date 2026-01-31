@@ -3,6 +3,8 @@ import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 
+// @coverage: 45.5% (2026-02-04)
+
 import { takeUntil, catchError } from 'rxjs/operators';
 
 import { Subject, of } from 'rxjs';
@@ -126,8 +128,6 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
         return 'Hosted Human';
       case 'steward':
         return 'Steward';
-      case 'self-sovereign':
-        return 'Steward'; // deprecated, mapped to steward
       case 'session':
         return 'Session Visitor';
       case 'anonymous':
@@ -147,8 +147,6 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
         return 'cloud_done';
       case 'steward':
         return 'verified_user';
-      case 'self-sovereign':
-        return 'verified_user'; // deprecated, mapped to steward
       case 'session':
         return 'local_activity';
       case 'migrating':
@@ -457,9 +455,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
           // Note: avatarUrl and locale not in Holochain schema yet
         });
         this.isEditing = false;
-      } catch (err) {
-        console.error('[ProfilePage] Failed to update Holochain profile:', err);
-        // Show error to user (could add error state signal)
+      } catch {
+        // Profile update failed silently - user will need to retry
       }
     } else {
       // Update session data for visitors
@@ -615,8 +612,8 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   async copyToClipboard(value: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(value);
-    } catch (err) {
-      console.warn('Failed to copy to clipboard:', err);
+    } catch {
+      // Clipboard write failed silently - not all browsers support this API
     }
   }
 

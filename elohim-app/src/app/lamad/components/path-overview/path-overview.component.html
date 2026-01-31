@@ -12,7 +12,7 @@
     <div class="error-state">
       <h2>Unable to load path</h2>
       <p>{{ error }}</p>
-      <button class="btn btn-primary" (click)="goHome()">Back to Home</button>
+      <button type="button" class="btn btn-primary" (click)="goHome()">Back to Home</button>
     </div>
   }
 
@@ -20,7 +20,7 @@
   @if (!isLoading && !error && path) {
     <!-- Back Navigation -->
     <nav class="back-nav">
-      <button class="btn-back" (click)="goHome()">
+      <button type="button" class="btn-back" (click)="goHome()">
         <span class="icon">&#8592;</span>
         All Paths
       </button>
@@ -30,7 +30,7 @@
     <div class="path-header">
       <div class="path-header-content">
         <div class="path-meta">
-          <span class="difficulty-badge" [class]="path.difficulty || 'beginner'">
+          <span class="difficulty-badge" [ngClass]="path.difficulty || 'beginner'">
             {{ getDifficultyDisplay() }}
           </span>
           <span class="duration" *ngIf="path.estimatedDuration">
@@ -81,15 +81,16 @@
           <div
             class="bar-segment mastered-elsewhere"
             [style.width.%]="
-              pathCompletion?.contentCompletionPercentage - pathCompletion?.stepCompletionPercentage
+              (pathCompletion?.contentCompletionPercentage ?? 0) -
+              (pathCompletion?.stepCompletionPercentage ?? 0)
             "
             title="Mastered in other journeys"
           ></div>
         </div>
 
-        <div class="shared-mastery-note" *ngIf="pathCompletion?.sharedContentCompleted > 0">
+        <div class="shared-mastery-note" *ngIf="(pathCompletion?.sharedContentCompleted ?? 0) > 0">
           <span class="checkmark-green">✓</span>
-          {{ pathCompletion.sharedContentCompleted }} concepts mastered in other paths!
+          {{ pathCompletion!.sharedContentCompleted }} concepts mastered in other paths!
         </div>
       </section>
 
@@ -191,12 +192,10 @@
                           @for (sec of mod.sections; track sec.section.id; let secIdx = $index) {
                             <div class="section-card">
                               <!-- Section Header - clickable link to lesson view -->
-                              <a
+                              <button
+                                type="button"
                                 class="section-header section-link"
                                 (click)="goToSection(sec.concepts.at(0)?.conceptId)"
-                                (keydown.enter)="goToSection(sec.concepts.at(0)?.conceptId)"
-                                role="link"
-                                tabindex="0"
                               >
                                 <div class="section-header-left">
                                   <h5 class="section-title">{{ sec.section.title }}</h5>
@@ -222,7 +221,7 @@
                                   </div>
                                   <span class="section-arrow">→</span>
                                 </div>
-                              </a>
+                              </button>
 
                               <!-- Section Body - concept list -->
                               <div class="section-body">
@@ -237,36 +236,38 @@
                                       concept of sec.concepts;
                                       track concept.conceptId || $index
                                     ) {
-                                      <li
-                                        class="concept-item"
-                                        [class.completed]="concept.isCompleted"
-                                        [class.global-complete]="concept.isGlobalCompletion"
-                                        (click)="goToConcept(concept.conceptId)"
-                                        (keydown.enter)="goToConcept(concept.conceptId)"
-                                        role="button"
-                                        tabindex="0"
-                                      >
-                                        <span class="concept-status-icon">
-                                          @if (concept.isCompleted) {
-                                            <span class="checkmark">✓</span>
-                                          } @else if (concept.isGlobalCompletion) {
-                                            <span
-                                              class="checkmark global"
-                                              title="Mastered in another journey"
-                                            >
-                                              ✓
-                                            </span>
-                                          } @else {
-                                            <span class="circle">○</span>
-                                          }
-                                        </span>
-                                        <span class="concept-icon">{{ concept.icon }}</span>
-                                        <span class="concept-name">{{ concept.title }}</span>
-                                        @if (concept.contentType) {
-                                          <span class="content-type-tag">
-                                            {{ concept.contentType }}
+                                      <li>
+                                        <button
+                                          type="button"
+                                          class="concept-item"
+                                          [ngClass]="{
+                                            completed: concept.isCompleted,
+                                            'global-complete': concept.isGlobalCompletion,
+                                          }"
+                                          (click)="goToConcept(concept.conceptId)"
+                                        >
+                                          <span class="concept-status-icon">
+                                            @if (concept.isCompleted) {
+                                              <span class="checkmark">✓</span>
+                                            } @else if (concept.isGlobalCompletion) {
+                                              <span
+                                                class="checkmark global"
+                                                title="Mastered in another journey"
+                                              >
+                                                ✓
+                                              </span>
+                                            } @else {
+                                              <span class="circle">○</span>
+                                            }
                                           </span>
-                                        }
+                                          <span class="concept-icon">{{ concept.icon }}</span>
+                                          <span class="concept-name">{{ concept.title }}</span>
+                                          @if (concept.contentType) {
+                                            <span class="content-type-tag">
+                                              {{ concept.contentType }}
+                                            </span>
+                                          }
+                                        </button>
                                       </li>
                                     }
                                   </ul>
@@ -281,7 +282,11 @@
                 </div>
 
                 <div class="chapter-actions">
-                  <button class="btn btn-sm btn-secondary" (click)="startChapter(item.chapter.id)">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-secondary"
+                    (click)="startChapter(item.chapter.id)"
+                  >
                     {{ item.completedConcepts > 0 ? 'Continue' : 'Start' }} Chapter
                   </button>
                 </div>
@@ -296,11 +301,7 @@
           @for (s of flatSteps; track s.step.order) {
             <li
               class="step-item"
-              [class.completed]="s.isCompleted"
-              [class.global-complete]="s.isGlobalCompletion"
-              [class.locked]="s.isLocked"
-              [class.accessible]="!s.isLocked"
-              [class]="getMasteryTierClass(s.masteryTier)"
+              [ngClass]="getStepClasses(s)"
               (click)="!s.isLocked ? goToStep(s.step.order) : null"
               (keydown.enter)="!s.isLocked ? goToStep(s.step.order) : null"
               [attr.role]="s.isLocked ? null : 'button'"
@@ -325,7 +326,7 @@
                   @if (s.masteryTier !== 'unseen') {
                     <span
                       class="mastery-badge"
-                      [class]="getMasteryTierClass(s.masteryTier)"
+                      [ngClass]="getMasteryTierClass(s.masteryTier)"
                       [title]="getMasteryTierLabel(s.masteryTier)"
                     >
                       {{ getMasteryTierIcon(s.masteryTier) }}
@@ -359,6 +360,7 @@
         </div>
 
         <button
+          type="button"
           *ngIf="hasStarted() && !isCompleted()"
           class="btn btn-primary btn-large"
           (click)="continueJourney()"
@@ -366,11 +368,18 @@
           Continue Journey
         </button>
 
-        <button *ngIf="!hasStarted()" class="btn btn-primary btn-large" (click)="beginJourney()">
+        <button
+          type="button"
+          *ngIf="!hasStarted()"
+          class="btn btn-primary btn-large"
+          (click)="beginJourney()"
+        >
           Begin Journey
         </button>
 
-        <button class="btn btn-secondary" (click)="goHome()">Back to All Paths</button>
+        <button type="button" class="btn btn-secondary" (click)="goHome()">
+          Back to All Paths
+        </button>
 
         <a [routerLink]="['/lamad/resource', 'path-' + pathId]" class="view-resource-link">
           <span class="icon">↗</span>

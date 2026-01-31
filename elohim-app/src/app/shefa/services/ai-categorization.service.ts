@@ -15,6 +15,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 15.0% (2026-02-04)
+
 import { map, catchError } from 'rxjs/operators';
 
 import { Observable, of } from 'rxjs';
@@ -49,7 +51,6 @@ export class AICategorizationService {
 
   constructor(private readonly elohimStub: ElohimStubService) {
     this.initializeDefaultPatterns();
-    console.warn('[AICategories] Initialized with ElohimStubService');
   }
 
   /**
@@ -127,18 +128,13 @@ export class AICategorizationService {
     return this.elohimStub.categorizeTransactions(request).pipe(
       map(results => {
         const duration = Date.now() - startTime;
-        console.warn(
-          `[AICategories] Categorized ${transactions.length} transactions in ${duration}ms`
-        );
-
         return {
           results,
           duration,
           model: 'elohim-stub',
         };
       }),
-      catchError(error => {
-        console.error('[AICategories] Elohim call failed, using fallback', error);
+      catchError(_error => {
         return of({
           results: transactions.map(txn => this.fallbackCategorize(txn)),
           model: 'fallback',
@@ -201,15 +197,8 @@ export class AICategorizationService {
     // Check if we should auto-create a TransactionRule
     const shouldCreateRule = this.checkShouldCreateRule(staged, correctedCategory);
     if (shouldCreateRule) {
-      console.warn(
-        `[AICategories] Would create TransactionRule for ${staged.merchantName} → ${correctedCategory}`
-      );
       // Emit event or call TransactionRuleService.createRule() when available
     }
-
-    console.warn(
-      `[AICategories] Learned correction: ${staged.merchantName} → ${correctedCategory}`
-    );
   }
 
   /**

@@ -12,6 +12,8 @@ import {
   computed,
 } from '@angular/core';
 
+// @coverage: 88.6% (2026-02-04)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import { CooldownStatus } from '../../models/attempt-record.model';

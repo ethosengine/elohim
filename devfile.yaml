@@ -30,10 +30,10 @@ components:
   - name: tools
     container:
       image: harbor.ethosengine.com/devspaces/rust-nix-dev:latest
-      memoryLimit: 8Gi
-      memoryRequest: 2Gi
-      cpuLimit: '2'
-      cpuRequest: '500m'
+      memoryLimit: 16Gi
+      memoryRequest: 4Gi
+      cpuLimit: '4'
+      cpuRequest: '1'
       mountSources: true
       sourceMapping: /projects
       env:
@@ -68,6 +68,9 @@ components:
           value: /projects/.sonarqube-mcp
         - name: SONARQUBE_URL
           value: "https://sonarqube.ethosengine.com"
+        # GitHub CLI integration (GITHUB_TOKEN comes from K8s secret)
+        - name: GH_TOKEN
+          value: "${GITHUB_TOKEN}"
         # Chrome for Angular testing
         - name: CHROME_BIN
           value: /usr/local/bin/chrome
@@ -129,7 +132,7 @@ components:
   # Nix store volume - required for Nix/Holochain tooling
   - name: nix-store
     volume:
-      size: 30Gi
+      size: 40Gi
   # XDG directories for Nix cache/config (npm, cypress, typescript caches)
   - name: nix-xdg
     volume:
@@ -182,6 +185,12 @@ commands:
             --transport http \
             --header "Authorization: Basic $JENKINS_AUTH"
         fi
+
+        # Configure GitHub CLI authentication
+        if [ -n "$GH_TOKEN" ]; then
+          echo "$GH_TOKEN" | gh auth login --with-token
+          gh auth status
+        fi
   - id: start-doorway
     exec:
       component: tools
@@ -209,8 +218,8 @@ commands:
       commandLine: |
         npm install && npm run seed
 
-events:
-  postStart:
-    - setup-vscode-cli
+#events:
+#  postStart:
+#    - setup-vscode-cli
 #    - setup-npm-env
-    - setup-claude-mcp
+#    - setup-claude-mcp

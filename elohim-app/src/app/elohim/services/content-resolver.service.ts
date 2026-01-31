@@ -32,9 +32,10 @@
 
 import { Injectable, OnDestroy, inject } from '@angular/core';
 
+// @coverage: 1.0% (2026-02-05)
+
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 
-// Import services for actual fetching
 import {
   SourceTier,
   createContentResolver,
@@ -49,9 +50,6 @@ import { HolochainContentService, HolochainPathWithSteps } from './holochain-con
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { ProjectionAPIService } from './projection-api.service';
 
-// Import models
-
-// Import from framework-agnostic content resolver
 import type {
   IContentResolver,
   ResolutionResult,
@@ -61,8 +59,6 @@ import type {
   SourceInfo,
   ResolverConfig,
 } from '@elohim/service/cache/content-resolver';
-
-// Import connection strategy types
 import type {
   IConnectionStrategy,
   ConnectionConfig,
@@ -230,17 +226,12 @@ export class ContentResolverService implements OnDestroy {
       this.implementation = result.implementation;
 
       this.stateSubject.next('ready');
-      console.log(
-        `[ContentResolverService] Initialized with ${this.implementation} implementation`
-      );
 
       return {
         success: true,
         implementation: this.implementation,
       };
     } catch (error) {
-      console.error('[ContentResolverService] Initialization failed:', error);
-
       // Fallback to TypeScript implementation
       try {
         this.resolver = new TsContentResolver();
@@ -253,7 +244,8 @@ export class ContentResolverService implements OnDestroy {
           implementation: 'typescript',
           error: `WASM failed, using TypeScript fallback: ${errorMessage}`,
         };
-      } catch (fallbackError) {
+      } catch {
+        // Both WASM and TypeScript resolver initialization failed
         this.stateSubject.next('error');
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return {
@@ -361,10 +353,6 @@ export class ContentResolverService implements OnDestroy {
 
     // Get sources from strategy
     const sources = strategy.getContentSources(config);
-    console.log(
-      `[ContentResolverService] Configuring sources for ${strategy.name} mode:`,
-      sources.map(s => s.id)
-    );
 
     // Register each source from the strategy
     for (const source of sources) {
@@ -377,14 +365,8 @@ export class ContentResolverService implements OnDestroy {
       );
 
       // Set initial availability
-      if (source.available !== undefined) {
-        this.setSourceAvailable(source.id, source.available);
-      }
+      this.setSourceAvailable(source.id, source.available);
     }
-
-    console.log(
-      `[ContentResolverService] Initialized for ${strategy.mode} mode with ${sources.length} sources`
-    );
   }
 
   /**
@@ -403,9 +385,7 @@ export class ContentResolverService implements OnDestroy {
         source.contentTypes,
         source.baseUrl
       );
-      if (source.available !== undefined) {
-        this.setSourceAvailable(source.id, source.available);
-      }
+      this.setSourceAvailable(source.id, source.available);
     }
   }
 
@@ -615,7 +595,6 @@ export class ContentResolverService implements OnDestroy {
       // For conductor, check actual availability (handles race condition during init)
       if (source.id === 'conductor') {
         if (!this.holochainContent.isAvailable()) {
-          console.debug('[ContentResolver] Conductor not yet available for content, skipping');
           continue;
         }
         // Update the resolver's knowledge now that conductor is available
@@ -635,8 +614,8 @@ export class ContentResolverService implements OnDestroy {
             durationMs: performance.now() - startTime,
           };
         }
-      } catch (err) {
-        console.debug(`[ContentResolver] Source ${source.id} failed for ${contentId}:`, err);
+      } catch {
+        // Source fetch failed, will try next source in chain
       }
     }
 
@@ -661,7 +640,6 @@ export class ContentResolverService implements OnDestroy {
       case 'conductor':
         // Conductor no longer handles content - use projection instead
         // Conductor is now reserved for agent-centric data (identity, attestations, points)
-        console.debug('[ContentResolver] Conductor skipped for content - use projection');
         return null;
 
       default:
@@ -685,7 +663,6 @@ export class ContentResolverService implements OnDestroy {
       // For conductor, check actual availability (handles race condition during init)
       if (source.id === 'conductor') {
         if (!this.holochainContent.isAvailable()) {
-          console.debug('[ContentResolver] Conductor not yet available, skipping');
           continue;
         }
         // Update the resolver's knowledge now that conductor is available
@@ -705,8 +682,8 @@ export class ContentResolverService implements OnDestroy {
             durationMs: performance.now() - startTime,
           };
         }
-      } catch (err) {
-        console.debug(`[ContentResolver] Source ${source.id} failed for path ${pathId}:`, err);
+      } catch {
+        // Source fetch failed, will try next source in chain
       }
     }
 
@@ -731,7 +708,6 @@ export class ContentResolverService implements OnDestroy {
       case 'conductor':
         // Conductor no longer handles paths - use projection instead
         // Conductor is now reserved for agent-centric data (identity, attestations, points)
-        console.debug('[ContentResolver] Conductor skipped for path - use projection');
         return null;
 
       default:
@@ -802,7 +778,6 @@ export class ContentResolverService implements OnDestroy {
       case 'conductor':
         // Conductor no longer handles content batches - use projection instead
         // Conductor is now reserved for agent-centric data (identity, attestations, points)
-        console.debug('[ContentResolver] Conductor skipped for batch content - use projection');
         return new Map();
 
       default:
@@ -818,8 +793,8 @@ export class ContentResolverService implements OnDestroy {
     try {
       await this.idbCache.setContent(content);
       this.resolver?.recordContentLocation(content.id, 'indexeddb');
-    } catch (err) {
-      console.debug('[ContentResolver] Failed to cache content:', err);
+    } catch {
+      // Cache failure is non-critical, resolution will fall back to remote sources
     }
   }
 
@@ -830,8 +805,8 @@ export class ContentResolverService implements OnDestroy {
     try {
       await this.idbCache.setPath(path);
       this.resolver?.recordContentLocation(path.id, 'indexeddb');
-    } catch (err) {
-      console.debug('[ContentResolver] Failed to cache path:', err);
+    } catch {
+      // Cache failure is non-critical, resolution will fall back to remote sources
     }
   }
 
@@ -840,6 +815,7 @@ export class ContentResolverService implements OnDestroy {
    */
   invalidateContent(contentId: string): void {
     this.resolver?.removeContentLocation(contentId, 'indexeddb');
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     this.idbCache.removeContent(contentId).catch(() => {});
   }
 

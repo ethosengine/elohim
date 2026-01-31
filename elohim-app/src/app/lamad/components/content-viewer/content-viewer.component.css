@@ -344,7 +344,7 @@
 }
 
 .btn-affinity:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 
@@ -1076,7 +1076,7 @@
 }
 
 .btn-secondary:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 

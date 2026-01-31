@@ -10,6 +10,8 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
+// @coverage: 81.9% (2026-02-04)
+
 import { takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
@@ -142,7 +144,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Subscribe to route param changes
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.pathId = params['pathId'];
-      this.stepIndex = parseInt(params['stepIndex'], 10) || 0;
+      const parsed = parseInt(params['stepIndex'], 10);
+      this.stepIndex = Number.isNaN(parsed) ? 0 : parsed;
       this.loadContext();
     });
   }
@@ -246,12 +249,24 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
           // Mark content as seen and emit learning signal
           if (content) {
-            this.agentService.markContentSeen(conceptId).pipe(takeUntil(this.destroy$)).subscribe();
+            this.agentService
+              .markContentSeen(conceptId)
+              .pipe(takeUntil(this.destroy$))
+              .subscribe({
+                error: (err: unknown) => {
+                  console.error('Failed to mark content as seen:', err);
+                },
+              });
             this.agentService
               .getContentMastery(conceptId)
               .pipe(takeUntil(this.destroy$))
-              .subscribe(level => {
-                this.currentBloomLevel = level;
+              .subscribe({
+                next: level => {
+                  this.currentBloomLevel = level;
+                },
+                error: (err: unknown) => {
+                  console.error('Failed to get content mastery:', err);
+                },
               });
 
             // Track view start time for learning signals
@@ -272,7 +287,11 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
                 },
               })
               .pipe(takeUntil(this.destroy$))
-              .subscribe();
+              .subscribe({
+                error: (err: unknown) => {
+                  console.error('Failed to record learning signal:', err);
+                },
+              });
           }
 
           this.isLoading = false;
@@ -287,6 +306,13 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    * Handle step loaded (fallback for non-hierarchical paths)
    */
   private handleStepLoaded(stepView: PathStepView, path: LearningPath): void {
+    // Handle case where content is not found
+    if (!stepView.content) {
+      this.error = `Content not found: ${stepView.step.resourceId}`;
+      this.isLoading = false;
+      return;
+    }
+
     this.stepView = stepView;
 
     const stepTitle = stepView.content?.title ?? stepView.step.stepTitle;
@@ -304,12 +330,21 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       this.agentService
         .markContentSeen(stepView.step.resourceId)
         .pipe(takeUntil(this.destroy$))
-        .subscribe();
+        .subscribe({
+          error: (err: unknown) => {
+            console.error('Failed to mark content as seen:', err);
+          },
+        });
       this.agentService
         .getContentMastery(stepView.step.resourceId)
         .pipe(takeUntil(this.destroy$))
-        .subscribe(level => {
-          this.currentBloomLevel = level;
+        .subscribe({
+          next: level => {
+            this.currentBloomLevel = level;
+          },
+          error: (err: unknown) => {
+            console.error('Failed to get content mastery:', err);
+          },
         });
     }
 
@@ -331,9 +366,9 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
         total += chapter.steps.length;
       } else {
         // 4-level format: modules → sections → conceptIds
-        for (const module of chapter.modules || []) {
-          for (const section of module.sections || []) {
-            total += section.conceptIds?.length || 0;
+        for (const module of chapter.modules ?? []) {
+          for (const section of module.sections ?? []) {
+            total += section.conceptIds?.length ?? 0;
           }
         }
       }
@@ -378,7 +413,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     let globalIndex = 0;
     for (let ci = 0; ci < path.chapters!.length; ci++) {
       const chapter = path.chapters![ci];
-      const chapterSteps = chapter.steps || [];
+      const chapterSteps = chapter.steps ?? [];
 
       // Check if current stepIndex falls within this chapter
       if (this.stepIndex >= globalIndex && this.stepIndex < globalIndex + chapterSteps.length) {
@@ -387,7 +422,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
         // Build concepts list from chapter steps
         const concepts: LessonConcept[] = chapterSteps.map((step, idx) => ({
           conceptId: step.resourceId,
-          title: step.stepTitle || this.formatConceptTitle(step.resourceId),
+          title: step.stepTitle ?? this.formatConceptTitle(step.resourceId),
           isCompleted: false, // TODO: Load from progress
           isCurrent: idx === currentConceptIndex,
           index: globalIndex + idx,
@@ -425,7 +460,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Fallback: use first chapter
     if (path.chapters!.length > 0) {
       const chapter = path.chapters![0];
-      const chapterSteps = chapter.steps || [];
+      const chapterSteps = chapter.steps ?? [];
       if (chapterSteps.length > 0) {
         const syntheticSection = {
           id: `${chapter.id}-section`,
@@ -447,7 +482,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           sectionIndex: 0,
           concepts: chapterSteps.map((step, idx) => ({
             conceptId: step.resourceId,
-            title: step.stepTitle || this.formatConceptTitle(step.resourceId),
+            title: step.stepTitle ?? this.formatConceptTitle(step.resourceId),
             isCompleted: false,
             isCurrent: idx === 0,
             index: idx,
@@ -618,7 +653,11 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    * Navigate to a specific concept in the lesson
    */
   goToConcept(globalIndex: number): void {
-    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', globalIndex]);
+    this.router
+      .navigate([this.PATH_ROUTE, this.pathId, 'step', globalIndex])
+      .catch((err: unknown) => {
+        console.error('Navigation failed:', err);
+      });
   }
 
   /**
@@ -627,7 +666,9 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   goToStep(index: number): void {
     // Emit progress signal before navigating
     this.emitProgressSignal();
-    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', index]);
+    this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', index]).catch((err: unknown) => {
+      console.error('Navigation failed:', err);
+    });
   }
 
   goToPrevious(): void {
@@ -643,7 +684,9 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   goToPathOverview(): void {
-    this.router.navigate([this.PATH_ROUTE, this.pathId]);
+    this.router.navigate([this.PATH_ROUTE, this.pathId]).catch((err: unknown) => {
+      console.error('Navigation failed:', err);
+    });
   }
 
   /**
@@ -658,12 +701,18 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Persist basic completion to backend if we reach a 'completed' state
     // For prototype, let's say 'remember' is enough to mark the step complete navigation-wise
     if (this.currentBloomLevel === 'remember' || this.currentBloomLevel === 'apply') {
-      this.agentService.completeStep(this.pathId, this.stepIndex).subscribe({
-        next: () => {
-          // Refresh sidebar
-          this.loadContext();
-        },
-      });
+      this.agentService
+        .completeStep(this.pathId, this.stepIndex)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            // Refresh sidebar
+            this.loadContext();
+          },
+          error: (err: unknown) => {
+            console.error('Failed to complete step:', err);
+          },
+        });
     }
   }
 
@@ -724,7 +773,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   buildPathContext(): PathContext {
     return {
       pathId: this.pathId,
-      pathTitle: this.path?.title || '',
+      pathTitle: this.path?.title ?? '',
       stepIndex: this.stepIndex,
       totalSteps: this.getTotalSteps(),
       chapterTitle: this.getCurrentChapterTitle(),
@@ -745,14 +794,16 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   onExploreContent(contentId: string): void {
     // Track the detour in path context
     this.pathContextService.startDetour({
-      fromContentId: this.stepView?.content?.id || '',
+      fromContentId: this.stepView?.content?.id ?? '',
       toContentId: contentId,
       detourType: 'related',
       timestamp: new Date().toISOString(),
     });
 
     // Navigate to the content
-    this.router.navigate(['/lamad/resource', contentId]);
+    this.router.navigate(['/lamad/resource', contentId]).catch((err: unknown) => {
+      console.error('Navigation failed:', err);
+    });
   }
 
   /**
@@ -771,13 +822,17 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     });
 
     // Navigate to graph explorer with context
-    this.router.navigate(['/lamad/explore'], {
-      queryParams: {
-        focus: contentId,
-        fromPath: this.pathId,
-        returnStep: this.stepIndex,
-      },
-    });
+    this.router
+      .navigate(['/lamad/explore'], {
+        queryParams: {
+          focus: contentId,
+          fromPath: this.pathId,
+          returnStep: this.stepIndex,
+        },
+      })
+      .catch((err: unknown) => {
+        console.error('Navigation failed:', err);
+      });
   }
 
   /**
@@ -796,7 +851,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     this.governanceSignalService
       .recordInteractiveCompletion({
         contentId,
-        interactionType: event.type || 'interactive',
+        interactionType: event.type ?? 'interactive',
         passed: event.passed,
         score: event.score,
         details: {

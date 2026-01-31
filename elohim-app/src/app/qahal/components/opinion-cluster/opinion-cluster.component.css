@@ -94,7 +94,7 @@
 .empty-icon {
   font-size: 3rem;
   margin-bottom: 0.5rem;
-  opacity: 0.5;
+  opacity: 50%;
 }
 
 .empty-state p {
@@ -105,7 +105,7 @@
 
 .empty-hint {
   font-size: 0.85rem;
-  opacity: 0.7;
+  opacity: 70%;
   margin-top: 0.25rem;
 }
 

@@ -20,9 +20,11 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 40.5% (2026-02-04)
+
 import { map, catchError } from 'rxjs/operators';
 
-import { Observable, from, of } from 'rxjs';
+import { Observable, from, of, firstValueFrom } from 'rxjs';
 
 import { DoorwayClientService } from '../../elohim/services/doorway-client.service';
 
@@ -158,13 +160,13 @@ export class BlobVerificationService {
           method: 'wasm',
         };
       }
-    } catch (error) {
-      console.warn('[BlobVerification] WASM verification failed, trying server:', error);
+    } catch {
+      // WASM verification failed - continue to next method
     }
 
     // Try server verification (authoritative, always available online)
     try {
-      const response = await this.doorway.verifyBlobData(data, expectedHash).toPromise();
+      const response = await firstValueFrom(this.doorway.verifyBlobData(data, expectedHash));
       if (response) {
         return {
           isValid: response.isValid,
@@ -174,8 +176,8 @@ export class BlobVerificationService {
           method: 'server',
         };
       }
-    } catch (error) {
-      console.warn('[BlobVerification] Server verification failed, trying SubtleCrypto:', error);
+    } catch {
+      // Server verification failed - continue to next method
     }
 
     // Try SubtleCrypto (browser native, requires HTTPS)
@@ -192,8 +194,8 @@ export class BlobVerificationService {
           method: 'subtle-crypto',
         };
       }
-    } catch (error) {
-      console.warn('[BlobVerification] SubtleCrypto failed, using JS fallback:', error);
+    } catch {
+      // SubtleCrypto verification failed - continue to fallback
     }
 
     // Final fallback: pure JavaScript SHA256
@@ -232,10 +234,10 @@ export class BlobVerificationService {
       await wasm.default(); // Initialize WASM
       this.wasmModule = wasm as unknown as ElohimWasmModule;
       this.wasmAvailable = true;
-      console.info('[BlobVerification] WASM module loaded successfully');
+
       return true;
-    } catch (error) {
-      console.warn('[BlobVerification] WASM module not available:', error);
+    } catch {
+      // WASM module load failed - WASM not available
       this.wasmAvailable = false;
       return false;
     }
@@ -273,8 +275,8 @@ export class BlobVerificationService {
         }
 
         return hasher.finalize_hash();
-      } catch (error) {
-        console.warn('[BlobVerification] WASM streaming failed, using fallback:', error);
+      } catch {
+        // WASM streaming hash failed - continue to fallback
       }
     }
 
@@ -322,9 +324,7 @@ export class BlobVerificationService {
   verifyMultiple(blobsWithHashes: [Blob, string][]): Observable<BlobVerificationResult[]> {
     const verifications = blobsWithHashes.map(([blob, hash]) => this.verifyBlob(blob, hash));
 
-    return from(
-      Promise.all(verifications.map(v => v.toPromise() as Promise<BlobVerificationResult>))
-    );
+    return from(Promise.all(verifications.map(async v => firstValueFrom(v))));
   }
 
   /**
@@ -344,7 +344,7 @@ export class BlobVerificationService {
     // Server is always available if we have network
     let serverAvailable = false;
     try {
-      await this.doorway.checkHealth().toPromise();
+      await firstValueFrom(this.doorway.checkHealth());
       serverAvailable = true;
     } catch {
       serverAvailable = false;
@@ -475,10 +475,6 @@ export class BlobVerificationService {
    * Convert ArrayBuffer/Uint8Array to base64 string.
    */
   private arrayBufferToBase64(bytes: Uint8Array): string {
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
+    return btoa(String.fromCodePoint(...Array.from(bytes)));
   }
 }

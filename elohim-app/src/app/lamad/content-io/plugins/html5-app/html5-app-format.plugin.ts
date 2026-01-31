@@ -1,5 +1,7 @@
 import { Injectable, Type } from '@angular/core';
 
+// @coverage: 100.0% (2026-02-04)
+
 import {
   IframeRendererComponent,
   Html5AppContent,
@@ -74,6 +76,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // Import
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async import(input: string | File): Promise<ContentIOImportResult> {
     // For HTML5 apps, import creates the content structure from a zip file
     // The actual zip is stored separately as a blob in the DHT
@@ -130,6 +133,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // Export
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async export(node: ContentIOExportInput): Promise<string> {
     // Export the content structure as JSON
     // The actual zip blob is handled separately by the blob service
@@ -150,6 +154,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async validate(input: string | File): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];

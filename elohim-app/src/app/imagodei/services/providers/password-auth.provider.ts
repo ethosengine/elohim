@@ -15,6 +15,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 72.5% (2026-02-04)
+
 import { firstValueFrom } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
@@ -79,14 +81,12 @@ export class PasswordAuthProvider implements AuthProvider {
     // Check for selected doorway first (fediverse-style gateway)
     const doorwayUrl = this.doorwayRegistry.selectedUrl();
     if (doorwayUrl) {
-      console.log('[PasswordAuth] Using selected doorway:', doorwayUrl);
       return doorwayUrl;
     }
 
     // Check for Eclipse Che environment
     const cheAuthUrl = this.getCheAuthUrl();
     if (cheAuthUrl) {
-      console.log('[PasswordAuth] Using Che hc-dev endpoint:', cheAuthUrl);
       return cheAuthUrl;
     }
 
@@ -130,8 +130,6 @@ export class PasswordAuthProvider implements AuthProvider {
    * Login with email/username and password.
    */
   async login(credentials: AuthCredentials): Promise<AuthResult> {
-    console.log('[PasswordAuth] login() called');
-
     if (credentials.type !== 'password') {
       return {
         success: false,
@@ -142,7 +140,6 @@ export class PasswordAuthProvider implements AuthProvider {
 
     const passwordCreds = credentials as PasswordCredentials;
     const url = `${this.getAuthBaseUrl()}/auth/login`;
-    console.log('[PasswordAuth] Making login request to:', url);
 
     const body: LoginRequest = {
       identifier: passwordCreds.identifier,
@@ -150,14 +147,11 @@ export class PasswordAuthProvider implements AuthProvider {
     };
 
     try {
-      console.log('[PasswordAuth] Sending HTTP POST...');
-      const startTime = Date.now();
       const response = await firstValueFrom(
         this.http.post<AuthResponse>(url, body, {
           headers: this.getHeaders(),
         })
       );
-      console.log('[PasswordAuth] Response received in', Date.now() - startTime, 'ms');
 
       return {
         success: true,
@@ -168,7 +162,6 @@ export class PasswordAuthProvider implements AuthProvider {
         identifier: response.identifier,
       };
     } catch (err) {
-      console.error('[PasswordAuth] Request failed:', err);
       return this.handleError(err);
     }
   }
@@ -199,16 +192,12 @@ export class PasswordAuthProvider implements AuthProvider {
       agentPubKey: credentials.agentPubKey,
     };
 
-    console.log('[PasswordAuth] Registering with doorway:', url);
-
     try {
       const response = await firstValueFrom(
         this.http.post<AuthResponse>(url, body, {
           headers: this.getHeaders(),
         })
       );
-
-      console.log('[PasswordAuth] Registration successful, profile:', response.profile);
 
       return {
         success: true,
@@ -219,7 +208,6 @@ export class PasswordAuthProvider implements AuthProvider {
         identifier: response.identifier,
       };
     } catch (err) {
-      console.error('[PasswordAuth] Registration failed:', err);
       return this.handleError(err);
     }
   }

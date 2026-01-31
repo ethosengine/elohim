@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 0.2% (2026-02-05)
+
 import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 
 import { Observable, of, from, defer, forkJoin } from 'rxjs';
@@ -220,7 +222,7 @@ export class DataLoaderService {
     private readonly idbCache: IndexedDBCacheService
   ) {
     // Initialize caches in background
-    this.initCaches();
+    void this.initCaches();
 
     // NOTE: Conductor availability tracking removed.
     // Conductor is no longer used for content resolution - content comes from doorway projection.
@@ -280,12 +282,13 @@ export class DataLoaderService {
         // Store in IndexedDB cache for offline persistence (background, non-blocking)
         if (this.idbInitialized) {
           this.idbCache.setPath(path).catch(() => {
-            // Ignore IndexedDB errors
+            // Silently ignore IndexedDB errors - caching is a performance optimization
+            // and should not block path loading if storage fails
           });
         }
       }),
       catchError(err => {
-        const errMsg = err.message || String(err);
+        const errMsg = err.message ?? String(err);
         if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
           this.logger.warn('Path not found (may be stale reference)', { pathId });
         } else {
@@ -343,7 +346,7 @@ export class DataLoaderService {
         return this.transformHolochainPathOverview(result);
       }),
       catchError(err => {
-        this.logger.warn('Path overview failed', { pathId, error: err.message || err });
+        this.logger.warn('Path overview failed', { pathId, error: err.message ?? err });
         throw err;
       }),
       shareReplay(1)
@@ -407,12 +410,13 @@ export class DataLoaderService {
         // Store in IndexedDB cache for offline persistence (background, non-blocking)
         if (this.idbInitialized && content.contentType !== 'placeholder') {
           this.idbCache.setContent(content).catch(() => {
-            // Ignore IndexedDB errors
+            // Silently ignore IndexedDB errors - caching is a performance optimization
+            // and should not block content loading if storage fails
           });
         }
       }),
       catchError(err => {
-        this.logger.warn('Error loading content', { resourceId, error: err.message || err });
+        this.logger.warn('Error loading content', { resourceId, error: err.message ?? err });
         return of(this.createPlaceholderContent(resourceId, err.message));
       })
     );
@@ -438,7 +442,10 @@ export class DataLoaderService {
             c => c.contentType !== 'placeholder'
           );
           if (toCache.length > 0) {
-            this.idbCache.setContentBatch(toCache).catch(() => {});
+            this.idbCache.setContentBatch(toCache).catch(() => {
+              // Silently ignore IndexedDB errors - batch caching is a performance optimization
+              // and should not block batch content loading if storage fails
+            });
           }
         }
       }),
@@ -454,7 +461,7 @@ export class DataLoaderService {
       catchError(err => {
         this.logger.warn('Batch load error', {
           count: resourceIds.length,
-          error: err.message || err,
+          error: err.message ?? err,
         });
         // Return placeholders for all
         const contentMap = new Map<string, ContentNode>();
@@ -513,7 +520,7 @@ export class DataLoaderService {
       id: resourceId,
       contentType: 'placeholder',
       title: `Content Not Found: ${resourceId}`,
-      description: errorMessage || `The content "${resourceId}" could not be loaded.`,
+      description: errorMessage ?? `The content "${resourceId}" could not be loaded.`,
       content: `This content is not yet available. It may not have been seeded or there was an error loading it.\n\nResource ID: ${resourceId}${errorMessage ? `\nError: ${errorMessage}` : ''}`,
       contentFormat: 'markdown',
       tags: ['missing', 'placeholder'],
@@ -538,22 +545,18 @@ export class DataLoaderService {
    * @returns Observable<boolean> - true if data layer is ready
    */
   checkReadiness(): Observable<boolean> {
-    if (!this.readinessCache$) {
-      // Try to get a single content item or path to verify connectivity
-      // This is much lighter than getContentIndex() which loads all content
-      this.readinessCache$ = this.contentService.queryContent({ limit: 1 }).pipe(
-        timeout(5000),
-        map(() => true),
-        catchError(err => {
-          this.logger.warn('Readiness check failed', err);
-          // Clear cache so next call retries
-          this.readinessCache$ = null;
-          return of(false);
-        }),
-        shareReplay(1)
-      );
-    }
-    return this.readinessCache$;
+    this.readinessCache$ ??= this.contentService.queryContent({ limit: 1 }).pipe(
+      timeout(5000),
+      map(() => true),
+      catchError(err => {
+        this.logger.warn('Readiness check failed', err);
+        // Clear cache so next call retries
+        this.readinessCache$ = null;
+        return of(false);
+      }),
+      shareReplay(1)
+    );
+    return this.readinessCache$ ?? of(false);
   }
 
   /**
@@ -574,39 +577,45 @@ export class DataLoaderService {
    * Use checkReadiness() if you just need to verify data is available.
    */
   getContentIndex(): Observable<any> {
-    if (!this.contentIndexCache$) {
-      this.contentIndexCache$ = this.contentService.queryContent({ limit: 1000 }).pipe(
-        map(nodes => ({
-          nodes: nodes.map(node => ({
-            id: node.id,
-            title: node.title,
-            description: node.description || '',
-            contentType: node.contentType,
-            tags: node.tags || [],
-            reach: node.reach || 'commons',
-            trustScore: node.trustScore,
-            createdAt: node.createdAt,
-            updatedAt: node.updatedAt,
-          })),
-          totalCount: nodes.length,
-          byType: this.groupByType(nodes),
-          lastUpdated: new Date().toISOString(),
+    this.contentIndexCache$ ??= this.contentService.queryContent({ limit: 1000 }).pipe(
+      map(nodes => ({
+        nodes: nodes.map(node => ({
+          id: node.id,
+          title: node.title,
+          description: node.description ?? '',
+          contentType: node.contentType,
+          tags: node.tags ?? [],
+          reach: node.reach ?? 'commons',
+          trustScore: node.trustScore,
+          createdAt: node.createdAt,
+          updatedAt: node.updatedAt,
         })),
-        shareReplay(1),
-        catchError(err => {
-          this.logger.error('Failed to load content index', err);
-          // Clear cache on error so next call retries
-          this.contentIndexCache$ = null;
-          return of({
-            nodes: [],
-            totalCount: 0,
-            byType: {},
-            lastUpdated: new Date().toISOString(),
-          });
-        })
-      );
-    }
-    return this.contentIndexCache$;
+        totalCount: nodes.length,
+        byType: this.groupByType(nodes),
+        lastUpdated: new Date().toISOString(),
+      })),
+      shareReplay(1),
+      catchError(err => {
+        this.logger.error('Failed to load content index', err);
+        // Clear cache on error so next call retries
+        this.contentIndexCache$ = null;
+        return of({
+          nodes: [],
+          totalCount: 0,
+          byType: {},
+          lastUpdated: new Date().toISOString(),
+        });
+      })
+    );
+    return (
+      this.contentIndexCache$ ??
+      of({
+        nodes: [],
+        totalCount: 0,
+        byType: {},
+        lastUpdated: new Date().toISOString(),
+      })
+    );
   }
 
   /**
@@ -615,7 +624,7 @@ export class DataLoaderService {
   private groupByType(nodes: ContentNode[]): Record<string, number> {
     const byType: Record<string, number> = {};
     for (const node of nodes) {
-      byType[node.contentType] = (byType[node.contentType] || 0) + 1;
+      byType[node.contentType] = (byType[node.contentType] ?? 0) + 1;
     }
     return byType;
   }
@@ -634,19 +643,20 @@ export class DataLoaderService {
    * Cached with shareReplay(1) to prevent redundant calls.
    */
   getPathIndex(): Observable<PathIndex> {
-    if (!this.pathIndexCache$) {
-      this.pathIndexCache$ = this.contentService.queryPaths({}).pipe(
-        map(paths => this.transformPathsToIndex(paths)),
-        shareReplay(1),
-        catchError(err => {
-          this.logger.error('Failed to load path index', err);
-          // Clear cache on error so next call retries
-          this.pathIndexCache$ = null;
-          return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-        })
-      );
-    }
-    return this.pathIndexCache$;
+    this.pathIndexCache$ ??= this.contentService.queryPaths({}).pipe(
+      map(paths => this.transformPathsToIndex(paths)),
+      shareReplay(1),
+      catchError(err => {
+        this.logger.error('Failed to load path index', err);
+        // Clear cache on error so next call retries
+        this.pathIndexCache$ = null;
+        return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+      })
+    );
+    return (
+      this.pathIndexCache$ ??
+      of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() })
+    );
   }
 
   /**
@@ -659,11 +669,11 @@ export class DataLoaderService {
       paths: paths.map(p => ({
         id: p.id,
         title: p.title,
-        description: p.description || '',
+        description: p.description ?? '',
         difficulty: p.difficulty as any,
         estimatedDuration: p.estimatedDuration ?? '',
         stepCount: this.calculateStepCount(p),
-        tags: p.tags || [],
+        tags: p.tags ?? [],
         thumbnailUrl: p.thumbnailUrl,
         thumbnailAlt: p.thumbnailAlt,
         chapterCount: p.chapters?.length,
@@ -726,7 +736,7 @@ export class DataLoaderService {
     return defer(() => from(this.holochainContent.getAgentById(agentId))).pipe(
       map(result => (result ? this.transformHolochainAgent(result.agent) : null)),
       catchError(err => {
-        this.logger.warn('Failed to load agent', { agentId, error: err.message || err });
+        this.logger.warn('Failed to load agent', { agentId, error: err.message ?? err });
         return of(null);
       })
     );
@@ -795,7 +805,8 @@ export class DataLoaderService {
     // Optionally clear IndexedDB persistent cache
     if (includeIndexedDB && this.idbInitialized) {
       this.idbCache.clearAll().catch(() => {
-        // Ignore errors
+        // Silently ignore IndexedDB clear errors - this is a best-effort cleanup operation
+        // and should not prevent cache clearing from completing
       });
     }
   }
@@ -891,8 +902,7 @@ export class DataLoaderService {
         results.map(r => this.transformHolochainContentAttestation(r.contentAttestation))
       ),
       shareReplay(1),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load content attestations:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -919,8 +929,7 @@ export class DataLoaderService {
       )
     ).pipe(
       map(results => results.map(r => this.transformHolochainAttestation(r.attestation))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load agent attestations:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1002,8 +1011,7 @@ export class DataLoaderService {
         this.attestationsByContentCache.set(contentId, attestations);
         return attestations;
       }),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load attestations for content:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1030,8 +1038,7 @@ export class DataLoaderService {
       map(results => ({
         agents: results.map(r => this.transformHolochainAgent(r.agent)),
       })),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load agent index:', err);
+      catchError(_err => {
         return of({ agents: [] });
       })
     );
@@ -1073,8 +1080,7 @@ export class DataLoaderService {
         totalCount: results.length,
         maps: results.map(r => this.transformHolochainKnowledgeMapToIndex(r.knowledgeMap)),
       })),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load knowledge map index:', err);
+      catchError(_err => {
         return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
       })
     );
@@ -1090,8 +1096,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.getKnowledgeMapById(mapId))).pipe(
       map(result => (result ? this.transformHolochainKnowledgeMap(result.knowledgeMap) : null)),
-      catchError(err => {
-        console.warn(`[DataLoader] Failed to load knowledge map "${mapId}":`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -1200,8 +1205,7 @@ export class DataLoaderService {
         totalCount: results.length,
         extensions: results.map(r => this.transformHolochainPathExtensionToIndex(r.pathExtension)),
       })),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load path extension index:', err);
+      catchError(_err => {
         return of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() });
       })
     );
@@ -1217,8 +1221,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.getPathExtensionById(extensionId))).pipe(
       map(result => (result ? this.transformHolochainPathExtension(result.pathExtension) : null)),
-      catchError(err => {
-        console.warn(`[DataLoader] Failed to load path extension "${extensionId}":`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -1236,8 +1239,7 @@ export class DataLoaderService {
       from(this.holochainContent.queryPathExtensions({ basePathId: pathId }))
     ).pipe(
       map(results => results.map(r => this.transformHolochainPathExtension(r.pathExtension))),
-      catchError(err => {
-        console.warn(`[DataLoader] Failed to load extensions for path "${pathId}":`, err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1364,8 +1366,7 @@ export class DataLoaderService {
         // Build graph from Holochain relationships
         this.graphCache$ = this.buildGraphFromHolochain().pipe(
           shareReplay(1),
-          catchError(err => {
-            console.warn('[DataLoader] Failed to load graph from Holochain:', err);
+          catchError(_err => {
             return of(this.createEmptyGraph());
           })
         );
@@ -1403,8 +1404,7 @@ export class DataLoaderService {
 
       const request = this.fetchRelationshipsForNode(contentId, direction).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(`[DataLoader] Failed to load relationships for "${contentId}":`, err);
+        catchError(_err => {
           // Remove from cache on error
           this.relationshipByNodeCache.delete(cacheKey);
           return of([]);
@@ -1491,6 +1491,9 @@ export class DataLoaderService {
           return this.createEmptyGraph();
         }
         return this.transformHolochainGraph(hcGraph);
+      }),
+      catchError(_err => {
+        return of(this.createEmptyGraph());
       })
     );
   }
@@ -1666,7 +1669,7 @@ export class DataLoaderService {
   ): void {
     nodes.set(node.id, node);
     this.addToSetMap(nodesByType, node.contentType, node.id);
-    for (const tag of node.tags || []) {
+    for (const tag of node.tags ?? []) {
       this.addToSetMap(nodesByTag, tag, node.id);
     }
     const category =
@@ -1779,7 +1782,7 @@ export class DataLoaderService {
     }
 
     // Query all governance types in parallel
-    return defer(() =>
+    return defer(async () =>
       Promise.all([
         this.holochainContent.queryChallenges({}),
         this.holochainContent.queryProposals({}),
@@ -1794,8 +1797,7 @@ export class DataLoaderService {
         precedentCount: precedents.length,
         discussionCount: discussions.length,
       })),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load governance index:', err);
+      catchError(_err => {
         return of({
           lastUpdated: new Date().toISOString(),
           challengeCount: 0,
@@ -1817,8 +1819,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryChallenges({}))).pipe(
       map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load challenges:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1841,8 +1842,7 @@ export class DataLoaderService {
       )
     ).pipe(
       map(results => results.map(r => this.transformHolochainChallenge(r.challenge))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load challenges for entity:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1898,8 +1898,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryProposals({}))).pipe(
       map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load proposals:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1915,8 +1914,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryProposals({ status }))).pipe(
       map(results => results.map(r => this.transformHolochainProposal(r.proposal))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load proposals by status:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1971,8 +1969,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryPrecedents({}))).pipe(
       map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load precedents:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -1988,8 +1985,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryPrecedents({ binding }))).pipe(
       map(results => results.map(r => this.transformHolochainPrecedent(r.precedent))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load precedents by binding:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -2032,8 +2028,7 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.queryDiscussions({}))).pipe(
       map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load discussions:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -2056,8 +2051,7 @@ export class DataLoaderService {
       )
     ).pipe(
       map(results => results.map(r => this.transformHolochainDiscussion(r.discussion))),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load discussions for entity:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -2114,8 +2108,7 @@ export class DataLoaderService {
       map(result =>
         result ? this.transformHolochainGovernanceState(result.governanceState) : null
       ),
-      catchError(err => {
-        console.warn('[DataLoader] Failed to load governance state:', err);
+      catchError(_err => {
         return of(null);
       })
     );

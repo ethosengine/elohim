@@ -31,7 +31,10 @@ describe('AppreciationService', () => {
   };
 
   beforeEach(() => {
-    holochainClientMock = jasmine.createSpyObj('HolochainClientService', ['callZome', 'isConnected']);
+    holochainClientMock = jasmine.createSpyObj('HolochainClientService', [
+      'callZome',
+      'isConnected',
+    ]);
 
     // Default: not connected
     holochainClientMock.isConnected.and.returnValue(false);
@@ -68,9 +71,7 @@ describe('AppreciationService', () => {
 
     describe('testAvailability', () => {
       it('should set available to true when zome responds successfully', async () => {
-        holochainClientMock.callZome.and.returnValue(
-          Promise.resolve({ success: true, data: [] })
-        );
+        holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
 
         const result = await service.testAvailability();
 
@@ -120,9 +121,7 @@ describe('AppreciationService', () => {
 
     it('should fetch appreciations when service is available', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // Now set up the actual response
@@ -159,9 +158,7 @@ describe('AppreciationService', () => {
 
     it('should cache results for same entity', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // First call
@@ -184,9 +181,7 @@ describe('AppreciationService', () => {
 
     it('should handle errors gracefully', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // Set up error response
@@ -203,9 +198,7 @@ describe('AppreciationService', () => {
 
     it('should sort results by date descending', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       holochainClientMock.callZome.and.returnValue(
@@ -265,9 +258,7 @@ describe('AppreciationService', () => {
 
     it('should fetch appreciations given by an agent', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       holochainClientMock.callZome.and.returnValue(
@@ -319,9 +310,7 @@ describe('AppreciationService', () => {
 
     it('should create appreciation when service is available', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       holochainClientMock.callZome.and.returnValue(
@@ -364,9 +353,7 @@ describe('AppreciationService', () => {
 
     it('should handle null note', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       const inputWithoutNote: CreateAppreciationInput = {
@@ -410,9 +397,7 @@ describe('AppreciationService', () => {
 
     it('should throw error when zome call fails', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       holochainClientMock.callZome.and.returnValue(
@@ -434,9 +419,7 @@ describe('AppreciationService', () => {
   describe('clearCache', () => {
     it('should clear both caches', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: [] })
-      );
+      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // Populate caches
@@ -460,8 +443,7 @@ describe('AppreciationService', () => {
         .all()
         .filter(
           call =>
-            call.args[0].fnName === 'get_appreciations_for' &&
-            call.args[0].payload === 'entity-1'
+            call.args[0].fnName === 'get_appreciations_for' && call.args[0].payload === 'entity-1'
         );
       expect(entityCalls.length).toBe(2); // Before clear + after clear
     });

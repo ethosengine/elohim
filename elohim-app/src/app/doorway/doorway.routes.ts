@@ -15,7 +15,7 @@ import { Routes } from '@angular/router';
 export const DOORWAY_ROUTES: Routes = [
   {
     path: '',
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/doorway-dashboard/doorway-dashboard.component').then(
         m => m.DoorwayDashboardComponent
       ),
@@ -30,7 +30,7 @@ export const DOORWAY_ROUTES: Routes = [
   },
   {
     path: 'config',
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/doorway-dashboard/doorway-dashboard.component').then(
         m => m.DoorwayDashboardComponent
       ),

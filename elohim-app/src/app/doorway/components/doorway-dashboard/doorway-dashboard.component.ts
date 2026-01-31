@@ -1,6 +1,8 @@
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
+// @coverage: 93.7% (2026-02-04)
+
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -122,8 +124,8 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   readonly tierColor = tierColor;
   readonly reachLevelName = reachLevelName;
 
-  async ngOnInit(): Promise<void> {
-    await this.loadData();
+  ngOnInit(): void {
+    void this.loadData();
     this.startRefresh();
     this.adminService.connect();
   }
@@ -173,8 +175,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
       this.cluster.set(cluster ?? null);
       this.resources.set(resources ?? null);
       this.custodians.set(custodians ?? null);
-    } catch (e) {
-      console.error('[Dashboard] Failed to load data:', e);
+    } catch {
       this.error.set('Failed to load dashboard data');
     } finally {
       this.loading.set(false);
@@ -183,7 +184,9 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
 
   private startRefresh(): void {
     // Refresh every 30 seconds
-    this.refreshInterval = setInterval(() => this.loadData(), 30000);
+    this.refreshInterval = setInterval(() => {
+      void this.loadData();
+    }, 30000);
   }
 
   private stopRefresh(): void {

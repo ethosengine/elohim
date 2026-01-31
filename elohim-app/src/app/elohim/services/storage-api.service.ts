@@ -33,13 +33,12 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
-import { map, catchError, timeout } from 'rxjs/operators';
+// @coverage: 67.9% (2026-02-04)
 
-import { Observable, throwError, of } from 'rxjs';
+import { catchError, map, timeout } from 'rxjs/operators';
 
-// View types from generated (Rust API now returns camelCase directly)
+import { Observable, of, throwError } from 'rxjs';
 
-// Extended view types and helpers from adapter
 import {
   HumanRelationshipView,
   ContributorPresenceView,
@@ -48,8 +47,6 @@ import {
   withEstablishingContentIds,
   withEstablishingContentIdsArray,
 } from '@app/elohim/adapters/storage-types.adapter';
-
-// Query and input types from domain models (these remain domain-specific)
 import { EventQuery } from '@app/elohim/models/economic-event.model';
 import {
   HumanRelationshipQuery,
@@ -212,7 +209,9 @@ export class StorageApiService {
       createInverse: input.createInverse ?? false,
       inverseType: input.inverseType,
       provenanceChain: input.provenanceChain ?? null,
-      metadata: input.metadataJson ? JSON.parse(input.metadataJson) : null,
+      metadata: input.metadataJson
+        ? (JSON.parse(input.metadataJson) as Record<string, unknown>)
+        : null,
     };
 
     return this.http.post<RelationshipView>(`${this.baseUrl}/db/relationships`, body).pipe(
@@ -317,7 +316,7 @@ export class StorageApiService {
         timeout(this.defaultTimeoutMs),
         map(view => (view ? withEstablishingContentIds(view) : null)),
         catchError(error => {
-          if ((error as any).status === 404) {
+          if ((error as Record<string, unknown>)['status'] === 404) {
             return of(null);
           }
           return this.handleError('getContributorPresence', error);
@@ -622,7 +621,7 @@ export class StorageApiService {
         timeout(this.defaultTimeoutMs),
         map(w => (w ? fromWireStewardshipAllocation(w) : null)),
         catchError(error => {
-          if ((error as any).status === 404) {
+          if ((error as Record<string, unknown>)['status'] === 404) {
             return of(null);
           }
           return this.handleError('getStewardshipAllocation', error);
@@ -668,10 +667,12 @@ export class StorageApiService {
       allocationMethod: input.allocationMethod ?? 'manual',
       contributionType: input.contributionType ?? 'inherited',
       contributionEvidence: input.contributionEvidenceJson
-        ? JSON.parse(input.contributionEvidenceJson)
+        ? (JSON.parse(input.contributionEvidenceJson) as Record<string, unknown>)
         : null,
       note: input.note,
-      metadata: input.metadataJson ? JSON.parse(input.metadataJson) : null,
+      metadata: input.metadataJson
+        ? (JSON.parse(input.metadataJson) as Record<string, unknown>)
+        : null,
     };
 
     return this.http.post<Record<string, unknown>>(`${this.baseUrl}/db/allocations`, body).pipe(
@@ -778,10 +779,12 @@ export class StorageApiService {
       allocationMethod: input.allocationMethod ?? 'manual',
       contributionType: input.contributionType ?? 'inherited',
       contributionEvidence: input.contributionEvidenceJson
-        ? JSON.parse(input.contributionEvidenceJson)
+        ? (JSON.parse(input.contributionEvidenceJson) as Record<string, unknown>)
         : null,
       note: input.note,
-      metadata: input.metadataJson ? JSON.parse(input.metadataJson) : null,
+      metadata: input.metadataJson
+        ? (JSON.parse(input.metadataJson) as Record<string, unknown>)
+        : null,
     }));
 
     return this.http.post<BulkAllocationResult>(`${this.baseUrl}/db/allocations/bulk`, body).pipe(
@@ -796,7 +799,7 @@ export class StorageApiService {
 
   private handleError(operation: string, error: unknown): Observable<never> {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[StorageApiService] ${operation} failed:`, message);
+
     return throwError(() => new Error(`${operation} failed: ${message}`));
   }
 }

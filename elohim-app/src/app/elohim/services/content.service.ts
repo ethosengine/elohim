@@ -12,6 +12,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 0.6% (2026-02-05)
+
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
 import { Observable, from, of } from 'rxjs';
@@ -195,10 +197,12 @@ export class ContentService {
 
         // Check if we need to fetch blob content
         // contentBody may be a blob reference (sha256:... or sha256-...) instead of actual content
-        const contentBody = data.contentBody || '';
+        const contentBody = data.contentBody ?? '';
+
         const isBlobReference =
           contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
-        const blobCid = isBlobReference ? contentBody : data.blobCid;
+        const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 
         if (needsBlobFetch && blobCid) {
@@ -207,8 +211,7 @@ export class ContentService {
               // Inject blob content as contentBody
               return this.transformContent({ ...data, contentBody: blobContent });
             }),
-            catchError(err => {
-              console.warn(`[ContentService] Failed to fetch blob ${blobCid}:`, err);
+            catchError(_err => {
               // Fall back to transforming without blob content
               return of(this.transformContent(data));
             })
@@ -217,8 +220,7 @@ export class ContentService {
 
         return of(this.transformContent(data));
       }),
-      catchError(err => {
-        console.debug(`[ContentService] getContent(${id}) failed:`, err);
+      catchError(_err => {
         return of(null);
       }),
       shareReplay(1)
@@ -241,7 +243,6 @@ export class ContentService {
 
     // Use StorageClientService to get the correct blob URL (handles doorway vs direct mode)
     const blobUrl = this.storageClient.getBlobUrl(normalizedCid);
-    console.debug(`[ContentService] Fetching blob from: ${blobUrl}`);
 
     const obs = this.http.get(blobUrl, { responseType: 'text' }).pipe(shareReplay(1));
 
@@ -264,8 +265,7 @@ export class ContentService {
     return from(this.client.query<ContentNode>(query)).pipe(
       map(items => items.map(c => this.transformContent(c))),
       map(items => this.applyLocalFilters(items, filters)),
-      catchError(err => {
-        console.debug('[ContentService] queryContent failed:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -283,8 +283,7 @@ export class ContentService {
         }
         return map;
       }),
-      catchError(err => {
-        console.debug('[ContentService] batchGetContent failed:', err);
+      catchError(_err => {
         return of(new Map());
       })
     );
@@ -315,8 +314,7 @@ export class ContentService {
 
     const obs = from(this.client.get<LearningPath>('path', id)).pipe(
       map(data => (data ? this.transformPath(data) : null)),
-      catchError(err => {
-        console.debug(`[ContentService] getPath(${id}) failed:`, err);
+      catchError(_err => {
         return of(null);
       }),
       shareReplay(1)
@@ -341,8 +339,7 @@ export class ContentService {
     return from(this.client.query<LearningPath>(query)).pipe(
       map(items => items.map(p => this.transformPath(p))),
       map(items => this.applyPathFilters(items, filters)),
-      catchError(err => {
-        console.debug('[ContentService] queryPaths failed:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -376,9 +373,8 @@ export class ContentService {
     }
 
     return from(this.client.fetch<{ items: any[] }>(`/db/relationships?${params}`)).pipe(
-      map(response => (response?.items || []).map(r => this.transformRelationship(r))),
-      catchError(err => {
-        console.debug('[ContentService] getRelationships failed:', err);
+      map(response => (response?.items ?? []).map(r => this.transformRelationship(r))),
+      catchError(_err => {
         return of([]);
       })
     );
@@ -398,8 +394,7 @@ export class ContentService {
 
     return from(this.client.fetch<any>(url)).pipe(
       map(data => (data ? this.transformContentGraph(data) : null)),
-      catchError(err => {
-        console.debug(`[ContentService] getContentGraph(${contentId}) failed:`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -415,8 +410,7 @@ export class ContentService {
   getKnowledgeMap(id: string): Observable<KnowledgeMap | null> {
     return from(this.client.fetch<any>(`/db/knowledge-maps/${id}`)).pipe(
       map(data => (data ? this.transformKnowledgeMap(data) : null)),
-      catchError(err => {
-        console.debug(`[ContentService] getKnowledgeMap(${id}) failed:`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -435,9 +429,8 @@ export class ContentService {
     if (filters.offset) params.set('offset', String(filters.offset));
 
     return from(this.client.fetch<{ items: any[] }>(`/db/knowledge-maps?${params}`)).pipe(
-      map(response => (response?.items || []).map((m: any) => this.transformKnowledgeMap(m))),
-      catchError(err => {
-        console.debug('[ContentService] queryKnowledgeMaps failed:', err);
+      map(response => (response?.items ?? []).map((m: any) => this.transformKnowledgeMap(m))),
+      catchError(_err => {
         return of([]);
       })
     );
@@ -453,8 +446,7 @@ export class ContentService {
   getPathExtension(id: string): Observable<PathExtension | null> {
     return from(this.client.fetch<any>(`/db/path-extensions/${id}`)).pipe(
       map(data => (data ? this.transformPathExtension(data) : null)),
-      catchError(err => {
-        console.debug(`[ContentService] getPathExtension(${id}) failed:`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -472,9 +464,8 @@ export class ContentService {
     if (filters.offset) params.set('offset', String(filters.offset));
 
     return from(this.client.fetch<{ items: any[] }>(`/db/path-extensions?${params}`)).pipe(
-      map(response => (response?.items || []).map((e: any) => this.transformPathExtension(e))),
-      catchError(err => {
-        console.debug('[ContentService] queryPathExtensions failed:', err);
+      map(response => (response?.items ?? []).map((e: any) => this.transformPathExtension(e))),
+      catchError(_err => {
         return of([]);
       })
     );
@@ -532,22 +523,22 @@ export class ContentService {
    * Transform raw data to ContentNode model
    */
   private transformContent(data: any): ContentNode {
-    const contentFormat = data.contentFormat || 'markdown';
-    const rawContent = data.contentBody || data.content || '';
+    const contentFormat = data.contentFormat ?? 'markdown';
+    const rawContent = data.contentBody ?? data.content ?? '';
 
     return {
-      id: data.id || data.docId,
+      id: data.id ?? data.docId,
       contentType: data.contentType,
-      title: data.title || '',
-      description: data.description || '',
+      title: data.title ?? '',
+      description: data.description ?? '',
       // Parse content for structured formats (html5-app, perseus, quiz-json, etc.)
       content: this.parseContentBody(rawContent, contentFormat),
       contentFormat,
-      tags: data.tags || [],
-      relatedNodeIds: data.relatedNodeIds || [],
-      metadata: data.metadata || {},
+      tags: data.tags ?? [],
+      relatedNodeIds: data.relatedNodeIds ?? [],
+      metadata: data.metadata ?? {},
       authorId: data.authorId,
-      reach: data.reach || 'commons',
+      reach: data.reach ?? 'commons',
       trustScore: data.trustScore,
       estimatedMinutes: data.estimatedMinutes,
       thumbnailUrl: this.resolveBlobUrl(data.thumbnailUrl),
@@ -606,19 +597,19 @@ export class ContentService {
    */
   private transformPath(data: any): LearningPath {
     // Handle nested response format from elohim-storage
-    const pathData = data.path || data;
+    const pathData = data.path ?? data;
     // Chapters can be at top-level, in path data, or in metadata
-    const rawChapters = data.chapters || pathData.chapters || pathData.metadata?.chapters || [];
-    const ungroupedSteps = data.ungroupedSteps || [];
+    const rawChapters = data.chapters ?? pathData.chapters ?? pathData.metadata?.chapters ?? [];
+    const ungroupedSteps = data.ungroupedSteps ?? [];
 
     // Transform chapters with their steps
     const chapters = rawChapters.map((ch: any) => ({
       id: ch.id,
-      title: ch.title || '',
-      description: ch.description || '',
+      title: ch.title ?? '',
+      description: ch.description ?? '',
       orderIndex: ch.orderIndex ?? 0,
-      estimatedDuration: ch.estimatedDuration || ch.estimatedDuration,
-      steps: (ch.steps || []).map((s: any) => this.transformStep(s)),
+      estimatedDuration: ch.estimatedDuration ?? ch.estimatedDuration,
+      steps: (ch.steps ?? []).map((s: any) => this.transformStep(s)),
     }));
 
     // Collect all steps from chapters + ungrouped
@@ -628,24 +619,24 @@ export class ContentService {
     ];
 
     return {
-      id: pathData.id || pathData.docId,
-      version: pathData.version || '1.0.0',
-      title: pathData.title || '',
-      description: pathData.description || '',
-      purpose: pathData.purpose || '',
-      difficulty: pathData.difficulty || 'beginner',
-      estimatedDuration: pathData.estimatedDuration || pathData.estimatedDuration,
-      visibility: pathData.visibility || 'public',
-      pathType: pathData.pathType || 'course',
+      id: pathData.id ?? pathData.docId,
+      version: pathData.version ?? '1.0.0',
+      title: pathData.title ?? '',
+      description: pathData.description ?? '',
+      purpose: pathData.purpose ?? '',
+      difficulty: pathData.difficulty ?? 'beginner',
+      estimatedDuration: pathData.estimatedDuration ?? pathData.estimatedDuration,
+      visibility: pathData.visibility ?? 'public',
+      pathType: pathData.pathType ?? 'course',
       thumbnailUrl: this.resolveBlobUrl(pathData.thumbnailUrl),
       thumbnailAlt: pathData.thumbnailAlt,
-      tags: pathData.tags || [],
-      createdBy: pathData.createdBy || pathData.createdBy || '',
-      contributors: pathData.contributors || [],
+      tags: pathData.tags ?? [],
+      createdBy: pathData.createdBy ?? pathData.createdBy ?? '',
+      contributors: pathData.contributors ?? [],
       steps: allSteps,
       chapters,
-      stepCount: pathData.stepCount || pathData.stepCount || allSteps.length,
-      chapterCount: pathData.chapterCount || pathData.chapterCount || chapters.length,
+      stepCount: pathData.stepCount ?? pathData.stepCount ?? allSteps.length,
+      chapterCount: pathData.chapterCount ?? pathData.chapterCount ?? chapters.length,
       createdAt: pathData.createdAt,
       updatedAt: pathData.updatedAt,
     } as LearningPath;
@@ -657,19 +648,19 @@ export class ContentService {
   private transformStep(step: any): any {
     return {
       id: step.id,
-      pathId: step.pathId || step.pathId,
+      pathId: step.pathId ?? step.pathId,
       chapterId: step.chapterId,
       // Map to both 'title' and 'stepTitle' for compatibility
-      title: step.title || '',
-      stepTitle: step.title || '',
-      stepNarrative: step.description || '',
-      description: step.description || '',
-      stepType: step.stepType || 'learn',
-      resourceId: step.resourceId || step.resourceId || '',
-      resourceType: step.resourceType || step.resourceType || 'content',
+      title: step.title ?? '',
+      stepTitle: step.title ?? '',
+      stepNarrative: step.description ?? '',
+      description: step.description ?? '',
+      stepType: step.stepType ?? 'learn',
+      resourceId: step.resourceId ?? step.resourceId ?? '',
+      resourceType: step.resourceType ?? step.resourceType ?? 'content',
       order: step.orderIndex ?? 0,
       orderIndex: step.orderIndex ?? 0,
-      estimatedDuration: step.estimatedDuration || step.estimatedDuration,
+      estimatedDuration: step.estimatedDuration ?? step.estimatedDuration,
       metadata: step.metadata,
     };
   }
@@ -766,11 +757,11 @@ export class ContentService {
   private transformRelationship(data: any): Relationship {
     return {
       id: data.id,
-      sourceId: data.sourceId || data.sourceId,
-      targetId: data.targetId || data.targetId,
-      relationshipType: data.relationshipType || data.relationshipType,
+      sourceId: data.sourceId ?? data.sourceId,
+      targetId: data.targetId ?? data.targetId,
+      relationshipType: data.relationshipType ?? data.relationshipType,
       confidence: data.confidence ?? 1.0,
-      inferenceSource: data.inferenceSource || data.inferenceSource || 'explicit',
+      inferenceSource: data.inferenceSource ?? data.inferenceSource ?? 'explicit',
       metadata: data.metadata,
       createdAt: data.createdAt,
     };
@@ -781,9 +772,9 @@ export class ContentService {
    */
   private transformContentGraph(data: any): ContentGraph {
     return {
-      rootId: data.rootId || data.rootId,
-      related: (data.related || []).map((node: any) => this.transformContentGraphNode(node)),
-      totalNodes: data.totalNodes || data.totalNodes || 0,
+      rootId: data.rootId ?? data.rootId,
+      related: (data.related ?? []).map((node: any) => this.transformContentGraphNode(node)),
+      totalNodes: data.totalNodes ?? data.totalNodes ?? 0,
     };
   }
 
@@ -792,10 +783,10 @@ export class ContentService {
    */
   private transformContentGraphNode(data: any): ContentGraphNode {
     return {
-      contentId: data.contentId || data.contentId,
-      relationshipType: data.relationshipType || data.relationshipType,
+      contentId: data.contentId ?? data.contentId,
+      relationshipType: data.relationshipType ?? data.relationshipType,
       confidence: data.confidence ?? 1.0,
-      children: (data.children || []).map((child: any) => this.transformContentGraphNode(child)),
+      children: (data.children ?? []).map((child: any) => this.transformContentGraphNode(child)),
     };
   }
 
@@ -805,19 +796,19 @@ export class ContentService {
   private transformKnowledgeMap(data: any): KnowledgeMap {
     return {
       id: data.id,
-      mapType: data.mapType || data.mapType,
-      ownerId: data.ownerId || data.ownerId,
-      title: data.title || '',
+      mapType: data.mapType ?? data.mapType,
+      ownerId: data.ownerId ?? data.ownerId,
+      title: data.title ?? '',
       description: data.description,
-      subjectType: data.subjectType || data.subjectType,
-      subjectId: data.subjectId || data.subjectId,
-      subjectName: data.subjectName || data.subjectName,
-      visibility: data.visibility || 'private',
+      subjectType: data.subjectType ?? data.subjectType,
+      subjectId: data.subjectId ?? data.subjectId,
+      subjectName: data.subjectName ?? data.subjectName,
+      visibility: data.visibility ?? 'private',
       sharedWith: data.sharedWith,
       nodes: data.nodes,
       pathIds: data.pathIds,
       overallAffinity: data.overallAffinity ?? data.overallAffinity ?? 0,
-      contentGraphId: data.contentGraphId || data.contentGraphId,
+      contentGraphId: data.contentGraphId ?? data.contentGraphId,
       masteryLevels: data.masteryLevels,
       goals: data.goals,
       metadata: data.metadata,
@@ -832,18 +823,18 @@ export class ContentService {
   private transformPathExtension(data: any): PathExtension {
     return {
       id: data.id,
-      basePathId: data.basePathId || data.basePathId,
-      basePathVersion: data.basePathVersion || data.basePathVersion,
-      extendedBy: data.extendedBy || data.extendedBy,
-      title: data.title || '',
+      basePathId: data.basePathId ?? data.basePathId,
+      basePathVersion: data.basePathVersion ?? data.basePathVersion,
+      extendedBy: data.extendedBy ?? data.extendedBy,
+      title: data.title ?? '',
       description: data.description,
       insertions: data.insertions,
       annotations: data.annotations,
       reorderings: data.reorderings,
       exclusions: data.exclusions,
-      visibility: data.visibility || 'private',
+      visibility: data.visibility ?? 'private',
       sharedWith: data.sharedWith,
-      forkedFrom: data.forkedFrom || data.forkedFrom,
+      forkedFrom: data.forkedFrom ?? data.forkedFrom,
       forks: data.forks,
       upstreamProposal: data.upstreamProposal,
       stats: data.stats,

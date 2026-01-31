@@ -1,5 +1,7 @@
 import { ContentNode } from '../models/content-node.model';
 
+// @coverage: 97.8% (2026-02-04)
+
 /**
  * Gherkin step (Given/When/Then/And/But)
  */
@@ -297,7 +299,7 @@ export class GherkinParser {
   }
 
   private static extractTags(line: string): string[] {
-    const tagMatch = /^\s*(@[\w-]+(?:\s+@[\w-]+)*)/.exec(line ?? '');
+    const tagMatch = /^\s*(@[\w:-]+(?:\s+@[\w:-]+)*)/.exec(line ?? '');
     if (!tagMatch) return [];
 
     return tagMatch[1]

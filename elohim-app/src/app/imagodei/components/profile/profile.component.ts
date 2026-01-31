@@ -13,6 +13,8 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 92.5% (2026-02-04)
+
 import {
   type UpdateProfileRequest,
   type ProfileReach,
@@ -99,7 +101,7 @@ export class ProfileComponent implements OnInit {
   /** Whether profile can be edited (requires network authentication) */
   readonly canEdit = computed(() => {
     const mode = this.mode();
-    const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
+    const isNetworkMode = mode === 'hosted' || mode === 'steward';
     return isNetworkMode && this.isAuthenticated();
   });
 
@@ -129,7 +131,7 @@ export class ProfileComponent implements OnInit {
 
   ngOnInit(): void {
     // Load fresh profile data
-    this.loadProfile();
+    void this.loadProfile();
   }
 
   // ==========================================================================
@@ -142,8 +144,9 @@ export class ProfileComponent implements OnInit {
   async loadProfile(): Promise<void> {
     try {
       await this.identityService.getCurrentHuman();
-    } catch (err) {
-      console.error('[ProfileComponent] Failed to load profile:', err);
+    } catch (error) {
+      // Intentionally silent - profile load failure is non-critical, uses cached data
+      console.warn('[Profile] Non-critical profile refresh failed:', error);
     }
   }
 
@@ -222,7 +225,7 @@ export class ProfileComponent implements OnInit {
    * Navigate back.
    */
   goBack(): void {
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   // ==========================================================================
@@ -291,6 +294,6 @@ export class ProfileComponent implements OnInit {
    * Navigate to discovery assessment.
    */
   navigateToDiscovery(): void {
-    this.router.navigate(['/lamad/discovery']);
+    void this.router.navigate(['/lamad/discovery']);
   }
 }

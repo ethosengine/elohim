@@ -123,39 +123,49 @@ def getGitCommitHashFull() {
 
 /**
  * Analyze all changes since the last successful orchestrator build.
- * This ensures we catch all changes, not just the most recent commit.
+ *
+ * Priority order:
+ *   1. FORCE_COMMIT parameter (manual override)
+ *   2. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin)
+ *   3. HEAD~1 fallback (only diffs the latest push)
  */
 def analyzeChangeset() {
-    // Try to get the commit from last successful build
-    def lastSuccessfulCommit = null
-    try {
-        def lastSuccess = currentBuild.previousSuccessfulBuild
-        if (lastSuccess) {
-            // Get the commit hash from the last successful build
-            lastSuccessfulCommit = lastSuccess.changeSets.collect { it.items.collect { item -> item.commitId } }.flatten().last()
+    // 1. Manual override via FORCE_COMMIT parameter
+    def baseCommit = params.FORCE_COMMIT?.trim() ?: null
+
+    // 2. Jenkins Git plugin automatic tracking
+    if (!baseCommit) {
+        baseCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
+    }
+
+    if (baseCommit) {
+        echo "Comparing HEAD against: ${baseCommit}"
+
+        // Verify commit exists (handles force-push/rebase scenarios)
+        def commitExists = sh(
+            script: "git cat-file -t ${baseCommit} 2>/dev/null || echo 'missing'",
+            returnStdout: true
+        ).trim()
+
+        if (commitExists == 'commit') {
+            return sh(
+                script: "git diff --name-only ${baseCommit}..HEAD",
+                returnStdout: true
+            ).trim().split('\n').findAll { it }
         }
-    } catch (Exception e) {
-        echo "Could not get last successful commit: ${e.message}"
+
+        echo "WARNING: Commit ${baseCommit} not found in repo"
     }
 
-    def changedFiles = []
-
-    if (lastSuccessfulCommit) {
-        echo "Comparing against last successful build commit: ${lastSuccessfulCommit}"
-        changedFiles = sh(
-            script: "git diff --name-only ${lastSuccessfulCommit}..HEAD 2>/dev/null || git diff --name-only HEAD~10",
-            returnStdout: true
-        ).trim().split('\n').findAll { it }
-    } else {
-        // Fallback: look at last 10 commits to be safe
-        echo 'No previous successful build found, analyzing last 10 commits'
-        changedFiles = sh(
-            script: 'git diff --name-only HEAD~10 2>/dev/null || git diff --name-only HEAD',
-            returnStdout: true
-        ).trim().split('\n').findAll { it }
-    }
-
-    return changedFiles
+    // 3. Fallback: diff against previous commit only
+    // This is conservative - only looks at what changed in the latest push.
+    // Once this build succeeds, GIT_PREVIOUS_SUCCESSFUL_COMMIT will be set
+    // and future builds will diff correctly.
+    echo 'No baseline commit available - diffing HEAD~1 (latest push only)'
+    return sh(
+        script: 'git diff --name-only HEAD~1 2>/dev/null || git diff --name-only HEAD',
+        returnStdout: true
+    ).trim().split('\n').findAll { it }
 }
 
 /**
@@ -163,6 +173,8 @@ def analyzeChangeset() {
  * Returns a detailed map with reasoning.
  */
 def analyzePipelineRequirements(changedFiles) {
+    // CI config files that shouldn't trigger source builds
+    def ciOnlyPatterns = ['Jenkinsfile', 'orchestrator/', '.claude', '.github/']
     def analysis = [:]
 
     PIPELINES.each { name, config ->
@@ -170,6 +182,11 @@ def analyzePipelineRequirements(changedFiles) {
         def matchedFiles = []
 
         changedFiles.each { file ->
+            // Skip CI-only files (Jenkinsfiles, orchestrator config, etc.)
+            if (file.endsWith('Jenkinsfile') || ciOnlyPatterns.any { file.startsWith(it) }) {
+                return  // skip this file
+            }
+
             config.changePatterns.each { pattern ->
                 if (file.startsWith(pattern)) {
                     if (!matchedPatterns.contains(pattern)) {
@@ -372,7 +389,7 @@ spec:
             name: 'MODE',
             choices: ['auto', 'status', 'rebuild-all', 'rebuild-edge', 'rebuild-app', 'genesis-only'],
             description: '''
-                auto = Analyze changes and build what's needed
+                auto = Analyze changes and build what's needed (DEFAULT for webhooks)
                 status = Report deployment status only (no builds)
                 rebuild-all = Force rebuild everything
                 rebuild-edge = Force rebuild edge infrastructure (doorway, storage, conductor)
@@ -403,11 +420,21 @@ spec:
 
     options {
         timeout(time: 120, unit: 'MINUTES')
-        disableConcurrentBuilds()
+        disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
         buildDiscarder(logRotator(numToKeepStr: '100'))
     }
 
     stages {
+        stage('Deduplication Guard') {
+            steps {
+                script {
+                    // Milestone: automatically aborts older builds when a newer one passes this point
+                    milestone(ordinal: 1, label: 'Build Started')
+                    echo "✅ Deduplication check passed - proceeding with build #${env.BUILD_NUMBER}"
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
                 container('builder') {
@@ -430,16 +457,25 @@ spec:
                         env.GIT_COMMIT_SHORT = getGitCommitHash()
                         env.GIT_COMMIT_FULL = getGitCommitHashFull()
 
+                        // Detect build trigger type
+                        def buildCause = currentBuild.getBuildCauses()[0]?.shortDescription ?: 'Unknown'
+                        def isWebhook = buildCause.contains('GitHub') || buildCause.contains('webhook') || buildCause.contains('SCM')
+                        env.BUILD_TRIGGER = isWebhook ? 'WEBHOOK' : 'MANUAL'
+
                         echo """
 ═══════════════════════════════════════════════════════════════════════════════
                         🎭 ELOHIM ORCHESTRATOR v2
 ═══════════════════════════════════════════════════════════════════════════════
   Branch:  ${env.BRANCH_NAME}
   Commit:  ${env.GIT_COMMIT_SHORT} (${env.GIT_COMMIT_FULL})
-  Mode:    ${params.MODE}
+  Mode:    ${params.MODE} ${params.MODE == 'auto' ? '(automatic changeset analysis)' : ''}
+  Trigger: ${env.BUILD_TRIGGER} (${buildCause})
   Build:   #${env.BUILD_NUMBER}
 ═══════════════════════════════════════════════════════════════════════════════
                         """
+
+                        // Milestone 2: Abort older builds that reach this point after checkout
+                        milestone(ordinal: 2, label: 'Checkout Complete')
                     }
                 }
             }
@@ -472,97 +508,102 @@ spec:
             }
         }
 
-        stage('Analyze Changes') {
-            when {
-                expression { params.MODE in ['auto', 'status'] }
-            }
+        stage('Determine Build Plan') {
             steps {
                 container('builder') {
                     script {
-                        def changedFiles = analyzeChangeset()
-                        def analysis = analyzePipelineRequirements(changedFiles)
-
-                        env.CHANGED_FILES_COUNT = changedFiles.size().toString()
-                        env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+                        def mode = params.MODE ?: 'auto'
+                        def pipelines = []
+                        def analysis = [:]
+                        def changedFiles = []
 
                         echo """
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                              CHANGESET ANALYSIS                               │
+│                              BUILD PLAN ANALYSIS                              │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│  Total changed files: ${changedFiles.size()}
+│  Mode:    ${mode}
+│  Trigger: ${env.BUILD_TRIGGER}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
-                        // Show changed files grouped by area
-                        def filesByArea = [:]
-                        changedFiles.each { file ->
-                            def area = file.split('/')[0]
-                            if (!filesByArea[area]) filesByArea[area] = []
-                            filesByArea[area].add(file)
+                        if (mode in ['auto', 'status']) {
+                            // Automatic changeset analysis
+                            echo "🔍 Analyzing changesets since last successful build..."
+                            changedFiles = analyzeChangeset()
+                            analysis = analyzePipelineRequirements(changedFiles)
+
+                            env.CHANGED_FILES_COUNT = changedFiles.size().toString()
+                            env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+
+                            // Show changed files grouped by area
+                            def filesByArea = [:]
+                            changedFiles.each { file ->
+                                def area = file.split('/')[0]
+                                if (!filesByArea[area]) filesByArea[area] = []
+                                filesByArea[area].add(file)
+                            }
+
+                            echo "📁 Changed Files (${changedFiles.size()} total):"
+                            filesByArea.each { area, files ->
+                                echo "   ${area}/ (${files.size()} files)"
+                                files.take(3).each { echo "      └─ ${it}" }
+                                if (files.size() > 3) echo "      └─ ... and ${files.size() - 3} more"
+                            }
+
+                            pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
+
+                        } else {
+                            // Manual forced builds
+                            echo "📋 Using manual build mode: ${mode}"
+
+                            switch (mode) {
+                                case 'rebuild-all':
+                                    pipelines = ['elohim-holochain', 'elohim-edge', 'elohim']
+                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+                                    break
+                                case 'rebuild-edge':
+                                    pipelines = ['elohim-edge']
+                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+                                    break
+                                case 'rebuild-app':
+                                    pipelines = ['elohim']
+                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+                                    break
+                                case 'genesis-only':
+                                    pipelines = ['elohim-genesis']
+                                    break
+                            }
+
+                            // Create analysis for display (even for manual mode)
+                            PIPELINES.each { name, config ->
+                                analysis[name] = [
+                                    shouldRun: pipelines.contains(name),
+                                    manualOnly: config.manualOnly ?: false,
+                                    matchedPatterns: pipelines.contains(name) ? ['manual-mode'] : [],
+                                    matchedFileCount: 0,
+                                    sampleFiles: [],
+                                    dependsOn: config.dependsOn ?: [],
+                                    triggersGenesis: config.triggersGenesis ?: false
+                                ]
+                            }
+                            env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
                         }
 
-                        filesByArea.each { area, files ->
-                            echo "📁 ${area}/ (${files.size()} files)"
-                            files.take(5).each { echo "   └─ ${it}" }
-                            if (files.size() > 5) echo "   └─ ... and ${files.size() - 5} more"
-                        }
-
-                        // Determine pipelines to run
-                        def toRun = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
-                        def ordered = orderByDependencies(toRun)
-
+                        // Order pipelines by dependencies
+                        def ordered = orderByDependencies(pipelines)
                         env.PIPELINES_TO_RUN = ordered.join(',')
 
+                        // ALWAYS show the decision matrix
                         printDecisionMatrix(analysis, ordered)
 
-                        if (ordered.isEmpty() && params.MODE == 'auto') {
+                        // Set build description
+                        if (ordered.isEmpty() && mode == 'auto') {
                             echo 'ℹ️  No pipelines need to run for these changes'
                             currentBuild.description = "No builds needed (${changedFiles.size()} files)"
+                        } else if (mode == 'status') {
+                            currentBuild.description = "Status check only"
                         } else {
-                            currentBuild.description = "Building: ${ordered.join(', ')}"
+                            currentBuild.description = "${mode}: ${ordered.join(', ')}"
                         }
-                    }
-                }
-            }
-        }
-
-        stage('Determine Build Plan') {
-            when {
-                expression { params.MODE in ['rebuild-all', 'rebuild-edge', 'rebuild-app', 'genesis-only'] }
-            }
-            steps {
-                container('builder') {
-                    script {
-                        def pipelines = []
-
-                        switch (params.MODE) {
-                            case 'rebuild-all':
-                                pipelines = ['elohim-holochain', 'elohim-edge', 'elohim']
-                                if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                break
-                            case 'rebuild-edge':
-                                pipelines = ['elohim-edge']
-                                if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                break
-                            case 'rebuild-app':
-                                pipelines = ['elohim']
-                                if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                break
-                            case 'genesis-only':
-                                pipelines = ['elohim-genesis']
-                                break
-                        }
-
-                        env.PIPELINES_TO_RUN = pipelines.join(',')
-
-                        echo """
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              FORCED BUILD PLAN                                │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  Mode: ${params.MODE}
-│  Pipelines: ${pipelines.join(' → ')}
-└──────────────────────────────────────────────────────────────────────────────┘"""
-
-                        currentBuild.description = "${params.MODE}: ${pipelines.join(', ')}"
                     }
                 }
             }

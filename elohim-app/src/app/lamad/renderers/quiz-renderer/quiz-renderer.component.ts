@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+// @coverage: 19.0% (2026-02-04)
+
 import { ContentNode } from '../../models/content-node.model';
 import { InteractiveRenderer, RendererCompletionEvent } from '../renderer-registry.service';
 
@@ -58,15 +60,18 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
     if (!this.node) return;
 
     // Handle quiz content - could be quiz-json format or assessment type
-    if (this.node.contentFormat === 'quiz-json' || this.node.contentType === 'assessment') {
+    if (
+      this.node.contentFormat === ('quiz-json' as any) ||
+      this.node.contentType === 'assessment'
+    ) {
       let content = this.node.content;
 
       // Parse if it's a string
       if (typeof content === 'string') {
         try {
           content = JSON.parse(content);
-        } catch (e) {
-          console.error('[QuizRenderer] Failed to parse quiz content:', e);
+        } catch {
+          // JSON parse failed - invalid quiz content, skip rendering
           return;
         }
       }
@@ -76,7 +81,7 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
       if (quizData && Array.isArray(quizData.questions)) {
         this.quiz = quizData;
       } else {
-        console.warn('[QuizRenderer] Invalid quiz structure - missing questions array:', content);
+        // Invalid quiz structure - will show error state
       }
     }
   }

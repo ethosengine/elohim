@@ -14,6 +14,8 @@
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
+// @coverage: 47.9% (2026-02-04)
+
 import { Observable } from 'rxjs';
 
 import { DoorwayClientService } from '../../elohim/services/doorway-client.service';
@@ -187,7 +189,7 @@ export class BlobStreamingService {
     let optimal = 1;
 
     if (bandwidthMbps < 5) {
-      optimal = 1; // Very slow - single chunk
+      // Very slow - single chunk (optimal already = 1)
     } else if (bandwidthMbps < 20) {
       optimal = 2; // Slow
     } else if (bandwidthMbps < 50) {
@@ -236,9 +238,6 @@ export class BlobStreamingService {
     if (avgSuccessRate < 0.8 || congestionCount > 2) {
       // Network issues detected - reduce parallelism
       newValue = Math.max(this.minParallelChunks, this.maxParallelChunks - 1);
-      console.info(
-        `[BlobStreaming] Reducing parallelism to ${newValue} (success rate: ${(avgSuccessRate * 100).toFixed(0)}%)`
-      );
     } else if (
       avgSuccessRate > 0.95 &&
       congestionCount === 0 &&
@@ -246,9 +245,6 @@ export class BlobStreamingService {
     ) {
       // Network performing well - try to increase parallelism
       newValue = Math.min(this.maxMaxParallelChunks, this.maxParallelChunks + 1);
-      console.info(
-        `[BlobStreaming] Increasing parallelism to ${newValue} (strong network detected)`
-      );
     }
 
     this.maxParallelChunks = newValue;
@@ -355,55 +351,40 @@ export class BlobStreamingService {
     // Track chunk download errors and results
     const chunkErrors = new Map<number, string>();
 
-    // Download chunks in parallel (up to maxParallelChunks at a time)
-    const downloadPromises: Promise<void>[] = [];
+    // Create array of chunk download promises
+    const createChunkPromise = async (chunkIndex: number): Promise<void> => {
+      try {
+        const chunk = await this.downloadChunk(url, chunkIndex, this.chunkSizeBytes, totalSize);
+        chunks.set(chunk.chunkIndex, chunk.data);
+        downloadedBytes += chunk.data.length;
 
-    for (let i = 0; i < chunkCount; i++) {
-      // Limit parallel downloads
-      if (downloadPromises.length >= this.maxParallelChunks) {
-        await Promise.race(downloadPromises);
-        downloadPromises.splice(
-          downloadPromises.findIndex(p => p === undefined),
-          1
-        );
+        if (progressCallback) {
+          const elapsed = performance.now() - startTime;
+          const speedMbps = downloadedBytes / 1024 / 1024 / (elapsed / 1000);
+
+          progressCallback({
+            bytesReceived: downloadedBytes,
+            totalBytes: totalSize,
+            percentComplete: (downloadedBytes / totalSize) * 100,
+            averageSpeedMbps: speedMbps,
+            estimatedTimeRemainingSeconds:
+              (totalSize - downloadedBytes) / (speedMbps * 1024 * 1024),
+            chunkIndex,
+            totalChunks: chunkCount,
+            isBuffering: false,
+          });
+        }
+
+        abortSignal?.throwIfAborted();
+      } catch (error) {
+        // Capture chunk download errors instead of failing entire download
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        chunkErrors.set(chunkIndex, errorMsg);
       }
+    };
 
-      const chunkPromise = this.downloadChunk(url, i, this.chunkSizeBytes, totalSize)
-        .then(chunk => {
-          chunks.set(chunk.chunkIndex, chunk.data);
-          downloadedBytes += chunk.data.length;
-
-          if (progressCallback) {
-            const elapsed = performance.now() - startTime;
-            const speedMbps = downloadedBytes / 1024 / 1024 / (elapsed / 1000);
-
-            progressCallback({
-              bytesReceived: downloadedBytes,
-              totalBytes: totalSize,
-              percentComplete: (downloadedBytes / totalSize) * 100,
-              averageSpeedMbps: speedMbps,
-              estimatedTimeRemainingSeconds:
-                (totalSize - downloadedBytes) / (speedMbps * 1024 * 1024),
-              chunkIndex: i,
-              totalChunks: chunkCount,
-              isBuffering: false,
-            });
-          }
-
-          abortSignal?.throwIfAborted();
-        })
-        .catch(error => {
-          // Capture chunk download errors instead of failing entire download
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          chunkErrors.set(i, errorMsg);
-          console.warn(`[BlobStreaming] Chunk ${i} download failed: ${errorMsg}`);
-        });
-
-      downloadPromises.push(chunkPromise);
-    }
-
-    // Wait for all chunks to complete (even if some fail)
-    await Promise.allSettled(downloadPromises);
+    // Download chunks in parallel (up to maxParallelChunks at a time)
+    await this.downloadChunksInParallel(chunkCount, createChunkPromise, this.maxParallelChunks);
 
     // Validate chunks before reassembly
     const validation = this.validateChunks(chunks, chunkCount, totalSize, chunkErrors);
@@ -547,7 +528,7 @@ export class BlobStreamingService {
           observe: 'response',
         })
         .subscribe({
-          next: (response: HttpResponse<any>) => {
+          next: (response: HttpResponse<object>) => {
             // ONLY 206 indicates Range support
             // NEVER accept 200 as Range support - that means server ignored the Range header
             const contentRange = response.headers.get('Content-Range');
@@ -833,6 +814,32 @@ export class BlobStreamingService {
       '4320p': 4320,
     };
     return heightMap[resolution] ?? 1080;
+  }
+
+  /**
+   * Helper method to download chunks in parallel with concurrency limit.
+   *
+   * @param chunkCount Total number of chunks to download
+   * @param createChunkPromise Function that creates a promise for a given chunk index
+   * @param maxParallel Maximum number of parallel downloads
+   */
+  private async downloadChunksInParallel(
+    chunkCount: number,
+    createChunkPromise: (index: number) => Promise<void>,
+    maxParallel: number
+  ): Promise<void> {
+    const allPromises: Promise<void>[] = [];
+
+    // First, create all promises
+    for (let i = 0; i < chunkCount; i++) {
+      allPromises.push(createChunkPromise(i));
+    }
+
+    // Then, execute them with concurrency limit
+    for (let i = 0; i < allPromises.length; i += maxParallel) {
+      const batch = allPromises.slice(i, i + maxParallel);
+      await Promise.all(batch);
+    }
   }
 
   /**

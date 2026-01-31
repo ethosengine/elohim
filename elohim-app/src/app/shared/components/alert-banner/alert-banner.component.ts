@@ -20,6 +20,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, TemplateRef, OnInit } from '@angular/core';
 
+// @coverage: 38.8% (2026-02-04)
+
 /**
  * Alert severity levels
  */
@@ -161,7 +163,7 @@ export class AlertBannerComponent implements OnInit {
     }
 
     // Filter out dismissed alerts
-    return all.filter(a => !this.dismissedAlerts.has(a.id || a.title));
+    return all.filter(a => !this.dismissedAlerts.has(a.id ?? a.title));
   }
 
   /**
@@ -238,7 +240,7 @@ export class AlertBannerComponent implements OnInit {
    * Get icon for an alert
    */
   getIcon(alert: AlertData): string {
-    return alert.icon || this.getDefaultIcon(alert.severity);
+    return alert.icon ?? this.getDefaultIcon(alert.severity);
   }
 
   /**
@@ -256,7 +258,7 @@ export class AlertBannerComponent implements OnInit {
   dismissAlert(alert: AlertData, event?: Event): void {
     event?.stopPropagation();
 
-    const id = alert.id || alert.title;
+    const id = alert.id ?? alert.title;
     this.dismissedAlerts.add(id);
     this.dismissed.emit(alert);
   }
@@ -279,6 +281,6 @@ export class AlertBannerComponent implements OnInit {
    * Get action variant class
    */
   getActionClass(action: AlertAction): string {
-    return `btn-${action.variant || 'secondary'}`;
+    return `btn-${action.variant ?? 'secondary'}`;
   }
 }

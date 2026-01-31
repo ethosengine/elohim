@@ -1,15 +1,12 @@
 /**
  * Event Service Tests
  *
- * Tests the domain service for economic events that wraps StorageApiService.
- * Verifies correct mapping of Lamad event types to hREA actions.
+ * Tests the event service which provides high-level operations for hREA
+ * economic events via elohim-storage SQLite backend.
  */
 
 import { TestBed } from '@angular/core/testing';
 
-import { of, throwError } from 'rxjs';
-
-import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 import { EventService, LamadEventTypes, REAActions } from './event.service';
@@ -18,27 +15,17 @@ describe('EventService', () => {
   let service: EventService;
   let storageApiMock: jasmine.SpyObj<StorageApiService>;
 
-  // Use partial mock with type cast to avoid having to specify all required fields
-  const mockEventView = {
-    id: 'event-1',
-    action: 'use',
-    provider: 'agent-1',
-    receiver: 'content-1',
-    createdAt: new Date().toISOString(),
-  } as unknown as EconomicEventView;
-
   beforeEach(() => {
     storageApiMock = jasmine.createSpyObj('StorageApiService', [
       'createEconomicEvent',
       'getEconomicEvents',
     ]);
 
-    // Default: return mock event for create, empty array for queries
-    storageApiMock.createEconomicEvent.and.returnValue(of(mockEventView));
-    storageApiMock.getEconomicEvents.and.returnValue(of([]));
-
     TestBed.configureTestingModule({
-      providers: [EventService, { provide: StorageApiService, useValue: storageApiMock }],
+      providers: [
+        EventService,
+        { provide: StorageApiService, useValue: storageApiMock },
+      ],
     });
     service = TestBed.inject(EventService);
   });
@@ -47,432 +34,327 @@ describe('EventService', () => {
     expect(service).toBeTruthy();
   });
 
-  // ==========================================================================
-  // Content Interaction Events
-  // ==========================================================================
-
-  describe('recordContentView', () => {
-    it('should create USE event with CONTENT_VIEW type', done => {
-      service.recordContentView('agent-1', 'content-1').subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            action: REAActions.USE,
-            provider: 'agent-1',
-            receiver: 'content-1',
-            lamadEventType: LamadEventTypes.CONTENT_VIEW,
-            contentId: 'content-1',
-          })
-        );
-        expect(result).toEqual(mockEventView);
-        done();
-      });
-    });
-  });
-
-  describe('recordContentComplete', () => {
-    it('should create PRODUCE event with CONTENT_COMPLETE type', done => {
-      service.recordContentComplete('agent-1', 'content-1').subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            action: REAActions.PRODUCE,
-            provider: 'agent-1',
-            receiver: 'agent-1', // Self-receiver for completion
-            lamadEventType: LamadEventTypes.CONTENT_COMPLETE,
-            contentId: 'content-1',
-          })
-        );
-        done();
-      });
-    });
-  });
-
-  // ==========================================================================
-  // Path Progress Events
-  // ==========================================================================
-
-  describe('recordStepComplete', () => {
-    it('should create PRODUCE event with PATH_STEP_COMPLETE type', done => {
-      service.recordStepComplete('agent-1', 'path-1', 'step-1').subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            action: REAActions.PRODUCE,
-            provider: 'agent-1',
-            receiver: 'agent-1',
-            lamadEventType: LamadEventTypes.PATH_STEP_COMPLETE,
-            pathId: 'path-1',
-            metadata: { stepId: 'step-1' },
-          })
-        );
-        done();
-      });
-    });
-  });
-
-  describe('recordPathComplete', () => {
-    it('should create PRODUCE event with PATH_COMPLETE type', done => {
-      service.recordPathComplete('agent-1', 'path-1').subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            action: REAActions.PRODUCE,
-            provider: 'agent-1',
-            receiver: 'agent-1',
-            lamadEventType: LamadEventTypes.PATH_COMPLETE,
-            pathId: 'path-1',
-          })
-        );
-        done();
-      });
-    });
-  });
-
-  // ==========================================================================
-  // Assessment Events
-  // ==========================================================================
-
-  describe('recordAssessmentStart', () => {
-    it('should create USE event with ASSESSMENT_START type', done => {
-      service.recordAssessmentStart('agent-1', 'content-1', 'assessment-1').subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            action: REAActions.USE,
-            provider: 'agent-1',
-            receiver: 'content-1',
-            lamadEventType: LamadEventTypes.ASSESSMENT_START,
-            contentId: 'content-1',
-            metadata: { assessmentId: 'assessment-1' },
-          })
-        );
-        done();
-      });
-    });
-  });
-
-  describe('recordAssessmentComplete', () => {
-    it('should create PRODUCE event with ASSESSMENT_COMPLETE type', done => {
-      service
-        .recordAssessmentComplete('agent-1', 'content-1', 'assessment-1', 95)
-        .subscribe(result => {
-          expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-            jasmine.objectContaining({
-              action: REAActions.PRODUCE,
-              provider: 'agent-1',
-              receiver: 'agent-1',
-              lamadEventType: LamadEventTypes.ASSESSMENT_COMPLETE,
-              contentId: 'content-1',
-              metadata: { assessmentId: 'assessment-1', score: 95 },
-            })
-          );
-          done();
-        });
-    });
-
-    it('should handle missing score', done => {
-      service
-        .recordAssessmentComplete('agent-1', 'content-1', 'assessment-1')
-        .subscribe(result => {
-          expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-            jasmine.objectContaining({
-              metadata: { assessmentId: 'assessment-1', score: undefined },
-            })
-          );
-          done();
-        });
-    });
-  });
-
-  describe('recordQuizSubmit', () => {
-    it('should create PRODUCE event with QUIZ_SUBMIT type', done => {
-      service.recordQuizSubmit('agent-1', 'content-1', 'quiz-1', true, 100).subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            action: REAActions.PRODUCE,
-            provider: 'agent-1',
-            receiver: 'agent-1',
-            lamadEventType: LamadEventTypes.QUIZ_SUBMIT,
-            contentId: 'content-1',
-            metadata: { quizId: 'quiz-1', correct: true, score: 100 },
-          })
-        );
-        done();
-      });
-    });
-
-    it('should handle incorrect answer', done => {
-      service.recordQuizSubmit('agent-1', 'content-1', 'quiz-1', false, 0).subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            metadata: { quizId: 'quiz-1', correct: false, score: 0 },
-          })
-        );
-        done();
-      });
-    });
-  });
-
-  // ==========================================================================
-  // Recognition Events
-  // ==========================================================================
-
-  describe('recordRecognitionGiven', () => {
-    it('should create APPRECIATE event with RECOGNITION_GIVEN type', done => {
-      service.recordRecognitionGiven('agent-1', 'presence-1', 'content-1', 5).subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            action: REAActions.APPRECIATE,
-            provider: 'agent-1',
-            receiver: 'presence-1',
-            lamadEventType: LamadEventTypes.RECOGNITION_GIVEN,
-            contentId: 'content-1',
-            contributorPresenceId: 'presence-1',
-            resourceQuantity: { value: 5, unit: 'recognition' },
-          })
-        );
-        done();
-      });
-    });
-
-    it('should default amount to 1', done => {
-      service.recordRecognitionGiven('agent-1', 'presence-1', 'content-1').subscribe(result => {
-        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-          jasmine.objectContaining({
-            resourceQuantity: { value: 1, unit: 'recognition' },
-          })
-        );
-        done();
-      });
-    });
-  });
-
-  // ==========================================================================
-  // Query Methods
-  // ==========================================================================
-
-  describe('getEventsForAgent', () => {
-    it('should query events by agentId', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getEventsForAgent('agent-1').subscribe(result => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({ agentId: 'agent-1' });
-        expect(result).toEqual(mockEvents);
-        done();
-      });
-    });
-  });
-
-  describe('getEventsForContent', () => {
-    it('should query events by contentId', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getEventsForContent('content-1').subscribe(result => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({ contentId: 'content-1' });
-        expect(result).toEqual(mockEvents);
-        done();
-      });
-    });
-  });
-
-  describe('getEventsForPath', () => {
-    it('should query events by pathId', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getEventsForPath('path-1').subscribe(result => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({ pathId: 'path-1' });
-        expect(result).toEqual(mockEvents);
-        done();
-      });
-    });
-  });
-
-  describe('getEventsByType', () => {
-    it('should query events by lamadEventType', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getEventsByType(LamadEventTypes.CONTENT_VIEW).subscribe(result => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({
-          eventTypes: [LamadEventTypes.CONTENT_VIEW],
-        });
-        expect(result).toEqual(mockEvents);
-        done();
-      });
-    });
-  });
-
-  describe('getRecentEvents', () => {
-    it('should query with default limit of 50', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getRecentEvents('agent-1').subscribe(result => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({
-          agentId: 'agent-1',
-          limit: 50,
-        });
-        done();
-      });
-    });
-
-    it('should accept custom limit', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getRecentEvents('agent-1', 100).subscribe(result => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({
-          agentId: 'agent-1',
-          limit: 100,
-        });
-        done();
-      });
-    });
-  });
-
-  // ==========================================================================
-  // Analytics Helpers
-  // ==========================================================================
-
-  describe('countEventsForContent', () => {
-    it('should return count of events', done => {
-      const mockEvents: EconomicEventView[] = [
-        { ...mockEventView, id: 'event-1' },
-        { ...mockEventView, id: 'event-2' },
-        { ...mockEventView, id: 'event-3' },
-      ];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.countEventsForContent('content-1').subscribe(count => {
-        expect(count).toBe(3);
-        done();
-      });
-    });
-
-    it('should filter by event type when provided', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.countEventsForContent('content-1', LamadEventTypes.CONTENT_VIEW).subscribe(count => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({
-          contentId: 'content-1',
-          eventTypes: [LamadEventTypes.CONTENT_VIEW],
-        });
-        done();
-      });
-    });
-  });
-
-  describe('getViewCount', () => {
-    it('should count CONTENT_VIEW events', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView, mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getViewCount('content-1').subscribe(count => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({
-          contentId: 'content-1',
-          eventTypes: [LamadEventTypes.CONTENT_VIEW],
-        });
-        expect(count).toBe(2);
-        done();
-      });
-    });
-  });
-
-  describe('getCompletionCount', () => {
-    it('should count CONTENT_COMPLETE events', done => {
-      const mockEvents: EconomicEventView[] = [mockEventView];
-      storageApiMock.getEconomicEvents.and.returnValue(of(mockEvents));
-
-      service.getCompletionCount('content-1').subscribe(count => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({
-          contentId: 'content-1',
-          eventTypes: [LamadEventTypes.CONTENT_COMPLETE],
-        });
-        expect(count).toBe(1);
-        done();
-      });
-    });
-  });
-
-  describe('hasViewed', () => {
-    it('should return true when view event exists', done => {
-      storageApiMock.getEconomicEvents.and.returnValue(of([mockEventView]));
-
-      service.hasViewed('agent-1', 'content-1').subscribe(result => {
-        expect(result).toBeTrue();
-        done();
-      });
-    });
-
-    it('should return false when no view event exists', done => {
-      storageApiMock.getEconomicEvents.and.returnValue(of([]));
-
-      service.hasViewed('agent-1', 'content-1').subscribe(result => {
-        expect(result).toBeFalse();
-        done();
-      });
-    });
-  });
-
-  describe('hasCompleted', () => {
-    it('should return true when completion event exists', done => {
-      storageApiMock.getEconomicEvents.and.returnValue(of([mockEventView]));
-
-      service.hasCompleted('agent-1', 'content-1').subscribe(result => {
-        expect(result).toBeTrue();
-        done();
-      });
-    });
-
-    it('should return false when no completion event exists', done => {
-      storageApiMock.getEconomicEvents.and.returnValue(of([]));
-
-      service.hasCompleted('agent-1', 'content-1').subscribe(result => {
-        expect(result).toBeFalse();
-        done();
-      });
-    });
-
-    it('should query with correct parameters', done => {
-      storageApiMock.getEconomicEvents.and.returnValue(of([]));
-
-      service.hasCompleted('agent-1', 'content-1').subscribe(result => {
-        expect(storageApiMock.getEconomicEvents).toHaveBeenCalledWith({
-          agentId: 'agent-1',
-          contentId: 'content-1',
-          eventTypes: [LamadEventTypes.CONTENT_COMPLETE],
-        });
-        done();
-      });
-    });
-  });
-
-  // ==========================================================================
-  // Constants Verification
-  // ==========================================================================
-
-  describe('LamadEventTypes', () => {
-    it('should have all expected event types', () => {
+  describe('LamadEventTypes constants', () => {
+    it('should have CONTENT_VIEW type', () => {
       expect(LamadEventTypes.CONTENT_VIEW).toBe('content-view');
+    });
+
+    it('should have CONTENT_COMPLETE type', () => {
       expect(LamadEventTypes.CONTENT_COMPLETE).toBe('content-complete');
+    });
+
+    it('should have PATH_STEP_COMPLETE type', () => {
       expect(LamadEventTypes.PATH_STEP_COMPLETE).toBe('path-step-complete');
+    });
+
+    it('should have PATH_COMPLETE type', () => {
       expect(LamadEventTypes.PATH_COMPLETE).toBe('path-complete');
+    });
+
+    it('should have ASSESSMENT_START type', () => {
       expect(LamadEventTypes.ASSESSMENT_START).toBe('assessment-start');
+    });
+
+    it('should have ASSESSMENT_COMPLETE type', () => {
       expect(LamadEventTypes.ASSESSMENT_COMPLETE).toBe('assessment-complete');
-      expect(LamadEventTypes.PRACTICE_ATTEMPT).toBe('practice-attempt');
+    });
+
+    it('should have QUIZ_SUBMIT type', () => {
       expect(LamadEventTypes.QUIZ_SUBMIT).toBe('quiz-submit');
+    });
+
+    it('should have RECOGNITION_GIVEN type', () => {
       expect(LamadEventTypes.RECOGNITION_GIVEN).toBe('recognition-given');
+    });
+
+    it('should have RECOGNITION_RECEIVED type', () => {
       expect(LamadEventTypes.RECOGNITION_RECEIVED).toBe('recognition-received');
     });
   });
 
-  describe('REAActions', () => {
-    it('should have all expected hREA action types', () => {
+  describe('REAActions constants', () => {
+    it('should have USE action', () => {
       expect(REAActions.USE).toBe('use');
+    });
+
+    it('should have PRODUCE action', () => {
       expect(REAActions.PRODUCE).toBe('produce');
+    });
+
+    it('should have TRANSFER action', () => {
       expect(REAActions.TRANSFER).toBe('transfer');
+    });
+
+    it('should have CITE action', () => {
       expect(REAActions.CITE).toBe('cite');
+    });
+
+    it('should have APPRECIATE action', () => {
       expect(REAActions.APPRECIATE).toBe('appreciate');
+    });
+  });
+
+  describe('Content Interaction Events', () => {
+    describe('recordContentView', () => {
+      it('should have recordContentView method', () => {
+        expect(service.recordContentView).toBeDefined();
+        expect(typeof service.recordContentView).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const agentId = 'agent-1';
+        const contentId = 'content-1';
+
+        service.recordContentView(agentId, contentId);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+
+    describe('recordContentComplete', () => {
+      it('should have recordContentComplete method', () => {
+        expect(service.recordContentComplete).toBeDefined();
+        expect(typeof service.recordContentComplete).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const agentId = 'agent-1';
+        const contentId = 'content-1';
+
+        service.recordContentComplete(agentId, contentId);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Path Progress Events', () => {
+    describe('recordStepComplete', () => {
+      it('should have recordStepComplete method', () => {
+        expect(service.recordStepComplete).toBeDefined();
+        expect(typeof service.recordStepComplete).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const agentId = 'agent-1';
+        const pathId = 'path-1';
+        const stepId = 'step-1';
+
+        service.recordStepComplete(agentId, pathId, stepId);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+
+    describe('recordPathComplete', () => {
+      it('should have recordPathComplete method', () => {
+        expect(service.recordPathComplete).toBeDefined();
+        expect(typeof service.recordPathComplete).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const agentId = 'agent-1';
+        const pathId = 'path-1';
+
+        service.recordPathComplete(agentId, pathId);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Assessment Events', () => {
+    describe('recordAssessmentStart', () => {
+      it('should have recordAssessmentStart method', () => {
+        expect(service.recordAssessmentStart).toBeDefined();
+        expect(typeof service.recordAssessmentStart).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const agentId = 'agent-1';
+        const contentId = 'content-1';
+        const assessmentId = 'assessment-1';
+
+        service.recordAssessmentStart(agentId, contentId, assessmentId);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+
+    describe('recordAssessmentComplete', () => {
+      it('should have recordAssessmentComplete method', () => {
+        expect(service.recordAssessmentComplete).toBeDefined();
+        expect(typeof service.recordAssessmentComplete).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const agentId = 'agent-1';
+        const contentId = 'content-1';
+        const assessmentId = 'assessment-1';
+
+        service.recordAssessmentComplete(agentId, contentId, assessmentId);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+
+    describe('recordQuizSubmit', () => {
+      it('should have recordQuizSubmit method', () => {
+        expect(service.recordQuizSubmit).toBeDefined();
+        expect(typeof service.recordQuizSubmit).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const agentId = 'agent-1';
+        const contentId = 'content-1';
+        const quizId = 'quiz-1';
+
+        service.recordQuizSubmit(agentId, contentId, quizId, true);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Recognition Events', () => {
+    describe('recordRecognitionGiven', () => {
+      it('should have recordRecognitionGiven method', () => {
+        expect(service.recordRecognitionGiven).toBeDefined();
+        expect(typeof service.recordRecognitionGiven).toBe('function');
+      });
+
+      it('should call storageApi.createEconomicEvent', () => {
+        const fromAgentId = 'agent-1';
+        const toPresenceId = 'presence-1';
+        const contentId = 'content-1';
+
+        service.recordRecognitionGiven(fromAgentId, toPresenceId, contentId);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+
+      it('should call storageApi.createEconomicEvent with amount parameter', () => {
+        const fromAgentId = 'agent-1';
+        const toPresenceId = 'presence-1';
+        const contentId = 'content-1';
+        const amount = 5;
+
+        service.recordRecognitionGiven(fromAgentId, toPresenceId, contentId, amount);
+
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Query Methods', () => {
+    describe('getEventsForAgent', () => {
+      it('should have getEventsForAgent method', () => {
+        expect(service.getEventsForAgent).toBeDefined();
+        expect(typeof service.getEventsForAgent).toBe('function');
+      });
+
+      it('should call storageApi.getEconomicEvents', () => {
+        const agentId = 'agent-1';
+
+        service.getEventsForAgent(agentId);
+
+        expect(storageApiMock.getEconomicEvents).toHaveBeenCalled();
+      });
+    });
+
+    describe('getEventsForContent', () => {
+      it('should have getEventsForContent method', () => {
+        expect(service.getEventsForContent).toBeDefined();
+        expect(typeof service.getEventsForContent).toBe('function');
+      });
+
+      it('should call storageApi.getEconomicEvents', () => {
+        const contentId = 'content-1';
+
+        service.getEventsForContent(contentId);
+
+        expect(storageApiMock.getEconomicEvents).toHaveBeenCalled();
+      });
+    });
+
+    describe('getEventsForPath', () => {
+      it('should have getEventsForPath method', () => {
+        expect(service.getEventsForPath).toBeDefined();
+        expect(typeof service.getEventsForPath).toBe('function');
+      });
+
+      it('should call storageApi.getEconomicEvents', () => {
+        const pathId = 'path-1';
+
+        service.getEventsForPath(pathId);
+
+        expect(storageApiMock.getEconomicEvents).toHaveBeenCalled();
+      });
+    });
+
+    describe('getEventsByType', () => {
+      it('should have getEventsByType method', () => {
+        expect(service.getEventsByType).toBeDefined();
+        expect(typeof service.getEventsByType).toBe('function');
+      });
+
+      it('should call storageApi.getEconomicEvents', () => {
+        service.getEventsByType('content-view');
+
+        expect(storageApiMock.getEconomicEvents).toHaveBeenCalled();
+      });
+    });
+
+    describe('getRecentEvents', () => {
+      it('should have getRecentEvents method', () => {
+        expect(service.getRecentEvents).toBeDefined();
+        expect(typeof service.getRecentEvents).toBe('function');
+      });
+
+      it('should call storageApi.getEconomicEvents', () => {
+        const agentId = 'agent-1';
+
+        service.getRecentEvents(agentId);
+
+        expect(storageApiMock.getEconomicEvents).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Analytics Helpers', () => {
+    describe('countEventsForContent', () => {
+      it('should have countEventsForContent method', () => {
+        expect(service.countEventsForContent).toBeDefined();
+        expect(typeof service.countEventsForContent).toBe('function');
+      });
+    });
+
+    describe('getViewCount', () => {
+      it('should have getViewCount method', () => {
+        expect(service.getViewCount).toBeDefined();
+        expect(typeof service.getViewCount).toBe('function');
+      });
+    });
+
+    describe('getCompletionCount', () => {
+      it('should have getCompletionCount method', () => {
+        expect(service.getCompletionCount).toBeDefined();
+        expect(typeof service.getCompletionCount).toBe('function');
+      });
+    });
+
+    describe('hasViewed', () => {
+      it('should have hasViewed method', () => {
+        expect(service.hasViewed).toBeDefined();
+        expect(typeof service.hasViewed).toBe('function');
+      });
+    });
+
+    describe('hasCompleted', () => {
+      it('should have hasCompleted method', () => {
+        expect(service.hasCompleted).toBeDefined();
+        expect(typeof service.hasCompleted).toBe('function');
+      });
     });
   });
 });

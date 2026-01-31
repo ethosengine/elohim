@@ -16,7 +16,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: elohim-doorway-prod-secrets
-  namespace: ethosengine
+  namespace: elohim-prod
 type: Opaque
 stringData:
   # IMPORTANT: These MUST be changed before production deployment!
@@ -30,8 +30,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: elohim-edgenode-prod-config
-  namespace: ethosengine
+  namespace: elohim-prod
 data:
+  # hApp version to fetch from Harbor (latest = main branch builds)
+  happ-version: "latest"
   conductor-config.yaml: |
     # Holochain Conductor Configuration for Elohim Protocol (Production)
     admin_interfaces:
@@ -57,11 +59,35 @@ data:
       type: lair_server_in_proc
       lair_root: "/var/local/lib/holochain/ks"
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: holochain-data-prod
+  namespace: elohim-prod
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: microk8s-hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-data-prod
+  namespace: elohim-prod
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: microk8s-hostpath
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: elohim-edgenode-prod
-  namespace: ethosengine
+  namespace: elohim-prod
   labels:
     app: elohim-edgenode
     environment: prod
@@ -79,35 +105,33 @@ spec:
     spec:
       nodeSelector:
         node-type: operations
-      # Init container fetches hApp from DNA pipeline artifacts
+      # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
-          image: curlimages/curl:latest
-          command:
-            - sh
-            - -c
+          image: ghcr.io/oras-project/oras:v1.1.0
+          command: ['sh', '-c']
+          args:
             - |
               set -e
-              echo "Fetching hApp from elohim-holochain pipeline..."
+              echo "Fetching hApp from Harbor registry..."
+              echo "Version: ${HAPP_VERSION}"
 
-              # Production: try main branch first, then dev as fallback
-              HAPP_URLS="
-                https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/elohim.happ
-                https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/elohim.happ
-              "
+              # Login to Harbor and pull artifact
+              oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${HAPP_VERSION} -o /happ
 
-              for url in $HAPP_URLS; do
-                echo "Trying: $url"
-                if curl -sfL -o /happ/elohim.happ "$url"; then
-                  echo "✅ hApp downloaded successfully"
-                  ls -lh /happ/elohim.happ
-                  exit 0
-                fi
-                echo "Failed, trying next..."
-              done
-
-              echo "❌ Could not download hApp from any source"
-              exit 1
+              if [ -f /happ/elohim.happ ]; then
+                echo "✅ hApp downloaded successfully from Harbor"
+                ls -lh /happ/elohim.happ
+              else
+                echo "❌ Failed to download hApp from Harbor"
+                exit 1
+              fi
+          env:
+            - name: HAPP_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: elohim-edgenode-prod-config
+                  key: happ-version
           volumeMounts:
             - name: happ-volume
               mountPath: /happ
@@ -267,8 +291,11 @@ spec:
         - name: happ-volume
           emptyDir: {}
         - name: holochain-data
-          emptyDir:
-            sizeLimit: 10Gi
+          persistentVolumeClaim:
+            claimName: holochain-data-prod
+        - name: storage-data
+          persistentVolumeClaim:
+            claimName: storage-data-prod
         - name: conductor-config
           configMap:
             name: elohim-edgenode-prod-config
@@ -277,7 +304,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: elohim-edgenode-prod
-  namespace: ethosengine
+  namespace: elohim-prod
   labels:
     app: elohim-edgenode
     environment: prod
@@ -305,7 +332,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: elohim-edgenode-prod
-  namespace: ethosengine
+  namespace: elohim-prod
   annotations:
     # WebSocket support for /admin, /app/*, signal subdomain
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"

@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 
-import { catchError } from 'rxjs/operators';
+// @coverage: 59.5% (2026-02-04)
 
-import { BehaviorSubject, Observable, map, from, of } from 'rxjs';
+import { BehaviorSubject, Observable, catchError, map, from, of } from 'rxjs';
 
 import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
 import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
@@ -402,13 +402,12 @@ export class ContentMasteryService {
    */
   private computePrivileges(level: MasteryLevel): ContentPrivilege[] {
     const privileges: ContentPrivilege[] = [];
-    const now = new Date().toISOString();
 
     for (const [privilegeType, requiredLevel] of Object.entries(PRIVILEGE_REQUIREMENTS)) {
       const granted = compareMasteryLevels(level, requiredLevel) >= 0;
       privileges.push({
         privilege: privilegeType as PrivilegeType,
-        grantedAt: granted ? now : '',
+        grantedAt: granted ? new Date().toISOString() : '',
         grantedByLevel: level,
         active: granted,
       });
@@ -543,13 +542,11 @@ export class ContentMasteryService {
    */
   getPathMasteryOverview(pathId: string): Observable<PathMasteryOverview | null> {
     if (!this.isBackendAvailable()) {
-      console.warn('[ContentMastery] Backend not available for path overview');
       return of(null);
     }
 
     return from(this.backend.getPathMasteryOverview(pathId)).pipe(
-      catchError(err => {
-        console.warn('[ContentMastery] Failed to get path overview:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -575,8 +572,8 @@ export class ContentMasteryService {
       }
 
       return true;
-    } catch (err) {
-      console.warn('[ContentMastery] Failed to sync to backend:', err);
+    } catch {
+      // Mastery attestation save failed - backend unavailable, return false
       return false;
     }
   }
@@ -610,8 +607,6 @@ export class ContentMasteryService {
       result.success = true;
       return result;
     }
-
-    console.info(`[ContentMastery] Migrating ${localRecords.length} mastery records to backend`);
 
     // Group by contentId (keep latest per content)
     const latestByContent = new Map<string, SourceChainEntry<MasteryRecordContent>>();
@@ -652,10 +647,6 @@ export class ContentMasteryService {
     }
 
     result.success = result.failed === 0;
-    console.info(
-      `[ContentMastery] Migration complete: ${result.migrated} migrated, ${result.failed} failed`
-    );
-
     return result;
   }
 

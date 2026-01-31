@@ -47,6 +47,8 @@ import type {
   ContributorPresenceView as ContributorPresenceViewBase,
 } from '@elohim/storage-client/generated';
 
+// @coverage: 100.0% (2026-02-04)
+
 // =============================================================================
 // Extended View Types with Derived Fields
 // =============================================================================

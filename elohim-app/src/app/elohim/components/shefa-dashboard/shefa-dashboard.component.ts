@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
+// @coverage: 26.7% (2026-02-04)
+
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
 import { ShefaService, CustodianMetrics } from '../../services/shefa.service';
 
@@ -147,11 +149,11 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
 
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
 
-  async ngOnInit(): Promise<void> {
-    await this.loadData();
+  ngOnInit(): void {
+    void this.loadData();
 
     // Refresh every 30 seconds
-    this.refreshInterval = setInterval(() => this.loadData(), 30000);
+    this.refreshInterval = setInterval(() => void this.loadData(), 30000);
   }
 
   ngOnDestroy(): void {
@@ -171,8 +173,8 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
       this.allMetrics.set(allMetrics);
       this.alerts.set(alerts);
       this.recommendations.set(recommendations);
-    } catch (err) {
-      console.error('[ShefaDashboard] Error loading data:', err);
+    } catch {
+      // Metrics load failure is non-critical - dashboard will show empty state
     }
   }
 
@@ -227,6 +229,6 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   }
 
   refreshData(): void {
-    this.loadData();
+    void this.loadData();
   }
 }

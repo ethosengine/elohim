@@ -2,7 +2,7 @@
  * ConnectionIndicatorComponent - Network connection status indicator
  *
  * Displays the current connection mode with visual feedback:
- * - Green: Local node (self-sovereign)
+ * - Green: Local node (steward)
  * - Blue: Doorway (hosted)
  * - Yellow: Connecting...
  * - Red: Offline (cached mode)
@@ -10,6 +10,8 @@
 
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
+
+// @coverage: 76.0% (2026-02-04)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
@@ -58,11 +60,8 @@ export class ConnectionIndicatorComponent {
       };
     }
 
-    // Steward mode (local node connected) - handles both 'steward' and deprecated 'self-sovereign'
-    if (
-      (identityMode === 'steward' || identityMode === 'self-sovereign') &&
-      holochainState === 'connected'
-    ) {
+    // Steward mode (local node connected)
+    if (identityMode === 'steward' && holochainState === 'connected') {
       return {
         mode: 'steward',
         label: 'Steward',

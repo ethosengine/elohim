@@ -9,7 +9,7 @@
         <p class="hero-subtitle">
           Digital guardians for human flourishing. Technology organized around love.
         </p>
-        <button class="listen-button" (click)="toggleVideo()">Play to Learn</button>
+        <button type="button" class="listen-button" (click)="toggleVideo()">Play to Learn</button>
       </div>
 
       <div class="video-section intro-video" [class.visible]="isVideoVisible">
@@ -33,8 +33,10 @@
         </div>
         <p class="video-subtitle">Summary (~7min)</p>
         <div class="video-buttons">
-          <button class="back-to-logo-button" (click)="hideVideo()">Back</button>
-          <button class="deep-dive-button" (click)="toggleDeepDive()">Deep Dive</button>
+          <button type="button" class="back-to-logo-button" (click)="hideVideo()">Back</button>
+          <button type="button" class="deep-dive-button" (click)="toggleDeepDive()">
+            Deep Dive
+          </button>
         </div>
       </div>
 
@@ -59,8 +61,8 @@
         </div>
         <p class="video-subtitle">Deep Dive Podcast (~51min)</p>
         <div class="video-buttons">
-          <button class="back-to-logo-button" (click)="hideVideo()">Back</button>
-          <button class="intro-video-button" (click)="toggleVideo()">Summary</button>
+          <button type="button" class="back-to-logo-button" (click)="hideVideo()">Back</button>
+          <button type="button" class="intro-video-button" (click)="toggleVideo()">Summary</button>
         </div>
       </div>
     </div>

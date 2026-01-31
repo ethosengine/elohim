@@ -111,7 +111,8 @@
       <p class="section-subtitle">Here's what we recommend to address these issues</p>
 
       <div class="recommendations-list">
-        <div
+        <button
+          type="button"
           class="recommendation-card"
           *ngFor="let rec of assessment.recommendations"
           [ngClass]="getPriorityClass(rec.priority)"
@@ -146,7 +147,11 @@
           </div>
 
           <div class="rec-actions" *ngIf="selectedRecommendation === rec">
-            <button class="btn-primary" (click)="onOrderNode(rec); $event.stopPropagation()">
+            <button
+              type="button"
+              class="btn-primary"
+              (click)="onOrderNode(rec); $event.stopPropagation()"
+            >
               Order {{ rec.displayName }}
             </button>
             <a
@@ -159,7 +164,7 @@
               Learn More
             </a>
           </div>
-        </div>
+        </button>
       </div>
     </section>
 

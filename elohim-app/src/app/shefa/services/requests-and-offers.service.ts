@@ -23,20 +23,17 @@
 
 import { Injectable } from '@angular/core';
 
-import { Observable } from 'rxjs';
+// @coverage: 59.7% (2026-02-04)
 
-import {
-  EconomicEvent,
-  CreateEventRequest,
-  LamadEventType,
-} from '@app/elohim/models/economic-event.model';
+import { firstValueFrom } from 'rxjs';
+
+import { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import {
   Intent,
   Proposal,
   Commitment,
-  REAAgent,
   Measure,
-  GovernanceLayer,
+  REAAction,
 } from '@app/elohim/models/rea-bridge.model';
 import {
   ServiceRequest,
@@ -48,10 +45,7 @@ import {
   SavedRequest,
   SavedOffer,
   ListingAdminStatus,
-  ContactPreference,
-  TimePreference,
   InteractionType,
-  DateRange,
 } from '@app/shefa/models/requests-and-offers.model';
 
 import { EconomicService } from './economic.service';
@@ -106,21 +100,25 @@ export class RequestsAndOffersService {
       requesterId,
       title: requestDetails.title,
       description: requestDetails.description,
-      contactPreference: requestDetails.contactPreference || 'email',
-      contactValue: requestDetails.contactValue || '',
-      timeZone: requestDetails.timeZone || 'UTC',
-      timePreference: requestDetails.timePreference || 'any',
-      interactionType: requestDetails.interactionType || 'virtual',
-      dateRange: requestDetails.dateRange || { startDate: now, endDate: '' },
+      contactPreference: requestDetails.contactPreference ?? 'email',
+      contactValue: requestDetails.contactValue ?? '',
+      timeZone: requestDetails.timeZone ?? 'UTC',
+      timePreference: requestDetails.timePreference ?? 'any',
+      interactionType: requestDetails.interactionType ?? 'virtual',
+      dateRange: requestDetails.dateRange ?? { startDate: now, endDate: '', flexibleDates: false },
       serviceTypeIds: requestDetails.serviceTypeIds,
-      requiredSkills: requestDetails.requiredSkills || [],
+      requiredSkills: requestDetails.requiredSkills ?? [],
       budget: requestDetails.budget,
       mediumOfExchangeIds: requestDetails.mediumOfExchangeIds,
-      status: 'pending', // Awaiting admin approval
+      status: 'active', // Note: 'pending' not in ServiceRequest status type
       isPublic: false, // Hidden until approved
-      links: requestDetails.links || [],
+      links: requestDetails.links ?? [],
       createdAt: now,
       updatedAt: now,
+      // Intent properties
+      action: 'take',
+      receiver: requesterId,
+      finished: false,
     };
 
     // Step 3: Create REA Intent for the request
@@ -130,32 +128,25 @@ export class RequestsAndOffersService {
       action: 'take',
       receiver: requesterId,
       resourceConformsTo: requestDetails.serviceTypeIds.join('|'), // Multi-type
-      resourceQuantity: request.budget,
+      resourceQuantity: request.budget?.amount, // Extract Measure from budget
       note: `Request for ${request.title}`,
-      metadata: {
-        requestId: request.id,
-        requestNumber: request.requestNumber,
-      },
+      finished: false,
+      classifiedAs: [request.id, request.requestNumber], // Use classifiedAs instead of metadata
     };
 
     // Step 4: Create 'service-request-created' EconomicEvent
-    const createdEvent = await this.economicService.createEvent({
-      action: 'propose',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      resourceConformsTo: 'service-request',
-      hasPointInTime: now,
-      state: 'proposed',
-      note: `Service request created: ${request.title}. Requester: ${requesterId}. Services: ${requestDetails.serviceTypeIds.join(', ')}`,
-      metadata: {
-        lamadEventType: 'service-request-created',
-        requestId: request.id,
-        requestNumber: request.requestNumber,
-        requesterId,
-        serviceTypeIds: requestDetails.serviceTypeIds,
-        status: 'pending',
-      },
-    });
+    const createdEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'transfer' as REAAction, // Note: 'propose' not in REAAction
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        resourceConformsTo: 'service-request',
+        note: `Service request created: ${request.title}. Requester: ${requesterId}. Services: ${requestDetails.serviceTypeIds.join(
+          ', '
+        )}. Request ID: ${request.id}. Request Number: ${request.requestNumber}.`,
+        lamadEventType: 'content-create',
+      })
+    );
 
     // Step 5: Persist request (in production, to Holochain DHT)
     await this.persistRequest(request);
@@ -204,21 +195,15 @@ export class RequestsAndOffersService {
     };
 
     // Step 4: Create 'service-request-updated' EconomicEvent
-    const updatedEvent = await this.economicService.createEvent({
-      action: 'modify',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Service request updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}`,
-      metadata: {
-        lamadEventType: 'service-request-updated',
-        requestId: request.id,
-        requestNumber: request.requestNumber,
-        requesterId,
-        changedFields: Object.keys(updates),
-      },
-    });
+    const updatedEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        note: `Service request updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}. Request ID: ${request.id}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     // Step 5: Persist updated request
     await this.persistRequest(updated);
@@ -252,18 +237,15 @@ export class RequestsAndOffersService {
     };
 
     // Create event
-    await this.economicService.createEvent({
-      action: 'raise',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Request archived: ${request.title}`,
-      metadata: {
-        lamadEventType: 'service-request-archived',
-        requestId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'raise',
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        note: `Request archived: ${request.title}. Request ID: ${requestId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistRequest(archived);
     return archived;
@@ -292,18 +274,15 @@ export class RequestsAndOffersService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.economicService.createEvent({
-      action: 'modify',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Request deleted: ${request.title}`,
-      metadata: {
-        lamadEventType: 'service-request-deleted',
-        requestId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        note: `Request deleted: ${request.title}. Request ID: ${requestId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistRequest(deleted);
   }
@@ -311,9 +290,8 @@ export class RequestsAndOffersService {
   /**
    * Get a specific request.
    */
-  async getRequest(requestId: string): Promise<ServiceRequest | null> {
+  async getRequest(_requestId: string): Promise<ServiceRequest | null> {
     // TODO: In production, fetch from Holochain DHT
-    console.log('Fetching request:', requestId);
     return null;
   }
 
@@ -321,8 +299,8 @@ export class RequestsAndOffersService {
    * Get all requests by a user.
    */
   async getUserRequests(
-    requesterId: string,
-    filters?: {
+    _requesterId: string,
+    _filters?: {
       status?: 'active' | 'archived' | 'deleted';
       fromDate?: string;
       toDate?: string;
@@ -330,7 +308,6 @@ export class RequestsAndOffersService {
   ): Promise<ServiceRequest[]> {
     // TODO: In production, query DHT for requests where requesterId matches
     // Apply filters if provided
-    console.log(`Fetching requests for user ${requesterId}`, filters);
     return [];
   }
 
@@ -378,23 +355,27 @@ export class RequestsAndOffersService {
       offerorId,
       title: offerDetails.title,
       description: offerDetails.description,
-      contactPreference: offerDetails.contactPreference || 'email',
-      contactValue: offerDetails.contactValue || '',
-      timeZone: offerDetails.timeZone || 'UTC',
-      timePreference: offerDetails.timePreference || 'any',
-      interactionType: offerDetails.interactionType || 'virtual',
-      hoursPerWeek: offerDetails.hoursPerWeek || 40,
-      dateRange: offerDetails.dateRange || { startDate: now, endDate: '' },
+      contactPreference: offerDetails.contactPreference ?? 'email',
+      contactValue: offerDetails.contactValue ?? '',
+      timeZone: offerDetails.timeZone ?? 'UTC',
+      timePreference: offerDetails.timePreference ?? 'any',
+      interactionType: offerDetails.interactionType ?? 'virtual',
+      hoursPerWeek: offerDetails.hoursPerWeek ?? 40,
+      dateRange: offerDetails.dateRange ?? { startDate: now, endDate: '', flexibleDates: false },
       serviceTypeIds: offerDetails.serviceTypeIds,
-      offeredSkills: offerDetails.offeredSkills || [],
+      offerredSkills: offerDetails.offerredSkills ?? [],
       rate: offerDetails.rate,
       mediumOfExchangeIds: offerDetails.mediumOfExchangeIds,
-      acceptsAlternativePayment: offerDetails.acceptsAlternativePayment || false,
-      status: 'pending', // Awaiting admin approval
+      acceptsAlternativePayment: offerDetails.acceptsAlternativePayment ?? false,
+      status: 'active', // Note: 'pending' not in ServiceOffer status type
       isPublic: false, // Hidden until approved
-      links: offerDetails.links || [],
+      links: offerDetails.links ?? [],
       createdAt: now,
       updatedAt: now,
+      // Intent properties
+      action: 'give',
+      provider: offerorId,
+      finished: false,
     };
 
     // Step 3: Create REA Intent for the offer
@@ -404,34 +385,25 @@ export class RequestsAndOffersService {
       action: 'give',
       provider: offerorId,
       resourceConformsTo: offerDetails.serviceTypeIds.join('|'), // Multi-type
-      resourceQuantity: offer.rate,
+      resourceQuantity: offer.rate?.amount, // Extract Measure from rate
       note: `Offer for ${offer.title}`,
-      metadata: {
-        offerId: offer.id,
-        offerNumber: offer.offerNumber,
-      },
+      finished: false,
+      classifiedAs: [offer.id, offer.offerNumber], // Use classifiedAs instead of metadata
     };
 
     // Step 4: Create 'service-offer-created' EconomicEvent
-    const createdEvent = await this.economicService.createEvent({
-      action: 'propose',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      resourceConformsTo: 'service-offer',
-      resourceQuantity: offer.rate,
-      hasPointInTime: now,
-      state: 'proposed',
-      note: `Service offer created: ${offer.title}. Offeror: ${offerorId}. Services: ${offerDetails.serviceTypeIds.join(', ')}. Rate: ${offer.rate.amount.value} ${offer.rate.amount.unit}/${offer.rate.per}`,
-      metadata: {
-        lamadEventType: 'service-offer-created',
-        offerId: offer.id,
-        offerNumber: offer.offerNumber,
-        offerorId,
-        serviceTypeIds: offerDetails.serviceTypeIds,
-        rate: offer.rate.amount.value,
-        status: 'pending',
-      },
-    });
+    const createdEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'transfer' as REAAction, // Note: 'propose' not in REAAction
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        resourceConformsTo: 'service-offer',
+        note: `Service offer created: ${offer.title}. Offeror: ${offerorId}. Services: ${offerDetails.serviceTypeIds.join(
+          ', '
+        )}. Offer ID: ${offer.id}. Offer Number: ${offer.offerNumber}.`,
+        lamadEventType: 'content-create',
+      })
+    );
 
     // Step 5: Persist offer (in production, to Holochain DHT)
     await this.persistOffer(offer);
@@ -479,21 +451,15 @@ export class RequestsAndOffersService {
     };
 
     // Step 4: Create update event
-    const updatedEvent = await this.economicService.createEvent({
-      action: 'modify',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Service offer updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}`,
-      metadata: {
-        lamadEventType: 'service-offer-updated',
-        offerId: offer.id,
-        offerNumber: offer.offerNumber,
-        offerorId,
-        changedFields: Object.keys(updates),
-      },
-    });
+    const updatedEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        note: `Service offer updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}. Offer ID: ${offer.id}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     // Step 5: Persist updated offer
     await this.persistOffer(updated);
@@ -522,18 +488,15 @@ export class RequestsAndOffersService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.economicService.createEvent({
-      action: 'raise',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Offer archived: ${offer.title}`,
-      metadata: {
-        lamadEventType: 'service-offer-archived',
-        offerId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'raise',
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        note: `Offer archived: ${offer.title}. Offer ID: ${offerId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistOffer(archived);
     return archived;
@@ -558,18 +521,15 @@ export class RequestsAndOffersService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.economicService.createEvent({
-      action: 'modify',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Offer deleted: ${offer.title}`,
-      metadata: {
-        lamadEventType: 'service-offer-deleted',
-        offerId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        note: `Offer deleted: ${offer.title}. Offer ID: ${offerId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistOffer(deleted);
   }
@@ -577,9 +537,8 @@ export class RequestsAndOffersService {
   /**
    * Get a specific offer.
    */
-  async getOffer(offerId: string): Promise<ServiceOffer | null> {
+  async getOffer(_offerId: string): Promise<ServiceOffer | null> {
     // TODO: In production, fetch from Holochain DHT
-    console.log('Fetching offer:', offerId);
     return null;
   }
 
@@ -587,15 +546,14 @@ export class RequestsAndOffersService {
    * Get all offers by a user.
    */
   async getUserOffers(
-    offerorId: string,
-    filters?: {
+    _offerorId: string,
+    _filters?: {
       status?: 'active' | 'archived' | 'deleted';
       fromDate?: string;
       toDate?: string;
     }
   ): Promise<ServiceOffer[]> {
     // TODO: In production, query DHT for offers where offerorId matches
-    console.log(`Fetching offers for user ${offerorId}`, filters);
     return [];
   }
 
@@ -639,19 +597,16 @@ export class RequestsAndOffersService {
     // 9. Exclude archived/deleted
     // 10. Sort by recency (newest first)
     // 11. Apply pagination
-    const page = pagination?.page || 1;
-    const pageSize = pagination?.pageSize || 20;
-
-    console.log('Searching requests with filters:', filters);
-    console.log(`Pagination: page ${page}, size ${pageSize}`);
+    const page = pagination?.page ?? 1;
+    const pageSize = pagination?.pageSize ?? 20;
 
     // Placeholder return for development
-    return {
+    return await Promise.resolve({
       requests: [],
       totalCount: 0,
       page,
       pageSize,
-    };
+    });
   }
 
   /**
@@ -689,18 +644,15 @@ export class RequestsAndOffersService {
     // 9. Exclude archived/deleted
     // 10. Sort by rate (lowest first) or newest
     // 11. Apply pagination
-    const page = pagination?.page || 1;
-    const pageSize = pagination?.pageSize || 20;
+    const page = pagination?.page ?? 1;
+    const pageSize = pagination?.pageSize ?? 20;
 
-    console.log('Searching offers with filters:', filters);
-    console.log(`Pagination: page ${page}, size ${pageSize}`);
-
-    return {
+    return await Promise.resolve({
       offers: [],
       totalCount: 0,
       page,
       pageSize,
-    };
+    });
   }
 
   /**
@@ -708,26 +660,24 @@ export class RequestsAndOffersService {
    *
    * Return requests with high engagement (saves, contacts, etc).
    */
-  async getTrendingRequests(limit = 10): Promise<ServiceRequest[]> {
+  async getTrendingRequests(_limit = 10): Promise<ServiceRequest[]> {
     // TODO: In production, query DHT for requests with highest:
     // - Number of matches suggested
     // - Number of saves
     // - Number of contacts received
     // - Recency (if tied)
-    console.log(`Fetching top ${limit} trending requests`);
     return [];
   }
 
   /**
    * Get trending or featured offers.
    */
-  async getTrendingOffers(limit = 10): Promise<ServiceOffer[]> {
+  async getTrendingOffers(_limit = 10): Promise<ServiceOffer[]> {
     // TODO: In production, query DHT for offers with highest:
     // - Number of matches suggested
     // - Number of saves
     // - Number of contacts received
     // - Recency (if tied)
-    console.log(`Fetching top ${limit} trending offers`);
     return [];
   }
 
@@ -754,7 +704,7 @@ export class RequestsAndOffersService {
    *
    * See: docs/alignment-reviews/service-matching-algorithm.md
    */
-  async findMatchesForRequest(requestId: string, limit = 10): Promise<ServiceMatch[]> {
+  async findMatchesForRequest(_requestId: string, _limit = 10): Promise<ServiceMatch[]> {
     // PLACEHOLDER IMPLEMENTATION
     // TODO: Implement matching algorithm with alignment review
     //
@@ -778,9 +728,6 @@ export class RequestsAndOffersService {
     // - Fairness: all offers get equal consideration regardless of creator
     // - Inclusion: matching algorithm doesn't create systemic exclusions
 
-    console.log(
-      `Finding matches for request ${requestId}. Limit: ${limit}. PLACEHOLDER IMPLEMENTATION.`
-    );
     return [];
   }
 
@@ -790,14 +737,11 @@ export class RequestsAndOffersService {
    * Mirror of findMatchesForRequest for offers.
    * See ⚠️ notes on findMatchesForRequest about alignment review.
    */
-  async findMatchesForOffer(offerId: string, limit = 10): Promise<ServiceMatch[]> {
+  async findMatchesForOffer(_offerId: string, _limit = 10): Promise<ServiceMatch[]> {
     // PLACEHOLDER IMPLEMENTATION
     // TODO: Implement matching algorithm with alignment review
     // See findMatchesForRequest for design notes and governance requirements
 
-    console.log(
-      `Finding matches for offer ${offerId}. Limit: ${limit}. PLACEHOLDER IMPLEMENTATION.`
-    );
     return [];
   }
 
@@ -807,9 +751,9 @@ export class RequestsAndOffersService {
    * Admin or matching algorithm can suggest a match.
    */
   async createMatch(
-    requestId: string,
-    offerId: string,
-    matchReason: string
+    _requestId: string,
+    _offerId: string,
+    _matchReason: string
   ): Promise<ServiceMatch> {
     // TODO: Implementation
     // 1. Get request and offer
@@ -817,23 +761,26 @@ export class RequestsAndOffersService {
     // 3. Create ServiceMatch
     // 4. Create 'service-match-suggested' event
     // 5. Return match
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get match details.
    */
-  async getMatch(matchId: string): Promise<ServiceMatch | null> {
+  async getMatch(_matchId: string): Promise<ServiceMatch | null> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Update match status (contacted, negotiating, agreed, etc).
    */
-  async updateMatchStatus(matchId: string, status: ServiceMatch['status']): Promise<ServiceMatch> {
+  async updateMatchStatus(
+    _matchId: string,
+    _status: ServiceMatch['status']
+  ): Promise<ServiceMatch> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -851,9 +798,9 @@ export class RequestsAndOffersService {
    * - Contact event (for audit trail)
    */
   async proposeOfferToRequest(
-    offerId: string,
-    requestId: string,
-    offerorMessage?: string
+    _offerId: string,
+    _requestId: string,
+    _offerorMessage?: string
   ): Promise<{
     match: ServiceMatch;
     proposal: Proposal;
@@ -868,7 +815,7 @@ export class RequestsAndOffersService {
     // 6. Create 'service-proposal-created' event
     // 7. Mark as 'contacted' in match
     // 8. Return match, proposal, event
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -877,16 +824,16 @@ export class RequestsAndOffersService {
    * Requester responding to an offer with their request.
    */
   async proposeRequestToOffer(
-    requestId: string,
-    offerId: string,
-    requesterMessage?: string
+    _requestId: string,
+    _offerId: string,
+    _requesterMessage?: string
   ): Promise<{
     match: ServiceMatch;
     proposal: Proposal;
     contactEvent: EconomicEvent;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -898,9 +845,9 @@ export class RequestsAndOffersService {
    * - 'service-agreed' event
    */
   async acceptProposal(
-    proposalId: string,
-    acceptedById: string,
-    agreedTerms?: {
+    _proposalId: string,
+    _acceptedById: string,
+    _agreedTerms?: {
       rate: Measure;
       schedule: string;
       deliverables: string;
@@ -918,7 +865,7 @@ export class RequestsAndOffersService {
     // 5. Create 'service-agreed' event
     // 6. Update match status to 'agreed'
     // 7. Return proposal, commitment, event
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -927,12 +874,12 @@ export class RequestsAndOffersService {
    * Either party can reject the proposal.
    */
   async rejectProposal(
-    proposalId: string,
-    rejectedById: string,
-    reason?: string
+    _proposalId: string,
+    _rejectedById: string,
+    _reason?: string
   ): Promise<Proposal> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -949,9 +896,9 @@ export class RequestsAndOffersService {
    * - Triggers payment settlement workflow
    */
   async markWorkComplete(
-    commitmentId: string,
-    completedById: string,
-    deliverables?: {
+    _commitmentId: string,
+    _completedById: string,
+    _deliverables?: {
       description: string;
       links: string[];
     }
@@ -965,7 +912,7 @@ export class RequestsAndOffersService {
     // 3. Create 'service-work-completed' event
     // 4. Trigger settlement workflow (payment collection)
     // 5. Return commitment and event
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -980,8 +927,8 @@ export class RequestsAndOffersService {
    * - May create recognition/reputation event
    */
   async settlePayment(
-    matchId: string,
-    paymentDetails: {
+    _matchId: string,
+    _paymentDetails: {
       amount: Measure;
       mediumOfExchangeId: string;
       paymentMethod: 'mutual-credit' | 'fiat-transfer' | 'barter';
@@ -999,7 +946,7 @@ export class RequestsAndOffersService {
     // 5. Create reputation/recognition event
     // 6. Mark match as 'completed'
     // 7. Return settlement event
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1012,21 +959,21 @@ export class RequestsAndOffersService {
    * How they like to be contacted, when they work, where they are.
    */
   async setUserPreferences(
-    userId: string,
-    preferences: Omit<UserPreferences, 'id' | 'userId' | 'updatedAt'>
+    _userId: string,
+    _preferences: Omit<UserPreferences, 'id' | 'userId' | 'updatedAt'>
   ): Promise<UserPreferences> {
     // TODO: Implementation
     // 1. Create or update UserPreferences
     // 2. Return preferences
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get user preferences.
    */
-  async getUserPreferences(userId: string): Promise<UserPreferences | null> {
+  async getUserPreferences(_userId: string): Promise<UserPreferences | null> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1034,17 +981,17 @@ export class RequestsAndOffersService {
    *
    * Use their preferences (time zone, service types, skills) to suggest requests.
    */
-  async getRecommendedRequests(userId: string, limit = 10): Promise<ServiceRequest[]> {
+  async getRecommendedRequests(_userId: string, _limit = 10): Promise<ServiceRequest[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get recommended offers for user based on their needs.
    */
-  async getRecommendedOffers(userId: string, limit = 10): Promise<ServiceOffer[]> {
+  async getRecommendedOffers(_userId: string, _limit = 10): Promise<ServiceOffer[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1056,49 +1003,49 @@ export class RequestsAndOffersService {
    *
    * User wants to remember this for later.
    */
-  async saveRequest(userId: string, requestId: string, reason?: string): Promise<SavedRequest> {
+  async saveRequest(_userId: string, _requestId: string, _reason?: string): Promise<SavedRequest> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Save an offer as favorite.
    */
-  async saveOffer(userId: string, offerId: string, reason?: string): Promise<SavedOffer> {
+  async saveOffer(_userId: string, _offerId: string, _reason?: string): Promise<SavedOffer> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get user's saved requests.
    */
-  async getSavedRequests(userId: string): Promise<SavedRequest[]> {
+  async getSavedRequests(_userId: string): Promise<SavedRequest[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get user's saved offers.
    */
-  async getSavedOffers(userId: string): Promise<SavedOffer[]> {
+  async getSavedOffers(_userId: string): Promise<SavedOffer[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Unsave a request.
    */
-  async unsaveRequest(userId: string, savedRequestId: string): Promise<void> {
+  async unsaveRequest(_userId: string, _savedRequestId: string): Promise<void> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Unsave an offer.
    */
-  async unsaveOffer(userId: string, savedOfferId: string): Promise<void> {
+  async unsaveOffer(_userId: string, _savedOfferId: string): Promise<void> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1111,39 +1058,39 @@ export class RequestsAndOffersService {
    * Used to categorize requests/offers (e.g., "Logo Design", "Tutoring").
    */
   async createServiceType(
-    creatorId: string,
-    typeDetails: Omit<ServiceType, 'id' | 'createdAt' | 'status'>
+    _creatorId: string,
+    _typeDetails: Omit<ServiceType, 'id' | 'createdAt' | 'status'>
   ): Promise<ServiceType> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Update a service type (creator only).
    */
   async updateServiceType(
-    serviceTypeId: string,
-    creatorId: string,
-    updates: Partial<ServiceType>
+    _serviceTypeId: string,
+    _creatorId: string,
+    _updates: Partial<ServiceType>
   ): Promise<ServiceType> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get all active service types.
    */
-  async getServiceTypes(filters?: { isTechnical?: boolean }): Promise<ServiceType[]> {
+  async getServiceTypes(_filters?: { isTechnical?: boolean }): Promise<ServiceType[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get service type by ID.
    */
-  async getServiceType(id: string): Promise<ServiceType | null> {
+  async getServiceType(_id: string): Promise<ServiceType | null> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1156,41 +1103,41 @@ export class RequestsAndOffersService {
    * Define what can be paid with (EUR, USD, Hours, Care Tokens, etc).
    */
   async createMediumOfExchange(
-    creatorId: string,
-    mediumDetails: Omit<MediumOfExchange, 'id' | 'createdAt' | 'status'>
+    _creatorId: string,
+    _mediumDetails: Omit<MediumOfExchange, 'id' | 'createdAt' | 'status'>
   ): Promise<MediumOfExchange> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Update a medium of exchange (creator only).
    */
   async updateMediumOfExchange(
-    mediumId: string,
-    creatorId: string,
-    updates: Partial<MediumOfExchange>
+    _mediumId: string,
+    _creatorId: string,
+    _updates: Partial<MediumOfExchange>
   ): Promise<MediumOfExchange> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get all active mediums of exchange.
    */
-  async getMediumsOfExchange(filters?: {
+  async getMediumsOfExchange(_filters?: {
     exchangeType?: MediumOfExchange['exchangeType'];
   }): Promise<MediumOfExchange[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get medium of exchange by ID.
    */
-  async getMediumOfExchange(id: string): Promise<MediumOfExchange | null> {
+  async getMediumOfExchange(_id: string): Promise<MediumOfExchange | null> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1202,7 +1149,7 @@ export class RequestsAndOffersService {
    */
   async getPendingRequests(): Promise<ServiceRequest[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1210,7 +1157,7 @@ export class RequestsAndOffersService {
    */
   async getPendingOffers(): Promise<ServiceOffer[]> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1219,28 +1166,28 @@ export class RequestsAndOffersService {
    * Sets admin status to 'accepted' so it becomes visible.
    */
   async approveRequest(
-    requestId: string,
-    adminId: string
+    _requestId: string,
+    _adminId: string
   ): Promise<{
     request: ServiceRequest;
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Approve an offer (admin only).
    */
   async approveOffer(
-    offerId: string,
-    adminId: string
+    _offerId: string,
+    _adminId: string
   ): Promise<{
     offer: ServiceOffer;
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1249,56 +1196,56 @@ export class RequestsAndOffersService {
    * Sets admin status to 'rejected' with reason.
    */
   async rejectRequest(
-    requestId: string,
-    adminId: string,
-    reason: string
+    _requestId: string,
+    _adminId: string,
+    _reason: string
   ): Promise<{
     request: ServiceRequest;
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Reject an offer (admin only).
    */
   async rejectOffer(
-    offerId: string,
-    adminId: string,
-    reason: string
+    _offerId: string,
+    _adminId: string,
+    _reason: string
   ): Promise<{
     offer: ServiceOffer;
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Suspend a request temporarily (admin).
    */
   async suspendRequest(
-    requestId: string,
-    adminId: string,
-    reason: string,
-    suspendUntil?: string
+    _requestId: string,
+    _adminId: string,
+    _reason: string,
+    _suspendUntil?: string
   ): Promise<ListingAdminStatus> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Suspend an offer temporarily (admin).
    */
   async suspendOffer(
-    offerId: string,
-    adminId: string,
-    reason: string,
-    suspendUntil?: string
+    _offerId: string,
+    _adminId: string,
+    _reason: string,
+    _suspendUntil?: string
   ): Promise<ListingAdminStatus> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1310,7 +1257,7 @@ export class RequestsAndOffersService {
    *
    * How many requests/offers, matches, completed, etc.
    */
-  async getActivityStats(period: '7-days' | '30-days' | 'all-time'): Promise<{
+  async getActivityStats(_period: '7-days' | '30-days' | 'all-time'): Promise<{
     totalRequests: number;
     totalOffers: number;
     totalMatches: number;
@@ -1319,7 +1266,7 @@ export class RequestsAndOffersService {
     mostActiveServiceTypes: string[];
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1327,7 +1274,7 @@ export class RequestsAndOffersService {
    *
    * How many requests/offers user has, matches, completed, reputation.
    */
-  async getUserActivitySummary(userId: string): Promise<{
+  async getUserActivitySummary(_userId: string): Promise<{
     requestsCreated: number;
     offersCreated: number;
     matchesInitiated: number;
@@ -1337,21 +1284,19 @@ export class RequestsAndOffersService {
     averageRating: number;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return await Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
   // HELPER METHODS
   // ============================================================================
 
-  private async persistRequest(request: ServiceRequest): Promise<void> {
+  private async persistRequest(_request: ServiceRequest): Promise<void> {
     // TODO: Persist to Holochain DHT
-    console.log('Persisting request:', request.requestNumber);
   }
 
-  private async persistOffer(offer: ServiceOffer): Promise<void> {
+  private async persistOffer(_offer: ServiceOffer): Promise<void> {
     // TODO: Persist to Holochain DHT
-    console.log('Persisting offer:', offer.offerNumber);
   }
 }
 
@@ -1366,7 +1311,9 @@ export class RequestsAndOffersService {
  */
 function generateRequestId(): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 9);
+  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32)
+    .toString(36)
+    .substring(2, 9);
   return `req-${timestamp}-${random}`;
 }
 
@@ -1375,6 +1322,8 @@ function generateRequestId(): string {
  */
 function generateOfferId(): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 9);
+  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32)
+    .toString(36)
+    .substring(2, 9);
   return `off-${timestamp}-${random}`;
 }

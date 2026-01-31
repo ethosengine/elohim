@@ -29,6 +29,8 @@ import {
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 92.6% (2026-02-04)
+
 import { Subject } from 'rxjs';
 
 import { ContentNode } from '../../../models/content-node.model';
@@ -699,18 +701,9 @@ export class SophiaRendererComponent
   ngOnInit(): void {
     // Initialize Psyche API for discovery/reflection aggregation
     this.psycheAPI = getPsycheAPI();
-    if (!this.psycheAPI) {
-      console.log('[SophiaRenderer] Psyche API not yet available - will initialize on first use');
-    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    console.log('[SophiaRenderer] ngOnChanges:', {
-      hasNodeChange: !!changes['node'],
-      nodeId: this.node?.id,
-      nodeContentFormat: this.node?.contentFormat,
-      hasContent: !!this.node?.content,
-    });
     if (changes['node'] && this.node) {
       this.loadMoments();
       this.cdr.markForCheck();
@@ -858,10 +851,7 @@ export class SophiaRendererComponent
   // ─────────────────────────────────────────────────────────────────────────
 
   private loadMoments(): void {
-    this.logNodeInfo();
-
     if (!this.node?.content) {
-      console.warn('[SophiaRenderer] No content in node');
       return;
     }
 
@@ -871,21 +861,8 @@ export class SophiaRendererComponent
     }
 
     this.moments = this.convertToMoments(content);
-    console.log(`[SophiaRenderer] Loaded ${this.moments.length} moment(s)`);
 
     this.initializeAssessmentMode();
-  }
-
-  private logNodeInfo(): void {
-    console.log('[SophiaRenderer] loadMoments called with node:', {
-      id: this.node?.id,
-      contentFormat: this.node?.contentFormat,
-      contentType: this.node?.contentType,
-      hasContent: !!this.node?.content,
-      contentTypeOf: typeof this.node?.content,
-      contentIsArray: Array.isArray(this.node?.content),
-      contentLength: Array.isArray(this.node?.content) ? this.node.content.length : 'N/A',
-    });
   }
 
   private parseContent(): unknown | null {
@@ -896,7 +873,6 @@ export class SophiaRendererComponent
       try {
         content = JSON.parse(content);
       } catch {
-        console.error('[SophiaRenderer] Failed to parse content as JSON');
         return null;
       }
     }
@@ -908,10 +884,9 @@ export class SophiaRendererComponent
     if (Array.isArray(content)) {
       return content.map(item => this.toMoment(item));
     }
-    if (typeof content === 'object' && content != null) {
+    if (typeof content === 'object' && content !== null) {
       return [this.toMoment(content)];
     }
-    console.error('[SophiaRenderer] Invalid content format');
     return [];
   }
 
@@ -921,7 +896,6 @@ export class SophiaRendererComponent
     const firstMoment = this.moments[0];
     this.assessmentMode = this.detectModeFromPurpose(firstMoment.purpose);
     this.modeConfig = MODE_PRESETS[this.assessmentMode];
-    console.log(`[SophiaRenderer] Assessment mode: ${this.assessmentMode}`);
 
     // Ensure Psyche API is available for discovery/reflection modes
     if (this.assessmentMode !== 'mastery' && !this.psycheAPI) {
@@ -954,7 +928,7 @@ export class SophiaRendererComponent
           : 'mastery';
 
       return {
-        id: String(obj['id'] || this.generateMomentId()),
+        id: obj['id'] ? String(obj['id']) : this.generateMomentId(),
         purpose,
         content: obj['question'] as Moment['content'],
         hints: obj['hints'] as Moment['hints'],
@@ -1005,19 +979,15 @@ export class SophiaRendererComponent
     this.reflectionRecognitions.push(reflectionRecognition);
 
     // Ensure Psyche API is available
-    if (!this.psycheAPI) {
-      this.psycheAPI = getPsycheAPI();
-    }
+    this.psycheAPI ??= getPsycheAPI();
 
     // Use Psyche API for aggregation if available
     if (this.psycheAPI && this.reflectionRecognitions.length > 0) {
       this.aggregatedReflection = this.psycheAPI.aggregateReflections(this.reflectionRecognitions, {
         normalization: 'sum',
       });
-      console.log('[SophiaRenderer] Aggregated via Psyche API:', this.aggregatedReflection);
     } else {
       // Fallback: create minimal aggregation manually
-      console.warn('[SophiaRenderer] Psyche API not available - using fallback aggregation');
       this.aggregateFallback(recognition);
     }
   }
@@ -1029,27 +999,25 @@ export class SophiaRendererComponent
    */
   private aggregateFallback(recognition: Recognition): void {
     const contributions =
-      recognition.reflection?.subscaleContributions || recognition.resonance?.subscaleContributions;
+      recognition.reflection?.subscaleContributions ?? recognition.resonance?.subscaleContributions;
 
     if (!contributions) return;
 
     // Initialize aggregated data if needed
-    if (!this.aggregatedReflection) {
-      this.aggregatedReflection = {
-        subscaleTotals: {},
-        subscaleCounts: {},
-        normalizedScores: {},
-        momentCount: 0,
-        momentIds: [],
-        aggregatedAt: 0,
-      };
-    }
+    this.aggregatedReflection ??= {
+      subscaleTotals: {},
+      subscaleCounts: {},
+      normalizedScores: {},
+      momentCount: 0,
+      momentIds: [],
+      aggregatedAt: 0,
+    };
 
     for (const [subscale, value] of Object.entries(contributions)) {
       this.aggregatedReflection.subscaleTotals[subscale] =
-        (this.aggregatedReflection.subscaleTotals[subscale] || 0) + value;
+        (this.aggregatedReflection.subscaleTotals[subscale] ?? 0) + value;
       this.aggregatedReflection.subscaleCounts[subscale] =
-        (this.aggregatedReflection.subscaleCounts[subscale] || 0) + 1;
+        (this.aggregatedReflection.subscaleCounts[subscale] ?? 0) + 1;
     }
 
     this.aggregatedReflection.momentIds.push(recognition.momentId);
@@ -1057,7 +1025,7 @@ export class SophiaRendererComponent
 
     // Normalize scores
     const total =
-      Object.values(this.aggregatedReflection.subscaleTotals).reduce((sum, v) => sum + v, 0) || 1;
+      Object.values(this.aggregatedReflection.subscaleTotals).reduce((sum, v) => sum + v, 0) ?? 1;
 
     for (const [subscale, value] of Object.entries(this.aggregatedReflection.subscaleTotals)) {
       this.aggregatedReflection.normalizedScores[subscale] = value / total;
@@ -1126,7 +1094,6 @@ export class SophiaRendererComponent
   private emitReflectionCompletion(): void {
     // Guard against null/undefined aggregatedReflection
     if (!this.aggregatedReflection?.subscaleTotals) {
-      console.warn('[SophiaRenderer] No aggregated reflection data available');
       // Emit basic completion event without subscale details
       const event: RendererCompletionEvent = {
         type: 'quiz',
@@ -1157,11 +1124,6 @@ export class SophiaRendererComponent
         }
       }
     }
-
-    console.log('[SophiaRenderer] Reflection complete:', {
-      subscaleTotals: this.aggregatedReflection.subscaleTotals,
-      primarySubscale,
-    });
 
     const event: RendererCompletionEvent = {
       type: 'quiz',

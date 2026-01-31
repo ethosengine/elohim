@@ -17,6 +17,8 @@ import { Component, inject, signal, computed, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-04)
+
 import { ContentService } from '@app/lamad/services/content.service';
 
 import {
@@ -62,10 +64,8 @@ export class CreatePresenceComponent {
   // Form State
   // ===========================================================================
 
-  readonly form = {
-    displayName: '',
-    note: '',
-  };
+  readonly displayName = signal('');
+  readonly note = signal('');
 
   /** External identifiers being added */
   readonly identifiers = signal<IdentifierEntry[]>([]);
@@ -106,7 +106,7 @@ export class CreatePresenceComponent {
 
   /** Whether form is valid */
   readonly isValid = computed(() => {
-    return this.form.displayName.trim().length >= 2;
+    return this.displayName().trim().length >= 2;
   });
 
   // ===========================================================================
@@ -167,6 +167,22 @@ export class CreatePresenceComponent {
   }
 
   /**
+   * Handle provider change event.
+   */
+  onProviderChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.setProvider(value);
+  }
+
+  /**
+   * Handle identifier input event.
+   */
+  onIdentifierInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.setIdentifierValue(value);
+  }
+
+  /**
    * Search for content to establish the presence.
    */
   searchContent(): void {
@@ -180,8 +196,7 @@ export class CreatePresenceComponent {
       next: results => {
         this.contentResults.set(results.slice(0, 10).map(c => ({ id: c.id, title: c.title })));
       },
-      error: err => {
-        console.error('[CreatePresence] Content search failed:', err);
+      error: () => {
         this.contentResults.set([]);
       },
     });
@@ -190,7 +205,7 @@ export class CreatePresenceComponent {
   /**
    * Add content to establishing content list.
    */
-  addEstablishingContent(contentId: string, _title: string): void {
+  addEstablishingContent(contentId: string): void {
     if (!this.establishingContentIds().includes(contentId)) {
       this.establishingContentIds.update(ids => [...ids, contentId]);
     }
@@ -237,18 +252,18 @@ export class CreatePresenceComponent {
       }));
 
       const request: CreatePresenceRequest = {
-        displayName: this.form.displayName.trim(),
+        displayName: this.displayName().trim(),
         externalIdentifiers: externalIdentifiers.length > 0 ? externalIdentifiers : undefined,
         establishingContentIds:
           this.establishingContentIds().length > 0 ? this.establishingContentIds() : undefined,
-        note: this.form.note.trim() || undefined,
+        note: this.note().trim() || undefined,
       };
 
       const presence = await this.presenceService.createPresence(request);
 
       // Emit success and navigate
       this.created.emit(presence.id);
-      this.router.navigate(['/identity/presences', presence.id]);
+      void this.router.navigate(['/identity/presences', presence.id]);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create presence';
       this.error.set(errorMessage);
@@ -262,7 +277,7 @@ export class CreatePresenceComponent {
    */
   onCancel(): void {
     this.cancelled.emit();
-    this.router.navigate(['/identity/presences']);
+    void this.router.navigate(['/identity/presences']);
   }
 
   /**

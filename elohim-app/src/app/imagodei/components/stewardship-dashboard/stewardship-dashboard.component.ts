@@ -16,6 +16,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 98.0% (2026-02-04)
+
 import {
   type StewardshipAllocation,
   type GovernanceState,
@@ -69,7 +71,7 @@ export class StewardshipDashboardComponent implements OnInit {
     // The human's presence ID is typically derived from their identity
     // For bootstrap, we use a convention: human-id → presence-{human-id}
     const humanId = this.identityService.humanId();
-    return humanId ? humanId : null;
+    return humanId ?? null;
   });
 
   /** Total recognition accumulated */
@@ -108,7 +110,7 @@ export class StewardshipDashboardComponent implements OnInit {
   /**
    * Load the steward's portfolio.
    */
-  async loadPortfolio(): Promise<void> {
+  loadPortfolio(): void {
     const presenceId = this.presenceId();
     if (!presenceId) {
       this.isLoading.set(false);
@@ -125,8 +127,7 @@ export class StewardshipDashboardComponent implements OnInit {
         this.allocations.set(portfolio.allocations.map(a => this.toAllocationDisplay(a)));
         this.isLoading.set(false);
       },
-      error: err => {
-        console.error('[StewardshipDashboard] Failed to load portfolio:', err);
+      error: _err => {
         this.error.set('Failed to load stewardship portfolio.');
         this.isLoading.set(false);
       },

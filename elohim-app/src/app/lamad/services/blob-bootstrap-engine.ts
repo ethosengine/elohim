@@ -148,9 +148,8 @@ export class BlobBootstrapEngine {
    * Start the bootstrap process (non-blocking).
    * Call this once and it runs the full sequence in background.
    */
-  async startBootstrap(): Promise<void> {
+  startBootstrap(): void {
     if (this.initializationStarted) {
-      console.info('[BlobBootstrapEngine] Bootstrap already started');
       return;
     }
 
@@ -158,8 +157,8 @@ export class BlobBootstrapEngine {
     this.updateState({ status: 'initializing' });
 
     // Run in background - don't await
-    this.runBootstrapSequence().catch(error => {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+    this.runBootstrapSequence().catch(_error => {
+      const message = _error instanceof Error ? _error.message : 'Unknown error';
       this.updateState({ status: 'degraded', error: message });
       this.emitEvent({ type: 'error', error: message });
     });
@@ -174,8 +173,8 @@ export class BlobBootstrapEngine {
       await this.initializeCachePersistence();
       this.updateState({ cacheInitialized: true });
       this.emitEvent({ type: 'cache-initialized' });
-    } catch (error) {
-      console.warn('[BlobBootstrapEngine] Cache persistence init failed, continuing:', error);
+    } catch {
+      // Cache persistence initialization failed - will continue without persistence
     }
 
     // Step 2: Wait for Holochain connection
@@ -185,7 +184,6 @@ export class BlobBootstrapEngine {
     const holochainReady = await this.waitForHolochainConnection(timeoutMs, pollIntervalMs);
 
     if (!holochainReady) {
-      console.warn('[BlobBootstrapEngine] Holochain not ready, entering degraded mode');
       this.updateState({ status: 'degraded', holochainConnected: false });
       this.startBackgroundServices();
       this.emitEvent({ type: 'ready' });
@@ -202,8 +200,8 @@ export class BlobBootstrapEngine {
         const loaded = await this.preloadMetadata(contentIds);
         this.updateState({ metadataLoaded: true, preloadedContentIds: loaded });
         this.emitEvent({ type: 'metadata-loaded', contentIds: Array.from(loaded) });
-      } catch (error) {
-        console.warn('[BlobBootstrapEngine] Metadata preload failed, continuing:', error);
+      } catch {
+        // Metadata preload failed - will continue without preloading
       }
     } else {
       this.updateState({ metadataLoaded: true });
@@ -249,7 +247,6 @@ export class BlobBootstrapEngine {
     }
 
     if (typeof indexedDB === 'undefined') {
-      console.warn('[BlobBootstrapEngine] IndexedDB not available');
       return;
     }
 
@@ -288,8 +285,8 @@ export class BlobBootstrapEngine {
         if (blobs && blobs.length > 0) {
           loaded.add(contentId);
         }
-      } catch (error) {
-        console.warn(`[BlobBootstrapEngine] Failed to preload metadata for ${contentId}:`, error);
+      } catch {
+        // Blob fetch for individual content ID failed - continue with others
       }
     }
 
@@ -316,13 +313,13 @@ export class BlobBootstrapEngine {
    */
   preloadContent(contentIds: string[]): void {
     if (this.holochainChecker.isConnected()) {
-      this.preloadMetadata(contentIds)
+      void this.preloadMetadata(contentIds)
         .then(loaded => {
           this.state.preloadedContentIds.forEach(id => loaded.add(id));
           this.updateState({ preloadedContentIds: loaded });
         })
-        .catch(error => {
-          console.warn('[BlobBootstrapEngine] Runtime preload failed:', error);
+        .catch(() => {
+          // Runtime metadata preload failed - gracefully continue without updating state
         });
     }
   }

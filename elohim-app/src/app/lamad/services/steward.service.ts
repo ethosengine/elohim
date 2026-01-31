@@ -19,7 +19,9 @@
  * @see EconomicService for underlying hREA primitives
  */
 
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, computed } from '@angular/core';
+
+// @coverage: 23.4% (2026-02-04)
 
 import { catchError, shareReplay, tap } from 'rxjs/operators';
 
@@ -233,7 +235,6 @@ export class StewardService {
     return defer(() => from(this.doCreateCredential(input))).pipe(
       tap(() => this.refreshMyCredentials()),
       catchError(err => {
-        console.error('[StewardService] Failed to create credential:', err);
         throw err;
       })
     );
@@ -253,8 +254,7 @@ export class StewardService {
     if (!this.credentialCache.has(credentialId)) {
       const request = defer(() => from(this.fetchCredential(credentialId))).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(`[StewardService] Failed to fetch credential "${credentialId}":`, err);
+        catchError(_err => {
           return of(null);
         })
       );
@@ -277,8 +277,7 @@ export class StewardService {
 
     return defer(() => from(this.fetchMyCredentials())).pipe(
       tap(credentials => this.myCredentialsSubject.next(credentials)),
-      catchError(err => {
-        console.warn('[StewardService] Failed to fetch my credentials:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -296,8 +295,7 @@ export class StewardService {
     }
 
     return defer(() => from(this.fetchCredentialsForHuman(humanPresenceId))).pipe(
-      catchError(err => {
-        console.warn(`[StewardService] Failed to fetch credentials for "${humanPresenceId}":`, err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -321,7 +319,6 @@ export class StewardService {
     return defer(() => from(this.doCreateGate(input))).pipe(
       tap(() => this.refreshMyGates()),
       catchError(err => {
-        console.error('[StewardService] Failed to create gate:', err);
         throw err;
       })
     );
@@ -339,8 +336,7 @@ export class StewardService {
     }
 
     return defer(() => from(this.fetchGate(gateId))).pipe(
-      catchError(err => {
-        console.warn(`[StewardService] Failed to fetch gate "${gateId}":`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -362,8 +358,7 @@ export class StewardService {
     if (!this.gatesByResourceCache.has(resourceId)) {
       const request = defer(() => from(this.fetchGatesForResource(resourceId))).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(`[StewardService] Failed to fetch gates for "${resourceId}":`, err);
+        catchError(_err => {
           return of([]);
         })
       );
@@ -392,8 +387,7 @@ export class StewardService {
     if (!this.accessCheckCache.has(gateId)) {
       const request = defer(() => from(this.fetchAccessCheck(gateId))).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(`[StewardService] Failed to check access for "${gateId}":`, err);
+        catchError(_err => {
           return of(null);
         })
       );
@@ -422,7 +416,6 @@ export class StewardService {
         this.refreshMyAccessGrants();
       }),
       catchError(err => {
-        console.error('[StewardService] Failed to grant access:', err);
         throw err;
       })
     );
@@ -440,8 +433,7 @@ export class StewardService {
 
     return defer(() => from(this.fetchMyAccessGrants())).pipe(
       tap(grants => this.myAccessGrantsSubject.next(grants)),
-      catchError(err => {
-        console.warn('[StewardService] Failed to fetch my access grants:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -463,8 +455,7 @@ export class StewardService {
     }
 
     return defer(() => from(this.fetchRevenueSummary(stewardPresenceId))).pipe(
-      catchError(err => {
-        console.warn(`[StewardService] Failed to fetch revenue for "${stewardPresenceId}":`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -519,8 +510,8 @@ export class StewardService {
 
       this.availableSignal.set(result.success);
       return result.success;
-    } catch (err) {
-      console.warn('[StewardService] Availability test failed:', err);
+    } catch {
+      // Service availability check failed - Steward service unavailable
       this.availableSignal.set(false);
       return false;
     }

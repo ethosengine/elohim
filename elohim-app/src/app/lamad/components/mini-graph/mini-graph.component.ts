@@ -14,6 +14,8 @@ import {
   ChangeDetectorRef,
 } from '@angular/core';
 
+// @coverage: 43.4% (2026-02-04)
+
 import { takeUntil } from 'rxjs/operators';
 
 import * as d3 from 'd3';
@@ -385,8 +387,7 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
           this.cdr.markForCheck();
           this.renderGraph();
         },
-        error: err => {
-          console.error('Failed to load neighborhood:', err);
+        error: _err => {
           this.isLoading = false;
           this.isEmpty = true;
           this.cdr.markForCheck();
@@ -461,7 +462,7 @@ export class MiniGraphComponent implements OnChanges, OnDestroy, AfterViewInit {
           this.nodeSelected.emit(d.id);
         }
       })
-      .on('mouseenter', (event, d) => {
+      .on('mouseenter', (event: MouseEvent, d) => {
         this.hoveredNode = d;
         const rect = this.graphContainer.nativeElement.getBoundingClientRect();
         this.tooltipX = event.clientX - rect.left;

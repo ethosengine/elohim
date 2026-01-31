@@ -17,6 +17,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 76.7% (2026-02-04)
+
 import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
@@ -91,8 +93,7 @@ export class PointsService {
           this.balanceSubject.next(output?.balance ?? null);
           this.loadingSubject.next(false);
         }),
-        catchError(err => {
-          console.warn('[Points] Failed to get balance:', err);
+        catchError(_err => {
           this.loadingSubject.next(false);
           return of(null);
         })
@@ -157,8 +158,7 @@ export class PointsService {
           this.historySubject.next([result.point_event.event, ...history]);
         }
       }),
-      catchError(err => {
-        console.warn('[Points] Failed to earn points:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -212,8 +212,7 @@ export class PointsService {
       tap(history => {
         this.historySubject.next(history);
       }),
-      catchError(err => {
-        console.warn('[Points] Failed to load history:', err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -237,7 +236,7 @@ export class PointsService {
     return this.balance$.pipe(
       map(balance => {
         if (!balance) return {};
-        return parsePointsByTrigger(balance.pointsByTriggerJson);
+        return parsePointsByTrigger(balance.points_by_trigger_json);
       })
     );
   }
@@ -248,7 +247,7 @@ export class PointsService {
   getPointsByTriggerSync(): Record<string, number> {
     const balance = this.balanceSubject.value;
     if (!balance) return {};
-    return parsePointsByTrigger(balance.pointsByTriggerJson);
+    return parsePointsByTrigger(balance.points_by_trigger_json);
   }
 
   /**

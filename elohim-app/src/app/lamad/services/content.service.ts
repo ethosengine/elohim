@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 85.2% (2026-02-04)
+
 import { map, switchMap, catchError } from 'rxjs/operators';
 
 import { Observable, of, forkJoin } from 'rxjs';

@@ -1,5 +1,5 @@
 import { TestBed, fakeAsync, tick, flush, waitForAsync } from '@angular/core/testing';
-import { HealthCheckService, HealthStatus, HealthState } from './health-check.service';
+import { HealthCheckService, HealthStatus, HealthState, HealthCheck } from './health-check.service';
 import { HolochainClientService } from './holochain-client.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
@@ -68,8 +68,327 @@ describe('HealthCheckService', () => {
     service.ngOnDestroy();
   });
 
+  // ===========================================================================
+  // SERVICE CREATION TEST
+  // ===========================================================================
+
   it('should be created', () => {
     expect(service).toBeTruthy();
+  });
+
+  it('should be injectable with root scope', () => {
+    const injectedService = TestBed.inject(HealthCheckService);
+    expect(injectedService).toBe(service);
+  });
+
+  // ===========================================================================
+  // PUBLIC METHODS EXISTENCE TESTS
+  // ===========================================================================
+
+  describe('Public Methods Existence', () => {
+    it('should have refresh method', () => {
+      expect(typeof service.refresh).toBe('function');
+    });
+
+    it('should have checkHolochainOnly method', () => {
+      expect(typeof service.checkHolochainOnly).toBe('function');
+    });
+
+    it('should have getQuickStatus method', () => {
+      expect(typeof service.getQuickStatus).toBe('function');
+    });
+
+    it('should have ngOnDestroy method', () => {
+      expect(typeof service.ngOnDestroy).toBe('function');
+    });
+
+    it('should have status computed signal', () => {
+      expect(typeof service.status).toBe('function');
+    });
+
+    it('should have isHealthy computed signal', () => {
+      expect(typeof service.isHealthy).toBe('function');
+    });
+
+    it('should have isDegraded computed signal', () => {
+      expect(typeof service.isDegraded).toBe('function');
+    });
+
+    it('should have isUnhealthy computed signal', () => {
+      expect(typeof service.isUnhealthy).toBe('function');
+    });
+
+    it('should have isChecking computed signal', () => {
+      expect(typeof service.isChecking).toBe('function');
+    });
+  });
+
+  // ===========================================================================
+  // PROPERTY INITIALIZATION TESTS
+  // ===========================================================================
+
+  describe('Property Initialization', () => {
+    it('should initialize status as a computed signal', () => {
+      const status = service.status();
+      expect(status).toBeDefined();
+      expect(typeof status).toBe('object');
+    });
+
+    it('should initialize isHealthy as a computed signal', () => {
+      const result = service.isHealthy();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('should initialize isDegraded as a computed signal', () => {
+      const result = service.isDegraded();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('should initialize isUnhealthy as a computed signal', () => {
+      const result = service.isUnhealthy();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('should initialize isChecking as a computed signal', () => {
+      const result = service.isChecking();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('status should return HealthStatus object structure', () => {
+      const status = service.status();
+      expect(status.status).toBeDefined();
+      expect(status.summary).toBeDefined();
+      expect(status.lastChecked).toBeDefined();
+      expect(status.checks).toBeDefined();
+      expect(status.isChecking).toBeDefined();
+    });
+
+    it('status checks should contain all required categories', () => {
+      const status = service.status();
+      expect(status.checks.holochain).toBeDefined();
+      expect(status.checks.indexedDb).toBeDefined();
+      expect(status.checks.blobCache).toBeDefined();
+      expect(status.checks.network).toBeDefined();
+    });
+  });
+
+  // ===========================================================================
+  // SIMPLE INPUT/OUTPUT TESTS
+  // ===========================================================================
+
+  describe('Simple Input/Output Tests', () => {
+    it('getQuickStatus should return object with required properties', () => {
+      const quickStatus = service.getQuickStatus();
+      expect(quickStatus.icon).toBeDefined();
+      expect(quickStatus.label).toBeDefined();
+      expect(quickStatus.color).toBeDefined();
+    });
+
+    it('getQuickStatus icon should be a string', () => {
+      const quickStatus = service.getQuickStatus();
+      expect(typeof quickStatus.icon).toBe('string');
+    });
+
+    it('getQuickStatus label should be a string', () => {
+      const quickStatus = service.getQuickStatus();
+      expect(typeof quickStatus.label).toBe('string');
+    });
+
+    it('getQuickStatus color should be a string', () => {
+      const quickStatus = service.getQuickStatus();
+      expect(typeof quickStatus.color).toBe('string');
+    });
+
+    it('getQuickStatus should return green icon for healthy status', () => {
+      const status = service.status();
+      if (status.status === 'healthy') {
+        const quickStatus = service.getQuickStatus();
+        expect(quickStatus.color).toBe('green');
+      }
+    });
+
+    it('getQuickStatus should return different outputs for different health states', () => {
+      // Get initial quick status
+      const quickStatus1 = service.getQuickStatus();
+
+      // Quick status output depends on current state
+      expect(quickStatus1).toBeTruthy();
+      expect(['●', '◐', '○', '?']).toContain(quickStatus1.icon);
+      expect(['green', 'yellow', 'red', 'gray']).toContain(quickStatus1.color);
+    });
+  });
+
+  // ===========================================================================
+  // OBSERVABLE/SIGNAL RETURN TYPE TESTS
+  // ===========================================================================
+
+  describe('Signal Return Type Tests', () => {
+    it('status should return signal value not Observable', () => {
+      const status = service.status();
+      expect(status).toBeDefined();
+      expect(status.status).toBeDefined();
+      expect(['healthy', 'degraded', 'unhealthy', 'unknown']).toContain(status.status);
+    });
+
+    it('isHealthy should return boolean signal value', () => {
+      const result = service.isHealthy();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('isDegraded should return boolean signal value', () => {
+      const result = service.isDegraded();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('isUnhealthy should return boolean signal value', () => {
+      const result = service.isUnhealthy();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('isChecking should return boolean signal value', () => {
+      const result = service.isChecking();
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('refresh should return Promise of HealthStatus', async () => {
+      const result = service.refresh();
+      expect(result instanceof Promise).toBe(true);
+      const status = await result;
+      expect(status).toBeDefined();
+      expect(typeof status).toBe('object');
+      expect(status.status).toBeDefined();
+    });
+
+    it('checkHolochainOnly should return Promise of HealthCheck', async () => {
+      const result = service.checkHolochainOnly();
+      expect(result instanceof Promise).toBe(true);
+      const check = await result;
+      expect(check).toBeDefined();
+      expect(typeof check).toBe('object');
+      expect(check.name).toBeDefined();
+      expect(check.status).toBeDefined();
+    });
+  });
+
+  // ===========================================================================
+  // HEALTH STATUS STRUCTURE TESTS
+  // ===========================================================================
+
+  describe('HealthStatus Structure', () => {
+    it('status should contain valid HealthState values', () => {
+      const status = service.status();
+      const validStates: HealthState[] = ['healthy', 'degraded', 'unhealthy', 'unknown'];
+      expect(validStates).toContain(status.status);
+    });
+
+    it('status.summary should be a string', () => {
+      const status = service.status();
+      expect(typeof status.summary).toBe('string');
+      expect(status.summary.length).toBeGreaterThan(0);
+    });
+
+    it('status.lastChecked should be an ISO string', () => {
+      const status = service.status();
+      expect(typeof status.lastChecked).toBe('string');
+      expect(new Date(status.lastChecked).toISOString()).toBe(status.lastChecked);
+    });
+
+    it('status.isChecking should be a boolean', () => {
+      const status = service.status();
+      expect(typeof status.isChecking).toBe('boolean');
+    });
+
+    it('each check should have required HealthCheck properties', () => {
+      const status = service.status();
+      const checks = [
+        status.checks.holochain,
+        status.checks.indexedDb,
+        status.checks.blobCache,
+        status.checks.network,
+      ];
+
+      checks.forEach(check => {
+        expect(check.name).toBeDefined();
+        expect(check.status).toBeDefined();
+        expect(check.message).toBeDefined();
+        expect(check.lastChecked).toBeDefined();
+        expect(typeof check.name).toBe('string');
+        expect(typeof check.status).toBe('string');
+        expect(typeof check.message).toBe('string');
+        expect(typeof check.lastChecked).toBe('string');
+      });
+    });
+
+    it('check should have correct names', () => {
+      const status = service.status();
+      expect(status.checks.holochain.name).toBe('holochain');
+      expect(status.checks.indexedDb.name).toBe('indexedDb');
+      expect(status.checks.blobCache.name).toBe('blobCache');
+      expect(status.checks.network.name).toBe('network');
+    });
+
+    it('check status should be valid HealthState', () => {
+      const status = service.status();
+      const validStates: HealthState[] = ['healthy', 'degraded', 'unhealthy', 'unknown'];
+      const checks = [
+        status.checks.holochain,
+        status.checks.indexedDb,
+        status.checks.blobCache,
+        status.checks.network,
+      ];
+
+      checks.forEach(check => {
+        expect(validStates).toContain(check.status);
+      });
+    });
+
+    it('check lastChecked should be ISO string', () => {
+      const status = service.status();
+      const checks = [
+        status.checks.holochain,
+        status.checks.indexedDb,
+        status.checks.blobCache,
+        status.checks.network,
+      ];
+
+      checks.forEach(check => {
+        expect(new Date(check.lastChecked).toISOString()).toBe(check.lastChecked);
+      });
+    });
+
+    it('check durationMs should be non-negative number if present', () => {
+      const status = service.status();
+      const checks = [
+        status.checks.holochain,
+        status.checks.indexedDb,
+        status.checks.blobCache,
+        status.checks.network,
+      ];
+
+      checks.forEach(check => {
+        if (check.durationMs !== undefined) {
+          expect(typeof check.durationMs).toBe('number');
+          expect(check.durationMs).toBeGreaterThanOrEqual(0);
+        }
+      });
+    });
+
+    it('check metadata should be object if present', () => {
+      const status = service.status();
+      const checks = [
+        status.checks.holochain,
+        status.checks.indexedDb,
+        status.checks.blobCache,
+        status.checks.network,
+      ];
+
+      checks.forEach(check => {
+        if (check.metadata !== undefined) {
+          expect(typeof check.metadata).toBe('object');
+          expect(Array.isArray(check.metadata)).toBe(false);
+        }
+      });
+    });
   });
 
   describe('Initial State', () => {

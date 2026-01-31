@@ -13,6 +13,8 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 38.3% (2026-02-04)
+
 import {
   type ContributorPresenceView,
   type CreatePresenceRequest,
@@ -107,8 +109,8 @@ export class PresenceListComponent implements OnInit {
   // ==========================================================================
 
   ngOnInit(): void {
-    this.loadPresences();
-    this.loadMyStewardedPresences();
+    void this.loadPresences();
+    void this.loadMyStewardedPresences();
   }
 
   // ==========================================================================
@@ -128,8 +130,8 @@ export class PresenceListComponent implements OnInit {
       ]);
 
       this.allPresencesSignal.set([...unclaimed, ...stewarded, ...claimed]);
-    } catch (err) {
-      console.error('[PresenceList] Failed to load presences:', err);
+    } catch (error) {
+      console.error('[PresenceList] Failed to load presences:', error);
       this.error.set('Failed to load presences');
     }
   }
@@ -142,8 +144,9 @@ export class PresenceListComponent implements OnInit {
 
     try {
       await this.presenceService.getMyStewardedPresences();
-    } catch (err) {
-      console.error('[PresenceList] Failed to load stewarded presences:', err);
+    } catch (error) {
+      // Intentionally silent - stewarded presence load failure is non-critical for list display
+      console.warn('[PresenceList] Non-critical stewarded presences load failed:', error);
     }
   }
 

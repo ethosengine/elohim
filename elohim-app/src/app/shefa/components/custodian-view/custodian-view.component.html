@@ -69,6 +69,7 @@
       <!-- Tab Navigation -->
       <nav class="tab-nav">
         <button
+          type="button"
           class="tab-btn"
           [class.active]="activeTab === 'helping'"
           (click)="setActiveTab('helping')"
@@ -78,6 +79,7 @@
           <span class="tab-count">{{ view.helpingCount }}</span>
         </button>
         <button
+          type="button"
           class="tab-btn"
           [class.active]="activeTab === 'beingHelped'"
           (click)="setActiveTab('beingHelped')"
@@ -90,7 +92,8 @@
 
       <!-- Relationship List -->
       <div class="relationship-list">
-        <div
+        <button
+          type="button"
           class="relationship-card"
           *ngFor="let rel of activeList"
           (click)="selectCustodian(rel)"
@@ -162,7 +165,7 @@
               Last active: {{ rel.lastActivity | date: 'mediumDate' }}
             </div>
           </div>
-        </div>
+        </button>
 
         <!-- Empty State -->
         <div class="empty-state" *ngIf="activeList.length === 0">

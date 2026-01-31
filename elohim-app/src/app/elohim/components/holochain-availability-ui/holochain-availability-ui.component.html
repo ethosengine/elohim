@@ -3,7 +3,7 @@
   <div class="banner-container">
     <!-- Icon and status -->
     <div class="status-section">
-      <span class="banner-icon" [class]="'icon-' + bannerClass()">{{ bannerIcon() }}</span>
+      <span [class]="'banner-icon icon-' + bannerClass()">{{ bannerIcon() }}</span>
       <div class="status-text">
         <div class="status-message">{{ statusMessage() }}</div>
         <div class="degradation-message" *ngIf="degradationMessage()">
@@ -15,6 +15,7 @@
     <!-- Actions -->
     <div class="actions-section">
       <button
+        type="button"
         *ngIf="isError()"
         class="btn btn-retry"
         (click)="retryConnection()"
@@ -24,6 +25,7 @@
       </button>
 
       <button
+        type="button"
         *ngIf="hasQueuedOperations()"
         class="btn btn-sync"
         (click)="syncQueuedOperations()"
@@ -33,7 +35,12 @@
         Sync {{ queuedOperations() }}
       </button>
 
-      <button class="btn btn-dismiss" (click)="dismissBanner()" title="Dismiss this banner">
+      <button
+        type="button"
+        class="btn btn-dismiss"
+        (click)="dismissBanner()"
+        title="Dismiss this banner"
+      >
         ✕
       </button>
     </div>

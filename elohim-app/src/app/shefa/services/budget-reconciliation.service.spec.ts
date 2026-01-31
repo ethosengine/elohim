@@ -305,6 +305,202 @@ describe('BudgetReconciliationService', () => {
 
       expect(result.varianceAfterReconciliation).toBeGreaterThan(0);
     });
+
+    it('should handle zero amount transaction', async () => {
+      const staged = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 0, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result = await service.reconcileBudget(staged, 'event-123');
+
+      expect(result.amountAdded).toBe(0);
+      expect(result.varianceAfterReconciliation).toBe(-500); // Still under budget
+    });
+
+    it('should handle multiple transactions to same category', async () => {
+      const staged1 = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 100, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result1 = await service.reconcileBudget(staged1, 'event-1');
+      expect(result1.newActualAmount).toBe(100);
+
+      // Second transaction to same category - currently creates fresh mock budget
+      // TODO: Once BudgetService integration is complete, this should accumulate
+      const staged2 = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 50, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result2 = await service.reconcileBudget(staged2, 'event-2');
+      expect(result2.previousActualAmount).toBe(0); // Fresh mock budget
+      expect(result2.newActualAmount).toBe(50);
+    });
+  });
+
+  // ==========================================================================
+  // Edge Cases and Error Handling
+  // ==========================================================================
+
+  describe('edge cases', () => {
+    it('should handle extremely large amounts', async () => {
+      const staged = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 999999999, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result = await service.reconcileBudget(staged, 'event-123');
+
+      expect(result.reconciled).toBeTrue();
+      expect(result.newHealthStatus).toBe('critical');
+    });
+
+    it('should handle negative amounts', async () => {
+      const staged = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: -100, unit: 'USD' }, // Refund/credit
+        stewardId: 'steward-1',
+      });
+
+      const result = await service.reconcileBudget(staged, 'event-123');
+
+      expect(result.reconciled).toBeTrue();
+      expect(result.amountAdded).toBe(-100);
+    });
+
+    it('should handle decimal amounts', async () => {
+      const staged = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 99.99, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result = await service.reconcileBudget(staged, 'event-123');
+
+      expect(result.amountAdded).toBe(99.99);
+      expect(result.newActualAmount).toBe(99.99);
+    });
+
+    it('should handle reconciliation at exactly budget limit', async () => {
+      const staged = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 500, unit: 'USD' }, // Exactly at planned amount
+        stewardId: 'steward-1',
+      });
+
+      const result = await service.reconcileBudget(staged, 'event-123');
+
+      expect(result.varianceAfterReconciliation).toBe(0);
+      expect(result.newHealthStatus).toBe('healthy');
+    });
+  });
+
+  // ==========================================================================
+  // Multiple Budgets and Categories
+  // ==========================================================================
+
+  describe('multiple categories', () => {
+    it('should handle different categories independently', async () => {
+      const staged1 = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1', // Groceries
+        amount: { value: 100, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const staged2 = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-2', // Dining
+        amount: { value: 50, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result1 = await service.reconcileBudget(staged1, 'event-1');
+      const result2 = await service.reconcileBudget(staged2, 'event-2');
+
+      expect(result1.budgetCategoryId).toBe('cat-1');
+      expect(result2.budgetCategoryId).toBe('cat-2');
+      expect(result1.newActualAmount).toBe(100);
+      expect(result2.newActualAmount).toBe(50);
+    });
+
+    it('should track different budgets independently', async () => {
+      const staged1 = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 100, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const staged2 = createStagedTransaction({
+        budgetId: 'budget-2', // Different budget
+        budgetCategoryId: 'cat-1',
+        amount: { value: 200, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result1 = await service.reconcileBudget(staged1, 'event-1');
+      const result2 = await service.reconcileBudget(staged2, 'event-2');
+
+      expect(result1.budgetId).toBe('budget-1');
+      expect(result2.budgetId).toBe('budget-2');
+    });
+  });
+
+  // ==========================================================================
+  // Health Status Transitions
+  // ==========================================================================
+
+  describe('health status transitions', () => {
+    it('should maintain healthy status when under budget', async () => {
+      const staged1 = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 400, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result1 = await service.reconcileBudget(staged1, 'event-1');
+      expect(result1.newHealthStatus).toBe('healthy');
+
+      // Note: Each call creates fresh mock budget, so no accumulation
+      // 750 in cat-1 (500 planned) + 0 in cat-2 (200 planned) = 50/700 = 7.1% over
+      // Still under 10% WARNING_THRESHOLD
+      const staged2 = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 750, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result2 = await service.reconcileBudget(staged2, 'event-2');
+      expect(result2.newHealthStatus).toBe('healthy');
+    });
+
+    it('should transition from warning to critical', async () => {
+      const staged = createStagedTransaction({
+        budgetId: 'budget-1',
+        budgetCategoryId: 'cat-1',
+        amount: { value: 1300, unit: 'USD' },
+        stewardId: 'steward-1',
+      });
+
+      const result = await service.reconcileBudget(staged, 'event-123');
+      expect(result.newHealthStatus).toBe('critical');
+    });
   });
 });
 

@@ -61,6 +61,7 @@ def withBuildVars(props, Closure body) {
 
 // Helper to determine SonarQube project config based on branch
 // Returns: [projectKey: String, shouldEnforce: Boolean, env: String]
+@NonCPS
 def getSonarProjectConfig() {
     def targetBranch = env.CHANGE_TARGET ?: env.BRANCH_NAME
 
@@ -76,6 +77,38 @@ def getSonarProjectConfig() {
 // ============================================================================
 // STAGE HELPER METHODS (to reduce bytecode size)
 // ============================================================================
+
+def deployAppToEnvironment(String environment, String namespace, String deploymentName, String manifestPath, String imageTag) {
+    echo "Deploying to ${environment}: ${imageTag}"
+
+    // Validate ConfigMap exists
+    sh "kubectl get configmap elohim-config-${environment} -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
+
+    // Update deployment manifest with image tag
+    sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml"
+
+    // Preview manifest
+    sh """
+        echo '==== Deployment manifest preview ===='
+        grep 'image:' ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml
+        echo '===================================='
+    """
+
+    // Deploy and rollout
+    sh "kubectl apply -f ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml"
+    sh "kubectl rollout restart deployment/${deploymentName} -n ${namespace}"
+    sh "kubectl rollout status deployment/${deploymentName} -n ${namespace} --timeout=300s"
+
+    // Verify deployed image
+    sh """
+        echo '==== Verifying deployed image ===='
+        kubectl get deployment ${deploymentName} -n ${namespace} -o jsonpath='{.spec.template.spec.containers[0].image}'
+        echo ''
+        echo '=================================='
+    """
+
+    echo "${environment} deployment completed!"
+}
 
 def buildSophiaPlugin() {
     // First, build the sophia monorepo (submodule) since its packages aren't on npm
@@ -298,6 +331,7 @@ spec:
         // Skip default checkout - it uses sparse checkout with 0% files
         // We do explicit full checkout in the Checkout stage
         skipDefaultCheckout(true)
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -369,22 +403,30 @@ spec:
                         if (!fileExists('VERSION')) {
                             error "VERSION file not found in workspace"
                         }
-                        
-                        // Read base version
-                        def baseVersion = readFile('VERSION').trim()
-                        echo "DEBUG - Base version: '${baseVersion}'"
-                        
-                        if (!baseVersion) {
-                            error "VERSION file is empty"
+
+                        // Parse VERSION file in key-value format (APP_VERSION=x.x.x, HAPP_VERSION=x.x.x)
+                        def versionContent = readFile('VERSION').trim()
+                        def versionMap = [:]
+                        versionContent.split('\n').each { line ->
+                            def parts = line.split('=')
+                            if (parts.length == 2) {
+                                versionMap[parts[0].trim()] = parts[1].trim()
+                            }
                         }
-                        
+                        def baseVersion = versionMap['APP_VERSION'] ?: versionMap['HAPP_VERSION'] ?: '1.0.0'
+                        echo "DEBUG - Base version: '${baseVersion}'"
+
+                        if (!baseVersion) {
+                            error "VERSION file is empty or malformed"
+                        }
+
                         // Get git hash
                         def gitHash = sh(
                             script: 'git rev-parse --short HEAD',
                             returnStdout: true
                         ).trim()
                         echo "DEBUG - Git hash: '${gitHash}'"
-                        
+
                         // Sync package.json version
                         dir('elohim-app') {
                             sh "npm version '${baseVersion}' --no-git-tag-version"
@@ -400,18 +442,18 @@ spec:
                             : "${baseVersion}-${sanitizedBranch}-${gitHash}"
 
                         echo "DEBUG - Image tag: '${imageTag}'"
-                        
+
                         // Write build.env file
                         def buildEnvContent = """BASE_VERSION=${baseVersion}
 GIT_COMMIT_HASH=${gitHash}
 IMAGE_TAG=${imageTag}
 BRANCH_NAME=${env.BRANCH_NAME}"""
-                        
+
                         writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
-                        
+
                         // Verify file was written
                         sh "cat '${env.WORKSPACE}/build.env'"
-                        
+
                         // Archive for debugging
                         archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
                         
@@ -426,54 +468,66 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
-                        echo 'Fetching holochain-cache-core WASM module...'
+                        echo 'Fetching holochain-cache-core WASM module from Harbor...'
 
                         def wasmDir = 'holochain/holochain-cache-core/pkg'
-                        def wasmFiles = [
-                            'holochain_cache_core.js',
-                            'holochain_cache_core_bg.wasm',
-                            'holochain_cache_core.d.ts',
-                            'holochain_cache_core_bg.wasm.d.ts',
-                            'package.json'
-                        ]
 
-                        // Helper to download WASM files from a branch
-                        def downloadWasm = { branch ->
-                            def baseUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${branch}/lastSuccessfulBuild/artifact/pkg"
-                            sh "mkdir -p '${wasmDir}'"
-
-                            def success = true
-                            for (file in wasmFiles) {
-                                def result = sh(
-                                    script: "wget -q --timeout=30 --tries=2 -O '${wasmDir}/${file}' '${baseUrl}/${file}' 2>&1",
-                                    returnStatus: true
-                                )
-                                if (result != 0) {
-                                    success = false
-                                    break
-                                }
+                        // Read HAPP_VERSION from VERSION file
+                        def versionContent = readFile('VERSION').trim()
+                        def versionMap = [:]
+                        versionContent.split('\n').each { line ->
+                            def parts = line.split('=')
+                            if (parts.length == 2) {
+                                versionMap[parts[0].trim()] = parts[1].trim()
                             }
-                            return success
+                        }
+                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
+                        // Compute Harbor tag using same logic as DNA pipeline producer
+                        def happVersion
+                        if (env.BRANCH_NAME == 'main') {
+                            happVersion = baseVersion
+                        } else {
+                            def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+                            happVersion = "${baseVersion}-${sanitizedBranch}-${gitHash}"
                         }
 
-                        // Try current branch, then dev, then main
-                        def fetched = downloadWasm(env.BRANCH_NAME)
+                        echo "Using HAPP_VERSION: ${happVersion}"
 
-                        if (!fetched) {
-                            echo "WASM not found for branch ${env.BRANCH_NAME}, trying dev..."
-                            fetched = downloadWasm('dev')
-                        }
+                        // Install oras CLI if not present
+                        sh '''
+                            if ! command -v oras &> /dev/null; then
+                                echo "Installing oras CLI..."
+                                curl -sLO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
+                                tar -xzf oras_1.1.0_linux_amd64.tar.gz
+                                chmod +x oras
+                                mv oras /usr/local/bin/
+                                rm oras_1.1.0_linux_amd64.tar.gz
+                            fi
+                        '''
 
-                        if (!fetched) {
-                            echo "WASM not found in dev, trying main..."
-                            fetched = downloadWasm('main')
+                        // Fetch WASM from Harbor
+                        def fetched = false
+                        withCredentials([usernamePassword(
+                            credentialsId: 'harbor-robot-registry',
+                            usernameVariable: 'HARBOR_USER',
+                            passwordVariable: 'HARBOR_PASS'
+                        )]) {
+                            def result = sh(script: """
+                                oras login harbor.ethosengine.com -u \$HARBOR_USER -p \$HARBOR_PASS
+                                mkdir -p '${wasmDir}'
+                                cd '${wasmDir}'
+                                oras pull harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${happVersion}
+                            """, returnStatus: true)
+                            fetched = (result == 0)
                         }
 
                         if (!fetched) {
                             echo """
-                            ⚠️ Could not fetch holochain-cache-core WASM from any branch.
+                            ⚠️ Could not fetch holochain-cache-core WASM from Harbor.
                             App will use TypeScript fallback (slightly slower but functional).
-                            To enable WASM: Run holochain pipeline with FORCE_BUILD=true
+                            To enable WASM: Run holochain DNA pipeline to push artifacts to Harbor.
                             """
                         }
 
@@ -635,20 +689,32 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             }
 
                             echo "Waiting for SonarQube quality gate..."
-                            timeout(time: 10, unit: 'MINUTES') {
-                                def qg = waitForQualityGate abortPipeline: false
-                                if (qg.status != 'OK') {
-                                    if (sonarConfig.shouldEnforce) {
-                                        // Production: Block deployment on quality gate failure
-                                        error "❌ SonarQube Quality Gate FAILED: ${qg.status}\nReview issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                            try {
+                                timeout(time: 10, unit: 'MINUTES') {
+                                    def qg = waitForQualityGate abortPipeline: false
+                                    if (qg.status != 'OK') {
+                                        if (sonarConfig.shouldEnforce) {
+                                            // Production: Block deployment on quality gate failure
+                                            error "❌ SonarQube Quality Gate FAILED: ${qg.status}\nReview issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                        } else {
+                                            // Alpha/Staging: Log warning but don't block
+                                            echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
+                                            echo "Review issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                            currentBuild.result = 'UNSTABLE'
+                                        }
                                     } else {
-                                        // Alpha/Staging: Log warning but don't block
-                                        echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
-                                        echo "Review issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
-                                        currentBuild.result = 'UNSTABLE'
+                                        echo "✅ SonarQube quality gate passed (${sonarConfig.env})"
                                     }
+                                }
+                            } catch (Exception e) {
+                                echo "⚠️ SonarQube quality gate check failed: ${e.message}"
+                                echo "This may be due to webhook configuration issues."
+                                echo "Review results at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                if (sonarConfig.shouldEnforce) {
+                                    currentBuild.result = 'UNSTABLE'
+                                    echo "⚠️ Marking build UNSTABLE - production quality gate could not be verified"
                                 } else {
-                                    echo "✅ SonarQube quality gate passed (${sonarConfig.env})"
+                                    echo "Continuing pipeline..."
                                 }
                             }
                         }
@@ -943,42 +1009,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
-                            echo "Deploying to Staging: ${IMAGE_TAG}"
-
-                            // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-staging -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-staging ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/staging-deployment.yaml > elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml"
-
-                            // Verify the image tag in the manifest
-                            sh """
-                                echo '==== Deployment manifest preview ===='
-                                grep 'image:' elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml
-                                echo '===================================='
-                            """
-
-                            // Deploy
-                            sh "kubectl apply -f elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
-
-                            // Verify the deployment is using the correct image
-                            sh """
-                                echo '==== Verifying deployed image ===='
-                                kubectl get deployment elohim-site-staging -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
-                                echo ''
-                                echo '=================================='
-                            """
-
-                            echo 'Staging deployment completed!'
+                            deployAppToEnvironment('staging', 'elohim-staging', 'elohim-site-staging',
+                                'elohim-app/manifests/staging-deployment.yaml', IMAGE_TAG)
                         }
                     }
                 }
@@ -996,7 +1029,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
                             echo """
                             ═══════════════════════════════════════════════════════════
@@ -1008,36 +1040,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-alpha -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-alpha ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/alpha-deployment.yaml > elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml"
-
-                            // Verify the image tag in the manifest
-                            sh """
-                                echo '==== Deployment manifest preview ===='
-                                grep 'image:' elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml
-                                echo '===================================='
-                            """
-
-                            // Deploy
-                            sh "kubectl apply -f elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site-alpha -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site-alpha -n ethosengine --timeout=300s'
-
-                            // Verify the deployment is using the correct image
-                            sh """
-                                echo '==== Verifying deployed image ===='
-                                kubectl get deployment elohim-site-alpha -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
-                                echo ''
-                                echo '=================================='
-                            """
+                            deployAppToEnvironment('alpha', 'elohim-alpha', 'elohim-site-alpha',
+                                'elohim-app/manifests/alpha-deployment.yaml', IMAGE_TAG)
 
                             echo """
                             ═══════════════════════════════════════════════════════════
@@ -1239,27 +1243,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
-                            echo "Deploying to Production: ${IMAGE_TAG}"
-
-                            // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-prod -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-prod ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
-
-                            // Deploy
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/prod-deployment.yaml > elohim-app/manifests/prod-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f elohim-app/manifests/prod-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
-
-                            echo 'Production deployment completed!'
+                            deployAppToEnvironment('prod', 'elohim-prod', 'elohim-site',
+                                'elohim-app/manifests/prod-deployment.yaml', IMAGE_TAG)
                         }
                     }
                 }

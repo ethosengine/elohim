@@ -1,9 +1,12 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 75.3% (2026-02-04)
+
 import { map, switchMap, shareReplay, catchError } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
 
+import { type ReachLevel } from '@app/elohim/models/protocol-core.model';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
 import { ContentNode, ContentMetadata } from '../models/content-node.model';
@@ -84,6 +87,7 @@ export class PathGraphService {
       attestationsGranted: path.attestationsGranted,
     };
 
+    const reach = this.mapVisibilityToReach(path.visibility);
     const pathNode: ContentNode = {
       id: `path-${path.id}`,
       contentType: 'path',
@@ -95,7 +99,7 @@ export class PathGraphService {
       relatedNodeIds: contentNodeIds,
       metadata: pathMetadata as unknown as ContentMetadata,
       authorId: path.createdBy,
-      reach: this.mapVisibilityToReach(path.visibility),
+      reach,
       createdAt: path.createdAt,
       updatedAt: path.updatedAt,
     };
@@ -293,24 +297,29 @@ export class PathGraphService {
     const ids = new Set<string>();
 
     // Process flat steps
-    for (const step of path.steps) {
-      if (this.isContentStep(step)) {
-        ids.add(step.resourceId);
-      }
-    }
+    this.extractIdsFromSteps(path.steps, ids);
 
     // Process chapter steps (if any)
     if (path.chapters) {
       for (const chapter of path.chapters) {
-        for (const step of chapter.steps) {
-          if (this.isContentStep(step)) {
-            ids.add(step.resourceId);
-          }
+        if (chapter.steps) {
+          this.extractIdsFromSteps(chapter.steps, ids);
         }
       }
     }
 
     return Array.from(ids);
+  }
+
+  /**
+   * Helper to extract content IDs from a list of steps.
+   */
+  private extractIdsFromSteps(steps: PathStep[], ids: Set<string>): void {
+    for (const step of steps) {
+      if (this.isContentStep(step)) {
+        ids.add(step.resourceId);
+      }
+    }
   }
 
   /**
@@ -331,7 +340,9 @@ export class PathGraphService {
 
     if (path.chapters) {
       for (const chapter of path.chapters) {
-        extractFromSteps(chapter.steps);
+        if (chapter.steps) {
+          extractFromSteps(chapter.steps);
+        }
       }
     }
 
@@ -351,7 +362,7 @@ export class PathGraphService {
    */
   private countSteps(path: LearningPath): number {
     if (path.chapters && path.chapters.length > 0) {
-      return path.chapters.reduce((sum, ch) => sum + ch.steps.length, 0);
+      return path.chapters.reduce((sum, ch) => sum + (ch.steps?.length ?? 0), 0);
     }
     return path.steps.length;
   }
@@ -359,15 +370,14 @@ export class PathGraphService {
   /**
    * Map path visibility to content reach.
    */
-  private mapVisibilityToReach(
-    visibility: string
-  ): 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons' {
+  private mapVisibilityToReach(visibility: string): ReachLevel {
     switch (visibility) {
       case 'public':
         return 'commons';
       case 'connections':
+        return 'invited';
       case 'organization':
-        return 'community';
+        return 'neighborhood';
       case 'trusted':
         return 'local';
       case 'intimate':
