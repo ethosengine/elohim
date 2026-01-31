@@ -731,8 +731,8 @@ export class PathAdaptationService {
           : undefined,
       };
       localStorage.setItem(this.STORAGE_PREFIX + key, JSON.stringify(serializable));
-    } catch (e) {
-      console.warn('Failed to save path adaptation state:', e);
+    } catch {
+      // localStorage write failure is non-critical
     }
   }
 
@@ -754,8 +754,8 @@ export class PathAdaptationService {
             }
           : undefined,
       };
-    } catch (e) {
-      console.warn('Failed to load path adaptation state:', e);
+    } catch {
+      // localStorage read failure is non-critical
       return null;
     }
   }
@@ -763,8 +763,8 @@ export class PathAdaptationService {
   private removeFromStorage(key: string): void {
     try {
       localStorage.removeItem(this.STORAGE_PREFIX + key);
-    } catch (e) {
-      console.warn('Failed to remove path adaptation state:', e);
+    } catch {
+      // localStorage remove failure is non-critical
     }
   }
 }

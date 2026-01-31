@@ -89,15 +89,6 @@ interface AgentStatus {
   consecutiveFailures?: number;
 }
 
-/**
- * Geographic risk factors
- */
-interface GeographicRisk {
-  region: string;
-  factors: string[]; // e.g., "single-isp", "geographic-clustering", "geopolitical-risk"
-  riskScore: number; // 0-100
-}
-
 @Injectable({
   providedIn: 'root',
 })
@@ -150,7 +141,7 @@ export class FamilyCommunityProtectionService {
       })
     ).pipe(
       switchMap(result => {
-        const commitments = result.success ? result.data || [] : [];
+        const commitments = result.success ? (result.data ?? []) : [];
         if (commitments.length === 0) {
           return of(this.getEmptyProtectionStatus());
         }
@@ -174,12 +165,10 @@ export class FamilyCommunityProtectionService {
 
         return combineLatest(healthObs);
       }),
-      map((data: any[]) => this.buildProtectionStatus(operatorId, data)),
+      map((data: { commitment: RawCustodianCommitment; status: AgentStatus | null }[]) =>
+        this.buildProtectionStatus(operatorId, data)
+      ),
       catchError(error => {
-        console.error(
-          '[FamilyCommunityProtectionService] Failed to load protection status:',
-          error
-        );
         return of(this.getEmptyProtectionStatus());
       })
     );
@@ -195,7 +184,7 @@ export class FamilyCommunityProtectionService {
     // Convert to CustodianNode objects
     const custodians: CustodianNode[] = commitmentHealthPairs.map(pair => ({
       id: pair.commitment.custodianId,
-      name: pair.commitment.custodianName || pair.commitment.custodianId,
+      name: pair.commitment.custodianName ?? pair.commitment.custodianId,
       type: pair.commitment.custodianType,
       location: pair.commitment.location,
       dataStored: {
@@ -221,8 +210,8 @@ export class FamilyCommunityProtectionService {
         expiryDate: pair.commitment.expiryDate,
         renewalStatus: pair.commitment.renewalStatus,
       },
-      trustLevel: pair.commitment.trustLevel || 50,
-      relationship: pair.commitment.relationship || pair.commitment.custodianType,
+      trustLevel: pair.commitment.trustLevel ?? 50,
+      relationship: pair.commitment.relationship ?? pair.commitment.custodianType,
     }));
 
     // Calculate redundancy metrics
@@ -320,7 +309,7 @@ export class FamilyCommunityProtectionService {
       const avgShardThreshold =
         commitmentHealthPairs.reduce(
           (sum, pair) =>
-            sum + (pair.commitment.shardThreshold || Math.ceil(pair.commitment.shardCount / 2)),
+            sum + (pair.commitment.shardThreshold ?? Math.ceil(pair.commitment.shardCount / 2)),
           0
         ) / commitmentHealthPairs.length;
       recoveryThreshold = Math.ceil(avgShardThreshold);
@@ -343,8 +332,8 @@ export class FamilyCommunityProtectionService {
     const regionMap = new Map<string, RegionalPresence>();
 
     custodians.forEach(custodian => {
-      const region = custodian.location?.region || 'unknown';
-      const key = `${region}-${custodian.location?.country || 'unknown'}`;
+      const region = custodian.location?.region ?? 'unknown';
+      const key = `${region}-${custodian.location?.country ?? 'unknown'}`;
 
       if (!regionMap.has(key)) {
         regionMap.set(key, {
@@ -465,9 +454,6 @@ export class FamilyCommunityProtectionService {
     redundancy: { strategy: string; redundancyFactor: number; recoveryThreshold: number }
   ): string {
     if (custodians.length === 0) return 'unable-to-recover';
-
-    // Calculate based on number of custodians and recovery threshold
-    const minResponseTime = Math.min(...custodians.map(c => c.health.responseTime));
 
     if (custodians.length >= 3 && redundancy.recoveryThreshold <= 2) {
       // 3+ replicas, need only 2: < 1 hour (quick shard recovery)

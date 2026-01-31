@@ -571,7 +571,6 @@ export class PerseusRendererComponent
 
   private loadQuestions(): void {
     if (!this.node?.content) {
-      console.warn('[PerseusRenderer] No content in node');
       return;
     }
 
@@ -584,7 +583,6 @@ export class PerseusRendererComponent
       try {
         content = JSON.parse(content);
       } catch {
-        console.error('[PerseusRenderer] Failed to parse content as JSON');
         return;
       }
     }
@@ -592,32 +590,16 @@ export class PerseusRendererComponent
     // Extract questions
     if (Array.isArray(content)) {
       this.questions = content as PerseusItem[];
-    } else if (typeof content === 'object' && content != null) {
+    } else if (typeof content === 'object' && content !== null) {
       // Single Perseus item (has question.widgets)
       this.questions = [content as PerseusItem];
     } else {
-      console.error('[PerseusRenderer] Invalid content format:', typeof content);
       return;
-    }
-
-    console.log(`[PerseusRenderer] Loaded ${this.questions.length} question(s)`);
-    // Debug: log first question structure
-    if (this.questions.length > 0) {
-      const q = this.questions[0];
-      console.log('[PerseusRenderer] First question structure:', {
-        id: q.id,
-        hasQuestion: !!q.question,
-        hasWidgets: !!q.question?.widgets,
-        widgetCount: q.question?.widgets ? Object.keys(q.question.widgets).length : 0,
-        contentPreview: q.question?.content?.substring(0, 100) || 'no content',
-        discoveryMode: q.discoveryMode,
-      });
     }
 
     // Detect quiz mode after loading questions
     this.quizMode = this.detectQuizMode();
     this.modeConfig = QUIZ_MODE_PRESETS[this.quizMode];
-    console.log(`[PerseusRenderer] Quiz mode: ${this.quizMode}`);
 
     // Initialize subscale tracking for discovery mode
     if (this.quizMode === 'discovery') {
@@ -654,8 +636,6 @@ export class PerseusRendererComponent
     subscales.forEach(subscale => {
       this.subscaleScores[subscale] = 0;
     });
-
-    console.log('[PerseusRenderer] Initialized subscales:', Object.keys(this.subscaleScores));
   }
 
   private collectSubscalesFromQuestions(): Set<string> {
@@ -728,7 +708,6 @@ export class PerseusRendererComponent
       for (const [subscale, value] of Object.entries(selectedChoice.subscaleContributions)) {
         this.subscaleScores[subscale] = (this.subscaleScores[subscale] ?? 0) + value;
       }
-      console.log('[PerseusRenderer] Updated subscale scores:', this.subscaleScores);
     }
   }
 
@@ -820,12 +799,6 @@ export class PerseusRendererComponent
         primaryDomain = subscale;
       }
     }
-
-    console.log('[PerseusRenderer] Discovery complete:', {
-      subscaleScores: this.subscaleScores,
-      primaryDomain,
-    });
-
     const event: RendererCompletionEvent = {
       type: 'quiz',
       passed: true, // Discovery assessments always "pass"
@@ -836,7 +809,7 @@ export class PerseusRendererComponent
         primaryDomain,
         total: this.questions.length,
         correct: this.questions.length, // All answers are valid in discovery mode
-        questions: this.questions.map((q, i) => ({
+        questions: this.questions.map((q, _i) => ({
           id: q.id,
           correct: true, // All answers are valid
           score: 1,

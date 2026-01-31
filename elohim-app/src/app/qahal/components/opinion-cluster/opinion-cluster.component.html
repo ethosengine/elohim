@@ -38,14 +38,15 @@
       </h4>
       <p class="section-description">These statements have broad agreement across groups.</p>
       <div class="statement-list">
-        <div
+        <button
           *ngFor="let statement of consensusStatements"
+          type="button"
           class="statement-item consensus"
           (click)="selectStatement(statement)"
         >
           <span class="statement-text">{{ statement.text }}</span>
           <span class="statement-indicator">✓ High Agreement</span>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -60,14 +61,15 @@
         These statements reveal different perspectives. More dialogue may help.
       </p>
       <div class="statement-list">
-        <div
+        <button
           *ngFor="let statement of divisiveStatements"
+          type="button"
           class="statement-item divisive"
           (click)="selectStatement(statement)"
         >
           <span class="statement-text">{{ statement.text }}</span>
           <span class="statement-indicator">↔ Mixed Views</span>
-        </div>
+        </button>
       </div>
     </div>
   </div>
@@ -78,7 +80,9 @@
       <span class="cluster-dot" [style.background-color]="selectedCluster.color"></span>
       <h4 class="cluster-name">{{ selectedCluster.label }}</h4>
       <span class="cluster-size">{{ selectedCluster.memberCount }} participants</span>
-      <button class="close-btn" (click)="selectedCluster = null" aria-label="Close">×</button>
+      <button type="button" class="close-btn" (click)="selectedCluster = null" aria-label="Close">
+        ×
+      </button>
     </div>
   </div>
 

@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 3.9% (2026-01-31)
+
 import { HolochainClientService } from './holochain-client.service';
 
 /**
@@ -82,13 +84,12 @@ export class CustodianCommitmentService {
       });
 
       if (!result.success) {
-        console.warn(`[CustodianCommitment] Failed to fetch commitments:`, result.error);
         return [];
       }
 
       return (result.data as CustodianCommitment[]) || [];
-    } catch (err) {
-      console.error('[CustodianCommitment] Error fetching commitments:', err);
+    } catch {
+      // Zome call failed - commitments query error, return empty list as fallback
       return [];
     }
   }
@@ -105,13 +106,12 @@ export class CustodianCommitmentService {
       });
 
       if (!result.success) {
-        console.warn(`[CustodianCommitment] Failed to fetch custodian commitments:`, result.error);
         return [];
       }
 
       return (result.data as CustodianCommitment[]) || [];
-    } catch (err) {
-      console.error('[CustodianCommitment] Error fetching custodian commitments:', err);
+    } catch {
+      // Zome call failed - custodian commitments query error, return empty list as fallback
       return [];
     }
   }
@@ -144,13 +144,11 @@ export class CustodianCommitmentService {
       });
 
       if (!result.success) {
-        console.warn('[CustodianCommitment] Create failed:', result.error);
         return { success: false, error: result.error };
       }
 
       return { success: true, commitmentId: result.data as string };
     } catch (err) {
-      console.error('[CustodianCommitment] Error creating commitment:', err);
       return { success: false, error: String(err) };
     }
   }
@@ -173,13 +171,11 @@ export class CustodianCommitmentService {
       });
 
       if (!result.success) {
-        console.warn('[CustodianCommitment] Renewal failed:', result.error);
         return { success: false, error: result.error };
       }
 
       return { success: true };
     } catch (err) {
-      console.error('[CustodianCommitment] Error renewing commitment:', err);
       return { success: false, error: String(err) };
     }
   }
@@ -196,13 +192,11 @@ export class CustodianCommitmentService {
       });
 
       if (!result.success) {
-        console.warn('[CustodianCommitment] Revocation failed:', result.error);
         return { success: false, error: result.error };
       }
 
       return { success: true };
     } catch (err) {
-      console.error('[CustodianCommitment] Error revoking commitment:', err);
       return { success: false, error: String(err) };
     }
   }
@@ -221,8 +215,8 @@ export class CustodianCommitmentService {
       const threshold = now + withinDays * 24 * 60 * 60 * 1000;
 
       return commitments.filter(c => c.expiresAt < threshold && c.isActive);
-    } catch (err) {
-      console.error('[CustodianCommitment] Error getting expiring commitments:', err);
+    } catch {
+      // Query error - expiring commitments check failed, return empty list as fallback
       return [];
     }
   }
@@ -234,8 +228,8 @@ export class CustodianCommitmentService {
     try {
       const commitments = await this.getCommitmentsByCustomian(custodianId);
       return commitments.filter(c => c.isActive).length;
-    } catch (err) {
-      console.error('[CustodianCommitment] Error counting commitments:', err);
+    } catch {
+      // Query error - active commitment count unavailable, return 0 as fallback
       return 0;
     }
   }
@@ -247,8 +241,8 @@ export class CustodianCommitmentService {
     try {
       const commitments = await this.getCommitmentsByCustomian(custodianId);
       return commitments.filter(c => c.isActive).reduce((sum, c) => sum + c.storageAllocated, 0);
-    } catch (err) {
-      console.error('[CustodianCommitment] Error calculating committed storage:', err);
+    } catch {
+      // Query error - total committed storage unavailable, return 0 as fallback
       return 0;
     }
   }
@@ -260,8 +254,8 @@ export class CustodianCommitmentService {
     try {
       const commitments = await this.getCommitmentsForContent(contentId);
       return commitments.some(c => c.custodianId === custodianId && c.isActive);
-    } catch (err) {
-      console.error('[CustodianCommitment] Error checking commitment:', err);
+    } catch {
+      // Query error - commitment check failed, assume not committed as fallback
       return false;
     }
   }

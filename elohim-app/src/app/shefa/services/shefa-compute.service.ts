@@ -21,15 +21,7 @@
 
 import { Injectable } from '@angular/core';
 
-import {
-  map,
-  switchMap,
-  catchError,
-  startWith,
-  shareReplay,
-  debounceTime,
-  tap,
-} from 'rxjs/operators';
+import { map, switchMap, catchError, startWith, shareReplay, tap } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, combineLatest, interval, of } from 'rxjs';
 
@@ -47,7 +39,6 @@ import {
   TrustRelationship,
   InfrastructureTokenBalance,
   TokenTransaction,
-  ExchangeRate,
   RecentEconomicEvent,
   ConstitutionalLimitsStatus,
   ConstitutionalAlert,
@@ -93,6 +84,184 @@ interface ShefaConfig {
   ceilingLimitStorageGB: number;
   ceilingLimitBandwidthMbps: number;
   tokenAccumulationCeiling: number; // Max tokens before forced circulation
+}
+
+/**
+ * Zome response interface for compute metrics
+ */
+interface ComputeMetricsZomeResponse {
+  cpu?: {
+    totalCores?: number;
+    availableCores?: number;
+    usagePercent?: number;
+    temperature?: number;
+  };
+  memory?: {
+    totalGb?: number;
+    usedGb?: number;
+  };
+  storage?: {
+    totalGb?: number;
+    usedGb?: number;
+    holochainGb?: number;
+    cacheGb?: number;
+    custodianDataGb?: number;
+    userAppsGb?: number;
+  };
+  network?: {
+    upstreamMaxMbps?: number;
+    downstreamMaxMbps?: number;
+    upstreamUsedMbps?: number;
+    downstreamUsedMbps?: number;
+    latencyP50Ms?: number;
+    latencyP95Ms?: number;
+    latencyP99Ms?: number;
+    totalConnections?: number;
+    holochainPeers?: number;
+    cacheClients?: number;
+    custodianStreams?: number;
+  };
+  loadAverage?: {
+    oneMinute?: number;
+    fiveMinutes?: number;
+    fifteenMinutes?: number;
+  };
+  power?: {
+    consumptionWatts: number;
+    thermalOutput: number;
+  };
+}
+
+/**
+ * Zome response interface for custodian commitments
+ */
+interface CustodianCommitmentZomeResponse {
+  id: string;
+  custodianId: string;
+  custodianName?: string;
+  custodianType?: string;
+  location?: {
+    region?: string;
+    country?: string;
+  };
+  totalGb?: number;
+  shardCount?: number;
+  redundancyLevel?: number;
+  status?: string;
+  startDate: string;
+  expiryDate: string;
+  renewalStatus?: string;
+  trustLevel?: number;
+  relationship?: string;
+  stewardId?: string;
+  stewardName?: string;
+  relationshipType?: string;
+  trustScore?: number;
+  contentCount?: number;
+  contentTypes?: { type: string; count: number; gb: number }[];
+  lastActivity?: string;
+  myReliability?: number;
+  custodianReliability?: number;
+}
+
+/**
+ * Zome response interface for agent status
+ */
+interface AgentStatusZomeResponse {
+  uptimePercent?: number;
+  lastHeartbeat?: string;
+  responseTimeMs?: number;
+}
+
+/**
+ * Zome response interface for allocation from stewarded resource
+ */
+interface AllocationZomeResponse {
+  id: string;
+  label?: string;
+  governanceLevel: string;
+  priority?: number;
+  cpuCores?: number;
+  cpuPercent?: number;
+  memoryGb?: number;
+  memoryPercent?: number;
+  storageGb?: number;
+  storagePercent?: number;
+  bandwidthMbps?: number;
+  bandwidthPercent?: number;
+  cpuUtilizedPercent?: number;
+  memoryUtilizedPercent?: number;
+  storageUtilizedPercent?: number;
+  bandwidthUtilizedPercent?: number;
+  commitmentId?: string;
+  relatedAgents?: string[];
+}
+
+/**
+ * Zome response interface for node registry
+ */
+interface NodeRegistryZomeResponse {
+  nodeId: string;
+  displayName?: string;
+  nodeType?: string;
+  status?: string;
+  lastHeartbeat?: string;
+  consecutiveUptime?: string;
+  location?: {
+    label?: string;
+    region?: string;
+    country?: string;
+  };
+  roles?: {
+    role: string;
+    description?: string;
+    utilizationPercent?: number;
+  }[];
+  resources?: {
+    cpuPercent?: number;
+    memoryPercent?: number;
+    storageUsedGb?: number;
+    storageTotalGb?: number;
+    bandwidthMbps?: number;
+  };
+  custodianActivity?: {
+    itemsCustodied?: number;
+    itemsBeingCustodied?: number;
+    totalCustodiedGb?: number;
+  };
+  isPrimary?: boolean;
+}
+
+/**
+ * Zome response interface for content distribution
+ */
+interface ContentDistributionZomeResponse {
+  byContentType?: {
+    contentType: string;
+    itemCount?: number;
+    sizeGb?: number;
+    percentOfTotal?: number;
+    fullyReplicated?: number;
+    underReplicated?: number;
+    averageReplicas?: number;
+  }[];
+  byReachLevel?: {
+    reachLevel: number;
+    itemCount?: number;
+    sizeGb?: number;
+    currentReplicas?: number;
+  }[];
+  byNode?: Record<
+    string,
+    {
+      myContentGb?: number;
+      cacheGb?: number;
+      contentTypes?: { type: string; gb: number }[];
+    }
+  >;
+  totalItems?: number;
+  totalSizeGb?: number;
+  totalReplicas?: number;
 }
 
 const DEFAULT_CONFIG: ShefaConfig = {
@@ -167,10 +336,9 @@ export class ShefaComputeService {
       }),
       tap(state => this.dashboardState$.next(state)),
       shareReplay(1),
-      catchError(error => {
-        console.error('[ShefaComputeService] Dashboard update failed:', error);
+      catchError(_error => {
         return of(
-          this.dashboardState$.value || this.getEmptyDashboardState(operatorId, stewardedResourceId)
+          this.dashboardState$.value ?? this.getEmptyDashboardState(operatorId, stewardedResourceId)
         );
       })
     );
@@ -198,63 +366,63 @@ export class ShefaComputeService {
     return this.holochain
       .callZome('content_store', 'get_compute_metrics', { operator_id: operatorId })
       .pipe(
-        map(data => ({
+        map((data: ComputeMetricsZomeResponse) => ({
           cpu: {
-            totalCores: data.cpu?.totalCores || 8,
-            available: data.cpu?.availableCores || 4,
-            usagePercent: data.cpu?.usagePercent || 45,
-            usageHistory: this.updateMetricHistory('cpu_usage', data.cpu?.usagePercent || 0),
+            totalCores: data.cpu?.totalCores ?? 8,
+            available: data.cpu?.availableCores ?? 4,
+            usagePercent: data.cpu?.usagePercent ?? 45,
+            usageHistory: this.updateMetricHistory('cpu_usage', data.cpu?.usagePercent ?? 0),
             temperature: data.cpu?.temperature,
           },
           memory: {
-            totalGB: data.memory?.totalGb || 16,
-            usedGB: data.memory?.usedGb || 8,
-            availableGB: (data.memory?.totalGb || 16) - (data.memory?.usedGb || 8),
-            usagePercent: ((data.memory?.usedGb || 8) / (data.memory?.totalGb || 16)) * 100,
+            totalGB: data.memory?.totalGb ?? 16,
+            usedGB: data.memory?.usedGb ?? 8,
+            availableGB: (data.memory?.totalGb ?? 16) - (data.memory?.usedGb ?? 8),
+            usagePercent: ((data.memory?.usedGb ?? 8) / (data.memory?.totalGb ?? 16)) * 100,
             usageHistory: this.updateMetricHistory(
               'memory_usage',
-              ((data.memory?.usedGb || 8) / (data.memory?.totalGb || 16)) * 100
+              ((data.memory?.usedGb ?? 8) / (data.memory?.totalGb ?? 16)) * 100
             ),
           },
           storage: {
-            totalGB: data.storage?.totalGb || 500,
-            usedGB: data.storage?.usedGb || 250,
-            availableGB: (data.storage?.totalGb || 500) - (data.storage?.usedGb || 250),
-            usagePercent: ((data.storage?.usedGb || 250) / (data.storage?.totalGb || 500)) * 100,
+            totalGB: data.storage?.totalGb ?? 500,
+            usedGB: data.storage?.usedGb ?? 250,
+            availableGB: (data.storage?.totalGb ?? 500) - (data.storage?.usedGb ?? 250),
+            usagePercent: ((data.storage?.usedGb ?? 250) / (data.storage?.totalGb ?? 500)) * 100,
             usageHistory: this.updateMetricHistory(
               'storage_usage',
-              ((data.storage?.usedGb || 250) / (data.storage?.totalGb || 500)) * 100
+              ((data.storage?.usedGb ?? 250) / (data.storage?.totalGb ?? 500)) * 100
             ),
             breakdown: {
-              holochain: data.storage?.holochainGb || 50,
-              cache: data.storage?.cacheGb || 20,
-              custodianData: data.storage?.custodianDataGb || 100,
-              userApplications: data.storage?.userAppsGb || 80,
+              holochain: data.storage?.holochainGb ?? 50,
+              cache: data.storage?.cacheGb ?? 20,
+              custodianData: data.storage?.custodianDataGb ?? 100,
+              userApplications: data.storage?.userAppsGb ?? 80,
             },
           },
           network: {
             bandwidth: {
-              upstreamMbps: data.network?.upstreamMaxMbps || 100,
-              downstreamMbps: data.network?.downstreamMaxMbps || 100,
-              usedUpstreamMbps: data.network?.upstreamUsedMbps || 20,
-              usedDownstreamMbps: data.network?.downstreamUsedMbps || 30,
+              upstreamMbps: data.network?.upstreamMaxMbps ?? 100,
+              downstreamMbps: data.network?.downstreamMaxMbps ?? 100,
+              usedUpstreamMbps: data.network?.upstreamUsedMbps ?? 20,
+              usedDownstreamMbps: data.network?.downstreamUsedMbps ?? 30,
             },
             latency: {
-              p50: data.network?.latencyP50Ms || 10,
-              p95: data.network?.latencyP95Ms || 50,
-              p99: data.network?.latencyP99Ms || 100,
+              p50: data.network?.latencyP50Ms ?? 10,
+              p95: data.network?.latencyP95Ms ?? 50,
+              p99: data.network?.latencyP99Ms ?? 100,
             },
             connections: {
-              total: data.network?.totalConnections || 150,
-              holochain: data.network?.holochainPeers || 50,
-              cache: data.network?.cacheClients || 75,
-              custodian: data.network?.custodianStreams || 25,
+              total: data.network?.totalConnections ?? 150,
+              holochain: data.network?.holochainPeers ?? 50,
+              cache: data.network?.cacheClients ?? 75,
+              custodian: data.network?.custodianStreams ?? 25,
             },
           },
           loadAverage: {
-            oneMinute: data.loadAverage?.oneMinute || 2.5,
-            fiveMinutes: data.loadAverage?.fiveMinutes || 2.3,
-            fifteenMinutes: data.loadAverage?.fifteenMinutes || 2.0,
+            oneMinute: data.loadAverage?.oneMinute ?? 2.5,
+            fiveMinutes: data.loadAverage?.fiveMinutes ?? 2.3,
+            fifteenMinutes: data.loadAverage?.fifteenMinutes ?? 2.0,
           },
           power: data.power
             ? {
@@ -263,8 +431,7 @@ export class ShefaComputeService {
               }
             : undefined,
         })),
-        catchError(error => {
-          console.error('[ShefaComputeService] Failed to load compute metrics:', error);
+        catchError(_error => {
           return of(this.getEmptyComputeMetrics());
         })
       );
@@ -277,7 +444,7 @@ export class ShefaComputeService {
   private getAllocationSnapshot(stewardedResourceId: string): Observable<AllocationSnapshot> {
     return this.stewaredResources.getResource(stewardedResourceId).pipe(
       map(resource => {
-        const allocations = resource?.allocations || [];
+        const allocations = (resource?.allocations ?? []) as AllocationZomeResponse[];
 
         // Group by governance level
         const byLevel = {
@@ -289,44 +456,44 @@ export class ShefaComputeService {
 
         const blocks: AllocationBlock[] = [];
 
-        allocations.forEach((alloc: any) => {
+        allocations.forEach((alloc: AllocationZomeResponse) => {
           const level = alloc.governanceLevel as keyof typeof byLevel;
           if (byLevel[level]) {
-            byLevel[level].cpuPercent += alloc.cpuPercent || 0;
-            byLevel[level].memoryPercent += alloc.memoryPercent || 0;
-            byLevel[level].storagePercent += alloc.storagePercent || 0;
-            byLevel[level].bandwidthPercent += alloc.bandwidthPercent || 0;
+            byLevel[level].cpuPercent += alloc.cpuPercent ?? 0;
+            byLevel[level].memoryPercent += alloc.memoryPercent ?? 0;
+            byLevel[level].storagePercent += alloc.storagePercent ?? 0;
+            byLevel[level].bandwidthPercent += alloc.bandwidthPercent ?? 0;
           }
 
           blocks.push({
             id: alloc.id,
-            label: alloc.label || 'Allocation',
+            label: alloc.label ?? 'Allocation',
             governanceLevel: level,
-            priority: alloc.priority || 5,
+            priority: alloc.priority ?? 5,
             cpu: {
-              cores: alloc.cpuCores || 0,
-              percent: alloc.cpuPercent || 0,
+              cores: alloc.cpuCores ?? 0,
+              percent: alloc.cpuPercent ?? 0,
             },
             memory: {
-              gb: alloc.memoryGb || 0,
-              percent: alloc.memoryPercent || 0,
+              gb: alloc.memoryGb ?? 0,
+              percent: alloc.memoryPercent ?? 0,
             },
             storage: {
-              gb: alloc.storageGb || 0,
-              percent: alloc.storagePercent || 0,
+              gb: alloc.storageGb ?? 0,
+              percent: alloc.storagePercent ?? 0,
             },
             bandwidth: {
-              mbps: alloc.bandwidthMbps || 0,
-              percent: alloc.bandwidthPercent || 0,
+              mbps: alloc.bandwidthMbps ?? 0,
+              percent: alloc.bandwidthPercent ?? 0,
             },
             utilized: {
-              cpuPercent: alloc.cpuUtilizedPercent || 0,
-              memoryPercent: alloc.memoryUtilizedPercent || 0,
-              storagePercent: alloc.storageUtilizedPercent || 0,
-              bandwidthPercent: alloc.bandwidthUtilizedPercent || 0,
+              cpuPercent: alloc.cpuUtilizedPercent ?? 0,
+              memoryPercent: alloc.memoryUtilizedPercent ?? 0,
+              storagePercent: alloc.storageUtilizedPercent ?? 0,
+              bandwidthPercent: alloc.bandwidthUtilizedPercent ?? 0,
             },
             commitmentId: alloc.commitmentId,
-            relatedAgents: alloc.relatedAgents || [],
+            relatedAgents: alloc.relatedAgents ?? [],
           });
         });
 
@@ -357,8 +524,7 @@ export class ShefaComputeService {
           allocationBlocks: blocks,
         };
       }),
-      catchError(error => {
-        console.error('[ShefaComputeService] Failed to load allocation snapshot:', error);
+      catchError(_error => {
         return of(this.getEmptyAllocationSnapshot());
       })
     );
@@ -374,16 +540,16 @@ export class ShefaComputeService {
     return this.holochain
       .callZome('content_store', 'get_custodian_commitments', { steward_id: operatorId })
       .pipe(
-        switchMap((commitments: any[]) => {
+        switchMap((commitments: CustodianCommitmentZomeResponse[]) => {
           // Get regional distribution and health data for custodians
-          const custodianObs = (commitments || []).map((c: any) =>
+          const custodianObs = (commitments ?? []).map((c: CustodianCommitmentZomeResponse) =>
             this.holochain
               .callZome('content_store', 'get_agent_status', { agent_id: c.custodianId })
               .pipe(
-                map(status => ({
+                map((status: AgentStatusZomeResponse) => ({
                   id: c.custodianId,
                   name: c.custodianName ?? c.custodianId,
-                  type: c.custodianType as
+                  type: (c.custodianType ?? 'community') as
                     | 'family'
                     | 'friend'
                     | 'community'
@@ -402,10 +568,13 @@ export class ShefaComputeService {
                   },
                   commitment: {
                     id: c.id,
-                    status: c.status as 'active' | 'pending' | 'breached' | 'expired',
+                    status: (c.status ?? 'active') as 'active' | 'pending' | 'breached' | 'expired',
                     startDate: c.startDate,
                     expiryDate: c.expiryDate,
-                    renewalStatus: c.renewalStatus as 'auto-renew' | 'manual' | 'expired',
+                    renewalStatus: (c.renewalStatus ?? 'manual') as
+                      | 'auto-renew'
+                      | 'manual'
+                      | 'expired',
                   },
                   trustLevel: c.trustLevel ?? 75,
                   relationship: c.relationship ?? 'custodian',
@@ -440,7 +609,16 @@ export class ShefaComputeService {
           const trustGraph: TrustRelationship[] = custodians.map(c => ({
             from: '', // Operator ID - would be passed in
             to: c.id,
-            type: c.type === 'family' ? 'family-member' : (c.type as any),
+            type:
+              c.type === 'family'
+                ? 'family-member'
+                : c.type === 'friend'
+                  ? 'friend'
+                  : c.type === 'professional'
+                    ? 'professional'
+                    : c.type === 'institution'
+                      ? 'institution'
+                      : 'community-peer',
             trustScore: c.trustLevel,
             depth: 1, // Direct relationships only
             strength: this.getTrustStrength(c.trustLevel),
@@ -466,7 +644,15 @@ export class ShefaComputeService {
             },
             custodians,
             totalCustodians: custodians.length,
-            geographicDistribution: Array.from(regionMap.values()),
+            geographicDistribution: {
+              regions: Array.from(regionMap.values()),
+              riskProfile:
+                regionMap.size >= 3
+                  ? 'geo-redundant'
+                  : regionMap.size >= 2
+                    ? 'distributed'
+                    : 'centralized',
+            },
             trustGraph,
             protectionLevel:
               custodians.length >= 3 && avgRedundancy >= 2.5
@@ -484,8 +670,7 @@ export class ShefaComputeService {
             verificationStatus: custodians.length > 0 ? 'verified' : 'pending',
           };
         }),
-        catchError(error => {
-          console.error('[ShefaComputeService] Failed to load family-community protection:', error);
+        catchError(_error => {
           return of(this.getEmptyFamilyCommunityProtection());
         })
       );
@@ -513,17 +698,27 @@ export class ShefaComputeService {
         const transactions: TokenTransaction[] = [];
 
         tokenEvents.forEach(e => {
-          const quantity = (e.quantity as ResourceMeasure).value || 0;
-          const txnType = e.metadata?.type as any;
+          const quantity = (e.quantity as ResourceMeasure).value ?? 0;
+          const txnType = e.metadata?.type ?? 'earned';
 
           if (txnType === 'infrastructure-token-issued') totalTokens += quantity;
           else if (txnType === 'token-transferred') totalTokens -= quantity;
           else if (txnType === 'token-decayed') totalTokens -= quantity;
 
+          // Map zome event types to token transaction types
+          const mappedType: TokenTransaction['type'] =
+            txnType === 'infrastructure-token-issued'
+              ? 'earned'
+              : txnType === 'token-transferred'
+                ? 'transferred'
+                : txnType === 'token-decayed'
+                  ? 'decayed'
+                  : 'earned';
+
           transactions.push({
             id: e.id,
             timestamp: e.timestamp,
-            type: txnType,
+            type: mappedType,
             amount: quantity,
             relatedAgent: e.providerId === operatorId ? e.receiverId : e.providerId,
             description: e.note,
@@ -601,8 +796,7 @@ export class ShefaComputeService {
           ],
         };
       }),
-      catchError(error => {
-        console.error('[ShefaComputeService] Failed to load infrastructure-token balance:', error);
+      catchError(_error => {
         return of(this.getEmptyInfrastructureTokenBalance());
       })
     );
@@ -614,22 +808,25 @@ export class ShefaComputeService {
   private getRecentEconomicEvents(operatorId: string): Observable<RecentEconomicEvent[]> {
     return this.economicService.getEventsByLamadType('cpu-hours-provided' as LamadEventType).pipe(
       map(events => {
-        return (events || [])
+        return (events ?? [])
           .filter(e => e.providerId === operatorId || e.receiverId === operatorId)
           .slice(0, 20) // Last 20 events
-          .map(e => ({
-            id: e.id,
-            timestamp: e.timestamp,
-            eventType: e.metadata?.type as any,
-            provider: e.providerId,
-            receiver: e.receiverId,
-            quantity: e.quantity as ResourceMeasure,
-            tokensMinted: e.metadata?.tokensMinted,
-            note: e.note,
-          }));
+          .map(e => {
+            const eventType = (e.metadata?.type ??
+              'cpu-hours-provided') as RecentEconomicEvent['eventType'];
+            return {
+              id: e.id,
+              timestamp: e.timestamp,
+              eventType,
+              provider: e.providerId,
+              receiver: e.receiverId,
+              quantity: e.quantity as ResourceMeasure,
+              tokensMinted: e.metadata?.tokensMinted as number | undefined,
+              note: e.note,
+            };
+          });
       }),
-      catchError(error => {
-        console.error('[ShefaComputeService] Failed to load recent economic events:', error);
+      catchError(_error => {
         return of([]);
       })
     );
@@ -708,8 +905,7 @@ export class ShefaComputeService {
           }))
         )
       ),
-      catchError(error => {
-        console.error('[ShefaComputeService] Failed to load constitutional limits:', error);
+      catchError(_error => {
         return of(this.getEmptyConstitutionalLimitsStatus());
       })
     );
@@ -845,39 +1041,39 @@ export class ShefaComputeService {
     return this.holochain
       .callZome('node_registry_coordinator', 'get_nodes_by_owner', { owner_id: operatorId })
       .pipe(
-        map((nodes: any[]) => {
-          const ownedNodes: OwnedNode[] = (nodes || []).map(n => ({
+        map((nodes: NodeRegistryZomeResponse[]) => {
+          const ownedNodes: OwnedNode[] = (nodes ?? []).map(n => ({
             nodeId: n.nodeId,
-            displayName: n.displayName || n.nodeId.substring(0, 8),
-            nodeType: n.nodeType || 'self-hosted',
-            status: this.mapNodeStatus(n.status),
-            lastHeartbeat: n.lastHeartbeat || new Date().toISOString(),
-            consecutiveUptime: n.consecutiveUptime || 'Unknown',
+            displayName: n.displayName ?? n.nodeId.substring(0, 8),
+            nodeType: (n.nodeType ?? 'self-hosted') as OwnedNode['nodeType'],
+            status: this.mapNodeStatus(n.status ?? 'unknown'),
+            lastHeartbeat: n.lastHeartbeat ?? new Date().toISOString(),
+            consecutiveUptime: n.consecutiveUptime ?? 'Unknown',
             location: n.location
               ? {
-                  label: n.location.label || 'Unknown',
-                  region: n.location.region || 'unknown',
-                  country: n.location.country || 'unknown',
+                  label: n.location.label ?? 'Unknown',
+                  region: n.location.region ?? 'unknown',
+                  country: n.location.country ?? 'unknown',
                 }
               : undefined,
-            roles: (n.roles || []).map((r: any) => ({
-              role: r.role,
-              description: r.description || '',
-              utilizationPercent: r.utilizationPercent || 0,
+            roles: (n.roles ?? []).map(r => ({
+              role: r.role as NodeRole['role'],
+              description: r.description ?? '',
+              utilizationPercent: r.utilizationPercent ?? 0,
             })),
             resources: {
-              cpuPercent: n.resources?.cpuPercent || 0,
-              memoryPercent: n.resources?.memoryPercent || 0,
-              storageUsedGB: n.resources?.storageUsedGb || 0,
-              storageTotalGB: n.resources?.storageTotalGb || 0,
-              bandwidthMbps: n.resources?.bandwidthMbps || 0,
+              cpuPercent: n.resources?.cpuPercent ?? 0,
+              memoryPercent: n.resources?.memoryPercent ?? 0,
+              storageUsedGB: n.resources?.storageUsedGb ?? 0,
+              storageTotalGB: n.resources?.storageTotalGb ?? 0,
+              bandwidthMbps: n.resources?.bandwidthMbps ?? 0,
             },
             custodianActivity: {
-              contentItemsCustodied: n.custodianActivity?.itemsCustodied || 0,
-              contentItemsBeingCustodied: n.custodianActivity?.itemsBeingCustodied || 0,
-              totalCustodiedGB: n.custodianActivity?.totalCustodiedGb || 0,
+              contentItemsCustodied: n.custodianActivity?.itemsCustodied ?? 0,
+              contentItemsBeingCustodied: n.custodianActivity?.itemsBeingCustodied ?? 0,
+              totalCustodiedGB: n.custodianActivity?.totalCustodiedGb ?? 0,
             },
-            isPrimary: n.isPrimary || false,
+            isPrimary: n.isPrimary ?? false,
           }));
 
           const onlineNodes = ownedNodes.filter(n => n.status === 'online').length;
@@ -908,8 +1104,7 @@ export class ShefaComputeService {
             lastUpdated: new Date().toISOString(),
           };
         }),
-        catchError(error => {
-          console.error('[ShefaComputeService] Failed to load node topology:', error);
+        catchError(_error => {
           return of(this.getEmptyNodeTopology());
         }),
         shareReplay(1)
@@ -954,77 +1149,89 @@ export class ShefaComputeService {
         steward_id: operatorId,
       }),
     ]).pipe(
-      map(([helpingRaw, beingHelpedRaw]: [any[], any[]]) => {
-        const helping: CustodianRelationship[] = (helpingRaw || []).map(c => ({
-          agentId: c.stewardId,
-          displayName: c.stewardName || c.stewardId.substring(0, 8),
-          relationshipType: c.relationshipType || 'community',
-          trustScore: c.trustScore || 50,
-          direction: 'i-help-them' as const,
-          contentSummary: {
-            totalItems: c.contentCount || 0,
-            totalGB: c.totalGb || 0,
-            contentTypes: (c.contentTypes || []).map((ct: any) => ({
-              type: ct.type,
-              count: ct.count,
-              gb: ct.gb,
-            })),
-          },
-          status: c.status || 'active',
-          lastActivity: c.lastActivity || new Date().toISOString(),
-          reliability: c.myReliability || 99,
-        }));
+      map(
+        ([helpingRaw, beingHelpedRaw]: [
+          CustodianCommitmentZomeResponse[],
+          CustodianCommitmentZomeResponse[],
+        ]) => {
+          const helping: CustodianRelationship[] = (helpingRaw ?? []).map(c => ({
+            agentId: c.stewardId ?? c.custodianId,
+            displayName: c.stewardName ?? c.stewardId?.substring(0, 8) ?? 'Unknown',
+            relationshipType: (c.relationshipType ??
+              'community') as CustodianRelationship['relationshipType'],
+            trustScore: c.trustScore ?? 50,
+            direction: 'i-help-them' as const,
+            contentSummary: {
+              totalItems: c.contentCount ?? 0,
+              totalGB: c.totalGb ?? 0,
+              contentTypes: (c.contentTypes ?? []).map(ct => ({
+                type: ct.type,
+                count: ct.count,
+                gb: ct.gb,
+              })),
+            },
+            status: (c.status ?? 'active') as CustodianRelationship['status'],
+            lastActivity: c.lastActivity ?? new Date().toISOString(),
+            reliability: c.myReliability ?? 99,
+          }));
 
-        const beingHelpedBy: CustodianRelationship[] = (beingHelpedRaw || []).map(c => ({
-          agentId: c.custodianId,
-          displayName: c.custodianName || c.custodianId.substring(0, 8),
-          relationshipType: c.relationshipType || 'community',
-          trustScore: c.trustScore || 50,
-          direction: 'they-help-me' as const,
-          contentSummary: {
-            totalItems: c.contentCount || 0,
-            totalGB: c.totalGb || 0,
-            contentTypes: (c.contentTypes || []).map((ct: any) => ({
-              type: ct.type,
-              count: ct.count,
-              gb: ct.gb,
-            })),
-          },
-          status: c.status || 'active',
-          lastActivity: c.lastActivity || new Date().toISOString(),
-          reliability: c.custodianReliability || 99,
-        }));
+          const beingHelpedBy: CustodianRelationship[] = (beingHelpedRaw ?? []).map(c => ({
+            agentId: c.custodianId,
+            displayName: c.custodianName ?? c.custodianId.substring(0, 8),
+            relationshipType: (c.relationshipType ??
+              'community') as CustodianRelationship['relationshipType'],
+            trustScore: c.trustScore ?? 50,
+            direction: 'they-help-me' as const,
+            contentSummary: {
+              totalItems: c.contentCount ?? 0,
+              totalGB: c.totalGb ?? 0,
+              contentTypes: (c.contentTypes ?? []).map(ct => ({
+                type: ct.type,
+                count: ct.count,
+                gb: ct.gb,
+              })),
+            },
+            status: (c.status ?? 'active') as CustodianRelationship['status'],
+            lastActivity: c.lastActivity ?? new Date().toISOString(),
+            reliability: c.custodianReliability ?? 99,
+          }));
 
-        const helpingTotalGB = helping.reduce((sum, r) => sum + r.contentSummary.totalGB, 0);
-        const beingHelpedTotalGB = beingHelpedBy.reduce(
-          (sum, r) => sum + r.contentSummary.totalGB,
-          0
-        );
-        const ratio =
-          beingHelpedTotalGB > 0 ? helpingTotalGB / beingHelpedTotalGB : helpingTotalGB > 0 ? 2 : 1;
+          const helpingTotalGB = helping.reduce((sum, r) => sum + r.contentSummary.totalGB, 0);
+          const beingHelpedTotalGB = beingHelpedBy.reduce(
+            (sum, r) => sum + r.contentSummary.totalGB,
+            0
+          );
+          const ratio =
+            beingHelpedTotalGB > 0
+              ? helpingTotalGB / beingHelpedTotalGB
+              : helpingTotalGB > 0
+                ? 2
+                : 1;
 
-        return {
-          helping,
-          helpingCount: helping.length,
-          helpingTotalGB,
-          beingHelpedBy,
-          beingHelpedByCount: beingHelpedBy.length,
-          beingHelpedByTotalGB: beingHelpedTotalGB,
-          mutualAidBalance: {
-            ratio,
-            status: ratio > 1.2 ? 'giving-more' : ratio < 0.8 ? 'receiving-more' : 'balanced',
-            message: this.generateBalanceMessage(
-              helping.length,
-              beingHelpedBy.length,
-              helpingTotalGB,
-              beingHelpedTotalGB
+          return {
+            helping,
+            helpingCount: helping.length,
+            helpingTotalGB,
+            beingHelpedBy,
+            beingHelpedByCount: beingHelpedBy.length,
+            beingHelpedByTotalGB: beingHelpedTotalGB,
+            mutualAidBalance: {
+              ratio,
+              status: ratio > 1.2 ? 'giving-more' : ratio < 0.8 ? 'receiving-more' : 'balanced',
+              message: this.generateBalanceMessage(
+                helping.length,
+                beingHelpedBy.length,
+                helpingTotalGB,
+                beingHelpedTotalGB
+              ),
+            },
+            communityStrength: this.calculateCommunityStrength(
+              helping.length + beingHelpedBy.length
             ),
-          },
-          communityStrength: this.calculateCommunityStrength(helping.length + beingHelpedBy.length),
-        };
-      }),
-      catchError(error => {
-        console.error('[ShefaComputeService] Failed to load bidirectional custodian view:', error);
+          };
+        }
+      ),
+      catchError(_error => {
         return of(this.getEmptyBidirectionalView());
       }),
       shareReplay(1)
@@ -1045,35 +1252,33 @@ export class ShefaComputeService {
       }),
       this.getNodeTopology(operatorId),
     ]).pipe(
-      map(([distribution, topology]: [any, NodeTopologyState]) => {
+      map(([distribution, topology]: [ContentDistributionZomeResponse, NodeTopologyState]) => {
         // By content type
-        const byContentType: ContentTypeStorage[] = (distribution?.byContentType || []).map(
-          (ct: any) => ({
-            contentType: ct.contentType,
-            displayLabel: this.getContentTypeLabel(ct.contentType),
-            icon: this.getContentTypeIcon(ct.contentType),
-            itemCount: ct.itemCount || 0,
-            sizeGB: ct.sizeGb || 0,
-            percentOfTotal: ct.percentOfTotal || 0,
-            fullyReplicated: ct.fullyReplicated || 0,
-            underReplicated: ct.underReplicated || 0,
-            averageReplicas: ct.averageReplicas || 0,
-          })
-        );
+        const byContentType: ContentTypeStorage[] = (distribution?.byContentType ?? []).map(ct => ({
+          contentType: ct.contentType as ContentTypeStorage['contentType'],
+          displayLabel: this.getContentTypeLabel(ct.contentType),
+          icon: this.getContentTypeIcon(ct.contentType),
+          itemCount: ct.itemCount ?? 0,
+          sizeGB: ct.sizeGb ?? 0,
+          percentOfTotal: ct.percentOfTotal ?? 0,
+          fullyReplicated: ct.fullyReplicated ?? 0,
+          underReplicated: ct.underReplicated ?? 0,
+          averageReplicas: ct.averageReplicas ?? 0,
+        }));
 
         // By reach level
-        const byReachLevel: ReachLevelStorage[] = (distribution?.byReachLevel || []).map(
-          (rl: any) => ({
-            reachLevel: rl.reachLevel,
-            reachLabel: this.getReachLevelLabel(rl.reachLevel),
-            itemCount: rl.itemCount || 0,
-            sizeGB: rl.sizeGb || 0,
-            targetReplicas: this.getTargetReplicasForReach(rl.reachLevel),
-            currentReplicas: rl.currentReplicas || 0,
-            replicationStatus:
-              rl.currentReplicas >= this.getTargetReplicasForReach(rl.reachLevel) ? 'met' : 'under',
-          })
-        );
+        const byReachLevel: ReachLevelStorage[] = (distribution?.byReachLevel ?? []).map(rl => ({
+          reachLevel: rl.reachLevel,
+          reachLabel: this.getReachLevelLabel(rl.reachLevel),
+          itemCount: rl.itemCount ?? 0,
+          sizeGB: rl.sizeGb ?? 0,
+          targetReplicas: this.getTargetReplicasForReach(rl.reachLevel),
+          currentReplicas: rl.currentReplicas ?? 0,
+          replicationStatus:
+            (rl.currentReplicas ?? 0) >= this.getTargetReplicasForReach(rl.reachLevel)
+              ? 'met'
+              : 'under',
+        }));
 
         // By node
         const byNode: NodeStorageBreakdown[] = topology.nodes.map(node => ({
@@ -1084,11 +1289,11 @@ export class ShefaComputeService {
           usedGB: node.resources.storageUsedGB,
           availableGB: node.resources.storageTotalGB - node.resources.storageUsedGB,
           contentBreakdown: {
-            myContent: distribution?.byNode?.[node.nodeId]?.myContentGb || 0,
+            myContent: distribution?.byNode?.[node.nodeId]?.myContentGb ?? 0,
             custodiedContent: node.custodianActivity.totalCustodiedGB,
-            cacheContent: distribution?.byNode?.[node.nodeId]?.cacheGb || 0,
+            cacheContent: distribution?.byNode?.[node.nodeId]?.cacheGb ?? 0,
           },
-          contentTypes: distribution?.byNode?.[node.nodeId]?.contentTypes || [],
+          contentTypes: distribution?.byNode?.[node.nodeId]?.contentTypes ?? [],
         }));
 
         return {
@@ -1096,14 +1301,13 @@ export class ShefaComputeService {
           byReachLevel,
           byNode,
           totalContent: {
-            items: distribution?.totalItems || 0,
-            sizeGB: distribution?.totalSizeGb || 0,
-            replicaCount: distribution?.totalReplicas || 0,
+            items: distribution?.totalItems ?? 0,
+            sizeGB: distribution?.totalSizeGb ?? 0,
+            replicaCount: distribution?.totalReplicas ?? 0,
           },
         };
       }),
-      catchError(error => {
-        console.error('[ShefaComputeService] Failed to load storage distribution:', error);
+      catchError(_error => {
         return of(this.getEmptyStorageDistribution());
       }),
       shareReplay(1)
@@ -1123,7 +1327,7 @@ export class ShefaComputeService {
       this.getNodeTopology(operatorId),
       this.getComputeMetrics(operatorId),
     ]).pipe(
-      map(([topology, metrics]) => {
+      map(([topology, _metrics]) => {
         // Calculate current capacity across all nodes
         const currentCapacity = {
           totalCPUCores: topology.nodes.reduce(
@@ -1232,8 +1436,7 @@ export class ShefaComputeService {
             : 'Your compute is healthy',
         };
       }),
-      catchError(error => {
-        console.error('[ShefaComputeService] Failed to assess compute needs:', error);
+      catchError(_error => {
         return of(this.getEmptyComputeNeedsAssessment());
       }),
       shareReplay(1)
@@ -1366,7 +1569,7 @@ export class ShefaComputeService {
       learning: 'Learning Materials',
       other: 'Other',
     };
-    return labels[type] || type;
+    return labels[type] ?? type;
   }
 
   private getContentTypeIcon(type: string): string {
@@ -1379,7 +1582,7 @@ export class ShefaComputeService {
       learning: 'school',
       other: 'folder',
     };
-    return icons[type] || 'folder';
+    return icons[type] ?? 'folder';
   }
 
   private getReachLevelLabel(level: number): string {
@@ -1393,13 +1596,13 @@ export class ShefaComputeService {
       'Network',
       'Commons',
     ];
-    return labels[level] || `Reach ${level}`;
+    return labels[level] ?? `Reach ${level}`;
   }
 
   private getTargetReplicasForReach(level: number): number {
     // Match the values from node_registry_coordinator
     const targets = [3, 4, 5, 7, 10, 15, 20, 30];
-    return targets[level] || 3;
+    return targets[level] ?? 3;
   }
 
   // =============================================================================
@@ -1570,7 +1773,10 @@ export class ShefaComputeService {
       redundancy: { strategy: 'full_replica', redundancyFactor: 0, recoveryThreshold: 0 },
       custodians: [],
       totalCustodians: 0,
-      geographicDistribution: [],
+      geographicDistribution: {
+        regions: [],
+        riskProfile: 'centralized',
+      },
       trustGraph: [],
       protectionLevel: 'vulnerable',
       estimatedRecoveryTime: 'unknown',

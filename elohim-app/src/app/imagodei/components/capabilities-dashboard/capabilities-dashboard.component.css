@@ -48,7 +48,7 @@
 }
 
 .refresh-btn:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 
@@ -80,11 +80,11 @@
   line-height: 1;
   cursor: pointer;
   color: currentcolor;
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .dismiss-btn:hover {
-  opacity: 1;
+  opacity: 100%;
 }
 
 /* Loading State */

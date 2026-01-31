@@ -22,7 +22,6 @@ import { firstValueFrom } from 'rxjs';
 import { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import {
   CommonsPool,
-  ValueAttribution,
   AttributionClaim,
   Measure,
   REAAgent,
@@ -82,23 +81,27 @@ export class InsuranceMutualService {
       id: generateId(),
       memberId,
       riskType: 'health', // Default; can be specialized per risk type
-      careMaintenanceScore: initialRiskFactors.careMaintenanceScore || 50,
-      communityConnectednessScore: initialRiskFactors.communityConnectednessScore || 50,
-      historicalClaimsRate: initialRiskFactors.historicalClaimsRate || 0,
+      careMaintenanceScore: initialRiskFactors.careMaintenanceScore ?? 50,
+      communityConnectednessScore: initialRiskFactors.communityConnectednessScore ?? 50,
+      historicalClaimsRate: initialRiskFactors.historicalClaimsRate ?? 0,
       riskScore: calculateRiskScore({
-        careMaintenanceScore: initialRiskFactors.careMaintenanceScore || 50,
-        communityConnectednessScore: initialRiskFactors.communityConnectednessScore || 50,
-        historicalClaimsRate: initialRiskFactors.historicalClaimsRate || 0,
+        careMaintenanceScore: initialRiskFactors.careMaintenanceScore ?? 50,
+        communityConnectednessScore: initialRiskFactors.communityConnectednessScore ?? 50,
+        historicalClaimsRate: initialRiskFactors.historicalClaimsRate ?? 0,
       }),
       riskTier: determineRiskTier(
         calculateRiskScore({
-          careMaintenanceScore: initialRiskFactors.careMaintenanceScore || 50,
-          communityConnectednessScore: initialRiskFactors.communityConnectednessScore || 50,
-          historicalClaimsRate: initialRiskFactors.historicalClaimsRate || 0,
+          careMaintenanceScore: initialRiskFactors.careMaintenanceScore ?? 50,
+          communityConnectednessScore: initialRiskFactors.communityConnectednessScore ?? 50,
+          historicalClaimsRate: initialRiskFactors.historicalClaimsRate ?? 0,
         })
       ),
-      riskTierRationale: `Initial assessment based on provided factors. Care score: ${initialRiskFactors.careMaintenanceScore || 50}, Connectedness: ${initialRiskFactors.communityConnectednessScore || 50}, Claims rate: ${initialRiskFactors.historicalClaimsRate || 0}`,
-      evidenceEventIds: initialRiskFactors.evidenceEventIds || [],
+      riskTierRationale: `Initial assessment based on provided factors. Care score: ${
+        initialRiskFactors.careMaintenanceScore ?? 50
+      }, Connectedness: ${
+        initialRiskFactors.communityConnectednessScore ?? 50
+      }, Claims rate: ${initialRiskFactors.historicalClaimsRate ?? 0}`,
+      evidenceEventIds: initialRiskFactors.evidenceEventIds ?? [],
       evidenceBreakdown: {
         careMaintenanceEventsCount: 0,
         communityConnectednessEventsCount: 0,
@@ -106,9 +109,9 @@ export class InsuranceMutualService {
       },
       riskTrendDirection: 'stable',
       lastRiskScore: calculateRiskScore({
-        careMaintenanceScore: initialRiskFactors.careMaintenanceScore || 50,
-        communityConnectednessScore: initialRiskFactors.communityConnectednessScore || 50,
-        historicalClaimsRate: initialRiskFactors.historicalClaimsRate || 0,
+        careMaintenanceScore: initialRiskFactors.careMaintenanceScore ?? 50,
+        communityConnectednessScore: initialRiskFactors.communityConnectednessScore ?? 50,
+        historicalClaimsRate: initialRiskFactors.historicalClaimsRate ?? 0,
       }),
       assessedAt: new Date().toISOString(),
       lastAssessmentAt: new Date().toISOString(),
@@ -124,14 +127,14 @@ export class InsuranceMutualService {
       memberId,
       coverageLevel: 'community', // Qahal-decided pooling
       governedAt: 'faith_community',
-      coveredRisks: qahalCoverage.defaultRisks || getDefaultCoveredRisks(),
+      coveredRisks: qahalCoverage.defaultRisks ?? getDefaultCoveredRisks(),
       deductible: qahalCoverage.deductible,
       coinsurance: qahalCoverage.coinsurance,
       outOfPocketMaximum: qahalCoverage.outOfPocketMaximum,
       effectiveFrom: new Date().toISOString(),
       renewalTerms: 'annual',
       renewalDueAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      constitutionalBasis: qahalCoverage.constitutionalBasis || 'community-health-coverage.md',
+      constitutionalBasis: qahalCoverage.constitutionalBasis ?? 'community-health-coverage.md',
       lastPremiumEventId: undefined, // No premium yet
       createdAt: new Date().toISOString(),
       lastModifiedAt: new Date().toISOString(),
@@ -150,7 +153,9 @@ export class InsuranceMutualService {
         providerId: memberId,
         receiverId: 'elohim-mutual',
         resourceClassifiedAs: ['stewardship', 'membership'],
-        note: `Member ${memberId} enrolled in ${qahalId} mutual. Risk tier: ${riskProfile.riskTier}. Coverage level: community.`,
+        note: `Member ${memberId} enrolled in ${qahalId} mutual. Risk tier: ${
+          riskProfile.riskTier
+        }. Coverage level: community.`,
         lamadEventType: 'coverage-decision',
       })
     );
@@ -177,51 +182,62 @@ export class InsuranceMutualService {
   private async getMember(memberId: string): Promise<REAAgent | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return mock
-    return { id: memberId, name: 'Member', type: 'human' } as REAAgent;
+    return Promise.resolve({ id: memberId, name: 'Member', type: 'human' } as REAAgent);
   }
 
-  private async getQahalCoverageTemplate(qahalId: string): Promise<any> {
+  private async getQahalCoverageTemplate(_qahalId: string): Promise<{
+    defaultRisks: CoveredRisk[];
+    deductible: Measure;
+    coinsurance: number;
+    outOfPocketMaximum: Measure;
+    constitutionalBasis: string;
+  }> {
     // TODO: Fetch Qahal's coverage constitution from governance layer
     // For now, return defaults
-    return {
+    return Promise.resolve({
       defaultRisks: getDefaultCoveredRisks(),
       deductible: { hasNumericalValue: 500, hasUnit: 'unit-token' },
       coinsurance: 20,
       outOfPocketMaximum: { hasNumericalValue: 5000, hasUnit: 'unit-token' },
       constitutionalBasis: 'community-health-coverage-2024.md',
-    };
+    });
   }
 
-  private async persistRiskProfile(profile: MemberRiskProfile): Promise<void> {
+  private async persistRiskProfile(_profile: MemberRiskProfile): Promise<void> {
     // TODO: Persist to Holochain DHT
     // For now, just log
-    console.log('Persisting risk profile:', profile.id);
+
+    return Promise.resolve();
   }
 
-  private async persistCoveragePolicy(policy: CoveragePolicy): Promise<void> {
+  private async persistCoveragePolicy(_policy: CoveragePolicy): Promise<void> {
     // TODO: Persist to Holochain DHT
-    console.log('Persisting coverage policy:', policy.id);
+
+    return Promise.resolve();
   }
 
-  private async getMemberRiskProfile(memberId: string): Promise<MemberRiskProfile | null> {
+  private async getMemberRiskProfile(_memberId: string): Promise<MemberRiskProfile | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return null (will be fetched in real implementation)
-    return null;
+    return Promise.resolve(null);
   }
 
-  private async persistClaim(claim: InsuranceClaim): Promise<void> {
+  private async persistClaim(_claim: InsuranceClaim): Promise<void> {
     // TODO: Persist to Holochain DHT
-    console.log('Persisting claim:', claim.claimNumber);
+
+    return Promise.resolve();
   }
 
-  private async persistAdjustmentReasoning(reasoning: AdjustmentReasoning): Promise<void> {
+  private async persistAdjustmentReasoning(_reasoning: AdjustmentReasoning): Promise<void> {
     // TODO: Persist to Holochain DHT
-    console.log('Persisting adjustment reasoning:', reasoning.id);
+
+    return Promise.resolve();
   }
 
-  private async persistAttributionClaim(attribution: AttributionClaim): Promise<void> {
+  private async persistAttributionClaim(_attribution: AttributionClaim): Promise<void> {
     // TODO: Persist to Holochain DHT and update CommonsPool
-    console.log('Persisting attribution claim:', attribution.id);
+
+    return Promise.resolve();
   }
 
   // ============================================================================
@@ -238,7 +254,7 @@ export class InsuranceMutualService {
    */
   async assessMemberRisk(
     memberId: string,
-    riskType: 'health' | 'property' | 'casualty' | 'care'
+    _riskType: 'health' | 'property' | 'casualty' | 'care'
   ): Promise<MemberRiskProfile> {
     // Step 1: Get current risk profile
     const currentProfile = await this.getMemberRiskProfile(memberId);
@@ -257,28 +273,32 @@ export class InsuranceMutualService {
       'claim-filed',
       'risk-reduction-verified',
     ];
-    const memberEvents = allMemberEvents.filter(e =>
-      relevantEventTypes.includes(e.metadata?.['lamadEventType'] as string)
-    );
+    const memberEvents = allMemberEvents.filter(e => {
+      const eventType = e.metadata?.['lamadEventType'];
+      return typeof eventType === 'string' && relevantEventTypes.includes(eventType);
+    });
 
     // Step 3: Extract care maintenance score from preventive events
-    const careEvents = memberEvents.filter(
-      e =>
-        e.metadata?.['lamadEventType'] === 'preventive-care-completed' ||
-        e.metadata?.['lamadEventType'] === 'risk-reduction-verified'
-    );
+    const careEvents = memberEvents.filter(e => {
+      const eventType = e.metadata?.['lamadEventType'];
+      return eventType === 'preventive-care-completed' || eventType === 'risk-reduction-verified';
+    });
     const careMaintenanceScore = calculateCareMaintenanceScore(careEvents);
     const careEventCount = careEvents.length;
 
     // Step 4: Extract community connectedness score from support network events
-    const supportEvents = memberEvents.filter(
-      e => e.metadata?.['lamadEventType'] === 'community-support-provided'
-    );
+    const supportEvents = memberEvents.filter(e => {
+      const eventType = e.metadata?.['lamadEventType'];
+      return eventType === 'community-support-provided';
+    });
     const communityConnectednessScore = calculateCommunityConnectednessScore(supportEvents);
     const communityEventCount = supportEvents.length;
 
     // Step 5: Extract claims history
-    const claimEvents = memberEvents.filter(e => e.metadata?.['lamadEventType'] === 'claim-filed');
+    const claimEvents = memberEvents.filter(e => {
+      const eventType = e.metadata?.['lamadEventType'];
+      return eventType === 'claim-filed';
+    });
     const historicalClaimsRate = calculateHistoricalClaimsRate(
       claimEvents,
       currentProfile.historicalClaimsRate
@@ -306,7 +326,9 @@ export class InsuranceMutualService {
       historicalClaimsRate,
       riskScore: newRiskScore,
       riskTier: newRiskTier,
-      riskTierRationale: `Updated assessment from behavioral observation. Care score: ${careMaintenanceScore} (${careEventCount} attestations), Connectedness: ${communityConnectednessScore} (${communityEventCount} events), Claims rate: ${historicalClaimsRate.toFixed(2)} (${claimsEventCount} claims). Trend: ${riskTrend}`,
+      riskTierRationale: `Updated assessment from behavioral observation. Care score: ${careMaintenanceScore} (${careEventCount} attestations), Connectedness: ${communityConnectednessScore} (${communityEventCount} events), Claims rate: ${historicalClaimsRate.toFixed(
+        2
+      )} (${claimsEventCount} claims). Trend: ${riskTrend}`,
       lastRiskScore: currentProfile.riskScore,
       riskTrendDirection: riskTrend,
       lastAssessmentAt: currentProfile.assessedAt,
@@ -349,11 +371,11 @@ export class InsuranceMutualService {
    * Batch assessment for annual review.
    * Updates risk profiles for all members in a Qahal.
    */
-  async assessQahalRisks(qahalId: string): Promise<MemberRiskProfile[]> {
+  async assessQahalRisks(_qahalId: string): Promise<MemberRiskProfile[]> {
     // TODO: Implementation
     // Get all members of Qahal, reassess each
     // Identify improving/declining members for governance review
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -371,9 +393,9 @@ export class InsuranceMutualService {
    * - Constitutional: cannot be opted out of
    */
   async updateCoveragePolicy(
-    memberId: string,
-    newPolicy: Partial<CoveragePolicy>,
-    governanceLevel: 'individual' | 'household' | 'community' | 'network' | 'constitutional'
+    _memberId: string,
+    _newPolicy: Partial<CoveragePolicy>,
+    _governanceLevel: 'individual' | 'household' | 'community' | 'network' | 'constitutional'
   ): Promise<CoveragePolicy> {
     // TODO: Implementation
     // 1. Validate coverage level is appropriate for member
@@ -381,24 +403,24 @@ export class InsuranceMutualService {
     // 3. Check against constitutional constraints (dignity floor, etc)
     // 4. Record policy creation/modification as EconomicEvent
     // 5. Return updated policy with event reference
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Add a new covered risk to member's policy.
    * Example: member adds dental coverage, mental health coverage
    */
-  async addCoveredRisk(policyId: string, risk: CoveredRisk): Promise<CoveragePolicy> {
+  async addCoveredRisk(_policyId: string, _risk: CoveredRisk): Promise<CoveragePolicy> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get member's current coverage policy.
    */
-  async getCoveragePolicy(memberId: string): Promise<CoveragePolicy | null> {
+  async getCoveragePolicy(_memberId: string): Promise<CoveragePolicy | null> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -466,7 +488,7 @@ export class InsuranceMutualService {
       estimatedAmount: lossDetails.estimatedLossAmount,
       status: 'filed',
       observerAttestationIds: lossDetails.observerAttestationIds,
-      memberDocumentIds: lossDetails.memberDocumentIds || [],
+      memberDocumentIds: lossDetails.memberDocumentIds ?? [],
       adjustmentEventIds: [],
       appealEventIds: [],
       settlementEventIds: [],
@@ -483,7 +505,7 @@ export class InsuranceMutualService {
         deductibleApplies: coveredRisk.deductibleApplies,
         coinsurancePercent: coveredRisk.coinsurancePercent,
         coverageLimit: coveredRisk.coverageLimit,
-      },
+      } as Record<string, unknown>,
     };
 
     // Step 5: Create 'claim-filed' EconomicEvent
@@ -495,7 +517,11 @@ export class InsuranceMutualService {
         resourceConformsTo: lossDetails.lossType,
         resourceQuantityValue: lossDetails.estimatedLossAmount.hasNumericalValue,
         resourceQuantityUnit: lossDetails.estimatedLossAmount.hasUnit,
-        note: `Member filed claim for ${lossDetails.lossType}. Loss date: ${lossDetails.lossDate}. Description: ${lossDetails.description}. Observer attestations: ${lossDetails.observerAttestationIds.length}`,
+        note: `Member filed claim for ${lossDetails.lossType}. Loss date: ${
+          lossDetails.lossDate
+        }. Description: ${lossDetails.description}. Observer attestations: ${
+          lossDetails.observerAttestationIds.length
+        }`,
         lamadEventType: 'claim-filed',
       })
     );
@@ -509,12 +535,11 @@ export class InsuranceMutualService {
     // Step 8: Trigger adjuster assignment workflow
     // TODO: This would normally trigger a queue/assignment system
     // For now, just log that it needs assignment
-    console.log(`Claim ${claim.claimNumber} needs adjuster assignment. Queue: adjuster-assignment`);
 
-    return {
+    return Promise.resolve({
       claim,
       filedEvent: claimFiledEvent,
-    };
+    });
   }
 
   /**
@@ -525,32 +550,32 @@ export class InsuranceMutualService {
    * - EconomicEvent (claim-evidence-submitted)
    */
   async submitClaimEvidence(
-    claimId: string,
-    evidenceDocumentIds: string[]
+    _claimId: string,
+    _evidenceDocumentIds: string[]
   ): Promise<InsuranceClaim> {
     // TODO: Implementation
     // 1. Add docs to claim
     // 2. Create event recording submission
     // 3. Notify assigned adjuster
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get claim status and history.
    */
-  async getClaim(claimId: string): Promise<InsuranceClaim | null> {
+  async getClaim(_claimId: string): Promise<InsuranceClaim | null> {
     // TODO: In production, fetch from Holochain DHT by claim ID
     // For now, return null (will be populated by real implementation)
-    console.log('Fetching claim:', claimId);
-    return null;
+
+    return Promise.resolve(null);
   }
 
   /**
    * Get all claims for a member.
    */
   async getMemberClaims(
-    memberId: string,
-    filters?: {
+    _memberId: string,
+    _filters?: {
       status?: InsuranceClaimStatus;
       fromDate?: string;
       toDate?: string;
@@ -558,8 +583,8 @@ export class InsuranceMutualService {
   ): Promise<InsuranceClaim[]> {
     // TODO: In production, query Holochain DHT for all claims where memberId matches
     // Apply filters if provided
-    console.log(`Fetching claims for member ${memberId}`, filters);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
@@ -570,7 +595,7 @@ export class InsuranceMutualService {
    * - Adjusters: finding members by policy
    * - Analytics: finding cohorts for trends
    */
-  async searchMembers(filters: {
+  async searchMembers(_filters: {
     qahalId?: string;
     riskTier?: 'low' | 'standard' | 'high' | 'uninsurable';
     riskTrendDirection?: 'improving' | 'stable' | 'declining';
@@ -587,8 +612,8 @@ export class InsuranceMutualService {
     // TODO: In production, query Holochain DHT with multiple filters
     // Index on: qahalId, riskTier, riskTrendDirection
     // Support aggregation for analytics
-    console.log('Searching members with filters:', filters);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
@@ -599,7 +624,7 @@ export class InsuranceMutualService {
    * - Governance: finding claims to review
    * - Analytics: finding trends
    */
-  async searchClaims(filters: {
+  async searchClaims(_filters: {
     qahalId?: string;
     status?: InsuranceClaimStatus;
     lossType?: string;
@@ -619,8 +644,8 @@ export class InsuranceMutualService {
     // TODO: In production, query Holochain DHT with multiple criteria
     // Index on: qahalId, status, lossType, flags
     // Support date range queries
-    console.log('Searching claims with filters:', filters);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
@@ -628,8 +653,8 @@ export class InsuranceMutualService {
    * For governance reports and community oversight.
    */
   async getQahalMembers(
-    qahalId: string,
-    options?: {
+    _qahalId: string,
+    _options?: {
       limit?: number;
       offset?: number;
     }
@@ -642,8 +667,8 @@ export class InsuranceMutualService {
   > {
     // TODO: In production, query DHT for all members in qahalId
     // With pagination support
-    console.log(`Fetching members of Qahal ${qahalId}`);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
@@ -651,21 +676,21 @@ export class InsuranceMutualService {
    * For governance oversight and reserves analysis.
    */
   async getQahalClaims(
-    qahalId: string,
-    filters?: {
+    _qahalId: string,
+    _filters?: {
       status?: InsuranceClaimStatus;
       fromDate?: string;
       toDate?: string;
     },
-    options?: {
+    _options?: {
       limit?: number;
       offset?: number;
     }
   ): Promise<InsuranceClaim[]> {
     // TODO: In production, query DHT for claims in qahalId
     // With filters and pagination
-    console.log(`Fetching claims for Qahal ${qahalId}`, filters);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
@@ -673,19 +698,19 @@ export class InsuranceMutualService {
    * For targeted prevention programs and rate analysis.
    */
   async getMembersByRiskTier(
-    qahalId: string,
-    riskTier: 'low' | 'standard' | 'high' | 'uninsurable'
+    _qahalId: string,
+    _riskTier: 'low' | 'standard' | 'high' | 'uninsurable'
   ): Promise<MemberRiskProfile[]> {
     // TODO: In production, query DHT with index on (qahalId, riskTier)
-    console.log(`Fetching ${riskTier} risk members in Qahal ${qahalId}`);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
    * Get members with improving risk trends.
    * For governance recognition and prevention incentive rewards.
    */
-  async getMembersWithImprovingRisk(qahalId: string): Promise<
+  async getMembersWithImprovingRisk(_qahalId: string): Promise<
     {
       member: MemberRiskProfile;
       previousScore: number;
@@ -694,30 +719,27 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: In production, query DHT for members with trend='improving'
-    console.log(`Fetching improving members in Qahal ${qahalId}`);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
    * Get claims pending adjudication.
    * For adjuster queue management.
    */
-  async getPendingClaims(qahalId?: string): Promise<InsuranceClaim[]> {
+  async getPendingClaims(_qahalId?: string): Promise<InsuranceClaim[]> {
     // TODO: In production, query DHT for claims with status='filed'
-    console.log(`Fetching pending claims${qahalId ? ` for Qahal ${qahalId}` : ''}`);
-    return [];
+
+    return Promise.resolve([]);
   }
 
   /**
    * Get high-value claims (above threshold).
    * For governance review of large payouts.
    */
-  async getHighValueClaims(threshold: Measure, qahalId?: string): Promise<InsuranceClaim[]> {
+  async getHighValueClaims(_threshold: Measure, _qahalId?: string): Promise<InsuranceClaim[]> {
     // TODO: In production, query DHT for claims with amount > threshold
-    console.log(
-      `Fetching claims > ${threshold.hasNumericalValue} ${threshold.hasUnit}${qahalId ? ` in Qahal ${qahalId}` : ''}`
-    );
-    return [];
+    return Promise.resolve([]);
   }
 
   /**
@@ -725,8 +747,8 @@ export class InsuranceMutualService {
    * For appeals processing and adjuster performance review.
    */
   async getDeniedClaims(
-    adjusterId?: string,
-    qahalId?: string
+    _adjusterId?: string,
+    _qahalId?: string
   ): Promise<
     {
       claim: InsuranceClaim;
@@ -734,10 +756,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: In production, query DHT for claims with adjustment status='denied'
-    console.log(
-      `Fetching denied claims${adjusterId ? ` by adjuster ${adjusterId}` : ''}${qahalId ? ` in Qahal ${qahalId}` : ''}`
-    );
-    return [];
+    return Promise.resolve([]);
   }
 
   // ============================================================================
@@ -750,13 +769,13 @@ export class InsuranceMutualService {
    * Links Elohim agent (adjuster) to claim processing workflow.
    * Creates EconomicEvent recording assignment.
    */
-  async assignClaimToAdjuster(claimId: string, adjusterId: string): Promise<void> {
+  async assignClaimToAdjuster(_claimId: string, _adjusterId: string): Promise<void> {
     // TODO: Implementation
     // 1. Verify adjuster is qualified (check tier, certification)
     // 2. Update claim with adjuster ID
     // 3. Create 'claim-assigned' event (or use 'stewardship-begin'?)
     // 4. Notify adjuster of assignment
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -774,7 +793,7 @@ export class InsuranceMutualService {
    */
   async adjustClaim(
     claimId: string,
-    adjusterId: string,
+    _adjusterId: string,
     reasoning: Omit<
       AdjustmentReasoning,
       'id' | 'claimId' | 'adjusterId' | 'adjustmentDate' | 'createdAt'
@@ -833,10 +852,13 @@ export class InsuranceMutualService {
     // Flag if: large approval (>80% of coverage limit)
     if (
       reasoning.coverageDecision === 'approved' &&
-      claim.metadata?.coverageLimit &&
+      claim.metadata?.['coverageLimit'] &&
       adjustmentReasoning.approvedAmount &&
+      typeof claim.metadata['coverageLimit'] === 'object' &&
+      'hasNumericalValue' in claim.metadata['coverageLimit'] &&
+      typeof claim.metadata['coverageLimit'].hasNumericalValue === 'number' &&
       adjustmentReasoning.approvedAmount.hasNumericalValue >
-        claim.metadata.coverageLimit.hasNumericalValue * 0.8
+        claim.metadata['coverageLimit'].hasNumericalValue * 0.8
     ) {
       flagForGovernance = true;
       flagReason = 'large-claim';
@@ -860,7 +882,9 @@ export class InsuranceMutualService {
       status: 'adjustment-made',
       changedAt: adjustmentReasoning.adjustmentDate,
       changedBy: adjusterId,
-      note: `Adjuster determined: ${reasoning.coverageDecision}. Amount: ${adjustmentReasoning.approvedAmount?.hasNumericalValue || 0}`,
+      note: `Adjuster determined: ${reasoning.coverageDecision}. Amount: ${
+        adjustmentReasoning.approvedAmount?.hasNumericalValue ?? 0
+      }`,
     });
     claim.adjustmentEventIds.push(''); // Will update with event ID in step 7
 
@@ -891,11 +915,11 @@ export class InsuranceMutualService {
       );
     }
 
-    return {
+    return Promise.resolve({
       claim,
       reasoning: adjustmentReasoning,
       adjustedEvent,
-    };
+    });
   }
 
   /**
@@ -904,9 +928,9 @@ export class InsuranceMutualService {
    * Adjuster approved → member will be paid
    * This is a state transition event.
    */
-  async approveClaim(claimId: string, adjusterId: string, note?: string): Promise<InsuranceClaim> {
+  async approveClaim(_claimId: string, _adjusterId: string, _note?: string): Promise<InsuranceClaim> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -916,16 +940,16 @@ export class InsuranceMutualService {
    * Creates AttributionClaim for appeal process if denied.
    */
   async denyClaim(
-    claimId: string,
-    adjusterId: string,
-    denialReasoning: string
+    _claimId: string,
+    _adjusterId: string,
+    _denialReasoning: string
   ): Promise<InsuranceClaim> {
     // TODO: Implementation
     // 1. Create AdjustmentReasoning with denial explanation
     // 2. Update claim status to 'denied'
     // 3. Create 'claim-denied' EconomicEvent
     // 4. Create appeal window (e.g., 30 days) for member
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -940,7 +964,7 @@ export class InsuranceMutualService {
   async settleClaim(
     claimId: string,
     settledAmount: Measure,
-    paymentMethod: 'mutual-credit' | 'fiat-transfer'
+    _paymentMethod: 'mutual-credit' | 'fiat-transfer'
   ): Promise<{
     claim: InsuranceClaim;
     settlementEvent: EconomicEvent;
@@ -954,12 +978,12 @@ export class InsuranceMutualService {
 
     const policy = await this.getCoveragePolicy(claim.memberId);
     if (!policy) {
-      throw new Error(`Coverage policy not found for member ${claim.memberId}`);
+      return Promise.reject(new Error(`Coverage policy not found for member ${claim.memberId}`));
     }
 
     // Step 2: Calculate cost sharing (deductible + coinsurance)
-    const deductibleAmount = policy.deductible?.hasNumericalValue || 0;
-    const coinsurancePercent = policy.coinsurance || 0;
+    const deductibleAmount = policy.deductible?.hasNumericalValue ?? 0;
+    const coinsurancePercent = policy.coinsurance ?? 0;
 
     const amountAfterDeductible = Math.max(0, settledAmount.hasNumericalValue - deductibleAmount);
     const coinsuranceAmount = Math.round(amountAfterDeductible * (coinsurancePercent / 100));
@@ -973,7 +997,7 @@ export class InsuranceMutualService {
         receiverId: claim.memberId,
         resourceConformsTo: 'settlement-payment',
         resourceQuantityValue: netPaymentToMember,
-        resourceQuantityUnit: settledAmount.hasUnit || 'unit-token',
+        resourceQuantityUnit: settledAmount.hasUnit ?? 'unit-token',
         note: `Claim settlement. Gross: ${settledAmount.hasNumericalValue}. Deductible: -${deductibleAmount}. Coinsurance: -${coinsuranceAmount}. Net to member: ${netPaymentToMember}`,
         lamadEventType: 'claim-settled',
       })
@@ -986,7 +1010,7 @@ export class InsuranceMutualService {
       agentId: claim.memberId,
       amount: {
         hasNumericalValue: netPaymentToMember,
-        hasUnit: settledAmount.hasUnit || 'unit-token',
+        hasUnit: settledAmount.hasUnit ?? 'unit-token',
       },
       sourceEventIds: [settlementEvent.id],
       claimDate: new Date().toISOString(),
@@ -1016,11 +1040,11 @@ export class InsuranceMutualService {
     // For now, just create the attribution record
     await this.persistAttributionClaim(attribution);
 
-    return {
+    return Promise.resolve({
       claim,
       settlementEvent,
       attribution,
-    };
+    });
   }
 
   // ============================================================================
@@ -1034,16 +1058,16 @@ export class InsuranceMutualService {
    * Second adjuster or governance committee reviews.
    */
   async appealClaimDecision(
-    claimId: string,
-    memberId: string,
-    appealReason: string
+    _claimId: string,
+    _memberId: string,
+    _appealReason: string
   ): Promise<InsuranceClaim> {
     // TODO: Implementation
     // 1. Create appeal record on claim
     // 2. Assign to different adjuster or governance committee
     // 3. Create 'claim-appealed' EconomicEvent
     // 4. Set review deadline
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1051,13 +1075,13 @@ export class InsuranceMutualService {
    * Second-level adjudication.
    */
   async resolveAppeal(
-    claimId: string,
-    reviewingAdjusterId: string,
-    decision: 'upheld' | 'overturned' | 'modified',
-    reasoning: string
+    _claimId: string,
+    _reviewingAdjusterId: string,
+    _decision: 'upheld' | 'overturned' | 'modified',
+    _reasoning: string
   ): Promise<InsuranceClaim> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1075,10 +1099,10 @@ export class InsuranceMutualService {
    * - EconomicEvent (risk-reduction-verified or prevention-incentive-awarded)
    */
   async recordRiskMitigation(
-    memberId: string,
-    riskType: 'health' | 'property' | 'casualty' | 'care',
-    observerAttestationId: string, // Evidence from Observer
-    mitigationActivity: string // What was done (e.g., "completed-driving-course")
+    _memberId: string,
+    _riskType: 'health' | 'property' | 'casualty' | 'care',
+    _observerAttestationId: string, // Evidence from Observer
+    _mitigationActivity: string // What was done (e.g., "completed-driving-course")
   ): Promise<{
     updatedProfile: MemberRiskProfile;
     incentiveEvent: EconomicEvent;
@@ -1090,7 +1114,7 @@ export class InsuranceMutualService {
     // 4. Create 'prevention-incentive-awarded' EconomicEvent
     // 5. Calculate premium adjustment for next period
     // 6. Return updated profile and event
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1099,7 +1123,7 @@ export class InsuranceMutualService {
    * Returns list of activities that would trigger discounts.
    * Personalized to member's risk profile and covered risks.
    */
-  async getPreventionIncentives(memberId: string): Promise<
+  async getPreventionIncentives(_memberId: string): Promise<
     {
       activity: string;
       discountPercent: number;
@@ -1107,7 +1131,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1122,19 +1146,19 @@ export class InsuranceMutualService {
    * are flagged for community review.
    */
   async flagClaimForGovernanceReview(
-    claimId: string,
-    reason: 'large-claim' | 'unusual-interpretation' | 'pattern-concern' | 'other',
-    note?: string
+    _claimId: string,
+    _reason: 'large-claim' | 'unusual-interpretation' | 'pattern-concern' | 'other',
+    _note?: string
   ): Promise<void> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
    * Get claims flagged for governance review.
    * For governance committees.
    */
-  async getFlaggedClaims(qahalId?: string): Promise<
+  async getFlaggedClaims(_qahalId?: string): Promise<
     {
       claim: InsuranceClaim;
       reasoning: AdjustmentReasoning;
@@ -1142,7 +1166,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1155,7 +1179,7 @@ export class InsuranceMutualService {
    * - Constitutional compliance
    * - "Generosity index" (% of decisions that interpreted coverage generously)
    */
-  async getAdjusterMetrics(adjusterId: string): Promise<{
+  async getAdjusterMetrics(_adjusterId: string): Promise<{
     claimsProcessed: number;
     denialRate: number;
     appealRate: number;
@@ -1164,7 +1188,7 @@ export class InsuranceMutualService {
     qualityTrend: 'improving' | 'stable' | 'declining';
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1177,7 +1201,7 @@ export class InsuranceMutualService {
    * Transparency on financial health.
    * Regulators require proof of adequate reserves.
    */
-  async getReserveStatus(poolId: string): Promise<{
+  async getReserveStatus(_poolId: string): Promise<{
     pool: CommonsPool;
     balance: Measure;
     expectedAnnualClaims: Measure;
@@ -1186,7 +1210,7 @@ export class InsuranceMutualService {
     isAdequate: boolean;
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1196,8 +1220,8 @@ export class InsuranceMutualService {
    * Used for: rate setting, reserve adequacy, governance decisions.
    */
   async analyzeClaimsTrends(
-    poolId: string,
-    period: '30-days' | '90-days' | 'annual'
+    _poolId: string,
+    _period: '30-days' | '90-days' | 'annual'
   ): Promise<{
     totalClaims: number;
     totalClaimed: Measure;
@@ -1207,7 +1231,7 @@ export class InsuranceMutualService {
     trend: 'stable' | 'increasing' | 'decreasing';
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1225,7 +1249,7 @@ export class InsuranceMutualService {
    */
   async calculatePremium(
     memberId: string,
-    coverageLevel: 'individual' | 'household' | 'community' | 'network'
+    _coverageLevel: 'individual' | 'household' | 'community' | 'network'
   ): Promise<{
     basePremium: Measure;
     riskAdjustment: Measure;
@@ -1242,7 +1266,7 @@ export class InsuranceMutualService {
     // Step 2: Get member's coverage policy
     const policy = await this.getCoveragePolicy(memberId);
     if (!policy) {
-      throw new Error(`Coverage policy not found for member ${memberId}`);
+      return Promise.reject(new Error(`Coverage policy not found for member ${memberId}`));
     }
 
     // Step 3: Calculate base premium (pool-level expected claims + overhead)
@@ -1272,8 +1296,10 @@ export class InsuranceMutualService {
         riskAdjustmentPercent = 30;
         break;
       case 'uninsurable':
-        throw new Error(
-          `Member ${memberId} is uninsurable. Requires risk mitigation before enrollment.`
+        return Promise.reject(
+          new Error(
+            `Member ${memberId} is uninsurable. Requires risk mitigation before enrollment.`
+          )
         );
     }
 
@@ -1340,13 +1366,13 @@ HOW TO LOWER YOUR PREMIUM:
 - Each improvement will reduce your premium the next renewal period
     `.trim();
 
-    return {
+    return Promise.resolve({
       basePremium,
       riskAdjustment,
       preventionDiscount,
       finalPremium,
       breakdown,
-    };
+    });
   }
 
   /**
@@ -1358,10 +1384,10 @@ HOW TO LOWER YOUR PREMIUM:
    * - Updates member's coverage status
    */
   async recordPremiumPayment(
-    memberId: string,
-    amount: Measure,
-    paymentMethod: 'mutual-credit' | 'fiat-transfer',
-    periodCovered: { from: string; to: string }
+    _memberId: string,
+    _amount: Measure,
+    _paymentMethod: 'mutual-credit' | 'fiat-transfer',
+    _periodCovered: { from: string; to: string }
   ): Promise<{
     paymentEvent: EconomicEvent;
     updatedPolicy: CoveragePolicy;
@@ -1372,7 +1398,7 @@ HOW TO LOWER YOUR PREMIUM:
     // 3. Update CommonsPool (add to reserves)
     // 4. Update policy (coverage effective dates, last premium event)
     // 5. Record in deductible tracker (reset if new period)
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   // ============================================================================
@@ -1385,7 +1411,7 @@ HOW TO LOWER YOUR PREMIUM:
    * What member sees about their coverage, claims, and pool.
    * Full transparency on how their premiums flow.
    */
-  async getMemberStatement(memberId: string): Promise<{
+  async getMemberStatement(_memberId: string): Promise<{
     member: REAAgent;
     riskProfile: MemberRiskProfile;
     policy: CoveragePolicy;
@@ -1395,7 +1421,7 @@ HOW TO LOWER YOUR PREMIUM:
     preventionOpportunities: string[];
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 
   /**
@@ -1403,7 +1429,7 @@ HOW TO LOWER YOUR PREMIUM:
    *
    * What Qahal governance sees about their risk pool.
    */
-  async getQahalAnalytics(qahalId: string): Promise<{
+  async getQahalAnalytics(_qahalId: string): Promise<{
     memberCount: number;
     totalPremiumsCollected: Measure;
     totalClaimsPaid: Measure;
@@ -1418,7 +1444,7 @@ HOW TO LOWER YOUR PREMIUM:
     topClaimReasons: { reason: string; count: number }[];
   }> {
     // TODO: Implementation
-    throw new Error('Not yet implemented');
+    return Promise.reject(new Error('Not yet implemented'));
   }
 }
 
@@ -1433,7 +1459,7 @@ HOW TO LOWER YOUR PREMIUM:
  */
 function generateId(): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 9);
+  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 9);
   return `id-${timestamp}-${random}`;
 }
 
@@ -1600,7 +1626,7 @@ function calculateCommunityConnectednessScore(supportEvents: EconomicEvent[]): n
   const eventsPerYear = Math.min(100, (supportEvents.length / 12) * 40);
 
   // Check for diverse community engagement (multiple different agents)
-  const uniqueAgents = new Set(supportEvents.map(e => e.provider || e.receiver || 'unknown')).size;
+  const uniqueAgents = new Set(supportEvents.map(e => e.provider ?? e.receiver ?? 'unknown')).size;
   const diversityBonus = Math.min(30, uniqueAgents * 5);
 
   return Math.min(100, Math.round(eventsPerYear + diversityBonus + 20));

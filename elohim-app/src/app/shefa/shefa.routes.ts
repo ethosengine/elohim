@@ -15,12 +15,12 @@ import { Routes } from '@angular/router';
 export const SHEFA_ROUTES: Routes = [
   {
     path: '',
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/shefa-layout/shefa-layout.component').then(m => m.ShefaLayoutComponent),
     children: [
       {
         path: '',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/shefa-home/shefa-home.component').then(m => m.ShefaHomeComponent),
         data: {
           title: 'Shefa - Economics of Human Flourishing',
@@ -33,7 +33,7 @@ export const SHEFA_ROUTES: Routes = [
       },
       {
         path: 'dashboard',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('../elohim/components/shefa-dashboard/shefa-dashboard.component').then(
             m => m.ShefaDashboardComponent
           ),

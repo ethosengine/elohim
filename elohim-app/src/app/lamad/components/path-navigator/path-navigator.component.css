@@ -25,8 +25,7 @@
    ============================================================================= */
 
 .path-player-container {
-  display: flex;
-  height: calc(100vh - 64px); /* Adjust based on global header height */
+  display: flex; /* Adjust based on global header height */
   height: calc(100dvh - 64px); /* Dynamic viewport height for mobile browsers */
   background-color: var(--lamad-bg-primary, #fff);
   overflow: hidden;
@@ -41,7 +40,6 @@
 
 /* Focused view mode overrides */
 .path-player-container.focused-view-active {
-  height: 100vh;
   height: 100dvh;
 }
 
@@ -238,7 +236,7 @@
 
 .step-item.locked a {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 60%;
 }
 
 /* Status Icons */
@@ -265,7 +263,7 @@
 
 .checkmark.global {
   color: var(--lamad-success, #10b981);
-  opacity: 0.7; /* Distinguish mastered-elsewhere */
+  opacity: 70%; /* Distinguish mastered-elsewhere */
 }
 
 /* =============================================================================
@@ -675,7 +673,7 @@
 }
 
 .btn-nav:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 
@@ -753,7 +751,7 @@
 
 .bloom-hint {
   font-size: 0.75rem;
-  opacity: 0.8;
+  opacity: 80%;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }

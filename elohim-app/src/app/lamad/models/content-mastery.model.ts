@@ -16,12 +16,11 @@
 
 import type { MasteryLevel } from '@app/elohim/models/agent.model';
 
+// @coverage: 30.0% (2026-01-31)
+
 // Re-export for convenience
 export type { MasteryLevel } from '@app/elohim/models/agent.model';
 export { MASTERY_LEVEL_VALUES, ATTESTATION_GATE_LEVEL } from '@app/elohim/models/agent.model';
-
-/** @deprecated Use MASTERY_LEVEL_VALUES instead */
-export { BLOOM_LEVEL_VALUES } from '@app/elohim/models/agent.model';
 
 /**
  * ContentMastery - A human's mastery state for a specific content node.

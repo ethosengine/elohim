@@ -204,7 +204,7 @@
 }
 
 :host ::ng-deep .node-state-locked {
-  opacity: 0.6;
+  opacity: 60%;
 }
 
 /* Cluster node styles */
@@ -234,42 +234,42 @@
 
 :host ::ng-deep .link-foundation {
   stroke: #6366f1;
-  stroke-opacity: 0.8;
+  stroke-opacity: 80%;
 }
 
 :host ::ng-deep .link-contains {
   stroke: #22c55e;
-  stroke-opacity: 0.6;
+  stroke-opacity: 60%;
 }
 
 :host ::ng-deep .link-relates_to {
   stroke: #f97316;
   stroke-dasharray: 4, 4;
-  stroke-opacity: 0.4;
+  stroke-opacity: 40%;
 }
 
 :host ::ng-deep .link-prereq {
   stroke: #3b82f6;
-  stroke-opacity: 0.7;
+  stroke-opacity: 70%;
 }
 
 :host ::ng-deep .link-related {
   stroke: #8b5cf6;
   stroke-dasharray: 6, 3;
-  stroke-opacity: 0.5;
+  stroke-opacity: 50%;
 }
 
 :host ::ng-deep .link-extends {
   stroke: #22c55e;
-  stroke-opacity: 0.6;
+  stroke-opacity: 60%;
 }
 
 /* Progression/NEXT link - learning path flow */
 :host ::ng-deep .link-next {
   stroke: #6366f1;
-  stroke-opacity: 0.8;
+  stroke-opacity: 80%;
   stroke-width: 3px;
-  marker-end: url("#arrow-next");
+  marker-end: url('#arrow-next');
 }
 
 /* Arrow marker for progression edges */
@@ -646,7 +646,7 @@
 .btn-primary:disabled {
   background: #475569;
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .btn-secondary {

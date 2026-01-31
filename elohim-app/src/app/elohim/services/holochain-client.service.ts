@@ -20,13 +20,9 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-import {
-  AdminWebsocket,
-  AppWebsocket,
-  type AgentPubKey,
-  type CellId,
-  type AppInfo,
-} from '@holochain/client';
+// @coverage: 14.8% (2026-01-31)
+
+import { AdminWebsocket, type AgentPubKey, type CellId, type AppInfo } from '@holochain/client';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -46,7 +42,7 @@ import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { LoggerService } from './logger.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
 
-import type { IConnectionStrategy, ConnectionConfig } from '@elohim/service/connection';
+import type { ConnectionConfig } from '@elohim/service/connection';
 
 @Injectable({
   providedIn: 'root',
@@ -271,7 +267,7 @@ export class HolochainClientService {
       const result = await this.strategy.connect(connectionConfig);
 
       if (!result.success) {
-        throw new Error(result.error || 'Connection failed');
+        throw new Error(result.error ?? 'Connection failed');
       }
 
       // Update state from strategy result
@@ -279,9 +275,9 @@ export class HolochainClientService {
 
       this.updateState({
         state: 'connected',
-        adminWs: result.adminWs ?? null,
-        appWs: result.appWs ?? null,
-        agentPubKey: result.agentPubKey ?? null,
+        adminWs: result.adminWs ?? undefined,
+        appWs: result.appWs ?? undefined,
+        agentPubKey: result.agentPubKey ?? undefined,
         cellId: firstCellId,
         cellIds: result.cellIds ?? new Map(),
         appInfo: result.appInfo ?? null,
@@ -438,7 +434,7 @@ export class HolochainClientService {
     this.logger.warn('Connection lost', { reason });
     this.updateState({
       state: 'error',
-      error: reason || 'Connection lost',
+      error: reason ?? 'Connection lost',
     });
 
     // Trigger auto-reconnect
@@ -489,7 +485,12 @@ export class HolochainClientService {
     let { appWs, cellIds } = this.connectionSignal();
 
     // Generate correlation ID for this request (for tracing)
-    const correlationId = `zome-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 6);
+    const correlationId = `zome-${Date.now()}-${randomStr}`;
     const callContext = {
       correlationId,
       zomeName: input.zomeName,
@@ -514,21 +515,19 @@ export class HolochainClientService {
     }
 
     // If not connected yet, wait for connection (only if actively connecting)
-    if (!appWs || cellIds.size === 0) {
-      if (state === 'connecting' || state === 'authenticating') {
-        this.logger.debug('Waiting for connection before zome call', callContext);
-        const connected = await this.waitForConnection();
-        if (!connected) {
-          timer.end({ ...callContext, success: false, reason: 'timeout' });
-          this.metrics.recordQuery(timer.elapsed(), false);
-          return {
-            success: false,
-            error: 'Connection timed out',
-          };
-        }
-        // Re-read connection state after waiting
-        ({ appWs, cellIds } = this.connectionSignal());
+    if ((!appWs || cellIds.size === 0) && (state === 'connecting' || state === 'authenticating')) {
+      this.logger.debug('Waiting for connection before zome call', callContext);
+      const connected = await this.waitForConnection();
+      if (!connected) {
+        timer.end({ ...callContext, success: false, reason: 'timeout' });
+        this.metrics.recordQuery(timer.elapsed(), false);
+        return {
+          success: false,
+          error: 'Connection timed out',
+        };
       }
+      // Re-read connection state after waiting
+      ({ appWs, cellIds } = this.connectionSignal());
     }
 
     if (!appWs || cellIds.size === 0) {
@@ -714,7 +713,7 @@ export class HolochainClientService {
   private async getInstalledApp(adminWs: AdminWebsocket): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
-      return apps.find(app => app.installed_app_id === this.config.appId) || null;
+      return apps.find(app => app.installed_app_id === this.config.appId) ?? null;
     } catch {
       return null;
     }
@@ -796,7 +795,7 @@ export class HolochainClientService {
    * Convert Uint8Array to base64
    */
   public uint8ArrayToBase64(arr: Uint8Array): string {
-    return btoa(String.fromCharCode.apply(null, Array.from(arr)));
+    return btoa(String.fromCharCode(...Array.from(arr)));
   }
 
   // =========================================================================

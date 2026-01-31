@@ -76,8 +76,7 @@ export class ComputeNeedsComponent implements OnInit, OnDestroy {
           this.isLoading = false;
           this.assessmentComplete.emit(assessment);
         },
-        error: err => {
-          console.error('[ComputeNeeds] Failed to load:', err);
+        error: _err => {
           this.error = 'Failed to assess compute needs';
           this.isLoading = false;
         },

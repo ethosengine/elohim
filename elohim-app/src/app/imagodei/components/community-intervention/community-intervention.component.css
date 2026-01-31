@@ -93,7 +93,7 @@
   line-height: 1;
   cursor: pointer;
   color: currentcolor;
-  opacity: 0.7;
+  opacity: 70%;
   margin-left: auto;
 }
 
@@ -406,7 +406,7 @@
 }
 
 .submit-btn:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 

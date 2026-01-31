@@ -47,7 +47,7 @@
 
 .stat-label {
   font-size: 0.9rem;
-  opacity: 0.9;
+  opacity: 90%;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -196,7 +196,7 @@
 
 .content-node-card.affinity-unseen {
   border-color: #e0e0e0;
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .content-node-card.affinity-low {

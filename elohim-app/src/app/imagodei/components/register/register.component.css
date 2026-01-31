@@ -212,7 +212,7 @@
 
 .form-group input:disabled,
 .form-group textarea:disabled {
-  opacity: 0.6;
+  opacity: 60%;
   cursor: not-allowed;
 }
 
@@ -344,7 +344,7 @@
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 60%;
   cursor: not-allowed;
 }
 

@@ -70,7 +70,7 @@ export class RecoveryInterviewComponent implements OnInit {
   // ===========================================================================
 
   ngOnInit(): void {
-    this.loadPendingRequests();
+    void this.loadPendingRequests();
   }
 
   // ===========================================================================

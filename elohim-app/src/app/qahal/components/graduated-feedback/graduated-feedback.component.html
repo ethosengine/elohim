@@ -50,13 +50,14 @@
 
   <!-- Intensity Slider (ARCH Pattern) -->
   <div class="intensity-section" *ngIf="selectedPosition !== null && !hasSubmitted">
-    <label class="intensity-label">
+    <label for="intensity-slider" class="intensity-label">
       How strongly do you feel about this?
       <span class="intensity-value">{{ getIntensityLabel() }}</span>
     </label>
     <div class="intensity-slider">
       <span class="intensity-low">Slightly</span>
       <input
+        id="intensity-slider"
         type="range"
         min="1"
         max="10"
@@ -80,11 +81,12 @@
     </button>
 
     <div class="reasoning-field" *ngIf="showReasoningField || reasoningRequired">
-      <label class="reasoning-label">
+      <label for="feedback-reasoning-textarea" class="reasoning-label">
         {{ reasoningRequired ? 'Please explain your position:' : 'Your reasoning (optional):' }}
         <span class="required-indicator" *ngIf="reasoningRequired">*</span>
       </label>
       <textarea
+        id="feedback-reasoning-textarea"
         [(ngModel)]="reasoning"
         rows="3"
         placeholder="Share your perspective..."

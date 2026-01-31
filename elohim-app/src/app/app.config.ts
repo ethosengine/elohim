@@ -2,6 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
+// @coverage: 100.0% (2026-01-31)
+
 import { environment } from '../environments/environment';
 
 import { routes } from './app.routes';

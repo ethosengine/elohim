@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 1.6% (2026-01-31)
+
 import { BehaviorSubject, Observable } from 'rxjs';
 
 import { PathContext, DetourInfo } from '../models/exploration-context.model';

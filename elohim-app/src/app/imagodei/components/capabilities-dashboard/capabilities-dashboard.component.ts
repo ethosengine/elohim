@@ -209,12 +209,12 @@ export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {
   // ===========================================================================
 
   ngOnInit(): void {
-    this.loadData();
+    void this.loadData();
 
     // Update time display every minute
     this.timerSubscription = interval(60000).subscribe(() => {
       this.currentTime.set(new Date());
-      this.refreshTimeAccess();
+      void this.refreshTimeAccess();
     });
   }
 
@@ -241,8 +241,7 @@ export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {
       this.policy.set(policy);
       this.stewards.set(stewards);
       this.timeAccess.set(timeAccess);
-    } catch (err) {
-      console.error('[CapabilitiesDashboard] Load failed:', err);
+    } catch {
       this.error.set('Failed to load capabilities information.');
     } finally {
       this.isLoading.set(false);
@@ -253,13 +252,13 @@ export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {
     try {
       const timeAccess = await this.stewardship.checkTimeAccess();
       this.timeAccess.set(timeAccess);
-    } catch (err) {
-      console.error('[CapabilitiesDashboard] Time refresh failed:', err);
+    } catch (_err) {
+      // intentionally empty - time access check failure is non-critical
     }
   }
 
   refresh(): void {
-    this.loadData();
+    void this.loadData();
   }
 
   // ===========================================================================
@@ -267,9 +266,8 @@ export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {
   // ===========================================================================
 
   /** File an appeal against a restriction */
-  fileAppeal(restriction: RestrictionItem): void {
+  fileAppeal(_restriction: RestrictionItem): void {
     // TODO: Navigate to appeal wizard with context
-    console.log('[CapabilitiesDashboard] File appeal:', restriction);
   }
 
   /** Contact steward */
@@ -278,7 +276,6 @@ export class CapabilitiesDashboardComponent implements OnInit, OnDestroy {
     if (!steward) return;
 
     // TODO: Open messaging/contact interface
-    console.log('[CapabilitiesDashboard] Contact steward:', steward.stewardId);
   }
 
   // ===========================================================================

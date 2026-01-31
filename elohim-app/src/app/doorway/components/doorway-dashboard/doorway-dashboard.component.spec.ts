@@ -115,10 +115,7 @@ describe('DoorwayDashboardComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [DoorwayDashboardComponent],
-      providers: [
-        { provide: DoorwayAdminService, useValue: mockAdminService },
-        DecimalPipe,
-      ],
+      providers: [{ provide: DoorwayAdminService, useValue: mockAdminService }, DecimalPipe],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DoorwayDashboardComponent);
@@ -420,9 +417,7 @@ describe('DoorwayDashboardComponent', () => {
 
   describe('error handling', () => {
     it('should set error signal on load failure', fakeAsync(() => {
-      mockAdminService.getNodes.and.returnValue(
-        of({ total: 0, byStatus: {} as any, nodes: [] })
-      );
+      mockAdminService.getNodes.and.returnValue(of({ total: 0, byStatus: {} as any, nodes: [] }));
       mockAdminService.getClusterMetrics.and.throwError('Network error');
 
       fixture.detectChanges();
@@ -456,11 +451,7 @@ describe('DoorwayDashboardComponent', () => {
 // Test Helpers
 // =============================================================================
 
-function createMockNode(
-  nodeId: string,
-  status: string,
-  combinedScore: number
-): NodeDetails {
+function createMockNode(nodeId: string, status: string, combinedScore: number): NodeDetails {
   return {
     nodeId,
     status: status as any,

@@ -7,6 +7,8 @@
 
 import { ContentType, ContentFormat } from '../models/content-node.model';
 
+// @coverage: 16.7% (2026-01-31)
+
 /**
  * Icon mappings for content types.
  * These represent the semantic category of content.

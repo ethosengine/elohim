@@ -21,13 +21,15 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 100.0% (2026-01-31)
+
 import { map } from 'rxjs/operators';
 
-import { Observable, forkJoin, of } from 'rxjs';
+import { Observable } from 'rxjs';
 
 import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
-import { EventQuery, LamadEventType } from '@app/elohim/models/economic-event.model';
-import { StorageApiService, CreateEventInput } from '@app/elohim/services/storage-api.service';
+import { LamadEventType } from '@app/elohim/models/economic-event.model';
+import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 /**
  * Lamad-specific event types (extends hREA actions with domain semantics)

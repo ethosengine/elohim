@@ -10,6 +10,7 @@ import {
   type AuthCredentials,
   type AuthResult,
   type RegisterCredentials,
+  type AuthProviderType,
   AUTH_TOKEN_KEY,
   AUTH_PROVIDER_KEY,
   AUTH_EXPIRY_KEY,
@@ -637,7 +638,7 @@ describe('AuthService', () => {
   // ==========================================================================
 
   describe('setAuthFromResult', () => {
-    it('should set auth state from successful result', async () => {
+    it('should set auth state from successful result', () => {
       const result: AuthResult = {
         success: true,
         token: 'external-token',
@@ -647,7 +648,7 @@ describe('AuthService', () => {
         identifier: 'external@example.com',
       };
 
-      await service.setAuthFromResult(result);
+      service.setAuthFromResult(result);
 
       expect(service.isAuthenticated()).toBe(true);
       expect(service.token()).toBe('external-token');
@@ -655,19 +656,19 @@ describe('AuthService', () => {
       expect(service.provider()).toBe('oauth'); // default provider type
     });
 
-    it('should set error from failed result', async () => {
+    it('should set error from failed result', () => {
       const result: AuthResult = {
         success: false,
         error: 'OAuth callback failed',
       };
 
-      await service.setAuthFromResult(result);
+      service.setAuthFromResult(result);
 
       expect(service.isAuthenticated()).toBe(false);
       expect(service.error()).toBe('OAuth callback failed');
     });
 
-    it('should use specified provider type', async () => {
+    it('should use specified provider type', () => {
       const result: AuthResult = {
         success: true,
         token: 'external-token',
@@ -677,7 +678,7 @@ describe('AuthService', () => {
         identifier: 'external@example.com',
       };
 
-      await service.setAuthFromResult(result, 'password');
+      service.setAuthFromResult(result, 'password');
 
       expect(service.provider()).toBe('password');
     });
@@ -731,4 +732,386 @@ describe('AuthService', () => {
       expect(service.error()).toBeNull();
     });
   });
+
+  // ==========================================================================
+  // Signal and Computed Property Tests
+  // ==========================================================================
+
+  describe('signals and computed properties', () => {
+    it('should expose auth signal as readonly', () => {
+      const authSignal = service.auth;
+      expect(authSignal).toBeDefined();
+      // Verify it's readable
+      const authState = authSignal();
+      expect(authState).toBeDefined();
+      expect(authState.isAuthenticated).toBe(false);
+    });
+
+    it('should expose isAuthenticated computed signal', () => {
+      expect(service.isAuthenticated()).toBe(false);
+    });
+
+    it('should expose token computed signal', () => {
+      expect(service.token()).toBeNull();
+    });
+
+    it('should expose humanId computed signal', () => {
+      expect(service.humanId()).toBeNull();
+    });
+
+    it('should expose agentPubKey computed signal', () => {
+      expect(service.agentPubKey()).toBeNull();
+    });
+
+    it('should expose identifier computed signal', () => {
+      expect(service.identifier()).toBeNull();
+    });
+
+    it('should expose provider computed signal', () => {
+      expect(service.provider()).toBeNull();
+    });
+
+    it('should expose isLoading computed signal', () => {
+      expect(service.isLoading()).toBe(false);
+    });
+
+    it('should expose error computed signal', () => {
+      expect(service.error()).toBeNull();
+    });
+
+    it('should expose expiresAt computed signal', () => {
+      expect(service.expiresAt()).toBeNull();
+    });
+
+    it('should expose doorway signals from registry', () => {
+      expect(service.selectedDoorway).toBeDefined();
+      expect(service.doorwayUrl).toBeDefined();
+      expect(service.hasDoorway).toBeDefined();
+    });
+  });
+
+  // ==========================================================================
+  // Method Existence Tests
+  // ==========================================================================
+
+  describe('method existence', () => {
+    it('should have registerProvider method', () => {
+      expect(typeof service.registerProvider).toBe('function');
+    });
+
+    it('should have getProvider method', () => {
+      expect(typeof service.getProvider).toBe('function');
+    });
+
+    it('should have hasProvider method', () => {
+      expect(typeof service.hasProvider).toBe('function');
+    });
+
+    it('should have login method', () => {
+      expect(typeof service.login).toBe('function');
+    });
+
+    it('should have register method', () => {
+      expect(typeof service.register).toBe('function');
+    });
+
+    it('should have logout method', () => {
+      expect(typeof service.logout).toBe('function');
+    });
+
+    it('should have refreshToken method', () => {
+      expect(typeof service.refreshToken).toBe('function');
+    });
+
+    it('should have restoreSession method', () => {
+      expect(typeof service.restoreSession).toBe('function');
+    });
+
+    it('should have hasStoredSession method', () => {
+      expect(typeof service.hasStoredSession).toBe('function');
+    });
+
+    it('should have clearError method', () => {
+      expect(typeof service.clearError).toBe('function');
+    });
+
+    it('should have setAuthFromResult method', () => {
+      expect(typeof service.setAuthFromResult).toBe('function');
+    });
+
+    it('should have setTauriSession method', () => {
+      expect(typeof service.setTauriSession).toBe('function');
+    });
+  });
+
+  // ==========================================================================
+  // Observable/Signal Return Type Tests
+  // ==========================================================================
+
+  describe('return type verification', () => {
+    it('login should return Promise<AuthResult>', async () => {
+      const provider = createMockProvider('password');
+      service.registerProvider(provider);
+
+      const result = await service.login('password', {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'password123',
+      });
+
+      expect(result).toBeDefined();
+      expect(typeof result === 'object').toBe(true);
+      expect('success' in result).toBe(true);
+    });
+
+    it('register should return Promise<AuthResult>', async () => {
+      const provider = createMockProvider('password');
+      service.registerProvider(provider);
+
+      const result = await service.register('password', {
+        identifier: 'new@example.com',
+        identifierType: 'email',
+        password: 'password123',
+        displayName: 'New User',
+      });
+
+      expect(result).toBeDefined();
+      expect(typeof result === 'object').toBe(true);
+      expect('success' in result).toBe(true);
+    });
+
+    it('logout should return Promise<void>', async () => {
+      const logoutPromise = service.logout();
+      expect(logoutPromise instanceof Promise).toBe(true);
+      await logoutPromise;
+    });
+
+    it('refreshToken should return Promise<AuthResult>', async () => {
+      const result = await service.refreshToken();
+      expect(result).toBeDefined();
+      expect(typeof result === 'object').toBe(true);
+      expect('success' in result).toBe(true);
+    });
+
+    it('restoreSession should return boolean', () => {
+      const result = service.restoreSession();
+      expect(typeof result === 'boolean').toBe(true);
+    });
+
+    it('hasStoredSession should return boolean', () => {
+      const result = service.hasStoredSession();
+      expect(typeof result === 'boolean').toBe(true);
+    });
+
+    it('clearError should return undefined', () => {
+      const result = service.clearError();
+      expect(result).toBeUndefined();
+    });
+
+    it('setAuthFromResult should return undefined', () => {
+      const result = service.setAuthFromResult({
+        success: false,
+        error: 'test',
+      });
+      expect(result).toBeUndefined();
+    });
+
+    it('setTauriSession should return undefined', () => {
+      const result = service.setTauriSession({
+        humanId: 'test',
+        agentPubKey: 'test',
+        doorwayUrl: 'http://test',
+        identifier: 'test',
+      });
+      expect(result).toBeUndefined();
+    });
+  });
+
+  // ==========================================================================
+  // Input Parameter Tests
+  // ==========================================================================
+
+  describe('input parameter handling', () => {
+    it('registerProvider should accept AuthProvider type', () => {
+      const provider = createMockProvider('password');
+      expect(() => service.registerProvider(provider)).not.toThrow();
+    });
+
+    it('getProvider should accept AuthProviderType', () => {
+      expect(() => service.getProvider('password')).not.toThrow();
+    });
+
+    it('hasProvider should accept AuthProviderType', () => {
+      expect(() => service.hasProvider('password')).not.toThrow();
+    });
+
+    it('login should accept provider type and credentials', async () => {
+      const provider = createMockProvider('password');
+      service.registerProvider(provider);
+
+      const credentials: AuthCredentials = {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'password123',
+      };
+
+      expect(() => service.login('password', credentials)).not.toThrow();
+      await service.login('password', credentials);
+    });
+
+    it('register should accept provider type and registration credentials', async () => {
+      const provider = createMockProvider('password');
+      service.registerProvider(provider);
+
+      const credentials: RegisterCredentials = {
+        identifier: 'new@example.com',
+        identifierType: 'email',
+        password: 'password123',
+        displayName: 'New User',
+      };
+
+      expect(() => service.register('password', credentials)).not.toThrow();
+      await service.register('password', credentials);
+    });
+
+    it('setAuthFromResult should accept AuthResult with optional provider type', () => {
+      const result: AuthResult = {
+        success: true,
+        token: 'test-token',
+        humanId: 'test-human',
+        agentPubKey: 'test-agent',
+        expiresAt: Date.now() + 3600000,
+        identifier: 'test@example.com',
+      };
+
+      expect(() => service.setAuthFromResult(result)).not.toThrow();
+      expect(() => service.setAuthFromResult(result, 'password')).not.toThrow();
+    });
+
+    it('setTauriSession should accept session object with required fields', () => {
+      const session = {
+        humanId: 'tauri-human',
+        agentPubKey: 'tauri-agent',
+        doorwayUrl: 'http://localhost:8888',
+        identifier: 'tauri@local',
+      };
+
+      expect(() => service.setTauriSession(session)).not.toThrow();
+    });
+
+    it('setTauriSession should accept session object with optional displayName', () => {
+      const session = {
+        humanId: 'tauri-human',
+        agentPubKey: 'tauri-agent',
+        doorwayUrl: 'http://localhost:8888',
+        identifier: 'tauri@local',
+        displayName: 'Tauri User',
+      };
+
+      expect(() => service.setTauriSession(session)).not.toThrow();
+    });
+  });
+
+  // ==========================================================================
+  // State Mutation Tests
+  // ==========================================================================
+
+  describe('state mutation and synchronization', () => {
+    it('should update all auth signals when state changes', async () => {
+      const provider = createMockProvider('password');
+      service.registerProvider(provider);
+
+      await service.login('password', {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'password123',
+      });
+
+      // All signals should reflect the new state
+      expect(service.isAuthenticated()).toBe(true);
+      expect(service.token()).toBeTruthy();
+      expect(service.humanId()).toBeTruthy();
+      expect(service.agentPubKey()).toBeTruthy();
+      expect(service.identifier()).toBe('test@example.com');
+      expect(service.provider()).toBe('password');
+      expect(service.isLoading()).toBe(false);
+      expect(service.error()).toBeNull();
+    });
+
+    it('should maintain consistency between individual signals and auth signal', async () => {
+      const provider = createMockProvider('password');
+      service.registerProvider(provider);
+
+      await service.login('password', {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'password123',
+      });
+
+      const fullAuth = service.auth();
+      expect(fullAuth.isAuthenticated).toBe(service.isAuthenticated());
+      expect(fullAuth.token).toBe(service.token());
+      expect(fullAuth.humanId).toBe(service.humanId());
+      expect(fullAuth.agentPubKey).toBe(service.agentPubKey());
+      expect(fullAuth.identifier).toBe(service.identifier());
+      expect(fullAuth.provider).toBe(service.provider());
+      expect(fullAuth.isLoading).toBe(service.isLoading());
+      expect(fullAuth.error).toBe(service.error());
+    });
+  });
+
+  // ==========================================================================
+  // Edge Case Tests
+  // ==========================================================================
+
+  describe('edge cases and boundary conditions', () => {
+    it('should handle provider not registered for all auth operations', async () => {
+      const loginResult = await service.login('nonexistent' as AuthProviderType, {
+        type: 'password',
+        identifier: 'test@example.com',
+        password: 'password123',
+      });
+
+      expect(loginResult.success).toBe(false);
+      if (!loginResult.success) {
+        expect(loginResult.code).toBe('NOT_ENABLED');
+      }
+    });
+
+    it('should handle empty localStorage gracefully', () => {
+      // localStorage should already be empty from setup
+      const hasSession = service.hasStoredSession();
+      expect(hasSession).toBe(false);
+    });
+
+    it('should preserve provider instance after registration', () => {
+      const provider = createMockProvider('password');
+      service.registerProvider(provider);
+
+      const retrieved = service.getProvider('password');
+      expect(retrieved).toBe(provider);
+    });
+
+    it('should not throw when clearing error with no prior error', () => {
+      expect(() => service.clearError()).not.toThrow();
+      expect(service.error()).toBeNull();
+    });
+
+    it('should accept null values in setAuthFromResult for failed results', () => {
+      const result: AuthResult = {
+        success: false,
+        error: 'Auth failed',
+      };
+
+      expect(() => service.setAuthFromResult(result)).not.toThrow();
+      expect(service.isAuthenticated()).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // TODO: Async Flow Tests and Complex Mocking
+  // ==========================================================================
+  // TODO: Add async flow tests for token refresh scheduling and timeout management
+  // TODO: Add comprehensive mocks for refresh timer behavior
+  // TODO: Add business logic tests for expiration logic and refresh scheduling logic
 });

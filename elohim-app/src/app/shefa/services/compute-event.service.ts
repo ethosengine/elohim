@@ -21,6 +21,7 @@
 import { Injectable } from '@angular/core';
 
 import { switchMap, tap, catchError, startWith, map } from 'rxjs/operators';
+
 import { BehaviorSubject, Observable, Subject, interval, from, of } from 'rxjs';
 
 import { LamadEventType } from '@app/elohim/models/economic-event.model';
@@ -119,8 +120,7 @@ export class ComputeEventService {
       tap(event => {
         if (event) this.computeEvents$.next(event);
       }),
-      catchError(error => {
-        console.error('[ComputeEventService] Event emission failed:', error);
+      catchError(() => {
         return of<ComputeEventPayload>(null as unknown as ComputeEventPayload);
       })
     );
@@ -143,8 +143,7 @@ export class ComputeEventService {
     allocations: AllocationSnapshot
   ): Observable<ComputeEventPayload> {
     const lastMetrics = this.lastMetrics$.value;
-    // Allocations baseline stored for future delta calculation
-    const _lastAllocations = this.lastAllocations$.value;
+    // Allocations baseline stored for future delta calculation - updated but not read yet
 
     // Calculate usage delta since last measurement
     const cpuCoreHours = this.calculateCpuCoreHours(lastMetrics, metrics);
@@ -347,8 +346,12 @@ export class ComputeEventService {
     const eventRequests = events.map(e => this.convertToEconomicEvent(operatorId, e));
 
     // Batch create events
+    interface BatchResult {
+      success: boolean;
+      data?: { id: string }[];
+    }
     return from(
-      this.holochain.callZome<any[]>({
+      this.holochain.callZome<BatchResult>({
         zomeName: 'content_store',
         fnName: 'create_economic_events_batch',
         payload: { events: eventRequests },
@@ -359,11 +362,10 @@ export class ComputeEventService {
         // Link persisted event IDs back to payloads
         return events.map((e, i) => ({
           ...e,
-          economicEventId: results[i]?.id,
+          economicEventId: results[i]?.id ?? undefined,
         }));
       }),
-      catchError(error => {
-        console.error('[ComputeEventService] Failed to persist compute events:', error);
+      catchError(() => {
         return of([]);
       })
     );
@@ -507,7 +509,7 @@ export class ComputeEventService {
    * Helper: Generate unique event ID
    */
   private generateEventId(): string {
-    return `ce-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `ce-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`;
   }
 
   /**

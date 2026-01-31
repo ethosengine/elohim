@@ -1,6 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 100.0% (2026-01-31)
+
 import { Observable, of, shareReplay, map, catchError } from 'rxjs';
 
 import { environment } from '../../environments/environment';

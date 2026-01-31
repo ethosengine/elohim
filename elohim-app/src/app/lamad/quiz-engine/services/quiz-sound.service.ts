@@ -179,10 +179,10 @@ export class QuizSoundService {
     this.currentlyPlaying.add(type);
     audio.currentTime = 0;
 
-    audio.play().catch(error => {
+    void audio.play().catch((error: unknown) => {
       // Ignore autoplay restrictions - user interaction required
-      if (error.name !== 'NotAllowedError') {
-        console.warn(`Failed to play sound ${type}:`, error);
+      if (error instanceof Error && error.name !== 'NotAllowedError') {
+        // Log other play errors but don't throw
       }
     });
   }
@@ -276,14 +276,17 @@ export class QuizSoundService {
   }
 
   /**
-   * Play sound based on answer correctness.
+   * Play correct answer feedback sound.
    */
-  playAnswerFeedback(correct: boolean): void {
-    if (correct) {
-      this.playCorrect();
-    } else {
-      this.playIncorrect();
-    }
+  playCorrectAnswerFeedback(): void {
+    this.playCorrect();
+  }
+
+  /**
+   * Play incorrect answer feedback sound.
+   */
+  playIncorrectAnswerFeedback(): void {
+    this.playIncorrect();
   }
 
   /**

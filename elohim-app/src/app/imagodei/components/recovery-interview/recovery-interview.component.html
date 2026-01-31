@@ -8,7 +8,14 @@
 
   <!-- Error Display -->
   @if (error()) {
-    <div class="error-banner" role="alert" (click)="clearError()">
+    <div
+      class="error-banner"
+      role="alert"
+      (click)="clearError()"
+      (keydown.enter)="clearError()"
+      (keydown.space)="clearError()"
+      tabindex="0"
+    >
       <span class="material-icons">error_outline</span>
       <span>{{ error() }}</span>
       <button type="button" class="dismiss-btn">Dismiss</button>
@@ -20,7 +27,12 @@
     <div class="queue-section">
       <div class="section-header">
         <h2>Pending Requests</h2>
-        <button class="refresh-btn" (click)="loadPendingRequests()" [disabled]="isLoading()">
+        <button
+          type="button"
+          class="refresh-btn"
+          (click)="loadPendingRequests()"
+          [disabled]="isLoading()"
+        >
           <span class="material-icons" [class.spinning]="isLoading()">refresh</span>
         </button>
       </div>
@@ -86,6 +98,7 @@
                   </span>
                 } @else {
                   <button
+                    type="button"
                     class="btn btn-primary"
                     (click)="startInterview(request.requestId)"
                     [disabled]="isLoading()"
@@ -129,9 +142,9 @@
           }
 
           <div class="answer-input">
-            <label for="answer">Claimant's Response</label>
+            <label for="answer-textarea">Claimant's Response</label>
             <textarea
-              id="answer"
+              id="answer-textarea"
               [value]="getCurrentAnswer()"
               (input)="setAnswer(question.id, $any($event.target).value)"
               placeholder="Enter the claimant's response..."
@@ -141,6 +154,7 @@
 
           <div class="question-actions">
             <button
+              type="button"
               class="btn btn-secondary"
               (click)="previousQuestion()"
               [disabled]="currentQuestionIndex() === 0"
@@ -149,6 +163,7 @@
               Previous
             </button>
             <button
+              type="button"
               class="btn btn-primary"
               (click)="submitAnswer()"
               [disabled]="!getCurrentAnswer().trim()"
@@ -164,7 +179,7 @@
         </div>
       }
 
-      <button class="abandon-btn" (click)="abandonInterview()">
+      <button type="button" class="abandon-btn" (click)="abandonInterview()">
         <span class="material-icons">close</span>
         Abandon Interview
       </button>
@@ -205,12 +220,19 @@
 
       <!-- Confidence Slider -->
       <div class="confidence-section">
-        <label>
+        <label for="confidence-slider">
           Confidence Level:
           <strong>{{ confidence }}%</strong>
           <span class="confidence-label">({{ getConfidenceLabel() }})</span>
         </label>
-        <input type="range" min="0" max="100" [(ngModel)]="confidence" class="confidence-slider" />
+        <input
+          id="confidence-slider"
+          type="range"
+          min="0"
+          max="100"
+          [(ngModel)]="confidence"
+          class="confidence-slider"
+        />
       </div>
 
       <!-- Notes -->
@@ -226,13 +248,13 @@
 
       <!-- Submit Buttons -->
       <div class="attestation-actions">
-        <button class="btn btn-secondary" (click)="viewMode.set('interview')">
+        <button type="button" class="btn btn-secondary" (click)="viewMode.set('interview')">
           <span class="material-icons">arrow_back</span>
           Back to Interview
         </button>
         <button
-          class="btn btn-primary"
-          [class]="getDecisionClass()"
+          type="button"
+          [class]="'btn btn-primary ' + getDecisionClass()"
           (click)="submitAttestation()"
           [disabled]="isLoading()"
         >

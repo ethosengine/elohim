@@ -134,7 +134,7 @@ describe('PathNavigatorComponent', () => {
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
     router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
 
     pathService.getPath.and.returnValue(of(mockPath));
     pathService.getPathStep.and.returnValue(of(mockStepView));

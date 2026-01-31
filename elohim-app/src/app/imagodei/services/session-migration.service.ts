@@ -147,10 +147,9 @@ export class SessionMigrationService {
 
       let masteryCount = 0;
       const masteryResult = await this.contentMasteryService.migrateToBackend();
-      if (!masteryResult.success) {
-        console.warn('[SessionMigration] Mastery migration had failures:', masteryResult.errors);
+      if (masteryResult.success) {
+        masteryCount = masteryResult.migrated;
       }
-      masteryCount = masteryResult.migrated;
 
       this.updateState({ currentStep: 'Finalizing...', progress: 90 });
 
@@ -218,28 +217,18 @@ export class SessionMigrationService {
         },
         roleName: 'imagodei',
       });
-    } catch (err) {
-      console.warn('[SessionMigration] Failed to transfer path progress:', progress.pathId, err);
-      // Continue with other progress - don't fail entire migration
+    } catch {
+      // Silently continue with other progress - individual path failures should not fail the entire migration
     }
   }
 
   /**
    * Transfer affinity data to network.
    */
-  private async transferAffinity(affinity: Record<string, number>): Promise<void> {
+  private transferAffinity(_affinity: Record<string, number>): void {
     // For now, we'll store this as a batch - future: individual affinity records
-    try {
-      // This could call a zome function to store affinity data
-      // For MVP, the affinity will be rebuilt as user interacts with content
-      console.log(
-        '[SessionMigration] Affinity data prepared for transfer:',
-        Object.keys(affinity).length,
-        'entries'
-      );
-    } catch (err) {
-      console.warn('[SessionMigration] Failed to transfer affinity:', err);
-    }
+    // This could call a zome function to store affinity data
+    // For MVP, the affinity will be rebuilt as user interacts with content
   }
 
   /**

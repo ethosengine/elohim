@@ -11,6 +11,7 @@
       <!-- Context Switcher Button -->
       <div class="context-switcher-container">
         <button
+          type="button"
           class="context-switch-btn"
           (click)="toggleContextSwitcher($event)"
           [attr.aria-expanded]="showContextSwitcher"
@@ -39,6 +40,7 @@
           <div class="scrollable-content-wrapper">
             <div class="context-apps-list">
               <button
+                type="button"
                 *ngFor="let app of otherApps"
                 class="context-app-item"
                 [class.coming-soon]="!app.available"
@@ -100,6 +102,7 @@
       <!-- Authenticated: Show Profile Bubble -->
       <div class="profile-bubble-container">
         <button
+          type="button"
           class="profile-bubble"
           (click)="toggleProfileTray($event)"
           [attr.aria-expanded]="showProfileTray"
@@ -125,7 +128,7 @@
           <div class="scrollable-content-wrapper">
             <!-- Actions -->
             <div class="profile-actions">
-              <button class="profile-action" (click)="goToProfile()" role="menuitem">
+              <button type="button" class="profile-action" (click)="goToProfile()" role="menuitem">
                 <svg
                   class="action-icon"
                   viewBox="0 0 24 24"
@@ -140,7 +143,12 @@
                 </svg>
                 <span class="action-label">View Profile</span>
               </button>
-              <button class="profile-action logout-action" (click)="onLogout()" role="menuitem">
+              <button
+                type="button"
+                class="profile-action logout-action"
+                (click)="onLogout()"
+                role="menuitem"
+              >
                 <svg
                   class="action-icon"
                   viewBox="0 0 24 24"
@@ -186,8 +194,10 @@
       }
       <!-- Visitor: Show Login/Register Buttons -->
       <div class="auth-buttons">
-        <button class="auth-btn auth-btn-link" (click)="goToLogin()">Log In</button>
-        <button class="auth-btn auth-btn-primary" (click)="goToRegister()">Sign Up</button>
+        <button type="button" class="auth-btn auth-btn-link" (click)="goToLogin()">Log In</button>
+        <button type="button" class="auth-btn auth-btn-primary" (click)="goToRegister()">
+          Sign Up
+        </button>
       </div>
     }
   </div>
@@ -200,6 +210,7 @@
   (click)="closeAllTrays()"
   (keydown.enter)="closeAllTrays()"
   (keydown.space)="closeAllTrays()"
+  tabindex="0"
   aria-hidden="true"
 ></div>
 
@@ -224,8 +235,13 @@
       <span>{{ activeUpgradePrompt.message }}</span>
     </div>
     <div class="upgrade-actions">
-      <button class="btn-upgrade" (click)="onJoinNetwork()">Learn More</button>
-      <button class="btn-dismiss" (click)="dismissUpgradePrompt()" aria-label="Dismiss">
+      <button type="button" class="btn-upgrade" (click)="onJoinNetwork()">Learn More</button>
+      <button
+        type="button"
+        class="btn-dismiss"
+        (click)="dismissUpgradePrompt()"
+        aria-label="Dismiss"
+      >
         <svg
           width="16"
           height="16"
@@ -263,7 +279,7 @@
     (click)="$event.stopPropagation()"
     (keydown)="$event.stopPropagation()"
   >
-    <button class="modal-close" (click)="closeUpgradeModal()" aria-label="Close">
+    <button type="button" class="modal-close" (click)="closeUpgradeModal()" aria-label="Close">
       <svg
         width="24"
         height="24"
@@ -435,8 +451,12 @@
     </div>
 
     <div class="modal-footer">
-      <button class="btn-secondary" (click)="closeUpgradeModal()">Continue as Visitor</button>
-      <button class="btn-primary" disabled title="Coming soon!">Get Notified When Available</button>
+      <button type="button" class="btn-secondary" (click)="closeUpgradeModal()">
+        Continue as Visitor
+      </button>
+      <button type="button" class="btn-primary" disabled title="Coming soon!">
+        Get Notified When Available
+      </button>
     </div>
   </div>
 </dialog>

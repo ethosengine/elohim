@@ -98,7 +98,6 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (!this.operatorId || !this.stewardedResourceId) {
-      console.error('[ShefaDashboard] Missing required inputs: operatorId or stewardedResourceId');
       return;
     }
 
@@ -359,9 +358,8 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   /**
    * Show notification (would integrate with toast/notification service)
    */
-  private showNotification(message: string): void {
+  private showNotification(_message: string): void {
     // Notification service integration - warn level for visibility
-    console.warn('[ShefaDashboard] Notification:', message);
   }
 
   /**

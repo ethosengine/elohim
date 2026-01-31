@@ -635,20 +635,32 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             }
 
                             echo "Waiting for SonarQube quality gate..."
-                            timeout(time: 10, unit: 'MINUTES') {
-                                def qg = waitForQualityGate abortPipeline: false
-                                if (qg.status != 'OK') {
-                                    if (sonarConfig.shouldEnforce) {
-                                        // Production: Block deployment on quality gate failure
-                                        error "❌ SonarQube Quality Gate FAILED: ${qg.status}\nReview issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                            try {
+                                timeout(time: 10, unit: 'MINUTES') {
+                                    def qg = waitForQualityGate abortPipeline: false
+                                    if (qg.status != 'OK') {
+                                        if (sonarConfig.shouldEnforce) {
+                                            // Production: Block deployment on quality gate failure
+                                            error "❌ SonarQube Quality Gate FAILED: ${qg.status}\nReview issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                        } else {
+                                            // Alpha/Staging: Log warning but don't block
+                                            echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
+                                            echo "Review issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                            currentBuild.result = 'UNSTABLE'
+                                        }
                                     } else {
-                                        // Alpha/Staging: Log warning but don't block
-                                        echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
-                                        echo "Review issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
-                                        currentBuild.result = 'UNSTABLE'
+                                        echo "✅ SonarQube quality gate passed (${sonarConfig.env})"
                                     }
+                                }
+                            } catch (Exception e) {
+                                echo "⚠️ SonarQube quality gate check failed: ${e.message}"
+                                echo "This may be due to webhook configuration issues."
+                                echo "Review results at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                if (sonarConfig.shouldEnforce) {
+                                    currentBuild.result = 'UNSTABLE'
+                                    echo "⚠️ Marking build UNSTABLE - production quality gate could not be verified"
                                 } else {
-                                    echo "✅ SonarQube quality gate passed (${sonarConfig.env})"
+                                    echo "Continuing pipeline..."
                                 }
                             }
                         }

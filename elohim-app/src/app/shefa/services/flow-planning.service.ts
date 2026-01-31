@@ -43,7 +43,6 @@ import {
   FlowPlanningInsight,
   FlowPlanningRecommendation,
   BudgetVarianceReport,
-  CategoryVariance,
   GoalEvaluationResult,
   GoalProjection,
   FlowHealthAnalysis,
@@ -52,15 +51,10 @@ import {
   ScenarioSimulationResult,
   PlanReviewResult,
   ComplianceCheck,
-  ConstitutionalViolation,
   TimeHorizon,
-  Frequency,
   PlanStatus,
-  BudgetStatus,
   GoalStatus,
-  ScenarioStatus,
   ConfidenceLevel,
-  ProjectionMethod,
 } from '../models/flow-planning.model';
 import { ResourceCategory } from '../models/stewarded-resources.model';
 
@@ -109,19 +103,20 @@ export class FlowPlanningService {
    * @returns Created FlowPlan with event ID
    */
   async createPlan(
-    stewardId: string,
-    name: string,
-    timeHorizon: TimeHorizon,
-    periodStart: string,
-    periodEnd: string,
-    resourceScopes: ResourceCategory[],
-    options?: {
+    _stewardId: string,
+    _name: string,
+    _timeHorizon: TimeHorizon,
+    _periodStart: string,
+    _periodEnd: string,
+    _resourceScopes: ResourceCategory[],
+    _options?: {
       description?: string;
       goals?: Partial<FlowGoal>[];
       milestones?: Partial<FlowMilestone>[];
     }
   ): Promise<FlowPlan> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowPlan;
   }
 
   /**
@@ -133,8 +128,9 @@ export class FlowPlanningService {
    * @param updates - Partial plan updates
    * @returns Updated FlowPlan
    */
-  async updatePlan(planId: string, updates: Partial<FlowPlan>): Promise<FlowPlan> {
-    throw new Error('Not yet implemented');
+  async updatePlan(_planId: string, _updates: Partial<FlowPlan>): Promise<FlowPlan> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowPlan;
   }
 
   /**
@@ -143,8 +139,9 @@ export class FlowPlanningService {
    * @param planId - Plan ID to fetch
    * @returns FlowPlan or null if not found
    */
-  async getPlan(planId: string): Promise<FlowPlan | null> {
-    throw new Error('Not yet implemented');
+  async getPlan(_planId: string): Promise<FlowPlan | null> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return null;
   }
 
   /**
@@ -154,8 +151,9 @@ export class FlowPlanningService {
    * @param status - Optional: filter by plan status
    * @returns Array of FlowPlans
    */
-  async getPlansForSteward(stewardId: string, status?: PlanStatus): Promise<FlowPlan[]> {
-    throw new Error('Not yet implemented');
+  async getPlansForSteward(_stewardId: string, _status?: PlanStatus): Promise<FlowPlan[]> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return [];
   }
 
   /**
@@ -168,8 +166,9 @@ export class FlowPlanningService {
    * @param reason - Why plan is being archived
    * @returns Archived FlowPlan
    */
-  async archivePlan(planId: string, reason: string): Promise<FlowPlan> {
-    throw new Error('Not yet implemented');
+  async archivePlan(_planId: string, _reason: string): Promise<FlowPlan> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowPlan;
   }
 
   /**
@@ -181,8 +180,9 @@ export class FlowPlanningService {
    * @param planId - Plan to review
    * @returns PlanReviewResult with assessment and recommendations
    */
-  async reviewPlan(planId: string): Promise<PlanReviewResult> {
-    throw new Error('Not yet implemented');
+  async reviewPlan(_planId: string): Promise<PlanReviewResult> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as PlanReviewResult;
   }
 
   // =========================================================================
@@ -205,14 +205,15 @@ export class FlowPlanningService {
    * @returns Created FlowBudget
    */
   async createBudget(
-    planId: string,
-    name: string,
-    budgetPeriod: 'weekly' | 'monthly' | 'quarterly' | 'annual',
-    categories: BudgetCategory[],
-    periodStart: string,
-    periodEnd: string
+    _planId: string,
+    _name: string,
+    _budgetPeriod: 'weekly' | 'monthly' | 'quarterly' | 'annual',
+    _categories: BudgetCategory[],
+    _periodStart: string,
+    _periodEnd: string
   ): Promise<FlowBudget> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowBudget;
   }
 
   /**
@@ -221,8 +222,9 @@ export class FlowPlanningService {
    * @param budgetId - Budget ID
    * @returns FlowBudget or null
    */
-  async getBudget(budgetId: string): Promise<FlowBudget | null> {
-    throw new Error('Not yet implemented');
+  async getBudget(_budgetId: string): Promise<FlowBudget | null> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return null;
   }
 
   /**
@@ -237,11 +239,12 @@ export class FlowPlanningService {
    * @returns Updated FlowBudget
    */
   async updateBudgetCategory(
-    budgetId: string,
-    categoryId: string,
-    plannedAmount: { value: number; unit: string }
+    _budgetId: string,
+    _categoryId: string,
+    _plannedAmount: { value: number; unit: string }
   ): Promise<FlowBudget> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowBudget;
   }
 
   /**
@@ -254,8 +257,9 @@ export class FlowPlanningService {
    * @param budgetId - Budget to analyze
    * @returns BudgetVarianceReport with detailed breakdown
    */
-  async compareBudgetToActual(budgetId: string): Promise<BudgetVarianceReport> {
-    throw new Error('Not yet implemented');
+  async compareBudgetToActual(_budgetId: string): Promise<BudgetVarianceReport> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as BudgetVarianceReport;
   }
 
   /**
@@ -269,10 +273,11 @@ export class FlowPlanningService {
    * @returns Rebalanced FlowBudget
    */
   async rebalanceBudget(
-    budgetId: string,
-    constraints: AllocationConstraint[]
+    _budgetId: string,
+    _constraints: AllocationConstraint[]
   ): Promise<FlowBudget> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowBudget;
   }
 
   /**
@@ -284,8 +289,9 @@ export class FlowPlanningService {
    * @param budgetId - Budget to reconcile
    * @returns Reconciled FlowBudget with updated actuals
    */
-  async reconcileBudget(budgetId: string): Promise<FlowBudget> {
-    throw new Error('Not yet implemented');
+  async reconcileBudget(_budgetId: string): Promise<FlowBudget> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowBudget;
   }
 
   // =========================================================================
@@ -302,8 +308,9 @@ export class FlowPlanningService {
    * @param goalDefinition - Partial goal definition (name, type, target, deadline)
    * @returns Created FlowGoal
    */
-  async createGoal(planId: string, goalDefinition: Partial<FlowGoal>): Promise<FlowGoal> {
-    throw new Error('Not yet implemented');
+  async createGoal(_planId: string, _goalDefinition: Partial<FlowGoal>): Promise<FlowGoal> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowGoal;
   }
 
   /**
@@ -317,8 +324,9 @@ export class FlowPlanningService {
    * @param currentValue - New current value
    * @returns Updated FlowGoal
    */
-  async updateGoalProgress(goalId: string, currentValue: number): Promise<FlowGoal> {
-    throw new Error('Not yet implemented');
+  async updateGoalProgress(_goalId: string, _currentValue: number): Promise<FlowGoal> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowGoal;
   }
 
   /**
@@ -330,8 +338,9 @@ export class FlowPlanningService {
    * @param goalId - Goal to evaluate
    * @returns GoalEvaluationResult with status and recommendations
    */
-  async evaluateGoal(goalId: string): Promise<GoalEvaluationResult> {
-    throw new Error('Not yet implemented');
+  async evaluateGoal(_goalId: string): Promise<GoalEvaluationResult> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as GoalEvaluationResult;
   }
 
   /**
@@ -341,8 +350,9 @@ export class FlowPlanningService {
    * @param status - Optional: filter by goal status
    * @returns Array of FlowGoals
    */
-  async getGoalsForPlan(planId: string, status?: GoalStatus): Promise<FlowGoal[]> {
-    throw new Error('Not yet implemented');
+  async getGoalsForPlan(_planId: string, _status?: GoalStatus): Promise<FlowGoal[]> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return [];
   }
 
   /**
@@ -355,8 +365,9 @@ export class FlowPlanningService {
    * @param resourceIds - Resource IDs to link
    * @returns Updated FlowGoal
    */
-  async linkGoalToResources(goalId: string, resourceIds: string[]): Promise<FlowGoal> {
-    throw new Error('Not yet implemented');
+  async linkGoalToResources(_goalId: string, _resourceIds: string[]): Promise<FlowGoal> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowGoal;
   }
 
   // =========================================================================
@@ -376,11 +387,12 @@ export class FlowPlanningService {
    * @returns FlowProjection with time series data
    */
   async projectFinancialHealth(
-    stewardId: string,
-    months: number,
-    confidenceLevel?: ConfidenceLevel
+    _stewardId: string,
+    _months: number,
+    _confidenceLevel?: ConfidenceLevel
   ): Promise<FlowProjection> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowProjection;
   }
 
   /**
@@ -393,8 +405,9 @@ export class FlowPlanningService {
    * @param months - Projection horizon
    * @returns FlowProjection for resource utilization
    */
-  async projectResourceUtilization(resourceId: string, months: number): Promise<FlowProjection> {
-    throw new Error('Not yet implemented');
+  async projectResourceUtilization(_resourceId: string, _months: number): Promise<FlowProjection> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowProjection;
   }
 
   /**
@@ -406,8 +419,9 @@ export class FlowPlanningService {
    * @param goalId - Goal to project
    * @returns GoalProjection with completion estimate
    */
-  async projectGoalCompletion(goalId: string): Promise<GoalProjection> {
-    throw new Error('Not yet implemented');
+  async projectGoalCompletion(_goalId: string): Promise<GoalProjection> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as GoalProjection;
   }
 
   /**
@@ -425,11 +439,12 @@ export class FlowPlanningService {
    * @returns Array of ProjectionBreakpoints
    */
   async identifyBreakpoints(
-    projectionId: string,
-    metric: string,
-    threshold: number
+    _projectionId: string,
+    _metric: string,
+    _threshold: number
   ): Promise<ProjectionBreakpoint[]> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return [];
   }
 
   /**
@@ -444,11 +459,12 @@ export class FlowPlanningService {
    * @returns FlowProjection with trend extrapolation
    */
   async extendTrendForward(
-    resourceId: string,
-    historicalMonths: number,
-    projectionMonths: number
+    _resourceId: string,
+    _historicalMonths: number,
+    _projectionMonths: number
   ): Promise<FlowProjection> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowProjection;
   }
 
   // =========================================================================
@@ -468,12 +484,13 @@ export class FlowPlanningService {
    * @returns Created FlowScenario
    */
   async createScenario(
-    planId: string,
-    name: string,
-    changes: ScenarioChange[],
-    scenarioType?: 'optimistic' | 'pessimistic' | 'baseline' | 'target' | 'what-if'
+    _planId: string,
+    _name: string,
+    __changes: ScenarioChange[],
+    _scenarioType?: 'optimistic' | 'pessimistic' | 'baseline' | 'target' | 'what-if'
   ): Promise<FlowScenario> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowScenario;
   }
 
   /**
@@ -489,8 +506,9 @@ export class FlowPlanningService {
    * @param scenarioId - Scenario to execute
    * @returns ScenarioSimulationResult with projections and impacts
    */
-  async runScenario(scenarioId: string): Promise<ScenarioSimulationResult> {
-    throw new Error('Not yet implemented');
+  async runScenario(_scenarioId: string): Promise<ScenarioSimulationResult> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as ScenarioSimulationResult;
   }
 
   /**
@@ -504,8 +522,9 @@ export class FlowPlanningService {
    * @param scenarioIds - Scenario IDs to compare
    * @returns ScenarioComparison with analysis
    */
-  async compareScenarios(scenarioIds: string[]): Promise<ScenarioComparison> {
-    throw new Error('Not yet implemented');
+  async compareScenarios(_scenarioIds: string[]): Promise<ScenarioComparison> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as ScenarioComparison;
   }
 
   /**
@@ -524,15 +543,16 @@ export class FlowPlanningService {
    * @returns OptimizationResult with optimal allocations
    */
   async optimizeAllocation(
-    planId: string,
-    constraints: AllocationConstraint[],
-    objectiveFunction:
+    _planId: string,
+    _constraints: AllocationConstraint[],
+    _objectiveFunction:
       | 'maximize-surplus'
       | 'minimize-variance'
       | 'achieve-targets'
       | 'balance-categories'
   ): Promise<OptimizationResult> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as OptimizationResult;
   }
 
   // =========================================================================
@@ -553,10 +573,11 @@ export class FlowPlanningService {
    * @returns Created RecurringPattern
    */
   async createRecurringPattern(
-    stewardId: string,
-    patternDefinition: Partial<RecurringPattern>
+    _stewardId: string,
+    _patternDefinition: Partial<RecurringPattern>
   ): Promise<RecurringPattern> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as RecurringPattern;
   }
 
   /**
@@ -573,10 +594,11 @@ export class FlowPlanningService {
    * @returns Array of ExpectedEvent objects (could be EconomicEvent or calendar events)
    */
   async generateRecurringEvents(
-    patternId: string,
-    durationMonths: number
+    __patternId: string,
+    _durationMonths: number
   ): Promise<{ timestamp: string; expectedAmount: number; label: string }[]> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return [];
   }
 
   /**
@@ -588,8 +610,9 @@ export class FlowPlanningService {
    * @param pattern - RecurringPattern to calculate for
    * @returns Next due date (ISO 8601)
    */
-  async calculateNextDue(pattern: RecurringPattern): Promise<string> {
-    throw new Error('Not yet implemented');
+  async calculateNextDue(_pattern: RecurringPattern): Promise<string> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return '';
   }
 
   /**
@@ -604,11 +627,12 @@ export class FlowPlanningService {
    * @returns Array of detected RecurringPatterns
    */
   async identifyPatternsFromHistory(
-    stewardId: string,
-    resourceCategory: ResourceCategory,
-    lookbackMonths: number
+    _stewardId: string,
+    _resourceCategory: ResourceCategory,
+    _lookbackMonths: number
   ): Promise<RecurringPattern[]> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return [];
   }
 
   /**
@@ -623,10 +647,11 @@ export class FlowPlanningService {
    * @returns Updated RecurringPattern with learned data
    */
   async updatePatternFromActual(
-    patternId: string,
-    actualEventId: string
+    _patternId: string,
+    _actualEventId: string
   ): Promise<RecurringPattern> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as RecurringPattern;
   }
 
   // =========================================================================
@@ -647,8 +672,9 @@ export class FlowPlanningService {
    * @param stewardId - Steward to get dashboard for
    * @returns FlowPlanningDashboard with complete overview
    */
-  async buildFlowDashboard(stewardId: string): Promise<FlowPlanningDashboard> {
-    throw new Error('Not yet implemented');
+  async buildFlowDashboard(_stewardId: string): Promise<FlowPlanningDashboard> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowPlanningDashboard;
   }
 
   /**
@@ -663,8 +689,9 @@ export class FlowPlanningService {
    * @param planId - Plan to analyze
    * @returns FlowHealthAnalysis with assessment
    */
-  async analyzeFlowHealth(planId: string): Promise<FlowHealthAnalysis> {
-    throw new Error('Not yet implemented');
+  async analyzeFlowHealth(_planId: string): Promise<FlowHealthAnalysis> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as FlowHealthAnalysis;
   }
 
   /**
@@ -682,10 +709,11 @@ export class FlowPlanningService {
    * @returns Array of FlowPlanningInsights
    */
   async generatePlanningInsights(
-    stewardId: string,
-    lookbackMonths?: number
+    _stewardId: string,
+    _lookbackMonths?: number
   ): Promise<FlowPlanningInsight[]> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return [];
   }
 
   /**
@@ -699,10 +727,11 @@ export class FlowPlanningService {
    * @returns Array of AnomalyDetection results
    */
   async detectAnomalies(
-    resourceId: string,
-    sensitivity?: 'low' | 'medium' | 'high'
+    _resourceId: string,
+    _sensitivity?: 'low' | 'medium' | 'high'
   ): Promise<AnomalyDetection[]> {
-    throw new Error('Not yet implemented');
+    await Promise.reject(new Error('Not yet implemented'));
+    return [];
   }
 
   // =========================================================================
@@ -722,8 +751,9 @@ export class FlowPlanningService {
    * @param planId - Plan to check
    * @returns ComplianceCheck with violations and required transitions
    */
-  async checkPlanCompliance(planId: string): Promise<ComplianceCheck> {
-    throw new Error('Not yet implemented');
+  async checkPlanCompliance(_planId: string): Promise<ComplianceCheck> {
+    await Promise.reject(new Error('Not yet implemented'));
+    return {} as ComplianceCheck;
   }
 
   // =========================================================================
@@ -738,9 +768,10 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private async persistPlan(plan: FlowPlan): Promise<void> {
+  private async persistPlan(_plan: FlowPlan): Promise<void> {
     // TODO: Call Holochain zome function: create_flow_plan
     // await this.holochain.callZomeFunction('content_store', 'create_flow_plan', plan);
+    return Promise.resolve();
   }
 
   /**
@@ -748,8 +779,9 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private async persistBudget(budget: FlowBudget): Promise<void> {
+  private async persistBudget(_budget: FlowBudget): Promise<void> {
     // TODO: Call Holochain zome function: create_flow_budget
+    return Promise.resolve();
   }
 
   /**
@@ -757,8 +789,9 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private async persistGoal(goal: FlowGoal): Promise<void> {
+  private async persistGoal(_goal: FlowGoal): Promise<void> {
     // TODO: Call Holochain zome function: create_flow_goal
+    return Promise.resolve();
   }
 
   /**
@@ -766,8 +799,9 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private async persistMilestone(milestone: FlowMilestone): Promise<void> {
+  private async persistMilestone(_milestone: FlowMilestone): Promise<void> {
     // TODO: Call Holochain zome function: create_flow_milestone
+    return Promise.resolve();
   }
 
   /**
@@ -775,8 +809,9 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private async persistScenario(scenario: FlowScenario): Promise<void> {
+  private async persistScenario(_scenario: FlowScenario): Promise<void> {
     // TODO: Call Holochain zome function: create_flow_scenario
+    return Promise.resolve();
   }
 
   /**
@@ -784,8 +819,9 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private async persistProjection(projection: FlowProjection): Promise<void> {
+  private async persistProjection(_projection: FlowProjection): Promise<void> {
     // TODO: Call Holochain zome function: create_flow_projection
+    return Promise.resolve();
   }
 
   /**
@@ -793,8 +829,9 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private async persistRecurringPattern(pattern: RecurringPattern): Promise<void> {
+  private async persistRecurringPattern(_pattern: RecurringPattern): Promise<void> {
     // TODO: Call Holochain zome function: create_recurring_pattern
+    return Promise.resolve();
   }
 
   /**
@@ -805,8 +842,8 @@ export class FlowPlanningService {
    * @private
    */
   private calculateTrendExtrapolation(
-    historical: { timestamp: string; value: number }[],
-    projectionHorizon: number
+    _historical: { timestamp: string; value: number }[],
+    _projectionHorizon: number
   ): ProjectionDataPoint[] {
     // TODO: Implement linear regression algorithm
     // Returns: Projected data points with confidence bands
@@ -822,15 +859,15 @@ export class FlowPlanningService {
    * @private
    */
   private applyScenarioChanges(
-    baseline: FlowProjection,
-    changes: ScenarioChange[]
+    _baseline: FlowProjection,
+    _changes: ScenarioChange[]
   ): FlowProjection {
     // TODO: Implement scenario projection algorithm
     // For each change:
     //   - Apply operator (add, multiply, percent-increase, etc.)
     //   - Recalculate affected downstream metrics
     //   - Propagate through dependencies
-    return { ...baseline };
+    return {};
   }
 
   /**
@@ -843,8 +880,8 @@ export class FlowPlanningService {
    * @private
    */
   private solveConstraints(
-    constraints: AllocationConstraint[],
-    objectiveFunction: string
+    _constraints: AllocationConstraint[],
+    __objectiveFunction: string
   ): OptimizationResult {
     // TODO: Implement constraint-solving algorithm
     // Formulate as linear programming problem
@@ -866,8 +903,8 @@ export class FlowPlanningService {
    * @private
    */
   private detectRecurringPatterns(
-    events: { timestamp: string; amount: number }[],
-    minOccurrences?: number
+    _events: { timestamp: string; amount: number }[],
+    _minOccurrences?: number
   ): RecurringPattern[] {
     // TODO: Implement pattern detection algorithm
     return [];
@@ -882,8 +919,8 @@ export class FlowPlanningService {
    * @private
    */
   private calculateBudgetVariance(
-    budget: FlowBudget,
-    actualTransactions: { category: string; amount: number }[]
+    _budget: FlowBudget,
+    _actualTransactions: { category: string; amount: number }[]
   ): BudgetVarianceReport {
     // TODO: Implement variance calculation
     // For each category:
@@ -905,7 +942,7 @@ export class FlowPlanningService {
    *
    * @private
    */
-  private assessGoalProgress(goal: FlowGoal): GoalEvaluationResult {
+  private assessGoalProgress(_goal: FlowGoal): GoalEvaluationResult {
     // TODO: Implement goal evaluation logic
     throw new Error('Not yet implemented');
   }
@@ -922,8 +959,8 @@ export class FlowPlanningService {
    * @private
    */
   private generateRecommendations(
-    stewardId: string,
-    context: {
+    _stewardId: string,
+    _context: {
       plans: FlowPlan[];
       budgets: FlowBudget[];
       goals: FlowGoal[];

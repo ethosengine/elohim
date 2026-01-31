@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 
+// @coverage: 4.8% (2026-01-31)
+
 /**
  * Lamad routing strategy (spec-compliant):
  *
@@ -26,7 +28,7 @@ import { Routes } from '@angular/router';
 export const LAMAD_ROUTES: Routes = [
   {
     path: '',
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/lamad-layout/lamad-layout.component').then(m => m.LamadLayoutComponent),
     children: [
       // ============================================
@@ -37,7 +39,7 @@ export const LAMAD_ROUTES: Routes = [
       // SEO: Dynamic title set by PathNavigatorComponent
       {
         path: 'path/:pathId/step/:stepIndex',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/path-navigator/path-navigator.component').then(
             m => m.PathNavigatorComponent
           ),
@@ -47,7 +49,7 @@ export const LAMAD_ROUTES: Routes = [
       // SEO: Dynamic title set by PathOverviewComponent
       {
         path: 'path/:pathId',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/path-overview/path-overview.component').then(
             m => m.PathOverviewComponent
           ),
@@ -60,7 +62,7 @@ export const LAMAD_ROUTES: Routes = [
       // SEO: Dynamic title set by ContentViewerComponent
       {
         path: 'resource/:resourceId',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/content-viewer/content-viewer.component').then(
             m => m.ContentViewerComponent
           ),
@@ -69,7 +71,7 @@ export const LAMAD_ROUTES: Routes = [
       // Content Editor - edit existing content
       {
         path: 'resource/:resourceId/edit',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/content-editor-page/content-editor-page.component').then(
             m => m.ContentEditorPageComponent
           ),
@@ -89,7 +91,7 @@ export const LAMAD_ROUTES: Routes = [
 
       {
         path: 'me',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/learner-dashboard/learner-dashboard.component').then(
             m => m.LearnerDashboardComponent
           ),
@@ -108,7 +110,7 @@ export const LAMAD_ROUTES: Routes = [
       // SEO: Dynamic title set by ProfilePageComponent
       {
         path: 'human',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/profile-page/profile-page.component').then(
             m => m.ProfilePageComponent
           ),
@@ -129,7 +131,7 @@ export const LAMAD_ROUTES: Routes = [
       // Graph explorer - visual knowledge map (Khan Academy style)
       {
         path: 'explore',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/graph-explorer/graph-explorer.component').then(
             m => m.GraphExplorerComponent
           ),
@@ -147,7 +149,7 @@ export const LAMAD_ROUTES: Routes = [
       // Meaning map - list/card view alternative
       {
         path: 'map',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/meaning-map/meaning-map.component').then(m => m.MeaningMapComponent),
         data: {
           title: 'Meaning Map',
@@ -161,7 +163,7 @@ export const LAMAD_ROUTES: Routes = [
 
       {
         path: 'search',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/search/search.component').then(m => m.SearchComponent),
         data: {
           title: 'Search',
@@ -179,7 +181,7 @@ export const LAMAD_ROUTES: Routes = [
 
       {
         path: '',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/lamad-home/lamad-home.component').then(m => m.LamadHomeComponent),
         data: {
           title: 'Lamad',
@@ -198,7 +200,7 @@ export const LAMAD_ROUTES: Routes = [
 
       {
         path: '**',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/not-found/lamad-not-found.component').then(
             m => m.LamadNotFoundComponent
           ),

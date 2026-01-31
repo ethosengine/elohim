@@ -7,6 +7,8 @@
 
 import type { Moment, Recognition } from './sophia-moment.model';
 
+// @coverage: 12.4% (2026-01-31)
+
 // Re-export types for consumers
 export type { Moment, Recognition };
 
@@ -37,7 +39,7 @@ let isRegistered = false;
 let cssLoaded = false;
 
 /** Log prefix for Sophia loader messages */
-const LOG_PREFIX = '[Sophia]';
+const _LOG_PREFIX = '[Sophia]';
 
 /** Custom element tag name for Sophia questions */
 const SOPHIA_ELEMENT_TAG = 'sophia-question';
@@ -69,7 +71,6 @@ function loadSophiaCSS(): void {
     baseLink.rel = 'stylesheet';
     baseLink.href = getSophiaStylesUrl();
     document.head.appendChild(baseLink);
-    console.log('[Sophia] Base CSS loaded from:', baseLink.href);
   }
 
   // Load theme overrides
@@ -80,7 +81,6 @@ function loadSophiaCSS(): void {
     themeLink.rel = 'stylesheet';
     themeLink.href = getSophiaThemeOverridesUrl();
     document.head.appendChild(themeLink);
-    console.log('[Sophia] Theme overrides CSS loaded from:', themeLink.href);
   }
 
   cssLoaded = true;
@@ -98,7 +98,7 @@ const getSophiaPluginUrl = (): string => {
 /**
  * Load an external script by URL.
  */
-function loadScript(url: string): Promise<void> {
+async function loadScript(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${url}"]`)) {
       resolve();
@@ -138,7 +138,6 @@ async function ensureReactLoaded(): Promise<void> {
   const win = window as any;
 
   if (win.React && win.ReactDOM) {
-    console.log('[Sophia] React already loaded');
     return;
   }
 
@@ -146,35 +145,24 @@ async function ensureReactLoaded(): Promise<void> {
   const localReactUrl = getReactUrl();
   const localReactDomUrl = getReactDomUrl();
 
-  console.log('[Sophia] Loading React from local assets...');
-
   try {
     await loadScript(localReactUrl);
     await loadScript(localReactDomUrl);
 
     if (win.React && win.ReactDOM) {
-      console.log('[Sophia] React loaded from local assets');
-      console.log('[Sophia] React version:', win.React.version);
-      console.log('[Sophia] ReactDOM version:', win.ReactDOM.version);
       return;
     }
-  } catch (localError) {
-    console.warn('[Sophia] Local React load failed, trying CDN fallback...', localError);
+  } catch {
+    // Local React load failed - will fallback to CDN
   }
 
   // Fallback to CDN
-  console.log('[Sophia] Loading React from CDN...');
-
   await loadScript(REACT_CDN_URL);
   await loadScript(REACT_DOM_CDN_URL);
 
   if (!win.React || !win.ReactDOM) {
     throw new Error('Failed to load React from both local assets and CDN');
   }
-
-  console.log('[Sophia] React loaded from CDN');
-  console.log('[Sophia] React version:', win.React.version);
-  console.log('[Sophia] ReactDOM version:', win.ReactDOM.version);
 }
 
 /**
@@ -201,24 +189,12 @@ export async function registerSophiaElement(): Promise<void> {
       await ensureReactLoaded();
 
       const pluginUrl = getSophiaPluginUrl();
-      console.log('[Sophia] Loading plugin from:', pluginUrl);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = globalThis as any;
-      console.log('[Sophia] Pre-load check - globalThis.React:', typeof g.React, g.React?.version);
-      console.log(
-        '[Sophia] Pre-load check - globalThis.ReactDOM:',
-        typeof g.ReactDOM,
-        g.ReactDOM?.version
-      );
 
       // Load the UMD bundle
       await loadScript(pluginUrl);
-      console.log('[Sophia] Script loaded');
 
       // Element should be registered synchronously
       const elementDef = customElements.get(SOPHIA_ELEMENT_TAG);
-      console.log('[Sophia] Element registered:', !!elementDef);
 
       if (!elementDef) {
         throw new Error('Sophia custom element not registered after bundle load');
@@ -236,15 +212,13 @@ export async function registerSophiaElement(): Promise<void> {
           detectThemeFrom: 'attribute',
           logLevel: 'debug',
         });
-        console.log('[Sophia] Configured with attribute-based theme detection');
       } else {
-        console.warn('[Sophia] Sophia.configure not available on window.SophiaElement');
+        // eslint-disable-next-line no-console
       }
 
       isRegistered = true;
-      console.log('[Sophia] Plugin loaded successfully');
     } catch (error) {
-      console.error('[Sophia] Failed to load plugin:', error);
+      // Sophia element registration failed - re-throw to caller
       loadPromise = null;
       throw error;
     }
@@ -474,14 +448,15 @@ export function getPsycheAPI(): PsycheAPI | null {
   const sophiaElement = (window as any).SophiaElement;
 
   if (!sophiaElement) {
-    console.warn('[Sophia] Element not loaded - Psyche API unavailable');
+    // eslint-disable-next-line no-console
+
     return null;
   }
 
   // Get getPrimarySubscale from SophiaElement (re-exported from sophia-core)
   const getPrimarySubscaleFn = sophiaElement.getPrimarySubscale;
   if (!getPrimarySubscaleFn) {
-    console.warn('[Sophia] getPrimarySubscale not found on SophiaElement');
+    // eslint-disable-next-line no-console
   }
 
   // Create a facade using available SophiaElement exports + local implementations

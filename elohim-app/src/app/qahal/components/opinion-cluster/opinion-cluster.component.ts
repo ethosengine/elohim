@@ -12,6 +12,8 @@ import {
   AfterViewInit,
 } from '@angular/core';
 
+// @coverage: 80.0% (2026-01-31)
+
 import {
   GovernanceSignalService,
   OpinionCluster,

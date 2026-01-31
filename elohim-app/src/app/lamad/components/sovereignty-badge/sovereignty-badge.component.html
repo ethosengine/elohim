@@ -13,13 +13,13 @@
     <span class="material-icons stage-icon">{{ stageInfo().icon }}</span>
 
     <!-- Stage Badge -->
-    <span class="stage-badge" [class]="getStageBadgeClass()">
+    <span class="stage-badge" [ngClass]="getStageBadgeClass()">
       {{ stageInfo().label }}
     </span>
 
     <!-- Connection Status -->
     <span class="status-indicator">
-      <span class="status-dot" [class]="getStatusDotClass()"></span>
+      <span class="status-dot" [ngClass]="getStatusDotClass()"></span>
       <span class="status-text">{{ connectionStatus().label }}</span>
     </span>
 
@@ -58,6 +58,7 @@
         <span class="detail-value monospace">
           {{ truncateHash(edgeNodeInfo().agentPubKey) }}
           <button
+            type="button"
             class="copy-btn"
             (click)="copyToClipboard(edgeNodeInfo().agentPubKey!, $event)"
             title="Copy"
@@ -72,6 +73,7 @@
         <span class="detail-value monospace">
           {{ truncateHash(edgeNodeInfo().dnaHash) }}
           <button
+            type="button"
             class="copy-btn"
             (click)="copyToClipboard(edgeNodeInfo().dnaHash!, $event)"
             title="Copy"
@@ -95,6 +97,7 @@
 
     <!-- Reconnect Button -->
     <button
+      type="button"
       class="reconnect-btn"
       *ngIf="connectionStatus().state === 'error' || connectionStatus().state === 'offline'"
       (click)="onReconnect()"
@@ -107,12 +110,12 @@
 
   <!-- Actions -->
   <div class="sovereignty-actions">
-    <button class="action-link" (click)="onViewDetails()">
+    <button type="button" class="action-link" (click)="onViewDetails()">
       View Details
       <span class="material-icons">arrow_forward</span>
     </button>
 
-    <button class="action-upgrade" *ngIf="canUpgrade()" (click)="onUpgrade()">
+    <button type="button" class="action-upgrade" *ngIf="canUpgrade()" (click)="onUpgrade()">
       Upgrade
       <span class="material-icons">arrow_upward</span>
     </button>

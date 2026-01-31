@@ -165,8 +165,7 @@ export class EconomicService {
     if (!this.eventsByAgentCache.has(cacheKey)) {
       const request = defer(() => from(this.fetchEventsForAgent(agentId, direction))).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(`[EconomicService] Failed to fetch events for "${agentId}":`, err);
+        catchError(_err => {
           return of([]);
         })
       );
@@ -189,8 +188,7 @@ export class EconomicService {
     }
 
     return defer(() => from(this.fetchEventsByAction(action))).pipe(
-      catchError(err => {
-        console.warn(`[EconomicService] Failed to fetch events by action "${action}":`, err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -208,8 +206,7 @@ export class EconomicService {
     }
 
     return defer(() => from(this.fetchEventsByLamadType(lamadType))).pipe(
-      catchError(err => {
-        console.warn(`[EconomicService] Failed to fetch events by type "${lamadType}":`, err);
+      catchError(_err => {
         return of([]);
       })
     );
@@ -234,9 +231,8 @@ export class EconomicService {
     }
 
     return defer(() => from(this.doCreateEvent(input))).pipe(
-      catchError(err => {
-        console.error('[EconomicService] Failed to create event:', err);
-        throw err;
+      catchError(_err => {
+        throw _err;
       })
     );
   }
@@ -268,8 +264,8 @@ export class EconomicService {
       // Even an empty result means the zome is available
       this.availableSignal.set(result.success);
       return result.success;
-    } catch (err) {
-      console.warn('[EconomicService] Availability test failed:', err);
+    } catch {
+      // Service availability check failed - Economic service unavailable
       this.availableSignal.set(false);
       return false;
     }
@@ -415,14 +411,14 @@ export class EconomicService {
           ? (resourceClassifiedAs as ResourceClassification[])
           : undefined,
       resourceQuantity:
-        hc.resourceQuantityValue != null
+        hc.resourceQuantityValue !== null
           ? {
               hasNumericalValue: hc.resourceQuantityValue,
               hasUnit: hc.resourceQuantityUnit ?? 'unit',
             }
           : undefined,
       effortQuantity:
-        hc.effortQuantityValue != null
+        hc.effortQuantityValue !== null
           ? {
               hasNumericalValue: hc.effortQuantityValue,
               hasUnit: hc.effortQuantityUnit ?? 'unit',

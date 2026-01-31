@@ -12,6 +12,8 @@
 
 import * as d3 from 'd3';
 
+// @coverage: 17.9% (2026-01-31)
+
 /**
  * Cluster type indicates the hierarchical level of a cluster node.
  */

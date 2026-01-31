@@ -1,4 +1,10 @@
-import { ComponentFixture, TestBed, fakeAsync, tick, discardPeriodicTasks } from '@angular/core/testing';
+import {
+  ComponentFixture,
+  TestBed,
+  fakeAsync,
+  tick,
+  discardPeriodicTasks,
+} from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 
 import { of, throwError, delay } from 'rxjs';
@@ -71,7 +77,11 @@ describe('ProposalVoteComponent', () => {
     }));
 
     it('should populate existing vote if found', fakeAsync(() => {
-      const existingVote: Vote = { proposalId: 'proposal-1', position: 'agree', reasoning: 'I support this' };
+      const existingVote: Vote = {
+        proposalId: 'proposal-1',
+        position: 'agree',
+        reasoning: 'I support this',
+      };
       mockGovernanceService.getMyVote.and.returnValue(of(existingVote));
 
       fixture.detectChanges();
@@ -286,7 +296,9 @@ describe('ProposalVoteComponent', () => {
     }));
 
     it('should handle submission error', fakeAsync(() => {
-      mockGovernanceService.voteOnProposal.and.returnValue(throwError(() => new Error('Network error')));
+      mockGovernanceService.voteOnProposal.and.returnValue(
+        throwError(() => new Error('Network error'))
+      );
       fixture.detectChanges();
       tick();
 

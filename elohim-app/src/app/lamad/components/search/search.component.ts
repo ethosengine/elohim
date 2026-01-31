@@ -3,6 +3,8 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
+// @coverage: 95.8% (2026-01-31)
+
 import { SearchResult } from '../../models/search.model';
 import { SearchService } from '../../services/search.service';
 

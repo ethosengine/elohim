@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 
-import { BehaviorSubject, Observable, of } from 'rxjs';
+// @coverage: 47.0% (2026-01-31)
+
+import { BehaviorSubject, Observable } from 'rxjs';
 
 import {
   SourceChainEntry,
@@ -419,8 +421,8 @@ export class LocalSourceChainService {
     const key = this.getMetadataKey();
     try {
       localStorage.setItem(key, JSON.stringify(metadata));
-    } catch (err) {
-      console.error('[LocalSourceChainService] Failed to save metadata:', err);
+    } catch {
+      // localStorage write failure is non-critical
     }
   }
 
@@ -521,8 +523,8 @@ export class LocalSourceChainService {
     const key = this.getEntriesKey();
     try {
       localStorage.setItem(key, JSON.stringify(entries));
-    } catch (err) {
-      console.error('[LocalSourceChainService] Failed to save entries:', err);
+    } catch {
+      // localStorage write failure is non-critical
     }
   }
 
@@ -530,8 +532,8 @@ export class LocalSourceChainService {
     const key = this.getLinksKey();
     try {
       localStorage.setItem(key, JSON.stringify(links));
-    } catch (err) {
-      console.error('[LocalSourceChainService] Failed to save links:', err);
+    } catch {
+      // localStorage write failure is non-critical
     }
   }
 
@@ -542,7 +544,11 @@ export class LocalSourceChainService {
    */
   private generateEntryHash(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10); // NOSONAR - Non-cryptographic hash generation
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const random = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 8);
     return `entry-${timestamp}-${random}`;
   }
 
@@ -551,7 +557,11 @@ export class LocalSourceChainService {
    */
   private generateLinkHash(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10); // NOSONAR - Non-cryptographic hash generation
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const random = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 8);
     return `link-${timestamp}-${random}`;
   }
 

@@ -107,8 +107,8 @@ export class PresenceListComponent implements OnInit {
   // ==========================================================================
 
   ngOnInit(): void {
-    this.loadPresences();
-    this.loadMyStewardedPresences();
+    void this.loadPresences();
+    void this.loadMyStewardedPresences();
   }
 
   // ==========================================================================
@@ -129,7 +129,6 @@ export class PresenceListComponent implements OnInit {
 
       this.allPresencesSignal.set([...unclaimed, ...stewarded, ...claimed]);
     } catch (err) {
-      console.error('[PresenceList] Failed to load presences:', err);
       this.error.set('Failed to load presences');
     }
   }
@@ -142,8 +141,8 @@ export class PresenceListComponent implements OnInit {
 
     try {
       await this.presenceService.getMyStewardedPresences();
-    } catch (err) {
-      console.error('[PresenceList] Failed to load stewarded presences:', err);
+    } catch (_err) {
+      // intentionally empty - stewarded presence load failure is non-critical
     }
   }
 

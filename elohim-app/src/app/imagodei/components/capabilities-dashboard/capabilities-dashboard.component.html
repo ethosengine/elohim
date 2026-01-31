@@ -4,7 +4,13 @@
     <h1>My Capabilities</h1>
     <p class="subtitle">View your current access and restrictions</p>
 
-    <button class="refresh-btn" (click)="refresh()" [disabled]="isLoading()" title="Refresh">
+    <button
+      type="button"
+      class="refresh-btn"
+      (click)="refresh()"
+      [disabled]="isLoading()"
+      title="Refresh"
+    >
       <span class="icon">&#8635;</span>
     </button>
   </header>
@@ -14,7 +20,9 @@
     <div class="error-banner" role="alert">
       <span class="error-icon">&#9888;</span>
       <span class="error-message">{{ error() }}</span>
-      <button class="dismiss-btn" (click)="clearError()" aria-label="Dismiss">&times;</button>
+      <button type="button" class="dismiss-btn" (click)="clearError()" aria-label="Dismiss">
+        &times;
+      </button>
     </div>
   }
 
@@ -30,7 +38,7 @@
   @if (!isLoading()) {
     <!-- Time Status Card -->
     @if (timeStatus()) {
-      <section class="time-status-card" [class]="timeStatus()?.status">
+      <section class="time-status-card" [ngClass]="timeStatus()?.status">
         <div class="status-icon">
           @if (timeStatus()?.status === 'ok') {
             <span class="icon-check">✓</span>
@@ -114,7 +122,12 @@
               </div>
 
               @if (restriction.canAppeal) {
-                <button class="appeal-btn" (click)="fileAppeal(restriction)" title="Request change">
+                <button
+                  type="button"
+                  class="appeal-btn"
+                  (click)="fileAppeal(restriction)"
+                  title="Request change"
+                >
                   Appeal
                 </button>
               }
@@ -148,7 +161,7 @@
           </div>
 
           <div class="steward-actions">
-            <button class="contact-btn" (click)="contactSteward()">Contact</button>
+            <button type="button" class="contact-btn" (click)="contactSteward()">Contact</button>
           </div>
         </div>
       </section>

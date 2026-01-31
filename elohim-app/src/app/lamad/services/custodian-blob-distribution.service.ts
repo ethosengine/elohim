@@ -12,6 +12,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 72.7% (2026-01-31)
+
 import { Observable, of } from 'rxjs';
 
 import { ContentBlob } from '../models/content-node.model';
@@ -368,7 +370,7 @@ export class CustodianBlobDistributionService {
    * Probe custodian for availability and health.
    * Checks if custodian is online and accepting new blob commitments.
    *
-   * @param custodianId Custodian ID
+   * @param _custodianId Custodian ID
    * @returns Observable with health status
    */
   probeCustodianHealth(_custodianId: string): Observable<{
@@ -377,7 +379,6 @@ export class CustodianBlobDistributionService {
     bandwidth: number;
     latency: number;
   }> {
-    // Would make HTTP request to custodian endpoint
     return of({
       online: true,
       acceptingBlobs: true,
@@ -424,16 +425,22 @@ export class CustodianBlobDistributionService {
    * @returns Fallback URL to best custodian, or null if none available
    */
   getBestCustodianUrl(contentId: string, blobHash: string): string | null {
-    const commitments = this.getCommitmentsForBlob(contentId, blobHash).filter(
+    const activeCommitments = this.getCommitmentsForBlob(contentId, blobHash).filter(
       c => c.commitmentStatus === 'active'
     );
 
-    if (commitments.length === 0) {
+    if (activeCommitments.length === 0) {
       return null;
     }
 
-    // Sort by bandwidth (highest first)
-    return commitments.sort((a, b) => b.bandwidth - a.bandwidth)[0].fallbackUrl;
+    let bestCommitment = activeCommitments[0];
+    for (let i = 1; i < activeCommitments.length; i++) {
+      if (activeCommitments[i].bandwidth > bestCommitment.bandwidth) {
+        bestCommitment = activeCommitments[i];
+      }
+    }
+
+    return bestCommitment.fallbackUrl;
   }
 
   // =========================================================================

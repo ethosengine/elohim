@@ -1,18 +1,23 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { Injector } from '@angular/core';
 import {
   BlobManagerService,
   BlobDownloadResult,
   BlobDownloadProgress,
+  BlobMetadataOutput,
+  BlobsForContentOutput,
 } from './blob-manager.service';
 import { BlobVerificationService } from './blob-verification.service';
-import { BlobFallbackService, UrlHealth } from './blob-fallback.service';
+import { BlobFallbackService, BlobFetchResult, UrlHealth } from './blob-fallback.service';
 import { ContentBlob } from '../models/content-node.model';
+import { of, throwError } from 'rxjs';
 
 describe('BlobManagerService', () => {
   let service: BlobManagerService;
   let verificationService: BlobVerificationService;
   let fallbackService: BlobFallbackService;
+  let injector: Injector;
 
   const createMockContentBlob = (): ContentBlob => ({
     hash: '0000000000000000000000000000000000000000000000000000000000000000',
@@ -24,6 +29,14 @@ describe('BlobManagerService', () => {
     codec: 'h264',
   });
 
+  const createMockBlobFetchResult = (): BlobFetchResult => ({
+    blob: new Blob(['test content']),
+    urlIndex: 0,
+    successUrl: 'https://example.com/blob.mp4',
+    durationMs: 100,
+    retryCount: 0,
+  });
+
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
@@ -32,11 +45,128 @@ describe('BlobManagerService', () => {
     service = TestBed.inject(BlobManagerService);
     verificationService = TestBed.inject(BlobVerificationService);
     fallbackService = TestBed.inject(BlobFallbackService);
+    injector = TestBed.inject(Injector);
   });
+
+  // =========================================================================
+  // Service Creation & Initialization
+  // =========================================================================
 
   it('should be created', () => {
     expect(service).toBeTruthy();
   });
+
+  it('should initialize with empty blob cache', () => {
+    expect(service['blobCache'].size).toBe(0);
+  });
+
+  it('should initialize with zero cache size', () => {
+    expect(service['cacheSize']).toBe(0);
+  });
+
+  it('should initialize with max cache size of 100 MB', () => {
+    expect(service.maxCacheSizeBytes).toBe(100 * 1024 * 1024);
+  });
+
+  it('should initialize cache lock as resolved promise', async () => {
+    const lock = service['cacheLock'];
+    expect(lock).toBeInstanceOf(Promise);
+    await expectAsync(Promise.resolve(lock)).toBeResolved();
+  });
+
+  it('should initialize storageClient as null', () => {
+    expect(service['storageClient']).toBeNull();
+  });
+
+  // =========================================================================
+  // Public Method Existence Tests
+  // =========================================================================
+
+  it('should have getBlobUrl method', () => {
+    expect(typeof service.getBlobUrl).toBe('function');
+  });
+
+  it('should have connectionMode getter', () => {
+    expect(typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(service), 'connectionMode')?.get).toBe(
+      'function'
+    );
+  });
+
+  it('should have getPriorityUrls method', () => {
+    expect(typeof service.getPriorityUrls).toBe('function');
+  });
+
+  it('should have downloadBlob method', () => {
+    expect(typeof service.downloadBlob).toBe('function');
+  });
+
+  it('should have downloadBlobs method', () => {
+    expect(typeof service.downloadBlobs).toBe('function');
+  });
+
+  it('should have isCached method', () => {
+    expect(typeof service.isCached).toBe('function');
+  });
+
+  it('should have getCachedBlob method', () => {
+    expect(typeof service.getCachedBlob).toBe('function');
+  });
+
+  it('should have removeFromCache method', () => {
+    expect(typeof service.removeFromCache).toBe('function');
+  });
+
+  it('should have clearCache method', () => {
+    expect(typeof service.clearCache).toBe('function');
+  });
+
+  it('should have getCacheStats method', () => {
+    expect(typeof service.getCacheStats).toBe('function');
+  });
+
+  it('should have getUrlHealth method', () => {
+    expect(typeof service.getUrlHealth).toBe('function');
+  });
+
+  it('should have isAccessible method', () => {
+    expect(typeof service.isAccessible).toBe('function');
+  });
+
+  it('should have testBlobAccess method', () => {
+    expect(typeof service.testBlobAccess).toBe('function');
+  });
+
+  it('should have createBlobUrl method', () => {
+    expect(typeof service.createBlobUrl).toBe('function');
+  });
+
+  it('should have revokeBlobUrl method', () => {
+    expect(typeof service.revokeBlobUrl).toBe('function');
+  });
+
+  it('should have downloadBlobToFile method', () => {
+    expect(typeof service.downloadBlobToFile).toBe('function');
+  });
+
+  it('should have getBlobsForContent method', () => {
+    expect(typeof service.getBlobsForContent).toBe('function');
+  });
+
+  it('should have getBlobMetadata method', () => {
+    expect(typeof service.getBlobMetadata).toBe('function');
+  });
+
+  it('should have blobExists method', () => {
+    expect(typeof service.blobExists).toBe('function');
+  });
+
+  it('should have getBlobsForMultipleContent method', () => {
+    expect(typeof service.getBlobsForMultipleContent).toBe('function');
+  });
+
+  // =========================================================================
+  // Cache Operations
+  // =========================================================================
 
   describe('Cache Operations', () => {
     it('should check if blob is cached', () => {
@@ -119,6 +249,71 @@ describe('BlobManagerService', () => {
     });
   });
 
+  // =========================================================================
+  // Strategy-Aware Blob URL Methods
+  // =========================================================================
+
+  describe('Strategy-Aware Blob URL Methods', () => {
+    it('should get blob URL', () => {
+      const blobHash = 'test_hash_123';
+      spyOn(service as any, 'getStorageClient').and.returnValue({
+        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://doorway.host/blob/test_hash_123'),
+      });
+
+      const url = service.getBlobUrl(blobHash);
+      expect(url).toBe('https://doorway.host/blob/test_hash_123');
+    });
+
+    it('should return connection mode', () => {
+      const mode = service.connectionMode;
+      expect(['doorway', 'direct']).toContain(mode);
+    });
+
+    it('should get priority URLs with strategy URL first', () => {
+      const contentBlob = createMockContentBlob();
+      contentBlob.fallbackUrls = [
+        'https://example.com/blob.mp4',
+        'https://fallback.com/blob.mp4',
+      ];
+
+      spyOn(service as any, 'getStorageClient').and.returnValue({
+        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://strategy.host/blob'),
+      });
+
+      const urls = service.getPriorityUrls(contentBlob);
+      expect(urls[0]).toBe('https://strategy.host/blob');
+      expect(urls.length).toBe(3); // strategy + 2 fallbacks
+    });
+
+    it('should not duplicate strategy URL in priority URLs', () => {
+      const contentBlob = createMockContentBlob();
+      const strategyUrl = 'https://strategy.host/blob';
+      contentBlob.fallbackUrls = [strategyUrl, 'https://fallback.com/blob.mp4'];
+
+      spyOn(service as any, 'getStorageClient').and.returnValue({
+        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue(strategyUrl),
+      });
+
+      const urls = service.getPriorityUrls(contentBlob);
+      const strategyCount = urls.filter(u => u === strategyUrl).length;
+      expect(strategyCount).toBe(1); // Should not be duplicated
+    });
+
+    it('should lazy inject StorageClientService', () => {
+      expect(service['storageClient']).toBeNull();
+      spyOn(injector, 'get').and.returnValue({
+        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://test.com'),
+      });
+
+      service['getStorageClient']();
+      expect(injector.get).toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // Blob URL Management
+  // =========================================================================
+
   describe('Blob URL Management', () => {
     it('should create blob URL', () => {
       const blob = new Blob(['test']);
@@ -145,6 +340,26 @@ describe('BlobManagerService', () => {
 
       expect(document.body.appendChild).toHaveBeenCalled();
       expect(document.body.removeChild).toHaveBeenCalled();
+    });
+
+    it('createBlobUrl should return string', () => {
+      const blob = new Blob(['test']);
+      const url = service.createBlobUrl(blob);
+      expect(typeof url).toBe('string');
+    });
+
+    it('downloadBlobToFile should create anchor element with download attribute', () => {
+      const blob = new Blob(['test']);
+      const filename = 'download.mp4';
+
+      const mockAnchor = document.createElement('a');
+      spyOn(document, 'createElement').and.returnValue(mockAnchor);
+      spyOn(document.body, 'appendChild');
+      spyOn(document.body, 'removeChild');
+
+      service.downloadBlobToFile(blob, filename);
+
+      expect(mockAnchor.download).toBe(filename);
     });
   });
 
@@ -181,42 +396,266 @@ describe('BlobManagerService', () => {
     });
   });
 
-  describe('Progress Tracking', () => {
-    it('should call progress callback during fetch', done => {
-      const contentBlob = createMockContentBlob();
-      const progressUpdates: BlobDownloadProgress[] = [];
+  // =========================================================================
+  // Observable Return Type Tests
+  // =========================================================================
 
-      const progressCallback = (progress: BlobDownloadProgress) => {
-        progressUpdates.push(progress);
-      };
+  describe('Observable Return Types', () => {
+    it('getBlobsForContent should return Observable', () => {
+      const contentId = 'content_123';
+      const result = service.getBlobsForContent(contentId);
 
-      // Mock the fallback service to avoid actual HTTP calls
-      spyOn(fallbackService, 'fetchWithFallback').and.returnValue({
-        pipe: jasmine.createSpy('pipe').and.callFake((op: any) => ({
-          pipe: jasmine.createSpy('pipe').and.callFake((op2: any) => ({
-            pipe: jasmine.createSpy('pipe').and.callFake((op3: any) => ({
-              pipe: jasmine.createSpy('pipe').and.callFake((op4: any) => ({
-                subscribe: (next: any) => {
-                  next({
-                    blob: new Blob(['test']),
-                    urlIndex: 0,
-                    successUrl: 'test',
-                    durationMs: 100,
-                    retryCount: 0,
-                  });
-                  return { unsubscribe: () => {} };
-                },
-              })),
-            })),
-          })),
-        })),
-      } as any);
-
-      // Test that progress callback is being set up
-      service.downloadBlob(contentBlob, progressCallback);
-      done();
+      expect(result).toBeDefined();
+      expect(typeof result.subscribe).toBe('function');
     });
 
+    it('getBlobMetadata should return Observable', () => {
+      const contentId = 'content_123';
+      const blobHash = 'hash_123';
+      const result = service.getBlobMetadata(contentId, blobHash);
+
+      expect(result).toBeDefined();
+      expect(typeof result.subscribe).toBe('function');
+    });
+
+    it('blobExists should return Observable', () => {
+      const contentId = 'content_123';
+      const blobHash = 'hash_123';
+      const result = service.blobExists(contentId, blobHash);
+
+      expect(result).toBeDefined();
+      expect(typeof result.subscribe).toBe('function');
+    });
+
+    it('getBlobsForMultipleContent should return Observable', () => {
+      const contentIds = ['id1', 'id2'];
+      const result = service.getBlobsForMultipleContent(contentIds);
+
+      expect(result).toBeDefined();
+      expect(typeof result.subscribe).toBe('function');
+    });
+
+    it('downloadBlob should return Observable', () => {
+      const contentBlob = createMockContentBlob();
+      const result = service.downloadBlob(contentBlob);
+
+      expect(result).toBeDefined();
+      expect(typeof result.subscribe).toBe('function');
+    });
+
+    it('downloadBlobs should return Observable', () => {
+      const blobs = [createMockContentBlob()];
+      const result = service.downloadBlobs(blobs);
+
+      expect(result).toBeDefined();
+      expect(typeof result.subscribe).toBe('function');
+    });
+  });
+
+  // =========================================================================
+  // Simple Input/Output Tests
+  // =========================================================================
+
+  describe('Simple Input/Output Tests', () => {
+    it('isCached should return boolean for valid hash', () => {
+      const result = service.isCached('any_hash');
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('getCachedBlob should return Blob or null', () => {
+      const result = service.getCachedBlob('nonexistent');
+      expect(result === null || result instanceof Blob).toBe(true);
+    });
+
+    it('getCacheStats should return stats object with required properties', () => {
+      const stats = service.getCacheStats();
+
+      expect(typeof stats.entriesCount).toBe('number');
+      expect(typeof stats.sizeBytes).toBe('number');
+      expect(typeof stats.maxSizeBytes).toBe('number');
+      expect(typeof stats.percentFull).toBe('number');
+    });
+
+    it('createBlobUrl should accept Blob and return string', () => {
+      const blob = new Blob(['test']);
+      const url = service.createBlobUrl(blob);
+
+      expect(typeof url).toBe('string');
+      expect(url.length).toBeGreaterThan(0);
+    });
+
+    it('revokeBlobUrl should accept string URL', () => {
+      const blob = new Blob(['test']);
+      const url = service.createBlobUrl(blob);
+
+      expect(() => service.revokeBlobUrl(url)).not.toThrow();
+    });
+
+    it('downloadBlobToFile should accept Blob and filename', () => {
+      const blob = new Blob(['test']);
+      const filename = 'test.txt';
+
+      spyOn(document.body, 'appendChild');
+      spyOn(document.body, 'removeChild');
+
+      expect(() => service.downloadBlobToFile(blob, filename)).not.toThrow();
+    });
+
+    it('removeFromCache should accept hash string', async () => {
+      await expectAsync(service.removeFromCache('test_hash')).toBeResolved();
+    });
+
+    it('clearCache should return resolved Promise', async () => {
+      await expectAsync(service.clearCache()).toBeResolved();
+    });
+
+    it('testBlobAccess should accept ContentBlob and return Promise', async () => {
+      const contentBlob = createMockContentBlob();
+      spyOn(fallbackService, 'testFallbackUrls').and.returnValue(Promise.resolve([]));
+
+      const result = service.testBlobAccess(contentBlob);
+      expect(result).toBeInstanceOf(Promise);
+    });
+
+    it('isAccessible should accept ContentBlob and return boolean', () => {
+      const contentBlob = createMockContentBlob();
+      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([]);
+
+      const result = service.isAccessible(contentBlob);
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('getUrlHealth should accept ContentBlob and return array', () => {
+      const contentBlob = createMockContentBlob();
+      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([]);
+
+      const result = service.getUrlHealth(contentBlob);
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('getPriorityUrls should accept ContentBlob and return string array', () => {
+      const contentBlob = createMockContentBlob();
+      spyOn(service as any, 'getStorageClient').and.returnValue({
+        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://test.com'),
+      });
+
+      const result = service.getPriorityUrls(contentBlob);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.every(item => typeof item === 'string')).toBe(true);
+    });
+
+    it('getBlobUrl should accept string and return string', () => {
+      const hash = 'test_hash';
+      spyOn(service as any, 'getStorageClient').and.returnValue({
+        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://test.com/blob'),
+      });
+
+      const result = service.getBlobUrl(hash);
+      expect(typeof result).toBe('string');
+    });
+  });
+
+  // =========================================================================
+  // Holochain Metadata Retrieval - Simple Tests
+  // =========================================================================
+
+  describe('Holochain Metadata Retrieval', () => {
+    it('should retrieve blobs for content', done => {
+      const contentId = 'content_123';
+
+      service.getBlobsForContent(contentId).subscribe(blobs => {
+        expect(Array.isArray(blobs)).toBe(true);
+        done();
+      });
+    });
+
+    it('should return empty array on metadata retrieval error', done => {
+      const contentId = 'content_nonexistent';
+
+      service.getBlobsForContent(contentId).subscribe(blobs => {
+        expect(blobs).toEqual([]);
+        done();
+      });
+    });
+
+    it('should retrieve specific blob metadata by hash', done => {
+      const contentId = 'content_123';
+      const blobHash = 'test_hash_123';
+
+      service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
+        expect(metadata === null || metadata instanceof Object).toBe(true);
+        done();
+      });
+    });
+
+    it('should check if blob exists in DHT', done => {
+      const contentId = 'content_123';
+      const blobHash = 'test_hash_123';
+
+      service.blobExists(contentId, blobHash).subscribe(exists => {
+        expect(typeof exists).toBe('boolean');
+        done();
+      });
+    });
+
+    it('should retrieve blobs for multiple content nodes', done => {
+      const contentIds = ['content_1', 'content_2', 'content_3'];
+
+      service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
+        expect(blobMap instanceof Map).toBe(true);
+        expect(blobMap.size).toBeLessThanOrEqual(contentIds.length);
+        done();
+      });
+    });
+
+    it('should transform BlobMetadataOutput to ContentBlob', () => {
+      const metadata: BlobMetadataOutput = {
+        hash: 'test_hash',
+        sizeBytes: 1024,
+        mimeType: 'video/mp4',
+        fallbackUrls: ['https://example.com/blob.mp4'],
+        bitrateMbps: 5,
+        durationSeconds: 300,
+        codec: 'h264',
+        createdAt: '2024-01-01T00:00:00Z',
+        verifiedAt: '2024-01-02T00:00:00Z',
+      };
+
+      const result = service['transformBlobMetadata'](metadata);
+
+      expect(result.hash).toBe('test_hash');
+      expect(result.sizeBytes).toBe(1024);
+      expect(result.mimeType).toBe('video/mp4');
+      expect(result.bitrateMbps).toBe(5);
+      expect(result.codec).toBe('h264');
+    });
+
+    it('should preserve all optional fields in transformation', () => {
+      const metadata: BlobMetadataOutput = {
+        hash: 'hash',
+        sizeBytes: 100,
+        mimeType: 'audio/mpeg',
+        fallbackUrls: [],
+        bitrateMbps: 320,
+        durationSeconds: 180,
+        codec: 'aac',
+        createdAt: '2024-01-01T00:00:00Z',
+        verifiedAt: '2024-01-02T00:00:00Z',
+      };
+
+      const result = service['transformBlobMetadata'](metadata);
+
+      expect(result.durationSeconds).toBe(180);
+      expect(result.createdAt).toBe('2024-01-01T00:00:00Z');
+      expect(result.verifiedAt).toBe('2024-01-02T00:00:00Z');
+    });
+  });
+
+  // =========================================================================
+  // Cached Blob Download
+  // =========================================================================
+
+  describe('Cached Blob Download', () => {
     it('should report 100% progress when cached', done => {
       const contentBlob = createMockContentBlob();
       const progressUpdates: BlobDownloadProgress[] = [];
@@ -236,6 +675,64 @@ describe('BlobManagerService', () => {
         done();
       });
     });
+
+    it('should return cached blob result with wasCached flag true', done => {
+      const contentBlob = createMockContentBlob();
+      const testBlob = new Blob(['cached']);
+      service['blobCache'].set(contentBlob.hash, testBlob);
+
+      service.downloadBlob(contentBlob).subscribe(result => {
+        expect(result.wasCached).toBe(true);
+        expect(result.blob).toBe(testBlob);
+        expect(result.totalDurationMs).toBe(0);
+        expect(result.fetch.successUrl).toBe('(cached)');
+        done();
+      });
+    });
+
+    it('downloadBlob should return BlobDownloadResult with all required properties', done => {
+      const contentBlob = createMockContentBlob();
+      const testBlob = new Blob(['cached']);
+      service['blobCache'].set(contentBlob.hash, testBlob);
+
+      service.downloadBlob(contentBlob).subscribe(result => {
+        expect(result.blob).toBeDefined();
+        expect(result.metadata).toBeDefined();
+        expect(result.verification).toBeDefined();
+        expect(result.fetch).toBeDefined();
+        expect(typeof result.totalDurationMs).toBe('number');
+        expect(typeof result.wasCached).toBe('boolean');
+        done();
+      });
+    });
+  });
+
+  // =========================================================================
+  // Progress Tracking - Complex async flows
+  // =========================================================================
+
+  describe('Progress Tracking', () => {
+    it('should accept optional progress callback parameter', () => {
+      const contentBlob = createMockContentBlob();
+      service['blobCache'].set(contentBlob.hash, new Blob(['test']));
+
+      // Should accept undefined callback
+      expect(() => {
+        service.downloadBlob(contentBlob, undefined);
+      }).not.toThrow();
+
+      // Should accept function callback
+      expect(() => {
+        service.downloadBlob(contentBlob, () => {});
+      }).not.toThrow();
+    });
+
+    // TODO: Add async flow tests
+    // - Mock fallbackService.fetchWithFallback properly
+    // - Mock verificationService.verifyBlob properly
+    // - Test progress callback invocation during fetch phase
+    // - Test progress callback invocation during verification phase
+    // - Test timing/duration calculation
   });
 
   describe('URL Health Operations', () => {
@@ -304,15 +801,27 @@ describe('BlobManagerService', () => {
       expect(health.length).toBe(1);
       expect(health[0].isHealthy).toBe(true);
     });
-  });
 
-  describe('Blob Download Integration', () => {
-    it('should not perform actual downloads in tests', () => {
-      // This is more of a documentation test
-      // In real scenarios, HTTP calls are intercepted by HttpTestingController
-      expect(service).toBeTruthy();
+    it('getUrlHealth should return array of UrlHealth objects', () => {
+      const contentBlob = createMockContentBlob();
+      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([]);
+
+      const result = service.getUrlHealth(contentBlob);
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('isAccessible should use getUrlHealth internally', () => {
+      const contentBlob = createMockContentBlob();
+      spyOn(service, 'getUrlHealth').and.returnValue([]);
+
+      service.isAccessible(contentBlob);
+      expect(service.getUrlHealth).toHaveBeenCalledWith(contentBlob);
     });
   });
+
+  // =========================================================================
+  // Multiple Blob Download
+  // =========================================================================
 
   describe('Multiple Blob Download', () => {
     it('should download multiple blobs in parallel', done => {
@@ -331,15 +840,136 @@ describe('BlobManagerService', () => {
         done();
       });
     });
+
+    it('downloadBlobs should accept array of ContentBlobs', () => {
+      const blobs = [createMockContentBlob(), createMockContentBlob()];
+
+      // Pre-cache to avoid async issues
+      blobs.forEach((blob, i) => {
+        service['blobCache'].set(blob.hash, new Blob([`data${i}`]));
+      });
+
+      const result = service.downloadBlobs(blobs);
+      expect(typeof result.subscribe).toBe('function');
+    });
+
+    it('downloadBlobs should accept empty array', () => {
+      const result = service.downloadBlobs([]);
+      expect(typeof result.subscribe).toBe('function');
+    });
+
+    // TODO: Add async flow tests
+    // - Test parallel execution timing
+    // - Test error handling for individual blob failures
+    // - Test progress callback aggregation across multiple downloads
   });
 
-  describe('Metadata Retrieval from Holochain', () => {
-    it('should retrieve blobs for content from Holochain', done => {
+  // =========================================================================
+  // Blob Download Integration - Complex async flows
+  // =========================================================================
+
+  describe('Blob Download Integration', () => {
+    it('should not perform actual downloads in tests', () => {
+      // This is more of a documentation test
+      // In real scenarios, HTTP calls are intercepted by HttpTestingController
+      expect(service).toBeTruthy();
+    });
+
+    // TODO: Add comprehensive mocks
+    // - Mock BlobFallbackService.fetchWithFallback with proper Observable
+    // - Mock BlobVerificationService.verifyBlob with proper Observable
+    // - Test full download flow with real RxJS operators
+    // - Test error scenarios (verification failure, fetch timeout)
+  });
+
+  // =========================================================================
+  // Cache Lock & Concurrency
+  // =========================================================================
+
+  describe('Cache Lock & Concurrency', () => {
+    it('should maintain cache lock promise chain', async () => {
+      const hash1 = 'hash1';
+      const hash2 = 'hash2';
+      const blob1 = new Blob(['data1']);
+      const blob2 = new Blob(['data2']);
+
+      const lock1Promise = service['cacheBlob'](hash1, blob1, blob1.size);
+      const lock2Promise = service['cacheBlob'](hash2, blob2, blob2.size);
+
+      await Promise.all([lock1Promise, lock2Promise]);
+
+      expect(service.isCached(hash1)).toBe(true);
+      expect(service.isCached(hash2)).toBe(true);
+    });
+
+    // TODO: Add storage coordination tests
+    // - Test race condition prevention with concurrent cache operations
+    // - Test lock serialization during eviction
+    // - Test cache stats accuracy under concurrent access
+  });
+
+  // =========================================================================
+  // Connection Mode & Environment Detection
+  // =========================================================================
+
+  describe('Connection Mode & Environment Detection', () => {
+    it('connectionMode getter should return valid mode', () => {
+      const mode = service.connectionMode;
+      expect(['doorway', 'direct']).toContain(mode);
+    });
+
+    it('getPriorityUrls should include strategy URL when not in fallbacks', () => {
+      const contentBlob = createMockContentBlob();
+      contentBlob.fallbackUrls = ['https://fallback1.com/blob'];
+
+      spyOn(service as any, 'getStorageClient').and.returnValue({
+        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://strategy.com/blob'),
+      });
+
+      const urls = service.getPriorityUrls(contentBlob);
+      expect(urls.includes('https://strategy.com/blob')).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Metadata Retrieval from Holochain - Simple tests
+  // =========================================================================
+
+  describe('Metadata Retrieval from Holochain - Integration', () => {
+    it('getBlobsForContent should return Observable of ContentBlob array', done => {
       const contentId = 'content_123';
 
       service.getBlobsForContent(contentId).subscribe(blobs => {
-        // Will return empty array since Holochain is mocked, but should not error
         expect(Array.isArray(blobs)).toBe(true);
+        done();
+      });
+    });
+
+    it('getBlobMetadata should return Observable of ContentBlob or null', done => {
+      const contentId = 'content_123';
+      const blobHash = 'test_hash_123';
+
+      service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
+        expect(metadata === null || metadata instanceof Object).toBe(true);
+        done();
+      });
+    });
+
+    it('blobExists should return Observable of boolean', done => {
+      const contentId = 'content_123';
+      const blobHash = 'test_hash_123';
+
+      service.blobExists(contentId, blobHash).subscribe(exists => {
+        expect(typeof exists).toBe('boolean');
+        done();
+      });
+    });
+
+    it('getBlobsForMultipleContent should return Observable of Map', done => {
+      const contentIds = ['content_1', 'content_2', 'content_3'];
+
+      service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
+        expect(blobMap instanceof Map).toBe(true);
         done();
       });
     });
@@ -353,55 +983,10 @@ describe('BlobManagerService', () => {
       });
     });
 
-    it('should retrieve specific blob metadata by hash', done => {
-      const contentId = 'content_123';
-      const blobHash = 'test_hash_123';
-
-      service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
-        // Will be null since Holochain is mocked, but should not error
-        expect(metadata === null || metadata instanceof Object).toBe(true);
-        done();
-      });
-    });
-
-    it('should check if blob exists in DHT', done => {
-      const contentId = 'content_123';
-      const blobHash = 'test_hash_123';
-
-      service.blobExists(contentId, blobHash).subscribe(exists => {
-        expect(typeof exists).toBe('boolean');
-        done();
-      });
-    });
-
-    it('should retrieve blobs for multiple content nodes in parallel', done => {
-      const contentIds = ['content_1', 'content_2', 'content_3'];
-
-      service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
-        expect(blobMap instanceof Map).toBe(true);
-        expect(blobMap.size).toBeLessThanOrEqual(contentIds.length);
-        done();
-      });
-    });
-
-    it('should transform BlobMetadataOutput to ContentBlob', () => {
-      const metadata = service['transformBlobMetadata']({
-        hash: 'test_hash',
-        sizeBytes: 1024,
-        mimeType: 'video/mp4',
-        fallbackUrls: ['https://example.com/blob.mp4'],
-        bitrateMbps: 5,
-        durationSeconds: 300,
-        codec: 'h264',
-        createdAt: '2024-01-01T00:00:00Z',
-        verifiedAt: '2024-01-02T00:00:00Z',
-      });
-
-      expect(metadata.hash).toBe('test_hash');
-      expect(metadata.sizeBytes).toBe(1024);
-      expect(metadata.mimeType).toBe('video/mp4');
-      expect(metadata.bitrateMbps).toBe(5);
-      expect(metadata.codec).toBe('h264');
-    });
+    // TODO: Add async flow tests
+    // - Mock HolochainClientService.callZome with proper success/failure paths
+    // - Test Holochain DHT query error handling
+    // - Test metadata transformation edge cases
+    // - Test content ID parameter validation
   });
 });

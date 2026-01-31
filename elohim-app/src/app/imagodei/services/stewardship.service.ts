@@ -206,17 +206,17 @@ function toGrant(raw: RawStewardshipGrant): StewardshipGrant {
 }
 
 function toPolicy(raw: RawDevicePolicy): DevicePolicy {
-  const blockedCategories = JSON.parse(raw.blockedCategoriesJson || '[]');
-  const blockedHashes = JSON.parse(raw.blockedHashesJson || '[]');
+  const blockedCategories = JSON.parse(raw.blockedCategoriesJson ?? '[]');
+  const blockedHashes = JSON.parse(raw.blockedHashesJson ?? '[]');
   const ageRatingMax = (raw.ageRatingMax ?? undefined) as DevicePolicy['ageRatingMax'];
   const reachLevelMax = raw.reachLevelMax ?? undefined;
   const sessionMaxMinutes = raw.sessionMaxMinutes ?? undefined;
   const dailyMaxMinutes = raw.dailyMaxMinutes ?? undefined;
-  const timeWindows = JSON.parse(raw.timeWindowsJson || '[]');
+  const timeWindows = JSON.parse(raw.timeWindowsJson ?? '[]');
   const cooldownMinutes = raw.cooldownMinutes ?? undefined;
-  const disabledFeatures = JSON.parse(raw.disabledFeaturesJson || '[]');
-  const disabledRoutes = JSON.parse(raw.disabledRoutesJson || '[]');
-  const requireApproval = JSON.parse(raw.requireApprovalJson || '[]');
+  const disabledFeatures = JSON.parse(raw.disabledFeaturesJson ?? '[]');
+  const disabledRoutes = JSON.parse(raw.disabledRoutesJson ?? '[]');
+  const requireApproval = JSON.parse(raw.requireApprovalJson ?? '[]');
 
   return {
     id: raw.id,
@@ -298,7 +298,7 @@ function toAppeal(raw: RawStewardshipAppeal): StewardshipAppeal {
     grantId: raw.grantId,
     policyId: raw.policyId ?? undefined,
     appealType: raw.appealType as StewardshipAppeal['appealType'],
-    grounds: JSON.parse(raw.groundsJson || '[]'),
+    grounds: JSON.parse(raw.groundsJson ?? '[]'),
     evidenceJson: raw.evidenceJson,
     advocateId: raw.advocateId ?? undefined,
     advocateNotes: raw.advocateNotes ?? undefined,
@@ -322,8 +322,8 @@ function toActivityLog(raw: RawActivityLog): ActivityLog {
     sessionId: raw.sessionId,
     sessionStartedAt: raw.sessionStartedAt,
     sessionDurationMinutes: raw.sessionDurationMinutes,
-    categoriesAccessed: JSON.parse(raw.categoriesAccessedJson || '[]'),
-    policyEvents: JSON.parse(raw.policyEventsJson || '[]'),
+    categoriesAccessed: JSON.parse(raw.categoriesAccessedJson ?? '[]'),
+    policyEvents: JSON.parse(raw.policyEventsJson ?? '[]'),
     loggedAt: raw.loggedAt,
     retentionExpiresAt: raw.retentionExpiresAt,
   };
@@ -463,10 +463,7 @@ export class StewardshipService {
    */
   async checkFeatureAccess(feature: string): Promise<boolean> {
     // Ensure we have policy
-    let policy = this.policySignal();
-    if (!policy) {
-      policy = await this.getMyPolicy();
-    }
+    const policy = this.policySignal() ?? (await this.getMyPolicy());
 
     if (!policy) {
       return true; // Fail open
@@ -479,10 +476,7 @@ export class StewardshipService {
    * Check if a route is accessible based on current policy.
    */
   async checkRouteAccess(route: string): Promise<boolean> {
-    let policy = this.policySignal();
-    if (!policy) {
-      policy = await this.getMyPolicy();
-    }
+    const policy = this.policySignal() ?? (await this.getMyPolicy());
 
     if (!policy) {
       return true; // Fail open
@@ -503,10 +497,7 @@ export class StewardshipService {
    * Returns remaining time if applicable.
    */
   async checkTimeAccess(): Promise<TimeAccessDecision> {
-    let policy = this.policySignal();
-    if (!policy) {
-      policy = await this.getMyPolicy();
-    }
+    const policy = this.policySignal() ?? (await this.getMyPolicy());
 
     if (!policy) {
       return { status: 'allowed' };

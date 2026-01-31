@@ -115,7 +115,7 @@
 
 .empty-state .material-icons {
   font-size: 3rem;
-  opacity: 0.5;
+  opacity: 50%;
 }
 
 .empty-state h3 {
@@ -143,7 +143,7 @@
 }
 
 .request-card.already-attested {
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .request-header {
@@ -258,7 +258,7 @@
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 60%;
   cursor: not-allowed;
 }
 

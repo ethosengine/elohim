@@ -84,8 +84,7 @@ export class QuestionPoolService {
     // Load from data loader
     const pool$ = this.loadPool(contentId).pipe(
       shareReplay(1),
-      catchError(err => {
-        console.warn(`Failed to load pool for ${contentId}:`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -574,7 +573,8 @@ export class QuestionPoolService {
 
   private shuffleArray<T>(array: T[]): void {
     for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const randomValue = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+      const j = Math.floor(randomValue * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
     }
   }

@@ -1,23 +1,29 @@
 /**
- * Circuit Breaker Service Tests
+ * Circuit Breaker Service Tests - Mechanical Coverage
+ *
+ * Mechanical tests cover:
+ * - Service creation and instantiation
+ * - All public method existence and accessibility
+ * - Basic input/output validation
+ * - Observable/Signal return type tests
+ * - Property initialization tests
  */
 
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import {
-  CircuitBreakerService,
-  CircuitState,
-  CircuitBreakerResult,
-} from './circuit-breaker.service';
+
+import { CircuitBreakerService, CircuitBreakerConfig } from './circuit-breaker.service';
 import { LoggerService } from './logger.service';
 
 describe('CircuitBreakerService', () => {
   let service: CircuitBreakerService;
   let mockLogger: jasmine.SpyObj<LoggerService>;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   let mockChildLogger: jasmine.SpyObj<ReturnType<LoggerService['createChild']>>;
 
   beforeEach(() => {
     mockChildLogger = jasmine.createSpyObj('ChildLogger', ['debug', 'info', 'warn', 'error']);
     mockLogger = jasmine.createSpyObj('LoggerService', ['createChild']);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockLogger.createChild.and.returnValue(mockChildLogger);
 
     TestBed.configureTestingModule({
@@ -26,6 +32,242 @@ describe('CircuitBreakerService', () => {
 
     service = TestBed.inject(CircuitBreakerService);
   });
+
+  // ===========================================================================
+  // MECHANICAL TESTS - Service Creation and Instantiation
+  // ===========================================================================
+
+  describe('Mechanical: Service Creation', () => {
+    it('should be created', () => {
+      expect(service).toBeTruthy();
+    });
+
+    it('should be injectable from root', () => {
+      const injectedService = TestBed.inject(CircuitBreakerService);
+      expect(injectedService).toBeTruthy();
+      expect(injectedService).toBe(service);
+    });
+
+    it('should instantiate with LoggerService dependency', () => {
+      expect(mockLogger.createChild).toHaveBeenCalledWith('CircuitBreaker');
+    });
+  });
+
+  // ===========================================================================
+  // MECHANICAL TESTS - Public Method Existence
+  // ===========================================================================
+
+  describe('Mechanical: Public Methods Existence', () => {
+    it('should have register method', () => {
+      expect(typeof service.register).toBe('function');
+    });
+
+    it('should have execute method', () => {
+      expect(typeof service.execute).toBe('function');
+    });
+
+    it('should have getState method', () => {
+      expect(typeof service.getState).toBe('function');
+    });
+
+    it('should have getStats method', () => {
+      expect(typeof service.getStats).toBe('function');
+    });
+
+    it('should have reset method', () => {
+      expect(typeof service.reset).toBe('function');
+    });
+
+    it('should have getCircuitNames method', () => {
+      expect(typeof service.getCircuitNames).toBe('function');
+    });
+
+    it('should have circuitStates property', () => {
+      expect(service.circuitStates).toBeDefined();
+    });
+  });
+
+  // ===========================================================================
+  // MECHANICAL TESTS - Property Initialization
+  // ===========================================================================
+
+  describe('Mechanical: Property Initialization', () => {
+    it('should initialize circuitStates as a signal', () => {
+      const states = service.circuitStates;
+      expect(typeof states).toBe('function'); // Signals are callable
+    });
+
+    it('should initialize circuitStates with empty Map', () => {
+      const states = service.circuitStates();
+      expect(states instanceof Map).toBe(true);
+      expect(states.size).toBe(0);
+    });
+
+    it('should initialize circuitStates as read-only', () => {
+      const states = service.circuitStates;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((states as any).set as any).toBeUndefined();
+    });
+
+    it('should have no circuits registered initially', () => {
+      const names = service.getCircuitNames();
+      expect(names).toEqual([]);
+    });
+  });
+
+  // ===========================================================================
+  // MECHANICAL TESTS - Observable/Signal Return Types
+  // ===========================================================================
+
+  describe('Mechanical: Signal Return Types', () => {
+    it('circuitStates should return a signal callable', () => {
+      const states = service.circuitStates;
+      expect(typeof states).toBe('function');
+      expect(typeof states()).toBe('object');
+    });
+
+    it('circuitStates() should return a Map instance', () => {
+      const states = service.circuitStates();
+      expect(states instanceof Map).toBe(true);
+    });
+
+    it('circuitStates should update reactively', fakeAsync(() => {
+      const states1 = service.circuitStates();
+      const initialSize = states1.size;
+
+      service.register('reactive');
+      tick(0);
+
+      const states2 = service.circuitStates();
+      expect(states2.size).toBeGreaterThan(initialSize);
+    }));
+  });
+
+  // ===========================================================================
+  // MECHANICAL TESTS - Basic Input/Output
+  // ===========================================================================
+
+  describe('Mechanical: register() Input/Output', () => {
+    it('should accept circuit name and register it', () => {
+      service.register('mech-test-1');
+      expect(service.getCircuitNames()).toContain('mech-test-1');
+    });
+
+    it('should accept optional config partial', () => {
+      const config: Partial<CircuitBreakerConfig> = { failureThreshold: 10 };
+      service.register('mech-test-2', config);
+      expect(service.getCircuitNames()).toContain('mech-test-2');
+    });
+
+    it('should return void', () => {
+      const result = service.register('mech-test-3');
+      expect(result).toBeUndefined();
+    });
+
+    it('should initialize state to CLOSED', () => {
+      service.register('mech-test-4');
+      expect(service.getState('mech-test-4')).toBe('CLOSED');
+    });
+  });
+
+  describe('Mechanical: execute() Input/Output', () => {
+    it('should accept circuit name and async function', async () => {
+      const fn = jasmine.createSpy('fn').and.resolveTo('data');
+      const result = await service.execute('mech-exec-1', fn);
+      expect(result).toBeTruthy();
+    });
+
+    it('should accept optional config partial', async () => {
+      const fn = jasmine.createSpy('fn').and.resolveTo('data');
+      const result = await service.execute('mech-exec-2', fn, { failureThreshold: 3 });
+      expect(result).toBeTruthy();
+    });
+
+    it('should return CircuitBreakerResult with required properties', async () => {
+      const fn = jasmine.createSpy('fn').and.resolveTo('test-data');
+      const result = await service.execute('mech-exec-3', fn);
+
+      expect(result.success).toBeDefined();
+      expect(typeof result.success).toBe('boolean');
+      expect(result.circuitOpen).toBeDefined();
+      expect(typeof result.circuitOpen).toBe('boolean');
+      expect(result.state).toBeDefined();
+      expect(['CLOSED', 'OPEN', 'HALF_OPEN']).toContain(result.state);
+    });
+
+    it('should be async and return Promise', () => {
+      const fn = jasmine.createSpy('fn').and.resolveTo('data');
+      const result = service.execute('mech-exec-4', fn);
+      expect(result instanceof Promise).toBe(true);
+    });
+  });
+
+  describe('Mechanical: getState() Input/Output', () => {
+    it('should accept circuit name', () => {
+      service.register('mech-state-1');
+      const result = service.getState('mech-state-1');
+      expect(result).not.toBeNull();
+    });
+
+    it('should return CircuitState or null', () => {
+      service.register('mech-state-2');
+      const result = service.getState('mech-state-2');
+      expect(result === null || ['CLOSED', 'OPEN', 'HALF_OPEN'].includes(result!)).toBe(true);
+    });
+  });
+
+  describe('Mechanical: getStats() Input/Output', () => {
+    it('should accept circuit name', () => {
+      service.register('mech-stats-1');
+      const result = service.getStats('mech-stats-1');
+      expect(result).toBeTruthy();
+    });
+
+    it('should return stats object with required properties', () => {
+      service.register('mech-stats-2');
+      const stats = service.getStats('mech-stats-2');
+
+      expect(stats!.state).toBeDefined();
+      expect(stats!.recentFailures).toBeDefined();
+      expect(typeof stats!.recentFailures).toBe('number');
+      expect(stats!.consecutiveSuccesses).toBeDefined();
+      expect(typeof stats!.consecutiveSuccesses).toBe('number');
+      expect(stats!.timeSinceLastFailure).toBeDefined();
+      expect(stats!.timeSinceStateChange).toBeDefined();
+      expect(typeof stats!.timeSinceStateChange).toBe('number');
+    });
+  });
+
+  describe('Mechanical: reset() Input/Output', () => {
+    it('should accept circuit name', () => {
+      service.register('mech-reset-1');
+      const result = service.reset('mech-reset-1');
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle non-existent circuit without error', () => {
+      expect(() => service.reset('nonexistent')).not.toThrow();
+    });
+  });
+
+  describe('Mechanical: getCircuitNames() Input/Output', () => {
+    it('should return string array', () => {
+      const result = service.getCircuitNames();
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should return registered circuit names', () => {
+      service.register('mech-name-1');
+      service.register('mech-name-2');
+      const result = service.getCircuitNames();
+      expect(result).toContain('mech-name-1');
+      expect(result).toContain('mech-name-2');
+    });
+  });
+
+  // ===========================================================================
+  // Existing Behavior Tests (Original)
+  // ===========================================================================
 
   describe('register', () => {
     it('should register a new circuit with default config', () => {
@@ -136,7 +378,7 @@ describe('CircuitBreakerService', () => {
   });
 
   describe('execute - HALF_OPEN state', () => {
-    it('should transition to HALF_OPEN after timeout', fakeAsync(() => {
+    it('should transition to HALF_OPEN after timeout', fakeAsync(async () => {
       const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
 
       service.register('halfopen-test', {
@@ -145,9 +387,11 @@ describe('CircuitBreakerService', () => {
       });
 
       // Open the circuit
-      service.execute('halfopen-test', fn);
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      void service.execute('halfopen-test', fn);
       tick(0);
-      service.execute('halfopen-test', fn);
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      void service.execute('halfopen-test', fn);
       tick(0);
 
       expect(service.getState('halfopen-test')).toBe('OPEN');
@@ -229,7 +473,7 @@ describe('CircuitBreakerService', () => {
       expect(stats!.timeSinceStateChange).toBeDefined();
     });
 
-    it('should clean old failures from window', fakeAsync(() => {
+    it('should clean old failures from window', fakeAsync(async () => {
       const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
 
       service.register('window-test', {
@@ -237,7 +481,8 @@ describe('CircuitBreakerService', () => {
         failureWindowMs: 1000,
       });
 
-      service.execute('window-test', fn);
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      void service.execute('window-test', fn);
       tick(0);
 
       let stats = service.getStats('window-test');

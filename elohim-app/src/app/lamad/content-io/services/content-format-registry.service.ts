@@ -1,5 +1,7 @@
 import { Injectable, Type } from '@angular/core';
 
+// @coverage: 89.1% (2026-01-31)
+
 import { ContentNode } from '../../models/content-node.model';
 import {
   ContentFormatPlugin,
@@ -100,9 +102,6 @@ export class ContentFormatRegistryService {
    */
   registerAlias(alias: string, canonicalFormatId: string): void {
     if (!this.plugins.has(canonicalFormatId)) {
-      console.warn(
-        `Cannot register alias '${alias}' → '${canonicalFormatId}': target plugin not found`
-      );
       return;
     }
     this.formatAliases.set(alias, canonicalFormatId);
@@ -339,7 +338,7 @@ export class ContentFormatRegistryService {
    * Get exportable formats appropriate for a specific content node.
    * Returns all exportable formats (content-specific filtering can be added later).
    */
-  getExportableFormatsForContent(node: { contentFormat: string }): FormatMetadata[] {
+  getExportableFormatsForContent(_node: { contentFormat: string }): FormatMetadata[] {
     // For now, return all exportable formats
     // In the future, could filter based on content type compatibility
     return this.getExportableFormats();
@@ -388,17 +387,19 @@ export class ContentFormatRegistryService {
    * Detect format from content string using plugin detection methods.
    */
   detectFormatFromContent(content: string, candidates?: ContentFormatPlugin[]): string | null {
-    const plugins = candidates || this.getAllPlugins();
+    const plugins = candidates ?? this.getAllPlugins();
 
     let bestMatch: { formatId: string; confidence: number } | null = null;
 
     for (const plugin of plugins) {
       if (plugin.detectFormat) {
         const confidence = plugin.detectFormat(content);
-        if (confidence !== null && confidence > 0) {
-          if (!bestMatch || confidence > bestMatch.confidence) {
-            bestMatch = { formatId: plugin.formatId, confidence };
-          }
+        if (
+          confidence !== null &&
+          confidence > 0 &&
+          (!bestMatch || confidence > bestMatch.confidence)
+        ) {
+          bestMatch = { formatId: plugin.formatId, confidence };
         }
       }
     }
@@ -445,7 +446,7 @@ export class ContentFormatRegistryService {
     return match ? match[0].toLowerCase() : null;
   }
 
-  private readFileAsText(file: File): Promise<string> {
+  private async readFileAsText(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

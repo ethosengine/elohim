@@ -1,6 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal, computed } from '@angular/core';
 
+// @coverage: 86.2% (2026-01-31)
+
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
 import { Observable, Subject, catchError, of, retry, timeout } from 'rxjs';
@@ -154,19 +156,15 @@ export class DoorwayAdminService {
     const host = this.baseUrl ? new URL(this.baseUrl).host : window.location.host;
     const wsUrl = `${wsProtocol}//${host}/admin/ws`;
 
-    console.log('[DoorwayAdmin] Connecting to WebSocket:', wsUrl);
-
     this.ws$ = webSocket<DashboardMessage | ClientMessage>({
       url: wsUrl,
       openObserver: {
         next: () => {
-          console.log('[DoorwayAdmin] WebSocket connected');
           this._connectionState.set('connected');
         },
       },
       closeObserver: {
         next: () => {
-          console.log('[DoorwayAdmin] WebSocket disconnected');
           this._connectionState.set('disconnected');
           this.ws$ = null;
         },
@@ -181,8 +179,7 @@ export class DoorwayAdminService {
           this.wsMessages$.next(msg);
         }
       },
-      error: err => {
-        console.error('[DoorwayAdmin] WebSocket error:', err);
+      error: () => {
         this._connectionState.set('error');
         this.ws$ = null;
       },
@@ -265,7 +262,7 @@ export class DoorwayAdminService {
         break;
 
       case 'heartbeat':
-        // Could trigger a UI pulse or log
+        // eslint-disable-next-line no-console
         console.debug('[DoorwayAdmin] Heartbeat received');
         break;
 
@@ -284,11 +281,11 @@ export class DoorwayAdminService {
    */
   private handleError<T>(operation: string, fallback: T) {
     return (error: HttpErrorResponse): Observable<T> => {
-      console.error(`[DoorwayAdmin] ${operation} failed:`, error.message);
-
-      // Could emit to an error service here
-      if (error.status === 503) {
-        console.warn('[DoorwayAdmin] Orchestrator not enabled on this doorway');
+      // Log specific warnings for known error conditions
+      if (operation === 'getCustodians' && error.status === 503) {
+        console.warn(
+          `[DoorwayAdmin] ${operation} failed with 503: Orchestrator not enabled or unavailable`
+        );
       }
 
       return of(fallback);

@@ -18,9 +18,10 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 3.5% (2026-01-31)
+
 import { HolochainClientService } from './holochain-client.service';
 
-// Mastery types
 import type {
   ContentMasteryOutput,
   InitializeMasteryInput,
@@ -32,8 +33,6 @@ import type {
   CheckPrivilegeInput,
   PrivilegeCheckResult,
 } from '@app/lamad/models/content-mastery.model';
-
-// Practice pool and challenge types
 import type {
   LearnerPointBalanceOutput,
   LamadPointEventOutput,
@@ -50,8 +49,6 @@ import type {
   SubmitChallengeInput,
   ChallengeResult,
 } from '@app/lamad/models/practice.model';
-
-// Learning points types
 
 const ZOME_NAME = 'content_store';
 
@@ -89,7 +86,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] initializeMastery failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -107,7 +103,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] recordEngagement failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -124,7 +119,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] recordAssessment failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -141,7 +135,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getMyMastery failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -158,7 +151,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getMyAllMastery failed:', result.error);
       return [];
     }
     return result.data ?? [];
@@ -175,7 +167,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getMasteryBatch failed:', result.error);
       return [];
     }
     return result.data ?? [];
@@ -192,7 +183,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getPathMasteryOverview failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -209,7 +199,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getMyMasteryStats failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -226,7 +215,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] checkPrivilege failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -247,7 +235,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getOrCreatePracticePool failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -264,7 +251,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] refreshPracticePool failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -281,7 +267,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] addPathToPool failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -298,7 +283,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getPoolRecommendations failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -315,7 +299,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] checkChallengeCooldown failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -336,7 +319,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] startMasteryChallenge failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -353,7 +335,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] submitMasteryChallenge failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -370,7 +351,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getChallengeHistory failed:', result.error);
       return [];
     }
     return result.data ?? [];
@@ -392,7 +372,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] earnLamadPoints failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -409,7 +388,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getMyLamadPointBalance failed:', result.error);
       return null;
     }
     return result.data ?? null;
@@ -426,7 +404,6 @@ export class LearnerBackendService {
     });
 
     if (!result.success) {
-      console.warn('[LearnerBackend] getMyLamadPointHistory failed:', result.error);
       return [];
     }
     return result.data ?? [];

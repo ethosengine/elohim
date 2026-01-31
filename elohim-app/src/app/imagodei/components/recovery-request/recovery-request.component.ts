@@ -117,13 +117,13 @@ export class RecoveryRequestComponent implements OnInit, OnDestroy {
     const success = await this.recoveryService.completeRecovery();
     if (success) {
       // Navigate to login after recovery
-      this.router.navigate(['/identity/login']);
+      void this.router.navigate(['/identity/login']);
     }
   }
 
   selectDoorway(): void {
     // Navigate to doorway picker
-    this.router.navigate(['/identity/login'], {
+    void this.router.navigate(['/identity/login'], {
       queryParams: { step: 'doorway' },
     });
   }
@@ -141,7 +141,7 @@ export class RecoveryRequestComponent implements OnInit, OnDestroy {
 
     // Poll every 10 seconds for status updates
     this.pollInterval = setInterval(() => {
-      this.recoveryService.refreshRequestStatus();
+      void this.recoveryService.refreshRequestStatus();
 
       // Check if recovery completed or denied
       const request = this.activeRequest();
@@ -156,7 +156,7 @@ export class RecoveryRequestComponent implements OnInit, OnDestroy {
     }, 10_000);
 
     // Initial fetch
-    this.recoveryService.refreshRequestStatus();
+    void this.recoveryService.refreshRequestStatus();
   }
 
   private stopPolling(): void {

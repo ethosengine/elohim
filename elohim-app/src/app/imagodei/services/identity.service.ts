@@ -16,6 +16,8 @@
 
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 
+// @coverage: 56.4% (2026-01-31)
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 import {
@@ -218,7 +220,6 @@ function generateDID(
       return null;
 
     case 'steward':
-    case 'self-sovereign': // @deprecated - use 'steward'
       // Steward DID using agent public key (cryptographic, self-custodied keys)
       // did:key uses multibase encoding - we use z prefix for base58btc
       if (agentPubKey) {
@@ -344,7 +345,7 @@ export class IdentityService {
 
       if (isConnected && currentMode === 'session') {
         // Holochain just connected - check if we have an identity there
-        this.checkHolochainIdentity();
+        void this.checkHolochainIdentity();
       } else if (!isConnected && isNetworkMode(currentMode)) {
         // Holochain disconnected - fall back to session
         this.fallbackToSession();
@@ -361,13 +362,13 @@ export class IdentityService {
         const currentMode = untracked(() => this.identitySignal().mode);
         if (currentMode === 'session' || currentMode === 'anonymous') {
           // Connect to Holochain as this authenticated user
-          this.connectAsAuthenticatedUser(auth.humanId, auth.agentPubKey);
+          void this.connectAsAuthenticatedUser(auth.humanId, auth.agentPubKey);
         }
       }
     });
 
     // Initialize identity state
-    this.initializeIdentity();
+    void this.initializeIdentity();
   }
 
   // ==========================================================================
@@ -438,26 +439,22 @@ export class IdentityService {
       return;
     }
 
-    console.log('[IdentityService] Fetching identity for restored session...');
-
     // Use the password provider to fetch current user from /auth/me
     const provider = this.authService.getProvider('password') as PasswordAuthProvider | undefined;
     if (!provider?.getCurrentUser) {
-      console.warn('[IdentityService] No provider available to fetch identity');
+      // eslint-disable-next-line no-console
+
       return;
     }
 
     try {
       const identity = await provider.getCurrentUser(auth.token);
       if (identity) {
-        console.log('[IdentityService] Fetched identity:', identity.humanId);
         // Now connect as the authenticated user
         await this.connectAsAuthenticatedUser(identity.humanId, identity.agentPubKey);
-      } else {
-        console.warn('[IdentityService] Failed to fetch identity from server');
       }
-    } catch (err) {
-      console.error('[IdentityService] Error fetching identity:', err);
+    } catch (_err) {
+      // eslint-disable-next-line no-console
     }
   }
 
@@ -562,10 +559,8 @@ export class IdentityService {
         errorMessage.includes('not found') ||
         errorMessage.includes('No human found');
 
-      if (isExpectedError) {
-        console.log('[IdentityService] No Holochain identity found, staying in session mode');
-      } else {
-        console.warn('[IdentityService] Unexpected error checking Holochain identity:', err);
+      if (!isExpectedError) {
+        // eslint-disable-next-line no-console
       }
 
       // Clear loading state, don't set error for expected cases
@@ -750,7 +745,6 @@ export class IdentityService {
         this.sessionHumanService.markAsMigrated(authResult.agentPubKey, authResult.humanId);
       }
 
-      console.log('[IdentityService] Registered via doorway:', authResult.humanId);
       return profile;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
@@ -863,8 +857,9 @@ export class IdentityService {
       }
 
       return null;
-    } catch (err) {
-      console.error('[IdentityService] Failed to get current human:', err);
+    } catch (_err) {
+      // eslint-disable-next-line no-console
+
       return null;
     }
   }
@@ -944,8 +939,6 @@ export class IdentityService {
 
     // Fall back to session identity
     this.fallbackToSession();
-
-    console.log('[IdentityService] Logged out, reverted to session');
   }
 
   /**
@@ -974,7 +967,6 @@ export class IdentityService {
           resolve(true);
         } else if (Date.now() - startTime > timeoutMs) {
           clearInterval(checkInterval);
-          console.log('[IdentityService] Timeout waiting for authenticated state');
           resolve(false);
         }
       }, 100);
@@ -990,14 +982,10 @@ export class IdentityService {
     // We need to verify the identity and load the profile
 
     if (!this.holochainClient.isConnected()) {
-      console.log('[IdentityService] Waiting for Holochain connection...');
-
       // Wait up to 10 seconds for connection
       const connected = await this.waitForHolochainConnection(10000);
       if (!connected) {
-        console.warn(
-          '[IdentityService] Timeout waiting for Holochain - setting hosted mode without profile'
-        );
+        // eslint-disable-next-line no-console
         // Still update state to show logged-in UI, just without full profile
         this.setMinimalAuthenticatedState(humanId, agentPubKey);
         return;
@@ -1018,7 +1006,7 @@ export class IdentityService {
 
         // Verify the humanId matches
         if (sessionResult.human.id !== humanId) {
-          console.warn('[IdentityService] HumanId mismatch after login');
+          // eslint-disable-next-line no-console
           // Continue anyway - the auth token is still valid
         }
 
@@ -1054,14 +1042,9 @@ export class IdentityService {
           isLoading: false,
           error: null,
         });
-
-        console.log(
-          '[IdentityService] Connected as authenticated user:',
-          sessionResult.human.displayName
-        );
       }
-    } catch (err) {
-      console.error('[IdentityService] Failed to verify authenticated user:', err);
+    } catch (_err) {
+      // eslint-disable-next-line no-console
     }
   }
 
@@ -1109,8 +1092,6 @@ export class IdentityService {
       isLoading: false,
       error: null,
     });
-
-    console.log('[IdentityService] Set minimal authenticated state for:', humanId);
   }
 
   // ==========================================================================

@@ -11,7 +11,14 @@
 
     <!-- Error Display -->
     @if (error()) {
-      <div class="error-banner" (click)="clearError()">
+      <div
+        class="error-banner"
+        (click)="clearError()"
+        (keydown.enter)="clearError()"
+        (keydown.space)="clearError()"
+        tabindex="0"
+        role="alert"
+      >
         <span class="error-icon">!</span>
         <span>{{ error() }}</span>
         <button type="button" class="error-dismiss">Dismiss</button>
@@ -39,7 +46,7 @@
 
       <!-- External Identifiers -->
       <div class="form-group">
-        <label>External Identifiers</label>
+        <label id="external-identifiers-label">External Identifiers</label>
         <p class="hint">Link to external profiles for verification when claiming</p>
 
         <!-- Existing identifiers -->
@@ -101,7 +108,7 @@
 
       <!-- Establishing Content -->
       <div class="form-group">
-        <label>Establishing Content</label>
+        <label id="establishing-content-label">Establishing Content</label>
         <p class="hint">Content that establishes this contributor (optional)</p>
 
         <!-- Selected content -->
@@ -141,7 +148,7 @@
                   <button
                     type="button"
                     class="content-result-item"
-                    (click)="addEstablishingContent(result.id, result.title)"
+                    (click)="addEstablishingContent(result.id)"
                   >
                     <span class="result-title">{{ result.title }}</span>
                     <span class="result-id">{{ result.id }}</span>

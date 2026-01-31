@@ -1,6 +1,8 @@
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 
+// @coverage: 33.3% (2026-01-31)
+
 import { ContentNode } from './content-node.model';
 
 /**

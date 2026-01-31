@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 73.5% (2026-01-31)
+
 import {
   ContentIOImportResult,
   ContentIOExportInput,
@@ -350,7 +352,7 @@ export class ContentIOService {
     URL.revokeObjectURL(url);
   }
 
-  private blobToString(blob: Blob): Promise<string> {
+  private async blobToString(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

@@ -20,7 +20,9 @@
  */
 
 import { isPlatformBrowser } from '@angular/common';
-import { InjectionToken, Provider, PLATFORM_ID } from '@angular/core';
+import { ClassProvider, InjectionToken, Provider, PLATFORM_ID } from '@angular/core';
+
+// @coverage: 25.0% (2026-01-31)
 
 import {
   type IConnectionStrategy,
@@ -47,11 +49,7 @@ export const CONNECTION_STRATEGY = new InjectionToken<IConnectionStrategy>('Conn
     const mode: ConnectionMode = environment.holochain?.connectionMode ?? 'auto';
 
     // Create strategy based on mode
-    const strategy = createConnectionStrategy(mode);
-
-    console.warn(`[CONNECTION_STRATEGY] Created ${strategy.name} strategy (mode: ${mode})`);
-
-    return strategy;
+    return createConnectionStrategy(mode);
   },
 });
 
@@ -81,9 +79,7 @@ export function provideConnectionStrategy(mode: ConnectionMode = 'auto'): Provid
 /**
  * Provider that forces Doorway mode (useful for testing).
  */
-// Provider return type varies based on use; explicit return type is Provider
-// eslint-disable-next-line sonarjs/function-return-type
-export function provideDoorwayStrategy(): Provider {
+export function provideDoorwayStrategy(): ClassProvider {
   return {
     provide: CONNECTION_STRATEGY,
     useClass: DoorwayConnectionStrategy,
@@ -93,9 +89,7 @@ export function provideDoorwayStrategy(): Provider {
 /**
  * Provider that forces Direct mode (useful for testing).
  */
-// Provider return type varies based on use; explicit return type is Provider
-// eslint-disable-next-line sonarjs/function-return-type
-export function provideDirectStrategy(): Provider {
+export function provideDirectStrategy(): ClassProvider {
   return {
     provide: CONNECTION_STRATEGY,
     useClass: DirectConnectionStrategy,
@@ -114,7 +108,6 @@ export function provideConnectionStrategySSR(): Provider {
     useFactory: (platformId: object) => {
       // On server, always use doorway (can't detect Tauri/Node.js)
       if (!isPlatformBrowser(platformId)) {
-        console.warn('[CONNECTION_STRATEGY] SSR detected, using doorway strategy');
         return new DoorwayConnectionStrategy();
       }
 

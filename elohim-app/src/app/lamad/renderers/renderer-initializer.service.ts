@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 100.0% (2026-01-31)
+
 import { SophiaRendererComponent } from '../content-io/plugins/sophia/sophia-renderer.component';
 
 import { GherkinRendererComponent } from './gherkin-renderer/gherkin-renderer.component';

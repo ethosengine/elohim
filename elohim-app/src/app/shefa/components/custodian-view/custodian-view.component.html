@@ -69,6 +69,7 @@
       <!-- Tab Navigation -->
       <nav class="tab-nav">
         <button
+          type="button"
           class="tab-btn"
           [class.active]="activeTab === 'helping'"
           (click)="setActiveTab('helping')"
@@ -78,6 +79,7 @@
           <span class="tab-count">{{ view.helpingCount }}</span>
         </button>
         <button
+          type="button"
           class="tab-btn"
           [class.active]="activeTab === 'beingHelped'"
           (click)="setActiveTab('beingHelped')"
@@ -94,6 +96,10 @@
           class="relationship-card"
           *ngFor="let rel of activeList"
           (click)="selectCustodian(rel)"
+          (keydown.enter)="selectCustodian(rel)"
+          (keydown.space)="selectCustodian(rel)"
+          tabindex="0"
+          role="button"
         >
           <!-- Card Header -->
           <div class="card-header">

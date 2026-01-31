@@ -17,7 +17,6 @@
  *   // Start mastery quiz
  *   const newRecord = recordAttempt(record, quizResult);
  * } else {
- *   console.log(`Cooldown ends: ${canAttempt.cooldownEndsAt}`);
  * }
  * ```
  */

@@ -26,8 +26,6 @@
 
 import { Injectable, inject, OnDestroy } from '@angular/core';
 
-import { takeUntil } from 'rxjs/operators';
-
 import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 
 import { ContentNode } from '../../lamad/models/content-node.model';
@@ -176,8 +174,8 @@ export class SeedingService implements OnDestroy {
         content: content.content,
         contentFormat: content.contentFormat,
         tags: content.tags,
-        relatedNodeIds: content.relatedNodeIds || [],
-        metadata: content.metadata || {},
+        relatedNodeIds: content.relatedNodeIds ?? [],
+        metadata: content.metadata ?? {},
       });
 
       this.writeBuffer.queueWrite(content.id, WriteOpType.CreateEntry, payload, priority);
@@ -236,25 +234,25 @@ export class SeedingService implements OnDestroy {
     for (const pathData of paths) {
       const payload = JSON.stringify({
         id: pathData.id,
-        version: pathData.version || '1.0.0',
+        version: pathData.version ?? '1.0.0',
         title: pathData.title,
         description: pathData.description,
-        purpose: pathData.purpose || '',
+        purpose: pathData.purpose ?? '',
         difficulty: pathData.difficulty,
-        estimatedDuration: pathData.estimatedDuration || '',
-        tags: pathData.tags || [],
-        visibility: pathData.visibility || 'public',
+        estimatedDuration: pathData.estimatedDuration ?? '',
+        tags: pathData.tags ?? [],
+        visibility: pathData.visibility ?? 'public',
         metadata: {
           chapters: pathData.chapters,
           ...(pathData as unknown as Record<string, unknown>).metadata,
         },
         steps: pathData.steps.map((step, index) => ({
           orderIndex: step.order ?? index,
-          stepType: step.stepType || 'content',
+          stepType: step.stepType ?? 'content',
           resourceId: step.resourceId,
-          stepTitle: step.stepTitle || `Step ${index + 1}`,
-          stepNarrative: step.stepNarrative || '',
-          isOptional: step.optional || false,
+          stepTitle: step.stepTitle ?? `Step ${index + 1}`,
+          stepNarrative: step.stepNarrative ?? '',
+          isOptional: step.optional ?? false,
         })),
       });
 
@@ -330,8 +328,8 @@ export class SeedingService implements OnDestroy {
         // Call the appropriate zome function based on operation type
         await this.executeBatch(batch);
         successCount += batch.operations.length;
-      } catch (error) {
-        console.error('[SeedingService] Batch failed:', error);
+      } catch {
+        // Batch execution failed - zome call error, all operations in batch marked failed
         failureCount += batch.operations.length;
         for (const op of batch.operations) {
           failedIds.push(op.opId);
@@ -369,22 +367,14 @@ export class SeedingService implements OnDestroy {
           description: parsed.description,
           contentBody: parsed.content, // Backend expects contentBody, not content
           contentFormat: parsed.contentFormat,
-          tags: parsed.tags || [],
+          tags: parsed.tags ?? [],
           metadataJson: parsed.metadataJson,
           reach: 'public',
         };
       });
 
       // Call bulk create via HTTP (through Doorway)
-      const result = await firstValueFrom(this.storageClient.bulkCreateContent(entries));
-
-      // Log result for debugging
-      if (result.errors && result.errors.length > 0) {
-        console.warn(`[SeedingService] ${result.errors.length} errors:`, result.errors.slice(0, 3));
-      }
-      console.log(
-        `[SeedingService] Bulk create: ${result.inserted} inserted, ${result.skipped} skipped`
-      );
+      await firstValueFrom(this.storageClient.bulkCreateContent(entries));
     }
   }
 

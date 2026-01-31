@@ -180,8 +180,7 @@ export class CreatePresenceComponent {
       next: results => {
         this.contentResults.set(results.slice(0, 10).map(c => ({ id: c.id, title: c.title })));
       },
-      error: err => {
-        console.error('[CreatePresence] Content search failed:', err);
+      error: () => {
         this.contentResults.set([]);
       },
     });
@@ -190,7 +189,7 @@ export class CreatePresenceComponent {
   /**
    * Add content to establishing content list.
    */
-  addEstablishingContent(contentId: string, _title: string): void {
+  addEstablishingContent(contentId: string): void {
     if (!this.establishingContentIds().includes(contentId)) {
       this.establishingContentIds.update(ids => [...ids, contentId]);
     }
@@ -248,7 +247,7 @@ export class CreatePresenceComponent {
 
       // Emit success and navigate
       this.created.emit(presence.id);
-      this.router.navigate(['/identity/presences', presence.id]);
+      void this.router.navigate(['/identity/presences', presence.id]);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create presence';
       this.error.set(errorMessage);
@@ -262,7 +261,7 @@ export class CreatePresenceComponent {
    */
   onCancel(): void {
     this.cancelled.emit();
-    this.router.navigate(['/identity/presences']);
+    void this.router.navigate(['/identity/presences']);
   }
 
   /**

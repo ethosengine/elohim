@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 100.0% (2026-01-31)
+
 import { takeUntil, map } from 'rxjs/operators';
 
 import { Subject, combineLatest } from 'rxjs';
@@ -177,7 +179,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Navigate to content viewer
    */
   viewContent(node: ContentNodeWithAffinity): void {
-    this.router.navigate(['/lamad/content', node.id]);
+    void this.router.navigate(['/lamad/content', node.id]);
   }
 
   /**

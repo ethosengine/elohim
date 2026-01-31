@@ -11,6 +11,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+// @coverage: 1.0% (2026-01-31)
+
 import { debounceTime, takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
@@ -137,11 +139,11 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
     // Update UI
     this.validationErrors = errors.map(e => e.message);
 
-    return {
+    return await Promise.resolve({
       valid: errors.length === 0,
       errors,
       warnings,
-    };
+    });
   }
 
   getContent(): ContentIOExportInput {
@@ -209,7 +211,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
     if (event.ctrlKey || event.metaKey) {
       if (event.key === 's') {
         event.preventDefault();
-        this.onSave();
+        void this.onSave();
       } else if (event.key === 'Escape') {
         event.preventDefault();
         this.onCancel();

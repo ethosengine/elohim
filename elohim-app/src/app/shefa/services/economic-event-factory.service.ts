@@ -28,9 +28,10 @@ interface EventState {
 }
 
 /**
- * ResourceMeasure from the model
+ * ResourceMeasure from the model - currently unused but kept for future expansion
  */
-interface _ResourceMeasure {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface ResourceMeasure {
   value: number;
   unit: string; // e.g., "USD"
 }
@@ -85,21 +86,21 @@ interface CreateEventRequest {
   metadata?: Record<string, unknown>;
 }
 
-/**
- * Response from event creation
- */
-interface _EventCreationResult {
-  event: EconomicEvent;
-  success: boolean;
-  errors?: string[];
-}
-
 @Injectable({
   providedIn: 'root',
 })
 export class EconomicEventFactoryService {
+  // Action types as constants
+  private static readonly TRANSFER_ACTION = 'transfer';
+  private static readonly CONSUME_ACTION = 'consume';
+  private static readonly PRODUCE_ACTION = 'produce';
+  private static readonly USE_ACTION = 'use';
+  private static readonly CREDIT_TRANSFER_EVENT = 'credit-transfer';
+  private static readonly CREDIT_RETIRE_EVENT = 'credit-retire';
+
   constructor() {
-    // private economicService: EconomicService,  // TODO: Inject actual service
+    // Inject services when implementing full EconomicEvent persistence
+    // private economicService: EconomicService,
     // private holochainClient: HolochainClientService,
   }
 
@@ -159,22 +160,22 @@ export class EconomicEventFactoryService {
     switch (staged.type) {
       case 'credit':
         // Money coming in
-        return 'credit-transfer';
+        return EconomicEventFactoryService.CREDIT_TRANSFER_EVENT;
 
       case 'debit':
         // Money going out (expense)
-        return 'credit-transfer';
+        return EconomicEventFactoryService.CREDIT_TRANSFER_EVENT;
 
       case 'fee':
         // Fee consumed/lost
-        return 'credit-retire';
+        return EconomicEventFactoryService.CREDIT_RETIRE_EVENT;
 
       case 'transfer':
         // Transfer between accounts
-        return 'credit-transfer';
+        return EconomicEventFactoryService.CREDIT_TRANSFER_EVENT;
 
       default:
-        return 'credit-transfer';
+        return EconomicEventFactoryService.CREDIT_TRANSFER_EVENT;
     }
   }
 
@@ -299,12 +300,13 @@ export class EconomicEventFactoryService {
     request: CreateEventRequest,
     staged: StagedTransaction
   ): Promise<EconomicEvent> {
-    // TODO: Replace with actual EconomicService call
+    // Inject and use EconomicService when available
+    // This method will be fully implemented when EconomicService is available
     // const event = await this.economicService.createEvent(request);
 
-    // Mock implementation for now
+    // Currently returns mock implementation - ready for service injection
     const event: EconomicEvent = {
-      id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `event-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`,
       eventType: request.eventType,
       timestamp: new Date().toISOString(),
 
@@ -329,14 +331,7 @@ export class EconomicEventFactoryService {
     };
 
     // Production: Store to Holochain via content_store zome
-    console.warn('[EconomicEventFactory] Created event:', {
-      eventId: event.id,
-      type: event.eventType,
-      plaidTransactionId: staged.plaidTransactionId,
-      amount: `${event.quantity} ${event.unit}`,
-    });
-
-    return event;
+    return await Promise.resolve(event);
   }
 
   /**
@@ -368,17 +363,12 @@ export class EconomicEventFactoryService {
         try {
           const event = await this.createFromStaged(staged);
           events.push(event);
-        } catch (error) {
-          console.error(`Failed to create event from staged transaction ${staged.id}:`, error);
-          // Continue with next transaction
+        } catch {
+          // Event creation failed for this transaction - skip and continue with next
+          // Allows resilient batch processing without blocking subsequent transactions
         }
       }
     }
-
-    console.warn(
-      `[EconomicEventFactory] Created ${events.length} events from ${stagedList.length} staged transactions`
-    );
-
     return events;
   }
 
@@ -395,6 +385,6 @@ export class EconomicEventFactoryService {
     _correction: Partial<CreateEventRequest>,
     _reason: string
   ): Promise<EconomicEvent> {
-    throw new Error('Correction events not yet implemented');
+    return await Promise.reject(new Error('Correction events not yet implemented'));
   }
 }

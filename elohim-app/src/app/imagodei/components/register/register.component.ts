@@ -172,9 +172,9 @@ export class RegisterComponent implements OnInit {
 
     // Check if already authenticated - redirect if so
     const mode = this.identityService.mode();
-    const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
+    const isNetworkMode = mode === 'hosted' || mode === 'steward';
     if (isNetworkMode && this.identityService.isAuthenticated()) {
-      this.router.navigate([this.returnUrl]);
+      void this.router.navigate([this.returnUrl]);
     }
   }
 
@@ -234,8 +234,6 @@ export class RegisterComponent implements OnInit {
       if (hasSessionToMigrate) {
         // Use migration flow to preserve session progress
         // Migration service will handle identity creation + auth credentials
-        console.log('[Register] Session data found, using migration flow to preserve progress');
-
         const overrides: Partial<RegisterHumanRequest> = {
           displayName: this.form.displayName.trim(),
           bio: this.form.bio.trim() || undefined,
@@ -251,8 +249,6 @@ export class RegisterComponent implements OnInit {
         if (!migrationResult.success) {
           throw new Error(migrationResult.error ?? 'Migration failed');
         }
-
-        console.log('[Register] Session migrated successfully:', migrationResult.migratedData);
       } else {
         // No session data - standard registration via doorway
         // Doorway handles identity creation + auth credentials atomically
@@ -274,7 +270,7 @@ export class RegisterComponent implements OnInit {
       this.form.confirmPassword = '';
 
       // Success - navigate to return URL
-      this.router.navigate([this.returnUrl]);
+      void this.router.navigate([this.returnUrl]);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
       this.error.set(errorMessage);
@@ -323,7 +319,7 @@ export class RegisterComponent implements OnInit {
         // Success - navigate to return URL
         // Note: If email/password were provided, this code path isn't reached
         // (we redirect to onRegister() at the start of this function)
-        this.router.navigate([this.returnUrl]);
+        void this.router.navigate([this.returnUrl]);
       } else {
         this.error.set(result.error ?? 'Migration failed');
       }
@@ -353,7 +349,7 @@ export class RegisterComponent implements OnInit {
    * Navigate to login page.
    */
   goToLogin(): void {
-    this.router.navigate(['/identity/login'], {
+    void this.router.navigate(['/identity/login'], {
       queryParams: { returnUrl: this.returnUrl },
     });
   }
@@ -365,8 +361,7 @@ export class RegisterComponent implements OnInit {
   /**
    * Handle doorway selection from picker.
    */
-  onDoorwaySelected(doorway: DoorwayInfo): void {
-    console.log('[Register] Doorway selected:', doorway.name);
+  onDoorwaySelected(_doorway: DoorwayInfo): void {
     this.currentStep.set('credentials');
   }
 
@@ -374,7 +369,7 @@ export class RegisterComponent implements OnInit {
    * Handle doorway picker cancellation.
    */
   onDoorwayPickerCancelled(): void {
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   /**

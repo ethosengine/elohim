@@ -138,8 +138,8 @@ export class CommunityInterventionComponent implements OnInit {
 
   ngOnInit(): void {
     const interventionId =
-      this.route.snapshot.paramMap.get('interventionId') || this.interventionIdInput();
-    const subjectId = this.route.snapshot.paramMap.get('subjectId') || this.subjectIdInput();
+      this.route.snapshot.paramMap.get('interventionId') ?? this.interventionIdInput();
+    const subjectId = this.route.snapshot.paramMap.get('subjectId') ?? this.subjectIdInput();
 
     if (interventionId) {
       this.mode.set('view');
@@ -158,17 +158,16 @@ export class CommunityInterventionComponent implements OnInit {
   // Data Loading
   // ===========================================================================
 
-  async loadIntervention(interventionId: string): Promise<void> {
+  loadIntervention(_interventionId: string): void {
     this.isLoading.set(true);
     this.error.set(null);
 
     try {
       // TODO: Call zome function to get intervention
       // For now, just set loading to false
-      console.log('[CommunityIntervention] Load:', interventionId);
+
       this.isLoading.set(false);
-    } catch (err) {
-      console.error('[CommunityIntervention] Load failed:', err);
+    } catch (_err) {
       this.error.set('Failed to load intervention.');
       this.isLoading.set(false);
     }
@@ -203,14 +202,14 @@ export class CommunityInterventionComponent implements OnInit {
   // Submit
   // ===========================================================================
 
-  async submitInitiation(): Promise<void> {
+  submitInitiation(): void {
     if (!this.canSubmit() || this.isSubmitting()) return;
 
     this.isSubmitting.set(true);
     this.error.set(null);
 
     try {
-      const input: InitiateInterventionInput = {
+      const _input: InitiateInterventionInput = {
         subjectId: this.subjectId(),
         relationshipLevel: this.relationshipLevel(),
         patternDescription: this.patternDescription(),
@@ -219,7 +218,6 @@ export class CommunityInterventionComponent implements OnInit {
       };
 
       // TODO: Call zome function to initiate intervention
-      console.log('[CommunityIntervention] Initiate:', input);
 
       this.successMessage.set(
         'Intervention initiated. It will proceed if community support reaches the threshold.'
@@ -229,15 +227,14 @@ export class CommunityInterventionComponent implements OnInit {
       this.patternDescription.set('');
       this.selectedCategories.set([]);
       this.evidence.set('');
-    } catch (err) {
-      console.error('[CommunityIntervention] Initiate failed:', err);
+    } catch (_err) {
       this.error.set('Failed to initiate intervention.');
     } finally {
       this.isSubmitting.set(false);
     }
   }
 
-  async submitSupport(): Promise<void> {
+  submitSupport(): void {
     const intv = this.intervention();
     if (!intv || !this.canSubmit() || this.isSubmitting()) return;
 
@@ -245,21 +242,20 @@ export class CommunityInterventionComponent implements OnInit {
     this.error.set(null);
 
     try {
-      const input: SupportInterventionInput = {
+      const _input: SupportInterventionInput = {
         interventionId: intv.id,
         relationshipLevel: this.relationshipLevel(),
         reason: this.supportReason(),
       };
 
       // TODO: Call zome function to support intervention
-      console.log('[CommunityIntervention] Support:', input);
+      // Debug: input contains interventionId, relationshipLevel, and reason
 
       this.successMessage.set(`Your support (weight: ${this.currentWeight()}) has been recorded.`);
 
       // Clear form
       this.supportReason.set('');
-    } catch (err) {
-      console.error('[CommunityIntervention] Support failed:', err);
+    } catch (_err) {
       this.error.set('Failed to record support.');
     } finally {
       this.isSubmitting.set(false);

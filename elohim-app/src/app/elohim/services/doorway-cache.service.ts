@@ -47,7 +47,7 @@ export class DoorwayCacheService {
   /** Base URL for cache API */
   private get baseUrl(): string {
     const doorwayUrl =
-      environment.holochain?.authUrl || environment.holochain?.appUrl || 'http://localhost:8080';
+      environment.holochain?.authUrl ?? environment.holochain?.appUrl ?? 'http://localhost:8080';
 
     // Convert WebSocket URL to HTTP
     return doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
@@ -185,7 +185,7 @@ export class DoorwayCacheService {
   private handleError<T>(error: HttpErrorResponse, context: string, fallback: T): Observable<T> {
     // Only log non-404 errors (404 is expected for missing content)
     if (error.status !== 404) {
-      console.debug(`[DoorwayCache] ${context} failed:`, error.status, error.message);
+      // Error occurred but we're returning fallback gracefully
     }
     return of(fallback);
   }

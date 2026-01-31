@@ -13,6 +13,8 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
+// @coverage: 1.2% (2026-01-31)
+
 import { environment } from '../../../environments/environment';
 
 import { AuthService } from './auth.service';
@@ -105,7 +107,7 @@ export class TauriAuthService {
    * Get the elohim-storage base URL.
    */
   private getStorageUrl(): string {
-    return environment.client?.storageUrl || 'http://localhost:8090';
+    return environment.client?.storageUrl ?? 'http://localhost:8090';
   }
 
   /**
@@ -115,11 +117,9 @@ export class TauriAuthService {
    */
   async initialize(): Promise<void> {
     if (!this.isTauriEnvironment()) {
-      console.log('[TauriAuth] Not in Tauri environment, skipping');
       return;
     }
 
-    console.log('[TauriAuth] Initializing...');
     this.status.set('checking');
 
     try {
@@ -127,21 +127,18 @@ export class TauriAuthService {
       const session = await this.getActiveSession();
 
       if (session) {
-        console.log('[TauriAuth] Found existing session:', session.identifier);
         this.currentSession.set(session);
         this.status.set('authenticated');
 
         // Update auth service with session info
         this.authService.setTauriSession(session);
       } else {
-        console.log('[TauriAuth] No session found, user needs to login');
         this.status.set('needs_login');
       }
 
       // Set up event listeners for OAuth callback
       await this.setupEventListeners();
     } catch (err) {
-      console.error('[TauriAuth] Initialization failed:', err);
       this.status.set('error');
       this.errorMessage.set(err instanceof Error ? err.message : 'Initialization failed');
     }
@@ -152,7 +149,6 @@ export class TauriAuthService {
    */
   private async setupEventListeners(): Promise<void> {
     if (!window.__TAURI__?.event) {
-      console.warn('[TauriAuth] Tauri event API not available');
       return;
     }
 
@@ -162,19 +158,15 @@ export class TauriAuthService {
     this.unsubscribeOAuthCallback = await listen<OAuthCallbackPayload>(
       'oauth-callback',
       async event => {
-        console.log('[TauriAuth] OAuth callback received');
         await this.handleOAuthCallback(event.payload);
       }
     );
 
     // Listen for deep link errors
     this.unsubscribeDeepLinkError = await listen<DeepLinkError>('deep-link-error', event => {
-      console.error('[TauriAuth] Deep link error:', event.payload.message);
       this.status.set('error');
       this.errorMessage.set(event.payload.message);
     });
-
-    console.log('[TauriAuth] Event listeners registered');
   }
 
   /**
@@ -219,8 +211,7 @@ export class TauriAuthService {
         lastSyncedAt: session.lastSyncedAt,
         bootstrapUrl: session.bootstrapUrl,
       };
-    } catch (err) {
-      console.warn('[TauriAuth] Failed to get session:', err);
+    } catch (_err) {
       return null;
     }
   }
@@ -229,7 +220,6 @@ export class TauriAuthService {
    * Handle OAuth callback from Tauri deep link.
    */
   private async handleOAuthCallback(payload: OAuthCallbackPayload): Promise<void> {
-    console.log('[TauriAuth] Processing OAuth callback...');
     this.status.set('checking');
 
     try {
@@ -273,7 +263,6 @@ export class TauriAuthService {
       }
 
       const handoff: NativeHandoffResponse = await handoffResponse.json();
-      console.log('[TauriAuth] Native handoff received:', handoff.identifier);
 
       // Step 3: Generate local agent public key
       // In a real implementation, this would come from the Holochain conductor
@@ -292,7 +281,6 @@ export class TauriAuthService {
         bootstrapUrl: handoff.bootstrapUrl,
       });
 
-      console.log('[TauriAuth] Session created:', session.id);
       this.currentSession.set(session);
       this.status.set('authenticated');
 
@@ -300,9 +288,8 @@ export class TauriAuthService {
       this.authService.setTauriSession(session);
 
       // Navigate to main app
-      this.router.navigate(['/lamad']);
+      void this.router.navigate(['/lamad']);
     } catch (err) {
-      console.error('[TauriAuth] OAuth callback failed:', err);
       this.status.set('error');
       this.errorMessage.set(err instanceof Error ? err.message : 'Authentication failed');
     }
@@ -371,20 +358,20 @@ export class TauriAuthService {
 
     try {
       await fetch(`${storageUrl}/session`, { method: 'DELETE' });
-    } catch (err) {
-      console.warn('[TauriAuth] Failed to delete session:', err);
+    } catch (_err) {
+      // intentionally empty - session deletion failure is non-critical
     }
 
     this.currentSession.set(null);
     this.status.set('needs_login');
-    this.authService.logout();
-    this.router.navigate(['/identity']);
+    void this.authService.logout();
+    void this.router.navigate(['/identity']);
   }
 
   /**
    * Navigate to doorway picker for login.
    */
   navigateToLogin(): void {
-    this.router.navigate(['/identity']);
+    void this.router.navigate(['/identity']);
   }
 }

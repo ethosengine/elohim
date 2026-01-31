@@ -116,7 +116,7 @@ export class ElohimStubService {
   };
 
   constructor() {
-    console.warn('[ElohimStub] Initialized - AI calls will be logged and stubbed');
+    // Stub service initialized - AI calls will be logged and stubbed
   }
 
   // ============================================================================
@@ -198,7 +198,7 @@ Instructions: For each transaction, determine the most appropriate category base
         return {
           transactionId: txn.id,
           category: matchedCategory,
-          confidence: 75 + Math.floor(Math.random() * 20), // 75-95
+          confidence: 75 + Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 20), // 75-95
           reasoning: `[STUB] Matched pattern "${pattern}" in transaction`,
           alternatives: this.generateAlternatives(availableCategories, matchedCategory),
         };
@@ -211,7 +211,7 @@ Instructions: For each transaction, determine the most appropriate category base
       category: availableCategories.includes('Uncategorized')
         ? 'Uncategorized'
         : availableCategories[0],
-      confidence: 25 + Math.floor(Math.random() * 25), // 25-50
+      confidence: 25 + Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 25), // 25-50
       reasoning: '[STUB] No pattern match - manual review recommended',
       alternatives: this.generateAlternatives(availableCategories, ''),
     };
@@ -229,7 +229,7 @@ Instructions: For each transaction, determine the most appropriate category base
       .slice(0, 2)
       .map(category => ({
         category,
-        confidence: 10 + Math.floor(Math.random() * 30),
+        confidence: 10 + Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 30),
         reasoning: '[STUB] Alternative suggestion',
         source: 'ai' as const,
       }));
@@ -361,18 +361,6 @@ Instructions:
    */
   private logCall(callLog: ElohimCallLog): void {
     this.callLogs.push(callLog);
-
-    // Console output for development visibility
-    console.group(`[ElohimStub] ${callLog.agentType.toUpperCase()} call`);
-    console.log('ID:', callLog.id);
-    console.log('Timestamp:', callLog.timestamp);
-    console.log('Context:', callLog.context);
-    console.log('------- PROMPT -------');
-    console.log(callLog.prompt);
-    console.log('------- RESPONSE -------');
-    console.log(callLog.response);
-    console.log('Latency:', callLog.latencyMs, 'ms');
-    console.groupEnd();
   }
 
   /**
@@ -394,7 +382,6 @@ Instructions:
    */
   clearLogs(): void {
     this.callLogs = [];
-    console.log('[ElohimStub] Logs cleared');
   }
 
   /**

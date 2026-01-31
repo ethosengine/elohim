@@ -65,8 +65,8 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
       if (typeof content === 'string') {
         try {
           content = JSON.parse(content);
-        } catch (e) {
-          console.error('[QuizRenderer] Failed to parse quiz content:', e);
+        } catch {
+          // JSON parse failed - invalid quiz content, skip rendering
           return;
         }
       }
@@ -76,7 +76,7 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
       if (quizData && Array.isArray(quizData.questions)) {
         this.quiz = quizData;
       } else {
-        console.warn('[QuizRenderer] Invalid quiz structure - missing questions array:', content);
+        // Invalid quiz structure - will show error state
       }
     }
   }

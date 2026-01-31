@@ -104,7 +104,7 @@ export class LoginComponent implements OnInit {
 
     // Check if already authenticated - redirect if so
     if (this.authService.isAuthenticated()) {
-      this.router.navigate([this.returnUrl]);
+      void this.router.navigate([this.returnUrl]);
     }
   }
 
@@ -155,7 +155,7 @@ export class LoginComponent implements OnInit {
         await this.identityService.waitForAuthenticatedState(3000);
 
         // Navigate to return URL
-        this.router.navigate([this.returnUrl]);
+        void this.router.navigate([this.returnUrl]);
       } else {
         this.error.set(result.error);
       }
@@ -185,7 +185,7 @@ export class LoginComponent implements OnInit {
    * Navigate to register page.
    */
   goToRegister(): void {
-    this.router.navigate(['/identity/register'], {
+    void this.router.navigate(['/identity/register'], {
       queryParams: { returnUrl: this.returnUrl },
     });
   }
@@ -197,8 +197,7 @@ export class LoginComponent implements OnInit {
   /**
    * Handle doorway selection from picker.
    */
-  onDoorwaySelected(doorway: DoorwayInfo): void {
-    console.log('[Login] Doorway selected:', doorway.name);
+  onDoorwaySelected(_doorway: DoorwayInfo): void {
     this.currentStep.set('credentials');
   }
 
@@ -206,7 +205,7 @@ export class LoginComponent implements OnInit {
    * Handle doorway picker cancellation.
    */
   onDoorwayPickerCancelled(): void {
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   /**

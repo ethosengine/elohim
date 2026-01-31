@@ -16,7 +16,14 @@
 
     <!-- Success Message -->
     @if (successMessage()) {
-      <div class="success-banner" (click)="clearMessages()">
+      <div
+        class="success-banner"
+        (click)="clearMessages()"
+        (keydown.enter)="clearMessages()"
+        (keydown.space)="clearMessages()"
+        tabindex="0"
+        role="status"
+      >
         <span class="success-icon">✓</span>
         <span>{{ successMessage() }}</span>
       </div>
@@ -24,7 +31,14 @@
 
     <!-- Error Display -->
     @if (error()) {
-      <div class="error-banner" (click)="clearMessages()">
+      <div
+        class="error-banner"
+        (click)="clearMessages()"
+        (keydown.enter)="clearMessages()"
+        (keydown.space)="clearMessages()"
+        tabindex="0"
+        role="alert"
+      >
         <span class="error-icon">✕</span>
         <span>{{ error() }}</span>
       </div>
@@ -40,7 +54,7 @@
             <div class="avatar">{{ initials() }}</div>
             <div class="identity-info">
               <h2 class="display-name">{{ displayName() }}</h2>
-              <span class="mode-badge" [class]="mode()">{{ mode() }}</span>
+              <span class="mode-badge" [ngClass]="mode()">{{ mode() }}</span>
             </div>
           </div>
 
@@ -240,8 +254,8 @@
 
           <!-- Profile Reach -->
           <div class="form-group">
-            <label>Visibility</label>
-            <div class="reach-options">
+            <label id="visibility-label">Visibility</label>
+            <div class="reach-options" role="group" aria-labelledby="visibility-label">
               @for (option of reachOptions; track option.value) {
                 <label class="reach-option" [class.selected]="form.profileReach === option.value">
                   <input

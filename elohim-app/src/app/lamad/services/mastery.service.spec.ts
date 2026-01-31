@@ -77,7 +77,7 @@ describe('MasteryService', () => {
   });
 
   describe('getMasteryForHuman', () => {
-    it('should fetch all mastery records for a human', (done) => {
+    it('should fetch all mastery records for a human', done => {
       const mockRecords = [
         createMockMastery({ contentId: 'content-1' }),
         createMockMastery({ contentId: 'content-2' }),
@@ -93,7 +93,7 @@ describe('MasteryService', () => {
   });
 
   describe('getMasteryForContent', () => {
-    it('should return mastery record when found', (done) => {
+    it('should return mastery record when found', done => {
       const mockRecord = createMockMastery();
       storageApiSpy.getMasteryRecords.and.returnValue(of([mockRecord]));
 
@@ -107,7 +107,7 @@ describe('MasteryService', () => {
       });
     });
 
-    it('should return null when no record found', (done) => {
+    it('should return null when no record found', done => {
       storageApiSpy.getMasteryRecords.and.returnValue(of([]));
 
       service.getMasteryForContent('human-1', 'nonexistent').subscribe(record => {
@@ -118,7 +118,7 @@ describe('MasteryService', () => {
   });
 
   describe('getMasteryState', () => {
-    it('should return map of contentId to mastery records', (done) => {
+    it('should return map of contentId to mastery records', done => {
       const mockRecords = [
         createMockMastery({ contentId: 'content-1', masteryLevel: 'aware' }),
         createMockMastery({ contentId: 'content-2', masteryLevel: 'mastered' }),
@@ -135,7 +135,7 @@ describe('MasteryService', () => {
       });
     });
 
-    it('should return empty map for empty contentIds', (done) => {
+    it('should return empty map for empty contentIds', done => {
       service.getMasteryState('human-1', []).subscribe(result => {
         expect(result.size).toBe(0);
         expect(storageApiSpy.getMasteryRecords).not.toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe('MasteryService', () => {
   });
 
   describe('getMasteryAtLevel', () => {
-    it('should fetch mastery records at or above minimum level', (done) => {
+    it('should fetch mastery records at or above minimum level', done => {
       const mockRecords = [createMockMastery({ masteryLevel: 'applying' })];
       storageApiSpy.getMasteryRecords.and.returnValue(of(mockRecords));
 
@@ -161,7 +161,7 @@ describe('MasteryService', () => {
   });
 
   describe('getRefreshNeeded', () => {
-    it('should fetch content needing refresh', (done) => {
+    it('should fetch content needing refresh', done => {
       const mockRecords = [createMockMastery({ freshnessScore: 0.3 })];
       storageApiSpy.getMasteryRecords.and.returnValue(of(mockRecords));
 
@@ -177,7 +177,7 @@ describe('MasteryService', () => {
   });
 
   describe('recordEngagement', () => {
-    it('should record engagement and return updated mastery', (done) => {
+    it('should record engagement and return updated mastery', done => {
       const updatedMastery = createMockMastery({ engagementCount: 6 });
       storageApiSpy.upsertMastery.and.returnValue(of(updatedMastery));
 
@@ -194,7 +194,7 @@ describe('MasteryService', () => {
   });
 
   describe('updateMasteryLevel', () => {
-    it('should update mastery level directly', (done) => {
+    it('should update mastery level directly', done => {
       const updatedMastery = createMockMastery({ masteryLevel: 'mastered' });
       storageApiSpy.upsertMastery.and.returnValue(of(updatedMastery));
 
@@ -211,21 +211,23 @@ describe('MasteryService', () => {
   });
 
   describe('recordBulkEngagement', () => {
-    it('should record engagement for multiple content items', (done) => {
+    it('should record engagement for multiple content items', done => {
       const mockResults = [
         createMockMastery({ contentId: 'content-1' }),
         createMockMastery({ contentId: 'content-2' }),
       ];
       storageApiSpy.upsertMastery.and.returnValues(of(mockResults[0]), of(mockResults[1]));
 
-      service.recordBulkEngagement('human-1', ['content-1', 'content-2'], 'view').subscribe(results => {
-        expect(results.length).toBe(2);
-        expect(storageApiSpy.upsertMastery).toHaveBeenCalledTimes(2);
-        done();
-      });
+      service
+        .recordBulkEngagement('human-1', ['content-1', 'content-2'], 'view')
+        .subscribe(results => {
+          expect(results.length).toBe(2);
+          expect(storageApiSpy.upsertMastery).toHaveBeenCalledTimes(2);
+          done();
+        });
     });
 
-    it('should return empty array for empty contentIds', (done) => {
+    it('should return empty array for empty contentIds', done => {
       service.recordBulkEngagement('human-1', [], 'view').subscribe(results => {
         expect(results).toEqual([]);
         expect(storageApiSpy.upsertMastery).not.toHaveBeenCalled();

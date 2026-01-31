@@ -367,7 +367,7 @@
 
           .confidence-small {
             margin-left: 4px;
-            opacity: 0.7;
+            opacity: 70%;
           }
         }
       }
@@ -467,7 +467,7 @@
       transition: all 0.2s ease;
 
       &:disabled {
-        opacity: 0.5;
+        opacity: 50%;
         cursor: not-allowed;
       }
 
@@ -657,7 +657,7 @@
         }
 
         &.approved {
-          opacity: 0.6;
+          opacity: 60%;
           text-decoration: line-through;
         }
 

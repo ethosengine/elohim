@@ -1,19 +1,21 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
 import {
-  Component,
-  OnInit,
-  OnDestroy,
-  ViewChild,
-  ViewContainerRef,
-  ComponentRef,
-  inject,
   AfterViewChecked,
+  Component,
+  ComponentRef,
   HostListener,
   Inject,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  ViewContainerRef,
+  inject,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-import { takeUntil, catchError } from 'rxjs/operators';
+// @coverage: 68.3% (2026-01-31)
+
+import { catchError, takeUntil } from 'rxjs/operators';
 
 import { Subject, Subscription, forkJoin, of } from 'rxjs';
 
@@ -21,26 +23,26 @@ import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import {
-  DataLoaderService,
   ChallengeRecord,
+  DataLoaderService,
   DiscussionRecord,
   GovernanceStateRecord,
 } from '@app/elohim/services/data-loader.service';
 import {
-  GovernanceSignalService,
   AggregatedSignals,
+  GovernanceSignalService,
 } from '@app/elohim/services/governance-signal.service';
 import { GovernanceService } from '@app/elohim/services/governance.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 import {
+  DEFAULT_FEEDBACK_PROFILES,
   EmotionalReactionType,
   FeedbackProfile,
-  DEFAULT_FEEDBACK_PROFILES,
   createProfileFromTemplate,
 } from '@app/lamad/models/feedback-profile.model';
 import {
-  GraduatedFeedbackComponent,
   FeedbackContext,
+  GraduatedFeedbackComponent,
 } from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
 
@@ -50,22 +52,14 @@ import { ContentEditorService } from '../../content-io/services/content-editor.s
 import { ContentNode } from '../../models/content-node.model';
 import { PathContext } from '../../models/exploration-context.model';
 import {
-  RendererRegistryService,
   ContentRenderer,
   RendererCompletionEvent,
+  RendererRegistryService,
 } from '../../renderers/renderer-registry.service';
 import { ContentService } from '../../services/content.service';
-
-// Content I/O for download functionality
-
-// Exploration components
 import { PathContextService } from '../../services/path-context.service';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
-
-// Governance feedback components
-
-// Focused view toggle for immersive content
 
 @Component({
   selector: 'app-content-viewer',
@@ -165,7 +159,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   ngOnInit(): void {
     // Handle direct content access: /lamad/resource/:resourceId
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
-      const resourceId = params['resourceId'];
+      const resourceId = params['resourceId'] as string;
       if (resourceId) {
         this.nodeId = resourceId;
         this.loadContent(resourceId);
@@ -246,11 +240,17 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     this.rendererRef.setInput('node', this.node);
 
     // Subscribe to completion events if the renderer supports them
-    const instance = this.rendererRef.instance as any;
-    if (instance.complete) {
-      this.rendererSubscription = instance.complete.subscribe((event: RendererCompletionEvent) =>
-        this.onRendererComplete(event)
-      );
+    const instance = this.rendererRef.instance as unknown as Record<string, unknown>;
+    if (
+      instance['complete'] &&
+      instance['complete'] instanceof Object &&
+      'subscribe' in (instance['complete'] as object)
+    ) {
+      this.rendererSubscription = (
+        instance['complete'] as {
+          subscribe: (fn: (event: RendererCompletionEvent) => void) => Subscription;
+        }
+      ).subscribe((event: RendererCompletionEvent) => this.onRendererComplete(event));
     }
   }
 
@@ -510,7 +510,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       announcement: 'community-announcement',
       proposal: 'governance-proposal',
     };
-    return mapping[contentType.toLowerCase()] || this.LEARNING_CONTENT_PROFILE;
+    return mapping[contentType.toLowerCase()] ?? this.LEARNING_CONTENT_PROFILE;
   }
 
   /**
@@ -558,7 +558,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    * Get human-readable governance status label
    */
   getGovernanceStatusLabel(): string {
-    const status = this.governanceState?.status || 'unreviewed';
+    const status = this.governanceState?.status ?? 'unreviewed';
     const labels: Record<string, string> = {
       unreviewed: 'Unreviewed',
       'auto-approved': 'Auto-Approved',
@@ -572,14 +572,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       restored: 'Restored',
       constitutional: 'Constitutional',
     };
-    return labels[status] || status;
+    return labels[status] ?? status;
   }
 
   /**
    * Get icon for governance status
    */
   getGovernanceStatusIcon(): string {
-    const status = this.governanceState?.status || 'unreviewed';
+    const status = this.governanceState?.status ?? 'unreviewed';
     const icons: Record<string, string> = {
       unreviewed: '❓',
       'auto-approved': '🤖',
@@ -593,7 +593,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       restored: '↩️',
       constitutional: '📜',
     };
-    return icons[status] || '❓';
+    return icons[status] ?? '❓';
   }
 
   /**
@@ -650,18 +650,17 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   /**
    * Handle badge action click
    */
-  handleAction(action: any): void {
+  handleAction(action: { route?: string }): void {
     if (action.route) {
-      this.router.navigate([action.route]);
+      void this.router.navigate([action.route]);
     }
-    // Actions without routes are no-ops (e.g., placeholder actions)
   }
 
   /**
    * Navigate to a path that contains this content
    */
   navigateToPath(pathId: string, stepIndex: number): void {
-    this.router.navigate(['/lamad/path', pathId, 'step', stepIndex]);
+    void this.router.navigate(['/lamad/path', pathId, 'step', stepIndex]);
   }
 
   /**
@@ -710,14 +709,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
    * Navigate to related content
    */
   viewRelatedContent(node: ContentNode): void {
-    this.router.navigate(['/lamad/content', node.id]);
+    void this.router.navigate(['/lamad/content', node.id]);
   }
 
   /**
    * Navigate back to lamad home
    */
   backToHome(): void {
-    this.router.navigate(['/lamad']);
+    void this.router.navigate(['/lamad']);
   }
 
   /**
@@ -747,7 +746,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       feature: 'Feature',
       scenario: 'Scenario',
     };
-    return displays[this.node.contentType] || this.node.contentType;
+    return displays[this.node.contentType] ?? this.node.contentType;
   }
 
   /**
@@ -760,7 +759,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       feature: '⚙️',
       scenario: '✓',
     };
-    return icons[this.node.contentType] || '📄';
+    return icons[this.node.contentType] ?? '📄';
   }
 
   /**
@@ -818,7 +817,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   returnToPath(): void {
     const returnRoute = this.pathContextService.returnToPath();
     if (returnRoute) {
-      this.router.navigate(returnRoute);
+      void this.router.navigate(returnRoute);
     }
   }
 
@@ -837,7 +836,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     }
 
     // Navigate to the selected content
-    this.router.navigate(['/lamad/resource', nodeId]);
+    void this.router.navigate(['/lamad/resource', nodeId]);
   }
 
   /**
@@ -857,7 +856,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
     }
 
     // Navigate to graph explorer
-    this.router.navigate(['/lamad/explore'], {
+    void this.router.navigate(['/lamad/explore'], {
       queryParams: {
         focus: this.nodeId,
         ...(this.pathContext

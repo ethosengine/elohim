@@ -22,9 +22,11 @@
 
 import { Injectable, computed, signal, inject } from '@angular/core';
 
-import { map, catchError, shareReplay, switchMap, tap, debounceTime, buffer } from 'rxjs/operators';
+// @coverage: 4.5% (2026-01-31)
 
-import { Observable, of, from, defer, Subject, BehaviorSubject } from 'rxjs';
+import { catchError, shareReplay } from 'rxjs/operators';
+
+import { Observable, of, from, defer, firstValueFrom } from 'rxjs';
 
 import {
   ContentNode,
@@ -822,9 +824,9 @@ export class HolochainContentService {
     // Check cache first
     if (this.contentCache.has(resourceId)) {
       try {
-        return (await this.contentCache.get(resourceId)!.toPromise()) ?? null;
+        return (await firstValueFrom(this.contentCache.get(resourceId)!)) ?? null;
       } catch {
-        // Cache error, continue to fetch
+        // Cache lookup failed - will proceed to fetch from network
       }
     }
 
@@ -849,7 +851,7 @@ export class HolochainContentService {
     }
 
     this.batchRequestTimer = setTimeout(() => {
-      this.executeBatchRequest();
+      void this.executeBatchRequest();
     }, this.BATCH_DEBOUNCE_MS);
   }
 
@@ -921,10 +923,7 @@ export class HolochainContentService {
     if (!this.contentCache.has(resourceId)) {
       const request = defer(() => from(this.fetchContentById(resourceId))).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(`[HolochainContent] Failed to fetch "${resourceId}":`, err);
-          return of(null);
-        })
+        catchError(() => of(null))
       );
 
       this.contentCache.set(resourceId, request);
@@ -952,41 +951,60 @@ export class HolochainContentService {
       return { found: new Map(), notFound: ids };
     }
 
-    // Filter out IDs already in cache
-    const uncachedIds: string[] = [];
+    const uncachedIds = this.separateUncachedIds(ids);
+
+    if (uncachedIds.length === 0) {
+      return this.resolveCachedItems(ids);
+    }
+
+    return this.fetchUncachedAndMerge(ids, uncachedIds);
+  }
+
+  /**
+   * Helper: Separate requested IDs into those not in cache.
+   */
+  private separateUncachedIds(ids: string[]): string[] {
+    const uncached: string[] = [];
+    for (const id of ids) {
+      if (!this.contentCache.has(id)) {
+        uncached.push(id);
+      }
+    }
+    return uncached;
+  }
+
+  /**
+   * Helper: Resolve all cached items to their ContentNode values.
+   */
+  private async resolveCachedItems(
+    ids: string[]
+  ): Promise<{ found: Map<string, ContentNode>; notFound: string[] }> {
     const found = new Map<string, ContentNode>();
 
     for (const id of ids) {
-      if (this.contentCache.has(id)) {
-        // Get from cache synchronously if possible
-        const cached = this.contentCache.get(id);
-        if (cached) {
-          // Note: This is async but we'll handle it
-          uncachedIds.push(id); // Still include for batch, cache will be used
-        }
-      } else {
-        uncachedIds.push(id);
-      }
-    }
-
-    if (uncachedIds.length === 0) {
-      // All items were in cache, resolve them
-      for (const id of ids) {
-        const cached = this.contentCache.get(id);
-        if (cached) {
-          try {
-            const content = await cached.toPromise();
-            if (content) {
-              found.set(id, content);
-            }
-          } catch {
-            // Ignore cache errors
+      const cached = this.contentCache.get(id);
+      if (cached) {
+        try {
+          const content = await firstValueFrom(cached);
+          if (content) {
+            found.set(id, content);
           }
+        } catch {
+          // Cache resolution failed - skip this cached item
         }
       }
-      return { found, notFound: [] };
     }
 
+    return { found, notFound: [] };
+  }
+
+  /**
+   * Helper: Fetch uncached items from Holochain.
+   */
+  private async fetchUncachedAndMerge(
+    allIds: string[],
+    uncachedIds: string[]
+  ): Promise<{ found: Map<string, ContentNode>; notFound: string[] }> {
     try {
       const result = await this.holochainClient.callZome<BatchGetContentOutput>({
         zomeName: 'content_store',
@@ -995,24 +1013,30 @@ export class HolochainContentService {
       });
 
       if (!result.success || !result.data) {
-        console.warn('[HolochainContent] Batch get failed:', result.error);
-        return { found: new Map(), notFound: ids };
+        return { found: new Map(), notFound: allIds };
       }
 
-      // Transform and cache results
-      for (const output of result.data.found) {
-        const content = this.transformToContentNode(output);
-        found.set(content.id, content);
-
-        // Update cache with shareReplay observable
-        this.contentCache.set(content.id, of(content).pipe(shareReplay(1)));
-      }
-
+      const found = this.transformAndCacheResults(result.data.found);
       return { found, notFound: result.data.notFound };
-    } catch (err) {
-      console.warn('[HolochainContent] Batch get error:', err);
-      return { found: new Map(), notFound: ids };
+    } catch {
+      // Batch fetch failed - return all IDs as not found
+      return { found: new Map(), notFound: allIds };
     }
+  }
+
+  /**
+   * Helper: Transform and cache fetched results.
+   */
+  private transformAndCacheResults(outputs: HolochainContentOutput[]): Map<string, ContentNode> {
+    const found = new Map<string, ContentNode>();
+
+    for (const output of outputs) {
+      const content = this.transformToContentNode(output);
+      found.set(content.id, content);
+      this.contentCache.set(content.id, of(content).pipe(shareReplay(1)));
+    }
+
+    return found;
   }
 
   /**
@@ -1036,8 +1060,8 @@ export class HolochainContentService {
     }
 
     // Fire and forget - don't await, don't block UI
-    this.batchGetContent(uncachedIds).catch(err => {
-      console.debug('[HolochainContent] Prefetch error (non-critical):', err);
+    this.batchGetContent(uncachedIds).catch(() => {
+      // Prefetch errors are non-critical - content will load on demand
     });
   }
 
@@ -1055,10 +1079,7 @@ export class HolochainContentService {
     }
 
     return defer(() => from(this.fetchContentByType(contentType, limit))).pipe(
-      catchError(err => {
-        console.warn(`[HolochainContent] Failed to fetch type "${contentType}":`, err);
-        return of([]);
-      })
+      catchError(() => of([]))
     );
   }
 
@@ -1093,7 +1114,6 @@ export class HolochainContentService {
       });
 
       if (!result.success || !result.data) {
-        console.warn('[HolochainContent] Paginated query failed:', result.error);
         return { items: [], totalCount: 0, offset, hasMore: false };
       }
 
@@ -1110,8 +1130,8 @@ export class HolochainContentService {
         offset: result.data.offset,
         hasMore: result.data.hasMore,
       };
-    } catch (err) {
-      console.warn('[HolochainContent] Paginated query error:', err);
+    } catch {
+      // Paginated query failed - return empty results
       return { items: [], totalCount: 0, offset, hasMore: false };
     }
   }
@@ -1145,7 +1165,6 @@ export class HolochainContentService {
       });
 
       if (!result.success || !result.data) {
-        console.warn('[HolochainContent] Paginated tag query failed:', result.error);
         return { items: [], totalCount: 0, offset, hasMore: false };
       }
 
@@ -1162,8 +1181,8 @@ export class HolochainContentService {
         offset: result.data.offset,
         hasMore: result.data.hasMore,
       };
-    } catch (err) {
-      console.warn('[HolochainContent] Paginated tag query error:', err);
+    } catch {
+      // Tag-based paginated query failed - return empty results
       return { items: [], totalCount: 0, offset, hasMore: false };
     }
   }
@@ -1212,17 +1231,13 @@ export class HolochainContentService {
 
       if (result.success) {
         this.availableSignal.set(true);
-        console.log(
-          '[HolochainContent] Service available, content count:',
-          result.data?.totalCount
-        );
         return true;
       }
 
       this.availableSignal.set(false);
       return false;
-    } catch (err) {
-      console.warn('[HolochainContent] Availability test failed:', err);
+    } catch {
+      // Availability test failed - Holochain content unavailable
       this.availableSignal.set(false);
       return false;
     }
@@ -1239,21 +1254,16 @@ export class HolochainContentService {
    * Paths are now served from doorway projection (SQLite), not DHT.
    */
   async getPathIndex(): Promise<HolochainPathIndex> {
-    console.log('[HolochainContent] Calling get_all_paths...');
     const result = await this.holochainClient.callZome<HolochainPathIndex>({
       zomeName: 'content_store',
       fnName: 'get_all_paths',
       payload: null,
     });
 
-    console.log('[HolochainContent] get_all_paths result:', result);
-
     if (!result.success || !result.data) {
-      console.warn('[HolochainContent] get_all_paths failed or empty:', result.error);
       return { paths: [], totalCount: 0, lastUpdated: new Date().toISOString() };
     }
 
-    console.log('[HolochainContent] Found paths:', result.data.totalCount);
     return result.data;
   }
 
@@ -1297,7 +1307,6 @@ export class HolochainContentService {
     });
 
     if (!result.success || !result.data) {
-      console.log('[HolochainContent] getPathOverviewRest failed:', result.error);
       return null;
     }
 
@@ -1807,19 +1816,14 @@ export class HolochainContentService {
   private async fetchContentById(id: string): Promise<ContentNode | null> {
     // Try to select a custodian for CDN-like serving (optional optimization)
     try {
-      const custodian = await this.custodianSelection.selectBestCustodian(id);
-      if (custodian) {
-        console.log(`[HolochainContent] Selected custodian for "${id}":`, {
-          custodianId: custodian.custodian.id.slice(0, 12) + '...',
-          score: custodian.finalScore.toFixed(1),
-        });
+      const _custodian = await this.custodianSelection.selectBestCustodian(id);
+      if (_custodian) {
         // TODO: When doorway service is ready, fetch from custodian endpoint here
-        // const content = await this.fetchFromCustodian(custodian.custodian.endpoint, id);
+        // const content = await this.fetchFromCustodian(_custodian.custodian.endpoint, id);
         // if (content) return content;
       }
-    } catch (err) {
-      console.debug('[HolochainContent] Custodian selection failed (non-critical):', err);
-      // Continue with DHT fallback
+    } catch {
+      // Custodian selection failed - will fallback to DHT query
     }
 
     // Fall back to DHT query

@@ -78,15 +78,14 @@ export function migrateQuizToPerseus(node: LegacyContentNode): PerseusItem[] {
   if (typeof content === 'string') {
     try {
       content = JSON.parse(content) as LegacyQuizContent;
-    } catch (e) {
-      console.error(`Failed to parse quiz content for ${node.id}:`, e);
+    } catch {
+      // JSON parse failed - invalid quiz content, return empty questions
       return [];
     }
   }
 
   const quiz = content as LegacyQuizContent;
   if (!quiz.questions || !Array.isArray(quiz.questions)) {
-    console.warn(`No questions array in ${node.id}`);
     return [];
   }
 
