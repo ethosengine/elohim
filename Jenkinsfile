@@ -959,13 +959,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Deploying to Staging: ${IMAGE_TAG}"
 
+                            def namespace = 'elohim-staging'
+
                             // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-staging -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-staging ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
+                            sh "kubectl get configmap elohim-config-staging -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
 
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/staging-deployment.yaml > elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml"
@@ -979,13 +976,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Deploy
                             sh "kubectl apply -f elohim-app/manifests/staging-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
+                            sh "kubectl rollout restart deployment/elohim-site-staging -n ${namespace}"
+                            sh "kubectl rollout status deployment/elohim-site-staging -n ${namespace} --timeout=300s"
 
                             // Verify the deployment is using the correct image
                             sh """
                                 echo '==== Verifying deployed image ===='
-                                kubectl get deployment elohim-site-staging -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
+                                kubectl get deployment elohim-site-staging -n ${namespace} -o jsonpath='{.spec.template.spec.containers[0].image}'
                                 echo ''
                                 echo '=================================='
                             """
@@ -1020,13 +1017,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
+                            def namespace = 'elohim-alpha'
+
                             // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-alpha -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-alpha ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
+                            sh "kubectl get configmap elohim-config-alpha -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
 
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/alpha-deployment.yaml > elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml"
@@ -1040,13 +1034,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Deploy
                             sh "kubectl apply -f elohim-app/manifests/alpha-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site-alpha -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site-alpha -n ethosengine --timeout=300s'
+                            sh "kubectl rollout restart deployment/elohim-site-alpha -n ${namespace}"
+                            sh "kubectl rollout status deployment/elohim-site-alpha -n ${namespace} --timeout=300s"
 
                             // Verify the deployment is using the correct image
                             sh """
                                 echo '==== Verifying deployed image ===='
-                                kubectl get deployment elohim-site-alpha -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
+                                kubectl get deployment elohim-site-alpha -n ${namespace} -o jsonpath='{.spec.template.spec.containers[0].image}'
                                 echo ''
                                 echo '=================================='
                             """
@@ -1255,21 +1249,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         withBuildVars(props) {
                             echo "Deploying to Production: ${IMAGE_TAG}"
 
+                            def namespace = 'elohim-prod'
+
                             // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-prod -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-prod ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
+                            sh "kubectl get configmap elohim-config-prod -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
 
                             // Deploy
 
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-app/manifests/prod-deployment.yaml > elohim-app/manifests/prod-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl apply -f elohim-app/manifests/prod-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
+                            sh "kubectl rollout restart deployment/elohim-site -n ${namespace}"
+                            sh "kubectl rollout status deployment/elohim-site -n ${namespace} --timeout=300s"
 
                             echo 'Production deployment completed!'
                         }

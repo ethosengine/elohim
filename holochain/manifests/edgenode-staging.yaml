@@ -1,7 +1,6 @@
-# Edge Node Production Deployment
+# Edge Node Staging Deployment
 #
-# Production Holochain conductor for elohim.host users.
-# Accessible at: doorway.elohim.host
+# Provides stable Holochain conductor for Eclipse Che workspaces.
 #
 # Architecture:
 #   Browser -> Doorway Gateway (auth + whitelist + worker pool) -> Conductor (localhost)
@@ -15,25 +14,24 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: elohim-doorway-prod-secrets
-  namespace: elohim-prod
+  name: elohim-doorway-staging-secrets
+  namespace: elohim-staging
 type: Opaque
 stringData:
-  # IMPORTANT: These MUST be changed before production deployment!
-  # Use strong, unique keys generated with: openssl rand -hex 32
-  api-key-authenticated: "CHANGE-ME-prod-elohim-auth-2024"
-  api-key-admin: "CHANGE-ME-prod-elohim-admin-2024"
-  jwt-secret: "CHANGE-ME-prod-jwt-secret-use-openssl-rand-hex-32"
+  # IMPORTANT: Change these in production!
+  api-key-authenticated: "dev-elohim-auth-2024"
+  api-key-admin: "dev-elohim-admin-2024"
+  jwt-secret: "dev-jwt-secret-change-in-production-2024"
 ---
 # ConfigMap for conductor configuration
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: elohim-edgenode-prod-config
-  namespace: elohim-prod
+  name: elohim-edgenode-staging-config
+  namespace: elohim-staging
 data:
   conductor-config.yaml: |
-    # Holochain Conductor Configuration for Elohim Protocol (Production)
+    # Holochain Conductor Configuration for Elohim Protocol
     admin_interfaces:
       - driver:
           type: websocket
@@ -43,9 +41,9 @@ data:
           allowed_origins: "*"
     network:
       # Bootstrap served by Doorway gateway
-      bootstrap_url: "https://doorway.elohim.host/bootstrap"
+      bootstrap_url: "https://doorway-staging.elohim.host/bootstrap"
       # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
-      signal_url: "wss://signal.doorway.elohim.host"
+      signal_url: "wss://signal.doorway-staging.elohim.host"
       enable_mdns: false
       enable_relaying: true
       webrtc_config:
@@ -60,8 +58,8 @@ data:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: holochain-data-prod
-  namespace: elohim-prod
+  name: holochain-data-staging
+  namespace: elohim-staging
 spec:
   accessModes: [ReadWriteOnce]
   resources:
@@ -72,8 +70,8 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: storage-data-prod
-  namespace: elohim-prod
+  name: storage-data-staging
+  namespace: elohim-staging
 spec:
   accessModes: [ReadWriteOnce]
   resources:
@@ -84,22 +82,22 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: elohim-edgenode-prod
-  namespace: elohim-prod
+  name: elohim-edgenode-staging
+  namespace: elohim-staging
   labels:
     app: elohim-edgenode
-    environment: prod
+    environment: staging
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: elohim-edgenode
-      environment: prod
+      environment: staging
   template:
     metadata:
       labels:
         app: elohim-edgenode
-        environment: prod
+        environment: staging
     spec:
       nodeSelector:
         node-type: operations
@@ -114,10 +112,10 @@ spec:
               set -e
               echo "Fetching hApp from elohim-holochain pipeline..."
 
-              # Production: try main branch first, then dev as fallback
+              # Try branch-specific build first, then dev, then main
               HAPP_URLS="
-                https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/elohim.happ
                 https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/elohim.happ
+                https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/elohim.happ
               "
 
               for url in $HAPP_URLS; do
@@ -209,10 +207,10 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
         # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
-        # Production uses versioned tags for stability
+        # Uses dev-latest tag for development
         - name: doorway
-          image: harbor.ethosengine.com/ethosengine/elohim-doorway:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
+          imagePullPolicy: Always
           args:
             - "--listen"
             - "0.0.0.0:8080"
@@ -223,30 +221,36 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            - name: DEV_MODE
+              value: "true"
             - name: RUST_LOG
-              value: "warn,doorway=info"
+              value: "info,doorway=debug"
+            - name: STORAGE_URL
+              value: "http://localhost:8090"
+            - name: THRESHOLD_URL
+              value: "http://localhost:80"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
-                  name: elohim-doorway-prod-secrets
+                  name: elohim-doorway-staging-secrets
                   key: api-key-authenticated
             - name: API_KEY_ADMIN
               valueFrom:
                 secretKeyRef:
-                  name: elohim-doorway-prod-secrets
+                  name: elohim-doorway-staging-secrets
                   key: api-key-admin
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: elohim-doorway-prod-secrets
+                  name: elohim-doorway-staging-secrets
                   key: jwt-secret
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              memory: "64Mi"
+              cpu: "50m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "256Mi"
+              cpu: "200m"
           readinessProbe:
             httpGet:
               path: /health
@@ -259,12 +263,58 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 30
+        # elohim-storage - Blob storage and import processing sidecar
+        # Handles heavy R/W operations, forwards to conductor
+        - name: elohim-storage
+          image: harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
+          imagePullPolicy: Always
+          env:
+            - name: RUST_LOG
+              value: "info,elohim_storage=debug"
+            - name: HOLOCHAIN_ADMIN_URL
+              value: "ws://localhost:4444"
+            - name: HOLOCHAIN_APP_URL
+              value: "ws://localhost:4445"
+            - name: HOLOCHAIN_APP_ID
+              value: "elohim"
+            - name: ENABLE_IMPORT_API
+              value: "true"
+            # SQLite content database for fast seeding (bypasses DHT)
+            - name: ENABLE_CONTENT_DB
+              value: "true"
+            # Import tuning: prevent conductor overload during bulk seeding
+            - name: IMPORT_CHUNK_SIZE
+              value: "50"
+            - name: IMPORT_CHUNK_DELAY_MS
+              value: "300"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: storage-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 30
         # hApp Installer - installs the hApp on conductor startup
-        # Production uses versioned tags for stability
+        # Uses dev-latest tag - rebuilds when installer code changes
         # hApp is fetched by init container, not baked into image
         - name: happ-installer
-          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
+          imagePullPolicy: Always
           env:
             - name: CONDUCTOR_URL
               value: "ws://localhost:4444"
@@ -286,28 +336,60 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "200m"
+        # Doorway Operator Dashboard - Angular app for node operators
+        # Provides: federated OAuth, node metrics, configuration UI
+        - name: doorway-app
+          image: harbor.ethosengine.com/ethosengine/doorway-app:dev-latest
+          imagePullPolicy: Always
+          ports:
+            - name: operator-ui
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: DOORWAY_API_URL
+              value: "http://localhost:8080"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
       volumes:
         # Shared volume for hApp (fetched by init container)
         - name: happ-volume
           emptyDir: {}
-        - name: holochain-data
-          persistentVolumeClaim:
-            claimName: holochain-data-prod
+        # Storage data for elohim-storage blobs
         - name: storage-data
           persistentVolumeClaim:
-            claimName: storage-data-prod
+            claimName: storage-data-staging
+        - name: holochain-data
+          persistentVolumeClaim:
+            claimName: holochain-data-staging
         - name: conductor-config
           configMap:
-            name: elohim-edgenode-prod-config
+            name: elohim-edgenode-staging-config
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: elohim-edgenode-prod
-  namespace: elohim-prod
+  name: elohim-edgenode-staging
+  namespace: elohim-staging
   labels:
     app: elohim-edgenode
-    environment: prod
+    environment: staging
 spec:
   type: ClusterIP
   ports:
@@ -321,25 +403,35 @@ spec:
       port: 8080
       targetPort: 8080
       protocol: TCP
+    # elohim-storage SQLite DB API (for fast seeding)
+    - name: storage-db
+      port: 8090
+      targetPort: 8090
+      protocol: TCP
+    # Doorway Operator Dashboard
+    - name: operator-ui
+      port: 8081
+      targetPort: 80
+      protocol: TCP
   selector:
     app: elohim-edgenode
-    environment: prod
+    environment: staging
 ---
 # Public Ingress - routes all traffic through authenticated Doorway Gateway
-# Supports: /admin, /app/*, /bootstrap/*, /api/v1/*
-# Signal subdomain: signal.doorway.elohim.host (tx5/SBD protocol)
+# Supports: /admin, /app/*, /bootstrap/*, /api/v1/*, /operator/*
+# Signal subdomain: signal.doorway-staging.elohim.host (tx5/SBD protocol)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: elohim-edgenode-prod
-  namespace: elohim-prod
+  name: elohim-edgenode-staging
+  namespace: elohim-staging
   annotations:
     # WebSocket support for /admin, /app/*, signal subdomain
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
-    nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-prod"
+    nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-staging"
     # Required for WebSocket upgrade headers
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header Upgrade $http_upgrade;
@@ -349,27 +441,29 @@ spec:
   ingressClassName: public
   tls:
     - hosts:
-        - doorway.elohim.host
-        - signal.doorway.elohim.host
-      secretName: doorway-prod-tls
+        - doorway-staging.elohim.host
+        - signal.doorway-staging.elohim.host
+      secretName: doorway-staging-tls
   rules:
-    - host: doorway.elohim.host
+    - host: doorway-staging.elohim.host
       http:
         paths:
+          # All traffic through doorway gateway
+          # Doorway handles routing: /threshold/* → doorway-app, /hc/* → conductor
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: elohim-edgenode-prod
+                name: elohim-edgenode-staging
                 port:
                   number: 8080
-    - host: signal.doorway.elohim.host
+    - host: signal.doorway-staging.elohim.host
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: elohim-edgenode-prod
+                name: elohim-edgenode-staging
                 port:
                   number: 8080

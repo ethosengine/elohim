@@ -2,10 +2,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: elohim-config-alpha
-  namespace: ethosengine
+  namespace: elohim-alpha
 data:
   config.json: |
     {
       "logLevel": "debug",
-      "environment": "alpha"
+      "environment": "alpha",
+      "doorwayUrl": "https://doorway-alpha.elohim.host"
     }

@@ -2,10 +2,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: elohim-config-staging
-  namespace: ethosengine
+  namespace: elohim-staging
 data:
   config.json: |
     {
       "logLevel": "info",
-      "environment": "staging"
+      "environment": "staging",
+      "doorwayUrl": "https://doorway-staging.elohim.host"
     }
