@@ -51,3 +51,5 @@ research/matrix/pinecone
 
 # Genesis blob cache (regenerated during pack/seed)
 genesis/.blob-cache/
+/elohim/research/A2A/
+/elohim/research/a2a-go/
