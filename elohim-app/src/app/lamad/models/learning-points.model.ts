@@ -24,6 +24,8 @@
 
 import type { ActionHash } from './content-mastery.model';
 
+// @coverage: 20.0% (2026-01-31)
+
 // =============================================================================
 // Holochain Output Wrapper Types
 // =============================================================================
@@ -348,7 +350,6 @@ export function parsePointsByTrigger(json: string): Record<LamadPointTrigger, nu
   try {
     return JSON.parse(json) as Record<LamadPointTrigger, number>;
   } catch {
-    console.warn('[LearningPoints] Failed to parse points by trigger JSON');
     return {} as Record<LamadPointTrigger, number>;
   }
 }
@@ -360,7 +361,6 @@ export function parseImpactByContent(json: string): Record<string, LamadContentI
   try {
     return JSON.parse(json) as Record<string, LamadContentImpactSummaryWire>;
   } catch {
-    console.warn('[LearningPoints] Failed to parse impact by content JSON');
     return {};
   }
 }

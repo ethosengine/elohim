@@ -1,6 +1,6 @@
 <!-- Shefa Dashboard: Operator visibility into compute, data protection, and economics -->
 
-<div class="shefa-dashboard" [class]="'display-' + mergedConfig.displayMode">
+<div [ngClass]="['shefa-dashboard', 'display-' + mergedConfig.displayMode]">
   <!-- Loading State -->
   <div class="loading-overlay" *ngIf="isLoading">
     <div class="spinner">
@@ -42,8 +42,12 @@
 
       <!-- Header Actions -->
       <div class="header-actions">
-        <button class="btn-icon" (click)="toggleConfigPanel()" title="Settings">⚙️</button>
-        <button class="btn-icon" [matMenuTriggerFor]="exportMenu" title="Export">📥</button>
+        <button type="button" class="btn-icon" (click)="toggleConfigPanel()" title="Settings">
+          ⚙️
+        </button>
+        <button type="button" class="btn-icon" [matMenuTriggerFor]="exportMenu" title="Export">
+          📥
+        </button>
       </div>
     </div>
 
@@ -52,9 +56,10 @@
       <h3>Dashboard Configuration</h3>
 
       <div class="config-group">
-        <label>Display Mode</label>
-        <div class="button-group">
+        <label id="display-mode-label">Display Mode</label>
+        <div class="button-group" role="group" aria-labelledby="display-mode-label">
           <button
+            type="button"
             *ngFor="let mode of ['compact', 'detailed', 'monitoring']"
             [class.active]="mergedConfig.displayMode === mode"
             (click)="setDisplayMode(mode as any)"
@@ -66,8 +71,8 @@
       </div>
 
       <div class="config-group">
-        <label>Visible Panels</label>
-        <div class="checkbox-group">
+        <label id="visible-panels-label">Visible Panels</label>
+        <div class="checkbox-group" role="group" aria-labelledby="visible-panels-label">
           <label>
             <input
               type="checkbox"
@@ -127,6 +132,7 @@
     <!-- Panel Navigation (if detailed mode) -->
     <nav class="panel-nav" *ngIf="mergedConfig.displayMode === 'detailed'">
       <button
+        type="button"
         *ngIf="isComputeMetricsVisible()"
         class="nav-btn"
         [class.active]="selectedPanel === 'compute'"
@@ -135,6 +141,7 @@
         💻 Compute
       </button>
       <button
+        type="button"
         *ngIf="isFamilyProtectionVisible()"
         class="nav-btn"
         [class.active]="selectedPanel === 'protection'"
@@ -143,6 +150,7 @@
         🛡️ Protection
       </button>
       <button
+        type="button"
         *ngIf="isTokenEarningsVisible()"
         class="nav-btn"
         [class.active]="selectedPanel === 'tokens'"
@@ -151,6 +159,7 @@
         💰 Tokens
       </button>
       <button
+        type="button"
         *ngIf="isEconomicEventsVisible()"
         class="nav-btn"
         [class.active]="selectedPanel === 'events'"
@@ -159,6 +168,7 @@
         📊 Events
       </button>
       <button
+        type="button"
         *ngIf="isConstitutionalLimitsVisible()"
         class="nav-btn"
         [class.active]="selectedPanel === 'limits'"
@@ -169,7 +179,7 @@
     </nav>
 
     <!-- Panels Grid / Detailed View -->
-    <div class="panels-container" [class]="'mode-' + mergedConfig.displayMode">
+    <div [ngClass]="['panels-container', 'mode-' + mergedConfig.displayMode]">
       <!-- Compute Metrics Panel -->
       <div
         class="panel compute-panel"
@@ -723,7 +733,7 @@
 
   <!-- Export Menu -->
   <mat-menu #exportMenu="matMenu">
-    <button mat-menu-item (click)="exportDashboard('json')">📄 Export as JSON</button>
-    <button mat-menu-item (click)="exportDashboard('csv')">📊 Export as CSV</button>
+    <button type="button" mat-menu-item (click)="exportDashboard('json')">📄 Export as JSON</button>
+    <button type="button" mat-menu-item (click)="exportDashboard('csv')">📊 Export as CSV</button>
   </mat-menu>
 </div>

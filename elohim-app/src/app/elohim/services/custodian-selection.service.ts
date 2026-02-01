@@ -1,5 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 
+// @coverage: 9.9% (2026-01-31)
+
 import { CustodianCommitmentService } from './custodian-commitment.service';
 import { ShefaService } from './shefa.service';
 
@@ -74,10 +76,7 @@ export class CustodianSelectionService {
    * @param userLocation - Optional: user's coordinates for latency calculation
    * @returns Best custodian with score breakdown, or null if none available
    */
-  async selectBestCustodian(
-    contentId: string,
-    userLocation?: { lat: number; lng: number }
-  ): Promise<CustodianScore | null> {
+  async selectBestCustodian(contentId: string): Promise<CustodianScore | null> {
     const stats = this.statistics();
     stats.selectionsAttempted++;
 
@@ -85,7 +84,6 @@ export class CustodianSelectionService {
     const cached = this.selectionCache.get(contentId);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       stats.cacheHits++;
-      console.log(`[CustodianSelection] Cache hit for ${contentId}`);
       return cached.score;
     }
 
@@ -96,7 +94,6 @@ export class CustodianSelectionService {
       const custodians = await this.commitments.getCommitmentsForContent(contentId);
 
       if (custodians.length === 0) {
-        console.warn(`[CustodianSelection] No custodians committed to ${contentId}`);
         return null;
       }
 
@@ -117,20 +114,20 @@ export class CustodianSelectionService {
           if (score && score.finalScore > 0) {
             scores.push(score);
           }
-        } catch (err) {
-          console.warn(`[CustodianSelection] Failed to score custodian:`, err);
+        } catch {
+          // Custodian scoring failed - skip this custodian and continue with next
           continue;
         }
       }
 
       if (scores.length === 0) {
-        console.warn(`[CustodianSelection] No valid custodian scores for ${contentId}`);
         return null;
       }
 
       // Select highest-scoring custodian
-      const best = scores.reduce((prev, current) =>
-        current.finalScore > prev.finalScore ? current : prev
+      const best = scores.reduce(
+        (prev, current) => (current.finalScore > prev.finalScore ? current : prev),
+        scores[0]
       );
 
       // Cache result
@@ -141,17 +138,9 @@ export class CustodianSelectionService {
 
       stats.selectionsSuccessful++;
 
-      console.log(`[CustodianSelection] Selected custodian for ${contentId}`, {
-        custodianId: best.custodian.id,
-        score: best.finalScore.toFixed(1),
-        health: best.breakdown.healthScore.toFixed(1),
-        latency: best.breakdown.latencyScore.toFixed(1),
-        bandwidth: best.breakdown.bandwidthScore.toFixed(1),
-      });
-
       return best;
-    } catch (err) {
-      console.error('[CustodianSelection] Selection failed:', err);
+    } catch {
+      // Custodian selection failed - no suitable custodian found, return null as fallback
       return null;
     }
   }
@@ -175,16 +164,11 @@ export class CustodianSelectionService {
       const metrics = await this.shefa.getMetrics(custodian.id);
 
       if (!metrics) {
-        console.warn(`[CustodianSelection] No metrics for ${custodian.id}`);
         return null;
       }
 
       // Skip unhealthy custodians
       if (metrics.health.uptimePercent < 50 || !metrics.health.availability) {
-        console.log(
-          `[CustodianSelection] Skipping unhealthy custodian ${custodian.id}: ` +
-            `uptime=${metrics.health.uptimePercent}%, available=${metrics.health.availability}`
-        );
         return null;
       }
 
@@ -236,8 +220,8 @@ export class CustodianSelectionService {
           commitmentBonus: 5,
         },
       };
-    } catch (err) {
-      console.error(`[CustodianSelection] Failed to score ${custodian.id}:`, err);
+    } catch {
+      // Custodian metrics fetch failed - unable to score, return null as fallback
       return null;
     }
   }
@@ -340,8 +324,8 @@ export class CustodianSelectionService {
       }
 
       return scores.sort((a, b) => b.finalScore - a.finalScore);
-    } catch (err) {
-      console.error('[CustodianSelection] Error scoring all custodians:', err);
+    } catch {
+      // Batch scoring failed - no custodians scored, return empty list as fallback
       return [];
     }
   }
@@ -359,7 +343,6 @@ export class CustodianSelectionService {
    */
   clearCache(): void {
     this.selectionCache.clear();
-    console.log('[CustodianSelection] Cache cleared');
   }
 
   /**

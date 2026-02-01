@@ -781,7 +781,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
         next: pool => {
           if (pool && pool.questions.length > 0) {
             // Shuffle questions
-            const shuffled = [...pool.questions].sort(() => Math.random() - 0.5);
+            const shuffled = this.shuffleArray([...pool.questions]);
             this.questions.set(shuffled);
             this.noQuestions.set(false);
           } else {
@@ -790,8 +790,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
           this.loading.set(false);
           this.cdr.markForCheck();
         },
-        error: err => {
-          console.error('Failed to load questions:', err);
+        error: _err => {
           this.noQuestions.set(true);
           this.loading.set(false);
           this.cdr.markForCheck();
@@ -804,7 +803,19 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
    */
   private shuffleQuestions(): void {
     const qs = this.questions();
-    this.questions.set([...qs].sort(() => Math.random() - 0.5));
+    this.questions.set(this.shuffleArray([...qs]));
+  }
+
+  /**
+   * Shuffle array using Fisher-Yates with crypto-secure random.
+   */
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }
 
   /**

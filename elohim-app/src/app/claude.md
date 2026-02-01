@@ -16,12 +16,12 @@ src/app/
 
 ## Routes
 
-| Path | Pillar | Component |
-|------|--------|-----------|
-| `/` | app | HomeComponent |
-| `/lamad/*` | lamad | Learning content and paths |
-| `/community/*` | qahal | Community and governance |
-| `/shefa/*` | shefa | Economy (placeholder) |
+| Path           | Pillar | Component                  |
+| -------------- | ------ | -------------------------- |
+| `/`            | app    | HomeComponent              |
+| `/lamad/*`     | lamad  | Learning content and paths |
+| `/community/*` | qahal  | Community and governance   |
+| `/shefa/*`     | shefa  | Economy (placeholder)      |
 
 ## Key Concepts
 

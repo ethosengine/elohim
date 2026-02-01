@@ -11,6 +11,8 @@
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 4.0% (2026-01-31)
+
 import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
 
 import { Observable, of } from 'rxjs';
@@ -100,7 +102,7 @@ export class ProjectionAPIService {
   /** Base URL for cache API */
   private get baseUrl(): string {
     const doorwayUrl =
-      environment.holochain?.authUrl || environment.holochain?.appUrl || 'http://localhost:8080';
+      environment.holochain?.authUrl ?? environment.holochain?.appUrl ?? 'http://localhost:8080';
     const httpUrl = doorwayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
     return `${httpUrl}/api/v1/cache`;
   }
@@ -169,7 +171,7 @@ export class ProjectionAPIService {
 
     return this.http.get<any[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
-      map(data => (data || []).map(c => this.transformContent(c))),
+      map(data => (data ?? []).map(c => this.transformContent(c))),
       // Apply client-side filters
       map(contents => this.applyContentFilters(contents, filters)),
       catchError(err => this.handleContentArrayError(err, 'queryContent'))
@@ -291,7 +293,7 @@ export class ProjectionAPIService {
 
     return this.http.get<any[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
-      map(data => (data || []).map(p => this.transformPath(p))),
+      map(data => (data ?? []).map(p => this.transformPath(p))),
       // Apply client-side filters
       map(paths => this.applyPathFilters(paths, filters)),
       catchError(err => this.handlePathArrayError(err, 'queryPaths'))
@@ -371,7 +373,7 @@ export class ProjectionAPIService {
       >(`${this.baseUrl}/content/${encodeURIComponent(nodeId)}/related`, { params })
       .pipe(
         timeout(this.defaultTimeout),
-        map(response => (response.data || []).map(c => this.transformContent(c))),
+        map(response => (response.data ?? []).map(c => this.transformContent(c))),
         catchError(err => this.handleContentArrayError(err, `getRelated(${nodeId})`))
       );
   }
@@ -407,90 +409,6 @@ export class ProjectionAPIService {
   // =========================================================================
   // Private Helpers
   // =========================================================================
-
-  /**
-   * Build HTTP params for content query
-   */
-  private buildContentParams(filters: ContentQueryFilters): HttpParams {
-    let params = new HttpParams();
-
-    if (filters.id) {
-      params = params.set('id', filters.id);
-    }
-    if (filters.ids?.length) {
-      params = params.set('ids', filters.ids.join(','));
-    }
-    if (filters.contentType) {
-      const types = Array.isArray(filters.contentType)
-        ? filters.contentType.join(',')
-        : filters.contentType;
-      params = params.set('contentType', types);
-    }
-    if (filters.tags?.length) {
-      params = params.set('tags', filters.tags.join(','));
-    }
-    if (filters.anyTags?.length) {
-      params = params.set('anyTags', filters.anyTags.join(','));
-    }
-    if (filters.reach) {
-      const reaches = Array.isArray(filters.reach) ? filters.reach.join(',') : filters.reach;
-      params = params.set('reach', reaches);
-    }
-    if (filters.publicOnly) {
-      params = params.set('publicOnly', 'true');
-    }
-    if (filters.author) {
-      params = params.set('author', filters.author);
-    }
-    if (filters.search) {
-      params = params.set('search', filters.search);
-    }
-    if (filters.limit) {
-      params = params.set('limit', filters.limit.toString());
-    }
-    if (filters.skip) {
-      params = params.set('skip', filters.skip.toString());
-    }
-
-    return params;
-  }
-
-  /**
-   * Build HTTP params for path query
-   */
-  private buildPathParams(filters: PathQueryFilters): HttpParams {
-    let params = new HttpParams();
-
-    if (filters.id) {
-      params = params.set('id', filters.id);
-    }
-    if (filters.ids?.length) {
-      params = params.set('ids', filters.ids.join(','));
-    }
-    if (filters.difficulty) {
-      params = params.set('difficulty', filters.difficulty);
-    }
-    if (filters.visibility) {
-      params = params.set('visibility', filters.visibility);
-    }
-    if (filters.publicOnly) {
-      params = params.set('publicOnly', 'true');
-    }
-    if (filters.tags?.length) {
-      params = params.set('tags', filters.tags.join(','));
-    }
-    if (filters.search) {
-      params = params.set('search', filters.search);
-    }
-    if (filters.limit) {
-      params = params.set('limit', filters.limit.toString());
-    }
-    if (filters.skip) {
-      params = params.set('skip', filters.skip.toString());
-    }
-
-    return params;
-  }
 
   /**
    * Transform projected content to ContentNode model
@@ -576,50 +494,37 @@ export class ProjectionAPIService {
    * Handle HTTP errors - returns null for single items, empty array for collections
    */
   private handleContentError(
-    error: HttpErrorResponse,
-    context: string
+    _error: HttpErrorResponse,
+    _context: string
   ): Observable<ContentNode | null> {
-    console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of(null);
   }
 
   private handleContentArrayError(
-    error: HttpErrorResponse,
-    context: string
+    _error: HttpErrorResponse,
+    _context: string
   ): Observable<ContentNode[]> {
-    console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of([]);
   }
 
   private handlePathError(
-    error: HttpErrorResponse,
-    context: string
+    _error: HttpErrorResponse,
+    _context: string
   ): Observable<LearningPath | null> {
-    console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
-    return of(null);
-  }
-
-  private handlePathOverviewError(
-    error: HttpErrorResponse,
-    context: string
-  ): Observable<Partial<LearningPath> | null> {
-    console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of(null);
   }
 
   private handlePathArrayError(
-    error: HttpErrorResponse,
-    context: string
+    _error: HttpErrorResponse,
+    _context: string
   ): Observable<LearningPath[]> {
-    console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of([]);
   }
 
   private handleStatsError(
-    error: HttpErrorResponse,
-    context: string
+    _error: HttpErrorResponse,
+    _context: string
   ): Observable<ProjectionStats | null> {
-    console.debug(`[ProjectionAPI] ${context} failed:`, error.status, error.message);
     return of(null);
   }
 }

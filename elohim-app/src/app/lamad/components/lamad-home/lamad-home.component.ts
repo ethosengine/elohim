@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 86.3% (2026-01-31)
+
 import { takeUntil, catchError } from 'rxjs/operators';
 
 import { Subject, forkJoin, of } from 'rxjs';
@@ -159,7 +161,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
           // Feature the Elohim Protocol path
           this.featuredPath =
-            this.allPaths.find(p => p.id === 'elohim-protocol') || this.allPaths[0] || null;
+            this.allPaths.find(p => p.id === 'elohim-protocol') ?? this.allPaths[0] ?? null;
 
           this.isLoading = false;
         },
@@ -198,7 +200,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    * Navigate to a path overview
    */
   goToPath(pathId: string): void {
-    this.router.navigate([this.PATH_ROUTE, pathId]);
+    void this.router.navigate([this.PATH_ROUTE, pathId]);
   }
 
   /**
@@ -206,7 +208,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   startFeaturedPath(): void {
     if (this.featuredPath) {
-      this.router.navigate([this.PATH_ROUTE, this.featuredPath.id, 'step', 0]);
+      void this.router.navigate([this.PATH_ROUTE, this.featuredPath.id, 'step', 0]);
     }
   }
 
@@ -215,7 +217,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   continueActiveJourney(): void {
     if (this.activeFocus) {
-      this.router.navigate([
+      void this.router.navigate([
         this.PATH_ROUTE,
         this.activeFocus.pathId,
         'step',
@@ -228,21 +230,21 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    * Navigate to explore/map view
    */
   goToExplore(): void {
-    this.router.navigate(['/lamad/explore']);
+    void this.router.navigate(['/lamad/explore']);
   }
 
   /**
    * Navigate to search
    */
   goToSearch(): void {
-    this.router.navigate(['/lamad/search']);
+    void this.router.navigate(['/lamad/search']);
   }
 
   /**
    * Navigate to learner dashboard
    */
   goToDashboard(): void {
-    this.router.navigate(['/lamad/me']);
+    void this.router.navigate(['/lamad/me']);
   }
 
   /**
@@ -280,7 +282,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
     // If explore mode, navigate to graph explorer
     if (mode === 'explore') {
-      this.router.navigate(['/lamad/explore']);
+      void this.router.navigate(['/lamad/explore']);
     }
   }
 }

@@ -79,11 +79,7 @@ describe('SophiaRendererComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [
-        SophiaRendererComponent,
-        RouterModule.forRoot([]),
-        NoopAnimationsModule,
-      ],
+      imports: [SophiaRendererComponent, RouterModule.forRoot([]), NoopAnimationsModule],
     })
       .overrideComponent(SophiaRendererComponent, {
         remove: { imports: [SophiaWrapperComponent] },
@@ -128,9 +124,7 @@ describe('SophiaRendererComponent', () => {
 
     it('should detect discovery mode from moment purpose', () => {
       component.node = createMockNode({
-        content: [
-          { id: 'm1', purpose: 'discovery', content: { content: 'Q1', widgets: {} } },
-        ],
+        content: [{ id: 'm1', purpose: 'discovery', content: { content: 'Q1', widgets: {} } }],
       });
       component.ngOnChanges({ node: { currentValue: component.node } as any });
 
@@ -141,9 +135,7 @@ describe('SophiaRendererComponent', () => {
 
     it('should detect reflection mode from moment purpose', () => {
       component.node = createMockNode({
-        content: [
-          { id: 'm1', purpose: 'reflection', content: { content: 'Q1', widgets: {} } },
-        ],
+        content: [{ id: 'm1', purpose: 'reflection', content: { content: 'Q1', widgets: {} } }],
       });
       component.ngOnChanges({ node: { currentValue: component.node } as any });
 
@@ -275,7 +267,11 @@ describe('SophiaRendererComponent', () => {
     it('should show feedback after submitting correct answer', () => {
       // Mock the moment component
       const mockWrapper = new MockSophiaWrapperComponent();
-      mockWrapper.setMockRecognition(createMockRecognition({ mastery: { demonstrated: true, score: 100, total: 100, message: 'Correct!' } }));
+      mockWrapper.setMockRecognition(
+        createMockRecognition({
+          mastery: { demonstrated: true, score: 100, total: 100, message: 'Correct!' },
+        })
+      );
       (component as any).momentComponent = mockWrapper;
       component.hasAnswer = true;
 
@@ -288,7 +284,11 @@ describe('SophiaRendererComponent', () => {
 
     it('should show feedback after submitting incorrect answer', () => {
       const mockWrapper = new MockSophiaWrapperComponent();
-      mockWrapper.setMockRecognition(createMockRecognition({ mastery: { demonstrated: false, score: 0, total: 100, message: 'Incorrect' } }));
+      mockWrapper.setMockRecognition(
+        createMockRecognition({
+          mastery: { demonstrated: false, score: 0, total: 100, message: 'Incorrect' },
+        })
+      );
       (component as any).momentComponent = mockWrapper;
       component.hasAnswer = true;
 
@@ -395,10 +395,12 @@ describe('SophiaRendererComponent', () => {
 
     it('should auto-advance after submission in discovery mode', () => {
       const mockWrapper = new MockSophiaWrapperComponent();
-      mockWrapper.setMockRecognition(createMockRecognition({
-        momentId: 'm1',
-        reflection: { subscaleContributions: { openness: 0.7 } },
-      }));
+      mockWrapper.setMockRecognition(
+        createMockRecognition({
+          momentId: 'm1',
+          reflection: { subscaleContributions: { openness: 0.7 } },
+        })
+      );
       (component as any).momentComponent = mockWrapper;
       component.hasAnswer = true;
 

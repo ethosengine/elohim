@@ -76,8 +76,7 @@ export class CustodianViewComponent implements OnInit, OnDestroy {
           this.view = view;
           this.isLoading = false;
         },
-        error: err => {
-          console.error('[CustodianView] Failed to load:', err);
+        error: _err => {
           this.error = 'Failed to load custodian relationships';
           this.isLoading = false;
         },

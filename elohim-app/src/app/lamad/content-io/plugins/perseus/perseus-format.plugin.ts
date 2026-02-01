@@ -124,7 +124,9 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       },
     }));
 
-    return JSON.stringify(updatedItems.length === 1 ? updatedItems[0] : updatedItems, null, 2);
+    const itemToExport = updatedItems.length === 1 ? updatedItems[0] : updatedItems;
+    await Promise.resolve();
+    return JSON.stringify(itemToExport, null, 2);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

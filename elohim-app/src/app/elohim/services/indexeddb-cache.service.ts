@@ -16,6 +16,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 20.3% (2026-01-31)
+
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
 
@@ -30,7 +32,7 @@ interface CacheEntry<T> {
   version: number; // Schema version for invalidation
 }
 
-interface CacheMetadata {
+interface _CacheMetadata {
   version: number;
   lastCleanup: number;
   contentCount: number;
@@ -362,7 +364,6 @@ export class IndexedDBCacheService {
   private async openDatabase(): Promise<boolean> {
     return new Promise(resolve => {
       if (!('indexedDB' in window)) {
-        console.warn('[IndexedDBCache] IndexedDB not supported');
         resolve(false);
         return;
       }
@@ -370,13 +371,11 @@ export class IndexedDBCacheService {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        console.warn('[IndexedDBCache] Failed to open database');
         resolve(false);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('[IndexedDBCache] Database opened successfully');
         resolve(true);
       };
 
@@ -404,7 +403,7 @@ export class IndexedDBCacheService {
   /**
    * Get a single entry from a store.
    */
-  private get<T>(storeName: string, key: string): Promise<CacheEntry<T> | null> {
+  private async get<T>(storeName: string, key: string): Promise<CacheEntry<T> | null> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve(null);
@@ -423,7 +422,10 @@ export class IndexedDBCacheService {
   /**
    * Get multiple entries from a store.
    */
-  private getBatch<T>(storeName: string, keys: string[]): Promise<Map<string, CacheEntry<T>>> {
+  private async getBatch<T>(
+    storeName: string,
+    keys: string[]
+  ): Promise<Map<string, CacheEntry<T>>> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve(new Map());
@@ -466,7 +468,7 @@ export class IndexedDBCacheService {
   /**
    * Put a single entry in a store.
    */
-  private put<T>(storeName: string, key: string, value: CacheEntry<T>): Promise<void> {
+  private async put<T>(storeName: string, key: string, value: CacheEntry<T>): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve();
@@ -485,7 +487,7 @@ export class IndexedDBCacheService {
   /**
    * Put multiple entries in a store (single transaction).
    */
-  private putBatch<T>(storeName: string, entries: Map<string, CacheEntry<T>>): Promise<void> {
+  private async putBatch<T>(storeName: string, entries: Map<string, CacheEntry<T>>): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.db || entries.size === 0) {
         resolve();
@@ -507,7 +509,7 @@ export class IndexedDBCacheService {
   /**
    * Delete a single entry from a store.
    */
-  private delete(storeName: string, key: string): Promise<void> {
+  private async delete(storeName: string, key: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve();
@@ -526,7 +528,7 @@ export class IndexedDBCacheService {
   /**
    * Clear all entries from a store.
    */
-  private clearStore(storeName: string): Promise<void> {
+  private async clearStore(storeName: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve();
@@ -545,7 +547,7 @@ export class IndexedDBCacheService {
   /**
    * Count entries in a store.
    */
-  private count(storeName: string): Promise<number> {
+  private async count(storeName: string): Promise<number> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve(0);
@@ -570,7 +572,6 @@ export class IndexedDBCacheService {
     return new Promise(resolve => {
       const tx = this.db!.transaction(storeName, 'readwrite');
       const store = tx.objectStore(storeName);
-      const now = Date.now();
       let removed = 0;
 
       const request = store.openCursor();

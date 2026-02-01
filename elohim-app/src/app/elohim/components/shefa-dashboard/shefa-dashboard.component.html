@@ -7,7 +7,9 @@
       <p>Network Health & Custodian Metrics</p>
     </div>
     <div class="header-right">
-      <button class="btn-refresh" (click)="refreshData()" title="Refresh data">🔄 Refresh</button>
+      <button type="button" class="btn-refresh" (click)="refreshData()" title="Refresh data">
+        🔄 Refresh
+      </button>
     </div>
   </div>
 
@@ -27,7 +29,7 @@
     <div class="card metric-card">
       <div class="metric-label">Network Uptime</div>
       <div class="metric-value">{{ networkUptime() | number: '1.1-1' }}%</div>
-      <div class="metric-status" [class]="getHealthClass(networkUptime())">
+      <div class="metric-status" [ngClass]="getHealthClass(networkUptime())">
         {{ getHealthLabel(networkUptime()) }}
       </div>
     </div>
@@ -60,6 +62,7 @@
   <!-- Tabs Navigation -->
   <div class="tabs-navigation">
     <button
+      type="button"
       [class.active]="activeTab() === 'overview'"
       (click)="setActiveTab('overview')"
       class="tab-button"
@@ -67,6 +70,7 @@
       📈 Overview
     </button>
     <button
+      type="button"
       [class.active]="activeTab() === 'custodians'"
       (click)="setActiveTab('custodians')"
       class="tab-button"
@@ -74,6 +78,7 @@
       🔗 Custodians ({{ totalCustodians() }})
     </button>
     <button
+      type="button"
       [class.active]="activeTab() === 'alerts'"
       (click)="setActiveTab('alerts')"
       class="tab-button"
@@ -81,6 +86,7 @@
       ⚠️ Alerts ({{ alerts().length }})
     </button>
     <button
+      type="button"
       [class.active]="activeTab() === 'performance'"
       (click)="setActiveTab('performance')"
       class="tab-button"
@@ -101,7 +107,7 @@
             <div class="performer-name">{{ c.custodianId.slice(0, 12) }}...</div>
             <div class="performer-metric">
               <span class="metric-label">Uptime:</span>
-              <span class="metric-value" [class]="getHealthClass(c.health.uptimePercent)">
+              <span class="metric-value" [ngClass]="getHealthClass(c.health.uptimePercent)">
                 {{ c.health.uptimePercent | number: '1.1-1' }}%
               </span>
             </div>
@@ -160,8 +166,8 @@
     <!-- Filters and Sort -->
     <div class="filters-bar">
       <div class="filter-group">
-        <label>Filter by Tier:</label>
-        <select (change)="filterByTier.set($any($event.target).value)" class="filter-select">
+        <label for="tier-filter">Filter by Tier:</label>
+        <select id="tier-filter" (change)="filterByTier.set($any($event.target).value)" class="filter-select">
           <option value="all">All Tiers</option>
           <option value="1">Caretaker</option>
           <option value="2">Curator</option>
@@ -171,8 +177,8 @@
       </div>
 
       <div class="filter-group">
-        <label>Sort by:</label>
-        <select (change)="sortBy.set($any($event.target).value)" class="filter-select">
+        <label for="sort-filter">Sort by:</label>
+        <select id="sort-filter" (change)="sortBy.set($any($event.target).value)" class="filter-select">
           <option value="health">Health</option>
           <option value="reputation">Reputation</option>
           <option value="capacity">Capacity</option>
@@ -276,14 +282,9 @@
           <div *ngFor="let c of filteredCustodians().slice(0, 10)" class="usage-bar">
             <div class="usage-label">{{ c.custodianId.slice(0, 8) }}</div>
             <div class="usage-bar-container">
-              <div
-                class="usage-bar-fill"
-                [style.width.%]="c.computation.memoryUsagePercent"
-              ></div>
+              <div class="usage-bar-fill" [style.width.%]="c.computation.memoryUsagePercent"></div>
             </div>
-            <div class="usage-value">
-              {{ c.computation.memoryUsagePercent | number: '1.0-0' }}%
-            </div>
+            <div class="usage-value">{{ c.computation.memoryUsagePercent | number: '1.0-0' }}%</div>
           </div>
         </div>
       </div>

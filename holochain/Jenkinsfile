@@ -703,19 +703,50 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-dev.yaml > holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f holochain/manifests/edgenode-dev-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-dev -n ethosengine"
-                            sh "kubectl rollout status deployment/elohim-edgenode-dev -n ethosengine --timeout=300s"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-alpha.yaml > holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-alpha -n elohim-alpha"
+                            sh "kubectl rollout status deployment/elohim-edgenode-alpha -n elohim-alpha --timeout=300s"
 
                             sh 'sleep 15'
 
-                            def healthy = checkEdgeNodeHealth('https://doorway-dev.elohim.host')
+                            def healthy = checkEdgeNodeHealth('https://doorway-alpha.elohim.host')
                             if (healthy) {
                                 env.EDGE_NODE_HEALTHY = 'true'
-                                echo "Edge Node Dev deployed and healthy: https://doorway-dev.elohim.host"
+                                echo "Edge Node Alpha deployed and healthy: https://doorway-alpha.elohim.host"
                             } else {
                                 echo "Edge Node deployed but health check failed - may need more time"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Edge Node - Staging') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'staging'
+                        expression { return env.BRANCH_NAME ==~ /staging-.+/ }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying Edge Node to Staging: ${IMAGE_TAG}"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-staging.yaml > holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-staging -n elohim-staging"
+                            sh "kubectl rollout status deployment/elohim-edgenode-staging -n elohim-staging --timeout=300s"
+                            sh 'sleep 15'
+                            if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
+                                echo "Edge Node Staging deployed and healthy"
                             }
                         }
                     }
@@ -793,8 +824,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-prod.yaml > holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
                             sh "kubectl apply -f holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-prod -n ethosengine"
-                            sh "kubectl rollout status deployment/elohim-edgenode-prod -n ethosengine --timeout=300s"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-prod -n elohim-prod"
+                            sh "kubectl rollout status deployment/elohim-edgenode-prod -n elohim-prod --timeout=300s"
 
                             sh 'sleep 15'
 

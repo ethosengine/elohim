@@ -6,11 +6,11 @@
       <p class="subtitle">Compute Resources & Network Health</p>
     </div>
     <div class="header-actions">
-      <span class="connection-status" [class]="connectionState()">
+      <span [class]="'connection-status ' + connectionState()">
         <span class="status-dot"></span>
         {{ connectionState() | titlecase }}
       </span>
-      <button class="refresh-btn" (click)="refresh()" [disabled]="loading()">
+      <button type="button" class="refresh-btn" (click)="refresh()" [disabled]="loading()">
         <span class="icon">&#8635;</span>
         Refresh
       </button>
@@ -29,7 +29,7 @@
   @if (error()) {
     <div class="error-state">
       <p>{{ error() }}</p>
-      <button (click)="refresh()">Retry</button>
+      <button type="button" (click)="refresh()">Retry</button>
     </div>
   }
 
@@ -86,13 +86,24 @@
 
     <!-- Tabs -->
     <nav class="tabs">
-      <button class="tab" [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+      <button
+        type="button"
+        class="tab"
+        [class.active]="activeTab() === 'overview'"
+        (click)="setTab('overview')"
+      >
         Overview
       </button>
-      <button class="tab" [class.active]="activeTab() === 'nodes'" (click)="setTab('nodes')">
+      <button
+        type="button"
+        class="tab"
+        [class.active]="activeTab() === 'nodes'"
+        (click)="setTab('nodes')"
+      >
         Nodes ({{ nodes().length }})
       </button>
       <button
+        type="button"
         class="tab"
         [class.active]="activeTab() === 'resources'"
         (click)="setTab('resources')"
@@ -142,8 +153,7 @@
                   <span class="tier-name">{{ tier.tier }}</span>
                   <div class="tier-bar">
                     <div
-                      class="tier-bar-fill"
-                      [class]="tier.tier.toLowerCase()"
+                      [class]="'tier-bar-fill ' + tier.tier.toLowerCase()"
                       [style.width.%]="tier.pct * 100"
                     ></div>
                   </div>
@@ -306,12 +316,12 @@
                 <tr [class]="node.status">
                   <td class="node-id">{{ node.nodeId | slice: 0 : 12 }}...</td>
                   <td>
-                    <span class="status-badge" [class]="node.status">
+                    <span [class]="'status-badge ' + node.status">
                       {{ node.status | titlecase }}
                     </span>
                   </td>
                   <td>
-                    <span class="tier-badge" [class]="node.stewardTier ?? 'unknown'">
+                    <span [class]="'tier-badge ' + (node.stewardTier ?? 'unknown')">
                       {{ node.stewardTier ?? '-' | titlecase }}
                     </span>
                   </td>

@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 0.7% (2026-01-31)
+
 import { tap } from 'rxjs/operators';
 
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
@@ -539,7 +541,11 @@ export class HumanConsentService {
 
   private generateConsentId(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10); // NOSONAR - Non-cryptographic ID generation
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const random = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 8);
     return `consent-${timestamp}-${random}`;
   }
 }

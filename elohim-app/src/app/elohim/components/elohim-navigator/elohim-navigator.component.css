@@ -56,7 +56,6 @@
   font-size: 1.125rem;
   line-height: 1;
   background: var(--lamad-accent-gradient);
-  background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
@@ -65,7 +64,6 @@
   font-size: 0.9rem;
   font-weight: 600;
   background: var(--lamad-accent-gradient);
-  background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
@@ -145,12 +143,12 @@
 
 @keyframes slideDown {
   from {
-    opacity: 0;
+    opacity: 0%;
     transform: translateY(-8px);
   }
 
   to {
-    opacity: 1;
+    opacity: 100%;
     transform: translateY(0);
   }
 }
@@ -201,7 +199,7 @@
 }
 
 .context-app-item.coming-soon {
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .context-app-item[disabled] {
@@ -213,7 +211,6 @@
   flex-shrink: 0;
   line-height: 1;
   background: var(--lamad-accent-gradient);
-  background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
@@ -421,7 +418,7 @@
 .action-icon {
   width: 18px;
   height: 18px;
-  opacity: 0.7;
+  opacity: 70%;
 }
 
 .action-label {
@@ -625,17 +622,17 @@
 
 .status-disconnected {
   background: var(--lamad-text-muted);
-  opacity: 0.5;
+  opacity: 50%;
 }
 
 @keyframes pulse {
   0%,
   100% {
-    opacity: 1;
+    opacity: 100%;
   }
 
   50% {
-    opacity: 0.4;
+    opacity: 40%;
   }
 }
 
@@ -754,7 +751,7 @@
 }
 
 .reconnect-btn:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 
@@ -835,12 +832,12 @@
   color: var(--lamad-text-muted);
   font-size: 1rem;
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 60%;
   transition: opacity 0.2s;
 }
 
 .btn-dismiss:hover {
-  opacity: 1;
+  opacity: 100%;
 }
 
 /* ============================================================================
@@ -891,7 +888,7 @@
   border: none;
   color: var(--lamad-text-muted);
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 60%;
   transition: opacity 0.2s;
   display: flex;
   align-items: center;
@@ -899,7 +896,7 @@
 }
 
 .modal-close:hover {
-  opacity: 1;
+  opacity: 100%;
 }
 
 .modal-header {
@@ -912,7 +909,6 @@
   margin: 0 0 0.5rem;
   font-size: 1.5rem;
   background: var(--lamad-accent-gradient);
-  background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
@@ -1066,7 +1062,7 @@
 }
 
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 60%;
   cursor: not-allowed;
 }
 
@@ -1295,10 +1291,10 @@
 
 @keyframes fadeIn {
   from {
-    opacity: 0;
+    opacity: 0%;
   }
 
   to {
-    opacity: 1;
+    opacity: 100%;
   }
 }

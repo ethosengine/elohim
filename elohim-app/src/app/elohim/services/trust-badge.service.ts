@@ -1,43 +1,38 @@
 import { Injectable } from '@angular/core';
 
-import { map, catchError } from 'rxjs/operators';
+// @coverage: 0.8% (2026-01-31)
 
-import { Observable, of, forkJoin } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
-// Services from elohim (local)
+import { forkJoin, Observable, of } from 'rxjs';
 
-// Models from elohim (local)
-
-// Models from lamad pillar (content-specific)
+import {
+  ATTESTATION_BADGE_CONFIG,
+  ATTESTATION_PRIORITY,
+  BadgeAction,
+  BadgeDisplay,
+  BadgeWarning,
+  CompactTrustBadge,
+  ContentAttestationType,
+  ContentReach,
+  REACH_BADGE_CONFIG,
+  TrustBadge,
+  TrustIndicator,
+  TrustIndicatorSet,
+  WARNING_CONFIG,
+  badgeToIndicator,
+  calculateTrustLevel,
+  generateAriaLabel,
+  generateTrustSummary,
+  toCompactBadge,
+  warningToIndicator,
+} from '@app/elohim/models/trust-badge.model';
 import {
   ContentAttestation,
   CONTENT_REACH_LEVELS,
-} from '../../lamad/models/content-attestation.model';
-import { ContentNode, ContentFlag } from '../../lamad/models/content-node.model';
-
-// Services from lamad pillar
-import { ContentService } from '../../lamad/services/content.service';
-import {
-  TrustBadge,
-  CompactTrustBadge,
-  BadgeDisplay,
-  BadgeWarning,
-  BadgeAction,
-  TrustIndicator,
-  TrustIndicatorSet,
-  ContentReach,
-  ContentAttestationType,
-  ATTESTATION_BADGE_CONFIG,
-  REACH_BADGE_CONFIG,
-  WARNING_CONFIG,
-  ATTESTATION_PRIORITY,
-  calculateTrustLevel,
-  generateTrustSummary,
-  generateAriaLabel,
-  toCompactBadge,
-  badgeToIndicator,
-  warningToIndicator,
-} from '../models/trust-badge.model';
+} from '@app/lamad/models/content-attestation.model';
+import { ContentFlag, ContentNode } from '@app/lamad/models/content-node.model';
+import { ContentService } from '@app/lamad/services/content.service';
 
 import { AgentService } from './agent.service';
 import { DataLoaderService } from './data-loader.service';
@@ -89,8 +84,7 @@ export class TrustBadgeService {
       attestations: this.dataLoader.getAttestationsForContent(contentId),
     }).pipe(
       map(({ content, attestations }) => this.computeBadge(content, attestations)),
-      catchError(err => {
-        console.error(`[TrustBadgeService] Failed to get badge for ${contentId}`, err);
+      catchError(_err => {
         return of(this.createUnverifiedBadge(contentId));
       })
     );
@@ -152,8 +146,7 @@ export class TrustBadgeService {
       attestations: this.dataLoader.getAttestationsForContent(contentId),
     }).pipe(
       map(({ content, attestations }) => this.computeIndicatorSet(content, attestations)),
-      catchError(err => {
-        console.error(`[TrustBadgeService] Failed to get indicators for ${contentId}`, err);
+      catchError(_err => {
         return of(this.createEmptyIndicatorSet(contentId));
       })
     );

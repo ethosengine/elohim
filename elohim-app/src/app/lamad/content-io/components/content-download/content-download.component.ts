@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
+// @coverage: 46.7% (2026-01-31)
+
 import { ContentNode } from '../../../models/content-node.model';
 import { ContentFormatRegistryService } from '../../services/content-format-registry.service';
 import { ContentIOService } from '../../services/content-io.service';
@@ -117,8 +119,8 @@ export class ContentDownloadComponent {
         },
         this.node.contentFormat
       );
-    } catch (error) {
-      console.error('Download failed:', error);
+    } catch {
+      // Download failed - browser download or format export error, silently handled
     } finally {
       this.downloading = false;
     }

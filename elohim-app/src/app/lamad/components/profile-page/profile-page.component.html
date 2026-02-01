@@ -13,7 +13,7 @@
 
     <div class="profile-info">
       <h1 class="profile-name">{{ displayName() }}</h1>
-      <div class="profile-badge" [class]="'badge-' + identityMode()">
+      <div class="profile-badge" [ngClass]="'badge-' + identityMode()">
         <span class="badge-icon">{{ modeBadgeIcon() }}</span>
         <span class="badge-text">{{ modeBadgeText() }}</span>
       </div>
@@ -36,7 +36,7 @@
     </div>
 
     <div class="profile-actions">
-      <button class="btn-secondary" (click)="setActiveTab('settings')">
+      <button type="button" class="btn-secondary" (click)="setActiveTab('settings')">
         <span class="btn-icon">settings</span>
         Edit Profile
       </button>
@@ -52,7 +52,7 @@
           <strong>Your progress is stored locally</strong>
           <p>Install the Elohim app to save your progress permanently and sync across devices.</p>
         </div>
-        <button class="btn-primary">Join Network</button>
+        <button type="button" class="btn-primary">Join Network</button>
       </div>
     </div>
   }
@@ -60,16 +60,23 @@
   <!-- Tab Navigation -->
   <nav class="tab-nav">
     <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'overview'"
       (click)="setActiveTab('overview')"
     >
       Overview
     </button>
-    <button class="tab-btn" [class.active]="activeTab === 'paths'" (click)="setActiveTab('paths')">
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab === 'paths'"
+      (click)="setActiveTab('paths')"
+    >
       Paths
     </button>
     <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'timeline'"
       (click)="setActiveTab('timeline')"
@@ -77,6 +84,7 @@
       Timeline
     </button>
     <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'network'"
       (click)="setActiveTab('network')"
@@ -84,6 +92,7 @@
       Network
     </button>
     <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'settings'"
       (click)="setActiveTab('settings')"
@@ -223,7 +232,9 @@
                 </div>
               }
             </div>
-            <button class="btn-link" (click)="setActiveTab('timeline')">View Full Timeline</button>
+            <button type="button" class="btn-link" (click)="setActiveTab('timeline')">
+              View Full Timeline
+            </button>
           </section>
         }
       </div>
@@ -446,6 +457,7 @@
           <summary>View detailed activity log</summary>
           <div class="timeline-filter">
             <button
+              type="button"
               class="filter-btn"
               [class.active]="activityFilter === 'all'"
               (click)="setActivityFilter('all')"
@@ -453,6 +465,7 @@
               All
             </button>
             <button
+              type="button"
               class="filter-btn"
               [class.active]="activityFilter === 'view'"
               (click)="setActivityFilter('view')"
@@ -460,6 +473,7 @@
               Views
             </button>
             <button
+              type="button"
               class="filter-btn"
               [class.active]="activityFilter === 'affinity'"
               (click)="setActivityFilter('affinity')"
@@ -467,6 +481,7 @@
               Affinity
             </button>
             <button
+              type="button"
               class="filter-btn"
               [class.active]="activityFilter === 'path-start'"
               (click)="setActivityFilter('path-start')"
@@ -474,6 +489,7 @@
               Path Starts
             </button>
             <button
+              type="button"
               class="filter-btn"
               [class.active]="activityFilter === 'step-complete'"
               (click)="setActivityFilter('step-complete')"
@@ -509,13 +525,13 @@
           <div class="stage-header">
             <span class="material-icons stage-icon">{{ stageInfo().icon }}</span>
             <div class="stage-info">
-              <span class="stage-badge" [class]="getStageBadgeClass()">
+              <span class="stage-badge" [ngClass]="getStageBadgeClass()">
                 {{ stageInfo().label }}
               </span>
               <span class="stage-tagline">{{ stageInfo().tagline }}</span>
             </div>
             <div class="connection-status">
-              <span class="status-dot" [class]="getStatusDotClass()"></span>
+              <span class="status-dot" [ngClass]="getStatusDotClass()"></span>
               <span class="status-label">{{ connectionStatus().label }}</span>
             </div>
           </div>
@@ -556,7 +572,7 @@
                 <strong>{{ sovereigntyState().migrationTarget }}</strong>
                 for more control.
               </span>
-              <button class="btn-primary">Learn About Upgrading</button>
+              <button type="button" class="btn-primary">Learn About Upgrading</button>
             </div>
           }
         </section>
@@ -624,6 +640,7 @@
                       {{ truncateHash(edgeNodeInfo().agentPubKey) }}
                     </code>
                     <button
+                      type="button"
                       class="copy-btn"
                       (click)="copyToClipboard(edgeNodeInfo().agentPubKey!)"
                       title="Copy full key"
@@ -642,6 +659,7 @@
                       {{ truncateHash(edgeNodeInfo().dnaHash) }}
                     </code>
                     <button
+                      type="button"
                       class="copy-btn"
                       (click)="copyToClipboard(edgeNodeInfo().dnaHash!)"
                       title="Copy full hash"
@@ -670,7 +688,7 @@
             </div>
 
             <div class="connection-actions">
-              <button class="btn-secondary" (click)="reconnect()">
+              <button type="button" class="btn-secondary" (click)="reconnect()">
                 <span class="material-icons">refresh</span>
                 Reconnect
               </button>
@@ -696,7 +714,12 @@
                   <div class="key-value">
                     <code [title]="key.value">{{ key.truncated }}</code>
                     @if (key.canExport) {
-                      <button class="copy-btn" (click)="copyToClipboard(key.value)" title="Copy">
+                      <button
+                        type="button"
+                        class="copy-btn"
+                        (click)="copyToClipboard(key.value)"
+                        title="Copy"
+                      >
                         <span class="material-icons">content_copy</span>
                       </button>
                     }
@@ -728,7 +751,7 @@
               <span class="material-icons not-connected-icon">cloud_off</span>
               <h3>Not Connected to Network</h3>
               <p>{{ connectionStatus().description }}</p>
-              <button class="btn-primary" (click)="reconnect()">
+              <button type="button" class="btn-primary" (click)="reconnect()">
                 <span class="material-icons">wifi</span>
                 Connect to Network
               </button>
@@ -782,7 +805,9 @@
                 </span>
                 <span class="field-value">{{ interests().join(', ') || '(not set)' }}</span>
               </div>
-              <button class="btn-primary" (click)="startEditing()">Edit Profile</button>
+              <button type="button" class="btn-primary" (click)="startEditing()">
+                Edit Profile
+              </button>
             </div>
           } @else {
             <form class="profile-form" (submit)="saveProfile(); $event.preventDefault()">
@@ -867,12 +892,12 @@
             </p>
           }
           <div class="settings-actions">
-            <button class="btn-secondary" (click)="exportData()">
+            <button type="button" class="btn-secondary" (click)="exportData()">
               <span class="btn-icon">download</span>
               Export Data
             </button>
             @if (!isNetworkAuthenticated()) {
-              <button class="btn-danger" (click)="resetSession()">
+              <button type="button" class="btn-danger" (click)="resetSession()">
                 <span class="btn-icon">delete</span>
                 Reset Session
               </button>
@@ -893,7 +918,7 @@
               </div>
               <div class="info-row">
                 <span class="info-label">Identity Mode</span>
-                <span class="info-value identity-mode" [class]="'mode-' + identityMode()">
+                <span [ngClass]="['info-value', 'identity-mode', 'mode-' + identityMode()]">
                   {{ modeBadgeText() }}
                 </span>
               </div>

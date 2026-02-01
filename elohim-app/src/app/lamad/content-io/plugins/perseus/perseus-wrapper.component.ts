@@ -147,15 +147,17 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
   // Lifecycle
   // ─────────────────────────────────────────────────────────────────────────
 
-  async ngAfterViewInit(): Promise<void> {
-    console.log('[PerseusWrapper] ngAfterViewInit, item:', this.item?.id || 'null');
+  ngAfterViewInit(): void {
+    void this.initializeAsync();
+  }
+
+  private async initializeAsync(): Promise<void> {
     try {
       // Lazy load React and register the custom element
       await registerPerseusElement();
 
       // Get reference to the custom element
       this.perseusElement = getPerseusElement(this.container.nativeElement);
-      console.log('[PerseusWrapper] Element found:', !!this.perseusElement);
 
       if (this.perseusElement) {
         // Set up event callbacks
@@ -172,30 +174,9 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
         // Apply pending item that arrived before element was ready
         // Use pendingItem if we have a pending change, otherwise fall back to current input
         const itemToApply = this.hasPendingItemChange ? this.pendingItem : this.item;
-        console.log('[PerseusWrapper] Applying item:', {
-          hasPendingChange: this.hasPendingItemChange,
-          pendingItemId: this.pendingItem?.id || 'null',
-          currentItemId: this.item?.id || 'null',
-          itemToApplyId: itemToApply?.id || 'null',
-        });
-
         if (itemToApply) {
-          console.log('[PerseusWrapper] Setting item:', itemToApply.id, {
-            hasQuestion: !!itemToApply.question,
-            hasWidgets: !!itemToApply.question?.widgets,
-            fullItem: itemToApply,
-          });
           this.perseusElement.item = itemToApply;
           this.hasPendingItemChange = false;
-          // Verify item was set
-          console.log(
-            '[PerseusWrapper] After setting, element.item:',
-            this.perseusElement.item?.id || 'null'
-          );
-          // Dark mode refresh disabled for debugging
-          // refreshPerseusDarkMode();
-        } else {
-          console.log('[PerseusWrapper] No item to set');
         }
 
         // Apply review mode
@@ -215,35 +196,22 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
       }
     } catch (error) {
       this.loadError = error instanceof Error ? error.message : 'Failed to load Perseus';
-      console.error('[PerseusWrapper] Load error:', error);
       this.cdr.markForCheck();
     }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    console.log('[PerseusWrapper] ngOnChanges:', {
-      hasElement: !!this.perseusElement,
-      initialized: this.initialized,
-      itemChanged: !!changes['item'],
-      newItem: changes['item']?.currentValue?.id || 'null',
-    });
-
     // Track item changes that arrive before element is ready
     if (changes['item']) {
-      this.pendingItem = changes['item'].currentValue;
+      this.pendingItem = changes['item'].currentValue as PerseusItem | null;
       this.hasPendingItemChange = true;
     }
 
     if (!this.perseusElement || !this.initialized) {
-      console.log(
-        '[PerseusWrapper] Element not ready, storing pending item:',
-        this.pendingItem?.id || 'null'
-      );
       return;
     }
 
     if (changes['item'] && changes['item'].currentValue !== changes['item'].previousValue) {
-      console.log('[PerseusWrapper] Updating item to:', this.item?.id);
       this.perseusElement.item = this.item;
       this.hasPendingItemChange = false;
       // Dark mode refresh disabled for debugging
@@ -275,7 +243,6 @@ export class PerseusWrapperComponent implements AfterViewInit, OnDestroy, OnChan
    */
   score(): PerseusScoreResult | null {
     if (!this.perseusElement) {
-      console.warn('Perseus element not initialized');
       return null;
     }
 

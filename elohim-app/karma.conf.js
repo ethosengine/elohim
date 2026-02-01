@@ -37,7 +37,8 @@ module.exports = function (config) {
       reporters: [
         { type: 'html' },
         { type: 'text-summary' },
-        { type: 'lcovonly', file: 'lcov.info' }
+        { type: 'lcovonly', file: 'lcov.info' },
+        { type: 'json-summary', file: 'coverage-summary.json' }
       ],
       check: {
         // Only enforce coverage on services (business logic)

@@ -905,7 +905,7 @@ export function transformEventFromWire(wire: EconomicEventWire): EconomicEvent {
     receiver: wire.receiver,
     resourceConformsTo: wire.resourceConformsTo ?? undefined,
     resourceQuantity:
-      wire.resourceQuantityValue != null
+      wire.resourceQuantityValue !== null
         ? {
             hasNumericalValue: wire.resourceQuantityValue,
             hasUnit: wire.resourceQuantityUnit ?? 'unit-each',

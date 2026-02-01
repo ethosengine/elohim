@@ -96,7 +96,7 @@ export class OAuthAuthProvider implements AuthProvider {
 
     // The 'token' field contains the authorization code for OAuth
     // This is called from the callback handler
-    return this.exchangeCodeForToken(oauthCreds.provider, oauthCreds.token);
+    return await this.exchangeCodeForToken(oauthCreds.provider, oauthCreds.token);
   }
 
   /**
@@ -127,7 +127,6 @@ export class OAuthAuthProvider implements AuthProvider {
     });
 
     const authorizeUrl = `${doorwayUrl}/auth/authorize?${params.toString()}`;
-    console.log('[OAuthProvider] Redirecting to:', authorizeUrl);
 
     this.isFlowInProgress.set(true);
 
@@ -144,8 +143,6 @@ export class OAuthAuthProvider implements AuthProvider {
    * @returns Authentication result
    */
   async handleCallback(code: string, state: string): Promise<AuthResult> {
-    console.log('[OAuthProvider] Handling callback with code and state');
-
     // Retrieve and verify stored state
     const storedStateJson = sessionStorage.getItem(OAUTH_STATE_KEY);
     if (!storedStateJson) {
@@ -215,7 +212,6 @@ export class OAuthAuthProvider implements AuthProvider {
     redirectUri?: string
   ): Promise<AuthResult> {
     const tokenUrl = `${doorwayUrl}/auth/token`;
-    console.log('[OAuthProvider] Exchanging code for token at:', tokenUrl);
 
     const body = {
       grantType: 'authorization_code',
@@ -231,8 +227,6 @@ export class OAuthAuthProvider implements AuthProvider {
         })
       );
 
-      console.log('[OAuthProvider] Token exchange successful');
-
       // Calculate expiry time
       const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
 
@@ -245,7 +239,6 @@ export class OAuthAuthProvider implements AuthProvider {
         identifier: response.identifier,
       };
     } catch (err) {
-      console.error('[OAuthProvider] Token exchange failed:', err);
       return this.handleError(err);
     }
   }
@@ -253,9 +246,10 @@ export class OAuthAuthProvider implements AuthProvider {
   /**
    * Logout - clear any OAuth state.
    */
-  async logout(): Promise<void> {
+  logout(): Promise<void> {
     sessionStorage.removeItem(OAUTH_STATE_KEY);
     this.isFlowInProgress.set(false);
+    return Promise.resolve();
   }
 
   /**
@@ -331,11 +325,6 @@ export class OAuthAuthProvider implements AuthProvider {
     const error = url.searchParams.get('error');
 
     if (error) {
-      console.error(
-        '[OAuthProvider] OAuth error:',
-        error,
-        url.searchParams.get('errorDescription')
-      );
       return null;
     }
 

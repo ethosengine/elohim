@@ -117,6 +117,10 @@
           [ngClass]="getPriorityClass(rec.priority)"
           [class.selected]="selectedRecommendation === rec"
           (click)="selectRecommendation(rec)"
+          (keydown.enter)="selectRecommendation(rec)"
+          (keydown.space)="selectRecommendation(rec)"
+          tabindex="0"
+          role="button"
         >
           <div class="rec-header">
             <span class="rec-icon">{{ getNodeIcon(rec.nodeType) }}</span>
@@ -146,7 +150,11 @@
           </div>
 
           <div class="rec-actions" *ngIf="selectedRecommendation === rec">
-            <button class="btn-primary" (click)="onOrderNode(rec); $event.stopPropagation()">
+            <button
+              type="button"
+              class="btn-primary"
+              (click)="onOrderNode(rec); $event.stopPropagation()"
+            >
               Order {{ rec.displayName }}
             </button>
             <a

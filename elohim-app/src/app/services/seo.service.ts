@@ -3,6 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 
+// @coverage: 92.4% (2026-01-31)
+
 import { filter, map, mergeMap } from 'rxjs/operators';
 
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';

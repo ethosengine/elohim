@@ -17,7 +17,14 @@
 
     <!-- Success Message -->
     @if (successMessage()) {
-      <div class="success-banner" (click)="clearMessages()">
+      <div
+        class="success-banner"
+        (click)="clearMessages()"
+        (keydown.enter)="clearMessages()"
+        (keydown.space)="clearMessages()"
+        tabindex="0"
+        role="status"
+      >
         <span class="success-icon">✓</span>
         <span>{{ successMessage() }}</span>
       </div>
@@ -25,7 +32,14 @@
 
     <!-- Error Display -->
     @if (error()) {
-      <div class="error-banner" (click)="clearMessages()">
+      <div
+        class="error-banner"
+        (click)="clearMessages()"
+        (keydown.enter)="clearMessages()"
+        (keydown.space)="clearMessages()"
+        tabindex="0"
+        role="alert"
+      >
         <span class="error-icon">✕</span>
         <span>{{ error() }}</span>
       </div>
@@ -33,8 +47,19 @@
 
     <!-- Create Form Modal -->
     @if (showCreateForm()) {
-      <div class="modal-overlay" (click)="closeCreateForm()">
-        <div class="modal-content" (click)="$event.stopPropagation()">
+      <div
+        class="modal-overlay"
+        (click)="closeCreateForm()"
+        (keydown.enter)="closeCreateForm()"
+        (keydown.space)="closeCreateForm()"
+        tabindex="0"
+      >
+        <div
+          class="modal-content"
+          (click)="$event.stopPropagation()"
+          (keydown)="$event.stopPropagation()"
+          tabindex="-1"
+        >
           <h2>Create Contributor Presence</h2>
           <p class="modal-subtitle">
             Create a presence for a contributor who isn't yet in the network. Recognition will

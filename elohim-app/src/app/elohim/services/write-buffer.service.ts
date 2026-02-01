@@ -169,9 +169,11 @@ export class WriteBufferService implements OnDestroy {
   private implementation: 'wasm' | 'typescript' = 'typescript';
   private initPromise: Promise<BufferInitializationResult> | null = null;
 
-  private readonly autoFlushInterval: number | null = null;
   private flushCallback: FlushCallback | null = null;
   private readonly destroy$ = new Subject<void>();
+
+  private readonly maxConsecutiveFailures = 3;
+  private readonly unknownErrorMessage = 'Unknown error';
 
   /** Observable buffer service state */
   readonly state$ = this.stateSubject.asObservable();
@@ -256,15 +258,16 @@ export class WriteBufferService implements OnDestroy {
         this.stateSubject.next('ready');
         this.updateStats();
 
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : this.unknownErrorMessage;
         return {
           success: true,
           implementation: 'typescript',
           error: `WASM failed, using TypeScript fallback: ${errorMessage}`,
         };
-      } catch (_fallbackError) {
+      } catch {
+        // Fallback initialization failed - TypeScript implementation also unavailable
         this.stateSubject.next('error');
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : this.unknownErrorMessage;
         return {
           success: false,
           implementation: 'typescript',
@@ -541,10 +544,8 @@ export class WriteBufferService implements OnDestroy {
 
     let totalCommitted = 0;
     let totalFailed = 0;
-    const allFailedIds: string[] = [];
     let batchCount = 0;
     let consecutiveFailures = 0;
-    const maxConsecutiveFailures = 3;
 
     while (this.buffer!.shouldFlush()) {
       const result = await this.flushBatch(callback);
@@ -553,7 +554,6 @@ export class WriteBufferService implements OnDestroy {
       if (result) {
         totalCommitted += result.successCount;
         totalFailed += result.failureCount;
-        allFailedIds.push(...result.failedOperationIds);
 
         if (result.success) {
           consecutiveFailures = 0;
@@ -561,7 +561,7 @@ export class WriteBufferService implements OnDestroy {
           consecutiveFailures++;
 
           // Stop if we're getting too many consecutive complete failures
-          if (consecutiveFailures >= maxConsecutiveFailures && result.successCount === 0) {
+          if (consecutiveFailures >= this.maxConsecutiveFailures && result.successCount === 0) {
             this.logger.warn('Stopping flush after consecutive failures', {
               consecutiveFailures,
               totalCommitted,
@@ -619,7 +619,6 @@ export class WriteBufferService implements OnDestroy {
     const allFailedIds: string[] = [];
     let batchCount = 0;
     let consecutiveFailures = 0;
-    const maxConsecutiveFailures = 3;
 
     while (this.buffer!.shouldFlush()) {
       const result = await this.flushBatch(callback);
@@ -635,7 +634,7 @@ export class WriteBufferService implements OnDestroy {
         } else {
           consecutiveFailures++;
 
-          if (consecutiveFailures >= maxConsecutiveFailures && result.successCount === 0) {
+          if (consecutiveFailures >= this.maxConsecutiveFailures && result.successCount === 0) {
             this.logger.warn('Stopping flush after consecutive failures', {
               consecutiveFailures,
               totalCommitted,
@@ -677,9 +676,9 @@ export class WriteBufferService implements OnDestroy {
 
     interval(intervalMs)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(async () => {
+      .subscribe(() => {
         if (this.buffer && this.buffer.shouldFlush() && this.flushCallback) {
-          await this.flushBatch(this.flushCallback);
+          void this.flushBatch(this.flushCallback);
         }
       });
 

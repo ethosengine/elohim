@@ -603,7 +603,7 @@ export class ShefaHomeComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadData();
+    void this.loadData();
   }
 
   async loadData(): Promise<void> {
@@ -620,7 +620,9 @@ export class ShefaHomeComponent implements OnInit {
         // Try to load events for current agent (or a sample)
         this.economicService.getEventsForAgent('current', 'both').subscribe({
           next: events => this.events.set(events),
-          error: err => console.warn('Could not load events:', err),
+          error: _err => {
+            // Handle error silently
+          },
         });
       }
 
@@ -628,7 +630,9 @@ export class ShefaHomeComponent implements OnInit {
         // Try to load appreciations
         this.appreciationService.getAppreciationsFor('current').subscribe({
           next: appreciations => this.appreciations.set(appreciations),
-          error: err => console.warn('Could not load appreciations:', err),
+          error: _err => {
+            // Handle error silently
+          },
         });
       }
 
@@ -636,8 +640,8 @@ export class ShefaHomeComponent implements OnInit {
       if (!this.isConnected()) {
         this.loadDemoData();
       }
-    } catch (err) {
-      console.error('Failed to load economic data:', err);
+    } catch {
+      // Holochain connection failed - fallback to demo data
       this.error.set('Failed to connect to Holochain. Showing demo data.');
       this.loadDemoData();
     } finally {
@@ -706,7 +710,7 @@ export class ShefaHomeComponent implements OnInit {
   }
 
   refreshData(): void {
-    this.loadData();
+    void this.loadData();
   }
 
   async testConnection(): Promise<void> {

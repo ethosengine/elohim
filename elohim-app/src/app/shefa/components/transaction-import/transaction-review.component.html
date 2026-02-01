@@ -64,6 +64,7 @@
             <div class="category-name">
               {{ currentTransaction.category }}
               <button
+                type="button"
                 class="btn-edit-category"
                 (click)="showCategoryDropdown = !showCategoryDropdown"
                 title="Press E to edit"
@@ -79,6 +80,7 @@
           <!-- Category Dropdown -->
           <div class="category-dropdown" *ngIf="showCategoryDropdown">
             <input
+              id="category-search"
               type="text"
               class="category-search"
               placeholder="Search categories..."
@@ -86,6 +88,7 @@
             />
             <div class="category-options">
               <button
+                type="button"
                 *ngFor="let cat of budgetCategories"
                 class="category-option"
                 (click)="updateCategory(cat.name)"
@@ -104,6 +107,7 @@
           <div class="suggestions-label">AI Suggestions</div>
           <div class="suggestion-chips">
             <button
+              type="button"
               *ngFor="let suggestion of allSuggestions"
               class="suggestion-chip"
               (click)="acceptSuggestion(suggestion)"
@@ -123,7 +127,7 @@
           <strong>Possible Duplicate</strong>
           <p>
             This transaction appears to be a duplicate of another transaction.
-            <button class="btn-link" (click)="markAsNotDuplicate()">Override</button>
+            <button type="button" class="btn-link" (click)="markAsNotDuplicate()">Override</button>
           </p>
         </div>
       </div>
@@ -148,6 +152,7 @@
     <!-- Action Buttons -->
     <div class="action-buttons">
       <button
+        type="button"
         class="btn btn-approve"
         (click)="approveTransaction()"
         [disabled]="isSaving"
@@ -158,6 +163,7 @@
       </button>
 
       <button
+        type="button"
         class="btn btn-flag"
         (click)="markAsNeedsAttention()"
         [disabled]="isSaving"
@@ -167,6 +173,7 @@
       </button>
 
       <button
+        type="button"
         class="btn btn-reject"
         (click)="rejectTransaction()"
         [disabled]="isSaving"
@@ -180,6 +187,7 @@
     <!-- Navigation -->
     <div class="navigation">
       <button
+        type="button"
         class="btn-nav prev"
         (click)="prevTransaction()"
         [disabled]="currentIndex === 0"
@@ -191,6 +199,7 @@
       <div class="nav-counter">{{ currentIndex + 1 }} / {{ stagedTransactions.length }}</div>
 
       <button
+        type="button"
         class="btn-nav next"
         (click)="nextTransaction()"
         [disabled]="currentIndex === stagedTransactions.length - 1"
@@ -207,6 +216,7 @@
     <div class="bulk-actions section">
       <h3>Bulk Actions</h3>
       <button
+        type="button"
         class="btn btn-small btn-outline"
         (click)="selectAll()"
         [disabled]="stagedTransactions.length === 0"
@@ -214,6 +224,7 @@
         Select All ({{ stagedTransactions.length }})
       </button>
       <button
+        type="button"
         class="btn btn-small btn-outline"
         (click)="clearSelection()"
         [disabled]="selectedIds.size === 0"
@@ -221,6 +232,7 @@
         Clear Selection
       </button>
       <button
+        type="button"
         class="btn btn-small btn-success"
         (click)="approveBulk()"
         [disabled]="selectedIds.size === 0 || isSaving"
@@ -234,8 +246,8 @@
       <h3>Filters</h3>
 
       <div class="filter-group">
-        <label>Status</label>
-        <select [(ngModel)]="filterStatus" (change)="applyFilters()">
+        <label for="transaction-status-filter">Status</label>
+        <select id="transaction-status-filter" [(ngModel)]="filterStatus" (change)="applyFilters()">
           <option value="pending">Pending</option>
           <option value="needs-attention">Needs Attention</option>
           <option value="all">All</option>
@@ -243,8 +255,9 @@
       </div>
 
       <div class="filter-group">
-        <label>Min Confidence</label>
+        <label for="transaction-confidence-filter">Min Confidence</label>
         <input
+          id="transaction-confidence-filter"
           type="range"
           min="0"
           max="100"
@@ -255,8 +268,9 @@
       </div>
 
       <div class="filter-group">
-        <label>Search</label>
+        <label for="transaction-search-filter">Search</label>
         <input
+          id="transaction-search-filter"
           type="text"
           placeholder="Merchant, description..."
           [(ngModel)]="searchText"
@@ -270,6 +284,7 @@
       <h3>Transactions ({{ stagedTransactions.length }})</h3>
       <div class="list-items">
         <button
+          type="button"
           *ngFor="let txn of stagedTransactions; let i = index"
           class="list-item"
           [class.active]="currentIndex === i"

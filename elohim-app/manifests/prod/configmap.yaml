@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elohim-config-prod
+  namespace: elohim-prod
+data:
+  config.json: |
+    {
+      "logLevel": "info",
+      "environment": "prod",
+      "doorwayUrl": "https://doorway.elohim.host"
+    }

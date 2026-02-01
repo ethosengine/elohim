@@ -39,8 +39,9 @@
 
     <!-- Region Filter -->
     <div class="region-filter">
-      <label class="filter-label">Region:</label>
+      <label for="region-select" class="filter-label">Region:</label>
       <select
+        id="region-select"
         class="region-select"
         [ngModel]="selectedRegion()"
         (ngModelChange)="selectedRegion.set($event)"
@@ -54,8 +55,13 @@
 
     <!-- Sort Options -->
     <div class="sort-filter">
-      <label class="filter-label">Sort:</label>
-      <select class="sort-select" [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">
+      <label for="sort-select" class="filter-label">Sort:</label>
+      <select
+        id="sort-select"
+        class="sort-select"
+        [ngModel]="sortBy()"
+        (ngModelChange)="sortBy.set($event)"
+      >
         <option value="recommended">Recommended</option>
         <option value="latency">Fastest</option>
         <option value="users">Most Popular</option>

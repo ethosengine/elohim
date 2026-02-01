@@ -1,5 +1,7 @@
 import { Injectable, Optional } from '@angular/core';
 
+// @coverage: 0.8% (2026-01-31)
+
 import { map, switchMap, catchError } from 'rxjs/operators';
 
 import { Observable, of, forkJoin, combineLatest } from 'rxjs';

@@ -12,6 +12,8 @@
 
 import { Injectable, inject, signal } from '@angular/core';
 
+// @coverage: 83.6% (2026-01-31)
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import {
   type ContributorPresenceView,
@@ -334,8 +336,7 @@ export class PresenceService {
       this.myStewardedSignal.set(presences);
 
       return presences;
-    } catch (err) {
-      console.error('[PresenceService] Failed to get stewarded presences:', err);
+    } catch (_err) {
       return [];
     }
   }
@@ -462,8 +463,7 @@ export class PresenceService {
       this.cachePresence(presence);
 
       return presence;
-    } catch (err) {
-      console.error('[PresenceService] Failed to get presence:', err);
+    } catch (_err) {
       return null;
     }
   }
@@ -495,8 +495,7 @@ export class PresenceService {
       presences.forEach(p => this.cachePresence(p));
 
       return presences;
-    } catch (err) {
-      console.error('[PresenceService] Failed to get presences by state:', err);
+    } catch (_err) {
       return [];
     }
   }

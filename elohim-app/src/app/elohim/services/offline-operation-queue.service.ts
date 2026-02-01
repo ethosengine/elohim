@@ -1,5 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 
+// @coverage: 87.9% (2026-01-31)
+
 import { HolochainClientService } from './holochain-client.service';
 import { LoggerService } from './logger.service';
 
@@ -17,7 +19,7 @@ export interface OfflineOperation {
   zomeName?: string;
   fnName?: string;
   /** Operation payload */
-  payload?: any;
+  payload?: Record<string, unknown>;
   /** Number of retry attempts so far */
   retryCount: number;
   /** Max retry attempts */
@@ -91,7 +93,7 @@ export class OfflineOperationQueueService {
   /**
    * Load previously queued operations from IndexedDB
    */
-  private async loadQueueFromStorage(): Promise<void> {
+  private loadQueueFromStorage(): void {
     try {
       // This would load from IndexedDB in production
       // For now, queue starts empty
@@ -107,7 +109,7 @@ export class OfflineOperationQueueService {
   /**
    * Save queue to IndexedDB for persistence
    */
-  private async saveQueueToStorage(): Promise<void> {
+  private saveQueueToStorage(): void {
     try {
       // This would save to IndexedDB in production
       const queueData = this.queue();
@@ -322,7 +324,7 @@ export class OfflineOperationQueueService {
     this.logger.debug('Scheduling retry', { operationId: operation.id, delayMs });
 
     // Schedule the actual retry
-    const timeoutId = setTimeout(async () => {
+    const timeoutId = setTimeout(() => {
       this.pendingRetries.delete(operation.id);
 
       // Only retry if still in queue and connected
@@ -340,7 +342,7 @@ export class OfflineOperationQueueService {
       }
 
       this.logger.debug('Executing retry', { operationId: operation.id });
-      await this.syncOperation(operation.id);
+      void this.syncOperation(operation.id);
     }, delayMs);
 
     this.pendingRetries.set(operation.id, timeoutId);
@@ -422,13 +424,24 @@ export class OfflineOperationQueueService {
    * Generate unique operation ID
    */
   private generateOperationId(): string {
-    return `op-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const randomBytes = crypto.getRandomValues(new Uint8Array(8));
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 9);
+    return `op-${Date.now()}-${randomStr}`;
   }
 
   /**
    * Get statistics about the queue
    */
-  getStats() {
+  getStats(): {
+    size: number;
+    totalRetries: number;
+    averageRetries: number;
+    oldestOperation: number;
+    lastSync: number | null;
+  } {
     const queue = this.queue();
     const totalRetries = queue.reduce((sum, op) => sum + op.retryCount, 0);
     const averageRetries = queue.length > 0 ? totalRetries / queue.length : 0;

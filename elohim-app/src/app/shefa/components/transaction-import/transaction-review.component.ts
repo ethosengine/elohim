@@ -98,7 +98,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     // Get batch ID from route
     this.batchId = this.route.snapshot.paramMap.get('batchId') ?? '';
     if (!this.batchId) {
-      console.error('[TransactionReview] No batchId in route');
       return;
     }
 
@@ -126,7 +125,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     try {
       this.batch = this.importService.getBatch(this.batchId);
       if (!this.batch) {
-        console.error(`[TransactionReview] Batch ${this.batchId} not found`);
         return;
       }
 
@@ -144,12 +142,8 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
       if (this.stagedTransactions.length > 0) {
         this.loadTransaction(0);
       }
-
-      console.warn(
-        `[TransactionReview] Loaded ${this.stagedTransactions.length} staged transactions`
-      );
-    } catch (error) {
-      console.error('[TransactionReview] Failed to load batch', error);
+    } catch {
+      // Transaction load failed - will show empty state, handled by isLoading flag
     } finally {
       this.isLoading = false;
     }
@@ -160,7 +154,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
    */
   private loadTransaction(index: number): void {
     if (index < 0 || index >= this.stagedTransactions.length) {
-      console.warn(`[TransactionReview] Index ${index} out of bounds`);
       return;
     }
 
@@ -178,10 +171,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
       // Variance impact equals transaction amount for now (should be calculated from budget)
       this.currentTransaction._varianceImpact = this.currentTransaction.amount.value;
     }
-
-    console.warn(
-      `[TransactionReview] Loaded transaction ${index}: ${this.currentTransaction.description}`
-    );
   }
 
   /**
@@ -248,7 +237,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     if (this.currentIndex < this.stagedTransactions.length - 1) {
       this.loadTransaction(this.currentIndex + 1);
     } else {
-      console.warn('[TransactionReview] End of transactions');
+      // Already at last transaction - no action needed
     }
   }
 
@@ -259,7 +248,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     if (this.currentIndex > 0) {
       this.loadTransaction(this.currentIndex - 1);
     } else {
-      console.warn('[TransactionReview] Beginning of transactions');
+      // Already at first transaction - no action needed
     }
   }
 
@@ -279,7 +268,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
    */
   async approveTransaction(): Promise<void> {
     if (!this.currentTransaction) {
-      console.error('[TransactionReview] No transaction selected');
       return;
     }
 
@@ -289,12 +277,11 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
       // Update UI
       this.currentTransaction.reviewStatus = 'approved';
-      console.warn(`[TransactionReview] Approved: ${this.currentTransaction.description}`);
 
       // Move to next
       setTimeout(() => this.nextTransaction(), 300);
     } catch (error) {
-      console.error('[TransactionReview] Approval failed', error);
+      // Approve failed - show error alert but continue
       alert(`Failed to approve transaction: ${String(error)}`);
     } finally {
       this.isSaving = false;
@@ -306,7 +293,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
    */
   async rejectTransaction(): Promise<void> {
     if (!this.currentTransaction) {
-      console.error('[TransactionReview] No transaction selected');
       return;
     }
 
@@ -316,12 +302,11 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
       // Update UI
       this.currentTransaction.reviewStatus = 'rejected';
-      console.warn(`[TransactionReview] Rejected: ${this.currentTransaction.description}`);
 
       // Move to next
       setTimeout(() => this.nextTransaction(), 300);
     } catch (error) {
-      console.error('[TransactionReview] Rejection failed', error);
+      // Reject failed - show error alert but continue
       alert(`Failed to reject transaction: ${String(error)}`);
     } finally {
       this.isSaving = false;
@@ -335,9 +320,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     if (!this.currentTransaction) return;
 
     this.currentTransaction.reviewStatus = 'needs-attention';
-    console.warn(
-      `[TransactionReview] Marked for attention: ${this.currentTransaction.description}`
-    );
   }
 
   // ============================================================================
@@ -356,8 +338,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
     this.showCategoryDropdown = false;
 
-    console.warn(`[TransactionReview] Category changed to ${categoryName}`);
-
     // Notify AI service for learning - to be implemented
   }
 
@@ -370,8 +350,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     this.currentTransaction.category = suggestion.category;
     this.currentTransaction.categoryConfidence = suggestion.confidence;
     this.currentTransaction.categorySource = 'ai';
-
-    console.warn(`[TransactionReview] Accepted suggestion: ${suggestion.category}`);
   }
 
   /**
@@ -408,8 +386,6 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
 
     this.currentTransaction.isDuplicate = false;
     this.showDuplicateWarning = false;
-
-    console.warn('[TransactionReview] Override: marked as not duplicate');
   }
 
   // ============================================================================
@@ -476,7 +452,7 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
       this.clearSelection();
       alert(`Approved ${ids.length} transactions`);
     } catch (error) {
-      console.error('[TransactionReview] Bulk approval failed', error);
+      // Bulk approval failed - show error alert but continue
       alert(`Bulk approval failed: ${String(error)}`);
     } finally {
       this.isSaving = false;
@@ -495,14 +471,14 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
       // Cmd/Ctrl + Enter = Approve
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        this.approveTransaction();
+        void this.approveTransaction();
         return;
       }
 
       // Cmd/Ctrl + Delete = Reject
       if ((e.metaKey || e.ctrlKey) && e.key === 'Delete') {
         e.preventDefault();
-        this.rejectTransaction();
+        void this.rejectTransaction();
         return;
       }
 

@@ -1,4 +1,6 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, computed, signal } from '@angular/core';
+
+// @coverage: 13.0% (2026-01-31)
 
 import { CustodianCommitmentService } from './custodian-commitment.service';
 import { HolochainClientService } from './holochain-client.service';
@@ -111,7 +113,7 @@ export class ShefaService {
   );
 
   // Reporting configuration
-  private reportingInterval: any;
+  private reportingInterval: NodeJS.Timeout | null = null;
   private readonly REPORTING_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
   // Current custodian metrics
@@ -149,7 +151,6 @@ export class ShefaService {
       });
 
       if (!result.success) {
-        console.warn(`[Shefa] Failed to fetch metrics for ${custodianId}:`, result.error);
         return null;
       }
 
@@ -162,8 +163,8 @@ export class ShefaService {
       });
 
       return metrics;
-    } catch (err) {
-      console.error('[Shefa] Error fetching metrics:', err);
+    } catch {
+      // Metrics fetch failed - specific custodian metrics unavailable, return null
       return null;
     }
   }
@@ -188,7 +189,6 @@ export class ShefaService {
       });
 
       if (!result.success) {
-        console.warn('[Shefa] Failed to fetch all metrics:', result.error);
         return [];
       }
 
@@ -201,8 +201,8 @@ export class ShefaService {
       });
 
       return metrics;
-    } catch (err) {
-      console.error('[Shefa] Error fetching all metrics:', err);
+    } catch {
+      // Metrics query failed - all custodian metrics unavailable, return empty list
       return [];
     }
   }
@@ -223,7 +223,6 @@ export class ShefaService {
       });
 
       if (!result.success) {
-        console.warn('[Shefa] Failed to report metrics:', result.error);
         return { success: false, error: result.error };
       }
 
@@ -233,7 +232,6 @@ export class ShefaService {
 
       return { success: true };
     } catch (err) {
-      console.error('[Shefa] Error reporting metrics:', err);
       return { success: false, error: String(err) };
     }
   }
@@ -243,9 +241,8 @@ export class ShefaService {
    */
   async getRankedByHealth(limit = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
-    return allMetrics
-      .sort((a, b) => b.health.uptimePercent - a.health.uptimePercent)
-      .slice(0, limit);
+    const sorted = [...allMetrics].sort((a, b) => b.health.uptimePercent - a.health.uptimePercent);
+    return sorted.slice(0, limit);
   }
 
   /**
@@ -253,9 +250,10 @@ export class ShefaService {
    */
   async getRankedBySpeed(limit = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
-    return allMetrics
-      .sort((a, b) => a.health.responseTimeP95Ms - b.health.responseTimeP95Ms)
-      .slice(0, limit);
+    const sorted = [...allMetrics].sort(
+      (a, b) => a.health.responseTimeP95Ms - b.health.responseTimeP95Ms
+    );
+    return sorted.slice(0, limit);
   }
 
   /**
@@ -263,9 +261,10 @@ export class ShefaService {
    */
   async getRankedByReputation(limit = 10): Promise<CustodianMetrics[]> {
     const allMetrics = await this.getAllMetrics();
-    return allMetrics
-      .sort((a, b) => b.reputation.reputationScore - a.reputation.reputationScore)
-      .slice(0, limit);
+    const sorted = [...allMetrics].sort(
+      (a, b) => b.reputation.reputationScore - a.reputation.reputationScore
+    );
+    return sorted.slice(0, limit);
   }
 
   /**
@@ -384,7 +383,12 @@ export class ShefaService {
     }[]
   > {
     const allMetrics = await this.getAllMetrics();
-    const recommendations = [];
+    const recommendations: {
+      custodianId: string;
+      category: string;
+      opportunity: string;
+      potential_revenue?: number;
+    }[] = [];
 
     for (const metrics of allMetrics) {
       // Available bandwidth opportunity
@@ -443,7 +447,7 @@ export class ShefaService {
    * Start periodic reporting of local metrics (for custodian node)
    */
   private startPeriodicReporting(): void {
-    this.reportingInterval = setInterval(async () => {
+    this.reportingInterval = setInterval(() => {
       // Only report if this is a custodian node (has commitments)
       // In production, would check if node has commitments
       // For now, skip reporting from app node
@@ -469,8 +473,8 @@ export class ShefaService {
   /**
    * Private helper: transform performance metrics to Shefa format
    */
-  private transformToShefaMetrics(perfMetrics: any): CustodianMetrics {
+  private transformToShefaMetrics(_perfMetrics: Record<string, unknown>): CustodianMetrics {
     // This would be implemented for custodian node
-    return {} as any;
+    return {} as CustodianMetrics;
   }
 }

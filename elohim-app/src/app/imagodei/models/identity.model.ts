@@ -28,38 +28,36 @@
 
 import type { SovereigntyStage } from './sovereignty.model';
 
+// @coverage: 33.3% (2026-01-31)
+
 // =============================================================================
 // Identity Mode
 // =============================================================================
 
 /**
  * The current identity mode - reflects stewardship progression.
- *
- * @deprecated 'self-sovereign' - Use 'steward' instead. Will be removed in v2.0.
  */
 export type IdentityMode =
   | 'anonymous' // Pure browser, no session created
   | 'session' // localStorage visitor with session
   | 'hosted' // Holochain with custodial keys on edge node
   | 'steward' // Holochain with keys on user's device (preferred)
-  | 'self-sovereign' // @deprecated - use 'steward' instead
   | 'migrating'; // In transition between stages
 
 /**
  * Check if the identity mode represents a steward (local keys).
- * Handles both 'steward' and deprecated 'self-sovereign' values.
  */
 export function isStewardMode(mode: IdentityMode): boolean {
-  return mode === 'steward' || mode === 'self-sovereign';
+  return mode === 'steward';
 }
 
 /**
  * Normalize identity mode, converting deprecated values to current ones.
  * @param mode - The identity mode (possibly deprecated)
- * @returns The normalized mode ('self-sovereign' → 'steward')
+ * @returns The normalized mode
  */
 export function normalizeIdentityMode(mode: IdentityMode): IdentityMode {
-  return mode === 'self-sovereign' ? 'steward' : mode;
+  return mode;
 }
 
 /**

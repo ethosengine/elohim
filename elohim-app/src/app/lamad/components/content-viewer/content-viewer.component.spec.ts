@@ -420,13 +420,13 @@ describe('ContentViewerComponent', () => {
 
   describe('action handling', () => {
     it('should navigate on action with route', () => {
-      component.handleAction({ route: '/some/route', label: 'Action' });
+      component.handleAction({ route: '/some/route' });
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/some/route']);
     });
 
     it('should handle action without route gracefully', () => {
       // Actions without routes are no-ops
-      expect(() => component.handleAction({ label: 'No Route Action' })).not.toThrow();
+      expect(() => component.handleAction({})).not.toThrow();
       expect(routerSpy.navigate).not.toHaveBeenCalled();
     });
   });

@@ -167,16 +167,14 @@ describe('EventService', () => {
     });
 
     it('should handle missing score', done => {
-      service
-        .recordAssessmentComplete('agent-1', 'content-1', 'assessment-1')
-        .subscribe(result => {
-          expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
-            jasmine.objectContaining({
-              metadata: { assessmentId: 'assessment-1', score: undefined },
-            })
-          );
-          done();
-        });
+      service.recordAssessmentComplete('agent-1', 'content-1', 'assessment-1').subscribe(result => {
+        expect(storageApiMock.createEconomicEvent).toHaveBeenCalledWith(
+          jasmine.objectContaining({
+            metadata: { assessmentId: 'assessment-1', score: undefined },
+          })
+        );
+        done();
+      });
     });
   });
 

@@ -21,28 +21,27 @@ def resolveDoorwayHost(String targetHost, String explicitDoorway) {
     if (explicitDoorway) {
         return explicitDoorway
     }
-    // Auto-detect doorway host from target host
-    // Architecture: dev doorway serves both alpha AND staging apps
-    // Only production app uses the production doorway
-    if (targetHost.contains('alpha.elohim.host') || targetHost.contains('staging.elohim.host')) {
-        return 'https://doorway-dev.elohim.host'
+    // Map target app URLs to environment-specific doorway URLs
+    if (targetHost.contains('alpha.elohim.host')) {
+        return 'https://doorway-alpha.elohim.host'
+    } else if (targetHost.contains('staging.elohim.host')) {
+        return 'https://doorway-staging.elohim.host'
     } else if (targetHost.contains('elohim.host') && !targetHost.contains('doorway')) {
         return 'https://doorway.elohim.host'
-    } else {
-        // For custom hosts, try doorway subdomain
-        return targetHost.replaceFirst('://', '://doorway.')
     }
+    return targetHost.replaceFirst('://', '://doorway.')
 }
 
 def resolveInternalDoorwayUrl(String doorwayHost) {
-    // Map external DNS to internal Kubernetes DNS
-    // Note: Only dev and prod edgenodes exist (no staging edgenode)
-    if (doorwayHost.contains('doorway-dev.elohim.host')) {
-        return 'elohim-edgenode-dev.ethosengine.svc.cluster.local:8080'
-    } else if (doorwayHost.contains('doorway.elohim.host') && !doorwayHost.contains('doorway-dev')) {
-        return 'elohim-edgenode-prod.ethosengine.svc.cluster.local:8080'
+    // Map external DNS to internal Kubernetes service DNS
+    if (doorwayHost.contains('doorway-alpha.elohim.host')) {
+        return 'elohim-edgenode-alpha.elohim-alpha.svc.cluster.local:8080'
+    } else if (doorwayHost.contains('doorway-staging.elohim.host')) {
+        return 'elohim-edgenode-staging.elohim-staging.svc.cluster.local:8080'
+    } else if (doorwayHost.contains('doorway.elohim.host') && !doorwayHost.contains('doorway-')) {
+        return 'elohim-edgenode-prod.elohim-prod.svc.cluster.local:8080'
     }
-    // For custom hosts, try using external URL
+    // Fallback for custom hosts
     return doorwayHost.replace('https://', '').replace('http://', '')
 }
 

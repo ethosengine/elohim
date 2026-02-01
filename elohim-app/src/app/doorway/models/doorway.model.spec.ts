@@ -1,10 +1,4 @@
-import {
-  reachLevelName,
-  statusColor,
-  tierColor,
-  NodeStatus,
-  StewardTier,
-} from './doorway.model';
+import { reachLevelName, statusColor, tierColor, NodeStatus, StewardTier } from './doorway.model';
 
 describe('Doorway Model Helpers', () => {
   describe('reachLevelName()', () => {

@@ -2,7 +2,7 @@
   <!-- Header -->
   <header class="editor-header">
     <div class="header-left">
-      <button class="btn-back" (click)="navigateBack()">
+      <button type="button" class="btn-back" (click)="navigateBack()">
         <span class="icon">&larr;</span>
         Back to Resource
       </button>
@@ -44,7 +44,7 @@
     <div class="error-state" *ngIf="!isLoading && error">
       <h2>Unable to load content</h2>
       <p>{{ error }}</p>
-      <button class="btn btn-primary" (click)="navigateBack()">Go Back</button>
+      <button type="button" class="btn btn-primary" (click)="navigateBack()">Go Back</button>
     </div>
 
     <!-- Not Editable State -->
@@ -55,7 +55,7 @@
         directly.
       </p>
       <p *ngIf="!node.id.startsWith('path-')">You don't have permission to edit this content.</p>
-      <button class="btn btn-primary" (click)="navigateBack()">View Content</button>
+      <button type="button" class="btn btn-primary" (click)="navigateBack()">View Content</button>
     </div>
 
     <!-- Editor Host -->

@@ -1,5 +1,7 @@
 import { Injectable, Optional, inject } from '@angular/core';
 
+// @coverage: 18.7% (2026-01-31)
+
 import { map, shareReplay, take, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, of, combineLatest } from 'rxjs';
@@ -8,7 +10,6 @@ import { SessionHumanService } from '@app/imagodei/services/session-human.servic
 import {
   EmotionalReaction,
   EmotionalReactionType,
-  FeedbackMechanism,
   MediationLog,
   REACTION_CATEGORIES,
 } from '@app/lamad/models/feedback-profile.model';
@@ -148,8 +149,10 @@ export class GovernanceSignalService {
    */
   recordReaction(contentId: string, reaction: EmotionalReaction): Observable<boolean> {
     const agentId = this.getAgentId();
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
     const reactionRecord: ReactionRecord = {
-      id: `reaction-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `reaction-${Date.now()}-${randomStr}`,
       contentId,
       reactorId: agentId,
       reactionType: reaction.type,
@@ -181,9 +184,11 @@ export class GovernanceSignalService {
    */
   recordMediationProceed(log: MediationLog): Observable<boolean> {
     // Add an id to the log for storage
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
     const logWithId = {
       ...log,
-      id: `mediation-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `mediation-${Date.now()}-${randomStr}`,
     };
     const saved = this.saveSignal('mediation-logs', log.contentId, logWithId);
 
@@ -225,7 +230,7 @@ export class GovernanceSignalService {
         };
 
         for (const r of reactions) {
-          counts.byType[r.reactionType] = (counts.byType[r.reactionType] || 0) + 1;
+          counts.byType[r.reactionType] = (counts.byType[r.reactionType] ?? 0) + 1;
           counts.byCategory[r.category]++;
         }
 
@@ -247,8 +252,10 @@ export class GovernanceSignalService {
     feedback: GraduatedFeedbackInput
   ): Observable<boolean> {
     const agentId = this.getAgentId();
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
     const feedbackRecord: GraduatedFeedbackRecord = {
-      id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `feedback-${Date.now()}-${randomStr}`,
       contentId,
       respondentId: agentId,
       context: feedback.context,
@@ -339,8 +346,10 @@ export class GovernanceSignalService {
    */
   recordLearningSignal(signal: LearningSignalInput): Observable<boolean> {
     const agentId = this.getAgentId();
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
     const signalRecord: LearningSignalRecord = {
-      id: `learning-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `learning-${Date.now()}-${randomStr}`,
       contentId: signal.contentId,
       signalType: signal.signalType,
       payload: signal.payload,
@@ -397,8 +406,10 @@ export class GovernanceSignalService {
    */
   recordInteractiveCompletion(signal: CompletionSignalInput): Observable<boolean> {
     const agentId = this.getAgentId();
+    const randomBytes = crypto.getRandomValues(new Uint8Array(6));
+    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
     const completionRecord: CompletionSignalRecord = {
-      id: `completion-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `completion-${Date.now()}-${randomStr}`,
       contentId: signal.contentId,
       interactionType: signal.interactionType,
       passed: signal.passed,
@@ -608,11 +619,6 @@ export class GovernanceSignalService {
       suggestedBy: 'governance-signal-service',
       status: 'pending',
     };
-
-    this.saveToStorage(
-      `${this.STORAGE_PREFIX}attestation-suggestions`,
-      this.loadFromStorage(`${this.STORAGE_PREFIX}attestation-suggestions`) ?? []
-    );
 
     const suggestions =
       this.loadFromStorage<AttestationSuggestion[]>(

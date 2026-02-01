@@ -92,12 +92,13 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
       .pipe(
         takeUntil(this.destroy$),
         switchMap(params => {
-          this.resourceId = params['resourceId'];
+          this.resourceId = params['resourceId'] as string;
           this.isLoading = true;
           this.error = '';
           return this.dataLoader.getContent(this.resourceId).pipe(
-            catchError(err => {
-              this.error = err.message ?? 'Failed to load content';
+            catchError((err: unknown) => {
+              const errorMsg = err instanceof Error ? err.message : 'Failed to load content';
+              this.error = errorMsg;
               return of(null);
             })
           );
@@ -130,11 +131,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
    * Navigate back to the resource view.
    */
   navigateBack(): void {
-    if (this.hasUnsavedChanges()) {
-      // Could show confirmation dialog here
-      // For now, just navigate
-    }
-    this.router.navigate(['/lamad/resource', this.resourceId]);
+    void this.router.navigate(['/lamad/resource', this.resourceId]);
   }
 
   /**
@@ -199,7 +196,7 @@ export class ContentEditorPageComponent implements OnInit, OnDestroy {
   // Save Handling
   // ═══════════════════════════════════════════════════════════════════════════
 
-  private async handleSave(event: ContentSaveEvent): Promise<void> {
+  private handleSave(event: ContentSaveEvent): void {
     this.isSaving = true;
     this.saveError = '';
     this.saveSuccess = '';

@@ -584,7 +584,8 @@ export function createQuizSession(
  */
 function generateSessionId(): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 8);
+  const randomValue = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+  const random = randomValue.toString(36).substring(2, 8);
   return `qs-${timestamp}-${random}`;
 }
 
@@ -593,7 +594,8 @@ function generateSessionId(): string {
  */
 function shuffleArray<T>(array: T[]): void {
   for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const randomValue = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+    const j = Math.floor(randomValue * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
 }

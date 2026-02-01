@@ -1,9 +1,12 @@
 @if (isVisible()) {
   <div
-    class="connection-indicator"
-    [class]="status().cssClass"
+    [class]="'connection-indicator ' + status().cssClass"
     [title]="status().label"
+    role="button"
+    tabindex="0"
     (click)="toggleExpanded()"
+    (keyup.enter)="toggleExpanded()"
+    (keyup.space)="toggleExpanded()"
   >
     <!-- Status Dot -->
     <span class="status-dot" [style.backgroundColor]="status().color"></span>
@@ -26,9 +29,6 @@
         <p class="tooltip-description">
           @switch (status().mode) {
             @case ('steward') {
-              Running on your local Holochain node. Full stewardship of your identity.
-            }
-            @case ('self-sovereign') {
               Running on your local Holochain node. Full stewardship of your identity.
             }
             @case ('hosted') {

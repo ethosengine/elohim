@@ -125,7 +125,6 @@
   font-weight: 700;
   margin-bottom: 0.5rem;
   background: var(--lamad-accent-gradient);
-  background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }

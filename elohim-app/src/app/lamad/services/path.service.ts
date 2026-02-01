@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 20.0% (2026-01-31)
+
 import { map, switchMap } from 'rxjs/operators';
 
 import { Observable, forkJoin, of } from 'rxjs';
@@ -120,13 +122,11 @@ export class PathService {
     const step = path.steps[stepIndex];
 
     // Check attestation requirement
-    if (step.attestationRequired) {
-      if (!attestations.includes(step.attestationRequired)) {
-        return {
-          accessible: false,
-          reason: `Requires attestation: ${step.attestationRequired}`,
-        };
-      }
+    if (step.attestationRequired && !attestations.includes(step.attestationRequired)) {
+      return {
+        accessible: false,
+        reason: `Requires attestation: ${step.attestationRequired}`,
+      };
     }
 
     // Check sequential progression

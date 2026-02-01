@@ -192,10 +192,10 @@ export class AppealWizardComponent implements OnInit {
   // ===========================================================================
 
   ngOnInit(): void {
-    const grantId = this.route.snapshot.paramMap.get('grantId') || this.grantIdInput();
+    const grantId = this.route.snapshot.paramMap.get('grantId') ?? this.grantIdInput();
 
     if (grantId) {
-      this.loadGrant(grantId);
+      void this.loadGrant(grantId);
     } else {
       this.error.set('No grant specified for appeal.');
       this.isLoading.set(false);
@@ -220,8 +220,7 @@ export class AppealWizardComponent implements OnInit {
       } else {
         this.error.set('Grant not found or you are not the subject of this grant.');
       }
-    } catch (err) {
-      console.error('[AppealWizard] Load failed:', err);
+    } catch (_err) {
       this.error.set('Failed to load grant information.');
     } finally {
       this.isLoading.set(false);
@@ -330,12 +329,11 @@ export class AppealWizardComponent implements OnInit {
       if (appeal) {
         this.appealFiled.emit(appeal);
         // Navigate to confirmation
-        this.router.navigate(['../appeal-filed', appeal.id], { relativeTo: this.route });
+        void this.router.navigate(['../appeal-filed', appeal.id], { relativeTo: this.route });
       } else {
         this.error.set('Failed to file appeal. Please try again.');
       }
-    } catch (err) {
-      console.error('[AppealWizard] Submit failed:', err);
+    } catch (_err) {
       this.error.set('Failed to submit appeal.');
     } finally {
       this.isSubmitting.set(false);

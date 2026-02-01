@@ -12,6 +12,8 @@ import { HolochainContentService } from './elohim/services/holochain-content.ser
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
+// @coverage: 90.9% (2026-01-31)
+
 /** Connection retry configuration */
 interface RetryConfig {
   maxAttempts: number;
@@ -63,7 +65,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.showFloatingToggle = this.isRootLandingPage(this.router.url);
 
     // Initialize auth and connections
-    this.initializeApp();
+    void this.initializeApp();
   }
 
   /**
@@ -79,7 +81,7 @@ export class AppComponent implements OnInit, OnDestroy {
       // The user should be routed to doorway picker
       if (this.tauriAuth.needsLogin()) {
         // No Tauri session found - routing to identity setup
-        this.router.navigate(['/identity/login']);
+        void this.router.navigate(['/identity/login']);
         return;
       }
 
@@ -125,7 +127,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     // Start blob bootstrap regardless of connectivity
     // It will serve cached blobs and upgrade to streaming when services connect
-    this.blobBootstrap.startBootstrap();
+    void this.blobBootstrap.startBootstrap();
 
     // Only attempt Holochain connection if config exists
     // Holochain is only for agent-centric data (identity, attestations, points)
@@ -183,18 +185,12 @@ export class AppComponent implements OnInit, OnDestroy {
         // Connection successful, testing zome availability
 
         // Test if we can make zome calls (for agent-centric data)
-        const zomeAvailable = await this.holochainContent.testAvailability();
-
-        if (!zomeAvailable) {
-          console.warn('[Holochain] Connected but zome calls unavailable');
-        }
+        await this.holochainContent.testAvailability();
 
         // Reset retry counter on success
         this.connectionAttempt = 0;
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-
+    } catch {
       if (this.connectionAttempt < maxAttempts) {
         // Calculate delay with exponential backoff + deterministic jitter
         const exponentialDelay =
@@ -202,24 +198,14 @@ export class AppComponent implements OnInit, OnDestroy {
         // Use deterministic jitter based on attempt number (avoids Math.random)
         const jitter = (this.connectionAttempt * 200) % 1000;
         const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
-
-        console.warn(
-          `[Holochain] Connection failed (attempt ${this.connectionAttempt}/${maxAttempts}): ${errorMessage}. ` +
-            `Retrying in ${Math.round(delay / 1000)}s...`
-        );
-
         // Schedule retry
         this.retryTimeoutId = setTimeout(() => {
           if (!this.isDestroyed) {
-            this.attemptConnection();
+            void this.attemptConnection();
           }
         }, delay);
       } else {
         // Max retries reached - log and continue without throwing
-        console.error(
-          `[Holochain] Connection failed after ${maxAttempts} attempts: ${errorMessage}. ` +
-            'App will continue without Holochain connectivity.'
-        );
         // Reset for potential future reconnection attempts
         this.connectionAttempt = 0;
       }
@@ -240,7 +226,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     // Attempt connection
-    this.initializeHolochainConnection();
+    void this.initializeHolochainConnection();
   }
 
   /** Check if URL is the root landing page (/ or empty) */

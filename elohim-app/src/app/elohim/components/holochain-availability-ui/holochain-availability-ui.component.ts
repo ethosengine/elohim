@@ -146,8 +146,8 @@ export class HolochainAvailabilityUiComponent {
     this.isDismissed.set(false);
     try {
       await this.holochainClient.connect();
-    } catch (err) {
-      console.error('Retry failed:', err);
+    } catch {
+      // Connection retry failed silently - user can try again
     }
   }
 
@@ -158,8 +158,8 @@ export class HolochainAvailabilityUiComponent {
     try {
       await this.operationQueue.syncAll();
       this.isDismissed.set(false); // Show success message
-    } catch (err) {
-      console.error('Sync failed:', err);
+    } catch {
+      // Operation sync failed silently - queued operations will retry
     }
   }
 

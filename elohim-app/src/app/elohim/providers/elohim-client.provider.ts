@@ -8,6 +8,8 @@
 
 import { InjectionToken, Provider } from '@angular/core';
 
+// @coverage: 50.0% (2026-01-31)
+
 import {
   ElohimClient,
   ElohimClientConfig,

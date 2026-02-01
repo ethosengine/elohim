@@ -7,6 +7,8 @@
 
 import { ContentNode } from './content-node.model';
 
+// @coverage: 100.0% (2026-01-31)
+
 /**
  * Path context maintained during learning navigation.
  * Enables "Return to Path" functionality when exploring related content.

@@ -41,11 +41,11 @@
 @keyframes pulse {
   0%,
   100% {
-    opacity: 1;
+    opacity: 100%;
   }
 
   50% {
-    opacity: 0.5;
+    opacity: 50%;
   }
 }
 
@@ -120,7 +120,7 @@
 }
 
 .refresh-button:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 

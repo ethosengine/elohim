@@ -76,6 +76,35 @@ export type Distinguishability =
   | 'mixed'; // Some aspects distinguishable, others not
 
 /**
+ * Formation method for a dyad
+ */
+export type DyadFormationMethod = 'mutual-invitation' | 'platform-matched' | 'researcher-assigned';
+
+/**
+ * Dyad status lifecycle
+ */
+export type DyadStatus = 'forming' | 'active' | 'paused' | 'dissolved';
+
+/**
+ * Reason for dyad dissolution
+ */
+export type DyadDissolutionReason =
+  | 'completed'
+  | 'withdrawn'
+  | 'one-member-left'
+  | 'researcher-ended';
+
+/**
+ * Consent status in a dyad
+ */
+export type ConsentStatus = 'pending' | 'consented' | 'declined' | 'withdrawn';
+
+/**
+ * Data visibility to partner
+ */
+export type PartnerVisibility = 'none' | 'aggregate' | 'full';
+
+/**
  * A dyad (paired participants) in the research system.
  */
 export interface ResearchDyad {
@@ -98,16 +127,16 @@ export interface ResearchDyad {
   formedAt: string;
 
   /** How the dyad was formed */
-  formationMethod: 'mutual-invitation' | 'platform-matched' | 'researcher-assigned';
+  formationMethod: DyadFormationMethod;
 
   /** Studies this dyad is participating in */
   activeStudies: string[];
 
   /** Dyad status */
-  status: 'forming' | 'active' | 'paused' | 'dissolved';
+  status: DyadStatus;
 
   /** Dissolution reason (if dissolved) */
-  dissolutionReason?: 'completed' | 'withdrawn' | 'one-member-left' | 'researcher-ended';
+  dissolutionReason?: DyadDissolutionReason;
 }
 
 /**
@@ -121,13 +150,13 @@ export interface DyadMember {
   role?: string;
 
   /** Consent status for this dyad */
-  consentStatus: 'pending' | 'consented' | 'declined' | 'withdrawn';
+  consentStatus: ConsentStatus;
 
   /** When they joined */
   joinedAt?: string;
 
   /** Visibility of their data to partner */
-  partnerVisibility: 'none' | 'aggregate' | 'full';
+  partnerVisibility: PartnerVisibility;
 }
 
 /**
@@ -320,7 +349,7 @@ export interface GroupMember {
   joinedAt: string;
 
   /** Consent status */
-  consentStatus: 'pending' | 'consented' | 'declined' | 'withdrawn';
+  consentStatus: ConsentStatus;
 
   /** Active participant? */
   active: boolean;

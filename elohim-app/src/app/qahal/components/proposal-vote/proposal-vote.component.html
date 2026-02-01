@@ -107,7 +107,7 @@
       class="reasoning-section"
       *ngIf="showReasoningField || getPosition(currentVote!)?.requiresReasoning"
     >
-      <label class="reasoning-label">
+      <label for="proposal-reasoning-textarea" class="reasoning-label">
         {{
           getPosition(currentVote!)?.requiresReasoning
             ? 'Explain your objection:'
@@ -116,6 +116,7 @@
         <span class="required" *ngIf="getPosition(currentVote!)?.requiresReasoning">*</span>
       </label>
       <textarea
+        id="proposal-reasoning-textarea"
         [(ngModel)]="reasoning"
         rows="3"
         placeholder="{{

@@ -21,17 +21,13 @@
  * - Some are community-governed (shared capacity)
  * - Constitutional minimums cannot be violated (dignity floors)
  *
- * TODO: [HOLOCHAIN-ZOME] Zome call payloads in this service use snake_case
+ * NOTE: Zome call payloads in this service use snake_case
  * (e.g., resource_id, steward_id) because Holochain zomes are Rust and expect
  * snake_case field names. This cannot be changed without updating the Rust
  * zomes and running a DNA migration.
  */
 
-import { Injectable, signal, computed } from '@angular/core';
-
-import { map, switchMap, catchError, shareReplay } from 'rxjs/operators';
-
-import { Observable, of, from, combineLatest } from 'rxjs';
+import { Injectable } from '@angular/core';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import {
@@ -44,14 +40,10 @@ import {
   StewardedResourceDashboard,
   ResourceAlert,
   ResourceInsight,
-  ComputeResource,
-  EnergyResource,
   FinancialAsset,
   FinancialObligation,
   IncomeStream,
-  BasicIncomeEntitlement,
   DignityFloor,
-  UBAEligibility,
   FinancialStewardshipView,
   FinancialRecommendation,
   getDimensionForCategory,
@@ -60,18 +52,6 @@ import {
 } from '@app/shefa/models/stewarded-resources.model';
 
 import { EconomicService } from './economic.service';
-
-// =============================================================================
-// Stewardship View Alerts & Insights
-// =============================================================================
-
-const ALERT_THRESHOLDS = {
-  CRITICAL_UTILIZATION: 95, // >95% capacity
-  WARNING_UTILIZATION: 75, // >75% capacity
-  CRITICAL_DIGNITY_SHORTFALL: 0, // Below dignity floor
-  WARNING_DIGNITY_SHORTFALL: -50, // Within $50 of floor
-  CRITICAL_BURN_RATE: 0, // Money runs out soon
-};
 
 // =============================================================================
 // Stewarded Resource Service
@@ -111,7 +91,7 @@ export class StewardedResourceService {
     const dimension = getDimensionForCategory(category);
 
     const resource: StewardedResource = {
-      id: `res-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `res-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`,
       resourceNumber: `RES-${Date.now()}`,
       stewardId,
       category,
@@ -123,8 +103,8 @@ export class StewardedResourceService {
       permanentReserve: options?.permanentReserve,
       allocatableCapacity: {
         value:
-          (options?.permanentReserve?.value || 0) > 0
-            ? totalCapacity.value - (options.permanentReserve?.value || 0)
+          (options?.permanentReserve?.value ?? 0) > 0
+            ? totalCapacity.value - (options.permanentReserve?.value ?? 0)
             : totalCapacity.value,
         unit: totalCapacity.unit,
       },
@@ -134,9 +114,9 @@ export class StewardedResourceService {
       available: { value: totalCapacity.value, unit: totalCapacity.unit },
       allocations: [],
       allocationStrategy: 'manual',
-      governanceLevel: options?.governanceLevel || 'individual',
+      governanceLevel: options?.governanceLevel ?? 'individual',
       canModifyAllocations: true,
-      observerEnabled: options?.observerEnabled || false,
+      observerEnabled: options?.observerEnabled ?? false,
       recentUsage: [],
       trends: [],
       allocationEventIds: [],
@@ -175,9 +155,8 @@ export class StewardedResourceService {
         'get_stewarded_resource',
         { resource_id: resourceId }
       );
-      return response || null;
-    } catch (err) {
-      console.error('Error fetching resource:', err);
+      return response ?? null;
+    } catch (_err) {
       return null;
     }
   }
@@ -192,9 +171,8 @@ export class StewardedResourceService {
         'get_steward_resources',
         { steward_id: stewardId }
       );
-      return response || [];
-    } catch (err) {
-      console.error('Error fetching resources:', err);
+      return response ?? [];
+    } catch (_err) {
       return [];
     }
   }
@@ -231,15 +209,15 @@ export class StewardedResourceService {
     const now = new Date().toISOString();
 
     const allocation: AllocationBlock = {
-      id: `alloc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `alloc-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`,
       resourceId,
       label,
       description: options?.description,
       allocated: allocatedAmount,
       used: { value: 0, unit: allocatedAmount.unit },
       reserved: { value: 0, unit: allocatedAmount.unit },
-      governanceLevel: options?.governanceLevel || 'individual',
-      priority: options?.priority || 5,
+      governanceLevel: options?.governanceLevel ?? 'individual',
+      priority: options?.priority ?? 5,
       utilization: 0,
       createdAt: now,
       updatedAt: now,
@@ -278,10 +256,10 @@ export class StewardedResourceService {
     const now = new Date().toISOString();
 
     const usage: UsageRecord = {
-      id: `use-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `use-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`,
       resourceId,
       allocationBlockId,
-      action: options?.action || 'use',
+      action: options?.action ?? 'use',
       quantity: amount,
       observerAttestationId: options?.observerAttestationId,
       timestamp: now,
@@ -293,12 +271,12 @@ export class StewardedResourceService {
 
     // Create economic event for immutability
     const event = await this.economicService.createEvent({
-      action: options?.action || ('use' as any),
+      action: options?.action ?? ('use' as any),
       providerId: resourceId,
       receiverId: resourceId,
       resourceQuantityValue: amount.value,
       resourceQuantityUnit: amount.unit,
-      note: options?.note || `Resource usage recorded`,
+      note: options?.note ?? `Resource usage recorded`,
     });
 
     usage.economicEventId = event.id;
@@ -425,7 +403,32 @@ export class StewardedResourceService {
   async getConstitutionalLimits(category: ResourceCategory): Promise<ConstitutionalLimit | null> {
     // These would come from Elohim governance documents
     // Here are reasonable defaults implementing donut economy principles
-    const limits: Record<string, ConstitutionalLimit> = {
+    const limits: Record<
+      string,
+      {
+        id: string;
+        resourceCategory: ResourceCategory;
+        name: string;
+        description: string;
+        floorValue: number;
+        floorUnit: string;
+        floorRationale: string;
+        floorEnforced: boolean;
+        ceilingValue: number;
+        ceilingUnit: string;
+        ceilingRationale: string;
+        ceilingEnforced: boolean;
+        safeMinValue: number;
+        safeMaxValue: number;
+        safeZoneDescription: string;
+        governanceLevel: string;
+        constitutionalBasis: string;
+        enforcementMethod: string;
+        transitionDeadline?: string;
+        createdAt: string;
+        updatedAt: string;
+      }
+    > = {
       'financial-asset': {
         id: 'limit-wealth-ceiling',
         resourceCategory: 'financial-asset',
@@ -497,7 +500,7 @@ export class StewardedResourceService {
       },
     };
 
-    return limits[category] || null;
+    return limits[category] ?? null;
   }
 
   /**
@@ -509,7 +512,28 @@ export class StewardedResourceService {
     category: ResourceCategory,
     currentValue: number,
     unit: string
-  ): Promise<ResourcePosition> {
+  ): Promise<{
+    resourceId: string;
+    stewardId: string;
+    resourceCategory: ResourceCategory;
+    currentValue: number;
+    unit: string;
+    constitutionalLimit: Awaited<ReturnType<typeof this.getConstitutionalLimits>>;
+    positionRelativeToFloor:
+      | 'below-floor'
+      | 'at-floor'
+      | 'in-safe-zone'
+      | 'above-ceiling'
+      | 'far-above-ceiling';
+    distanceFromFloor: number;
+    distanceFromCeiling: number;
+    excessAboveCeiling?: number;
+    excessPercentage?: number;
+    surplusAvailableForTransition: number;
+    complianceStatus: 'compliant' | 'approaching-limit' | 'exceeds-ceiling' | 'far-exceeds-ceiling';
+    warningLevel: 'none' | 'yellow' | 'orange' | 'red';
+    onTransitionPath: boolean;
+  }> {
     const limit = await this.getConstitutionalLimits(category);
 
     if (!limit) {
@@ -581,11 +605,49 @@ export class StewardedResourceService {
    * Build constitutional compliance report
    * Shows steward's position relative to all constitutional limits
    */
-  async buildComplianceReport(stewardId: string): Promise<ConstitutionalCompliance> {
+  async buildComplianceReport(stewardId: string): Promise<{
+    stewardId: string;
+    assessmentDate: string;
+    byCategory: Array<{
+      category: ResourceCategory;
+      totalValue: number;
+      constitutionalCeiling: number;
+      floorEntitlement: number;
+      complianceStatus: 'compliant' | 'at-risk' | 'exceeds-ceiling';
+      excess?: number;
+      warningLevel: 'none' | 'orange' | 'red';
+    }>;
+    overallCompliant: boolean;
+    totalExcess: number;
+    categories_at_risk: number;
+    estimatedTimeToCompliance?: string;
+    recommendations: Array<{
+      id: string;
+      priority: string;
+      resourceCategory: ResourceCategory;
+      title: string;
+      description: string;
+      action: string;
+      estimatedImpact: string;
+      timeline: string;
+      governanceRequired: string;
+    }>;
+    activeTransitionPaths: number;
+    transitioningAmount: number;
+    completedTransitions: number;
+  }> {
     const allResources = await this.getStewardResources(stewardId);
     const now = new Date().toISOString();
 
-    const byCategory: any[] = [];
+    const byCategory: Array<{
+      category: ResourceCategory;
+      totalValue: number;
+      constitutionalCeiling: number;
+      floorEntitlement: number;
+      complianceStatus: 'compliant' | 'at-risk' | 'exceeds-ceiling';
+      excess?: number;
+      warningLevel: 'none' | 'orange' | 'red';
+    }> = [];
     let totalExcess = 0;
     let categoriesAtRisk = 0;
 
@@ -626,7 +688,17 @@ export class StewardedResourceService {
     }
 
     // Generate recommendations
-    const recommendations: ComplianceRecommendation[] = [];
+    const recommendations: Array<{
+      id: string;
+      priority: string;
+      resourceCategory: ResourceCategory;
+      title: string;
+      description: string;
+      action: string;
+      estimatedImpact: string;
+      timeline: string;
+      governanceRequired: string;
+    }> = [];
     if (totalExcess > 0) {
       recommendations.push({
         id: 'rec-excess-assets',
@@ -664,13 +736,33 @@ export class StewardedResourceService {
     resourceId: string,
     stewardId: string,
     excessAmount: number,
-    proposedSplits: any[], // AssetSplit[]
+    proposedSplits: Array<{ amount: number; [key: string]: unknown }>,
     governanceLevel: string
-  ): Promise<TransitionPath> {
+  ): Promise<{
+    id: string;
+    resourceId: string;
+    stewardId: string;
+    assetName: string;
+    currentValue: number;
+    constitutionalCeiling: number;
+    excess: number;
+    proposedSplits: Array<{ amount: number; [key: string]: unknown }>;
+    totalProposedExcess: number;
+    status: string;
+    proposedAt: string;
+    negotiationDeadline: string;
+    governanceLevel: string;
+    approvalStatus: string;
+    executionPhases: unknown[];
+    transitionEventIds: unknown[];
+    transparencyLevel: string;
+    createdAt: string;
+    updatedAt: string;
+  }> {
     const now = new Date().toISOString();
 
-    const transitionPath: TransitionPath = {
-      id: `trans-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const transitionPath = {
+      id: `trans-${Date.now()}-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 11)}`,
       resourceId,
       stewardId,
       assetName: '', // Would come from resource
@@ -712,17 +804,43 @@ export class StewardedResourceService {
   async executeTransitionPhase(
     transitionPathId: string,
     phaseNumber: number,
-    actions: any[] // TransitionAction[]
-  ): Promise<TransitionPhase> {
-    const now = new Date().toISOString();
-
-    const phase: TransitionPhase = {
+    actions: Array<{
+      id?: string;
+      actionType?: string;
+      responsible?: string;
+      amount?: number;
+      description?: string;
+      economicEventId?: string;
+      status?: string;
+      [key: string]: unknown;
+    }>
+  ): Promise<{
+    id: string;
+    sequenceNumber: number;
+    name: string;
+    description: string;
+    targetDate: string;
+    amount: number;
+    actions: Array<{
+      id?: string;
+      actionType?: string;
+      responsible?: string;
+      amount?: number;
+      description?: string;
+      economicEventId?: string;
+      status?: string;
+      [key: string]: unknown;
+    }>;
+    status: string;
+    blockReason?: string;
+  }> {
+    const phase = {
       id: `phase-${transitionPathId}-${phaseNumber}`,
       sequenceNumber: phaseNumber,
       name: `Phase ${phaseNumber} Execution`,
       description: '',
       targetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      amount: actions.reduce((sum, a) => sum + (a.amount || 0), 0),
+      amount: actions.reduce((sum, a) => sum + (a.amount ?? 0), 0),
       actions,
       status: 'in-progress',
     };
@@ -732,10 +850,10 @@ export class StewardedResourceService {
       try {
         // Create immutable economic event for each transfer
         const event = await this.economicService.createEvent({
-          action: (action.actionType || 'transfer') as any,
+          action: (action.actionType ?? 'transfer') as any,
           providerId: action.responsible,
           receiverId: action.responsible,
-          resourceQuantityValue: action.amount || 0,
+          resourceQuantityValue: action.amount ?? 0,
           note: action.description,
         });
 
@@ -859,8 +977,8 @@ export class StewardedResourceService {
   private buildDignityFloor(
     humanId: string,
     monthlyIncome: number,
-    monthlyObligations: number,
-    incomeStreams: IncomeStream[]
+    _monthlyObligations: number,
+    _incomeStreams: IncomeStream[]
   ): DignityFloor {
     // These would come from governance constitution
     // For now, using reasonable minimums
@@ -944,7 +1062,7 @@ export class StewardedResourceService {
     }
 
     // Check for high-interest debt
-    const highInterestDebt = allObligations.filter(o => (o.interest || 0) > 10);
+    const highInterestDebt = allObligations.filter(o => (o.interest ?? 0) > 10);
     if (highInterestDebt.length > 0) {
       recommendations.push({
         id: 'rec-high-interest',
@@ -977,43 +1095,43 @@ export class StewardedResourceService {
   /**
    * Persist resource to Holochain
    */
-  private async persistResource(resource: StewardedResource): Promise<void> {
-    try {
-      await this.holochain.callZomeFunction('content_store', 'create_stewarded_resource', resource);
-    } catch (err) {
-      console.error('Error persisting resource:', err);
-      throw err;
-    }
+  private persistResource(resource: StewardedResource): Promise<void> {
+    return this.holochain
+      .callZomeFunction('content_store', 'create_stewarded_resource', resource)
+      .catch(err => {
+        // Re-throw persistence errors to caller for upstream handling
+        throw new Error(`Failed to persist resource: ${err instanceof Error ? err.message : String(err)}`);
+      });
   }
 
   /**
    * Persist allocation block
    */
-  private async persistAllocation(resourceId: string, allocation: AllocationBlock): Promise<void> {
-    try {
-      await this.holochain.callZomeFunction('content_store', 'create_allocation_block', {
+  private persistAllocation(resourceId: string, allocation: AllocationBlock): Promise<void> {
+    return this.holochain
+      .callZomeFunction('content_store', 'create_allocation_block', {
         resource_id: resourceId,
         allocation,
+      })
+      .catch(err => {
+        // Re-throw persistence errors to caller for upstream handling
+        throw new Error(`Failed to persist allocation: ${err instanceof Error ? err.message : String(err)}`);
       });
-    } catch (err) {
-      console.error('Error persisting allocation:', err);
-      throw err;
-    }
   }
 
   /**
    * Persist usage record
    */
-  private async persistUsage(resourceId: string, usage: UsageRecord): Promise<void> {
-    try {
-      await this.holochain.callZomeFunction('content_store', 'record_resource_usage', {
+  private persistUsage(resourceId: string, usage: UsageRecord): Promise<void> {
+    return this.holochain
+      .callZomeFunction('content_store', 'record_resource_usage', {
         resource_id: resourceId,
         usage,
+      })
+      .catch(err => {
+        // Re-throw persistence errors to caller
+        throw err;
       });
-    } catch (err) {
-      console.error('Error persisting usage:', err);
-      throw err;
-    }
   }
 
   /**
@@ -1042,7 +1160,7 @@ export class StewardedResourceService {
     let weightedUtilization = 0;
 
     for (const cat of categories) {
-      const weight = weights[cat.category] || 0.05;
+      const weight = weights[cat.category] ?? 0.05;
       weightedUtilization += cat.utilizationPercent * weight;
       totalWeight += weight;
     }
@@ -1055,7 +1173,7 @@ export class StewardedResourceService {
    */
   private generateAlerts(
     resources: StewardedResource[],
-    categories: CategorySummary[]
+    _categories: CategorySummary[]
   ): ResourceAlert[] {
     const alerts: ResourceAlert[] = [];
 
@@ -1092,7 +1210,7 @@ export class StewardedResourceService {
    */
   private generateInsights(
     resources: StewardedResource[],
-    categories: CategorySummary[]
+    _categories: CategorySummary[]
   ): ResourceInsight[] {
     const insights: ResourceInsight[] = [];
 
@@ -1128,7 +1246,7 @@ export class StewardedResourceService {
       annual: 0.083,
       irregular: 0,
     };
-    return amount * (conversions[frequency] || 0);
+    return amount * (conversions[frequency] ?? 0);
   }
 
   /**
@@ -1137,7 +1255,7 @@ export class StewardedResourceService {
   private assessIncomeStability(streams: IncomeStream[]): 'stable' | 'variable' | 'uncertain' {
     const guaranteedCount = streams.filter(s => s.isGuaranteed && s.status === 'active').length;
     const averageConfidence =
-      streams.reduce((sum, s) => sum + s.confidence, 0) / (streams.length || 1);
+      streams.reduce((sum, s) => sum + s.confidence, 0) / (streams.length ?? 1);
 
     if (guaranteedCount > streams.length * 0.7 && averageConfidence > 80) {
       return 'stable';
@@ -1146,5 +1264,46 @@ export class StewardedResourceService {
       return 'variable';
     }
     return 'uncertain';
+  }
+
+  /**
+   * Persist transition path
+   */
+  private persistTransitionPath(transitionPath: {
+    id: string;
+    resourceId: string;
+    stewardId: string;
+    [key: string]: unknown;
+  }): Promise<void> {
+    return this.holochain
+      .callZomeFunction('content_store', 'create_transition_path', {
+        transition_path: transitionPath,
+      })
+      .catch(err => {
+        // Re-throw persistence errors to caller
+        throw err;
+      });
+  }
+
+  /**
+   * Persist transition phase
+   */
+  private persistTransitionPhase(
+    transitionPathId: string,
+    phase: {
+      id: string;
+      sequenceNumber: number;
+      [key: string]: unknown;
+    }
+  ): Promise<void> {
+    return this.holochain
+      .callZomeFunction('content_store', 'create_transition_phase', {
+        transition_path_id: transitionPathId,
+        phase,
+      })
+      .catch(err => {
+        // Re-throw persistence errors to caller
+        throw err;
+      });
   }
 }

@@ -16,7 +16,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: elohim-doorway-prod-secrets
-  namespace: ethosengine
+  namespace: elohim-prod
 type: Opaque
 stringData:
   # IMPORTANT: These MUST be changed before production deployment!
@@ -30,7 +30,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: elohim-edgenode-prod-config
-  namespace: ethosengine
+  namespace: elohim-prod
 data:
   conductor-config.yaml: |
     # Holochain Conductor Configuration for Elohim Protocol (Production)
@@ -57,11 +57,35 @@ data:
       type: lair_server_in_proc
       lair_root: "/var/local/lib/holochain/ks"
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: holochain-data-prod
+  namespace: elohim-prod
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: microk8s-hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-data-prod
+  namespace: elohim-prod
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: microk8s-hostpath
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: elohim-edgenode-prod
-  namespace: ethosengine
+  namespace: elohim-prod
   labels:
     app: elohim-edgenode
     environment: prod
@@ -267,8 +291,11 @@ spec:
         - name: happ-volume
           emptyDir: {}
         - name: holochain-data
-          emptyDir:
-            sizeLimit: 10Gi
+          persistentVolumeClaim:
+            claimName: holochain-data-prod
+        - name: storage-data
+          persistentVolumeClaim:
+            claimName: storage-data-prod
         - name: conductor-config
           configMap:
             name: elohim-edgenode-prod-config
@@ -277,7 +304,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: elohim-edgenode-prod
-  namespace: ethosengine
+  namespace: elohim-prod
   labels:
     app: elohim-edgenode
     environment: prod
@@ -305,7 +332,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: elohim-edgenode-prod
-  namespace: ethosengine
+  namespace: elohim-prod
   annotations:
     # WebSocket support for /admin, /app/*, signal subdomain
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"

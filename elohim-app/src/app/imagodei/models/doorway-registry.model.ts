@@ -206,7 +206,7 @@ export function sortDoorwaysByTrust(doorways: RegisteredDoorway[]): RegisteredDo
   return [...doorways].sort((a, b) => {
     const tierDiff = tierOrder[a.trustTier] - tierOrder[b.trustTier];
     if (tierDiff !== 0) return tierDiff;
-    return (a.region || '').localeCompare(b.region || '');
+    return (a.region ?? '').localeCompare(b.region ?? '');
   });
 }
 

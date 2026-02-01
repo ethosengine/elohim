@@ -173,11 +173,7 @@ export class ContributorService {
     if (!this.dashboardCache.has(contributorId)) {
       const request = defer(() => from(this.fetchDashboard(contributorId))).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(
-            `[ContributorService] Failed to fetch dashboard for "${contributorId}":`,
-            err
-          );
+        catchError(_err => {
           return of(null);
         })
       );
@@ -202,8 +198,7 @@ export class ContributorService {
 
     return defer(() => from(this.fetchMyDashboard())).pipe(
       tap(dashboard => this.dashboardSubject.next(dashboard)),
-      catchError(err => {
-        console.warn('[ContributorService] Failed to fetch my dashboard:', err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -225,8 +220,7 @@ export class ContributorService {
     }
 
     return defer(() => from(this.fetchImpact(contributorId))).pipe(
-      catchError(err => {
-        console.warn(`[ContributorService] Failed to fetch impact for "${contributorId}":`, err);
+      catchError(_err => {
         return of(null);
       })
     );
@@ -268,11 +262,7 @@ export class ContributorService {
     if (!this.recognitionCache.has(contributorId)) {
       const request = defer(() => from(this.fetchRecognitionHistory(contributorId))).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.warn(
-            `[ContributorService] Failed to fetch recognition for "${contributorId}":`,
-            err
-          );
+        catchError(_err => {
           return of([]);
         })
       );
@@ -319,8 +309,8 @@ export class ContributorService {
       // Even a null result (no dashboard yet) means the zome is available
       this.availableSignal.set(result.success);
       return result.success;
-    } catch (err) {
-      console.warn('[ContributorService] Availability test failed:', err);
+      // eslint-disable-next-line sonarjs/no-ignored-exceptions
+    } catch (_err) {
       this.availableSignal.set(false);
       return false;
     }

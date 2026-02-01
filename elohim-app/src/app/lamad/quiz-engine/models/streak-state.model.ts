@@ -16,7 +16,6 @@
  * streak = recordAnswer(streak, true);  // correct
  * streak = recordAnswer(streak, true);  // correct
  * streak = recordAnswer(streak, true);  // correct - achieved!
- * console.log(isStreakAchieved(streak)); // true
  * ```
  */
 

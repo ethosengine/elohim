@@ -23,6 +23,8 @@
 
 import { REACH_LEVEL_VALUES } from '@app/elohim/models/protocol-core.model';
 
+// @coverage: 100.0% (2026-01-31)
+
 import type { ContentReach } from './content-node.model';
 
 // Re-export ContentReach for backward compatibility

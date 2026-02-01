@@ -226,6 +226,7 @@ export function createMockStorageApiService(): MockStorageApiService {
   ]);
 
   // Default: return empty observable for queries
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   mock.getEconomicEvents.and.returnValue({ pipe: () => ({ subscribe: () => {} }) });
 
   return mock;

@@ -1,5 +1,7 @@
 import { Component, OnInit, ElementRef, ViewEncapsulation } from '@angular/core';
 
+// @coverage: 100.0% (2026-01-31)
+
 import { DomInteractionService } from '../../services/dom-interaction.service';
 
 @Component({

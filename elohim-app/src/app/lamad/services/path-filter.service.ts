@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+// @coverage: 2.5% (2026-01-31)
+
 import { PathIndexEntry } from '../models/learning-path.model';
 
 /**

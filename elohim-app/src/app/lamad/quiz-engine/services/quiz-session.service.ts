@@ -272,7 +272,6 @@ export class QuizSessionService {
     if (!session) return null;
 
     if (!isValidTransition(session.state, newState)) {
-      console.warn(`Invalid transition: ${session.state} → ${newState}`);
       return null;
     }
 
@@ -319,7 +318,6 @@ export class QuizSessionService {
     // Find the question
     const questionIndex = session.questions.findIndex(q => q.item.id === questionId);
     if (questionIndex === -1) {
-      console.warn(`Question ${questionId} not found in session`);
       return null;
     }
 

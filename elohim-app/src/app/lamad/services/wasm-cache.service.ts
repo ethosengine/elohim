@@ -22,6 +22,8 @@
 
 import { Injectable, OnDestroy } from '@angular/core';
 
+// @coverage: 33.7% (2026-01-31)
+
 import { BehaviorSubject } from 'rxjs';
 
 // Import from framework-agnostic cache module
@@ -152,8 +154,6 @@ export class WasmCacheService implements OnDestroy {
 
       this.stateSubject.next('ready');
 
-      console.info(`[WasmCacheService] Initialized with ${this.implementation} implementation`);
-
       return {
         success: true,
         implementation: this.implementation,
@@ -161,8 +161,6 @@ export class WasmCacheService implements OnDestroy {
     } catch (error) {
       this.stateSubject.next('error');
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      console.error('[WasmCacheService] Initialization failed:', error);
 
       // Fallback to TypeScript implementation
       try {

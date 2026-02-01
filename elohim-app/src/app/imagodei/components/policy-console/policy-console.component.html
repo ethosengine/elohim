@@ -17,7 +17,7 @@
     <div class="error-banner" role="alert">
       <span class="icon">&#9888;</span>
       <span class="message">{{ error() }}</span>
-      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+      <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
     </div>
   }
 
@@ -25,7 +25,7 @@
     <div class="success-banner" role="status">
       <span class="icon">&#10003;</span>
       <span class="message">{{ successMessage() }}</span>
-      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+      <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
     </div>
   }
 
@@ -83,6 +83,7 @@
     <!-- Tab Navigation -->
     <nav class="tab-nav">
       <button
+        type="button"
         class="tab-btn"
         [class.active]="activeTab() === 'content'"
         (click)="setActiveTab('content')"
@@ -91,6 +92,7 @@
         Content
       </button>
       <button
+        type="button"
         class="tab-btn"
         [class.active]="activeTab() === 'time'"
         (click)="setActiveTab('time')"
@@ -99,6 +101,7 @@
         Time
       </button>
       <button
+        type="button"
         class="tab-btn"
         [class.active]="activeTab() === 'features'"
         (click)="setActiveTab('features')"
@@ -108,6 +111,7 @@
       </button>
       @if (canViewMonitoring()) {
         <button
+          type="button"
           class="tab-btn"
           [class.active]="activeTab() === 'monitoring'"
           (click)="setActiveTab('monitoring')"
@@ -318,6 +322,7 @@
 
                   @if (canEditTime()) {
                     <button
+                      type="button"
                       class="remove-window-btn"
                       (click)="removeTimeWindow(i)"
                       title="Remove window"
@@ -329,7 +334,7 @@
               }
 
               @if (canEditTime()) {
-                <button class="add-window-btn" (click)="addTimeWindow()">
+                <button type="button" class="add-window-btn" (click)="addTimeWindow()">
                   <span class="icon">+</span>
                   Add Time Window
                 </button>
@@ -424,7 +429,7 @@
     <!-- Save Bar -->
     <div class="save-bar">
       @if (!isEditingSelf() || canEditContent() || canEditTime() || canEditFeatures()) {
-        <button class="save-btn" [disabled]="isSaving()" (click)="savePolicy()">
+        <button type="button" class="save-btn" [disabled]="isSaving()" (click)="savePolicy()">
           @if (isSaving()) {
             <span class="spinner-small"></span>
             Saving...

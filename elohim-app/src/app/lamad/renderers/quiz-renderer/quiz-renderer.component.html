@@ -34,6 +34,7 @@
 
   <div class="actions mt-6 flex flex-col items-center">
     <button
+      type="button"
       *ngIf="!submitted"
       (click)="submitQuiz()"
       class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
@@ -49,6 +50,7 @@
       <p class="text-xl mb-4">Score: {{ score }}% (Required: {{ quiz.passingScore }}%)</p>
 
       <button
+        type="button"
         *ngIf="quiz.allowRetake"
         (click)="retake()"
         class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"

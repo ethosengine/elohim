@@ -155,7 +155,9 @@ export class BankingStore {
   private db: IDBDatabase | null = null;
   private initPromise: Promise<void> | null = null;
 
-  private constructor() {}
+  private constructor() {
+    // Private constructor enforces singleton pattern. Use getInstance() to get the instance.
+  }
 
   static getInstance(): BankingStore {
     BankingStore.instance ??= new BankingStore();
@@ -170,13 +172,12 @@ export class BankingStore {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        console.error('[BankingStore] Failed to open database:', request.error);
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.warn('[BankingStore] Database opened successfully');
+
         resolve();
       };
 
@@ -243,7 +244,7 @@ export class BankingStore {
     return tx.objectStore(storeName);
   }
 
-  private wrapRequest<T>(request: IDBRequest<T>): Promise<T> {
+  private async wrapRequest<T>(request: IDBRequest<T>): Promise<T> {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);

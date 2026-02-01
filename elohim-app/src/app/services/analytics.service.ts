@@ -1,6 +1,8 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 100.0% (2026-01-31)
+
 import { ConfigService } from './config.service';
 
 const GA_TRACKING_ID = 'G-NSL7PVP55B' as const;

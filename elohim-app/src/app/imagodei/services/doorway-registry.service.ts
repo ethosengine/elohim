@@ -20,6 +20,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
+// @coverage: 77.8% (2026-01-31)
+
 import { catchError, of, timeout, firstValueFrom } from 'rxjs';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
@@ -233,7 +235,7 @@ export class DoorwayRegistryService {
     // Check health in batches to avoid overwhelming
     for (let i = 0; i < doorways.length; i += MAX_CONCURRENT_HEALTH_CHECKS) {
       const batch = doorways.slice(i, i + MAX_CONCURRENT_HEALTH_CHECKS);
-      const results = await Promise.all(batch.map(d => this.checkHealth(d)));
+      const results = await Promise.all(batch.map(async d => this.checkHealth(d)));
       results.forEach(r => healthMap.set(r.id, r));
     }
 
@@ -487,10 +489,6 @@ export class DoorwayRegistryService {
     // In Eclipse Che, always use the local hc-dev endpoint
     if (isEclipseChe()) {
       const cheDoorway = createCheDoorway();
-      console.log(
-        '[DoorwayRegistry] Eclipse Che detected, using local hc-dev endpoint:',
-        cheDoorway.url
-      );
       this.selectedSignal.set({
         doorway: cheDoorway,
         selectedAt: new Date().toISOString(),

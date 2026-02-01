@@ -99,7 +99,7 @@ export class ProfileComponent implements OnInit {
   /** Whether profile can be edited (requires network authentication) */
   readonly canEdit = computed(() => {
     const mode = this.mode();
-    const isNetworkMode = mode === 'hosted' || mode === 'self-sovereign';
+    const isNetworkMode = mode === 'hosted' || mode === 'steward';
     return isNetworkMode && this.isAuthenticated();
   });
 
@@ -129,7 +129,7 @@ export class ProfileComponent implements OnInit {
 
   ngOnInit(): void {
     // Load fresh profile data
-    this.loadProfile();
+    void this.loadProfile();
   }
 
   // ==========================================================================
@@ -142,8 +142,8 @@ export class ProfileComponent implements OnInit {
   async loadProfile(): Promise<void> {
     try {
       await this.identityService.getCurrentHuman();
-    } catch (err) {
-      console.error('[ProfileComponent] Failed to load profile:', err);
+    } catch (_err) {
+      // intentionally empty - profile load failure is non-critical
     }
   }
 
@@ -222,7 +222,7 @@ export class ProfileComponent implements OnInit {
    * Navigate back.
    */
   goBack(): void {
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   // ==========================================================================
@@ -291,6 +291,6 @@ export class ProfileComponent implements OnInit {
    * Navigate to discovery assessment.
    */
   navigateToDiscovery(): void {
-    this.router.navigate(['/lamad/discovery']);
+    void this.router.navigate(['/lamad/discovery']);
   }
 }

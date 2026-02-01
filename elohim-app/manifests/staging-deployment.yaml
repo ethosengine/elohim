@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: elohim-site-staging
-  namespace: ethosengine
+  namespace: elohim-staging
   labels:
     app: elohim-site-staging
 spec:

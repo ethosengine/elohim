@@ -202,8 +202,8 @@ export class AuthCallbackComponent implements OnInit {
   readonly status = signal<CallbackStatus>('processing');
   readonly errorMessage = signal<string>('');
 
-  async ngOnInit(): Promise<void> {
-    await this.handleCallback();
+  ngOnInit(): void {
+    void this.handleCallback();
   }
 
   private async handleCallback(): Promise<void> {
@@ -238,13 +238,13 @@ export class AuthCallbackComponent implements OnInit {
 
       if (result.success) {
         // Update auth state
-        await this.authService.setAuthFromResult(result);
+        this.authService.setAuthFromResult(result);
 
         this.status.set('success');
 
         // Redirect to lamad after brief delay for UX
         setTimeout(() => {
-          this.router.navigate(['/lamad']);
+          void this.router.navigate(['/lamad']);
         }, 1500);
       } else {
         this.status.set('error');
@@ -258,11 +258,11 @@ export class AuthCallbackComponent implements OnInit {
 
   retry(): void {
     // Navigate back to identity page (with doorway picker)
-    this.router.navigate(['/identity']);
+    void this.router.navigate(['/identity']);
   }
 
   goHome(): void {
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   private getOAuthErrorMessage(error: string): string {

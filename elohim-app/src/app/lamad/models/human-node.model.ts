@@ -47,6 +47,8 @@ import {
   type GeographicContext,
 } from '@app/elohim/models/protocol-core.model';
 
+// @coverage: 22.2% (2026-01-31)
+
 // Re-export core types for convenience
 export type { IntimacyLevel, ConsentState, GovernanceLayer, ReachLevel, GeographicContext };
 

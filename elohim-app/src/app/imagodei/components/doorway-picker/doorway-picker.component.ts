@@ -193,7 +193,7 @@ export class DoorwayPickerComponent implements OnInit {
   // ===========================================================================
 
   ngOnInit(): void {
-    this.loadDoorways();
+    void this.loadDoorways();
   }
 
   // ===========================================================================

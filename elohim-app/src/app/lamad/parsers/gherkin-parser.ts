@@ -1,5 +1,7 @@
 import { ContentNode } from '../models/content-node.model';
 
+// @coverage: 0.0% (2026-01-31)
+
 /**
  * Gherkin step (Given/When/Then/And/But)
  */

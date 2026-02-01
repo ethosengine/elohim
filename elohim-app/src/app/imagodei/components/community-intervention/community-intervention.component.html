@@ -35,7 +35,7 @@
     <div class="error-banner" role="alert">
       <span class="icon">&#9888;</span>
       <span class="message">{{ error() }}</span>
-      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+      <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
     </div>
   }
 
@@ -43,7 +43,7 @@
     <div class="success-banner" role="status">
       <span class="icon">&#10003;</span>
       <span class="message">{{ successMessage() }}</span>
-      <button class="dismiss-btn" (click)="clearMessages()">&times;</button>
+      <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
     </div>
   }
 
@@ -100,7 +100,7 @@
         @if (!intervention()!.thresholdMet) {
           <div class="support-form">
             <h3>Add Your Support</h3>
-            <button class="support-btn" (click)="switchToSupport()">
+            <button type="button" class="support-btn" (click)="switchToSupport()">
               Support This Intervention
             </button>
           </div>
@@ -119,6 +119,7 @@
           <div class="relationship-options">
             @for (level of relationshipLevels; track level.value) {
               <button
+                type="button"
                 class="relationship-btn"
                 [class.selected]="relationshipLevel() === level.value"
                 (click)="setRelationshipLevel(level.value)"
@@ -150,6 +151,7 @@
         <!-- Submit -->
         <div class="form-actions">
           <button
+            type="button"
             class="submit-btn"
             [disabled]="!canSubmit() || isSubmitting()"
             (click)="submitSupport()"
@@ -161,7 +163,7 @@
               Add Support
             }
           </button>
-          <button class="cancel-btn" (click)="mode.set('view')">Cancel</button>
+          <button type="button" class="cancel-btn" (click)="mode.set('view')">Cancel</button>
         </div>
       </section>
     }
@@ -185,10 +187,15 @@
 
         <!-- Relationship Level -->
         <div class="form-group">
-          <label>Your relationship to this person:</label>
-          <div class="relationship-options">
+          <label id="relationship-legend-initiate">Your relationship to this person:</label>
+          <div
+            class="relationship-options"
+            role="group"
+            aria-labelledby="relationship-legend-initiate"
+          >
             @for (level of relationshipLevels; track level.value) {
               <button
+                type="button"
                 class="relationship-btn"
                 [class.selected]="relationshipLevel() === level.value"
                 (click)="setRelationshipLevel(level.value)"
@@ -222,7 +229,7 @@
         <!-- Categories -->
         <div class="form-group">
           <label>Categories (select all that apply):</label>
-          <div class="category-options">
+          <div class="category-options" role="group" aria-labelledby="category-legend">
             @for (cat of categories; track cat.value) {
               <label class="category-option" [class.selected]="isCategorySelected(cat.value)">
                 <input
@@ -254,6 +261,7 @@
         <!-- Submit -->
         <div class="form-actions">
           <button
+            type="button"
             class="submit-btn"
             [disabled]="!canSubmit() || isSubmitting()"
             (click)="submitInitiation()"

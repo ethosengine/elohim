@@ -1,17 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { NgModule, ModuleWithProviders, inject, provideAppInitializer } from '@angular/core';
 
-// Core services
+// @coverage: 23.1% (2026-01-31)
 
-// Components
 import { ContentDownloadComponent } from './components/content-download/content-download.component';
 import { DefaultCodeEditorComponent } from './components/default-code-editor/default-code-editor.component';
-
-// Unified format plugins
 import { GherkinFormatPlugin } from './plugins/gherkin/gherkin-format.plugin';
 import { Html5AppFormatPlugin } from './plugins/html5-app/html5-app-format.plugin';
 import { MarkdownFormatPlugin } from './plugins/markdown/markdown-format.plugin';
-// Sophia plugin handles both mastery quizzes and discovery/reflection assessments
 import { SophiaFormatPlugin } from './plugins/sophia/sophia-format.plugin';
 import { ContentEditorService } from './services/content-editor.service';
 import { ContentFormatRegistryService } from './services/content-format-registry.service';

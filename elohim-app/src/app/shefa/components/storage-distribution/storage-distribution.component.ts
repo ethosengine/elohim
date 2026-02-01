@@ -85,8 +85,7 @@ export class StorageDistributionComponent implements OnInit, OnDestroy {
           this.distribution = dist;
           this.isLoading = false;
         },
-        error: err => {
-          console.error('[StorageDistribution] Failed to load:', err);
+        error: _err => {
           this.error = 'Failed to load storage distribution';
           this.isLoading = false;
         },

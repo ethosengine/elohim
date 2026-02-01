@@ -419,8 +419,8 @@ export class DiscoveryAttestationService {
       if (attestationsJson) {
         this.attestationsSignal.set(JSON.parse(attestationsJson));
       }
-    } catch (err) {
-      console.error('[DiscoveryAttestationService] Failed to load from storage:', err);
+    } catch {
+      // localStorage read failed - fall back to empty state
     }
   }
 
@@ -431,8 +431,8 @@ export class DiscoveryAttestationService {
         STORAGE_KEYS.DISCOVERY_ATTESTATIONS,
         JSON.stringify(this.attestationsSignal())
       );
-    } catch (err) {
-      console.error('[DiscoveryAttestationService] Failed to save to storage:', err);
+    } catch {
+      // localStorage write failed - cache write is non-critical
     }
   }
 }

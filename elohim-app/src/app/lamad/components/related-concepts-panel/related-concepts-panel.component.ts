@@ -11,6 +11,8 @@ import {
   OnDestroy,
 } from '@angular/core';
 
+// @coverage: 4.2% (2026-01-31)
+
 import { takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
@@ -344,8 +346,7 @@ export class RelatedConceptsPanelComponent implements OnChanges, OnDestroy {
           this.isLoading = false;
           this.cdr.markForCheck();
         },
-        error: err => {
-          console.error('Failed to load related concepts:', err);
+        error: _err => {
           this.isLoading = false;
           this.cdr.markForCheck();
         },

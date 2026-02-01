@@ -5,11 +5,7 @@ import { of } from 'rxjs';
 
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 
-import {
-  OpinionClusterComponent,
-  Statement,
-  StatementVote,
-} from './opinion-cluster.component';
+import { OpinionClusterComponent, Statement, StatementVote } from './opinion-cluster.component';
 
 // OpinionCluster matches the service interface
 interface MockOpinionCluster {
@@ -47,9 +43,7 @@ describe('OpinionClusterComponent', () => {
   ];
 
   beforeEach(async () => {
-    mockSignalService = jasmine.createSpyObj('GovernanceSignalService', [
-      'computeOpinionClusters',
-    ]);
+    mockSignalService = jasmine.createSpyObj('GovernanceSignalService', ['computeOpinionClusters']);
     mockSignalService.computeOpinionClusters.and.returnValue(of(mockClusters));
 
     await TestBed.configureTestingModule({
@@ -239,7 +233,14 @@ describe('OpinionClusterComponent', () => {
       component.participants = [
         { participantId: 'p1', x: 0.5, y: 0.5, cluster: null, isCurrentUser: false, voteCount: 1 },
         { participantId: 'p2', x: 0.6, y: 0.6, cluster: null, isCurrentUser: false, voteCount: 1 },
-        { participantId: 'p3', x: 0.55, y: 0.55, cluster: null, isCurrentUser: false, voteCount: 1 },
+        {
+          participantId: 'p3',
+          x: 0.55,
+          y: 0.55,
+          cluster: null,
+          isCurrentUser: false,
+          voteCount: 1,
+        },
       ];
 
       const clusters = (component as any).computeClusters();
@@ -513,8 +514,22 @@ describe('OpinionClusterComponent', () => {
         { participantId: 'p2', x: 0, y: 0, cluster: 'b', isCurrentUser: false, voteCount: 2 },
       ];
       component.clusters = [
-        { id: 'a', label: 'A', color: '#fff', centroid: [0, 0], memberCount: 1, averagePosition: 0 },
-        { id: 'b', label: 'B', color: '#fff', centroid: [0, 0], memberCount: 1, averagePosition: 0 },
+        {
+          id: 'a',
+          label: 'A',
+          color: '#fff',
+          centroid: [0, 0],
+          memberCount: 1,
+          averagePosition: 0,
+        },
+        {
+          id: 'b',
+          label: 'B',
+          color: '#fff',
+          centroid: [0, 0],
+          memberCount: 1,
+          averagePosition: 0,
+        },
       ];
 
       (component as any).updateStats();
@@ -633,8 +648,22 @@ describe('OpinionClusterComponent', () => {
       // Participant exactly at origin should go to center cluster
       component.participants = [
         { participantId: 'p1', x: 0, y: 0, cluster: null, isCurrentUser: false, voteCount: 1 },
-        { participantId: 'p2', x: 0.01, y: 0.01, cluster: null, isCurrentUser: false, voteCount: 1 },
-        { participantId: 'p3', x: -0.01, y: 0.01, cluster: null, isCurrentUser: false, voteCount: 1 },
+        {
+          participantId: 'p2',
+          x: 0.01,
+          y: 0.01,
+          cluster: null,
+          isCurrentUser: false,
+          voteCount: 1,
+        },
+        {
+          participantId: 'p3',
+          x: -0.01,
+          y: 0.01,
+          cluster: null,
+          isCurrentUser: false,
+          voteCount: 1,
+        },
       ];
 
       const clusters = (component as any).computeClusters();
@@ -646,9 +675,7 @@ describe('OpinionClusterComponent', () => {
 
   describe('consensus/divisive identification edge cases', () => {
     it('should handle all participants passing on a statement', () => {
-      component.statements = [
-        { id: 's1', text: 'All pass' },
-      ];
+      component.statements = [{ id: 's1', text: 'All pass' }];
       component.votes = [
         { participantId: 'p1', statementId: 's1', value: 0 },
         { participantId: 'p2', statementId: 's1', value: 0 },
@@ -717,9 +744,7 @@ describe('OpinionClusterComponent', () => {
     });
 
     it('should handle edge case of single statement', () => {
-      component.statements = [
-        { id: 's1', text: 'Only statement' },
-      ];
+      component.statements = [{ id: 's1', text: 'Only statement' }];
       component.votes = [
         { participantId: 'p1', statementId: 's1', value: 1 },
         { participantId: 'p2', statementId: 's1', value: 1 },

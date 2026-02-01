@@ -22,23 +22,24 @@ import { identityGuard } from './guards/identity.guard';
 export const IMAGODEI_ROUTES: Routes = [
   {
     path: 'login',
-    loadComponent: () => import('./components/login/login.component').then(m => m.LoginComponent),
+    loadComponent: async () =>
+      import('./components/login/login.component').then(m => m.LoginComponent),
   },
   {
     path: 'register',
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/register/register.component').then(m => m.RegisterComponent),
   },
   {
     path: 'profile',
     canActivate: [identityGuard],
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/profile/profile.component').then(m => m.ProfileComponent),
   },
   {
     path: 'presences',
     canActivate: [identityGuard],
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/presence-list/presence-list.component').then(
         m => m.PresenceListComponent
       ),
@@ -46,7 +47,7 @@ export const IMAGODEI_ROUTES: Routes = [
   {
     path: 'presences/create',
     canActivate: [identityGuard],
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/create-presence/create-presence.component').then(
         m => m.CreatePresenceComponent
       ),
@@ -57,49 +58,49 @@ export const IMAGODEI_ROUTES: Routes = [
     children: [
       {
         path: '',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/stewardship-dashboard/stewardship-dashboard.component').then(
             m => m.StewardshipDashboardComponent
           ),
       },
       {
         path: 'capabilities',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/capabilities-dashboard/capabilities-dashboard.component').then(
             m => m.CapabilitiesDashboardComponent
           ),
       },
       {
         path: 'policy/:subjectId',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/policy-console/policy-console.component').then(
             m => m.PolicyConsoleComponent
           ),
       },
       {
         path: 'appeal/:grantId',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/appeal-wizard/appeal-wizard.component').then(
             m => m.AppealWizardComponent
           ),
       },
       {
         path: 'intervention',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/community-intervention/community-intervention.component').then(
             m => m.CommunityInterventionComponent
           ),
       },
       {
         path: 'intervention/view/:interventionId',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/community-intervention/community-intervention.component').then(
             m => m.CommunityInterventionComponent
           ),
       },
       {
         path: 'intervention/initiate/:subjectId',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/community-intervention/community-intervention.component').then(
             m => m.CommunityInterventionComponent
           ),

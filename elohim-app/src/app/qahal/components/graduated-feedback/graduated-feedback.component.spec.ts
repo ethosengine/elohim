@@ -8,10 +8,7 @@ import {
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
 
-import {
-  GraduatedFeedbackComponent,
-  FeedbackContext,
-} from './graduated-feedback.component';
+import { GraduatedFeedbackComponent, FeedbackContext } from './graduated-feedback.component';
 
 describe('GraduatedFeedbackComponent', () => {
   let component: GraduatedFeedbackComponent;
@@ -35,12 +32,13 @@ describe('GraduatedFeedbackComponent', () => {
 
   beforeEach(async () => {
     signalChanges$ = new Subject();
-    mockSignalService = jasmine.createSpyObj('GovernanceSignalService', [
-      'recordGraduatedFeedback',
-      'getFeedbackStats',
-    ], {
-      signalChanges$: signalChanges$.asObservable(),
-    });
+    mockSignalService = jasmine.createSpyObj(
+      'GovernanceSignalService',
+      ['recordGraduatedFeedback', 'getFeedbackStats'],
+      {
+        signalChanges$: signalChanges$.asObservable(),
+      }
+    );
     mockSignalService.getFeedbackStats.and.returnValue(of(mockStats));
     mockSignalService.recordGraduatedFeedback.and.returnValue(of(true));
 
@@ -95,7 +93,13 @@ describe('GraduatedFeedbackComponent', () => {
 
   describe('scales', () => {
     it('should have 5 contexts defined', () => {
-      const contexts: FeedbackContext[] = ['accuracy', 'usefulness', 'proposal', 'clarity', 'relevance'];
+      const contexts: FeedbackContext[] = [
+        'accuracy',
+        'usefulness',
+        'proposal',
+        'clarity',
+        'relevance',
+      ];
       contexts.forEach(ctx => {
         expect(component.scales[ctx]).toBeDefined();
       });
@@ -313,7 +317,9 @@ describe('GraduatedFeedbackComponent', () => {
     }));
 
     it('should handle submission error', fakeAsync(() => {
-      mockSignalService.recordGraduatedFeedback.and.returnValue(throwError(() => new Error('Failed')));
+      mockSignalService.recordGraduatedFeedback.and.returnValue(
+        throwError(() => new Error('Failed'))
+      );
       component.selectedPosition = 0.5;
       component.submit();
       tick();

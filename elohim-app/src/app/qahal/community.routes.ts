@@ -14,14 +14,14 @@ import { Routes } from '@angular/router';
 export const COMMUNITY_ROUTES: Routes = [
   {
     path: '',
-    loadComponent: () =>
+    loadComponent: async () =>
       import('./components/community-layout/community-layout.component').then(
         m => m.CommunityLayoutComponent
       ),
     children: [
       {
         path: '',
-        loadComponent: () =>
+        loadComponent: async () =>
           import('./components/community-home/community-home.component').then(
             m => m.CommunityHomeComponent
           ),
