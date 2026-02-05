@@ -158,7 +158,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Subscribe to route param changes
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.pathId = params['pathId'];
-      const parsed = parseInt(params['stepIndex'], 10);
+      const parsed = Number.parseInt(params['stepIndex'], 10);
       this.stepIndex = Number.isNaN(parsed) ? 0 : parsed;
       this.loadContext();
     });

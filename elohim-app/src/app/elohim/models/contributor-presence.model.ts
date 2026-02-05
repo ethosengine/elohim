@@ -698,9 +698,9 @@ export const DEFAULT_STEWARDSHIP_CONFIG = {
  */
 export const RECOGNITION_SCORE_WEIGHTS = {
   view: 0.1,
-  affinity: 1.0,
-  citation: 5.0,
-  endorsement: 10.0,
-  pathInclusion: 3.0,
-  synthesisReference: 2.0,
+  affinity: 1,
+  citation: 5,
+  endorsement: 10,
+  pathInclusion: 3,
+  synthesisReference: 2,
 };

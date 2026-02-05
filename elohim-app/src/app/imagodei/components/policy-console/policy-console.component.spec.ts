@@ -210,7 +210,7 @@ describe('PolicyConsoleComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(component.subjectId()).toBeNull();
+      expect(component.currentSubjectId()).toBeNull();
       expect(component.isEditingSelf()).toBe(true);
     });
 
@@ -220,7 +220,7 @@ describe('PolicyConsoleComponent', () => {
       component.ngOnInit();
       await fixture.whenStable();
 
-      expect(component.subjectId()).toBe('subject-123');
+      expect(component.currentSubjectId()).toBe('subject-123');
       expect(component.isEditingSelf()).toBe(false);
     });
 
@@ -235,7 +235,7 @@ describe('PolicyConsoleComponent', () => {
 
   describe('Data Loading - Self', () => {
     beforeEach(() => {
-      component.subjectId.set(null);
+      component.currentSubjectId.set(null);
     });
 
     it('should load own policy when editing self', async () => {
@@ -314,7 +314,7 @@ describe('PolicyConsoleComponent', () => {
 
   describe('Data Loading - Other Subject', () => {
     beforeEach(() => {
-      component.subjectId.set('subject-123');
+      component.currentSubjectId.set('subject-123');
     });
 
     it('should load subject policy with grant', async () => {
@@ -551,7 +551,7 @@ describe('PolicyConsoleComponent', () => {
     });
 
     it('should call upsertPolicy with editing state', async () => {
-      component.subjectId.set('subject-123');
+      component.currentSubjectId.set('subject-123');
       component.editingContentRules.set({
         blockedCategories: ['violence'],
         blockedHashes: [],
@@ -631,7 +631,7 @@ describe('PolicyConsoleComponent', () => {
 
   describe('Subject Display Name', () => {
     it('should show "Your Settings" when editing self', () => {
-      component.subjectId.set(null);
+      component.currentSubjectId.set(null);
 
       expect(component.subjectDisplayName()).toBe('Your Settings');
     });
@@ -659,7 +659,7 @@ describe('PolicyConsoleComponent', () => {
         updatedAt: '2024-01-01T00:00:00Z',
       };
       component.grant.set(mockGrant);
-      component.subjectId.set('subject-123456789');
+      component.currentSubjectId.set('subject-123456789');
 
       const displayName = component.subjectDisplayName();
 

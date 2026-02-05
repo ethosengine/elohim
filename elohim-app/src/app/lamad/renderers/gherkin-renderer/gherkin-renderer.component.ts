@@ -391,8 +391,10 @@ export class GherkinRendererComponent implements OnChanges {
       ctx.currentExample.table.push(cells);
     } else if (ctx.currentScenario?.steps.length) {
       const lastStep = ctx.currentScenario.steps.at(-1);
-      lastStep.dataTable ??= [];
-      lastStep.dataTable.push(cells);
+      if (lastStep) {
+        lastStep.dataTable ??= [];
+        lastStep.dataTable.push(cells);
+      }
     }
   }
 

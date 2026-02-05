@@ -7,7 +7,8 @@
 
 // @coverage: 51.1% (2026-02-05)
 
-// Re-export types for consumers
+// Import types for local use and re-export for consumers
+import type { Moment, Recognition } from './sophia-moment.model';
 export type { Moment, Recognition } from './sophia-moment.model';
 
 /** User input map for answer persistence */

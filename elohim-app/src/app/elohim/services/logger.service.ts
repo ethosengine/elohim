@@ -199,7 +199,7 @@ export class LoggerService {
   /**
    * Log an error message.
    */
-  error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void {
+  error(message: string, error?: unknown, context?: Record<string, unknown>): void {
     const err = error instanceof Error ? error : undefined;
     this.log('error', message, err, context);
   }
@@ -415,7 +415,7 @@ export class ChildLogger {
     this.parent.setSource(null);
   }
 
-  error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void {
+  error(message: string, error?: unknown, context?: Record<string, unknown>): void {
     this.parent.setSource(this.source);
     this.parent.error(message, error, context);
     this.parent.setSource(null);

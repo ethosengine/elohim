@@ -322,8 +322,8 @@ export class GherkinParser {
     if (title) {
       const titlePart = title
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/(^_)|(_$)/g, '');
+        .replaceAll(/[^a-z0-9]+/g, '_')
+        .replaceAll(/(^_)|(_$)/g, '');
       return `${type}_${pathPart}_${titlePart}`;
     }
 

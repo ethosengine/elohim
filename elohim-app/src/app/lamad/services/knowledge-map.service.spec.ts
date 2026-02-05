@@ -523,7 +523,7 @@ describe('KnowledgeMapService', () => {
             category: 'test',
             title: 'High Affinity',
             content: '',
-            affinity: 1.0, // Maximum affinity
+            affinity: 1, // Maximum affinity
             relatedNodeIds: [],
             tags: [],
           })

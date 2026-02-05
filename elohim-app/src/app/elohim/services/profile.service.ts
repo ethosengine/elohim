@@ -409,7 +409,7 @@ export class ProfileService {
             context: {
               type: 'path_step',
               pathId: progress.pathId,
-              stepIndex: parseInt(stepIndex, 10),
+              stepIndex: Number.parseInt(stepIndex, 10),
             },
           });
         }

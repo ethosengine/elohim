@@ -284,7 +284,7 @@ describe('StewardshipDashboardComponent', () => {
     it('should format ratio as percentage', () => {
       expect(component.formatRatio(0.5)).toBe('50%');
       expect(component.formatRatio(0.75)).toBe('75%');
-      expect(component.formatRatio(1.0)).toBe('100%');
+      expect(component.formatRatio(1)).toBe('100%');
     });
 
     it('should round percentages', () => {
@@ -454,7 +454,7 @@ describe('StewardshipDashboardComponent', () => {
       const mockAllocation = {
         contentId: 'test-content',
         stewardId: presenceId,
-        ratio: 1.0,
+        ratio: 1,
         governanceState: 'active' as const,
         totalRecognition: 100,
         createdAt: '2024-01-01T00:00:00Z',
@@ -608,7 +608,7 @@ describe('StewardshipDashboardComponent', () => {
       const mockAllocation = {
         contentId: 'quiz-manifesto-foundations',
         stewardId: presenceId,
-        ratio: 1.0,
+        ratio: 1,
         governanceState: 'active' as const,
         totalRecognition: 100,
         createdAt: '2024-01-01T00:00:00Z',
@@ -645,7 +645,7 @@ describe('StewardshipDashboardComponent', () => {
       const mockAllocation = {
         contentId: 'introduction',
         stewardId: presenceId,
-        ratio: 1.0,
+        ratio: 1,
         governanceState: 'active' as const,
         totalRecognition: 50,
         createdAt: '2024-01-01T00:00:00Z',

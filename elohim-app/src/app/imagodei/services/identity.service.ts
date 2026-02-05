@@ -233,7 +233,7 @@ function generateDID(
         // Convert base64 agentPubKey to multibase format
         // For simplicity, we use the raw pubkey with z prefix
         // A full implementation would use proper multicodec encoding
-        return `did:key:z${agentPubKey.replace(/[+/=]/g, '')}`;
+        return `did:key:z${agentPubKey.replaceAll(/[+/=]/g, '')}`;
       }
       return null;
 

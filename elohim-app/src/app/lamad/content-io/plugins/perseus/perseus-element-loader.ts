@@ -10,7 +10,8 @@
 
 // @coverage: 83.3% (2026-02-05)
 
-// Re-export types for consumers
+// Import types for local use and re-export for consumers
+import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
 export type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
 
 /**

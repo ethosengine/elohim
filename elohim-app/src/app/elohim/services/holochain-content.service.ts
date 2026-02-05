@@ -38,6 +38,13 @@ import {
 import { CustodianSelectionService } from './custodian-selection.service';
 import { HolochainClientService } from './holochain-client.service';
 
+import type {
+  AttestationGrantor,
+  AttestationRevocation,
+  AttestationEvidence,
+  AttestationScope,
+} from '../../lamad/models/content-attestation.model';
+
 // =============================================================================
 // Holochain Content Types (match Rust DNA structures)
 // =============================================================================
@@ -333,14 +340,14 @@ export interface HolochainContentAttestationEntry {
   contentId: string;
   attestationType: string; // author-verified, steward-approved, etc.
   reachGranted: string; // private, local, community, commons
-  grantedBy: unknown; // AttestationGrantor parsed
+  grantedBy: AttestationGrantor; // AttestationGrantor parsed
   grantedAt: string;
   expiresAt: string | null;
   status: string; // active, expired, revoked, superseded
-  revocation: unknown | null; // AttestationRevocation if revoked
-  evidence: unknown | null; // AttestationEvidence
-  scope: unknown | null; // AttestationScope (optional)
-  metadata: unknown;
+  revocation: AttestationRevocation | null; // AttestationRevocation if revoked
+  evidence: AttestationEvidence | null; // AttestationEvidence
+  scope: AttestationScope | null; // AttestationScope (optional)
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   schemaVersion: number;
@@ -417,7 +424,7 @@ export interface HolochainRelationshipEntry {
   relationshipType: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
   confidence: number; // 0.0 - 1.0
   inferenceSource: string; // explicit, path, tag, semantic
-  metadata: unknown | null;
+  metadata: Record<string, unknown> | null;
   createdAt: string;
 }
 
@@ -537,7 +544,7 @@ export interface HolochainPathExtensionEntry {
   sharedWith: unknown;
   forkedFrom: string | null;
   forks: unknown;
-  upstreamProposal: unknown | null;
+  upstreamProposal: Record<string, unknown> | null;
   stats: unknown;
   createdAt: string;
   updatedAt: string;
@@ -583,10 +590,10 @@ export interface HolochainChallengeEntry {
   slaDeadline: string | null;
   assignedElohim: string | null;
   priority: string;
-  resolution: unknown | null;
+  resolution: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
-  metadata: unknown;
+  metadata: Record<string, unknown>;
 }
 
 /**
@@ -624,12 +631,12 @@ export interface HolochainProposalEntry {
   amendments: unknown;
   votingConfig: unknown;
   currentVotes: unknown;
-  outcome: unknown | null;
+  outcome: Record<string, unknown> | null;
   relatedEntityType: string | null;
   relatedEntityId: string | null;
   createdAt: string;
   updatedAt: string;
-  metadata: unknown;
+  metadata: Record<string, unknown>;
 }
 
 /**

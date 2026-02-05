@@ -63,7 +63,7 @@ describe('StorageApiService', () => {
           sourceId: 'content-1',
           targetId: 'content-2',
           relationshipType: 'prerequisite',
-          confidence: 1.0,
+          confidence: 1,
         },
       ];
 
@@ -159,7 +159,7 @@ describe('StorageApiService', () => {
         );
       });
 
-      expect(req.request.body.confidence).toBe(1.0);
+      expect(req.request.body.confidence).toBe(1);
       expect(req.request.body.inferenceSource).toBe('author');
       expect(req.request.body.createInverse).toBe(false);
 
@@ -609,7 +609,7 @@ describe('StorageApiService', () => {
           id: 'alloc-1',
           content_id: 'content-1',
           steward_presence_id: 'presence-1',
-          allocation_ratio: 1.0,
+          allocation_ratio: 1,
           governance_state: 'active',
         },
       ];
@@ -639,7 +639,7 @@ describe('StorageApiService', () => {
         request.method === 'POST' && request.url.includes('/db/allocations')
       );
 
-      expect(req.request.body.allocationRatio).toBe(1.0);
+      expect(req.request.body.allocationRatio).toBe(1);
       expect(req.request.body.allocationMethod).toBe('manual');
       expect(req.request.body.contributionType).toBe('inherited');
 

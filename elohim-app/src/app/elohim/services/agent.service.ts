@@ -693,10 +693,10 @@ export class AgentService implements OnDestroy {
     if (pathProgress.length > 0) {
       const startDates = pathProgress
         .map(p => new Date(p.startedAt).getTime())
-        .filter(d => !isNaN(d));
+        .filter(d => !Number.isNaN(d));
       const endDates = pathProgress
         .map(p => new Date(p.lastActivityAt).getTime())
-        .filter(d => !isNaN(d));
+        .filter(d => !Number.isNaN(d));
 
       if (startDates.length > 0)
         firstActivityDate = new Date(Math.min(...startDates)).toISOString();

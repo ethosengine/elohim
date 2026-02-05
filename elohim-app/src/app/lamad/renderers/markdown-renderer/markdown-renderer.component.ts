@@ -271,7 +271,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       toc.push({
         id: uniqueId,
         text,
-        level: parseInt(level, 10),
+        level: Number.parseInt(level, 10),
       });
 
       // Return heading with ID and anchor link
@@ -297,9 +297,9 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private generateId(text: string): string {
     return text
       .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
+      .replaceAll(/[^\w\s-]/g, '')
+      .replaceAll(/\s+/g, '-')
+      .replaceAll(/-+/g, '-')
       .substring(0, 50);
   }
 

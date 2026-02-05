@@ -986,7 +986,7 @@ export class ExplorationService {
   deserializeGraphView(serialized: GraphViewSerialized): GraphView {
     const neighbors = new Map<number, ContentNode[]>();
     for (const [depth, nodes] of Object.entries(serialized.neighbors)) {
-      neighbors.set(parseInt(depth, 10), nodes);
+      neighbors.set(Number.parseInt(depth, 10), nodes);
     }
 
     return {

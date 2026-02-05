@@ -363,8 +363,8 @@ export class ContentIOService {
 
   private sanitizeFilename(name: string): string {
     return name
-      .replace(/[^a-z0-9\s-]/gi, '')
-      .replace(/\s+/g, '-')
+      .replaceAll(/[^a-z0-9\s-]/gi, '')
+      .replaceAll(/\s+/g, '-')
       .toLowerCase()
       .substring(0, 100);
   }
