@@ -549,7 +549,7 @@ export class IdentityService {
     const conductorInfo = this.detectConductorType();
     const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
     const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-    const agencyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+    const agencyStage = conductorInfo.isLocal ? 'app-steward' : 'hosted';
 
     // Check if session exists alongside Holochain
     const session = this.sessionHumanService.getSession();
@@ -869,7 +869,7 @@ export class IdentityService {
         did,
         profile,
         attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
-        agencyStage: 'app-user',
+        agencyStage: 'app-steward',
         keyLocation: 'device',
         canExportKeys: false,
         keyBackup: null,
@@ -1099,7 +1099,7 @@ export class IdentityService {
     const conductorInfo = this.detectConductorType();
     const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
     const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-    const agencyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+    const agencyStage = conductorInfo.isLocal ? 'app-steward' : 'hosted';
 
     // Generate DID for authenticated identity
     const did = generateDID(identityMode, sessionResult.human.id, sessionResult.agentPubkey, null);

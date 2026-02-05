@@ -211,7 +211,7 @@ export interface IdentityState {
   keyBackup: KeyBackupStatus | null;
 
   // =========================================================================
-  // Conductor Information (for app-user/node-operator detection)
+  // Conductor Information (for app-steward/node-operator detection)
   // =========================================================================
 
   /** Whether connected to a local conductor (vs remote edge node) */

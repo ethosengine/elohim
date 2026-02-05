@@ -10,14 +10,14 @@
  * Four-Stage Progression:
  * 1. Visitor - Browser session, anonymous, no persistence
  * 2. Hosted User - Custodial keys on server, full DHT participation
- * 3. App User - Local Holochain on device, intermittent connectivity
+ * 3. App Steward - Local Holochain on device, intermittent connectivity
  * 4. Node Operator - Always-on infrastructure, full network participation
  */
 
 /**
  * The four stages of human agency in data ownership within the Elohim network.
  */
-export type AgencyStage = 'visitor' | 'hosted' | 'app-user' | 'node-operator';
+export type AgencyStage = 'visitor' | 'hosted' | 'app-steward' | 'node-operator';
 
 /**
  * Detailed information about each agency stage.
@@ -175,9 +175,9 @@ export const AGENCY_STAGES: Record<AgencyStage, AgencyStageInfo> = {
     order: 2,
   },
 
-  'app-user': {
-    stage: 'app-user',
-    label: 'App User',
+  'app-steward': {
+    stage: 'app-steward',
+    label: 'App Steward',
     tagline: 'Keys on your device',
     description: 'Your identity lives on your device. You control your keys. Syncs when connected.',
     icon: 'smartphone',

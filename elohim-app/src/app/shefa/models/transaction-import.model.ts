@@ -403,6 +403,15 @@ export interface CorrectionRecord {
  * ReconciliationResult tracks the outcome of reconciling a transaction
  * with a FlowBudget.
  */
+export interface VarianceAlert {
+  budgetId: string;
+  categoryId?: string;
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  variancePercent: number;
+  timestamp: string;
+}
+
 export interface ReconciliationResult {
   budgetId: string;
   budgetCategoryId: string;
@@ -414,6 +423,7 @@ export interface ReconciliationResult {
   newHealthStatus: 'healthy' | 'warning' | 'critical';
   reconciled: boolean;
   timestamp: string;
+  alerts: VarianceAlert[];
 }
 
 // ============================================================================

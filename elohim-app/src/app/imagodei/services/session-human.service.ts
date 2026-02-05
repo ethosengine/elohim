@@ -723,7 +723,7 @@ export class SessionHumanService {
   /**
    * Start an upgrade intent (user begins but hasn't completed upgrade).
    */
-  startUpgradeIntent(targetStage: 'hosted' | 'app-user' | 'node-operator'): void {
+  startUpgradeIntent(targetStage: 'hosted' | 'app-steward' | 'node-operator'): void {
     const session = this.sessionSubject.value;
     if (!session) return;
 

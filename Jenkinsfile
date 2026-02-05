@@ -1071,7 +1071,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         ═══════════════════════════════════════════════════════════
                         VERIFYING HOLOCHAIN INFRASTRUCTURE
                         ═══════════════════════════════════════════════════════════
-                        Alpha and Staging apps use: doorway-dev.elohim.host
+                        Alpha app uses: doorway-alpha.elohim.host
                         Seeding is managed by: elohim-genesis pipeline
                         ═══════════════════════════════════════════════════════════
                         """
@@ -1096,7 +1096,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         for (int i = 0; i < 3; i++) {
                             holochainHealth = sh(
                                 script: '''
-                                    timeout 10s curl -sf -o /dev/null -w "%{http_code}" https://doorway-dev.elohim.host/health 2>/dev/null || echo "000"
+                                    timeout 10s curl -sf -o /dev/null -w "%{http_code}" https://doorway-alpha.elohim.host/health 2>/dev/null || echo "000"
                                 ''',
                                 returnStdout: true
                             ).trim()

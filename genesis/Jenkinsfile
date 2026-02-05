@@ -7,8 +7,8 @@
  * Pipeline: checkout → resolve hosts → verify health → seed
  *
  * Auto-detects target environment from branch:
- *   - dev, feat-*, claude-* → alpha.elohim.host (doorway-dev)
- *   - staging*              → staging.elohim.host (doorway-dev)
+ *   - dev, feat-*, claude-* → alpha.elohim.host (doorway-alpha)
+ *   - staging*              → staging.elohim.host (doorway-staging)
  *   - main                  → elohim.host (doorway)
  *
  * Parameters:

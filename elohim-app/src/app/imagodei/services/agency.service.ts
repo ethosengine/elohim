@@ -5,7 +5,7 @@
  * data from session management and Holochain connection services.
  *
  * This service provides a unified view of:
- * - Current agency stage (Visitor → Hosted → App User → Node Operator)
+ * - Current agency stage (Visitor → Hosted → App Steward → Node Operator)
  * - Data residency (where is my data stored?)
  * - Connection status (am I connected to the network?)
  * - Key/credential information
@@ -107,7 +107,7 @@ export class AgencyService {
    * Stage Detection Logic:
    * - visitor: No Holochain connection, session-only or anonymous
    * - hosted: Connected to remote edge node (custodial keys)
-   * - app-user: Connected to local conductor on user's device (self-sovereign keys)
+   * - app-steward: Connected to local conductor on user's device (self-sovereign keys)
    * - node-operator: Local conductor that also hosts other humans
    */
   private determineStage(holochainState: string, hasStoredCredentials: boolean): AgencyStage {
@@ -118,11 +118,11 @@ export class AgencyService {
       const isLocalConductor = this.isLocalConductor(displayInfo.appUrl);
 
       if (isLocalConductor) {
-        // Local conductor - either app-user or node-operator
+        // Local conductor - either app-steward or node-operator
         // For now, detect node-operator based on configuration
         // In the future, check if hosting other humans via DHT query
         const isNodeOperator = this.detectNodeOperatorStatus();
-        return isNodeOperator ? 'node-operator' : 'app-user';
+        return isNodeOperator ? 'node-operator' : 'app-steward';
       }
 
       // Remote conductor = Hosted User
@@ -226,7 +226,7 @@ export class AgencyService {
         return getVisitorDataResidency();
       case 'hosted':
         return getHostedDataResidency();
-      case 'app-user':
+      case 'app-steward':
       case 'node-operator':
         return getAppUserDataResidency();
       default:
@@ -277,7 +277,7 @@ export class AgencyService {
         return 'none';
       case 'hosted':
         return 'custodial'; // Keys held by edge node
-      case 'app-user':
+      case 'app-steward':
         return 'device'; // Keys on local conductor
       case 'node-operator':
         return 'device'; // Could be 'hardware' if using HSM
@@ -360,7 +360,7 @@ export class AgencyService {
         return { data: 'Browser only', progress: 'Temporary' };
       case 'hosted':
         return { data: 'DHT Network', progress: 'Saved' };
-      case 'app-user':
+      case 'app-steward':
         return { data: 'Your Device', progress: 'Saved' };
       case 'node-operator':
         return { data: 'Your Node', progress: 'Always-on' };

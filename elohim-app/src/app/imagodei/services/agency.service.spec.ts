@@ -113,7 +113,7 @@ describe('AgencyService', () => {
       expect(service.currentStage()).toBe('hosted');
     });
 
-    it('should detect app-user stage when connected to localhost', () => {
+    it('should detect app-steward stage when connected to localhost', () => {
       connectionSignal.set({
         state: 'connected',
         adminWs: null,
@@ -127,10 +127,10 @@ describe('AgencyService', () => {
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
-      expect(service.currentStage()).toBe('app-user');
+      expect(service.currentStage()).toBe('app-steward');
     });
 
-    it('should detect app-user stage when connected to 127.0.0.1', () => {
+    it('should detect app-steward stage when connected to 127.0.0.1', () => {
       connectionSignal.set({
         state: 'connected',
         adminWs: null,
@@ -144,7 +144,7 @@ describe('AgencyService', () => {
         createMockDisplayInfo('connected', 'ws://127.0.0.1:8888')
       );
 
-      expect(service.currentStage()).toBe('app-user');
+      expect(service.currentStage()).toBe('app-steward');
     });
 
     it('should detect visitor during connecting state without credentials', () => {
@@ -229,7 +229,7 @@ describe('AgencyService', () => {
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
-      expect(service.currentStage()).toBe('app-user');
+      expect(service.currentStage()).toBe('app-steward');
     });
 
     it('should handle malformed node operator config', () => {
@@ -248,7 +248,7 @@ describe('AgencyService', () => {
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
-      expect(service.currentStage()).toBe('app-user');
+      expect(service.currentStage()).toBe('app-steward');
     });
   });
 
@@ -378,7 +378,7 @@ describe('AgencyService', () => {
       expect(state.dataResidency.some((d) => d.locationLabel.includes('Elohim Server') || d.locationLabel.includes('DHT Network'))).toBe(true);
     });
 
-    it('should return app-user data residency for app-user stage', () => {
+    it('should return app-steward data residency for app-steward stage', () => {
       connectionSignal.set({
         state: 'connected',
         adminWs: null,
@@ -540,7 +540,7 @@ describe('AgencyService', () => {
 
       const state = service.agencyState();
       expect(state.migrationAvailable).toBe(true);
-      expect(state.migrationTarget).toBe('app-user');
+      expect(state.migrationTarget).toBe('app-steward');
     });
 
     it('should indicate no migration from node-operator (final stage)', () => {

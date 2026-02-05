@@ -20,7 +20,11 @@ import { Injectable } from '@angular/core';
 
 // @coverage: 94.0% (2026-02-05)
 
-import { StagedTransaction, ReconciliationResult } from '../models/transaction-import.model';
+import {
+  StagedTransaction,
+  ReconciliationResult,
+  VarianceAlert,
+} from '../models/transaction-import.model';
 
 type HealthStatusType = 'healthy' | 'warning' | 'critical';
 
@@ -97,18 +101,6 @@ interface FlowBudget {
   // Audit
   createdAt: string;
   updatedAt: string;
-}
-
-/**
- * Variance notification
- */
-interface VarianceAlert {
-  budgetId: string;
-  categoryId?: string;
-  severity: 'info' | 'warning' | 'critical';
-  message: string;
-  variancePercent: number;
-  timestamp: string;
 }
 
 @Injectable({
@@ -205,8 +197,8 @@ export class BudgetReconciliationService {
       // Persist to storage
       await this.updateBudget(budget);
 
-      // Check for alerts
-      this.checkVarianceAlerts(budget, category, previousHealthStatus);
+      // Check for alerts (collected for future notification service)
+      const alerts = this.checkVarianceAlerts(budget, category, previousHealthStatus);
 
       const result: ReconciliationResult = {
         budgetId: staged.budgetId,
@@ -219,6 +211,7 @@ export class BudgetReconciliationService {
         newHealthStatus: budget.healthStatus,
         reconciled: true,
         timestamp: new Date().toISOString(),
+        alerts,
       };
       return result;
     } catch (error) {
@@ -326,7 +319,7 @@ export class BudgetReconciliationService {
     budget: FlowBudget,
     category: BudgetCategory,
     previousHealthStatus: HealthStatusType
-  ): void {
+  ): VarianceAlert[] {
     const alerts: VarianceAlert[] = [];
 
     // Category-level alerts
@@ -361,12 +354,7 @@ export class BudgetReconciliationService {
       });
     }
 
-    // Alerts collected for potential notification service integration
-    // Currently tracked in audit trail; notification emission deferred
-    if (alerts.length > 0) {
-      // Future: Emit to notification service
-      // Example: this.notificationService.emit(alerts);
-    }
+    return alerts;
   }
 
   // ============================================================================

@@ -232,6 +232,9 @@ clearAfterMigration(): void;
 
 **Philosophy**: The concept of individual sovereignty conflicts with the communal, interdependent nature of the Elohim Protocol. "Agency" emphasizes capacity to act within relational networks rather than isolated self-determination.
 
-**Stage names preserved**: Visitor → Hosted → App User → Node Operator (these describe technical architecture, not philosophical positioning)
+**Stage names updated**:
+- ✅ "App User" → "App Steward" (2026-02-05)
+- Progression now: Visitor → Hosted → App Steward → Node Operator
+- Rationale: "User" is transactional; "Steward" emphasizes care and relationship
 
 **Note**: This was an aggressive refactoring with no backward compatibility - clean break to avoid tech debt.
