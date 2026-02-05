@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 80.0% (2026-01-31)
+// @coverage: 80.0% (2026-02-05)
 
 import { map, switchMap, tap } from 'rxjs/operators';
 
@@ -596,7 +596,7 @@ export class PathExtensionService {
     }
 
     // Filter out undefined entries (can occur from sparse array operations)
-    return reorderedSteps.filter(s => Boolean(s));
+    return reorderedSteps.filter(Boolean);
   }
 
   /** Apply step insertions */

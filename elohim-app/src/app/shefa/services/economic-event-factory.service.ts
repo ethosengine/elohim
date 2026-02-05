@@ -16,6 +16,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 90.2% (2026-02-05)
+
 import { StagedTransaction } from '../models/transaction-import.model';
 
 /**
@@ -121,30 +123,30 @@ export class EconomicEventFactoryService {
       );
     }
 
-    if (!staged.economicEventId) {
-      // Determine event type based on transaction type
-      const eventType = this.determineEventType(staged);
-
-      // Determine provider/receiver based on direction
-      const { providerId, receiverId } = this.determineAgents(staged);
-
-      // Build the event request
-      const request: CreateEventRequest = {
-        eventType,
-        providerId,
-        receiverId,
-        quantity: staged.amount.value,
-        unit: staged.amount.unit,
-        note: this.buildEventNote(staged),
-        metadata: this.buildEventMetadata(staged),
-      };
-
-      // Create the immutable event
-      return await this.createEvent(request, staged);
-    } else {
+    if (staged.economicEventId) {
       // Event already exists for this staged transaction
       throw new Error(`Event already created for staged transaction: ${staged.economicEventId}`);
     }
+
+    // Determine event type based on transaction type
+    const eventType = this.determineEventType(staged);
+
+    // Determine provider/receiver based on direction
+    const { providerId, receiverId } = this.determineAgents(staged);
+
+    // Build the event request
+    const request: CreateEventRequest = {
+      eventType,
+      providerId,
+      receiverId,
+      quantity: staged.amount.value,
+      unit: staged.amount.unit,
+      note: this.buildEventNote(staged),
+      metadata: this.buildEventMetadata(staged),
+    };
+
+    // Create the immutable event
+    return await this.createEvent(request, staged);
   }
 
   /**
@@ -183,7 +185,7 @@ export class EconomicEventFactoryService {
    * Determines provider and receiver based on transaction direction
    *
    * For bank account transactions:
-   * - Debit (expense): steward is provider (giving away), external is receiver
+   * - Debit (expense): steward is provider (giving away), merchant/external is receiver
    * - Credit (income): external is provider (giving to steward), steward is receiver
    * - Fee: steward is provider (bank takes fee), bank is receiver
    */
@@ -200,7 +202,7 @@ export class EconomicEventFactoryService {
         // Expense: steward pays someone
         return {
           providerId: staged.stewardId,
-          receiverId: 'external-party',
+          receiverId: staged.merchantName ?? 'external-party',
         };
 
       case 'fee':
@@ -271,6 +273,7 @@ export class EconomicEventFactoryService {
       budgetCategoryId: staged.budgetCategoryId,
 
       // === IMPORT CONTEXT ===
+      source: 'plaid-import',
       importBatchId: staged.batchId,
       importedAt: new Date().toISOString(),
       importSource: 'plaid',
@@ -296,7 +299,7 @@ export class EconomicEventFactoryService {
    * 3. Link to FinancialAsset
    * 4. Emit EconomicEventCreated signal
    */
-  private async createEvent(
+  private createEvent(
     request: CreateEventRequest,
     staged: StagedTransaction
   ): Promise<EconomicEvent> {
@@ -331,7 +334,7 @@ export class EconomicEventFactoryService {
     };
 
     // Production: Store to Holochain via content_store zome
-    return await Promise.resolve(event);
+    return Promise.resolve(event);
   }
 
   /**

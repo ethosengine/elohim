@@ -22,7 +22,7 @@
 import { isPlatformBrowser } from '@angular/common';
 import { ClassProvider, InjectionToken, Provider, PLATFORM_ID } from '@angular/core';
 
-// @coverage: 25.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 import {
   type IConnectionStrategy,

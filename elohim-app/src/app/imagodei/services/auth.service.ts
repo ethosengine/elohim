@@ -24,7 +24,7 @@
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 93.6% (2026-01-31)
+// @coverage: 93.6% (2026-02-05)
 
 import {
   type AuthState,
@@ -370,7 +370,8 @@ export class AuthService {
       this.scheduleRefresh(expiresAt);
 
       return true;
-    } catch (_err) {
+    } catch {
+      // Session restore failure is non-critical - user can login again
       return false;
     }
   }

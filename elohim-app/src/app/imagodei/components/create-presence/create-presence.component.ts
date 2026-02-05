@@ -17,6 +17,8 @@ import { Component, inject, signal, computed, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-05)
+
 import { ContentService } from '@app/lamad/services/content.service';
 
 import {
@@ -62,10 +64,8 @@ export class CreatePresenceComponent {
   // Form State
   // ===========================================================================
 
-  readonly form = {
-    displayName: '',
-    note: '',
-  };
+  readonly displayName = signal('');
+  readonly note = signal('');
 
   /** External identifiers being added */
   readonly identifiers = signal<IdentifierEntry[]>([]);
@@ -106,7 +106,7 @@ export class CreatePresenceComponent {
 
   /** Whether form is valid */
   readonly isValid = computed(() => {
-    return this.form.displayName.trim().length >= 2;
+    return this.displayName().trim().length >= 2;
   });
 
   // ===========================================================================
@@ -164,6 +164,22 @@ export class CreatePresenceComponent {
       ...current,
       value,
     }));
+  }
+
+  /**
+   * Handle provider change event.
+   */
+  onProviderChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.setProvider(value);
+  }
+
+  /**
+   * Handle identifier input event.
+   */
+  onIdentifierInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.setIdentifierValue(value);
   }
 
   /**
@@ -236,11 +252,11 @@ export class CreatePresenceComponent {
       }));
 
       const request: CreatePresenceRequest = {
-        displayName: this.form.displayName.trim(),
+        displayName: this.displayName().trim(),
         externalIdentifiers: externalIdentifiers.length > 0 ? externalIdentifiers : undefined,
         establishingContentIds:
           this.establishingContentIds().length > 0 ? this.establishingContentIds() : undefined,
-        note: this.form.note.trim() || undefined,
+        note: this.note().trim() || undefined,
       };
 
       const presence = await this.presenceService.createPresence(request);

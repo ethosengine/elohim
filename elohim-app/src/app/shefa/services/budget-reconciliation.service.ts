@@ -18,9 +18,13 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 95.5% (2026-01-31)
+// @coverage: 94.0% (2026-02-05)
 
-import { StagedTransaction, ReconciliationResult } from '../models/transaction-import.model';
+import {
+  StagedTransaction,
+  ReconciliationResult,
+  VarianceAlert,
+} from '../models/transaction-import.model';
 
 type HealthStatusType = 'healthy' | 'warning' | 'critical';
 
@@ -99,18 +103,6 @@ interface FlowBudget {
   updatedAt: string;
 }
 
-/**
- * Variance notification
- */
-interface VarianceAlert {
-  budgetId: string;
-  categoryId?: string;
-  severity: 'info' | 'warning' | 'critical';
-  message: string;
-  variancePercent: number;
-  timestamp: string;
-}
-
 @Injectable({
   providedIn: 'root',
 })
@@ -154,6 +146,7 @@ export class BudgetReconciliationService {
         newHealthStatus: 'healthy',
         reconciled: false,
         timestamp: new Date().toISOString(),
+        alerts: [],
       };
     }
 
@@ -162,7 +155,7 @@ export class BudgetReconciliationService {
       // const budget = await this.budgetService.getBudget(staged.budgetId);
 
       // Mock budget retrieval
-      const budget = this.createMockBudget(staged.budgetId, staged.stewardId);
+      const budget = this.createMockBudgetSync(staged.budgetId, staged.stewardId);
 
       const category = budget.categories.find(c => c.id === staged.budgetCategoryId);
 
@@ -205,8 +198,8 @@ export class BudgetReconciliationService {
       // Persist to storage
       await this.updateBudget(budget);
 
-      // Check for alerts
-      this.checkVarianceAlerts(budget, category, previousHealthStatus);
+      // Check for alerts (collected for future notification service)
+      const alerts = this.checkVarianceAlerts(budget, category, previousHealthStatus);
 
       const result: ReconciliationResult = {
         budgetId: staged.budgetId,
@@ -219,6 +212,7 @@ export class BudgetReconciliationService {
         newHealthStatus: budget.healthStatus,
         reconciled: true,
         timestamp: new Date().toISOString(),
+        alerts,
       };
       return result;
     } catch (error) {
@@ -326,7 +320,7 @@ export class BudgetReconciliationService {
     budget: FlowBudget,
     category: BudgetCategory,
     previousHealthStatus: HealthStatusType
-  ): void {
+  ): VarianceAlert[] {
     const alerts: VarianceAlert[] = [];
 
     // Category-level alerts
@@ -361,10 +355,7 @@ export class BudgetReconciliationService {
       });
     }
 
-    // Emit alerts (notification service integration pending)
-    if (alerts.length > 0) {
-      // TODO: Emit alerts via notification service
-    }
+    return alerts;
   }
 
   // ============================================================================
@@ -375,24 +366,30 @@ export class BudgetReconciliationService {
    * Updates budget in storage
    * Persistence will be integrated with BudgetService
    */
-  private updateBudget(_budget: FlowBudget): Promise<void> {
+  private async updateBudget(_budget: FlowBudget): Promise<void> {
     // Persistence integration pending
-    return Promise.resolve();
   }
 
   /**
    * Retrieves a budget
    * Retrieval will be integrated with BudgetService
    */
-  private getBudget(budgetId: string): Promise<FlowBudget> {
+  private async getBudget(budgetId: string): Promise<FlowBudget> {
     // BudgetService integration pending
-    return Promise.resolve(this.createMockBudget(budgetId, ''));
+    return this.createMockBudget(budgetId, '');
   }
 
   /**
-   * Creates a mock budget for testing
+   * Creates a mock budget for testing (async wrapper)
    */
-  private createMockBudget(budgetId: string, stewardId: string): FlowBudget {
+  private async createMockBudget(budgetId: string, stewardId: string): Promise<FlowBudget> {
+    return this.createMockBudgetSync(budgetId, stewardId);
+  }
+
+  /**
+   * Creates a mock budget synchronously
+   */
+  private createMockBudgetSync(budgetId: string, stewardId: string): FlowBudget {
     return {
       id: budgetId,
       budgetNumber: `FB-${(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 10).toUpperCase()}`,

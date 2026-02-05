@@ -24,7 +24,7 @@
 
 import type { ActionHash } from './content-mastery.model';
 
-// @coverage: 20.0% (2026-01-31)
+// @coverage: 46.7% (2026-02-05)
 
 // =============================================================================
 // Holochain Output Wrapper Types

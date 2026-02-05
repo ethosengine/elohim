@@ -13,7 +13,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
-// @coverage: 1.2% (2026-01-31)
+// @coverage: 92.2% (2026-02-05)
 
 import { environment } from '../../../environments/environment';
 
@@ -211,7 +211,12 @@ export class TauriAuthService {
         lastSyncedAt: session.lastSyncedAt,
         bootstrapUrl: session.bootstrapUrl,
       };
-    } catch (_err) {
+    } catch (err) {
+      // Session retrieval failure is non-critical - returns null to allow app to continue
+      // This can happen if sidecar is not running or network is unavailable
+      if (err instanceof Error) {
+        console.warn('[TauriAuthService] Failed to retrieve session:', err.message);
+      }
       return null;
     }
   }
@@ -358,8 +363,12 @@ export class TauriAuthService {
 
     try {
       await fetch(`${storageUrl}/session`, { method: 'DELETE' });
-    } catch (_err) {
-      // intentionally empty - session deletion failure is non-critical
+    } catch (err) {
+      // Session deletion failure is non-critical - user can still logout locally
+      // This can happen if sidecar is not running or network is unavailable
+      if (err instanceof Error) {
+        console.warn('[TauriAuthService] Failed to delete session:', err.message);
+      }
     }
 
     this.currentSession.set(null);

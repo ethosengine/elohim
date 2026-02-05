@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@angular/core';
 
-// @coverage: 0.8% (2026-01-31)
+// @coverage: 44.2% (2026-02-05)
 
 import { map, switchMap, catchError } from 'rxjs/operators';
 

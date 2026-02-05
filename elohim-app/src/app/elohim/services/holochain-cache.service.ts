@@ -1,5 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 
+// @coverage: 85.6% (2026-02-05)
+
 /**
  * Cache entry metadata
  */
@@ -103,8 +105,6 @@ export class HolochainCacheService {
     return new Promise((resolve, reject) => {
       // Check if IndexedDB is available
       if (!window.indexedDB) {
-        // eslint-disable-next-line no-console
-
         resolve();
         return;
       }
@@ -153,7 +153,7 @@ export class HolochainCacheService {
 
     // Try L2 (IndexedDB)
     if (this.db) {
-      const entry = await this.getFromIndexedDB<T>(key);
+      const entry = await this.getFromIndexedDB(key);
       if (entry) {
         if (!this.isExpired(entry)) {
           // Load to L1 for next access
@@ -306,14 +306,17 @@ export class HolochainCacheService {
    * Get entries by tag (searches metadata)
    */
   getByTag(tag: string): CacheEntry[] {
-    return this.query(entry => entry.metadata?.tags?.includes(tag) ?? false);
+    return this.query(entry => {
+      const tags = entry.metadata?.['tags'];
+      return Array.isArray(tags) && tags.includes(tag);
+    });
   }
 
   /**
    * Get entries by domain (from metadata)
    */
   getByDomain(domain: string): CacheEntry[] {
-    return this.query(entry => entry.metadata?.domain === domain);
+    return this.query(entry => entry.metadata?.['domain'] === domain);
   }
 
   /**

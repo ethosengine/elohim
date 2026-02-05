@@ -12,6 +12,8 @@
 
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 98.5% (2026-02-05)
+
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 import { bankingStore, StagedTransactionLocal } from '../stores/banking-store';
@@ -123,7 +125,8 @@ export class EconomicEventBridgeService {
       }
 
       const economicEventId = eventPayload.id;
-      const actionHash = result.data;
+      const actionHash: string | undefined =
+        typeof result.data === 'string' ? result.data : undefined;
 
       // 4. Update the staged transaction with the event ID
       staged.economicEventId = economicEventId;

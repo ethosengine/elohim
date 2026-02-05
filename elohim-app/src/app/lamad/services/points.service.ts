@@ -17,6 +17,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 76.7% (2026-02-05)
+
 import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
@@ -234,7 +236,7 @@ export class PointsService {
     return this.balance$.pipe(
       map(balance => {
         if (!balance) return {};
-        return parsePointsByTrigger(balance.pointsByTriggerJson);
+        return parsePointsByTrigger(balance.points_by_trigger_json);
       })
     );
   }
@@ -245,7 +247,7 @@ export class PointsService {
   getPointsByTriggerSync(): Record<string, number> {
     const balance = this.balanceSubject.value;
     if (!balance) return {};
-    return parsePointsByTrigger(balance.pointsByTriggerJson);
+    return parsePointsByTrigger(balance.points_by_trigger_json);
   }
 
   /**

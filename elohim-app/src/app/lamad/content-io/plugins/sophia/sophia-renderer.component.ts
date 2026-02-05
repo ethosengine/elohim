@@ -29,7 +29,7 @@ import {
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 92.6% (2026-01-31)
+// @coverage: 92.6% (2026-02-05)
 
 import { Subject } from 'rxjs';
 
@@ -928,7 +928,7 @@ export class SophiaRendererComponent
           : 'mastery';
 
       return {
-        id: String(obj['id'] ?? this.generateMomentId()),
+        id: obj['id'] ? String(obj['id']) : this.generateMomentId(),
         purpose,
         content: obj['question'] as Moment['content'],
         hints: obj['hints'] as Moment['hints'],

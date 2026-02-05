@@ -14,6 +14,8 @@ import {
   inject,
 } from '@angular/core';
 
+// @coverage: 23.4% (2026-02-05)
+
 import { Subject } from 'rxjs';
 
 import { ContentNode } from '../../../models/content-node.model';

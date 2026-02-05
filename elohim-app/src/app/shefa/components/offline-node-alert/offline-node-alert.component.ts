@@ -16,6 +16,8 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 
+// @coverage: 44.8% (2026-02-05)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import {
@@ -23,8 +25,7 @@ import {
   AlertData,
   AlertAction,
   AlertSeverity,
-} from '@app/shared/components/alert-banner/alert-banner.component';
-
+} from '../../../shared/components/alert-banner/alert-banner.component';
 import {
   OfflineNodeAlert,
   NodeTopologyState,

@@ -1,6 +1,6 @@
 import { Injectable, Type } from '@angular/core';
 
-// @coverage: 0.8% (2026-01-31)
+// @coverage: 0.8% (2026-02-05)
 
 import { GherkinParser, GherkinStep } from '../../../parsers/gherkin-parser';
 import { GherkinRendererComponent } from '../../../renderers/gherkin-renderer/gherkin-renderer.component';

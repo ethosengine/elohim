@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 
-// @coverage: 75.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 /**
  * Toggle button for focused/fullscreen content view.

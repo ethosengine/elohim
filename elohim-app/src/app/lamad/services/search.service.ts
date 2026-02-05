@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 93.9% (2026-01-31)
+// @coverage: 93.9% (2026-02-05)
 
 import { map, catchError } from 'rxjs/operators';
 
@@ -395,7 +395,11 @@ export class SearchService {
   private passesTagFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
     const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
 
-    if (query.tags && query.tags.length > 0 && !query.tags.some(t => nodeTags.includes(t.toLowerCase()))) {
+    if (
+      query.tags &&
+      query.tags.length > 0 &&
+      !query.tags.some(t => nodeTags.includes(t.toLowerCase()))
+    ) {
       return false;
     }
 

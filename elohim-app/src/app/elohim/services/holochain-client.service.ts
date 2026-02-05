@@ -20,7 +20,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 14.8% (2026-01-31)
+// @coverage: 38.7% (2026-02-05)
 
 import { AdminWebsocket, type AgentPubKey, type CellId, type AppInfo } from '@holochain/client';
 import { firstValueFrom } from 'rxjs';
@@ -795,7 +795,7 @@ export class HolochainClientService {
    * Convert Uint8Array to base64
    */
   public uint8ArrayToBase64(arr: Uint8Array): string {
-    return btoa(String.fromCharCode(...Array.from(arr)));
+    return btoa(String.fromCodePoint(...Array.from(arr)));
   }
 
   // =========================================================================

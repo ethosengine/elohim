@@ -26,6 +26,8 @@
 
 import { Injectable, inject, OnDestroy } from '@angular/core';
 
+// @coverage: 79.3% (2026-02-05)
+
 import { BehaviorSubject, Subject, firstValueFrom } from 'rxjs';
 
 import { ContentNode } from '../../lamad/models/content-node.model';
@@ -232,6 +234,15 @@ export class SeedingService implements OnDestroy {
 
     // Queue all paths for writing (camelCase InputView)
     for (const pathData of paths) {
+      // Extract metadata safely to avoid index signature spread issues
+      // Use proper type extraction instead of direct cast
+      const pathDataRecord = pathData as Partial<LearningPath> & Record<string, unknown>;
+      const existingMetadata = pathDataRecord['metadata'] as Record<string, unknown> | undefined;
+      const combinedMetadata: Record<string, unknown> = {
+        chapters: pathData.chapters,
+        ...existingMetadata,
+      };
+
       const payload = JSON.stringify({
         id: pathData.id,
         version: pathData.version ?? '1.0.0',
@@ -242,10 +253,7 @@ export class SeedingService implements OnDestroy {
         estimatedDuration: pathData.estimatedDuration ?? '',
         tags: pathData.tags ?? [],
         visibility: pathData.visibility ?? 'public',
-        metadata: {
-          chapters: pathData.chapters,
-          ...(pathData as unknown as Record<string, unknown>).metadata,
-        },
+        metadata: combinedMetadata,
         steps: pathData.steps.map((step, index) => ({
           orderIndex: step.order ?? index,
           stepType: step.stepType ?? 'content',
@@ -358,7 +366,17 @@ export class SeedingService implements OnDestroy {
     if (contentOps.length > 0) {
       // Parse payloads and transform to backend format
       const entries = contentOps.map(op => {
-        const parsed = JSON.parse(op.payload);
+        interface ParsedContent {
+          id: string;
+          contentType: string;
+          title: string;
+          description: string;
+          content: string;
+          contentFormat: string;
+          tags?: string[];
+          metadataJson?: Record<string, unknown>;
+        }
+        const parsed = JSON.parse(op.payload) as ParsedContent;
         // Transform to backend format: content → contentBody
         return {
           id: parsed.id,
@@ -368,7 +386,7 @@ export class SeedingService implements OnDestroy {
           contentBody: parsed.content, // Backend expects contentBody, not content
           contentFormat: parsed.contentFormat,
           tags: parsed.tags ?? [],
-          metadataJson: parsed.metadataJson,
+          metadataJson: parsed.metadataJson ? JSON.stringify(parsed.metadataJson) : null,
           reach: 'public',
         };
       });

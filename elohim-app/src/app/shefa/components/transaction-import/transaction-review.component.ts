@@ -19,8 +19,12 @@
  * - Reversible actions (approve/reject before EconomicEvent creation)
  */
 
+import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+
+// @coverage: 19.8% (2026-02-05)
 
 import { Subject } from 'rxjs';
 
@@ -53,6 +57,8 @@ interface UITransaction extends StagedTransaction {
 
 @Component({
   selector: 'app-transaction-review',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
   templateUrl: './transaction-review.component.html',
   styleUrls: ['./transaction-review.component.scss'],
 })
@@ -123,10 +129,12 @@ export class TransactionReviewComponent implements OnInit, OnDestroy {
     this.isLoading = true;
 
     try {
-      this.batch = this.importService.getBatch(this.batchId);
-      if (!this.batch) {
+      const batch = this.importService.getBatch(this.batchId);
+      if (!batch) {
+        this.batch = null;
         return;
       }
+      this.batch = batch;
 
       // Load staged transactions
       const staged = this.importService.getStagedTransactionsForBatch(this.batchId);

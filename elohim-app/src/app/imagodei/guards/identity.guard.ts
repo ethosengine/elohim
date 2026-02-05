@@ -13,9 +13,14 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
 
+// @coverage: 100.0% (2026-02-05)
+
 import { isNetworkMode } from '../models/identity.model';
 import { IdentityService } from '../services/identity.service';
 import { SessionHumanService } from '../services/session-human.service';
+
+/** Registration route for unauthenticated users */
+const REGISTER_ROUTE = '/identity/register';
 
 /**
  * Guard that requires network authentication.
@@ -23,6 +28,7 @@ import { SessionHumanService } from '../services/session-human.service';
  * Redirects to /register if not authenticated via network.
  * Passes return URL as query parameter for post-auth redirect.
  */
+// eslint-disable-next-line sonarjs/function-return-type
 export const identityGuard: CanActivateFn = (route, state): boolean | UrlTree => {
   const identityService = inject(IdentityService);
   const router = inject(Router);
@@ -34,7 +40,7 @@ export const identityGuard: CanActivateFn = (route, state): boolean | UrlTree =>
   }
 
   // Redirect to register with return URL
-  return router.createUrlTree(['/identity/register'], {
+  return router.createUrlTree([REGISTER_ROUTE], {
     queryParams: { returnUrl: state.url },
   });
 };
@@ -45,6 +51,7 @@ export const identityGuard: CanActivateFn = (route, state): boolean | UrlTree =>
  * Use for pages that work with session but offer enhanced features
  * for authenticated users.
  */
+// eslint-disable-next-line sonarjs/function-return-type -- Angular guard specification requires boolean | UrlTree
 export const sessionOrAuthGuard: CanActivateFn = (): boolean | UrlTree => {
   const identityService = inject(IdentityService);
   const sessionHumanService = inject(SessionHumanService);
@@ -62,7 +69,7 @@ export const sessionOrAuthGuard: CanActivateFn = (): boolean | UrlTree => {
   }
 
   // Neither - redirect to register
-  return router.createUrlTree(['/identity/register']);
+  return router.createUrlTree([REGISTER_ROUTE]);
 };
 
 /**
@@ -76,6 +83,7 @@ export const sessionOrAuthGuard: CanActivateFn = (): boolean | UrlTree => {
  *   }
  */
 export function attestationGuard(requiredAttestation: string): CanActivateFn {
+  // eslint-disable-next-line sonarjs/function-return-type -- Angular guard specification requires boolean | UrlTree
   return (route, state): boolean | UrlTree => {
     const identityService = inject(IdentityService);
     const router = inject(Router);
@@ -83,14 +91,14 @@ export function attestationGuard(requiredAttestation: string): CanActivateFn {
     // Must be network authenticated (hosted or steward)
     const mode = identityService.mode();
     if (!isNetworkMode(mode) || !identityService.isAuthenticated()) {
-      return router.createUrlTree(['/identity/register'], {
+      return router.createUrlTree([REGISTER_ROUTE], {
         queryParams: { returnUrl: state.url },
       });
     }
 
     // Check for required attestation
     const attestations = identityService.attestations();
-    if (attestations.includes(requiredAttestation)) {
+    if (attestations?.includes(requiredAttestation)) {
       return true;
     }
 

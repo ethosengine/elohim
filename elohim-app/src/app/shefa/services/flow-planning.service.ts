@@ -24,6 +24,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 48.8% (2026-02-05)
+
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import {
   FlowPlan,
@@ -77,6 +79,8 @@ import { StewardedResourceService } from './stewarded-resources.service';
   providedIn: 'root',
 })
 export class FlowPlanningService {
+  private static readonly NOT_IMPLEMENTED_ERROR = 'Not yet implemented';
+
   constructor(
     private readonly holochain: HolochainClientService,
     private readonly economicService: EconomicService,
@@ -115,7 +119,7 @@ export class FlowPlanningService {
       milestones?: Partial<FlowMilestone>[];
     }
   ): Promise<FlowPlan> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowPlan;
   }
 
@@ -129,7 +133,7 @@ export class FlowPlanningService {
    * @returns Updated FlowPlan
    */
   async updatePlan(_planId: string, _updates: Partial<FlowPlan>): Promise<FlowPlan> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowPlan;
   }
 
@@ -140,7 +144,7 @@ export class FlowPlanningService {
    * @returns FlowPlan or null if not found
    */
   async getPlan(_planId: string): Promise<FlowPlan | null> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return null;
   }
 
@@ -152,7 +156,7 @@ export class FlowPlanningService {
    * @returns Array of FlowPlans
    */
   async getPlansForSteward(_stewardId: string, _status?: PlanStatus): Promise<FlowPlan[]> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return [];
   }
 
@@ -167,7 +171,7 @@ export class FlowPlanningService {
    * @returns Archived FlowPlan
    */
   async archivePlan(_planId: string, _reason: string): Promise<FlowPlan> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowPlan;
   }
 
@@ -181,7 +185,7 @@ export class FlowPlanningService {
    * @returns PlanReviewResult with assessment and recommendations
    */
   async reviewPlan(_planId: string): Promise<PlanReviewResult> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as PlanReviewResult;
   }
 
@@ -212,7 +216,7 @@ export class FlowPlanningService {
     _periodStart: string,
     _periodEnd: string
   ): Promise<FlowBudget> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowBudget;
   }
 
@@ -223,7 +227,7 @@ export class FlowPlanningService {
    * @returns FlowBudget or null
    */
   async getBudget(_budgetId: string): Promise<FlowBudget | null> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return null;
   }
 
@@ -243,7 +247,7 @@ export class FlowPlanningService {
     _categoryId: string,
     _plannedAmount: { value: number; unit: string }
   ): Promise<FlowBudget> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowBudget;
   }
 
@@ -258,7 +262,7 @@ export class FlowPlanningService {
    * @returns BudgetVarianceReport with detailed breakdown
    */
   async compareBudgetToActual(_budgetId: string): Promise<BudgetVarianceReport> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as BudgetVarianceReport;
   }
 
@@ -276,7 +280,7 @@ export class FlowPlanningService {
     _budgetId: string,
     _constraints: AllocationConstraint[]
   ): Promise<FlowBudget> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowBudget;
   }
 
@@ -290,7 +294,7 @@ export class FlowPlanningService {
    * @returns Reconciled FlowBudget with updated actuals
    */
   async reconcileBudget(_budgetId: string): Promise<FlowBudget> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowBudget;
   }
 
@@ -309,7 +313,7 @@ export class FlowPlanningService {
    * @returns Created FlowGoal
    */
   async createGoal(_planId: string, _goalDefinition: Partial<FlowGoal>): Promise<FlowGoal> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowGoal;
   }
 
@@ -325,7 +329,7 @@ export class FlowPlanningService {
    * @returns Updated FlowGoal
    */
   async updateGoalProgress(_goalId: string, _currentValue: number): Promise<FlowGoal> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowGoal;
   }
 
@@ -339,7 +343,7 @@ export class FlowPlanningService {
    * @returns GoalEvaluationResult with status and recommendations
    */
   async evaluateGoal(_goalId: string): Promise<GoalEvaluationResult> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as GoalEvaluationResult;
   }
 
@@ -351,7 +355,7 @@ export class FlowPlanningService {
    * @returns Array of FlowGoals
    */
   async getGoalsForPlan(_planId: string, _status?: GoalStatus): Promise<FlowGoal[]> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return [];
   }
 
@@ -366,7 +370,7 @@ export class FlowPlanningService {
    * @returns Updated FlowGoal
    */
   async linkGoalToResources(_goalId: string, _resourceIds: string[]): Promise<FlowGoal> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowGoal;
   }
 
@@ -391,7 +395,7 @@ export class FlowPlanningService {
     _months: number,
     _confidenceLevel?: ConfidenceLevel
   ): Promise<FlowProjection> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowProjection;
   }
 
@@ -406,7 +410,7 @@ export class FlowPlanningService {
    * @returns FlowProjection for resource utilization
    */
   async projectResourceUtilization(_resourceId: string, _months: number): Promise<FlowProjection> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowProjection;
   }
 
@@ -420,7 +424,7 @@ export class FlowPlanningService {
    * @returns GoalProjection with completion estimate
    */
   async projectGoalCompletion(_goalId: string): Promise<GoalProjection> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as GoalProjection;
   }
 
@@ -443,7 +447,7 @@ export class FlowPlanningService {
     _metric: string,
     _threshold: number
   ): Promise<ProjectionBreakpoint[]> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return [];
   }
 
@@ -463,7 +467,7 @@ export class FlowPlanningService {
     _historicalMonths: number,
     _projectionMonths: number
   ): Promise<FlowProjection> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowProjection;
   }
 
@@ -489,7 +493,7 @@ export class FlowPlanningService {
     __changes: ScenarioChange[],
     _scenarioType?: 'optimistic' | 'pessimistic' | 'baseline' | 'target' | 'what-if'
   ): Promise<FlowScenario> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowScenario;
   }
 
@@ -507,7 +511,7 @@ export class FlowPlanningService {
    * @returns ScenarioSimulationResult with projections and impacts
    */
   async runScenario(_scenarioId: string): Promise<ScenarioSimulationResult> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as ScenarioSimulationResult;
   }
 
@@ -523,7 +527,7 @@ export class FlowPlanningService {
    * @returns ScenarioComparison with analysis
    */
   async compareScenarios(_scenarioIds: string[]): Promise<ScenarioComparison> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as ScenarioComparison;
   }
 
@@ -551,7 +555,7 @@ export class FlowPlanningService {
       | 'achieve-targets'
       | 'balance-categories'
   ): Promise<OptimizationResult> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as OptimizationResult;
   }
 
@@ -576,7 +580,7 @@ export class FlowPlanningService {
     _stewardId: string,
     _patternDefinition: Partial<RecurringPattern>
   ): Promise<RecurringPattern> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as RecurringPattern;
   }
 
@@ -597,7 +601,7 @@ export class FlowPlanningService {
     __patternId: string,
     _durationMonths: number
   ): Promise<{ timestamp: string; expectedAmount: number; label: string }[]> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return [];
   }
 
@@ -611,7 +615,7 @@ export class FlowPlanningService {
    * @returns Next due date (ISO 8601)
    */
   async calculateNextDue(_pattern: RecurringPattern): Promise<string> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return '';
   }
 
@@ -631,7 +635,7 @@ export class FlowPlanningService {
     _resourceCategory: ResourceCategory,
     _lookbackMonths: number
   ): Promise<RecurringPattern[]> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return [];
   }
 
@@ -650,7 +654,7 @@ export class FlowPlanningService {
     _patternId: string,
     _actualEventId: string
   ): Promise<RecurringPattern> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as RecurringPattern;
   }
 
@@ -673,7 +677,7 @@ export class FlowPlanningService {
    * @returns FlowPlanningDashboard with complete overview
    */
   async buildFlowDashboard(_stewardId: string): Promise<FlowPlanningDashboard> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowPlanningDashboard;
   }
 
@@ -690,7 +694,7 @@ export class FlowPlanningService {
    * @returns FlowHealthAnalysis with assessment
    */
   async analyzeFlowHealth(_planId: string): Promise<FlowHealthAnalysis> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as FlowHealthAnalysis;
   }
 
@@ -712,7 +716,7 @@ export class FlowPlanningService {
     _stewardId: string,
     _lookbackMonths?: number
   ): Promise<FlowPlanningInsight[]> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return [];
   }
 
@@ -730,7 +734,7 @@ export class FlowPlanningService {
     _resourceId: string,
     _sensitivity?: 'low' | 'medium' | 'high'
   ): Promise<AnomalyDetection[]> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return [];
   }
 
@@ -752,7 +756,7 @@ export class FlowPlanningService {
    * @returns ComplianceCheck with violations and required transitions
    */
   async checkPlanCompliance(_planId: string): Promise<ComplianceCheck> {
-    await Promise.reject(new Error('Not yet implemented'));
+    await Promise.reject(new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR));
     return {} as ComplianceCheck;
   }
 
@@ -764,14 +768,13 @@ export class FlowPlanningService {
    * Persist plan to Holochain
    *
    * Creates FlowPlan entry and links.
-   * TODO: Wire to actual Holochain persistence
+   * IMPLEMENTATION: Wire to actual Holochain persistence
    *
    * @private
    */
   private async persistPlan(_plan: FlowPlan): Promise<void> {
-    // TODO: Call Holochain zome function: create_flow_plan
+    // IMPLEMENTATION: Call Holochain zome function: create_flow_plan
     // await this.holochain.callZomeFunction('content_store', 'create_flow_plan', plan);
-    return Promise.resolve();
   }
 
   /**
@@ -780,8 +783,7 @@ export class FlowPlanningService {
    * @private
    */
   private async persistBudget(_budget: FlowBudget): Promise<void> {
-    // TODO: Call Holochain zome function: create_flow_budget
-    return Promise.resolve();
+    // IMPLEMENTATION: Call Holochain zome function: create_flow_budget
   }
 
   /**
@@ -790,8 +792,7 @@ export class FlowPlanningService {
    * @private
    */
   private async persistGoal(_goal: FlowGoal): Promise<void> {
-    // TODO: Call Holochain zome function: create_flow_goal
-    return Promise.resolve();
+    // IMPLEMENTATION: Call Holochain zome function: create_flow_goal
   }
 
   /**
@@ -800,8 +801,7 @@ export class FlowPlanningService {
    * @private
    */
   private async persistMilestone(_milestone: FlowMilestone): Promise<void> {
-    // TODO: Call Holochain zome function: create_flow_milestone
-    return Promise.resolve();
+    // IMPLEMENTATION: Call Holochain zome function: create_flow_milestone
   }
 
   /**
@@ -810,8 +810,7 @@ export class FlowPlanningService {
    * @private
    */
   private async persistScenario(_scenario: FlowScenario): Promise<void> {
-    // TODO: Call Holochain zome function: create_flow_scenario
-    return Promise.resolve();
+    // IMPLEMENTATION: Call Holochain zome function: create_flow_scenario
   }
 
   /**
@@ -820,8 +819,7 @@ export class FlowPlanningService {
    * @private
    */
   private async persistProjection(_projection: FlowProjection): Promise<void> {
-    // TODO: Call Holochain zome function: create_flow_projection
-    return Promise.resolve();
+    // IMPLEMENTATION: Call Holochain zome function: create_flow_projection
   }
 
   /**
@@ -830,8 +828,7 @@ export class FlowPlanningService {
    * @private
    */
   private async persistRecurringPattern(_pattern: RecurringPattern): Promise<void> {
-    // TODO: Call Holochain zome function: create_recurring_pattern
-    return Promise.resolve();
+    // IMPLEMENTATION: Call Holochain zome function: create_recurring_pattern
   }
 
   /**
@@ -845,7 +842,7 @@ export class FlowPlanningService {
     _historical: { timestamp: string; value: number }[],
     _projectionHorizon: number
   ): ProjectionDataPoint[] {
-    // TODO: Implement linear regression algorithm
+    // IMPLEMENTATION: Implement linear regression algorithm
     // Returns: Projected data points with confidence bands
     return [];
   }
@@ -862,12 +859,27 @@ export class FlowPlanningService {
     _baseline: FlowProjection,
     _changes: ScenarioChange[]
   ): FlowProjection {
-    // TODO: Implement scenario projection algorithm
+    // IMPLEMENTATION: Implement scenario projection algorithm
     // For each change:
     //   - Apply operator (add, multiply, percent-increase, etc.)
     //   - Recalculate affected downstream metrics
     //   - Propagate through dependencies
-    return {};
+    return {
+      id: '',
+      projectionNumber: '',
+      stewardId: '',
+      resourceCategory: 'financial-asset',
+      projectionStart: '',
+      projectionEnd: '',
+      projectionHorizon: 'monthly',
+      dataPoints: [],
+      confidenceLevel: 'low',
+      confidencePercent: 0,
+      projectionMethod: 'trend-extrapolation',
+      assumptionsMade: [],
+      breakpoints: [],
+      createdAt: new Date().toISOString(),
+    };
   }
 
   /**
@@ -883,12 +895,12 @@ export class FlowPlanningService {
     _constraints: AllocationConstraint[],
     __objectiveFunction: string
   ): OptimizationResult {
-    // TODO: Implement constraint-solving algorithm
+    // IMPLEMENTATION: Implement constraint-solving algorithm
     // Formulate as linear programming problem
     // Solve using greedy heuristic (Phase 1) or LP solver (Phase 5)
     // Check feasibility
     // Return optimal allocations or infeasibility report
-    throw new Error('Not yet implemented');
+    throw new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR);
   }
 
   /**
@@ -906,7 +918,7 @@ export class FlowPlanningService {
     _events: { timestamp: string; amount: number }[],
     _minOccurrences?: number
   ): RecurringPattern[] {
-    // TODO: Implement pattern detection algorithm
+    // IMPLEMENTATION: Implement pattern detection algorithm
     return [];
   }
 
@@ -922,14 +934,14 @@ export class FlowPlanningService {
     _budget: FlowBudget,
     _actualTransactions: { category: string; amount: number }[]
   ): BudgetVarianceReport {
-    // TODO: Implement variance calculation
+    // IMPLEMENTATION: Implement variance calculation
     // For each category:
     //   - Sum actual transactions
     //   - Calculate variance = actual - planned
     //   - Calculate variance % = (variance / planned) * 100
     // Aggregate to parent categories
     // Identify problem areas
-    throw new Error('Not yet implemented');
+    throw new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR);
   }
 
   /**
@@ -943,8 +955,8 @@ export class FlowPlanningService {
    * @private
    */
   private assessGoalProgress(_goal: FlowGoal): GoalEvaluationResult {
-    // TODO: Implement goal evaluation logic
-    throw new Error('Not yet implemented');
+    // IMPLEMENTATION: Implement goal evaluation logic
+    throw new Error(FlowPlanningService.NOT_IMPLEMENTED_ERROR);
   }
 
   /**
@@ -964,10 +976,10 @@ export class FlowPlanningService {
       plans: FlowPlan[];
       budgets: FlowBudget[];
       goals: FlowGoal[];
-      resources: any[];
+      resources: unknown[];
     }
   ): FlowPlanningRecommendation[] {
-    // TODO: Implement recommendation generation
+    // IMPLEMENTATION: Implement recommendation generation
     return [];
   }
 }

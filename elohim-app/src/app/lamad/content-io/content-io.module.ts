@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { NgModule, ModuleWithProviders, inject, provideAppInitializer } from '@angular/core';
 
-// @coverage: 23.1% (2026-01-31)
+// @coverage: 23.1% (2026-02-05)
 
 import { ContentDownloadComponent } from './components/content-download/content-download.component';
 import { DefaultCodeEditorComponent } from './components/default-code-editor/default-code-editor.component';

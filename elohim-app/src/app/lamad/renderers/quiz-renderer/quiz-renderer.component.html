@@ -6,17 +6,21 @@
     <h3 class="font-bold text-lg mb-3">{{ i + 1 }}. {{ q.question }}</h3>
 
     <div *ngIf="q.type === 'multiple-choice' || q.type === 'true-false'" class="options space-y-2">
-      <div *ngFor="let opt of q.options" class="option flex items-center">
-        <label class="flex items-center space-x-2 cursor-pointer">
-          <input
-            type="radio"
-            [name]="'q-' + q.id"
-            [value]="opt"
-            [checked]="answers.get(q.id) === opt"
-            (change)="selectAnswer(q.id, opt)"
-            [disabled]="submitted"
-            class="form-radio text-blue-600"
-          />
+      <div *ngFor="let opt of q.options; let optIdx = index" class="option flex items-center">
+        <input
+          type="radio"
+          [id]="'q-' + q.id + '-opt-' + optIdx"
+          [name]="'q-' + q.id"
+          [value]="opt"
+          [checked]="answers.get(q.id) === opt"
+          (change)="selectAnswer(q.id, opt)"
+          [disabled]="submitted"
+          class="form-radio text-blue-600"
+        />
+        <label
+          [for]="'q-' + q.id + '-opt-' + optIdx"
+          class="flex items-center space-x-2 cursor-pointer"
+        >
           <span>{{ opt }}</span>
         </label>
       </div>

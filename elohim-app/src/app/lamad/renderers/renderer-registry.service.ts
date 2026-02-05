@@ -1,6 +1,6 @@
 import { Injectable, Type, EventEmitter } from '@angular/core';
 
-// @coverage: 28.6% (2026-01-31)
+// @coverage: 42.9% (2026-02-05)
 
 import { ContentNode } from '../models/content-node.model';
 
@@ -61,7 +61,8 @@ interface RendererEntry {
  */
 @Injectable({ providedIn: 'root' })
 export class RendererRegistryService {
-  private readonly renderers: RendererEntry[] = [];
+  // eslint-disable-next-line @typescript-eslint/prefer-readonly
+  private renderers: RendererEntry[] = [];
 
   /**
    * Register a renderer component for specific formats.

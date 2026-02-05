@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, computed, signal } from '@angular/core';
 
+// @coverage: 30.2% (2026-02-05)
+
 import { HolochainClientService } from '../../services/holochain-client.service';
 import { HolochainContentService } from '../../services/holochain-content.service';
 import { OfflineOperationQueueService } from '../../services/offline-operation-queue.service';
@@ -39,7 +41,7 @@ export class HolochainAvailabilityUiComponent {
   readonly connectionState = this.holochainClient.state;
   readonly isConnected = this.holochainClient.isConnected;
   readonly error = this.holochainClient.error;
-  readonly contentAvailable = this.holochainContent.availableSignal;
+  readonly contentAvailable = this.holochainContent.available;
 
   // Local component state
   readonly isDismissed = signal(false);

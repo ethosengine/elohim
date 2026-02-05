@@ -1,6 +1,6 @@
 import { Injectable, Optional, inject } from '@angular/core';
 
-// @coverage: 18.7% (2026-01-31)
+// @coverage: 42.6% (2026-02-05)
 
 import { map, shareReplay, take, catchError } from 'rxjs/operators';
 
@@ -150,7 +150,10 @@ export class GovernanceSignalService {
   recordReaction(contentId: string, reaction: EmotionalReaction): Observable<boolean> {
     const agentId = this.getAgentId();
     const randomBytes = crypto.getRandomValues(new Uint8Array(6));
-    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 7);
     const reactionRecord: ReactionRecord = {
       id: `reaction-${Date.now()}-${randomStr}`,
       contentId,
@@ -185,7 +188,10 @@ export class GovernanceSignalService {
   recordMediationProceed(log: MediationLog): Observable<boolean> {
     // Add an id to the log for storage
     const randomBytes = crypto.getRandomValues(new Uint8Array(6));
-    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 7);
     const logWithId = {
       ...log,
       id: `mediation-${Date.now()}-${randomStr}`,
@@ -253,7 +259,10 @@ export class GovernanceSignalService {
   ): Observable<boolean> {
     const agentId = this.getAgentId();
     const randomBytes = crypto.getRandomValues(new Uint8Array(6));
-    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 7);
     const feedbackRecord: GraduatedFeedbackRecord = {
       id: `feedback-${Date.now()}-${randomStr}`,
       contentId,
@@ -347,7 +356,10 @@ export class GovernanceSignalService {
   recordLearningSignal(signal: LearningSignalInput): Observable<boolean> {
     const agentId = this.getAgentId();
     const randomBytes = crypto.getRandomValues(new Uint8Array(6));
-    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 7);
     const signalRecord: LearningSignalRecord = {
       id: `learning-${Date.now()}-${randomStr}`,
       contentId: signal.contentId,
@@ -407,7 +419,10 @@ export class GovernanceSignalService {
   recordInteractiveCompletion(signal: CompletionSignalInput): Observable<boolean> {
     const agentId = this.getAgentId();
     const randomBytes = crypto.getRandomValues(new Uint8Array(6));
-    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 7);
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 7);
     const completionRecord: CompletionSignalRecord = {
       id: `completion-${Date.now()}-${randomStr}`,
       contentId: signal.contentId,

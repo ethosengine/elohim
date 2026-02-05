@@ -12,6 +12,8 @@ import {
   computed,
 } from '@angular/core';
 
+// @coverage: 48.8% (2026-02-05)
+
 import { Subject, takeUntil } from 'rxjs';
 
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
@@ -638,7 +640,11 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
     this.showFeedback.set(true);
 
     // Play sound
-    this.soundService.playAnswerFeedback(correct);
+    if (correct) {
+      this.soundService.playCorrectAnswerFeedback();
+    } else {
+      this.soundService.playIncorrectAnswerFeedback();
+    }
 
     // Update streak
     const questionId = this.currentQuestion()!.id;

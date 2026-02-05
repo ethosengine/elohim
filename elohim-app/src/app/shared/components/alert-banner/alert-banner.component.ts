@@ -20,6 +20,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, TemplateRef, OnInit } from '@angular/core';
 
+// @coverage: 38.8% (2026-02-05)
+
 /**
  * Alert severity levels
  */

@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// @coverage: 1.0% (2026-01-31)
+// @coverage: 23.2% (2026-02-05)
 
 import { debounceTime, takeUntil } from 'rxjs/operators';
 
@@ -123,6 +123,7 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
   // ContentEditorComponent Methods
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async validate(): Promise<EditorValidationResult> {
     const errors: { field: string; message: string }[] = [];
     const warnings: { field: string; message: string }[] = [];
@@ -139,11 +140,11 @@ export class DefaultCodeEditorComponent implements ContentEditorComponent, OnIni
     // Update UI
     this.validationErrors = errors.map(e => e.message);
 
-    return await Promise.resolve({
+    return {
       valid: errors.length === 0,
       errors,
       warnings,
-    });
+    };
   }
 
   getContent(): ContentIOExportInput {

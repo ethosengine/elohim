@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 1.6% (2026-01-31)
+// @coverage: 96.9% (2026-02-05)
 
 import { map, switchMap } from 'rxjs/operators';
 
@@ -255,10 +255,12 @@ export class ElohimAgentService {
       elohimId: elohim.id,
       respondedAt: new Date().toISOString(),
       cost: {
-        tokensProcessed: Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 2**32 * 1000) + 500, // Demo data generation
+        tokensProcessed:
+          Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 1000) + 500, // Demo data generation
         timeMs: this.estimateProcessingTime(request.capability),
-        constitutionalChecks: Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 2**32 * 5) + 1, // Demo data generation
-        precedentLookups: Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 2**32 * 3), // Demo data generation
+        constitutionalChecks:
+          Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 5) + 1, // Demo data generation
+        precedentLookups: Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 3), // Demo data generation
       },
     };
 
@@ -288,7 +290,7 @@ export class ElohimAgentService {
     const params = request.params as ContentReviewParams;
 
     // Simulate content review (in production: actual AI analysis)
-    const approved = crypto.getRandomValues(new Uint32Array(1))[0] / 2**32 > 0.1; // Demo data generation (90% approval for demo)
+    const approved = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 > 0.1; // Demo data generation (90% approval for demo)
     const issues = approved
       ? []
       : [
@@ -336,7 +338,8 @@ export class ElohimAgentService {
     const params = request.params as AttestationRecommendationParams;
 
     // Simulate attestation decision (in production: actual AI analysis)
-    const recommend = crypto.getRandomValues(new Uint32Array(1))[0] / 2**32 > 0.2 ? 'grant' : 'defer'; // Demo data generation
+    const recommend =
+      crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 > 0.2 ? 'grant' : 'defer'; // Demo data generation
 
     const payload: AttestationRecommendation = {
       type: 'attestation-recommendation',
@@ -382,7 +385,10 @@ export class ElohimAgentService {
 
   private generateRequestId(): string {
     const randomBytes = crypto.getRandomValues(new Uint8Array(8));
-    const randomStr = Array.from(randomBytes).map(b => b.toString(36)).join('').substring(0, 9);
+    const randomStr = Array.from(randomBytes)
+      .map(b => b.toString(36))
+      .join('')
+      .substring(0, 9);
     return `req-${Date.now()}-${randomStr}`;
   }
 

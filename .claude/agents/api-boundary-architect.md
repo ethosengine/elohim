@@ -231,7 +231,7 @@ export class ContentScoringService {
 |------|-------------|
 | `holochain-zome` agent | Zome development (Rust DNA) |
 | `angular-architect` agent | Angular patterns, DI |
-| `test-generator` agent | After writing code |
+| `quality-deep` agent | After writing code |
 | `code-reviewer` agent | Before committing |
 
 ---

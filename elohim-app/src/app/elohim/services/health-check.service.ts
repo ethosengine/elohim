@@ -27,7 +27,7 @@
 
 import { Injectable, signal, computed, inject, OnDestroy } from '@angular/core';
 
-// @coverage: 80.2% (2026-01-31)
+// @coverage: 80.2% (2026-02-05)
 
 import { HolochainClientService } from './holochain-client.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';

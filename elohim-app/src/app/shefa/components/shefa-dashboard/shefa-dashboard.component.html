@@ -45,9 +45,27 @@
         <button type="button" class="btn-icon" (click)="toggleConfigPanel()" title="Settings">
           ⚙️
         </button>
-        <button type="button" class="btn-icon" [matMenuTriggerFor]="exportMenu" title="Export">
-          📥
-        </button>
+        <div class="export-menu-container">
+          <button type="button" class="btn-icon" (click)="toggleExportMenu()" title="Export">
+            📥
+          </button>
+          <div class="export-menu" *ngIf="showExportMenu">
+            <button
+              type="button"
+              class="menu-item"
+              (click)="exportDashboard('json'); toggleExportMenu()"
+            >
+              📄 Export as JSON
+            </button>
+            <button
+              type="button"
+              class="menu-item"
+              (click)="exportDashboard('csv'); toggleExportMenu()"
+            >
+              📊 Export as CSV
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -55,24 +73,24 @@
     <div class="config-panel" *ngIf="showConfigPanel">
       <h3>Dashboard Configuration</h3>
 
-      <div class="config-group">
-        <label id="display-mode-label">Display Mode</label>
-        <div class="button-group" role="group" aria-labelledby="display-mode-label">
+      <fieldset class="config-group">
+        <legend>Display Mode</legend>
+        <div class="button-group">
           <button
             type="button"
-            *ngFor="let mode of ['compact', 'detailed', 'monitoring']"
+            *ngFor="let mode of displayModes"
             [class.active]="mergedConfig.displayMode === mode"
-            (click)="setDisplayMode(mode as any)"
+            (click)="setDisplayMode(mode)"
             class="btn-small"
           >
             {{ mode | titlecase }}
           </button>
         </div>
-      </div>
+      </fieldset>
 
-      <div class="config-group">
-        <label id="visible-panels-label">Visible Panels</label>
-        <div class="checkbox-group" role="group" aria-labelledby="visible-panels-label">
+      <fieldset class="config-group">
+        <legend>Visible Panels</legend>
+        <div class="checkbox-group">
           <label>
             <input
               type="checkbox"
@@ -114,7 +132,7 @@
             Constitutional Limits
           </label>
         </div>
-      </div>
+      </fieldset>
     </div>
   </header>
 
@@ -730,10 +748,4 @@
       </div>
     </div>
   </main>
-
-  <!-- Export Menu -->
-  <mat-menu #exportMenu="matMenu">
-    <button type="button" mat-menu-item (click)="exportDashboard('json')">📄 Export as JSON</button>
-    <button type="button" mat-menu-item (click)="exportDashboard('csv')">📊 Export as CSV</button>
-  </mat-menu>
 </div>

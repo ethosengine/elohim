@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 0.9% (2026-01-31)
+// @coverage: 96.1% (2026-02-05)
 
 import { map, shareReplay, take, switchMap, catchError, tap } from 'rxjs/operators';
 
@@ -28,6 +28,78 @@ import {
  * Category names for relationship categorization.
  */
 type CategoryName = 'prerequisites' | 'extensions' | 'related' | 'children' | 'parents';
+
+/**
+ * Context for querying relationships in a graph.
+ * Groups graph navigation parameters to reduce method parameter count.
+ */
+interface QueryContext {
+  /** The content graph to query */
+  readonly graph: ContentGraph;
+  /** The ID of the current/focus content node */
+  readonly contentId: string;
+  /** Set of adjacent node IDs (outgoing or incoming) */
+  readonly adjacentIds: Set<string>;
+}
+
+/**
+ * Context for neighborhood processing during BFS traversal.
+ * Groups traversal state to reduce method parameter count.
+ */
+interface NeighborhoodContext {
+  /** The content graph to traverse */
+  readonly graph: ContentGraph;
+  /** Current node being processed */
+  readonly nodeId: string;
+  /** Current depth in BFS traversal */
+  readonly depth: number;
+  /** Maximum nodes to include in neighborhood */
+  readonly maxNodes: number;
+  /** Filter for relationship types (undefined = all types) */
+  readonly relationshipTypes: RelationshipType[] | undefined;
+  /** Set of visited nodes to prevent cycles */
+  readonly visited: Set<string>;
+  /** Next frontier for BFS iteration */
+  readonly nextFrontier: string[];
+  /** Accumulated neighbor nodes */
+  readonly neighbors: MiniGraphNode[];
+  /** Accumulated graph edges */
+  readonly edges: MiniGraphEdge[];
+}
+
+/**
+ * Options for relationship queries.
+ * Groups configuration parameters to reduce method parameter count.
+ */
+interface QueryOptions {
+  /** Filter to include only specific relationship types */
+  readonly includeTypes?: RelationshipType[];
+  /** Filter to exclude specific relationship types */
+  readonly excludeTypes?: RelationshipType[];
+  /** Whether to include content body in results */
+  readonly includeContent: boolean;
+  /** Maximum number of nodes per category */
+  readonly limit: number;
+}
+
+/**
+ * Collectors for categorized relationships.
+ * Groups output arrays to reduce method parameter count.
+ */
+interface CategoryCollectors {
+  /** All relationships (for comprehensive view) */
+  readonly allRelationships: RelationshipEdge[];
+  /** Prerequisite nodes */
+  readonly prerequisites: ContentNode[];
+  /** Extension nodes */
+  readonly extensions: ContentNode[];
+  /** Related nodes */
+  readonly related: ContentNode[];
+  /** Child nodes (hierarchical) */
+  readonly children: ContentNode[];
+  /** Parent nodes (hierarchical) */
+  readonly parents: ContentNode[];
+}
 
 /**
  * Rule for categorizing a relationship into a result category.
@@ -494,43 +566,37 @@ export class RelatedConceptsService {
   ): RelatedConceptsResult {
     const { limit = 10, includeTypes, excludeTypes, includeContent = false } = options;
 
-    const allRelationships: RelationshipEdge[] = [];
-    const prerequisites: ContentNode[] = [];
-    const extensions: ContentNode[] = [];
-    const related: ContentNode[] = [];
-    const children: ContentNode[] = [];
-    const parents: ContentNode[] = [];
+    const collectors: CategoryCollectors = {
+      allRelationships: [],
+      prerequisites: [],
+      extensions: [],
+      related: [],
+      children: [],
+      parents: [],
+    };
 
-    const filterOptions = { includeTypes, excludeTypes };
+    const queryOptions: QueryOptions = {
+      includeTypes,
+      excludeTypes,
+      includeContent,
+      limit,
+    };
+
     const outgoingIds = graph.adjacency.get(contentId) ?? new Set<string>();
     const incomingIds = graph.reverseAdjacency.get(contentId) ?? new Set<string>();
 
     // Process outgoing relationships (this node is source)
     this.processQueryOutgoing(
-      graph,
-      contentId,
-      outgoingIds,
-      filterOptions,
-      includeContent,
-      limit,
-      allRelationships,
-      prerequisites,
-      extensions,
-      related,
-      children
+      { graph, contentId, adjacentIds: outgoingIds },
+      queryOptions,
+      collectors
     );
 
     // Process incoming relationships (this node is target)
     this.processQueryIncoming(
-      graph,
-      contentId,
-      incomingIds,
-      filterOptions,
-      includeContent,
-      limit,
-      allRelationships,
-      related,
-      parents
+      { graph, contentId, adjacentIds: incomingIds },
+      queryOptions,
+      collectors
     );
 
     // Handle prerequisites specially - DEPENDS_ON outgoing means this depends on target
@@ -540,38 +606,32 @@ export class RelatedConceptsService {
       outgoingIds,
       includeContent,
       limit,
-      prerequisites
+      collectors.prerequisites
     );
 
     return {
-      prerequisites,
-      extensions,
-      related,
-      children,
-      parents,
-      allRelationships,
+      prerequisites: collectors.prerequisites,
+      extensions: collectors.extensions,
+      related: collectors.related,
+      children: collectors.children,
+      parents: collectors.parents,
+      allRelationships: collectors.allRelationships,
     };
   }
 
   /**
    * Process outgoing relationships for queryRelatedConcepts.
+   * Refactored to use parameter objects for reduced complexity.
    */
   private processQueryOutgoing(
-    graph: ContentGraph,
-    contentId: string,
-    outgoingIds: Set<string>,
-    filterOptions: { includeTypes?: RelationshipType[]; excludeTypes?: RelationshipType[] },
-    includeContent: boolean,
-    limit: number,
-    allRelationships: RelationshipEdge[],
-    prerequisites: ContentNode[],
-    extensions: ContentNode[],
-    related: ContentNode[],
-    children: ContentNode[]
+    context: QueryContext,
+    options: QueryOptions,
+    collectors: CategoryCollectors
   ): void {
-    const { includeTypes, excludeTypes } = filterOptions;
+    const { graph, contentId, adjacentIds } = context;
+    const { includeTypes, excludeTypes, includeContent, limit } = options;
 
-    for (const targetId of outgoingIds) {
+    for (const targetId of adjacentIds) {
       const rel = this.findRelationshipBetween(graph, contentId, targetId);
       if (!rel) continue;
 
@@ -579,7 +639,7 @@ export class RelatedConceptsService {
 
       if (!this.passesFilters(relType, includeTypes, excludeTypes)) continue;
 
-      allRelationships.push({
+      collectors.allRelationships.push({
         id: rel.id,
         source: contentId,
         target: targetId,
@@ -596,31 +656,27 @@ export class RelatedConceptsService {
         relType,
         nodeToAdd,
         limit,
-        prerequisites,
-        extensions,
-        related,
-        children
+        collectors.prerequisites,
+        collectors.extensions,
+        collectors.related,
+        collectors.children
       );
     }
   }
 
   /**
    * Process incoming relationships for queryRelatedConcepts.
+   * Refactored to use parameter objects for reduced complexity.
    */
   private processQueryIncoming(
-    graph: ContentGraph,
-    contentId: string,
-    incomingIds: Set<string>,
-    filterOptions: { includeTypes?: RelationshipType[]; excludeTypes?: RelationshipType[] },
-    includeContent: boolean,
-    limit: number,
-    allRelationships: RelationshipEdge[],
-    related: ContentNode[],
-    parents: ContentNode[]
+    context: QueryContext,
+    options: QueryOptions,
+    collectors: CategoryCollectors
   ): void {
-    const { includeTypes, excludeTypes } = filterOptions;
+    const { graph, contentId, adjacentIds } = context;
+    const { includeTypes, excludeTypes, includeContent, limit } = options;
 
-    for (const sourceId of incomingIds) {
+    for (const sourceId of adjacentIds) {
       const rel = this.findRelationshipBetween(graph, sourceId, contentId);
       if (!rel) continue;
 
@@ -628,7 +684,7 @@ export class RelatedConceptsService {
 
       if (!this.passesFilters(relType, includeTypes, excludeTypes)) continue;
 
-      allRelationships.push({
+      collectors.allRelationships.push({
         id: rel.id,
         source: sourceId,
         target: contentId,
@@ -641,7 +697,14 @@ export class RelatedConceptsService {
 
       const nodeToAdd = includeContent ? node : this.stripContent(node);
 
-      this.categorizeIncomingNode(relType, nodeToAdd, sourceId, limit, related, parents);
+      this.categorizeIncomingNode(
+        relType,
+        nodeToAdd,
+        sourceId,
+        limit,
+        collectors.related,
+        collectors.parents
+      );
     }
   }
 
@@ -729,6 +792,7 @@ export class RelatedConceptsService {
 
   /**
    * Build neighborhood graph for mini-graph visualization.
+   * Refactored to reduce cognitive complexity by extracting edge processing.
    */
   private buildNeighborhoodGraph(
     graph: ContentGraph,
@@ -759,71 +823,24 @@ export class RelatedConceptsService {
       for (const nodeId of frontier) {
         if (neighbors.length >= maxNodes - 1) break;
 
-        // Outgoing edges
-        const outgoing = graph.adjacency.get(nodeId) ?? new Set<string>();
-        for (const targetId of outgoing) {
-          if (visited.has(targetId)) continue;
-          if (neighbors.length >= maxNodes - 1) break;
+        // Create shared context for neighborhood processing
+        const context: NeighborhoodContext = {
+          graph,
+          nodeId,
+          depth: d,
+          maxNodes,
+          relationshipTypes,
+          visited,
+          nextFrontier,
+          neighbors,
+          edges,
+        };
 
-          const rel = this.findRelationshipBetween(graph, nodeId, targetId);
-          const relType = (rel?.relationshipType ?? 'RELATES_TO') as RelationshipType;
+        // Process outgoing edges
+        this.processNeighborhoodOutgoing(context);
 
-          // Apply relationship filter
-          if (relationshipTypes && !relationshipTypes.includes(relType)) continue;
-
-          visited.add(targetId);
-          nextFrontier.push(targetId);
-
-          const targetNode = graph.nodes.get(targetId);
-          if (targetNode) {
-            neighbors.push({
-              id: targetId,
-              title: targetNode.title || targetId,
-              contentType: targetNode.contentType,
-              isFocus: false,
-              depth: d,
-            });
-          }
-
-          edges.push({
-            source: nodeId,
-            target: targetId,
-            relationshipType: relType,
-          });
-        }
-
-        // Incoming edges
-        const incoming = graph.reverseAdjacency.get(nodeId) ?? new Set<string>();
-        for (const sourceId of incoming) {
-          if (visited.has(sourceId)) continue;
-          if (neighbors.length >= maxNodes - 1) break;
-
-          const rel = this.findRelationshipBetween(graph, sourceId, nodeId);
-          const relType = (rel?.relationshipType ?? 'RELATES_TO') as RelationshipType;
-
-          // Apply relationship filter
-          if (relationshipTypes && !relationshipTypes.includes(relType)) continue;
-
-          visited.add(sourceId);
-          nextFrontier.push(sourceId);
-
-          const sourceNode = graph.nodes.get(sourceId);
-          if (sourceNode) {
-            neighbors.push({
-              id: sourceId,
-              title: sourceNode.title || sourceId,
-              contentType: sourceNode.contentType,
-              isFocus: false,
-              depth: d,
-            });
-          }
-
-          edges.push({
-            source: sourceId,
-            target: nodeId,
-            relationshipType: relType,
-          });
-        }
+        // Process incoming edges
+        this.processNeighborhoodIncoming(context);
       }
 
       frontier = nextFrontier;
@@ -840,6 +857,78 @@ export class RelatedConceptsService {
       neighbors,
       edges,
     };
+  }
+
+  /**
+   * Process outgoing edges for neighborhood graph building.
+   */
+  private processNeighborhoodOutgoing(context: NeighborhoodContext): void {
+    const outgoing = context.graph.adjacency.get(context.nodeId) ?? new Set<string>();
+    for (const targetId of outgoing) {
+      if (context.visited.has(targetId)) continue;
+      if (context.neighbors.length >= context.maxNodes - 1) break;
+
+      const rel = this.findRelationshipBetween(context.graph, context.nodeId, targetId);
+      const relType = (rel?.relationshipType ?? 'RELATES_TO') as RelationshipType;
+
+      if (context.relationshipTypes && !context.relationshipTypes.includes(relType)) continue;
+
+      context.visited.add(targetId);
+      context.nextFrontier.push(targetId);
+
+      const targetNode = context.graph.nodes.get(targetId);
+      if (targetNode) {
+        context.neighbors.push({
+          id: targetId,
+          title: targetNode.title || targetId,
+          contentType: targetNode.contentType,
+          isFocus: false,
+          depth: context.depth,
+        });
+      }
+
+      context.edges.push({
+        source: context.nodeId,
+        target: targetId,
+        relationshipType: relType,
+      });
+    }
+  }
+
+  /**
+   * Process incoming edges for neighborhood graph building.
+   */
+  private processNeighborhoodIncoming(context: NeighborhoodContext): void {
+    const incoming = context.graph.reverseAdjacency.get(context.nodeId) ?? new Set<string>();
+    for (const sourceId of incoming) {
+      if (context.visited.has(sourceId)) continue;
+      if (context.neighbors.length >= context.maxNodes - 1) break;
+
+      const rel = this.findRelationshipBetween(context.graph, sourceId, context.nodeId);
+      const relType = (rel?.relationshipType ?? 'RELATES_TO') as RelationshipType;
+
+      if (context.relationshipTypes && !context.relationshipTypes.includes(relType)) continue;
+
+      context.visited.add(sourceId);
+      context.nextFrontier.push(sourceId);
+
+      const sourceNode = context.graph.nodes.get(sourceId);
+      if (sourceNode) {
+        context.neighbors.push({
+          id: sourceId,
+          title: sourceNode.title || sourceId,
+          contentType: sourceNode.contentType,
+          isFocus: false,
+          depth: context.depth,
+        });
+      }
+
+      context.edges.push({
+        source: sourceId,
+        target: context.nodeId,
+        relationshipType: relType,
+      });
+    }
   }
 
   /**
@@ -865,7 +954,7 @@ export class RelatedConceptsService {
         direction === 'outgoing' ? [contentId, adjacentId] : [adjacentId, contentId];
 
       const rel = this.findRelationshipBetween(graph, sourceId, targetId);
-      if (rel && rel.relationshipType === relationshipType) {
+      if (rel && String(rel.relationshipType) === relationshipType) {
         results.push(rel);
       }
     }

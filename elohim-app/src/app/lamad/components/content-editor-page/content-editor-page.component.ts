@@ -10,6 +10,8 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
+// @coverage: 29.3% (2026-02-05)
+
 import { takeUntil, switchMap, catchError } from 'rxjs/operators';
 
 import { Subject, of } from 'rxjs';

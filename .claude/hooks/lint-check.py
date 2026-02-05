@@ -172,7 +172,7 @@ def get_coverage_signal(file_path: str) -> str:
     if annotation:
         pct = annotation['coverage_pct']
         if pct < COVERAGE_THRESHOLD:
-            return f"[Coverage] {basename}: {pct}% < {COVERAGE_THRESHOLD}% - use linter agent to write basic tests"
+            return f"[Coverage] {basename}: {pct}% < {COVERAGE_THRESHOLD}% - use quality-sweep agent to write basic tests"
         return ''  # Above threshold, no signal
 
     # 2. No annotation - check lcov as fallback
@@ -185,7 +185,7 @@ def get_coverage_signal(file_path: str) -> str:
 
     # 3. No data at all
     if not check_spec_file_exists(file_path):
-        return f"[Coverage] {basename}: no spec file - use linter agent to add basic tests"
+        return f"[Coverage] {basename}: no spec file - use quality-sweep agent to add basic tests"
 
     return ''
 

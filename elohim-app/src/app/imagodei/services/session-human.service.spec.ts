@@ -325,7 +325,7 @@ describe('SessionHumanService', () => {
     });
 
     it('should update upgrade progress', () => {
-      service.startUpgradeIntent('app-user');
+      service.startUpgradeIntent('app-steward');
       service.updateUpgradeProgress('verify-email', 'initiated');
 
       const intent = service.getUpgradeIntent();

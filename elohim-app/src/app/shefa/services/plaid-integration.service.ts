@@ -13,6 +13,8 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
+// @coverage: 31.6% (2026-02-05)
+
 import { catchError, retry, timeout } from 'rxjs/operators';
 
 import { Observable, Subject, firstValueFrom, throwError } from 'rxjs';
@@ -186,8 +188,9 @@ export class PlaidIntegrationService {
   ): Observable<{ accessToken: string; itemId: string }> {
     const requestBody = {
       public_token: publicToken,
-      client_id: environment.plaid?.clientId,
-      secret: environment.plaid?.secret,
+      // Note: environment.plaid not in Environment type - using placeholders
+      client_id: (environment as any).plaid?.clientId ?? 'PLAID_CLIENT_ID',
+      secret: (environment as any).plaid?.secret ?? 'PLAID_SECRET',
     };
 
     return this.callPlaidAPI<{ accessToken: string; itemId: string }>(
@@ -424,8 +427,11 @@ export class PlaidIntegrationService {
       combined.set(derivedKey.salt, iv.length + new Uint8Array(encryptedData).length);
 
       // Base64 encode for storage
-      return btoa(String.fromCharCode(...Array.from(combined).map(b => b)));
-    } catch (_error) {
+      return btoa(String.fromCodePoint(...Array.from(combined).map(b => b)));
+    } catch (error) {
+      // Encryption failure - log and re-throw with clear message
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[PlaidIntegration] Token encryption failed:', message);
       throw new Error('Failed to encrypt access token');
     }
   }
@@ -458,7 +464,10 @@ export class PlaidIntegrationService {
       );
 
       return new TextDecoder().decode(decryptedData);
-    } catch (_error) {
+    } catch (error) {
+      // Decryption failure - log and re-throw with clear message
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[PlaidIntegration] Token decryption failed:', message);
       throw new Error('Failed to decrypt access token');
     }
   }
@@ -495,7 +504,10 @@ export class PlaidIntegrationService {
       );
 
       return { key, salt: useSalt };
-    } catch (_error) {
+    } catch (error) {
+      // Key derivation failure - log and re-throw with clear message
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[PlaidIntegration] Key derivation failed:', message);
       throw new Error('Failed to derive encryption key');
     }
   }

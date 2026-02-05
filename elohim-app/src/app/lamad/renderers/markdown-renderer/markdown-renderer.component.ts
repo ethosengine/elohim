@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
-// @coverage: 72.8% (2026-01-31)
+// @coverage: 72.8% (2026-02-05)
 
 import hljs from 'highlight.js';
 import { Marked } from 'marked';

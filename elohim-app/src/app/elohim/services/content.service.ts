@@ -12,7 +12,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 83.1% (2026-01-31)
+// @coverage: 83.1% (2026-02-05)
 
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
@@ -198,7 +198,7 @@ export class ContentService {
         // Check if we need to fetch blob content
         // contentBody may be a blob reference (sha256:... or sha256-...) instead of actual content
         const contentBody = data.contentBody ?? '';
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+
         const isBlobReference =
           contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
         const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);

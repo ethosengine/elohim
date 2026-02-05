@@ -1,12 +1,9 @@
 @if (isVisible()) {
-  <div
+  <button
+    type="button"
     [class]="'connection-indicator ' + status().cssClass"
     [title]="status().label"
-    role="button"
-    tabindex="0"
     (click)="toggleExpanded()"
-    (keyup.enter)="toggleExpanded()"
-    (keyup.space)="toggleExpanded()"
   >
     <!-- Status Dot -->
     <span class="status-dot" [style.backgroundColor]="status().color"></span>
@@ -50,5 +47,5 @@
         </p>
       </div>
     }
-  </div>
+  </button>
 }

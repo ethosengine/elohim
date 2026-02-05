@@ -12,6 +12,8 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+// @coverage: 100.0% (2026-02-05)
+
 import {
   type PendingRecoveryRequest,
   type InterviewQuestion,
@@ -121,6 +123,14 @@ export class RecoveryInterviewComponent implements OnInit {
       newMap.set(questionId, answer);
       return newMap;
     });
+  }
+
+  /**
+   * Handle textarea input event.
+   */
+  onAnswerInput(event: Event, questionId: string): void {
+    const value = (event.target as HTMLTextAreaElement).value;
+    this.setAnswer(questionId, value);
   }
 
   previousQuestion(): void {

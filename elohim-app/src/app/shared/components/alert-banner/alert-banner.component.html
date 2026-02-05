@@ -11,12 +11,12 @@
     aria-live="polite"
   >
     <!-- Summary Row -->
-    <div
+    <button
+      type="button"
       class="banner-row"
       (click)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null"
-      (keydown.enter)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null"
-      (keydown.space)="expandable && activeAlerts.length > 1 ? toggleExpanded() : null"
-      tabindex="0"
+      [disabled]="!expandable || activeAlerts.length <= 1"
+      [attr.aria-expanded]="isExpanded"
     >
       <!-- Icon -->
       <ng-container *ngIf="iconTemplate; else defaultIcon">
@@ -99,7 +99,7 @@
           {{ isExpanded ? '▲' : '▼' }}
         </button>
       </div>
-    </div>
+    </button>
 
     <!-- Expanded List -->
     <div class="banner-details" *ngIf="isExpanded && activeAlerts.length > 1">

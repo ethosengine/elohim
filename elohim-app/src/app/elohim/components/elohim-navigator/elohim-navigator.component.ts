@@ -3,7 +3,7 @@ import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
 
-// @coverage: 23.3% (2026-01-31)
+// @coverage: 34.2% (2026-02-05)
 
 import { filter, takeUntil } from 'rxjs/operators';
 
@@ -17,7 +17,7 @@ import { SessionHuman, HolochainUpgradePrompt } from '@app/imagodei/models/sessi
 import { AuthService } from '@app/imagodei/services/auth.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { SovereigntyBadgeComponent } from '@app/lamad/components/sovereignty-badge/sovereignty-badge.component';
+import { AgencyBadgeComponent } from '@app/lamad/components/agency-badge/agency-badge.component';
 
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 
@@ -55,7 +55,7 @@ export interface ContextAppConfig {
     RouterLink,
     FormsModule,
     ThemeToggleComponent,
-    SovereigntyBadgeComponent,
+    AgencyBadgeComponent,
     ConnectionIndicatorComponent,
   ],
   templateUrl: './elohim-navigator.component.html',

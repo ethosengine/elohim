@@ -22,14 +22,15 @@
   "author": "Elohim Protocol",
   "license": "MIT",
   "dependencies": {
-    "@holochain/client": "^0.20.0",
+    "@holochain/client": ">=0.20.0",
     "@msgpack/msgpack": "^3.0.0-beta2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^8.55.0",
     "typescript": "^5.3.0",
-    "vitest": "^1.0.0",
-    "eslint": "^8.55.0"
+    "vitest": "^1.0.0"
   },
   "peerDependencies": {
     "@holochain/client": ">=0.20.0"

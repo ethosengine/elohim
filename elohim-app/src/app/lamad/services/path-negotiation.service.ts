@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 74.4% (2026-01-31)
+// @coverage: 94.2% (2026-02-05)
 
 import { tap, switchMap } from 'rxjs/operators';
 
@@ -671,13 +671,17 @@ export class PathNegotiationService {
 
   private generateNegotiationId(): string {
     const timestamp = Date.now().toString(36);
-    const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 10); // Crypto-secure random ID
+    const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32)
+      .toString(36)
+      .substring(2, 10); // Crypto-secure random ID
     return `negotiation-${timestamp}-${random}`;
   }
 
   private generatePathId(): string {
     const timestamp = Date.now().toString(36);
-    const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 10); // Crypto-secure random ID
+    const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32)
+      .toString(36)
+      .substring(2, 10); // Crypto-secure random ID
     return `love-map-${timestamp}-${random}`;
   }
 }

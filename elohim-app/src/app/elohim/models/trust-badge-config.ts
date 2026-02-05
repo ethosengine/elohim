@@ -16,7 +16,7 @@ import type {
   BadgeColor,
 } from '@app/elohim/models/trust-badge.model';
 
-// @coverage: 100.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 // ============================================================================
 // Badge Configuration

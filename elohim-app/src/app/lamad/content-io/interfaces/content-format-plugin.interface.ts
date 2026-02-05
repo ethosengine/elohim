@@ -23,7 +23,7 @@
 
 import { Type, EventEmitter } from '@angular/core';
 
-// @coverage: 66.7% (2026-01-31)
+// @coverage: 66.7% (2026-02-05)
 
 import { ContentNode } from '../../models/content-node.model';
 

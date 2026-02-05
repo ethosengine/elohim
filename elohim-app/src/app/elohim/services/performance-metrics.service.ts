@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 
-// @coverage: 98.9% (2026-01-31)
+// @coverage: 96.7% (2026-02-05)
 
 /**
  * PerformanceMetricsService

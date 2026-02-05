@@ -13,7 +13,10 @@
  * Represents the abundance of resources flowing through the network
  */
 
+import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+
+// @coverage: 32.5% (2026-02-05)
 
 import { takeUntil, tap } from 'rxjs/operators';
 
@@ -25,10 +28,15 @@ import { FamilyCommunityProtectionService } from '../../services/family-communit
 import { ShefaComputeService } from '../../services/shefa-compute.service';
 
 /**
+ * Display mode type
+ */
+type DisplayMode = 'compact' | 'detailed' | 'monitoring';
+
+/**
  * Display configuration for dashboard
  */
 interface DashboardConfig {
-  displayMode: 'compact' | 'detailed' | 'monitoring';
+  displayMode: DisplayMode;
   refreshInterval: number; // Milliseconds
   chartTimescale: '1h' | '24h' | '7d' | '30d';
   alertThreshold: 'high' | 'medium' | 'low';
@@ -59,6 +67,8 @@ const DEFAULT_CONFIG: DashboardConfig = {
 
 @Component({
   selector: 'app-shefa-dashboard',
+  standalone: true,
+  imports: [CommonModule],
   templateUrl: './shefa-dashboard.component.html',
   styleUrls: ['./shefa-dashboard.component.scss'],
 })
@@ -81,9 +91,13 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   lastUpdateTime: Date | null = null;
   selectedPanel: 'compute' | 'protection' | 'tokens' | 'events' | 'limits' = 'compute';
   showConfigPanel = false;
+  showExportMenu = false;
 
   // Computed config
   mergedConfig: DashboardConfig;
+
+  // Display mode options for template
+  readonly displayModes: DisplayMode[] = ['compact', 'detailed', 'monitoring'];
 
   // Cleanup
   private readonly destroy$ = new Subject<void>();
@@ -342,9 +356,16 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Toggle export menu
+   */
+  toggleExportMenu(): void {
+    this.showExportMenu = !this.showExportMenu;
+  }
+
+  /**
    * Update display mode
    */
-  setDisplayMode(mode: 'compact' | 'detailed' | 'monitoring'): void {
+  setDisplayMode(mode: DisplayMode): void {
     this.mergedConfig.displayMode = mode;
   }
 

@@ -331,6 +331,7 @@ spec:
         // Skip default checkout - it uses sparse checkout with 0% files
         // We do explicit full checkout in the Checkout stage
         skipDefaultCheckout(true)
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -402,22 +403,30 @@ spec:
                         if (!fileExists('VERSION')) {
                             error "VERSION file not found in workspace"
                         }
-                        
-                        // Read base version
-                        def baseVersion = readFile('VERSION').trim()
-                        echo "DEBUG - Base version: '${baseVersion}'"
-                        
-                        if (!baseVersion) {
-                            error "VERSION file is empty"
+
+                        // Parse VERSION file in key-value format (APP_VERSION=x.x.x, HAPP_VERSION=x.x.x)
+                        def versionContent = readFile('VERSION').trim()
+                        def versionMap = [:]
+                        versionContent.split('\n').each { line ->
+                            def parts = line.split('=')
+                            if (parts.length == 2) {
+                                versionMap[parts[0].trim()] = parts[1].trim()
+                            }
                         }
-                        
+                        def baseVersion = versionMap['APP_VERSION'] ?: versionMap['HAPP_VERSION'] ?: '1.0.0'
+                        echo "DEBUG - Base version: '${baseVersion}'"
+
+                        if (!baseVersion) {
+                            error "VERSION file is empty or malformed"
+                        }
+
                         // Get git hash
                         def gitHash = sh(
                             script: 'git rev-parse --short HEAD',
                             returnStdout: true
                         ).trim()
                         echo "DEBUG - Git hash: '${gitHash}'"
-                        
+
                         // Sync package.json version
                         dir('elohim-app') {
                             sh "npm version '${baseVersion}' --no-git-tag-version"
@@ -433,18 +442,18 @@ spec:
                             : "${baseVersion}-${sanitizedBranch}-${gitHash}"
 
                         echo "DEBUG - Image tag: '${imageTag}'"
-                        
+
                         // Write build.env file
                         def buildEnvContent = """BASE_VERSION=${baseVersion}
 GIT_COMMIT_HASH=${gitHash}
 IMAGE_TAG=${imageTag}
 BRANCH_NAME=${env.BRANCH_NAME}"""
-                        
+
                         writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
-                        
+
                         // Verify file was written
                         sh "cat '${env.WORKSPACE}/build.env'"
-                        
+
                         // Archive for debugging
                         archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
                         
@@ -459,54 +468,66 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
-                        echo 'Fetching holochain-cache-core WASM module...'
+                        echo 'Fetching holochain-cache-core WASM module from Harbor...'
 
                         def wasmDir = 'holochain/holochain-cache-core/pkg'
-                        def wasmFiles = [
-                            'holochain_cache_core.js',
-                            'holochain_cache_core_bg.wasm',
-                            'holochain_cache_core.d.ts',
-                            'holochain_cache_core_bg.wasm.d.ts',
-                            'package.json'
-                        ]
 
-                        // Helper to download WASM files from a branch
-                        def downloadWasm = { branch ->
-                            def baseUrl = "https://jenkins.ethosengine.com/job/elohim-holochain/job/${branch}/lastSuccessfulBuild/artifact/pkg"
-                            sh "mkdir -p '${wasmDir}'"
-
-                            def success = true
-                            for (file in wasmFiles) {
-                                def result = sh(
-                                    script: "wget -q --timeout=30 --tries=2 -O '${wasmDir}/${file}' '${baseUrl}/${file}' 2>&1",
-                                    returnStatus: true
-                                )
-                                if (result != 0) {
-                                    success = false
-                                    break
-                                }
+                        // Read HAPP_VERSION from VERSION file
+                        def versionContent = readFile('VERSION').trim()
+                        def versionMap = [:]
+                        versionContent.split('\n').each { line ->
+                            def parts = line.split('=')
+                            if (parts.length == 2) {
+                                versionMap[parts[0].trim()] = parts[1].trim()
                             }
-                            return success
+                        }
+                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
+                        // Compute Harbor tag using same logic as DNA pipeline producer
+                        def happVersion
+                        if (env.BRANCH_NAME == 'main') {
+                            happVersion = baseVersion
+                        } else {
+                            def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+                            happVersion = "${baseVersion}-${sanitizedBranch}-${gitHash}"
                         }
 
-                        // Try current branch, then dev, then main
-                        def fetched = downloadWasm(env.BRANCH_NAME)
+                        echo "Using HAPP_VERSION: ${happVersion}"
 
-                        if (!fetched) {
-                            echo "WASM not found for branch ${env.BRANCH_NAME}, trying dev..."
-                            fetched = downloadWasm('dev')
-                        }
+                        // Install oras CLI if not present
+                        sh '''
+                            if ! command -v oras &> /dev/null; then
+                                echo "Installing oras CLI..."
+                                curl -sLO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
+                                tar -xzf oras_1.1.0_linux_amd64.tar.gz
+                                chmod +x oras
+                                mv oras /usr/local/bin/
+                                rm oras_1.1.0_linux_amd64.tar.gz
+                            fi
+                        '''
 
-                        if (!fetched) {
-                            echo "WASM not found in dev, trying main..."
-                            fetched = downloadWasm('main')
+                        // Fetch WASM from Harbor
+                        def fetched = false
+                        withCredentials([usernamePassword(
+                            credentialsId: 'harbor-robot-registry',
+                            usernameVariable: 'HARBOR_USER',
+                            passwordVariable: 'HARBOR_PASS'
+                        )]) {
+                            def result = sh(script: """
+                                oras login harbor.ethosengine.com -u \$HARBOR_USER -p \$HARBOR_PASS
+                                mkdir -p '${wasmDir}'
+                                cd '${wasmDir}'
+                                oras pull harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${happVersion}
+                            """, returnStatus: true)
+                            fetched = (result == 0)
                         }
 
                         if (!fetched) {
                             echo """
-                            ⚠️ Could not fetch holochain-cache-core WASM from any branch.
+                            ⚠️ Could not fetch holochain-cache-core WASM from Harbor.
                             App will use TypeScript fallback (slightly slower but functional).
-                            To enable WASM: Run holochain pipeline with FORCE_BUILD=true
+                            To enable WASM: Run holochain DNA pipeline to push artifacts to Harbor.
                             """
                         }
 
@@ -1050,7 +1071,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         ═══════════════════════════════════════════════════════════
                         VERIFYING HOLOCHAIN INFRASTRUCTURE
                         ═══════════════════════════════════════════════════════════
-                        Alpha and Staging apps use: doorway-dev.elohim.host
+                        Alpha app uses: doorway-alpha.elohim.host
                         Seeding is managed by: elohim-genesis pipeline
                         ═══════════════════════════════════════════════════════════
                         """
@@ -1075,7 +1096,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         for (int i = 0; i < 3; i++) {
                             holochainHealth = sh(
                                 script: '''
-                                    timeout 10s curl -sf -o /dev/null -w "%{http_code}" https://doorway-dev.elohim.host/health 2>/dev/null || echo "000"
+                                    timeout 10s curl -sf -o /dev/null -w "%{http_code}" https://doorway-alpha.elohim.host/health 2>/dev/null || echo "000"
                                 ''',
                                 returnStdout: true
                             ).trim()

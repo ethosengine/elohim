@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 
-// @coverage: 92.4% (2026-01-31)
+// @coverage: 92.4% (2026-02-05)
 
 import { filter, map, mergeMap } from 'rxjs/operators';
 

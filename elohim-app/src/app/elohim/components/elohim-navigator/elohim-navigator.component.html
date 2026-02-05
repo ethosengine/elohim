@@ -175,8 +175,8 @@
               </div>
             </div>
 
-            <!-- Sovereignty Badge - At-a-glance sovereignty status -->
-            <app-sovereignty-badge></app-sovereignty-badge>
+            <!-- Agency Badge - At-a-glance agency status -->
+            <app-agency-badge></app-agency-badge>
 
             <!-- Footer -->
             <div class="profile-footer">
@@ -204,15 +204,13 @@
 </header>
 
 <!-- Mobile Menu Backdrop -->
-<div
+<button
+  type="button"
   class="mobile-menu-backdrop"
   *ngIf="showContextSwitcher || showProfileTray"
   (click)="closeAllTrays()"
-  (keydown.enter)="closeAllTrays()"
-  (keydown.space)="closeAllTrays()"
-  tabindex="0"
-  aria-hidden="true"
-></div>
+  aria-label="Close menu"
+></button>
 
 <!-- Upgrade Prompt Banner -->
 <div *ngIf="activeUpgradePrompt && !showUpgradeModal" class="upgrade-banner">
@@ -273,11 +271,13 @@
   (keydown.escape)="closeUpgradeModal()"
   open
   aria-labelledby="upgrade-modal-title"
+  tabindex="-1"
 >
-  <div
+  <section
     class="upgrade-modal"
     (click)="$event.stopPropagation()"
     (keydown)="$event.stopPropagation()"
+    tabindex="-1"
   >
     <button type="button" class="modal-close" (click)="closeUpgradeModal()" aria-label="Close">
       <svg
@@ -458,5 +458,5 @@
         Get Notified When Available
       </button>
     </div>
-  </div>
+  </section>
 </dialog>

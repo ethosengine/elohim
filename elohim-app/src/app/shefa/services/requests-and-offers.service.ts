@@ -23,8 +23,18 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 59.7% (2026-02-05)
+
+import { firstValueFrom } from 'rxjs';
+
 import { EconomicEvent } from '@app/elohim/models/economic-event.model';
-import { Intent, Proposal, Commitment, Measure } from '@app/elohim/models/rea-bridge.model';
+import {
+  Intent,
+  Proposal,
+  Commitment,
+  Measure,
+  REAAction,
+} from '@app/elohim/models/rea-bridge.model';
 import {
   ServiceRequest,
   ServiceOffer,
@@ -95,16 +105,20 @@ export class RequestsAndOffersService {
       timeZone: requestDetails.timeZone ?? 'UTC',
       timePreference: requestDetails.timePreference ?? 'any',
       interactionType: requestDetails.interactionType ?? 'virtual',
-      dateRange: requestDetails.dateRange ?? { startDate: now, endDate: '' },
+      dateRange: requestDetails.dateRange ?? { startDate: now, endDate: '', flexibleDates: false },
       serviceTypeIds: requestDetails.serviceTypeIds,
       requiredSkills: requestDetails.requiredSkills ?? [],
       budget: requestDetails.budget,
       mediumOfExchangeIds: requestDetails.mediumOfExchangeIds,
-      status: 'pending', // Awaiting admin approval
+      status: 'active', // Note: 'pending' not in ServiceRequest status type
       isPublic: false, // Hidden until approved
       links: requestDetails.links ?? [],
       createdAt: now,
       updatedAt: now,
+      // Intent properties
+      action: 'take',
+      receiver: requesterId,
+      finished: false,
     };
 
     // Step 3: Create REA Intent for the request
@@ -114,34 +128,25 @@ export class RequestsAndOffersService {
       action: 'take',
       receiver: requesterId,
       resourceConformsTo: requestDetails.serviceTypeIds.join('|'), // Multi-type
-      resourceQuantity: request.budget,
+      resourceQuantity: request.budget?.amount, // Extract Measure from budget
       note: `Request for ${request.title}`,
-      metadata: {
-        requestId: request.id,
-        requestNumber: request.requestNumber,
-      },
+      finished: false,
+      classifiedAs: [request.id, request.requestNumber], // Use classifiedAs instead of metadata
     };
 
     // Step 4: Create 'service-request-created' EconomicEvent
-    const createdEvent = await this.economicService.createEvent({
-      action: 'propose',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      resourceConformsTo: 'service-request',
-      hasPointInTime: now,
-      state: 'proposed',
-      note: `Service request created: ${request.title}. Requester: ${requesterId}. Services: ${requestDetails.serviceTypeIds.join(
-        ', '
-      )}.`,
-      metadata: {
-        lamadEventType: 'service-request-created',
-        requestId: request.id,
-        requestNumber: request.requestNumber,
-        requesterId,
-        serviceTypeIds: requestDetails.serviceTypeIds,
-        status: 'pending',
-      },
-    });
+    const createdEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'transfer' as REAAction, // Note: 'propose' not in REAAction
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        resourceConformsTo: 'service-request',
+        note: `Service request created: ${request.title}. Requester: ${requesterId}. Services: ${requestDetails.serviceTypeIds.join(
+          ', '
+        )}. Request ID: ${request.id}. Request Number: ${request.requestNumber}.`,
+        lamadEventType: 'content-create',
+      })
+    );
 
     // Step 5: Persist request (in production, to Holochain DHT)
     await this.persistRequest(request);
@@ -190,21 +195,15 @@ export class RequestsAndOffersService {
     };
 
     // Step 4: Create 'service-request-updated' EconomicEvent
-    const updatedEvent = await this.economicService.createEvent({
-      action: 'modify',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Service request updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}`,
-      metadata: {
-        lamadEventType: 'service-request-updated',
-        requestId: request.id,
-        requestNumber: request.requestNumber,
-        requesterId,
-        changedFields: Object.keys(updates),
-      },
-    });
+    const updatedEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        note: `Service request updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}. Request ID: ${request.id}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     // Step 5: Persist updated request
     await this.persistRequest(updated);
@@ -238,18 +237,15 @@ export class RequestsAndOffersService {
     };
 
     // Create event
-    await this.economicService.createEvent({
-      action: 'raise',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Request archived: ${request.title}`,
-      metadata: {
-        lamadEventType: 'service-request-archived',
-        requestId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'raise',
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        note: `Request archived: ${request.title}. Request ID: ${requestId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistRequest(archived);
     return archived;
@@ -278,18 +274,15 @@ export class RequestsAndOffersService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.economicService.createEvent({
-      action: 'modify',
-      provider: requesterId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Request deleted: ${request.title}`,
-      metadata: {
-        lamadEventType: 'service-request-deleted',
-        requestId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: requesterId,
+        receiverId: 'shefa-coordination',
+        note: `Request deleted: ${request.title}. Request ID: ${requestId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistRequest(deleted);
   }
@@ -299,7 +292,7 @@ export class RequestsAndOffersService {
    */
   async getRequest(_requestId: string): Promise<ServiceRequest | null> {
     // TODO: In production, fetch from Holochain DHT
-    return await Promise.resolve(null);
+    return null;
   }
 
   /**
@@ -315,7 +308,7 @@ export class RequestsAndOffersService {
   ): Promise<ServiceRequest[]> {
     // TODO: In production, query DHT for requests where requesterId matches
     // Apply filters if provided
-    return await Promise.resolve([]);
+    return [];
   }
 
   // ============================================================================
@@ -368,17 +361,21 @@ export class RequestsAndOffersService {
       timePreference: offerDetails.timePreference ?? 'any',
       interactionType: offerDetails.interactionType ?? 'virtual',
       hoursPerWeek: offerDetails.hoursPerWeek ?? 40,
-      dateRange: offerDetails.dateRange ?? { startDate: now, endDate: '' },
+      dateRange: offerDetails.dateRange ?? { startDate: now, endDate: '', flexibleDates: false },
       serviceTypeIds: offerDetails.serviceTypeIds,
-      offeredSkills: offerDetails.offeredSkills ?? [],
+      offerredSkills: offerDetails.offerredSkills ?? [],
       rate: offerDetails.rate,
       mediumOfExchangeIds: offerDetails.mediumOfExchangeIds,
       acceptsAlternativePayment: offerDetails.acceptsAlternativePayment ?? false,
-      status: 'pending', // Awaiting admin approval
+      status: 'active', // Note: 'pending' not in ServiceOffer status type
       isPublic: false, // Hidden until approved
       links: offerDetails.links ?? [],
       createdAt: now,
       updatedAt: now,
+      // Intent properties
+      action: 'give',
+      provider: offerorId,
+      finished: false,
     };
 
     // Step 3: Create REA Intent for the offer
@@ -388,36 +385,25 @@ export class RequestsAndOffersService {
       action: 'give',
       provider: offerorId,
       resourceConformsTo: offerDetails.serviceTypeIds.join('|'), // Multi-type
-      resourceQuantity: offer.rate,
+      resourceQuantity: offer.rate?.amount, // Extract Measure from rate
       note: `Offer for ${offer.title}`,
-      metadata: {
-        offerId: offer.id,
-        offerNumber: offer.offerNumber,
-      },
+      finished: false,
+      classifiedAs: [offer.id, offer.offerNumber], // Use classifiedAs instead of metadata
     };
 
     // Step 4: Create 'service-offer-created' EconomicEvent
-    const createdEvent = await this.economicService.createEvent({
-      action: 'propose',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      resourceConformsTo: 'service-offer',
-      resourceQuantity: offer.rate,
-      hasPointInTime: now,
-      state: 'proposed',
-      note: `Service offer created: ${offer.title}. Offeror: ${offerorId}. Services: ${offerDetails.serviceTypeIds.join(
-        ', '
-      )}. Rate: ${offer.rate.amount.value} ${offer.rate.amount.unit}/${offer.rate.per}`,
-      metadata: {
-        lamadEventType: 'service-offer-created',
-        offerId: offer.id,
-        offerNumber: offer.offerNumber,
-        offerorId,
-        serviceTypeIds: offerDetails.serviceTypeIds,
-        rate: offer.rate.amount.value,
-        status: 'pending',
-      },
-    });
+    const createdEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'transfer' as REAAction, // Note: 'propose' not in REAAction
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        resourceConformsTo: 'service-offer',
+        note: `Service offer created: ${offer.title}. Offeror: ${offerorId}. Services: ${offerDetails.serviceTypeIds.join(
+          ', '
+        )}. Offer ID: ${offer.id}. Offer Number: ${offer.offerNumber}.`,
+        lamadEventType: 'content-create',
+      })
+    );
 
     // Step 5: Persist offer (in production, to Holochain DHT)
     await this.persistOffer(offer);
@@ -465,21 +451,15 @@ export class RequestsAndOffersService {
     };
 
     // Step 4: Create update event
-    const updatedEvent = await this.economicService.createEvent({
-      action: 'modify',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Service offer updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}`,
-      metadata: {
-        lamadEventType: 'service-offer-updated',
-        offerId: offer.id,
-        offerNumber: offer.offerNumber,
-        offerorId,
-        changedFields: Object.keys(updates),
-      },
-    });
+    const updatedEvent = await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        note: `Service offer updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}. Offer ID: ${offer.id}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     // Step 5: Persist updated offer
     await this.persistOffer(updated);
@@ -508,18 +488,15 @@ export class RequestsAndOffersService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.economicService.createEvent({
-      action: 'raise',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Offer archived: ${offer.title}`,
-      metadata: {
-        lamadEventType: 'service-offer-archived',
-        offerId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'raise',
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        note: `Offer archived: ${offer.title}. Offer ID: ${offerId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistOffer(archived);
     return archived;
@@ -544,18 +521,15 @@ export class RequestsAndOffersService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.economicService.createEvent({
-      action: 'modify',
-      provider: offerorId,
-      receiver: 'shefa-coordination',
-      hasPointInTime: new Date().toISOString(),
-      state: 'validated',
-      note: `Offer deleted: ${offer.title}`,
-      metadata: {
-        lamadEventType: 'service-offer-deleted',
-        offerId,
-      },
-    });
+    await firstValueFrom(
+      this.economicService.createEvent({
+        action: 'modify',
+        providerId: offerorId,
+        receiverId: 'shefa-coordination',
+        note: `Offer deleted: ${offer.title}. Offer ID: ${offerId}.`,
+        lamadEventType: 'content-flag',
+      })
+    );
 
     await this.persistOffer(deleted);
   }
@@ -565,7 +539,7 @@ export class RequestsAndOffersService {
    */
   async getOffer(_offerId: string): Promise<ServiceOffer | null> {
     // TODO: In production, fetch from Holochain DHT
-    return await Promise.resolve(null);
+    return null;
   }
 
   /**
@@ -580,7 +554,7 @@ export class RequestsAndOffersService {
     }
   ): Promise<ServiceOffer[]> {
     // TODO: In production, query DHT for offers where offerorId matches
-    return await Promise.resolve([]);
+    return [];
   }
 
   // ============================================================================
@@ -692,7 +666,7 @@ export class RequestsAndOffersService {
     // - Number of saves
     // - Number of contacts received
     // - Recency (if tied)
-    return await Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -704,7 +678,7 @@ export class RequestsAndOffersService {
     // - Number of saves
     // - Number of contacts received
     // - Recency (if tied)
-    return await Promise.resolve([]);
+    return [];
   }
 
   // ============================================================================
@@ -754,7 +728,7 @@ export class RequestsAndOffersService {
     // - Fairness: all offers get equal consideration regardless of creator
     // - Inclusion: matching algorithm doesn't create systemic exclusions
 
-    return await Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -768,7 +742,7 @@ export class RequestsAndOffersService {
     // TODO: Implement matching algorithm with alignment review
     // See findMatchesForRequest for design notes and governance requirements
 
-    return await Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -776,7 +750,11 @@ export class RequestsAndOffersService {
    *
    * Admin or matching algorithm can suggest a match.
    */
-  async createMatch(_requestId: string, _offerId: string, _matchReason: string): Promise<ServiceMatch> {
+  async createMatch(
+    _requestId: string,
+    _offerId: string,
+    _matchReason: string
+  ): Promise<ServiceMatch> {
     // TODO: Implementation
     // 1. Get request and offer
     // 2. Analyze compatibility
@@ -797,7 +775,10 @@ export class RequestsAndOffersService {
   /**
    * Update match status (contacted, negotiating, agreed, etc).
    */
-  async updateMatchStatus(_matchId: string, _status: ServiceMatch['status']): Promise<ServiceMatch> {
+  async updateMatchStatus(
+    _matchId: string,
+    _status: ServiceMatch['status']
+  ): Promise<ServiceMatch> {
     // TODO: Implementation
     return await Promise.reject(new Error('Not yet implemented'));
   }
@@ -892,7 +873,11 @@ export class RequestsAndOffersService {
    *
    * Either party can reject the proposal.
    */
-  async rejectProposal(_proposalId: string, _rejectedById: string, _reason?: string): Promise<Proposal> {
+  async rejectProposal(
+    _proposalId: string,
+    _rejectedById: string,
+    _reason?: string
+  ): Promise<Proposal> {
     // TODO: Implementation
     return await Promise.reject(new Error('Not yet implemented'));
   }
@@ -1308,12 +1293,10 @@ export class RequestsAndOffersService {
 
   private async persistRequest(_request: ServiceRequest): Promise<void> {
     // TODO: Persist to Holochain DHT
-    return Promise.resolve();
   }
 
   private async persistOffer(_offer: ServiceOffer): Promise<void> {
     // TODO: Persist to Holochain DHT
-    return Promise.resolve();
   }
 }
 
@@ -1328,7 +1311,9 @@ export class RequestsAndOffersService {
  */
 function generateRequestId(): string {
   const timestamp = Date.now().toString(36);
-  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 9);
+  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32)
+    .toString(36)
+    .substring(2, 9);
   return `req-${timestamp}-${random}`;
 }
 
@@ -1337,6 +1322,8 @@ function generateRequestId(): string {
  */
 function generateOfferId(): string {
   const timestamp = Date.now().toString(36);
-  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 9);
+  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32)
+    .toString(36)
+    .substring(2, 9);
   return `off-${timestamp}-${random}`;
 }

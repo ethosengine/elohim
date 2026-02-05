@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 
-// @coverage: 90.9% (2026-01-31)
+// @coverage: 90.9% (2026-02-05)
 
 import { ConfigService, AppConfig } from '../../services/config.service';
 

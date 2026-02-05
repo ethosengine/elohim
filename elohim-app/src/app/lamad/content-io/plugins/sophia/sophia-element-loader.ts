@@ -7,7 +7,7 @@
 
 import type { Moment, Recognition } from './sophia-moment.model';
 
-// @coverage: 12.4% (2026-01-31)
+// @coverage: 51.1% (2026-02-05)
 
 // Re-export types for consumers
 export type { Moment, Recognition };
@@ -213,7 +213,8 @@ export async function registerSophiaElement(): Promise<void> {
           logLevel: 'debug',
         });
       } else {
-        // eslint-disable-next-line no-console
+        // Sophia.configure not available - using default configuration
+        console.debug('[SophiaLoader] Sophia.configure not available, using defaults');
       }
 
       isRegistered = true;
@@ -448,15 +449,14 @@ export function getPsycheAPI(): PsycheAPI | null {
   const sophiaElement = (window as any).SophiaElement;
 
   if (!sophiaElement) {
-    // eslint-disable-next-line no-console
-
     return null;
   }
 
   // Get getPrimarySubscale from SophiaElement (re-exported from sophia-core)
   const getPrimarySubscaleFn = sophiaElement.getPrimarySubscale;
   if (!getPrimarySubscaleFn) {
-    // eslint-disable-next-line no-console
+    // getPrimarySubscale not available in this version of SophiaElement
+    console.debug('[SophiaLoader] getPrimarySubscale not available in SophiaElement');
   }
 
   // Create a facade using available SophiaElement exports + local implementations

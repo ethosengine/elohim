@@ -12,6 +12,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 100.0% (2026-02-05)
+
 import { map } from 'rxjs/operators';
 
 import { Observable, forkJoin } from 'rxjs';
@@ -20,6 +22,7 @@ import { HumanRelationshipView } from '@app/elohim/adapters/storage-types.adapte
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 import {
   CreateHumanRelationshipInput,
+  HumanRelationshipType,
   IntimacyLevel,
   INTIMACY_LEVEL_ORDER,
 } from '@app/imagodei/models/human-relationship.model';
@@ -60,7 +63,7 @@ export class HumanRelationshipService {
    */
   getRelationshipsByType(
     personId: string,
-    relationshipType: string
+    relationshipType: HumanRelationshipType
   ): Observable<HumanRelationshipView[]> {
     return this.storageApi.getHumanRelationships({
       partyId: personId,

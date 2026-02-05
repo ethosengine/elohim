@@ -10,6 +10,8 @@
 
 import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
 
+// @coverage: 83.3% (2026-02-05)
+
 // Re-export types for consumers
 export type { PerseusItem, PerseusScoreResult };
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 2.5% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 import { PathIndexEntry } from '../models/learning-path.model';
 
@@ -31,8 +31,10 @@ export class PathFilterService {
     }));
 
     // Sort by score descending, then take top N
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, limit).map(s => s.path);
+    return [...scored]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(s => s.path);
   }
 
   /**

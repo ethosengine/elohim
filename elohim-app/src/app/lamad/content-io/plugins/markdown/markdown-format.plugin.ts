@@ -1,6 +1,6 @@
 import { Injectable, Type } from '@angular/core';
 
-// @coverage: 91.3% (2026-01-31)
+// @coverage: 91.3% (2026-02-05)
 
 import { MarkdownParser } from '../../../parsers/markdown-parser';
 import { MarkdownRendererComponent } from '../../../renderers/markdown-renderer/markdown-renderer.component';

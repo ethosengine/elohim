@@ -192,12 +192,10 @@
                           @for (sec of mod.sections; track sec.section.id; let secIdx = $index) {
                             <div class="section-card">
                               <!-- Section Header - clickable link to lesson view -->
-                              <a
+                              <button
+                                type="button"
                                 class="section-header section-link"
                                 (click)="goToSection(sec.concepts.at(0)?.conceptId)"
-                                (keydown.enter)="goToSection(sec.concepts.at(0)?.conceptId)"
-                                role="link"
-                                tabindex="0"
                               >
                                 <div class="section-header-left">
                                   <h5 class="section-title">{{ sec.section.title }}</h5>
@@ -223,7 +221,7 @@
                                   </div>
                                   <span class="section-arrow">→</span>
                                 </div>
-                              </a>
+                              </button>
 
                               <!-- Section Body - concept list -->
                               <div class="section-body">
@@ -238,38 +236,38 @@
                                       concept of sec.concepts;
                                       track concept.conceptId || $index
                                     ) {
-                                      <li
-                                        class="concept-item"
-                                        [ngClass]="{
-                                          completed: concept.isCompleted,
-                                          'global-complete': concept.isGlobalCompletion,
-                                        }"
-                                        (click)="goToConcept(concept.conceptId)"
-                                        (keydown.enter)="goToConcept(concept.conceptId)"
-                                        role="button"
-                                        tabindex="0"
-                                      >
-                                        <span class="concept-status-icon">
-                                          @if (concept.isCompleted) {
-                                            <span class="checkmark">✓</span>
-                                          } @else if (concept.isGlobalCompletion) {
-                                            <span
-                                              class="checkmark global"
-                                              title="Mastered in another journey"
-                                            >
-                                              ✓
-                                            </span>
-                                          } @else {
-                                            <span class="circle">○</span>
-                                          }
-                                        </span>
-                                        <span class="concept-icon">{{ concept.icon }}</span>
-                                        <span class="concept-name">{{ concept.title }}</span>
-                                        @if (concept.contentType) {
-                                          <span class="content-type-tag">
-                                            {{ concept.contentType }}
+                                      <li>
+                                        <button
+                                          type="button"
+                                          class="concept-item"
+                                          [ngClass]="{
+                                            completed: concept.isCompleted,
+                                            'global-complete': concept.isGlobalCompletion,
+                                          }"
+                                          (click)="goToConcept(concept.conceptId)"
+                                        >
+                                          <span class="concept-status-icon">
+                                            @if (concept.isCompleted) {
+                                              <span class="checkmark">✓</span>
+                                            } @else if (concept.isGlobalCompletion) {
+                                              <span
+                                                class="checkmark global"
+                                                title="Mastered in another journey"
+                                              >
+                                                ✓
+                                              </span>
+                                            } @else {
+                                              <span class="circle">○</span>
+                                            }
                                           </span>
-                                        }
+                                          <span class="concept-icon">{{ concept.icon }}</span>
+                                          <span class="concept-name">{{ concept.title }}</span>
+                                          @if (concept.contentType) {
+                                            <span class="content-type-tag">
+                                              {{ concept.contentType }}
+                                            </span>
+                                          }
+                                        </button>
                                       </li>
                                     }
                                   </ul>

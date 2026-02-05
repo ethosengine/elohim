@@ -65,12 +65,7 @@
               [class.current]="concept.isCurrent"
               [class.completed]="concept.isCompleted"
             >
-              <a
-                (click)="goToConcept(concept.index)"
-                (keydown.enter)="goToConcept(concept.index)"
-                role="link"
-                tabindex="0"
-              >
+              <button type="button" (click)="goToConcept(concept.index)" class="concept-link">
                 <span class="status-icon">
                   @if (concept.isCompleted) {
                     <span class="checkmark">✓</span>
@@ -82,7 +77,7 @@
                 </span>
                 <span class="concept-icon">{{ concept.icon }}</span>
                 <span class="concept-label">{{ concept.title }}</span>
-              </a>
+              </button>
             </li>
           }
         </ul>

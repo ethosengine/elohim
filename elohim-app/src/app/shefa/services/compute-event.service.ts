@@ -20,6 +20,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 79.4% (2026-02-05)
+
 import { switchMap, tap, catchError, startWith, map } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, Subject, interval, from, of } from 'rxjs';
@@ -357,8 +359,11 @@ export class ComputeEventService {
         payload: { events: eventRequests },
       })
     ).pipe(
-      map(result => {
-        const results = result.success ? (result.data ?? []) : [];
+      map(response => {
+        const batchResult: BatchResult = response.success
+          ? (response.data ?? { success: false })
+          : { success: false };
+        const results: { id: string }[] = batchResult.success ? (batchResult.data ?? []) : [];
         // Link persisted event IDs back to payloads
         return events.map((e, i) => ({
           ...e,

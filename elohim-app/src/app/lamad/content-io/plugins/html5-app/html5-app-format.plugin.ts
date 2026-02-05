@@ -1,6 +1,6 @@
 import { Injectable, Type } from '@angular/core';
 
-// @coverage: 100.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 import {
   IframeRendererComponent,
@@ -76,6 +76,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // Import
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async import(input: string | File): Promise<ContentIOImportResult> {
     // For HTML5 apps, import creates the content structure from a zip file
     // The actual zip is stored separately as a blob in the DHT
@@ -84,7 +85,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
       // Parse JSON content structure
       try {
         const content = JSON.parse(input) as Html5AppContent;
-        return await Promise.resolve(this.createImportResult(content));
+        return this.createImportResult(content);
       } catch {
         throw new Error('Invalid HTML5 app JSON structure');
       }
@@ -94,7 +95,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
     const filename = input.name.replace(/\.zip$/i, '');
     const appId = this.slugify(filename);
 
-    return await Promise.resolve({
+    return {
       content: {
         appId,
         entryPoint: 'index.html',
@@ -110,7 +111,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
         embedStrategy: 'iframe',
         requiredCapabilities: ['javascript'],
       },
-    });
+    };
   }
 
   private createImportResult(content: Html5AppContent): ContentIOImportResult {
@@ -132,21 +133,20 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // Export
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async export(node: ContentIOExportInput): Promise<string> {
     // Export the content structure as JSON
     // The actual zip blob is handled separately by the blob service
     const content = node.content as Html5AppContent;
 
-    return await Promise.resolve(
-      JSON.stringify(
-        {
-          appId: content.appId,
-          entryPoint: content.entryPoint,
-          fallbackUrl: content.fallbackUrl,
-        },
-        null,
-        2
-      )
+    return JSON.stringify(
+      {
+        appId: content.appId,
+        entryPoint: content.entryPoint,
+        fallbackUrl: content.fallbackUrl,
+      },
+      null,
+      2
     );
   }
 
@@ -154,6 +154,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   // Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Method signature requires async for interface compliance
   async validate(input: string | File): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -168,7 +169,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
       warnings.push(...fileResult.warnings);
     }
 
-    return await Promise.resolve({
+    return {
       valid: errors.length === 0,
       errors,
       warnings,
@@ -176,7 +177,7 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
         formatId: this.formatId,
         isFile: input instanceof File,
       },
-    });
+    };
   }
 
   private validateJsonContent(input: string): {

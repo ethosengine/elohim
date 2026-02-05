@@ -8,17 +8,10 @@
 
   <!-- Error Display -->
   @if (error()) {
-    <div
-      class="error-banner"
-      role="alert"
-      (click)="clearError()"
-      (keydown.enter)="clearError()"
-      (keydown.space)="clearError()"
-      tabindex="0"
-    >
+    <div class="error-banner" role="alert">
       <span class="material-icons">error_outline</span>
       <span>{{ error() }}</span>
-      <button type="button" class="dismiss-btn">Dismiss</button>
+      <button type="button" class="dismiss-btn" (click)="clearError()">Dismiss</button>
     </div>
   }
 
@@ -146,7 +139,7 @@
             <textarea
               id="answer-textarea"
               [value]="getCurrentAnswer()"
-              (input)="setAnswer(question.id, $any($event.target).value)"
+              (input)="onAnswerInput($event, question.id)"
               placeholder="Enter the claimant's response..."
               rows="4"
             ></textarea>

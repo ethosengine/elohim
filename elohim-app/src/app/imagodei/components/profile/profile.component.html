@@ -16,31 +16,19 @@
 
     <!-- Success Message -->
     @if (successMessage()) {
-      <div
-        class="success-banner"
-        (click)="clearMessages()"
-        (keydown.enter)="clearMessages()"
-        (keydown.space)="clearMessages()"
-        tabindex="0"
-        role="status"
-      >
+      <output class="success-banner">
         <span class="success-icon">✓</span>
         <span>{{ successMessage() }}</span>
-      </div>
+        <button type="button" class="dismiss-btn" (click)="clearMessages()">Dismiss</button>
+      </output>
     }
 
     <!-- Error Display -->
     @if (error()) {
-      <div
-        class="error-banner"
-        (click)="clearMessages()"
-        (keydown.enter)="clearMessages()"
-        (keydown.space)="clearMessages()"
-        tabindex="0"
-        role="alert"
-      >
+      <div class="error-banner" role="alert">
         <span class="error-icon">✕</span>
         <span>{{ error() }}</span>
+        <button type="button" class="dismiss-btn" (click)="clearMessages()">Dismiss</button>
       </div>
     }
 
@@ -58,10 +46,10 @@
             </div>
           </div>
 
-          <!-- Sovereignty Stage -->
-          <div class="sovereignty-section">
-            <span class="sovereignty-label">Sovereignty Stage</span>
-            <span class="sovereignty-value">{{ sovereigntyInfo().label }}</span>
+          <!-- Agency Stage -->
+          <div class="agency-section">
+            <span class="agency-label">Agency Stage</span>
+            <span class="agency-value">{{ agencyInfo().label }}</span>
           </div>
 
           <!-- Profile Details -->
@@ -254,8 +242,8 @@
 
           <!-- Profile Reach -->
           <div class="form-group">
-            <label id="visibility-label">Visibility</label>
-            <div class="reach-options" role="group" aria-labelledby="visibility-label">
+            <fieldset class="reach-options">
+              <legend class="form-label">Visibility</legend>
               @for (option of reachOptions; track option.value) {
                 <label class="reach-option" [class.selected]="form.profileReach === option.value">
                   <input
@@ -271,7 +259,7 @@
                   </div>
                 </label>
               }
-            </div>
+            </fieldset>
           </div>
 
           <!-- Form Actions -->

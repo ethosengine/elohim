@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 
-// @coverage: 97.5% (2026-01-31)
+// @coverage: 97.5% (2026-02-05)
 
 import { ContentNode } from '../../models/content-node.model';
 

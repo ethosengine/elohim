@@ -16,7 +16,7 @@
 
 import { ContentNode, ContentRelationshipType } from './content-node.model';
 
-// @coverage: 100.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 // ============================================================================
 // Exploration Query Types

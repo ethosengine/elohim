@@ -734,29 +734,673 @@ describe('OfflineOperationQueueService', () => {
     });
   });
 
-  /*
-   * Tests to escalate:
-   *
-   * Async flow tests:
-   * - Exponential backoff timing
-   * - Concurrent sync handling with multiple pending operations
-   * - Connection state change during sync
-   * - Timeout handling for long-running operations
-   *
-   * Comprehensive mocks:
-   * - Mock LoggerService.createChild()
-   * - Mock IndexedDB storage operations
-   * - Mock crypto.getRandomValues for deterministic ID generation
-   *
-   * Business logic tests:
-   * - Retry count increment logic
-   * - Operation deduplication
-   * - Queue ordering guarantees
-   * - State consistency across signal updates
-   *
-   * Queue state tests:
-   * - Queue persistence verification
-   * - State after service destruction/recreation
-   * - Memory cleanup (Map of pending retries)
-   */
+  // ==========================================================================
+  // Exponential Backoff & Retry Logic
+  // ==========================================================================
+
+  describe('exponential backoff retry', () => {
+    it('should increment retry count on failure', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      const opId = service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 3,
+      });
+
+      // First sync attempt
+      await service.syncAll();
+      tick(0);
+
+      const queue = service.getQueue();
+      const operation = queue.find(op => op.id === opId);
+      expect(operation?.retryCount).toBe(1);
+    }));
+
+    it('should schedule retry with exponential delay', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 3,
+      });
+
+      // Initial sync
+      await service.syncAll();
+      tick(0);
+      const initialCalls = mockHolochainClient.callZome.calls.count();
+
+      // Wait 500ms - should not retry yet (delay is 1000ms for retry count 0)
+      tick(500);
+      expect(mockHolochainClient.callZome.calls.count()).toBe(initialCalls);
+
+      // Wait another 600ms (total 1100ms) - should retry now
+      tick(600);
+      expect(mockHolochainClient.callZome.calls.count()).toBeGreaterThan(initialCalls);
+    }));
+
+    it('should stop retrying after max retries exceeded', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      const opId = service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 2,
+      });
+
+      // Sync 1
+      await service.syncAll();
+      tick(0);
+      expect(service.getQueue()[0].retryCount).toBe(1);
+
+      // Trigger retry 1
+      tick(1000);
+      tick(0);
+      expect(service.getQueue()[0].retryCount).toBe(2);
+
+      // Trigger retry 2
+      tick(2000);
+      tick(0);
+
+      // After maxRetries, should still be in queue but no more scheduled retries
+      const operation = service.getQueue().find(op => op.id === opId);
+      expect(operation?.retryCount).toBe(2);
+    }));
+
+    it('should calculate exponential backoff correctly', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 4,
+      });
+
+      const callCounts: number[] = [];
+      callCounts.push(mockHolochainClient.callZome.calls.count());
+
+      // Initial sync
+      await service.syncAll();
+      tick(0);
+      callCounts.push(mockHolochainClient.callZome.calls.count());
+
+      // Retry 1: 1000ms (2^0 * 1000)
+      tick(1000);
+      tick(0);
+      callCounts.push(mockHolochainClient.callZome.calls.count());
+
+      // Retry 2: 2000ms (2^1 * 1000)
+      tick(2000);
+      tick(0);
+      callCounts.push(mockHolochainClient.callZome.calls.count());
+
+      // Verify each retry happened
+      expect(callCounts[1]).toBeGreaterThan(callCounts[0]); // Initial sync
+      expect(callCounts[2]).toBeGreaterThan(callCounts[1]); // First retry
+      expect(callCounts[3]).toBeGreaterThan(callCounts[2]); // Second retry
+    }));
+
+    it('should not schedule duplicate retries', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      const opId = service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 3,
+      });
+
+      // Initial sync
+      await service.syncAll();
+      tick(0);
+
+      // Try to sync same operation again before retry
+      await service.syncOperation(opId);
+      tick(0);
+
+      const callCount = mockHolochainClient.callZome.calls.count();
+
+      // Wait for scheduled retry
+      tick(1100);
+
+      // Should only be 1 additional call (the scheduled retry)
+      expect(mockHolochainClient.callZome.calls.count()).toBe(callCount + 1);
+    }));
+  });
+
+  // ==========================================================================
+  // Concurrent Operations & Race Conditions
+  // ==========================================================================
+
+  describe('concurrent operations', () => {
+    it('should handle multiple operations in queue', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op1',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op2',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op3',
+      });
+
+      const result = await service.syncAll();
+
+      expect(result.succeeded).toBe(3);
+      expect(service.queueSize()).toBe(0);
+    });
+
+    it('should process operations in FIFO order', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      const callOrder: string[] = [];
+      mockHolochainClient.callZome.and.callFake(async (params: any) => {
+        callOrder.push(params.fnName);
+        return { success: true };
+      });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'first',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'second',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'third',
+      });
+
+      await service.syncAll();
+
+      expect(callOrder).toEqual(['first', 'second', 'third']);
+    });
+
+    it('should handle mixed success/failure in batch', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      let callCount = 0;
+      mockHolochainClient.callZome.and.callFake(async () => {
+        callCount++;
+        // Fail every other call
+        return { success: callCount % 2 === 1 };
+      });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op1',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op2',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op3',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op4',
+      });
+
+      const result = await service.syncAll();
+
+      expect(result.succeeded).toBe(2); // op1, op3
+      expect(result.failed).toBe(2); // op2, op4
+      expect(service.queueSize()).toBe(2); // Failed ops remain
+    });
+
+    it('should handle errors thrown during sync', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      let callCount = 0;
+      mockHolochainClient.callZome.and.callFake(async () => {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Network error');
+        }
+        return { success: true };
+      });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op1',
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op2', // Will throw
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op3',
+      });
+
+      const result = await service.syncAll();
+
+      expect(result.succeeded).toBe(2);
+      expect(result.failed).toBe(1);
+    });
+  });
+
+  // ==========================================================================
+  // Connection State Handling
+  // ==========================================================================
+
+  describe('connection state handling', () => {
+    it('should defer retry when connection lost', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 3,
+      });
+
+      // Initial sync
+      await service.syncAll();
+      tick(0);
+
+      // Lose connection
+      mockHolochainClient.isConnected.and.returnValue(false);
+
+      // Wait for retry attempt
+      tick(1100);
+
+      // Retry should be deferred, not executed
+      expect(mockHolochainClient.callZome.calls.count()).toBe(1); // Only initial
+    }));
+
+    it('should skip operations removed from queue during retry', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      const opId = service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 3,
+      });
+
+      // Initial sync
+      await service.syncAll();
+      tick(0);
+
+      // Remove operation before retry
+      service.dequeue(opId);
+
+      // Wait for retry attempt
+      tick(1100);
+
+      // Should not retry removed operation
+      expect(mockHolochainClient.callZome.calls.count()).toBe(1);
+    }));
+  });
+
+  // ==========================================================================
+  // Error Recovery & Edge Cases
+  // ==========================================================================
+
+  describe('error recovery', () => {
+    it('should handle malformed operation gracefully', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        // Missing fnName - should be caught
+      } as any);
+
+      const result = await service.syncAll();
+
+      expect(result.failed).toBe(1);
+      expect(result.succeeded).toBe(0);
+    });
+
+    it('should handle exceptions in callZome', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.rejectWith(new Error('Connection timeout'));
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+      });
+
+      const result = await service.syncAll();
+
+      expect(result.failed).toBe(1);
+      expect(service.queueSize()).toBe(1); // Still in queue for retry
+    });
+
+    it('should handle payload serialization issues', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      // Create circular reference
+      const circular: any = { prop: 'value' };
+      circular.self = circular;
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        payload: circular,
+      });
+
+      // Should not crash, payload is stored as-is
+      expect(service.queueSize()).toBe(1);
+    });
+  });
+
+  // ==========================================================================
+  // Queue State Consistency
+  // ==========================================================================
+
+  describe('queue state consistency', () => {
+    it('should maintain signal consistency after rapid enqueues', () => {
+      for (let i = 0; i < 10; i++) {
+        service.enqueue({ type: 'create' });
+      }
+
+      expect(service.queueSize()).toBe(10);
+      expect(service.isPending()).toBe(true);
+      expect(service.getQueue().length).toBe(10);
+    });
+
+    it('should maintain signal consistency after rapid dequeues', () => {
+      const ids: string[] = [];
+      for (let i = 0; i < 10; i++) {
+        ids.push(service.enqueue({ type: 'create' }));
+      }
+
+      for (const id of ids) {
+        service.dequeue(id);
+      }
+
+      expect(service.queueSize()).toBe(0);
+      expect(service.isPending()).toBe(false);
+      expect(service.getQueue().length).toBe(0);
+    });
+
+    it('should notify all callbacks for each change', () => {
+      const callbacks = [
+        jasmine.createSpy('callback1'),
+        jasmine.createSpy('callback2'),
+        jasmine.createSpy('callback3'),
+      ];
+
+      callbacks.forEach(cb => service.onQueueChanged(cb));
+
+      service.enqueue({ type: 'create' });
+      service.enqueue({ type: 'update' });
+      service.clearQueue();
+
+      callbacks.forEach(cb => {
+        expect(cb).toHaveBeenCalledTimes(3);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Operation ID Generation
+  // ==========================================================================
+
+  describe('operation ID generation', () => {
+    it('should generate unique IDs', () => {
+      const ids = new Set<string>();
+
+      for (let i = 0; i < 100; i++) {
+        const id = service.enqueue({ type: 'create' });
+        ids.add(id);
+      }
+
+      expect(ids.size).toBe(100);
+    });
+
+    it('should generate IDs with correct format', () => {
+      const id = service.enqueue({ type: 'create' });
+
+      expect(id).toMatch(/^op-\d+-[a-z0-9]+$/);
+    });
+  });
+
+  // ==========================================================================
+  // Stats Calculation
+  // ==========================================================================
+
+  describe('stats calculation edge cases', () => {
+    it('should calculate average retries correctly', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op1',
+        maxRetries: 5,
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op2',
+        maxRetries: 5,
+      });
+
+      // Sync once
+      await service.syncAll();
+      tick(0);
+
+      // Both should have retryCount = 1
+      const stats = service.getStats();
+      expect(stats.totalRetries).toBe(2);
+      expect(stats.averageRetries).toBe(1.0);
+    }));
+
+    it('should handle oldest operation age', () => {
+      const beforeEnqueue = Date.now();
+      service.enqueue({ type: 'create' });
+
+      // Wait a bit
+      const delay = 100;
+      const start = Date.now();
+      while (Date.now() - start < delay) {
+        // Busy wait
+      }
+
+      const stats = service.getStats();
+      const ageSeconds = stats.oldestOperation;
+
+      expect(ageSeconds).toBeGreaterThanOrEqual(0);
+      expect(ageSeconds).toBeLessThan(10); // Should be very recent
+    });
+
+    it('should round average retries to 1 decimal', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      // Create operations with different retry counts
+      const op1 = service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op1',
+        maxRetries: 5,
+      });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op2',
+        maxRetries: 5,
+      });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op3',
+        maxRetries: 5,
+      });
+
+      // Sync once - all get 1 retry
+      await service.syncAll();
+      tick(0);
+
+      // Manually set different retry counts for testing
+      // (In real scenario, this would happen through multiple failed syncs)
+      const queue = service.getQueue();
+      (queue[0] as any).retryCount = 1;
+      (queue[1] as any).retryCount = 2;
+      (queue[2] as any).retryCount = 3;
+
+      // Average: (1 + 2 + 3) / 3 = 2.0
+      const stats = service.getStats();
+      expect(stats.averageRetries).toBe(2.0);
+    }));
+  });
+
+  // ==========================================================================
+  // Memory Management
+  // ==========================================================================
+
+  describe('memory management', () => {
+    it('should clean up retry timeouts when operation dequeued', fakeAsync(async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: false });
+
+      const opId = service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        maxRetries: 3,
+      });
+
+      // Trigger sync to schedule retry
+      await service.syncAll();
+      tick(0);
+
+      // Dequeue should clean up pending timeout
+      service.dequeue(opId);
+
+      // Advance time
+      tick(2000);
+
+      // Should not have any more calls
+      expect(mockHolochainClient.callZome.calls.count()).toBe(1);
+    }));
+
+    it('should handle many operations without memory issues', () => {
+      // Create 1000 operations
+      for (let i = 0; i < 1000; i++) {
+        service.enqueue({
+          type: 'create',
+          payload: { index: i, data: 'test'.repeat(10) },
+        });
+      }
+
+      expect(service.queueSize()).toBe(1000);
+
+      // Clear should free memory
+      service.clearQueue();
+
+      expect(service.queueSize()).toBe(0);
+      expect(service.getQueue()).toEqual([]);
+    });
+  });
+
+  // ==========================================================================
+  // Complex Async Scenarios
+  // ==========================================================================
+
+  describe('complex async scenarios', () => {
+    it('should handle operation added during sync', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      let syncStarted = false;
+      mockHolochainClient.callZome.and.callFake(async () => {
+        syncStarted = true;
+        await new Promise(r => setTimeout(r, 10));
+        return { success: true };
+      });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op1',
+      });
+
+      // Start sync
+      const syncPromise = service.syncAll();
+
+      // Wait for sync to start
+      while (!syncStarted) {
+        await new Promise(r => setTimeout(r, 1));
+      }
+
+      // Add operation during sync
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op2',
+      });
+
+      await syncPromise;
+
+      // Second operation should still be in queue
+      expect(service.queueSize()).toBe(1);
+    });
+
+    it('should handle rapid sync calls', async () => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'op1',
+      });
+
+      // Multiple rapid sync calls
+      const results = await Promise.all([
+        service.syncAll(),
+        service.syncAll(),
+        service.syncAll(),
+      ]);
+
+      // Only first should succeed, others should return early
+      expect(results[0].succeeded).toBe(1);
+      expect(results[1].succeeded).toBe(0);
+      expect(results[2].succeeded).toBe(0);
+    });
+  });
 });

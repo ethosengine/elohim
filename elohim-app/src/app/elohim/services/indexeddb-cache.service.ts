@@ -16,7 +16,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 20.3% (2026-01-31)
+// @coverage: 20.3% (2026-02-05)
 
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
@@ -32,7 +32,7 @@ interface CacheEntry<T> {
   version: number; // Schema version for invalidation
 }
 
-interface _CacheMetadata {
+interface CacheMetadata {
   version: number;
   lastCleanup: number;
   contentCount: number;

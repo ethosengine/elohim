@@ -111,7 +111,8 @@
       <p class="section-subtitle">Here's what we recommend to address these issues</p>
 
       <div class="recommendations-list">
-        <div
+        <button
+          type="button"
           class="recommendation-card"
           *ngFor="let rec of assessment.recommendations"
           [ngClass]="getPriorityClass(rec.priority)"
@@ -167,7 +168,7 @@
               Learn More
             </a>
           </div>
-        </div>
+        </button>
       </div>
     </section>
 

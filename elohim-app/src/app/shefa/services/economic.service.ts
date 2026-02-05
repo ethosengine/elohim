@@ -24,6 +24,8 @@
 
 import { Injectable, signal, computed } from '@angular/core';
 
+// @coverage: 29.7% (2026-02-05)
+
 import { catchError, shareReplay } from 'rxjs/operators';
 
 import { Observable, of, from, defer } from 'rxjs';
@@ -410,20 +412,15 @@ export class EconomicService {
         resourceClassifiedAs.length > 0
           ? (resourceClassifiedAs as ResourceClassification[])
           : undefined,
-      resourceQuantity:
-        hc.resourceQuantityValue !== null
-          ? {
-              hasNumericalValue: hc.resourceQuantityValue,
-              hasUnit: hc.resourceQuantityUnit ?? 'unit',
-            }
-          : undefined,
-      effortQuantity:
-        hc.effortQuantityValue !== null
-          ? {
-              hasNumericalValue: hc.effortQuantityValue,
-              hasUnit: hc.effortQuantityUnit ?? 'unit',
-            }
-          : undefined,
+      resourceQuantity: hc.resourceQuantityValue
+        ? {
+            hasNumericalValue: hc.resourceQuantityValue,
+            hasUnit: hc.resourceQuantityUnit ?? 'unit',
+          }
+        : undefined,
+      effortQuantity: hc.effortQuantityValue
+        ? { hasNumericalValue: hc.effortQuantityValue, hasUnit: hc.effortQuantityUnit ?? 'unit' }
+        : undefined,
       hasPointInTime: hc.hasPointInTime,
       hasDuration: hc.hasDuration ?? undefined,
       inputOf: hc.inputOf ?? undefined,

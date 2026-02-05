@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 96.7% (2026-01-31)
+// @coverage: 94.9% (2026-02-05)
 
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -47,6 +47,11 @@ import {
 export class SessionHumanService {
   private readonly STORAGE_KEY = 'lamad-session';
   private readonly ACTIVITY_LIMIT = 1000; // Max activities to store
+
+  // Upgrade trigger constants
+  private readonly PROGRESS_AT_RISK = 'progress-at-risk';
+  private readonly SESSION_AT_RISK = 'progress-at-risk';
+  private readonly NOT_AUTHENTICATED = 'not-authenticated';
 
   private readonly sessionSubject = new BehaviorSubject<SessionHuman | null>(null);
   private readonly upgradePromptsSubject = new BehaviorSubject<HolochainUpgradePrompt[]>([]);
@@ -392,8 +397,12 @@ export class SessionHumanService {
 
     try {
       localStorage.setItem(key, JSON.stringify(activities));
-    } catch (_err) {
-      this.triggerUpgradePrompt('progress-at-risk');
+    } catch (err) {
+      // localStorage quota exceeded - handle gracefully by prompting user to upgrade
+      // This is intentional: we catch quota errors and trigger upgrade flow rather than losing data
+      if (err instanceof Error && err.message.includes('QuotaExceededError')) {
+        this.triggerUpgradePrompt(this.PROGRESS_AT_RISK);
+      }
     }
 
     // Update last active
@@ -464,8 +473,12 @@ export class SessionHumanService {
     const key = `lamad-session-${session.sessionId}-progress-${progress.pathId}`;
     try {
       localStorage.setItem(key, JSON.stringify(progress));
-    } catch (_err) {
-      this.triggerUpgradePrompt('progress-at-risk');
+    } catch (err) {
+      // localStorage quota exceeded - handle gracefully by prompting user to upgrade
+      // This is intentional: we catch quota errors and trigger upgrade flow rather than losing data
+      if (err instanceof Error && err.message.includes('QuotaExceededError')) {
+        this.triggerUpgradePrompt(this.PROGRESS_AT_RISK);
+      }
     }
 
     this.touch();
@@ -628,7 +641,7 @@ export class SessionHumanService {
           dismissed: false,
         };
 
-      case 'progress-at-risk':
+      case this.PROGRESS_AT_RISK:
         return {
           id,
           trigger,
@@ -710,7 +723,7 @@ export class SessionHumanService {
   /**
    * Start an upgrade intent (user begins but hasn't completed upgrade).
    */
-  startUpgradeIntent(targetStage: 'hosted' | 'app-user' | 'node-operator'): void {
+  startUpgradeIntent(targetStage: 'hosted' | 'app-steward' | 'node-steward'): void {
     const session = this.sessionSubject.value;
     if (!session) return;
 
@@ -898,6 +911,7 @@ export class SessionHumanService {
 
   /**
    * Load session from localStorage.
+   * Returns null if session doesn't exist or cannot be parsed.
    */
   private loadSession(): SessionHuman | null {
     try {
@@ -905,20 +919,33 @@ export class SessionHumanService {
       if (stored) {
         return JSON.parse(stored);
       }
-    } catch (_err) {
-      // intentionally empty - session parse failure falls back to null
+    } catch (err) {
+      // Session parse failure is non-critical - falls back to null for visitor mode
+      // This can happen if localStorage is corrupted or quota exceeded
+      if (err instanceof Error) {
+        console.warn(
+          '[SessionHumanService] Failed to parse session from localStorage:',
+          err.message
+        );
+      }
     }
     return null;
   }
 
   /**
    * Save session to localStorage.
+   * Silently fails if localStorage is unavailable or quota exceeded.
    */
   private saveSession(session: SessionHuman): void {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session));
-    } catch (_err) {
-      // intentionally empty - localStorage write failure is non-critical
+    } catch (err) {
+      // localStorage write failure is non-critical
+      // This can happen if localStorage is disabled or quota exceeded
+      // User can continue with temporary session until upgrade
+      if (err instanceof Error && err.message.includes('QuotaExceededError')) {
+        this.triggerUpgradePrompt(this.SESSION_AT_RISK);
+      }
     }
   }
 
@@ -991,7 +1018,7 @@ export class SessionHumanService {
     if (accessMetadata.accessLevel === 'gated') {
       return {
         canAccess: false,
-        reason: 'not-authenticated',
+        reason: this.NOT_AUTHENTICATED,
         actionRequired: this.createInstallAction(
           accessMetadata.restrictionReason ?? 'This content requires joining the Elohim network.'
         ),
@@ -1027,7 +1054,7 @@ export class SessionHumanService {
 
       return {
         canAccess: false,
-        reason: requirements?.requiredPaths?.length ? 'missing-path' : 'not-authenticated',
+        reason: requirements?.requiredPaths?.length ? 'missing-path' : this.NOT_AUTHENTICATED,
         actionRequired: actions[0],
         missingAttestations: requirements?.requiredAttestations,
         missingPaths: requirements?.requiredPaths,
@@ -1038,7 +1065,7 @@ export class SessionHumanService {
     // Default: deny
     return {
       canAccess: false,
-      reason: 'not-authenticated',
+      reason: this.NOT_AUTHENTICATED,
     };
   }
 

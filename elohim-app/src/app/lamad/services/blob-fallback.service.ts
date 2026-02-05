@@ -13,7 +13,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
-// @coverage: 90.9% (2026-01-31)
+// @coverage: 88.6% (2026-02-05)
 
 import { retry, timeout, catchError, tap, map } from 'rxjs/operators';
 
@@ -311,21 +311,19 @@ export class BlobFallbackService {
   async testFallbackUrls(fallbackUrls: string[]): Promise<UrlHealth[]> {
     const tests = fallbackUrls.map(async url =>
       firstValueFrom(
-        this.http
-          .head(url, {
-            responseType: 'blob',
-          })
+        this.http.head(url, {
+          responseType: 'blob',
+        })
+      ).then(
+        () => {
+          this.recordUrlSuccess(url);
+          return this.getUrlHealth(url);
+        },
+        error => {
+          this.recordUrlFailure(url, error.message);
+          return this.getUrlHealth(url);
+        }
       )
-        .then(
-          () => {
-            this.recordUrlSuccess(url);
-            return this.getUrlHealth(url);
-          },
-          error => {
-            this.recordUrlFailure(url, error.message);
-            return this.getUrlHealth(url);
-          }
-        )
     );
 
     return Promise.all(tests);
@@ -349,17 +347,16 @@ export class BlobFallbackService {
 
     try {
       const response = await firstValueFrom(
-        this.http
-          .head(url, {
-            observe: 'response',
-            responseType: 'text',
-          })
+        this.http.head(url, {
+          observe: 'response',
+          responseType: 'text',
+        })
       );
 
       const responseTimeMs = Math.round(performance.now() - startTime);
-      const statusCode = response!.status;
-      const contentLength = response!.headers.get('Content-Length');
-      const acceptRanges = response!.headers.get('Accept-Ranges');
+      const statusCode = response.status;
+      const contentLength = response.headers.get('Content-Length');
+      const acceptRanges = response.headers.get('Accept-Ranges');
 
       return {
         url,

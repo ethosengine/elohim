@@ -30,6 +30,8 @@ metadata:
   name: elohim-edgenode-alpha-config
   namespace: elohim-alpha
 data:
+  # hApp version to fetch from Harbor (dev-latest for dev environments, explicit version for prod)
+  happ-version: "dev-latest"
   conductor-config.yaml: |
     # Holochain Conductor Configuration for Elohim Protocol
     admin_interfaces:
@@ -101,35 +103,33 @@ spec:
     spec:
       nodeSelector:
         node-type: operations
-      # Init container fetches hApp from DNA pipeline artifacts
+      # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
-          image: curlimages/curl:latest
-          command:
-            - sh
-            - -c
+          image: ghcr.io/oras-project/oras:v1.1.0
+          command: ['sh', '-c']
+          args:
             - |
               set -e
-              echo "Fetching hApp from elohim-holochain pipeline..."
+              echo "Fetching hApp from Harbor registry..."
+              echo "Version: ${HAPP_VERSION}"
 
-              # Try branch-specific build first, then dev, then main
-              HAPP_URLS="
-                https://jenkins.ethosengine.com/job/elohim-holochain/job/dev/lastSuccessfulBuild/artifact/elohim.happ
-                https://jenkins.ethosengine.com/job/elohim-holochain/job/main/lastSuccessfulBuild/artifact/elohim.happ
-              "
+              # Login to Harbor and pull artifact
+              oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${HAPP_VERSION} -o /happ
 
-              for url in $HAPP_URLS; do
-                echo "Trying: $url"
-                if curl -sfL -o /happ/elohim.happ "$url"; then
-                  echo "✅ hApp downloaded successfully"
-                  ls -lh /happ/elohim.happ
-                  exit 0
-                fi
-                echo "Failed, trying next..."
-              done
-
-              echo "❌ Could not download hApp from any source"
-              exit 1
+              if [ -f /happ/elohim.happ ]; then
+                echo "✅ hApp downloaded successfully from Harbor"
+                ls -lh /happ/elohim.happ
+              else
+                echo "❌ Failed to download hApp from Harbor"
+                exit 1
+              fi
+          env:
+            - name: HAPP_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: elohim-edgenode-alpha-config
+                  key: happ-version
           volumeMounts:
             - name: happ-volume
               mountPath: /happ

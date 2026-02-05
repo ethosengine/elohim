@@ -16,7 +16,7 @@
 
 import { Injectable, Injector } from '@angular/core';
 
-// @coverage: 87.1% (2026-01-31)
+// @coverage: 86.4% (2026-02-05)
 
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 
@@ -323,9 +323,7 @@ export class BlobManagerService {
   ): Observable<BlobDownloadResult[]> {
     const downloads = blobMetadatas.map(metadata => this.downloadBlob(metadata, progressCallback));
 
-    return from(
-      Promise.all(downloads.map(async d => firstValueFrom(d)))
-    );
+    return from(Promise.all(downloads.map(async d => firstValueFrom(d))));
   }
 
   /**
@@ -644,7 +642,12 @@ export class BlobManagerService {
       }
 
       return result.data;
-    } catch (_error) {
+    } catch (error) {
+      // Blob retrieval failure is non-critical - returns null to allow content to load without blobs
+      // This can happen if Holochain is unavailable or content has no associated blobs
+      if (error instanceof Error) {
+        console.warn('[BlobManagerService] Failed to retrieve blobs for content:', error.message);
+      }
       return null;
     }
   }

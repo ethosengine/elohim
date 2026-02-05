@@ -22,7 +22,7 @@
 
 import { Injectable, computed, signal, inject } from '@angular/core';
 
-// @coverage: 4.5% (2026-01-31)
+// @coverage: 4.5% (2026-02-05)
 
 import { catchError, shareReplay } from 'rxjs/operators';
 
@@ -1060,6 +1060,7 @@ export class HolochainContentService {
     }
 
     // Fire and forget - don't await, don't block UI
+    // eslint-disable-next-line @typescript-eslint/no-deprecated,sonarjs/deprecation
     this.batchGetContent(uncachedIds).catch(() => {
       // Prefetch errors are non-critical - content will load on demand
     });

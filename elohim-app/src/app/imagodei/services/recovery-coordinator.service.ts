@@ -19,7 +19,7 @@
 
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 98.7% (2026-01-31)
+// @coverage: 98.7% (2026-02-05)
 
 import {
   type RecoveryRequest,
@@ -150,7 +150,6 @@ export class RecoveryCoordinatorService {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to initiate recovery';
       this._error.set(message);
-      // eslint-disable-next-line no-console
 
       return false;
     } finally {
@@ -179,8 +178,8 @@ export class RecoveryCoordinatorService {
       if (updated.status === 'attested' || updated.status === 'completed') {
         await this.fetchCredential(request.id);
       }
-    } catch (_err) {
-      // intentionally empty - recovery poll failure is non-critical
+    } catch {
+      // Recovery poll failure is non-critical - will retry on next call
     }
   }
 
@@ -197,8 +196,8 @@ export class RecoveryCoordinatorService {
 
       const credential: RecoveryCredential = await response.json();
       this._credential.set(credential);
-    } catch (_err) {
-      // intentionally empty - credential fetch failure is non-critical
+    } catch {
+      // Credential fetch failure is non-critical - will retry later
     }
   }
 
@@ -218,8 +217,8 @@ export class RecoveryCoordinatorService {
       });
 
       this._activeRequest.set(null);
-    } catch (_err) {
-      // intentionally empty - recovery cancellation failure is non-critical
+    } catch {
+      // Recovery cancellation failure is non-critical - user can try again
     }
   }
 
@@ -290,8 +289,8 @@ export class RecoveryCoordinatorService {
 
       const data = await response.json();
       this._pendingRequests.set(data.requests ?? []);
-    } catch (_err) {
-      // Error loading recovery queue - will be handled by isLoading signal
+    } catch {
+      // Failed to load recovery queue - will retry on next call (non-critical)
     } finally {
       this._isLoading.set(false);
     }
@@ -346,7 +345,8 @@ export class RecoveryCoordinatorService {
 
       const data = await response.json();
       return data.questions ?? [];
-    } catch (_err) {
+    } catch {
+      // Failed to generate questions - return empty array
       return [];
     }
   }
@@ -387,7 +387,8 @@ export class RecoveryCoordinatorService {
       );
 
       return data.response;
-    } catch (_err) {
+    } catch {
+      // Failed to submit response - return null
       return null;
     }
   }

@@ -1,5 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 
+// @coverage: 93.5% (2026-02-05)
+
 import { BehaviorSubject, Observable, of, map, switchMap } from 'rxjs';
 
 import {
@@ -332,13 +334,22 @@ export class QuizSessionService {
     const timeSpentMs = Date.now() - startTime;
 
     // Create response record
+    // Note: PerseusScoreResult may or may not have a 'score' property depending on the source
+    // Fall back to binary scoring (1 for correct, 0 for incorrect) if score is not available
+    let scoreValue = 0;
+    if ('score' in scoreResult && typeof scoreResult.score === 'number') {
+      scoreValue = scoreResult.score;
+    } else if (scoreResult.correct) {
+      scoreValue = 1;
+    }
+
     const quizResponse: QuizResponse = {
       questionId,
       questionIndex,
       contentId: question.contentId,
       response,
-      correct: scoreResult.correct,
-      score: scoreResult.score,
+      correct: scoreResult.correct ?? false,
+      score: scoreValue,
       answeredAt: now,
       timeSpentMs,
       attemptNumber: question.attempts + 1,
@@ -351,8 +362,8 @@ export class QuizSessionService {
     updatedQuestions[questionIndex] = {
       ...question,
       answered: true,
-      correct: scoreResult.correct,
-      score: scoreResult.score,
+      correct: scoreResult.correct ?? false,
+      score: scoreValue,
       timeSpentMs: question.timeSpentMs + timeSpentMs,
       attempts: question.attempts + 1,
     };
@@ -360,7 +371,7 @@ export class QuizSessionService {
     // Update streak for inline quizzes
     let updatedStreakInfo = session.streakInfo;
     if (session.type === 'inline' && session.streakInfo) {
-      if (scoreResult.correct) {
+      if (scoreResult.correct ?? false) {
         const newStreak = session.streakInfo.currentStreak + 1;
         updatedStreakInfo = {
           ...session.streakInfo,

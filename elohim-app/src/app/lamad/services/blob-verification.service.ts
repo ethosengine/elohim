@@ -20,7 +20,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 40.9% (2026-01-31)
+// @coverage: 40.5% (2026-02-05)
 
 import { map, catchError } from 'rxjs/operators';
 
@@ -324,9 +324,7 @@ export class BlobVerificationService {
   verifyMultiple(blobsWithHashes: [Blob, string][]): Observable<BlobVerificationResult[]> {
     const verifications = blobsWithHashes.map(([blob, hash]) => this.verifyBlob(blob, hash));
 
-    return from(
-      Promise.all(verifications.map(async v => firstValueFrom(v)))
-    );
+    return from(Promise.all(verifications.map(async v => firstValueFrom(v))));
   }
 
   /**
@@ -477,6 +475,6 @@ export class BlobVerificationService {
    * Convert ArrayBuffer/Uint8Array to base64 string.
    */
   private arrayBufferToBase64(bytes: Uint8Array): string {
-    return btoa(String.fromCharCode(...Array.from(bytes)));
+    return btoa(String.fromCodePoint(...Array.from(bytes)));
   }
 }

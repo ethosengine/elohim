@@ -152,8 +152,8 @@ export type SessionAccessLevel =
  * Tracks upgrade intent for users who start but don't complete upgrade.
  */
 export interface UpgradeIntent {
-  /** Target sovereignty stage */
-  targetStage: 'hosted' | 'app-user' | 'node-operator';
+  /** Target agency stage */
+  targetStage: 'hosted' | 'app-steward' | 'node-steward';
   /** When upgrade process started */
   startedAt: string;
   /** Current step in upgrade process */

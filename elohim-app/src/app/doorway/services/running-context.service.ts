@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 96.4% (2026-01-31)
+// @coverage: 94.6% (2026-02-05)
 
 import { Observable } from 'rxjs';
 
@@ -187,8 +187,12 @@ export class RunningContextService {
         doorwayNodes,
         detectedAt,
       };
-    } catch (_error) {
-      // Node registry query failed - no nodes registered, return default context
+    } catch (error) {
+      // Node registry query failed - log error and return default context
+      console.warn(
+        'Failed to fetch registered nodes:',
+        error instanceof Error ? error.message : String(error)
+      );
       return {
         hasRegisteredNodes: false,
         registeredNodes: [],

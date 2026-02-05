@@ -11,7 +11,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 
-// @coverage: 4.0% (2026-01-31)
+// @coverage: 76.0% (2026-02-05)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 

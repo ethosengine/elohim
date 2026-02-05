@@ -25,6 +25,8 @@
 
 import { Injectable, signal, computed } from '@angular/core';
 
+// @coverage: 37.7% (2026-02-05)
+
 import { catchError, map, shareReplay, tap } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, of, from, defer } from 'rxjs';
@@ -173,7 +175,7 @@ export class ContributorService {
     if (!this.dashboardCache.has(contributorId)) {
       const request = defer(() => from(this.fetchDashboard(contributorId))).pipe(
         shareReplay(1),
-        catchError(_err => {
+        catchError(_error => {
           return of(null);
         })
       );
@@ -198,7 +200,7 @@ export class ContributorService {
 
     return defer(() => from(this.fetchMyDashboard())).pipe(
       tap(dashboard => this.dashboardSubject.next(dashboard)),
-      catchError(_err => {
+      catchError(_error => {
         return of(null);
       })
     );
@@ -220,7 +222,7 @@ export class ContributorService {
     }
 
     return defer(() => from(this.fetchImpact(contributorId))).pipe(
-      catchError(_err => {
+      catchError(_error => {
         return of(null);
       })
     );
@@ -262,7 +264,7 @@ export class ContributorService {
     if (!this.recognitionCache.has(contributorId)) {
       const request = defer(() => from(this.fetchRecognitionHistory(contributorId))).pipe(
         shareReplay(1),
-        catchError(_err => {
+        catchError(_error => {
           return of([]);
         })
       );
@@ -310,7 +312,7 @@ export class ContributorService {
       this.availableSignal.set(result.success);
       return result.success;
       // eslint-disable-next-line sonarjs/no-ignored-exceptions
-    } catch (_err) {
+    } catch (_error) {
       this.availableSignal.set(false);
       return false;
     }

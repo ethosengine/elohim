@@ -36,7 +36,7 @@ import {
   type ConsentStateChange as BaseConsentStateChange,
 } from '@app/elohim/models/protocol-core.model';
 
-// @coverage: 33.3% (2026-01-31)
+// @coverage: 66.7% (2026-02-05)
 
 // Re-export for convenience (types only to avoid duplicate values)
 export type { IntimacyLevel, ConsentState };
@@ -259,10 +259,13 @@ export function requiresMutualAttestation(level: IntimacyLevel): boolean {
 }
 
 /**
- * Check if consent can be elevated (not at max level, is accepted).
+ * Check if consent can be elevated (not at max level, is active).
  */
 export function canElevate(consent: HumanConsent): boolean {
-  return consent.consentState === 'accepted' && consent.intimacyLevel !== 'intimate';
+  return (
+    (consent.consentState === 'accepted' || consent.consentState === 'not_required') &&
+    consent.intimacyLevel !== 'intimate'
+  );
 }
 
 // Re-export utility functions from protocol-core for convenience

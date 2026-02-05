@@ -26,7 +26,7 @@
 
 import { Injectable, inject, signal } from '@angular/core';
 
-// @coverage: 100.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 import { LoggerService } from './logger.service';
 
@@ -279,7 +279,10 @@ export class CircuitBreakerService {
     });
 
     // Check if we should open the circuit
-    if ((circuit.state === 'CLOSED' || circuit.state === 'HALF_OPEN') && circuit.failures.length >= circuit.config.failureThreshold) {
+    if (
+      (circuit.state === 'CLOSED' || circuit.state === 'HALF_OPEN') &&
+      circuit.failures.length >= circuit.config.failureThreshold
+    ) {
       this.transitionTo(name, circuit, 'OPEN');
       this.logger.warn('Circuit opened due to failures', {
         name,

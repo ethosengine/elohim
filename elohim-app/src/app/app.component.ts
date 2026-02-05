@@ -12,7 +12,7 @@ import { HolochainContentService } from './elohim/services/holochain-content.ser
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
-// @coverage: 90.9% (2026-01-31)
+// @coverage: 90.9% (2026-02-05)
 
 /** Connection retry configuration */
 interface RetryConfig {
@@ -127,7 +127,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     // Start blob bootstrap regardless of connectivity
     // It will serve cached blobs and upgrade to streaming when services connect
-    void this.blobBootstrap.startBootstrap();
+    this.blobBootstrap.startBootstrap();
 
     // Only attempt Holochain connection if config exists
     // Holochain is only for agent-centric data (identity, attestations, points)

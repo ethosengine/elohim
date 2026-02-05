@@ -25,6 +25,8 @@ import type {
 } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
 
+// @coverage: 100.0% (2026-02-05)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Session Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -628,8 +630,8 @@ export function calculateQuizResult(session: QuizSession): QuizResult {
 
     // Get Bloom's level from question
     const question = session.questions.find(q => q.item.id === response.questionId);
-    if (question?.item.metadata?.bloomsLevel) {
-      existing.blooms.add(question.item.metadata.bloomsLevel);
+    if (question?.item.metadata?.['bloomsLevel']) {
+      existing.blooms.add(question.item.metadata['bloomsLevel'] as string);
     }
 
     contentScoreMap.set(response.contentId, existing);

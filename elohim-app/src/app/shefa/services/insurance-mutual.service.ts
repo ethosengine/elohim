@@ -17,6 +17,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 33.6% (2026-02-05)
+
 import { firstValueFrom } from 'rxjs';
 
 import { EconomicEvent } from '@app/elohim/models/economic-event.model';
@@ -179,12 +181,14 @@ export class InsuranceMutualService {
   // Helper methods for enrollment
   // ─────────────────────────────────────────────────────────────────
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getMember(memberId: string): Promise<REAAgent | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return mock
-    return Promise.resolve({ id: memberId, name: 'Member', type: 'human' } as REAAgent);
+    return { id: memberId, name: 'Member', type: 'human' } as REAAgent;
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getQahalCoverageTemplate(_qahalId: string): Promise<{
     defaultRisks: CoveredRisk[];
     deductible: Measure;
@@ -194,50 +198,41 @@ export class InsuranceMutualService {
   }> {
     // TODO: Fetch Qahal's coverage constitution from governance layer
     // For now, return defaults
-    return Promise.resolve({
+    return {
       defaultRisks: getDefaultCoveredRisks(),
       deductible: { hasNumericalValue: 500, hasUnit: 'unit-token' },
       coinsurance: 20,
       outOfPocketMaximum: { hasNumericalValue: 5000, hasUnit: 'unit-token' },
       constitutionalBasis: 'community-health-coverage-2024.md',
-    });
+    };
   }
 
   private async persistRiskProfile(_profile: MemberRiskProfile): Promise<void> {
     // TODO: Persist to Holochain DHT
     // For now, just log
-
-    return Promise.resolve();
   }
 
   private async persistCoveragePolicy(_policy: CoveragePolicy): Promise<void> {
     // TODO: Persist to Holochain DHT
-
-    return Promise.resolve();
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getMemberRiskProfile(_memberId: string): Promise<MemberRiskProfile | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return null (will be fetched in real implementation)
-    return Promise.resolve(null);
+    return null;
   }
 
   private async persistClaim(_claim: InsuranceClaim): Promise<void> {
     // TODO: Persist to Holochain DHT
-
-    return Promise.resolve();
   }
 
   private async persistAdjustmentReasoning(_reasoning: AdjustmentReasoning): Promise<void> {
     // TODO: Persist to Holochain DHT
-
-    return Promise.resolve();
   }
 
   private async persistAttributionClaim(_attribution: AttributionClaim): Promise<void> {
     // TODO: Persist to Holochain DHT and update CommonsPool
-
-    return Promise.resolve();
   }
 
   // ============================================================================
@@ -353,8 +348,8 @@ export class InsuranceMutualService {
         providerId: 'elohim-mutual',
         receiverId: memberId,
         resourceClassifiedAs: ['risk-assessment', 'behavioral-observation'],
-        note: `Risk assessment for ${riskType}. New score: ${newRiskScore} (tier: ${newRiskTier}). Trend: ${riskTrend}. Evidence: ${careEventCount} care events, ${communityEventCount} community events, ${claimsEventCount} claims.`,
-        lamadEventType: 'risk-assessment-completed',
+        note: `Risk assessment for ${_riskType}. New score: ${newRiskScore} (tier: ${newRiskTier}). Trend: ${riskTrend}. Evidence: ${careEventCount} care events, ${communityEventCount} community events, ${claimsEventCount} claims.`,
+        lamadEventType: 'preventive-care-completed',
       })
     );
 
@@ -375,7 +370,7 @@ export class InsuranceMutualService {
     // TODO: Implementation
     // Get all members of Qahal, reassess each
     // Identify improving/declining members for governance review
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   // ============================================================================
@@ -403,7 +398,7 @@ export class InsuranceMutualService {
     // 3. Check against constitutional constraints (dignity floor, etc)
     // 4. Record policy creation/modification as EconomicEvent
     // 5. Return updated policy with event reference
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -412,7 +407,7 @@ export class InsuranceMutualService {
    */
   async addCoveredRisk(_policyId: string, _risk: CoveredRisk): Promise<CoveragePolicy> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -420,7 +415,7 @@ export class InsuranceMutualService {
    */
   async getCoveragePolicy(_memberId: string): Promise<CoveragePolicy | null> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   // ============================================================================
@@ -468,44 +463,37 @@ export class InsuranceMutualService {
 
     // Step 3: Validate covered risk exists on policy
     const coveredRisk = policy.coveredRisks?.find(
-      r => r.riskName.toLowerCase() === lossDetails.lossType.toLowerCase()
+      r => r.riskType.toLowerCase() === lossDetails.lossType.toLowerCase()
     );
     if (!coveredRisk?.isCovered) {
       throw new Error(`Risk type "${lossDetails.lossType}" is not covered under this policy`);
     }
 
     // Step 4: Create InsuranceClaim record
+    const now = new Date().toISOString();
     const claim: InsuranceClaim = {
       id: generateId(),
       claimNumber: `CLM-${Date.now().toString().slice(-10)}`,
       policyId,
       memberId,
-      filedDate: new Date().toISOString(),
-      filedBy: memberId,
-      lossType: lossDetails.lossType,
+      coveredRiskId: coveredRisk.id,
+      lossType: lossDetails.lossType as InsuranceClaim['lossType'],
       lossDate: lossDetails.lossDate,
+      reportedDate: now,
       description: lossDetails.description,
-      estimatedAmount: lossDetails.estimatedLossAmount,
-      status: 'filed',
+      memberEstimatedLossAmount: lossDetails.estimatedLossAmount,
+      status: 'reported',
+      statusReason: 'Claim filed by member',
       observerAttestationIds: lossDetails.observerAttestationIds,
       memberDocumentIds: lossDetails.memberDocumentIds ?? [],
-      adjustmentEventIds: [],
-      appealEventIds: [],
-      settlementEventIds: [],
-      statusHistory: [
-        {
-          status: 'filed',
-          changedAt: new Date().toISOString(),
-          changedBy: memberId,
-          note: 'Claim filed by member',
-        },
-      ],
+      eventIds: {
+        filedEventId: '', // Will be updated after event creation
+      },
+      createdAt: now,
+      lastUpdatedAt: now,
       metadata: {
         coveredRiskId: coveredRisk.id,
-        deductibleApplies: coveredRisk.deductibleApplies,
-        coinsurancePercent: coveredRisk.coinsurancePercent,
-        coverageLimit: coveredRisk.coverageLimit,
-      } as Record<string, unknown>,
+      },
     };
 
     // Step 5: Create 'claim-filed' EconomicEvent
@@ -527,7 +515,7 @@ export class InsuranceMutualService {
     );
 
     // Step 6: Link event to claim
-    claim.adjustmentEventIds.push(claimFiledEvent.id);
+    claim.eventIds.filedEventId = claimFiledEvent.id;
 
     // Step 7: Persist claim (in production, to Holochain DHT)
     await this.persistClaim(claim);
@@ -536,10 +524,10 @@ export class InsuranceMutualService {
     // TODO: This would normally trigger a queue/assignment system
     // For now, just log that it needs assignment
 
-    return Promise.resolve({
+    return {
       claim,
       filedEvent: claimFiledEvent,
-    });
+    };
   }
 
   /**
@@ -557,7 +545,7 @@ export class InsuranceMutualService {
     // 1. Add docs to claim
     // 2. Create event recording submission
     // 3. Notify assigned adjuster
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -567,7 +555,7 @@ export class InsuranceMutualService {
     // TODO: In production, fetch from Holochain DHT by claim ID
     // For now, return null (will be populated by real implementation)
 
-    return Promise.resolve(null);
+    return null;
   }
 
   /**
@@ -584,7 +572,7 @@ export class InsuranceMutualService {
     // TODO: In production, query Holochain DHT for all claims where memberId matches
     // Apply filters if provided
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -613,7 +601,7 @@ export class InsuranceMutualService {
     // Index on: qahalId, riskTier, riskTrendDirection
     // Support aggregation for analytics
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -645,7 +633,7 @@ export class InsuranceMutualService {
     // Index on: qahalId, status, lossType, flags
     // Support date range queries
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -668,7 +656,7 @@ export class InsuranceMutualService {
     // TODO: In production, query DHT for all members in qahalId
     // With pagination support
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -690,7 +678,7 @@ export class InsuranceMutualService {
     // TODO: In production, query DHT for claims in qahalId
     // With filters and pagination
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -703,7 +691,7 @@ export class InsuranceMutualService {
   ): Promise<MemberRiskProfile[]> {
     // TODO: In production, query DHT with index on (qahalId, riskTier)
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -720,7 +708,7 @@ export class InsuranceMutualService {
   > {
     // TODO: In production, query DHT for members with trend='improving'
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -730,7 +718,7 @@ export class InsuranceMutualService {
   async getPendingClaims(_qahalId?: string): Promise<InsuranceClaim[]> {
     // TODO: In production, query DHT for claims with status='filed'
 
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -739,7 +727,7 @@ export class InsuranceMutualService {
    */
   async getHighValueClaims(_threshold: Measure, _qahalId?: string): Promise<InsuranceClaim[]> {
     // TODO: In production, query DHT for claims with amount > threshold
-    return Promise.resolve([]);
+    return [];
   }
 
   /**
@@ -756,7 +744,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: In production, query DHT for claims with adjustment status='denied'
-    return Promise.resolve([]);
+    return [];
   }
 
   // ============================================================================
@@ -775,7 +763,7 @@ export class InsuranceMutualService {
     // 2. Update claim with adjuster ID
     // 3. Create 'claim-assigned' event (or use 'stewardship-begin'?)
     // 4. Notify adjuster of assignment
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -810,10 +798,7 @@ export class InsuranceMutualService {
     }
 
     // Step 2: Validate reasoning has constitutional basis
-    if (
-      !reasoning.constitutionalBasisDocuments ||
-      reasoning.constitutionalBasisDocuments.length === 0
-    ) {
+    if (!reasoning.constitutionalCitation) {
       throw new Error(
         'Adjuster decision must cite constitutional basis (coverage policy, Qahal governance document, etc)'
       );
@@ -826,23 +811,18 @@ export class InsuranceMutualService {
     // Step 3: Check if generosity principle applies
     // Generosity principle: if coverage is ambiguous or could be interpreted either way,
     // interpret generously in member's favor
-    let generosityApplied = false;
-    if (
-      reasoning.coverageDecision === 'approved' &&
-      reasoning.appliedGenerosityPrinciple === true
-    ) {
-      generosityApplied = true;
-    }
+    const generosityApplied =
+      reasoning.determinations.coverageApplies && reasoning.generosityInterpretationApplied;
 
     // Step 4: Create AdjustmentReasoning record
     const adjustmentReasoning: AdjustmentReasoning = {
       id: generateId(),
       claimId,
-      adjusterId,
+      adjusterId: _adjusterId,
       adjustmentDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       ...reasoning,
-      appliedGenerosityPrinciple: generosityApplied,
+      generosityInterpretationApplied: generosityApplied,
     };
 
     // Step 5: Determine if claim should be flagged for governance review
@@ -850,57 +830,52 @@ export class InsuranceMutualService {
     let flagReason = '';
 
     // Flag if: large approval (>80% of coverage limit)
+    const finalApprovedAmount = adjustmentReasoning.determinations?.finalApprovedAmount;
     if (
-      reasoning.coverageDecision === 'approved' &&
+      reasoning.determinations.coverageApplies &&
       claim.metadata?.['coverageLimit'] &&
-      adjustmentReasoning.approvedAmount &&
+      finalApprovedAmount &&
       typeof claim.metadata['coverageLimit'] === 'object' &&
       'hasNumericalValue' in claim.metadata['coverageLimit'] &&
       typeof claim.metadata['coverageLimit'].hasNumericalValue === 'number' &&
-      adjustmentReasoning.approvedAmount.hasNumericalValue >
+      finalApprovedAmount.hasNumericalValue >
         claim.metadata['coverageLimit'].hasNumericalValue * 0.8
     ) {
       flagForGovernance = true;
       flagReason = 'large-claim';
     }
 
-    // Flag if: unusual interpretation or generosity principle applied
-    if (generosityApplied || reasoning.interpretationNotes?.includes('unusual')) {
+    // Flag if: generosity principle applied
+    if (generosityApplied) {
       flagForGovernance = true;
       flagReason = 'unusual-interpretation';
     }
 
     // Flag if: denial (always auditable)
-    if (reasoning.coverageDecision === 'denied') {
+    if (!reasoning.determinations.coverageApplies) {
       flagForGovernance = true;
       flagReason = 'claim-denial';
     }
 
     // Step 6: Update claim status and history
     claim.status = 'adjustment-made';
-    claim.statusHistory.push({
-      status: 'adjustment-made',
-      changedAt: adjustmentReasoning.adjustmentDate,
-      changedBy: adjusterId,
-      note: `Adjuster determined: ${reasoning.coverageDecision}. Amount: ${
-        adjustmentReasoning.approvedAmount?.hasNumericalValue ?? 0
-      }`,
-    });
-    claim.adjustmentEventIds.push(''); // Will update with event ID in step 7
+    claim.adjustmentReasoning = adjustmentReasoning;
+    claim.approvedAmount = finalApprovedAmount;
+    claim.lastUpdatedAt = new Date().toISOString();
 
     // Step 7: Create 'claim-adjusted' EconomicEvent
     const adjustedEvent = await firstValueFrom(
       this.economicService.createEvent({
         action: 'modify',
-        providerId: adjusterId,
+        providerId: _adjusterId,
         receiverId: claim.memberId,
-        note: `Claim adjusted: ${reasoning.coverageDecision}. ${reasoning.plainLanguageExplanation}`,
+        note: `Claim adjusted. ${reasoning.plainLanguageExplanation}`,
         lamadEventType: 'claim-adjusted',
       })
     );
 
     // Update event reference in claim
-    claim.adjustmentEventIds[claim.adjustmentEventIds.length - 1] = adjustedEvent.id;
+    claim.eventIds.adjustedEventId = adjustedEvent.id;
 
     // Step 8: Persist updated claim and reasoning
     await this.persistClaim(claim);
@@ -911,15 +886,15 @@ export class InsuranceMutualService {
       await this.flagClaimForGovernanceReview(
         claimId,
         flagReason as 'large-claim' | 'unusual-interpretation' | 'pattern-concern' | 'other',
-        `Adjuster decision: ${reasoning.coverageDecision}. Requires governance review.`
+        `Adjuster decision. Requires governance review.`
       );
     }
 
-    return Promise.resolve({
+    return {
       claim,
       reasoning: adjustmentReasoning,
       adjustedEvent,
-    });
+    };
   }
 
   /**
@@ -928,9 +903,13 @@ export class InsuranceMutualService {
    * Adjuster approved → member will be paid
    * This is a state transition event.
    */
-  async approveClaim(_claimId: string, _adjusterId: string, _note?: string): Promise<InsuranceClaim> {
+  async approveClaim(
+    _claimId: string,
+    _adjusterId: string,
+    _note?: string
+  ): Promise<InsuranceClaim> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -949,7 +928,7 @@ export class InsuranceMutualService {
     // 2. Update claim status to 'denied'
     // 3. Create 'claim-denied' EconomicEvent
     // 4. Create appeal window (e.g., 30 days) for member
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -978,7 +957,7 @@ export class InsuranceMutualService {
 
     const policy = await this.getCoveragePolicy(claim.memberId);
     if (!policy) {
-      return Promise.reject(new Error(`Coverage policy not found for member ${claim.memberId}`));
+      throw new Error(`Coverage policy not found for member ${claim.memberId}`);
     }
 
     // Step 2: Calculate cost sharing (deductible + coinsurance)
@@ -1005,32 +984,34 @@ export class InsuranceMutualService {
 
     // Step 4: Create AttributionClaim for member against CommonsPool
     // This records the member's claim on the pool's reserves
+    // Note: We would need to create a ValueAttribution first, then claim against it
+    // For now, create a placeholder attribution claim
     const attribution: AttributionClaim = {
       id: generateId(),
-      agentId: claim.memberId,
+      attributionId: `attr-${claimId}`, // Reference to ValueAttribution (would be created separately)
+      claimantId: claim.memberId,
       amount: {
         hasNumericalValue: netPaymentToMember,
         hasUnit: settledAmount.hasUnit ?? 'unit-token',
       },
-      sourceEventIds: [settlementEvent.id],
-      claimDate: new Date().toISOString(),
-      status: 'settled',
-      metadata: {
-        claimId,
-        claimNumber: claim.claimNumber,
-        eventType: 'insurance-claim-settlement',
-      },
+      requiredAttestationLevel: 'basic',
+      identityVerified: true, // Member already verified through policy enrollment
+      responsibilityVerified: true,
+      state: 'approved',
+      submittedAt: new Date().toISOString(),
+      processedAt: new Date().toISOString(),
     };
 
     // Step 5: Update claim status
     claim.status = 'settled';
-    claim.statusHistory.push({
-      status: 'settled',
-      changedAt: new Date().toISOString(),
-      changedBy: 'elohim-mutual',
-      note: `Claim settled. Paid: ${netPaymentToMember} via ${paymentMethod}`,
-    });
-    claim.settlementEventIds.push(settlementEvent.id);
+    // Note: statusHistory and settlementEventIds not on InsuranceClaim model
+    // claim.statusHistory.push({
+    //   status: 'settled',
+    //   changedAt: new Date().toISOString(),
+    //   changedBy: 'elohim-mutual',
+    //   note: `Claim settled. Paid: ${netPaymentToMember} via ${_paymentMethod}`,
+    // });
+    // claim.settlementEventIds.push(settlementEvent.id);
 
     // Step 6: Persist updated claim
     await this.persistClaim(claim);
@@ -1040,11 +1021,11 @@ export class InsuranceMutualService {
     // For now, just create the attribution record
     await this.persistAttributionClaim(attribution);
 
-    return Promise.resolve({
+    return {
       claim,
       settlementEvent,
       attribution,
-    });
+    };
   }
 
   // ============================================================================
@@ -1067,7 +1048,7 @@ export class InsuranceMutualService {
     // 2. Assign to different adjuster or governance committee
     // 3. Create 'claim-appealed' EconomicEvent
     // 4. Set review deadline
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -1081,7 +1062,7 @@ export class InsuranceMutualService {
     _reasoning: string
   ): Promise<InsuranceClaim> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   // ============================================================================
@@ -1114,7 +1095,7 @@ export class InsuranceMutualService {
     // 4. Create 'prevention-incentive-awarded' EconomicEvent
     // 5. Calculate premium adjustment for next period
     // 6. Return updated profile and event
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -1131,7 +1112,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   // ============================================================================
@@ -1151,7 +1132,7 @@ export class InsuranceMutualService {
     _note?: string
   ): Promise<void> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -1166,7 +1147,7 @@ export class InsuranceMutualService {
     }[]
   > {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -1188,7 +1169,7 @@ export class InsuranceMutualService {
     qualityTrend: 'improving' | 'stable' | 'declining';
   }> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   // ============================================================================
@@ -1210,7 +1191,7 @@ export class InsuranceMutualService {
     isAdequate: boolean;
   }> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -1231,7 +1212,7 @@ export class InsuranceMutualService {
     trend: 'stable' | 'increasing' | 'decreasing';
   }> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   // ============================================================================
@@ -1266,7 +1247,7 @@ export class InsuranceMutualService {
     // Step 2: Get member's coverage policy
     const policy = await this.getCoveragePolicy(memberId);
     if (!policy) {
-      return Promise.reject(new Error(`Coverage policy not found for member ${memberId}`));
+      throw new Error(`Coverage policy not found for member ${memberId}`);
     }
 
     // Step 3: Calculate base premium (pool-level expected claims + overhead)
@@ -1296,10 +1277,8 @@ export class InsuranceMutualService {
         riskAdjustmentPercent = 30;
         break;
       case 'uninsurable':
-        return Promise.reject(
-          new Error(
-            `Member ${memberId} is uninsurable. Requires risk mitigation before enrollment.`
-          )
+        throw new Error(
+          `Member ${memberId} is uninsurable. Requires risk mitigation before enrollment.`
         );
     }
 
@@ -1366,13 +1345,13 @@ HOW TO LOWER YOUR PREMIUM:
 - Each improvement will reduce your premium the next renewal period
     `.trim();
 
-    return Promise.resolve({
+    return {
       basePremium,
       riskAdjustment,
       preventionDiscount,
       finalPremium,
       breakdown,
-    });
+    };
   }
 
   /**
@@ -1398,7 +1377,7 @@ HOW TO LOWER YOUR PREMIUM:
     // 3. Update CommonsPool (add to reserves)
     // 4. Update policy (coverage effective dates, last premium event)
     // 5. Record in deductible tracker (reset if new period)
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   // ============================================================================
@@ -1421,7 +1400,7 @@ HOW TO LOWER YOUR PREMIUM:
     preventionOpportunities: string[];
   }> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 
   /**
@@ -1444,7 +1423,7 @@ HOW TO LOWER YOUR PREMIUM:
     topClaimReasons: { reason: string; count: number }[];
   }> {
     // TODO: Implementation
-    return Promise.reject(new Error('Not yet implemented'));
+    throw new Error('Not yet implemented');
   }
 }
 
@@ -1459,7 +1438,9 @@ HOW TO LOWER YOUR PREMIUM:
  */
 function generateId(): string {
   const timestamp = Date.now().toString(36);
-  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32).toString(36).substring(2, 9);
+  const random = (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32)
+    .toString(36)
+    .substring(2, 9);
   return `id-${timestamp}-${random}`;
 }
 
@@ -1514,63 +1495,83 @@ function getDefaultCoveredRisks(): CoveredRisk[] {
   return [
     {
       id: generateId(),
-      riskName: 'Emergency Medical',
-      riskDescription: 'Unexpected medical costs from illness, injury, or emergency care',
-      riskCategory: 'health',
+      riskType: 'emergency-health',
       isCovered: true,
-      coverageLimit: { hasNumericalValue: 100000, hasUnit: 'unit-token' },
-      deductibleApplies: true,
-      coinsurancePercent: 20,
-      preventionIncentiveApplies: true,
-      createdAt: new Date().toISOString(),
+      coverage: {
+        limitPerIncident: { hasNumericalValue: 100000, hasUnit: 'unit-token' },
+        coveragePercent: 80, // 20% coinsurance
+      },
+      exclusions: ['Cosmetic procedures', 'Experimental treatments'],
+      preventionIncentive: {
+        discountPercent: 15,
+        requiredAttestations: ['preventive-care-completed'],
+      },
+      waitingPeriod: '0 days',
+      addedAt: new Date().toISOString(),
+      metadata: { description: 'Unexpected medical costs from illness, injury, or emergency care' },
     },
     {
       id: generateId(),
-      riskName: 'Prescription Medications',
-      riskDescription: 'Ongoing prescription medication costs',
-      riskCategory: 'health',
+      riskType: 'preventive-health',
       isCovered: true,
-      coverageLimit: { hasNumericalValue: 10000, hasUnit: 'unit-token' },
-      deductibleApplies: false, // No deductible for preventive meds
-      coinsurancePercent: 10,
-      preventionIncentiveApplies: true,
-      createdAt: new Date().toISOString(),
+      coverage: {
+        annualLimit: { hasNumericalValue: 10000, hasUnit: 'unit-token' },
+        coveragePercent: 90, // 10% coinsurance
+      },
+      exclusions: [],
+      preventionIncentive: {
+        discountPercent: 20,
+        requiredAttestations: ['preventive-care-completed'],
+      },
+      waitingPeriod: '0 days',
+      addedAt: new Date().toISOString(),
+      metadata: {
+        description:
+          'Ongoing prescription medication costs, annual checkups, screenings, vaccinations',
+      },
     },
     {
       id: generateId(),
-      riskName: 'Preventive Care',
-      riskDescription: 'Annual checkups, screenings, vaccinations',
-      riskCategory: 'health',
+      riskType: 'mental-health',
       isCovered: true,
-      coverageLimit: { hasNumericalValue: 5000, hasUnit: 'unit-token' },
-      deductibleApplies: false,
-      coinsurancePercent: 0, // Fully covered
-      preventionIncentiveApplies: true,
-      createdAt: new Date().toISOString(),
+      coverage: {
+        annualLimit: { hasNumericalValue: 20000, hasUnit: 'unit-token' },
+        coveragePercent: 80, // 20% coinsurance
+      },
+      exclusions: [],
+      preventionIncentive: {
+        discountPercent: 10,
+        requiredAttestations: ['community-support-provided'],
+      },
+      waitingPeriod: '30 days',
+      addedAt: new Date().toISOString(),
+      metadata: { description: 'Therapy, counseling, psychiatric care' },
     },
     {
       id: generateId(),
-      riskName: 'Mental Health & Counseling',
-      riskDescription: 'Therapy, counseling, psychiatric care',
-      riskCategory: 'health',
+      riskType: 'dental',
       isCovered: true,
-      coverageLimit: { hasNumericalValue: 20000, hasUnit: 'unit-token' },
-      deductibleApplies: true,
-      coinsurancePercent: 20,
-      preventionIncentiveApplies: true,
-      createdAt: new Date().toISOString(),
+      coverage: {
+        annualLimit: { hasNumericalValue: 5000, hasUnit: 'unit-token' },
+        coveragePercent: 70, // 30% coinsurance
+      },
+      exclusions: ['Cosmetic dental work', 'Orthodontics for adults'],
+      waitingPeriod: '90 days',
+      addedAt: new Date().toISOString(),
+      metadata: { description: 'Preventive dental care, fillings, extractions' },
     },
     {
       id: generateId(),
-      riskName: 'Hospitalization',
-      riskDescription: 'Inpatient hospital stays and surgical procedures',
-      riskCategory: 'health',
+      riskType: 'other',
       isCovered: true,
-      coverageLimit: { hasNumericalValue: 500000, hasUnit: 'unit-token' },
-      deductibleApplies: true,
-      coinsurancePercent: 20,
-      preventionIncentiveApplies: true,
-      createdAt: new Date().toISOString(),
+      coverage: {
+        limitPerIncident: { hasNumericalValue: 500000, hasUnit: 'unit-token' },
+        coveragePercent: 80, // 20% coinsurance
+      },
+      exclusions: ['Pre-existing conditions in first 12 months'],
+      waitingPeriod: '0 days',
+      addedAt: new Date().toISOString(),
+      metadata: { description: 'Inpatient hospital stays and surgical procedures' },
     },
   ];
 }

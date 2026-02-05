@@ -1,9 +1,9 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 9.9% (2026-01-31)
+// @coverage: 97.6% (2026-02-05)
 
 import { CustodianCommitmentService } from './custodian-commitment.service';
-import { ShefaService } from './shefa.service';
+import { ShefaService, CustodianMetrics } from './shefa.service';
 
 /**
  * CustodianSelectionService
@@ -77,17 +77,25 @@ export class CustodianSelectionService {
    * @returns Best custodian with score breakdown, or null if none available
    */
   async selectBestCustodian(contentId: string): Promise<CustodianScore | null> {
-    const stats = this.statistics();
-    stats.selectionsAttempted++;
+    this.statistics.update(stats => ({
+      ...stats,
+      selectionsAttempted: stats.selectionsAttempted + 1,
+    }));
 
     // Check cache
     const cached = this.selectionCache.get(contentId);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      stats.cacheHits++;
+      this.statistics.update(stats => ({
+        ...stats,
+        cacheHits: stats.cacheHits + 1,
+      }));
       return cached.score;
     }
 
-    stats.cacheMisses++;
+    this.statistics.update(stats => ({
+      ...stats,
+      cacheMisses: stats.cacheMisses + 1,
+    }));
 
     try {
       // Find all custodians committed to this content
@@ -136,7 +144,10 @@ export class CustodianSelectionService {
         timestamp: Date.now(),
       });
 
-      stats.selectionsSuccessful++;
+      this.statistics.update(current => ({
+        ...current,
+        selectionsSuccessful: current.selectionsSuccessful + 1,
+      }));
 
       return best;
     } catch {
@@ -157,11 +168,12 @@ export class CustodianSelectionService {
    */
   private async scoreCustodian(
     custodian: Custodian,
-    stewardTier: 1 | 2 | 3 | 4
+    stewardTier: 1 | 2 | 3 | 4,
+    providedMetrics?: CustodianMetrics
   ): Promise<CustodianScore | null> {
     try {
-      // Get metrics from Shefa
-      const metrics = await this.shefa.getMetrics(custodian.id);
+      // Get metrics from Shefa if not provided
+      const metrics = providedMetrics ?? (await this.shefa.getMetrics(custodian.id));
 
       if (!metrics) {
         return null;
@@ -169,6 +181,18 @@ export class CustodianSelectionService {
 
       // Skip unhealthy custodians
       if (metrics.health.uptimePercent < 50 || !metrics.health.availability) {
+        return null;
+      }
+
+      // Skip custodians with extreme latency (>2000ms)
+      if (metrics.health.responseTimeP95Ms > 2000) {
+        return null;
+      }
+
+      // Skip custodians with extreme bandwidth utilization (>95%)
+      const bandwidthUtilization =
+        (metrics.bandwidth.currentUsageMbps / metrics.bandwidth.declaredMbps) * 100;
+      if (bandwidthUtilization > 95) {
         return null;
       }
 
@@ -316,7 +340,7 @@ export class CustodianSelectionService {
           epic: 'unknown',
         };
 
-        const score = await this.scoreCustodian(custodian, metrics.economic.stewardTier);
+        const score = await this.scoreCustodian(custodian, metrics.economic.stewardTier, metrics);
 
         if (score) {
           scores.push(score);

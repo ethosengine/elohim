@@ -17,6 +17,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal, computed, output, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+// @coverage: 58.4% (2026-02-05)
+
 import {
   type DoorwayInfo,
   type DoorwayRegion,

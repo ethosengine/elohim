@@ -14,7 +14,7 @@
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
-// @coverage: 47.9% (2026-01-31)
+// @coverage: 47.9% (2026-02-05)
 
 import { Observable } from 'rxjs';
 

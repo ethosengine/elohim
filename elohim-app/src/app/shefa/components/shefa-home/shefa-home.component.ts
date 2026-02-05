@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 98.6% (2026-02-05)
+
 import { EconomicEvent, REAAction } from '@app/elohim/models';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
@@ -778,6 +780,10 @@ export class ShefaHomeComponent implements OnInit {
   formatTime(isoString: string): string {
     try {
       const date = new Date(isoString);
+      // Check if the date is invalid
+      if (Number.isNaN(date.getTime())) {
+        return 'Unknown';
+      }
       const now = new Date();
       const diff = now.getTime() - date.getTime();
 

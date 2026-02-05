@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
+// @coverage: 26.7% (2026-02-05)
+
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
 import { ShefaService, CustodianMetrics } from '../../services/shefa.service';
 

@@ -12,7 +12,7 @@
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 2.0% (2026-01-31)
+// @coverage: 48.0% (2026-02-05)
 
 import { firstValueFrom } from 'rxjs';
 
@@ -138,7 +138,7 @@ export class BlobBootstrapService {
    * Start blob bootstrap sequence (non-blocking).
    * Called from app.component.ts when Holochain is ready.
    */
-  async startBootstrap(contentIdsToPreload?: string[]): Promise<void> {
+  startBootstrap(contentIdsToPreload?: string[]): void {
     if (!this.engine) {
       return;
     }
@@ -163,7 +163,7 @@ export class BlobBootstrapService {
       // Re-attach event listeners (simplified - in production use a helper method)
     }
 
-    await this.engine.startBootstrap();
+    this.engine.startBootstrap();
   }
 
   /**

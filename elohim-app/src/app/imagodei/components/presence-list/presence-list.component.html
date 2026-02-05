@@ -17,50 +17,35 @@
 
     <!-- Success Message -->
     @if (successMessage()) {
-      <div
-        class="success-banner"
-        (click)="clearMessages()"
-        (keydown.enter)="clearMessages()"
-        (keydown.space)="clearMessages()"
-        tabindex="0"
-        role="status"
-      >
+      <output class="success-banner">
         <span class="success-icon">✓</span>
         <span>{{ successMessage() }}</span>
-      </div>
+        <button type="button" class="dismiss-btn" (click)="clearMessages()">Dismiss</button>
+      </output>
     }
 
     <!-- Error Display -->
     @if (error()) {
-      <div
-        class="error-banner"
-        (click)="clearMessages()"
-        (keydown.enter)="clearMessages()"
-        (keydown.space)="clearMessages()"
-        tabindex="0"
-        role="alert"
-      >
+      <div class="error-banner" role="alert">
         <span class="error-icon">✕</span>
         <span>{{ error() }}</span>
+        <button type="button" class="dismiss-btn" (click)="clearMessages()">Dismiss</button>
       </div>
     }
 
     <!-- Create Form Modal -->
     @if (showCreateForm()) {
-      <div
-        class="modal-overlay"
-        (click)="closeCreateForm()"
-        (keydown.enter)="closeCreateForm()"
-        (keydown.space)="closeCreateForm()"
-        tabindex="0"
-      >
-        <div
-          class="modal-content"
-          (click)="$event.stopPropagation()"
-          (keydown)="$event.stopPropagation()"
-          tabindex="-1"
-        >
-          <h2>Create Contributor Presence</h2>
+      <dialog class="modal-overlay" open>
+        <div class="modal-content" aria-labelledby="modal-title">
+          <button
+            type="button"
+            class="modal-close"
+            (click)="closeCreateForm()"
+            aria-label="Close dialog"
+          >
+            ×
+          </button>
+          <h2 id="modal-title">Create Contributor Presence</h2>
           <p class="modal-subtitle">
             Create a presence for a contributor who isn't yet in the network. Recognition will
             accumulate until they claim their presence.
@@ -118,7 +103,7 @@
             </div>
           </form>
         </div>
-      </div>
+      </dialog>
     }
 
     <!-- Filters -->

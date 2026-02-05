@@ -3,6 +3,8 @@ import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 
+// @coverage: 45.5% (2026-02-05)
+
 import { takeUntil, catchError } from 'rxjs/operators';
 
 import { Subject, of } from 'rxjs';
@@ -18,7 +20,7 @@ import {
 } from '@app/imagodei/models/session-human.model';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+import { AgencyService } from '@app/imagodei/services/agency.service';
 
 import { MasteryStats, MasteryLevel } from '../../models';
 import { ContentMasteryService } from '../../services/content-mastery.service';
@@ -49,7 +51,7 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
   // Injected services for sovereignty/network tab
-  private readonly sovereigntyService = inject(SovereigntyService);
+  private readonly agencyService = inject(AgencyService);
   private readonly holochainService = inject(HolochainClientService);
   readonly identityService = inject(IdentityService); // Public for template access
   private readonly route = inject(ActivatedRoute);
@@ -58,10 +60,10 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   activeTab: 'overview' | 'paths' | 'timeline' | 'network' | 'settings' = 'overview';
 
   // Sovereignty state (reactive)
-  readonly sovereigntyState = this.sovereigntyService.sovereigntyState;
-  readonly stageInfo = this.sovereigntyService.stageInfo;
-  readonly connectionStatus = this.sovereigntyService.connectionStatus;
-  readonly canUpgrade = this.sovereigntyService.canUpgrade;
+  readonly agencyState = this.agencyService.agencyState;
+  readonly stageInfo = this.agencyService.stageInfo;
+  readonly connectionStatus = this.agencyService.connectionStatus;
+  readonly canUpgrade = this.agencyService.canUpgrade;
   readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());
 
   // ==========================================================================
@@ -568,7 +570,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
    * Get CSS class for sovereignty stage badge.
    */
   getStageBadgeClass(): string {
-    const stage = this.sovereigntyState().currentStage;
+    const stage = this.agencyState().currentStage;
     return `stage-badge--${stage}`;
   }
 

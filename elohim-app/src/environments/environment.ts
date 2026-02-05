@@ -1,6 +1,6 @@
 import { Environment, LogLevel } from './environment.types';
 
-// @coverage: 100.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 export const environment: Environment = {
   production: false,

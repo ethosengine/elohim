@@ -1,6 +1,40 @@
 # Lint & Coverage Orchestrator Skill
 
-Orchestrate parallel Haiku agents to fix lint issues and write basic tests. Escalate complex work to Sonnet. Run with Sonnet for cost-effective batch processing.
+Orchestrate the two-tier quality pipeline (quality-sweep → quality-deep) for lint fixes, test writing, and backlog generation.
+
+## Pipeline Overview
+
+```
+Orchestrator checks: does module have existing specs?
+     │
+     ├─ YES → dispatch quality-sweep directly
+     │
+     └─ NO  → dispatch quality-deep to seed reference spec
+                    │
+                    ▼
+quality-deep (Sonnet) - Reference Spec Seeding
+     │
+     ├─ Creates: 1 thorough spec with mock factories + // PATTERN: comments
+     └─ Reports: sweep-ready sibling files list
+                    │
+                    ▼
+quality-sweep (Haiku) - 1st Pass
+     │
+     ├─ Handles: ~80% (mechanical lint, basic tests)
+     ├─ Copies: mock patterns from reference spec
+     └─ Escalates: ~20% → quality-deep
+                          │
+                          ▼
+quality-deep (Sonnet) - 2nd Pass
+     │
+     ├─ Finishes: Complex tests, refactoring
+     └─ Creates: GitHub Issues for ~5% needing sprint work
+                          │
+                          ▼
+GitHub Issues (backlog label)
+     │
+     └─ Sprint planning picks up P0/P1 items
+```
 
 ## Coverage Workflow
 
@@ -16,7 +50,7 @@ grep -r "@coverage:" elohim-app/src --include="*.ts" | grep -v ".spec.ts" | whil
 done
 ```
 
-### Haiku Test Writing (Mechanical Only)
+### quality-sweep Test Writing (Mechanical Only)
 ```
 Write basic mechanical tests for:
 /projects/elohim/elohim-app/src/app/PATH/FILE.ts
@@ -27,21 +61,21 @@ Do NOT run tests. Write only:
 - Observable return tests
 - Property initialization tests
 
-Escalate to Sonnet:
+Escalate to quality-deep:
 - Async flow testing
 - Complex mock setup
 - Error handling paths
 - Business logic verification
 
-Report with Test Outcome format.
+Report with First-Pass Complete format.
 ```
 
-### Sonnet Test Writing (Complex/Escalated)
+### quality-deep Test Writing (Complex/Escalated)
 ```
-Write comprehensive tests for:
+Finish tests for:
 /projects/elohim/elohim-app/src/app/PATH/FILE.ts
 
-Escalated from Haiku because: [reason]
+Escalated from quality-sweep because: [reason]
 
 Do NOT run tests. Cover:
 - Async/Observable chains
@@ -49,7 +83,10 @@ Do NOT run tests. Cover:
 - Edge cases
 - Business logic
 
-Report gaps and design suggestions.
+For items needing sprint work, create GitHub Issues:
+- Search first: gh issue list --search "FILE.ts" --label "backlog"
+- Create: [module/area] Title format with backlog label
+- Report issues created in Second-Pass Complete format
 ```
 
 ## Quick Start
@@ -70,15 +107,56 @@ jq '[.[] | select(.tier == "mechanical")] | group_by(.ruleId) | map({rule: .[0].
 jq -r '[.[] | select(.ruleId == "RULE_ID")] | group_by(.file) | map({file: .[0].file | split("/") | .[-1], path: .[0].file, count: length}) | sort_by(-.count) | .[0:10]' .claude/lint-manifest.json
 ```
 
-### 2. Dispatch Haiku Agents (max 7 parallel)
+### 2. Check for Uncovered Modules (Reference Spec Seeding)
+
+Before dispatching sweep, check if target modules have existing spec files:
+
+```bash
+# Find modules with no spec files at all
+for dir in elohim-app/src/app/MODULE/services; do
+  specs=$(find "$dir" -name "*.spec.ts" 2>/dev/null | wc -l)
+  sources=$(find "$dir" -name "*.ts" ! -name "*.spec.ts" 2>/dev/null | wc -l)
+  if [ "$specs" -eq 0 ] && [ "$sources" -gt 0 ]; then
+    echo "NEEDS SEED: $dir ($sources files, 0 specs)"
+  fi
+done
+```
+
+**If a module has zero specs**, dispatch quality-deep FIRST to create a reference spec:
+
+```
+Create a reference spec for the most representative service in:
+/projects/elohim/elohim-app/src/app/MODULE/services/
+
+This is a reference spec seeding task. Follow the Reference Spec Seeding
+workflow in your agent prompt:
+1. Scan the module for all untested files
+2. Pick the best seed target (most dependencies, most representative)
+3. Write a thorough spec with mock factories and // PATTERN: comments
+4. Report the sweep-ready siblings list
+```
+
+Wait for deep to finish, then dispatch sweep for the siblings it listed.
+
+### 3. Dispatch quality-sweep Agents (max 7 parallel)
 
 Use the Task tool with:
-- `subagent_type`: "general-purpose"
-- `model`: "haiku"
+- `subagent_type`: "quality-sweep"
 - `run_in_background`: true
-- `allowed_tools`: ["Read", "Edit"] (minimal for speed)
 
-### 3. Agent Prompt Templates
+quality-sweep handles 80% mechanical work, escalates 20% to quality-deep.
+
+**Important**: Sweep relies on existing spec files as reference for mock patterns and data shapes. If sweep is assigned a file in a module with no specs, it will escalate the entire file back to deep. To avoid this round-trip waste, always run the reference spec seeding step (step 2) first for uncovered modules.
+
+### 4. Dispatch quality-deep for Escalations
+
+After quality-sweep completes, dispatch quality-deep for escalated items:
+- `subagent_type`: "quality-deep"
+- `run_in_background`: true
+
+quality-deep finishes complex work, creates GitHub Issues for the 5% needing sprint work.
+
+### 4. Agent Prompt Templates
 
 #### Unused Variables
 ```
@@ -198,11 +276,63 @@ grep -r "@coverage:" elohim-app/src --include="*.ts" | grep -v ".spec.ts" | wc -
 
 | Task | Tier | Agent | Runs Tests? |
 |------|------|-------|-------------|
-| Mechanical lint fixes | mechanical | Haiku | No |
-| Basic test writing | mechanical | Haiku (linter) | No |
-| Type safety fixes | contextual | Sonnet | No |
-| Complex test writing | contextual | Sonnet (test-generator) | No |
+| Reference spec seeding | seeding | Sonnet (quality-deep) | No |
+| Mechanical lint fixes | mechanical | Haiku (quality-sweep) | No |
+| Basic test writing | mechanical | Haiku (quality-sweep) | No |
+| Type safety fixes | contextual | Sonnet (quality-deep) | No |
+| Complex test writing | contextual | Sonnet (quality-deep) | No |
 | Architectural decisions | judgment | Opus | No |
 | **Batch test run** | - | npm test | **Yes** |
 
 All test execution happens in batch via `npm test` before commit, which also updates coverage annotations.
+
+## GitHub Issues Workflow (The 5%)
+
+quality-deep creates GitHub Issues for work needing sprint planning.
+
+### Check Existing Backlog
+```bash
+# View all backlog items
+gh issue list --label "backlog" --limit 50
+
+# Filter by priority
+gh issue list --label "backlog,P1"
+
+# Search by module
+gh issue list --search "[lamad/" --label "backlog"
+```
+
+### Issue Format
+
+**Title**: `[module/area] Brief description`
+- `[lamad/path] Implement mastery-based suggestions`
+- `[imagodei/auth] Add session timeout handling`
+
+**Labels**:
+- `backlog` (required)
+- Priority: `P0`, `P1`, `P2`, `P3`
+- Type: `architectural`, `feature-gap`, `security`, `tech-debt`
+
+### Sprint Planning
+
+```bash
+# Review P0/P1 for next sprint
+gh issue list --label "backlog,P1" --json number,title,labels
+
+# Promote to sprint
+gh issue edit 123 --milestone "Sprint-Name" --remove-label "backlog" --add-label "sprint-active"
+
+# After sprint completion
+gh issue close 123
+```
+
+### Backlog Hygiene
+
+```bash
+# Find stale backlog items (no updates in 30 days)
+gh issue list --label "backlog" --json number,title,updatedAt | \
+  jq '[.[] | select(.updatedAt < (now - 2592000 | todate))]'
+
+# Bulk update priority
+gh issue edit 123 124 125 --add-label "P2" --remove-label "P3"
+```

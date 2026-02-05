@@ -7,7 +7,7 @@
 
 import { ContentNode } from './content-node.model';
 
-// @coverage: 100.0% (2026-01-31)
+// @coverage: 100.0% (2026-02-05)
 
 /**
  * Path context maintained during learning navigation.

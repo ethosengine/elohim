@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 36.8% (2026-01-31)
+// @coverage: 81.9% (2026-02-05)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -306,6 +306,13 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
    * Handle step loaded (fallback for non-hierarchical paths)
    */
   private handleStepLoaded(stepView: PathStepView, path: LearningPath): void {
+    // Handle case where content is not found
+    if (!stepView.content) {
+      this.error = `Content not found: ${stepView.step.resourceId}`;
+      this.isLoading = false;
+      return;
+    }
+
     this.stepView = stepView;
 
     const stepTitle = stepView.content?.title ?? stepView.step.stepTitle;
@@ -694,15 +701,18 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Persist basic completion to backend if we reach a 'completed' state
     // For prototype, let's say 'remember' is enough to mark the step complete navigation-wise
     if (this.currentBloomLevel === 'remember' || this.currentBloomLevel === 'apply') {
-      this.agentService.completeStep(this.pathId, this.stepIndex).subscribe({
-        next: () => {
-          // Refresh sidebar
-          this.loadContext();
-        },
-        error: (err: unknown) => {
-          console.error('Failed to complete step:', err);
-        },
-      });
+      this.agentService
+        .completeStep(this.pathId, this.stepIndex)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            // Refresh sidebar
+            this.loadContext();
+          },
+          error: (err: unknown) => {
+            console.error('Failed to complete step:', err);
+          },
+        });
     }
   }
 

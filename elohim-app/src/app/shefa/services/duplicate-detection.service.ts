@@ -12,6 +12,8 @@
 
 import { Injectable } from '@angular/core';
 
+// @coverage: 58.3% (2026-02-05)
+
 import {
   DuplicateResult,
   FuzzyMatch,
@@ -53,7 +55,7 @@ export class DuplicateDetectionService {
    */
   detect(transaction: PlaidTransaction): DuplicateResult {
     // Level 1: Exact plaidTransactionId match
-    const exactMatch = this.checkExactMatch(transaction.transactionId);
+    const exactMatch = this.checkExactMatch(transaction.transaction_id);
     if (exactMatch) {
       return {
         isDuplicate: true,
@@ -99,12 +101,12 @@ export class DuplicateDetectionService {
    *
    * Returns only new, non-duplicate transactions.
    */
-  async filterDuplicates(transactions: PlaidTransaction[]): Promise<PlaidTransaction[]> {
+  filterDuplicates(transactions: PlaidTransaction[]): PlaidTransaction[] {
     const uniqueTransactions: PlaidTransaction[] = [];
     const seenHashes = new Set<string>();
 
     for (const txn of transactions) {
-      const dupResult = await this.detect(txn);
+      const dupResult = this.detect(txn);
 
       if (!dupResult.isDuplicate && !seenHashes.has(this.generateHash(txn))) {
         uniqueTransactions.push(txn);
@@ -177,7 +179,7 @@ export class DuplicateDetectionService {
    * Same transaction imported twice will have identical hash.
    */
   private generateHash(transaction: PlaidTransaction): string {
-    const data = `${transaction.accountId}|${this.roundAmount(transaction.amount)}|${transaction.date}|${transaction.name}`;
+    const data = `${transaction.account_id}|${this.roundAmount(transaction.amount)}|${transaction.date}|${transaction.name}`;
     return this.sha256Hash(data);
   }
 

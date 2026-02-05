@@ -15,7 +15,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 17.5% (2026-01-31)
+// @coverage: 90.5% (2026-02-05)
 
 import { Observable, catchError, map, of, throwError, timeout } from 'rxjs';
 

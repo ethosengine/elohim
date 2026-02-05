@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 3.9% (2026-01-31)
+// @coverage: 92.2% (2026-02-05)
 
 import { HolochainClientService } from './holochain-client.service';
 

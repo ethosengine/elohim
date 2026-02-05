@@ -7,8 +7,8 @@
  * Pipeline: checkout → resolve hosts → verify health → seed
  *
  * Auto-detects target environment from branch:
- *   - dev, feat-*, claude-* → alpha.elohim.host (doorway-dev)
- *   - staging*              → staging.elohim.host (doorway-dev)
+ *   - dev, feat-*, claude-* → alpha.elohim.host (doorway-alpha)
+ *   - staging*              → staging.elohim.host (doorway-staging)
  *   - main                  → elohim.host (doorway)
  *
  * Parameters:
@@ -99,6 +99,7 @@ spec:
         skipDefaultCheckout(true)
         timeout(time: 15, unit: 'MINUTES')  // SQLite seeding is fast (~5 seconds)
         buildDiscarder(logRotator(numToKeepStr: '20'))
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }
 
     // No triggers - orchestrator handles triggering genesis after all builds complete

@@ -40,11 +40,11 @@
   }
 
   @if (successMessage()) {
-    <div class="success-banner" role="status">
+    <output class="success-banner">
       <span class="icon">&#10003;</span>
       <span class="message">{{ successMessage() }}</span>
       <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
-    </div>
+    </output>
   }
 
   <!-- Loading State -->
@@ -115,8 +115,8 @@
 
         <!-- Relationship Level -->
         <div class="form-group">
-          <label>Your relationship to this person:</label>
-          <div class="relationship-options">
+          <fieldset class="relationship-options">
+            <legend class="form-label">Your relationship to this person:</legend>
             @for (level of relationshipLevels; track level.value) {
               <button
                 type="button"
@@ -128,7 +128,7 @@
                 <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
               </button>
             }
-          </div>
+          </fieldset>
           <p class="weight-note">
             Your support will add
             <strong>{{ currentWeight() }}</strong>
@@ -187,12 +187,8 @@
 
         <!-- Relationship Level -->
         <div class="form-group">
-          <label id="relationship-legend-initiate">Your relationship to this person:</label>
-          <div
-            class="relationship-options"
-            role="group"
-            aria-labelledby="relationship-legend-initiate"
-          >
+          <fieldset class="relationship-options">
+            <legend class="form-label">Your relationship to this person:</legend>
             @for (level of relationshipLevels; track level.value) {
               <button
                 type="button"
@@ -204,7 +200,7 @@
                 <span class="level-name">{{ getRelationshipLevelLabel(level.value) }}</span>
               </button>
             }
-          </div>
+          </fieldset>
           <p class="weight-note">
             Your initial support will be
             <strong>{{ currentWeight() }}</strong>
@@ -228,8 +224,8 @@
 
         <!-- Categories -->
         <div class="form-group">
-          <label>Categories (select all that apply):</label>
-          <div class="category-options" role="group" aria-labelledby="category-legend">
+          <fieldset class="category-options">
+            <legend class="form-label">Categories (select all that apply):</legend>
             @for (cat of categories; track cat.value) {
               <label class="category-option" [class.selected]="isCategorySelected(cat.value)">
                 <input
@@ -243,7 +239,7 @@
                 </div>
               </label>
             }
-          </div>
+          </fieldset>
         </div>
 
         <!-- Evidence -->

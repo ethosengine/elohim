@@ -455,4 +455,421 @@ describe('ContentViewerComponent', () => {
       expect(true).toBeTrue();
     }));
   });
+
+  describe('governance features', () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+    }));
+
+    it('should get governance status label', () => {
+      component.governanceState = { status: 'community-reviewed' } as any;
+      expect(component.getGovernanceStatusLabel()).toBe('Community Reviewed');
+
+      component.governanceState = { status: 'challenged' } as any;
+      expect(component.getGovernanceStatusLabel()).toBe('Under Challenge');
+
+      component.governanceState = null;
+      expect(component.getGovernanceStatusLabel()).toBe('Unreviewed');
+    });
+
+    it('should get governance status icon', () => {
+      component.governanceState = { status: 'elohim-reviewed' } as any;
+      expect(component.getGovernanceStatusIcon()).toBe('✓');
+
+      component.governanceState = { status: 'challenged' } as any;
+      expect(component.getGovernanceStatusIcon()).toBe('⚠️');
+
+      component.governanceState = null;
+      expect(component.getGovernanceStatusIcon()).toBe('❓');
+    });
+
+    it('should get SLA status for challenge', () => {
+      const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(); // 10 days
+      const nearDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days
+      const pastDate = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(); // -1 day
+
+      expect(component.getSlaStatus({ slaDeadline: futureDate } as any)).toBe('sla-on-track');
+      expect(component.getSlaStatus({ slaDeadline: nearDate } as any)).toBe('sla-warning');
+      expect(component.getSlaStatus({ slaDeadline: pastDate } as any)).toBe('sla-breached');
+      expect(component.getSlaStatus({} as any)).toBe('unknown');
+    });
+
+    it('should get days remaining until deadline', () => {
+      const futureDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+      const daysRemaining = component.getDaysRemaining(futureDate);
+      expect(daysRemaining).toBeGreaterThanOrEqual(4);
+      expect(daysRemaining).toBeLessThanOrEqual(6);
+
+      expect(component.getDaysRemaining(undefined)).toBe(-1);
+    });
+
+    it('should format governance date', () => {
+      const isoDate = '2025-01-15T10:30:00.000Z';
+      const formatted = component.formatGovernanceDate(isoDate);
+      expect(formatted).toContain('Jan');
+      expect(formatted).toContain('15');
+      expect(formatted).toContain('2025');
+    });
+
+    it('should handle invalid governance date', () => {
+      expect(component.formatGovernanceDate('invalid-date')).toBe('Invalid Date');
+      expect(component.formatGovernanceDate(undefined)).toBe('Unknown');
+    });
+  });
+
+  describe('feedback profile mapping', () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+    }));
+
+    it('should map content types to feedback profiles', () => {
+      expect(component.mapContentTypeToProfileType('epic')).toBe('learning-content');
+      expect(component.mapContentTypeToProfileType('tutorial')).toBe('learning-content');
+      expect(component.mapContentTypeToProfileType('research')).toBe('research-content');
+      expect(component.mapContentTypeToProfileType('testimony')).toBe('personal-testimony');
+      expect(component.mapContentTypeToProfileType('proposal')).toBe('governance-proposal');
+      expect(component.mapContentTypeToProfileType('unknown')).toBe('learning-content');
+    });
+  });
+
+  describe('path context and detours', () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+    }));
+
+    it('should track path context from service', fakeAsync(() => {
+      const pathContext = {
+        pathId: 'test-path',
+        pathTitle: 'Test Path',
+        stepIndex: 2,
+        totalSteps: 10,
+        returnRoute: ['path', 'test-path'],
+        detourStack: [{ fromContentId: 'node-1', toContentId: 'test-content-1', detourType: 'graph-explore' as const, timestamp: new Date().toISOString() }],
+      };
+
+      pathContextSubject.next(pathContext);
+      tick();
+
+      expect(component.pathContext).toEqual(pathContext);
+      expect(component.hasReturnPath).toBe(true);
+    }));
+
+    it('should detect no return path when detour stack is empty', fakeAsync(() => {
+      const pathContext = {
+        pathId: 'test-path',
+        pathTitle: 'Test Path',
+        stepIndex: 2,
+        totalSteps: 10,
+        detourStack: [],
+      };
+
+      pathContextSubject.next(pathContext);
+      tick();
+
+      expect(component.hasReturnPath).toBe(false);
+    }));
+
+    it('should return to path when hasReturnPath', () => {
+      component.pathContext = {
+        pathId: 'test-path',
+        pathTitle: 'Test Path',
+        stepIndex: 2,
+        totalSteps: 10,
+        returnRoute: ['/lamad/path', 'test-path', 'step', '2'],
+        detourStack: [],
+      };
+      pathContextServiceSpy.returnToPath.and.returnValue(['/lamad/path', 'test-path', 'step', '2']);
+
+      component.returnToPath();
+
+      expect(pathContextServiceSpy.returnToPath).toHaveBeenCalled();
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path', 'step', '2']);
+    });
+
+    it('should not navigate if no return path', () => {
+      component.pathContext = null;
+      pathContextServiceSpy.returnToPath.and.returnValue(null);
+
+      component.returnToPath();
+
+      expect(routerSpy.navigate).not.toHaveBeenCalled();
+    });
+
+    it('should track detour when selecting graph node', () => {
+      component.pathContext = {
+        pathId: 'test-path',
+        pathTitle: 'Test Path',
+        stepIndex: 2,
+        totalSteps: 10,
+        returnRoute: ['path', 'test-path'],
+        detourStack: [],
+      };
+      component['nodeId'] = 'current-node';
+
+      component.onGraphNodeSelected('related-node');
+
+      expect(pathContextServiceSpy.startDetour).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          fromContentId: 'current-node',
+          toContentId: 'related-node',
+          detourType: 'related',
+        })
+      );
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/resource', 'related-node']);
+    });
+
+    it('should track detour when exploring in graph', () => {
+      component.pathContext = {
+        pathId: 'test-path',
+        pathTitle: 'Test Path',
+        stepIndex: 2,
+        totalSteps: 10,
+        returnRoute: ['path', 'test-path'],
+        detourStack: [],
+      };
+      component['nodeId'] = 'current-node';
+
+      component.exploreInGraph();
+
+      expect(pathContextServiceSpy.startDetour).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          fromContentId: 'current-node',
+          toContentId: 'current-node',
+          detourType: 'graph-explore',
+        })
+      );
+      expect(routerSpy.navigate).toHaveBeenCalledWith(
+        ['/lamad/explore'],
+        jasmine.objectContaining({
+          queryParams: jasmine.objectContaining({
+            focus: 'current-node',
+            fromPath: 'test-path',
+            returnStep: 2,
+          }),
+        })
+      );
+    });
+
+    it('should not track detour if no path context', () => {
+      component.pathContext = null;
+      component['nodeId'] = 'current-node';
+
+      component.onGraphNodeSelected('related-node');
+
+      expect(pathContextServiceSpy.startDetour).not.toHaveBeenCalled();
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/resource', 'related-node']);
+    });
+
+    it('should not explore in graph if no nodeId', () => {
+      component['nodeId'] = null;
+
+      component.exploreInGraph();
+
+      expect(routerSpy.navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('focused view mode', () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+    }));
+
+    it('should toggle focused view on', () => {
+      expect(component.isFocusedView).toBe(false);
+
+      component.onFocusedViewToggle(true);
+
+      expect(component.isFocusedView).toBe(true);
+    });
+
+    it('should toggle focused view off', () => {
+      component.isFocusedView = true;
+
+      component.onFocusedViewToggle(false);
+
+      expect(component.isFocusedView).toBe(false);
+    });
+
+    it('should exit focused view on escape key', () => {
+      component.isFocusedView = true;
+
+      component.onEscapeKey();
+
+      expect(component.isFocusedView).toBe(false);
+    });
+
+    it('should not exit if not in focused view', () => {
+      component.isFocusedView = false;
+      spyOn(component, 'onFocusedViewToggle');
+
+      component.onEscapeKey();
+
+      expect(component.onFocusedViewToggle).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('renderer completion events', () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      component['nodeId'] = 'test-content-1';
+    }));
+
+    it('should handle renderer completion with passing score', () => {
+      const event = {
+        type: 'quiz',
+        passed: true,
+        score: 85,
+        details: { attempts: 1 },
+      };
+
+      (component as any).onRendererComplete(event);
+
+      expect(affinityServiceSpy.incrementAffinity).toHaveBeenCalledWith(
+        'test-content-1',
+        jasmine.any(Number)
+      );
+    });
+
+    it('should handle renderer completion with failing score', () => {
+      const event = {
+        type: 'quiz',
+        passed: false,
+        score: 45,
+        details: { attempts: 2 },
+      };
+
+      (component as any).onRendererComplete(event);
+
+      expect(affinityServiceSpy.incrementAffinity).toHaveBeenCalledWith('test-content-1', 0.1);
+    });
+
+    it('should not handle completion if no nodeId', () => {
+      component['nodeId'] = null;
+      const event = {
+        type: 'quiz',
+        passed: true,
+        score: 90,
+        details: {},
+      };
+
+      (component as any).onRendererComplete(event);
+
+      expect(affinityServiceSpy.incrementAffinity).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loading states and errors', () => {
+    it('should handle related nodes load error', fakeAsync(() => {
+      dataLoaderSpy.getContent.and.callFake((id: string) => {
+        if (id === 'test-content-1') return of(mockContentNode);
+        return throwError(() => new Error('Failed'));
+      });
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.relatedNodes).toEqual([]);
+    }));
+
+    it('should handle containing paths load error', fakeAsync(() => {
+      contentServiceSpy.getContainingPathsSummary.and.returnValue(
+        throwError(() => new Error('Failed'))
+      );
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.loadingPaths).toBe(false);
+      expect(component.containingPaths).toEqual([]);
+    }));
+
+    it('should handle trust badge load error', fakeAsync(() => {
+      trustBadgeServiceSpy.getBadge.and.returnValue(throwError(() => new Error('Failed')));
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.isLoadingTrust).toBe(false);
+      expect(component.trustBadge).toBeNull();
+    }));
+
+    it('should handle governance data load errors gracefully', fakeAsync(() => {
+      governanceServiceSpy.getGovernanceState.and.returnValue(
+        throwError(() => new Error('Failed'))
+      );
+      governanceServiceSpy.getChallengesForEntity.and.returnValue(
+        throwError(() => new Error('Failed'))
+      );
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.isLoadingGovernance).toBe(false);
+    }));
+  });
+
+  describe('empty related nodes', () => {
+    it('should handle content with no related nodes', fakeAsync(() => {
+      const nodeWithoutRelated = { ...mockContentNode, relatedNodeIds: [] };
+      dataLoaderSpy.getContent.and.returnValue(of(nodeWithoutRelated));
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.relatedNodes).toEqual([]);
+    }));
+
+    it('should handle content with null related node IDs', fakeAsync(() => {
+      const nodeWithNullRelated = { ...mockContentNode, relatedNodeIds: null as any };
+      dataLoaderSpy.getContent.and.returnValue(of(nodeWithNullRelated));
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.relatedNodes).toEqual([]);
+    }));
+
+    it('should limit related nodes to 5', fakeAsync(() => {
+      const nodeWithManyRelated = {
+        ...mockContentNode,
+        relatedNodeIds: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7'],
+      };
+      dataLoaderSpy.getContent.and.callFake((id: string) => {
+        if (id === 'test-content-1') return of(nodeWithManyRelated);
+        return of(mockRelatedNode);
+      });
+
+      fixture.detectChanges();
+      tick();
+
+      // Should call getContent for max 5 related nodes + 1 for main content
+      expect(dataLoaderSpy.getContent).toHaveBeenCalledTimes(6);
+    }));
+  });
+
+  describe('content editor capability', () => {
+    it('should check edit capability on content load', fakeAsync(() => {
+      editorServiceSpy.canEdit.and.returnValue(true);
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.canEditContent).toBe(true);
+      expect(editorServiceSpy.canEdit).toHaveBeenCalledWith(mockContentNode);
+    }));
+
+    it('should set canEdit to false when user cannot edit', fakeAsync(() => {
+      editorServiceSpy.canEdit.and.returnValue(false);
+
+      fixture.detectChanges();
+      tick();
+
+      expect(component.canEditContent).toBe(false);
+    }));
+  });
 });

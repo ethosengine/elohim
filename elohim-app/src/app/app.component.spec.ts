@@ -44,7 +44,7 @@ describe('AppComponent', () => {
     mockTauriAuth.isTauriEnvironment.and.returnValue(false);
     mockTauriAuth.initialize.and.returnValue(Promise.resolve());
     mockTauriAuth.needsLogin.and.returnValue(false);
-    mockBlobBootstrap.startBootstrap.and.returnValue(Promise.resolve());
+    // startBootstrap returns void, no need to set return value
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],

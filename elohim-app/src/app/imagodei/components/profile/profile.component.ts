@@ -13,6 +13,8 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 
+// @coverage: 92.5% (2026-02-05)
+
 import {
   type UpdateProfileRequest,
   type ProfileReach,
@@ -28,7 +30,7 @@ import {
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
 import { IdentityService } from '../../services/identity.service';
-import { SovereigntyService } from '../../services/sovereignty.service';
+import { AgencyService } from '../../services/agency.service';
 
 @Component({
   selector: 'app-profile',
@@ -39,7 +41,7 @@ import { SovereigntyService } from '../../services/sovereignty.service';
 })
 export class ProfileComponent implements OnInit {
   private readonly identityService = inject(IdentityService);
-  private readonly sovereigntyService = inject(SovereigntyService);
+  private readonly agencyService = inject(AgencyService);
   private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly router = inject(Router);
 
@@ -76,8 +78,8 @@ export class ProfileComponent implements OnInit {
   // Sovereignty Signals
   // ==========================================================================
 
-  readonly sovereigntyStage = this.sovereigntyService.currentStage;
-  readonly sovereigntyInfo = this.sovereigntyService.stageInfo;
+  readonly agencyStage = this.agencyService.currentStage;
+  readonly agencyInfo = this.agencyService.stageInfo;
 
   // ==========================================================================
   // Discovery Signals
@@ -142,8 +144,9 @@ export class ProfileComponent implements OnInit {
   async loadProfile(): Promise<void> {
     try {
       await this.identityService.getCurrentHuman();
-    } catch (_err) {
-      // intentionally empty - profile load failure is non-critical
+    } catch (error) {
+      // Intentionally silent - profile load failure is non-critical, uses cached data
+      console.warn('[Profile] Non-critical profile refresh failed:', error);
     }
   }
 

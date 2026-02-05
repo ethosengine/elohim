@@ -20,6 +20,8 @@
 
 import { Injectable, signal, inject } from '@angular/core';
 
+// @coverage: 14.8% (2026-02-05)
+
 import { Observable, of, BehaviorSubject, map, catchError, tap } from 'rxjs';
 
 import { StorageApiService } from '@app/elohim/services/storage-api.service';

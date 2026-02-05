@@ -167,7 +167,11 @@
     <div class="filters-bar">
       <div class="filter-group">
         <label for="tier-filter">Filter by Tier:</label>
-        <select id="tier-filter" (change)="filterByTier.set($any($event.target).value)" class="filter-select">
+        <select
+          id="tier-filter"
+          (change)="filterByTier.set($any($event.target).value)"
+          class="filter-select"
+        >
           <option value="all">All Tiers</option>
           <option value="1">Caretaker</option>
           <option value="2">Curator</option>
@@ -178,7 +182,11 @@
 
       <div class="filter-group">
         <label for="sort-filter">Sort by:</label>
-        <select id="sort-filter" (change)="sortBy.set($any($event.target).value)" class="filter-select">
+        <select
+          id="sort-filter"
+          (change)="sortBy.set($any($event.target).value)"
+          class="filter-select"
+        >
           <option value="health">Health</option>
           <option value="reputation">Reputation</option>
           <option value="capacity">Capacity</option>
