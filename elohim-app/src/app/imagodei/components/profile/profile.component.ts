@@ -5,7 +5,7 @@
  * - Display current profile information
  * - Edit mode for updating profile
  * - Profile reach selection
- * - Sovereignty stage indicator
+ * - Agency stage indicator
  */
 
 import { CommonModule } from '@angular/common';
@@ -75,7 +75,7 @@ export class ProfileComponent implements OnInit {
   readonly isLoading = this.identityService.isLoading;
 
   // ==========================================================================
-  // Sovereignty Signals
+  // Agency Signals
   // ==========================================================================
 
   readonly agencyStage = this.agencyService.currentStage;

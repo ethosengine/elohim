@@ -569,7 +569,7 @@
               <span class="material-icons">arrow_upward</span>
               <span>
                 Ready to upgrade? Move to
-                <strong>{{ sovereigntyState().migrationTarget }}</strong>
+                <strong>{{ agencyState().migrationTarget }}</strong>
                 for more control.
               </span>
               <button type="button" class="btn-primary">Learn About Upgrading</button>
@@ -589,7 +589,7 @@
           </p>
 
           <div class="residency-grid">
-            @for (item of sovereigntyState().dataResidency; track item.category) {
+            @for (item of agencyState().dataResidency; track item.category) {
               <div class="residency-card">
                 <div class="residency-header">
                   <span class="material-icons residency-icon">{{ item.icon }}</span>
@@ -697,7 +697,7 @@
         }
 
         <!-- Keys Section -->
-        @if (sovereigntyState().keys.length > 0) {
+        @if (agencyState().keys.length > 0) {
           <section class="keys-section">
             <h2 class="section-title">
               <span class="material-icons">vpn_key</span>
@@ -705,7 +705,7 @@
             </h2>
 
             <div class="keys-grid">
-              @for (key of sovereigntyState().keys; track key.type) {
+              @for (key of agencyState().keys; track key.type) {
                 <div class="key-card">
                   <div class="key-header">
                     <span class="key-label">{{ key.label }}</span>
