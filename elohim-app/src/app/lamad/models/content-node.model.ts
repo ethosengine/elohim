@@ -872,10 +872,10 @@ export interface ContentRelationshipDetailWire {
   inferenceSource: string;
   isBidirectional: number; // SQLite stores boolean as 0/1
   inverseRelationshipId: string | null;
-  provenanceChain: unknown | null;
+  provenanceChain: string[] | null;
   governanceLayer: string | null;
   reach: string;
-  metadata: unknown | null;
+  metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }

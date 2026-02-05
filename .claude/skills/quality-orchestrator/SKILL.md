@@ -1,6 +1,6 @@
-# Lint & Coverage Orchestrator Skill
+# Quality Orchestrator Skill
 
-Orchestrate the two-tier quality pipeline (quality-sweep → quality-deep) for lint fixes, test writing, and backlog generation.
+Orchestrate the three-tier quality pipeline (quality-sweep → quality-deep → quality-architect) for lint fixes, test writing, and sprint planning.
 
 ## Pipeline Overview
 
@@ -28,12 +28,14 @@ quality-sweep (Haiku) - 1st Pass
 quality-deep (Sonnet) - 2nd Pass
      │
      ├─ Finishes: Complex tests, refactoring
-     └─ Creates: GitHub Issues for ~5% needing sprint work
+     └─ Reports: ~5% escalations to quality-architect
                           │
                           ▼
-GitHub Issues (backlog label)
+quality-architect (Opus) - Triage
      │
-     └─ Sprint planning picks up P0/P1 items
+     ├─ Reviews: Escalations against project vision
+     ├─ Creates: GitHub Issues with user stories
+     └─ Updates: Agent prompts for future passes
 ```
 
 ## Coverage Workflow
@@ -83,10 +85,9 @@ Do NOT run tests. Cover:
 - Edge cases
 - Business logic
 
-For items needing sprint work, create GitHub Issues:
-- Search first: gh issue list --search "FILE.ts" --label "backlog"
-- Create: [module/area] Title format with backlog label
-- Report issues created in Second-Pass Complete format
+For items needing sprint work, report in escalation format.
+Do NOT create GitHub Issues — quality-architect handles that.
+Report escalations in Second-Pass Complete format.
 ```
 
 ## Quick Start
@@ -154,7 +155,7 @@ After quality-sweep completes, dispatch quality-deep for escalated items:
 - `subagent_type`: "quality-deep"
 - `run_in_background`: true
 
-quality-deep finishes complex work, creates GitHub Issues for the 5% needing sprint work.
+quality-deep finishes complex work, reports the 5% as escalations for quality-architect to triage.
 
 ### 4. Agent Prompt Templates
 
@@ -209,7 +210,7 @@ catch (_err) {
 }
 ```
 
-## Mechanical Issue Types (Haiku-appropriate)
+## Mechanical Issue Types (quality-sweep)
 
 | Rule | Fix Pattern |
 |------|-------------|
@@ -224,7 +225,7 @@ catch (_err) {
 | promise-function-async | Add `async` keyword |
 | require-await | Remove `async` or add `await` |
 
-## Contextual Issue Types (Sonnet-appropriate)
+## Contextual Issue Types (quality-deep)
 
 | Rule | Requires |
 |------|----------|
@@ -253,10 +254,10 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 ## Cost Optimization
 
-- **Orchestration**: Use Sonnet (this skill)
-- **Mechanical fixes**: Use Haiku agents
-- **Type safety fixes**: Use Sonnet agents
-- **Architectural decisions**: Use Opus
+- **Orchestration**: This skill (runs in the main conversation)
+- **Mechanical fixes**: quality-sweep agents (Haiku)
+- **Type safety fixes**: quality-deep agents (Sonnet)
+- **Architectural decisions**: Escalate to user or resolve in main conversation
 
 ## Session Metrics
 
@@ -276,19 +277,19 @@ grep -r "@coverage:" elohim-app/src --include="*.ts" | grep -v ".spec.ts" | wc -
 
 | Task | Tier | Agent | Runs Tests? |
 |------|------|-------|-------------|
-| Reference spec seeding | seeding | Sonnet (quality-deep) | No |
-| Mechanical lint fixes | mechanical | Haiku (quality-sweep) | No |
-| Basic test writing | mechanical | Haiku (quality-sweep) | No |
-| Type safety fixes | contextual | Sonnet (quality-deep) | No |
-| Complex test writing | contextual | Sonnet (quality-deep) | No |
-| Architectural decisions | judgment | Opus | No |
+| Reference spec seeding | seeding | quality-deep (Sonnet) | No |
+| Mechanical lint fixes | mechanical | quality-sweep (Haiku) | No |
+| Basic test writing | mechanical | quality-sweep (Haiku) | No |
+| Type safety fixes | contextual | quality-deep (Sonnet) | No |
+| Complex test writing | contextual | quality-deep (Sonnet) | No |
+| Architectural decisions | judgment | main conversation | No |
 | **Batch test run** | - | npm test | **Yes** |
 
 All test execution happens in batch via `npm test` before commit, which also updates coverage annotations.
 
 ## GitHub Issues Workflow (The 5%)
 
-quality-deep creates GitHub Issues for work needing sprint planning.
+**Only quality-architect (Opus) creates GitHub Issues.** quality-deep reports escalations in its conclusion format; quality-architect triages them against the project vision and creates well-formed issues with user stories.
 
 ### Check Existing Backlog
 ```bash
@@ -302,17 +303,6 @@ gh issue list --label "backlog,P1"
 gh issue list --search "[lamad/" --label "backlog"
 ```
 
-### Issue Format
-
-**Title**: `[module/area] Brief description`
-- `[lamad/path] Implement mastery-based suggestions`
-- `[imagodei/auth] Add session timeout handling`
-
-**Labels**:
-- `backlog` (required)
-- Priority: `P0`, `P1`, `P2`, `P3`
-- Type: `architectural`, `feature-gap`, `security`, `tech-debt`
-
 ### Sprint Planning
 
 ```bash
@@ -324,15 +314,4 @@ gh issue edit 123 --milestone "Sprint-Name" --remove-label "backlog" --add-label
 
 # After sprint completion
 gh issue close 123
-```
-
-### Backlog Hygiene
-
-```bash
-# Find stale backlog items (no updates in 30 days)
-gh issue list --label "backlog" --json number,title,updatedAt | \
-  jq '[.[] | select(.updatedAt < (now - 2592000 | todate))]'
-
-# Bulk update priority
-gh issue edit 123 124 125 --add-label "P2" --remove-label "P3"
 ```

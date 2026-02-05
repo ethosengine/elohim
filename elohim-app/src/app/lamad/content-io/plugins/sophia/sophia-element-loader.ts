@@ -5,12 +5,10 @@
  * an external UMD bundle, ensuring React and Sophia are only loaded when needed.
  */
 
-import type { Moment, Recognition } from './sophia-moment.model';
-
 // @coverage: 51.1% (2026-02-05)
 
 // Re-export types for consumers
-export type { Moment, Recognition };
+export type { Moment, Recognition } from './sophia-moment.model';
 
 /** User input map for answer persistence */
 export type UserInputMap = Record<string, unknown>;
@@ -46,13 +44,15 @@ const SOPHIA_ELEMENT_TAG = 'sophia-question';
 
 // CSS URLs
 const getSophiaStylesUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((window as any)['__SOPHIA_STYLES_URL__'] as string) || '/assets/sophia-plugin/index.css';
+  return (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((globalThis as any)['__SOPHIA_STYLES_URL__'] as string) || '/assets/sophia-plugin/index.css'
+  );
 };
 
 const getSophiaThemeOverridesUrl = (): string => {
   return (
-    ((window as any)['__SOPHIA_THEME_OVERRIDES_URL__'] as string) ||
+    ((globalThis as any)['__SOPHIA_THEME_OVERRIDES_URL__'] as string) ||
     '/assets/sophia-plugin/sophia-theme-overrides.css'
   );
 };
@@ -90,7 +90,7 @@ function loadSophiaCSS(): void {
 const CACHE_BUST = Date.now();
 const getSophiaPluginUrl = (): string => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customUrl = (window as any)['__SOPHIA_PLUGIN_URL__'] as string;
+  const customUrl = (globalThis as any)['__SOPHIA_PLUGIN_URL__'] as string;
   if (customUrl) return customUrl;
   return `/assets/sophia-plugin/sophia-element.umd.js?v=${CACHE_BUST}`;
 };
@@ -116,13 +116,16 @@ async function loadScript(url: string): Promise<void> {
 
 // React URLs - local assets for offline support, CDN fallback for development
 const getReactUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((window as any)['__REACT_URL__'] as string) || '/assets/react/react.production.min.js';
+  return (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((globalThis as any)['__REACT_URL__'] as string) || '/assets/react/react.production.min.js'
+  );
 };
 
 const getReactDomUrl = (): string => {
   return (
-    ((window as any)['__REACT_DOM_URL__'] as string) || '/assets/react/react-dom.production.min.js'
+    ((globalThis as any)['__REACT_DOM_URL__'] as string) ||
+    '/assets/react/react-dom.production.min.js'
   );
 };
 
@@ -135,7 +138,7 @@ const REACT_DOM_CDN_URL = 'https://unpkg.com/react-dom@18/umd/react-dom.producti
  */
 async function ensureReactLoaded(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const win = window as any;
+  const win = globalThis as any;
 
   if (win.React && win.ReactDOM) {
     return;
@@ -202,7 +205,7 @@ export async function registerSophiaElement(): Promise<void> {
 
       // Configure Sophia with debug logging for development
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SophiaElement = (window as any).SophiaElement;
+      const SophiaElement = (globalThis as any).SophiaElement;
       if (SophiaElement?.Sophia?.configure) {
         // Use 'attribute' mode because elohim-app sets data-theme="light|dark|device"
         // Class mode wouldn't work because our classes are 'theme-light' not 'light'
@@ -446,7 +449,7 @@ export interface DimensionalProfile {
  */
 export function getPsycheAPI(): PsycheAPI | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sophiaElement = (window as any).SophiaElement;
+  const sophiaElement = (globalThis as any).SophiaElement;
 
   if (!sophiaElement) {
     return null;

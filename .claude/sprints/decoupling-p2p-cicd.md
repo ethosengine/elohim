@@ -3,10 +3,14 @@
 ## Vision
 Transform the monorepo from tightly-coupled sequential builds to independent, version-aware components that can model real P2P network topology using Kubernetes.
 
-## Current State (Problems)
-1. **Pipeline Coupling**: DNA → Edge → App → Genesis runs sequentially; one failure blocks all
-2. **Shared Infrastructure**: Alpha + Staging share `doorway-dev.elohim.host` (one pod)
-3. **Ephemeral Storage**: `emptyDir` volumes lose data on restart
+## Current State (as of 2026-02-05)
+
+**Resolved:**
+1. ~~**Shared Infrastructure**: Alpha + Staging share `doorway-dev.elohim.host`~~ -- **FIXED** (Sprint 3)
+2. ~~**Ephemeral Storage**: `emptyDir` volumes lose data on restart~~ -- **FIXED** (PVCs deployed)
+
+**Remaining:**
+3. **Pipeline Coupling**: DNA → Edge → App → Genesis runs sequentially; one failure blocks all
 4. **No Schema Versioning**: Seeder JSON has no `schema_version`; Rust structs have tight serde coupling
 5. **Artifact Fragility**: `wget lastSuccessfulBuild` fetches from Jenkins (race conditions, timeouts)
 6. **Dormant P2P**: libp2p is 95% built but not activated
@@ -33,40 +37,47 @@ Transform the monorepo from tightly-coupled sequential builds to independent, ve
 
 ## Sprint Index (Reordered by Priority)
 
-| Sprint | Focus | Forcing Function | Priority |
-|--------|-------|------------------|----------|
-| 0 | Schema Versioning Foundation | All subsequent work must be version-aware | **FIRST** |
-| 3 | K8s Environment Isolation | Environments can't accidentally share | **IMMEDIATE** |
-| 1 | Artifact Storage Decoupling | Pipelines must fetch versioned artifacts | HIGH |
-| 2 | Pipeline Parallelization | Each pipeline independently triggerable | HIGH |
-| 4 | Seeder Version Negotiation | Seeder declares version, storage handles multiple | MEDIUM |
-| 6 | P2P Activation | Content syncs via libp2p, not deployment | MEDIUM |
-| 7 | Network Topology Modeling | True P2P testing in K8s | FUTURE |
-| 5 | DNA Build Isolation | DNA changes explicitly versioned | **DEFERRED** |
+| Sprint | Focus | Status | Priority |
+|--------|-------|--------|----------|
+| 3 | K8s Environment Isolation | **~85% COMPLETE** | ~~IMMEDIATE~~ |
+| 0 | Schema Versioning Foundation | **~10% COMPLETE** | **NEXT** |
+| 1 | Artifact Storage Decoupling | Not started | HIGH |
+| 2 | Pipeline Parallelization | Not started | HIGH |
+| 4 | Seeder Version Negotiation | Not started | MEDIUM |
+| 6 | P2P Activation | Not started | MEDIUM |
+| 7 | Network Topology Modeling | Not started | FUTURE |
+| 5 | DNA Build Isolation | Not started | **DEFERRED** |
 
-**Execution Order**: 0 → 3 → 1 → 2 → 4 → 6 → 7 (Sprint 5 deferred)
+**Execution Order**: ~~0 → 3~~ → finish Sprint 3 cleanup → 0 → 1 → 2 → 4 → 6 → 7 (Sprint 5 deferred)
 
 ---
 
-## Sprint 0: Schema Versioning Foundation
+## Sprint 0: Schema Versioning Foundation -- ~10% COMPLETE
 
 **Goal**: Establish version-aware data contracts before any other decoupling.
 
-**Scope** (fits in one session):
-1. Add `schemaVersion` field to seed JSON format
-2. Add tolerant reader pattern to Rust InputView structs
-3. Add `#[serde(default)]` to all optional fields
-4. Create shared validation constants (ts-rs generated)
+**Status**: Partial. `#[serde(default)]` widely used (89 occurrences in views.rs) but tolerant reader pattern and schemaVersion not yet added.
+
+### What's Done
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| `#[serde(default)]` on InputView fields | PARTIAL | 89 occurrences in `views.rs`; coverage audit needed |
+
+### What Remains
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Add `schemaVersion` to seed JSON models | HIGH | `genesis/seeder/src/seed-entities.ts` interfaces need field |
+| Complete `#[serde(default)]` audit | MEDIUM | Verify ALL optional fields covered in `views.rs` |
+| Add `#[serde(flatten)] extra: HashMap<String, Value>` | HIGH | Tolerant reader for unknown fields |
+| Generate TypeScript types from ts-rs | MEDIUM | `cargo test export_bindings` (ts annotations exist) |
+| Add CI lint check for required fields | LOW | Enforce schema discipline |
 
 **Files to Modify**:
-- `holochain/elohim-storage/src/views.rs` - Add `#[serde(default)]` and `#[serde(flatten)] extra: HashMap<String, Value>`
-- `genesis/seeder/src/models/` - Add `schemaVersion: number` to all content types
+- `holochain/elohim-storage/src/views.rs` - Complete `#[serde(default)]` + add `#[serde(flatten)] extra: HashMap<String, Value>`
+- `genesis/seeder/src/seed-entities.ts` - Add `schemaVersion: number` to all content types
 - `genesis/seeder/src/validation-constants.ts` - Export from ts-rs bindings
-
-**Forcing Function**:
-- All InputView structs require `#[serde(deny_unknown_fields = false)]`
-- CI adds lint check: "no required fields without defaults"
-- Seeder fails if `schemaVersion` missing
 
 **Verification**:
 ```bash
@@ -146,59 +157,53 @@ curl -X POST "https://jenkins/job/elohim-edge/job/dev/build"
 
 ---
 
-## Sprint 3: K8s Environment Isolation ⭐ PRIORITY
+## Sprint 3: K8s Environment Isolation ⭐ ~85% COMPLETE
 
 **Goal**: Separate alpha/staging/prod into independent deployments with dedicated namespaces.
 
-**Scope**:
-1. Create dedicated namespaces: `elohim-alpha`, `elohim-staging`, `elohim-prod`
-2. Create `edgenode-alpha.yaml` manifest (rename from dev, update URLs)
-3. Create `edgenode-staging.yaml` manifest (new, independent)
-4. Create `doorway-alpha.elohim.host` and `doorway-staging.elohim.host` DNS/Ingress
-5. Add PersistentVolumeClaims (replace emptyDir)
-6. Update app ConfigMaps with environment-specific doorway URLs
-7. Migrate existing ethosengine resources to new namespaces
+**Status**: Substantially complete. Core isolation is operational. Cleanup items remain.
 
-**Files to Create**:
-- `holochain/manifests/namespaces.yaml` - Define all three namespaces
-- `holochain/manifests/edgenode-alpha.yaml` - Alpha-specific (from edgenode-dev)
-- `holochain/manifests/edgenode-staging.yaml` - Staging-specific (new)
-- `holochain/manifests/pvc-alpha.yaml` - Persistent storage for alpha
-- `holochain/manifests/pvc-staging.yaml` - Persistent storage for staging
-- `elohim-app/manifests/ingress-alpha.yaml` - Alpha routing
-- `elohim-app/manifests/ingress-staging.yaml` - Staging routing
+### What's Done
 
-**Files to Modify**:
-- `elohim-app/manifests/configmap-alpha.yaml` - doorway URL → `doorway-alpha.elohim.host`
-- `elohim-app/manifests/configmap-staging.yaml` - doorway URL → `doorway-staging.elohim.host`
-- `elohim-app/manifests/*-deployment.yaml` - Update namespace to dedicated
-- `holochain/Jenkinsfile` - Add staging deployment stage, update namespace references
-- `genesis/Jenkinsfile` - Update `resolveDoorwayHost()` for alpha/staging split
+| Item | Status | Evidence |
+|------|--------|----------|
+| K8s namespaces created | DONE | `elohim-alpha`, `elohim-staging`, `elohim-prod` all Active |
+| `edgenode-alpha.yaml` | DONE | Full manifest: namespace, ConfigMap, secrets, PVCs, Deployment, Ingress |
+| `edgenode-staging.yaml` | DONE | Full manifest: namespace, ConfigMap, secrets, PVCs, Deployment, Ingress |
+| PVCs for alpha | DONE | `holochain-data-alpha` (10Gi), `storage-data-alpha` (5Gi) embedded in manifest |
+| PVCs for staging | DONE | `holochain-data-staging` (10Gi), `storage-data-staging` (5Gi) embedded in manifest |
+| App ConfigMaps | DONE | `elohim-app/manifests/alpha/configmap.yaml` → `doorway-alpha.elohim.host` |
+| | | `elohim-app/manifests/staging/configmap.yaml` → `doorway-staging.elohim.host` |
+| Edge Ingress (alpha) | DONE | `doorway-alpha.elohim.host`, `signal.doorway-alpha.elohim.host` |
+| Edge Ingress (staging) | DONE | `doorway-staging.elohim.host`, `signal.doorway-staging.elohim.host` |
+| Jenkinsfile updates | DONE | All 4 Jenkinsfiles updated: namespace refs, stage names, health URLs |
+| `doorway-dev` refs eliminated | DONE | Zero `doorway-dev` references remain in any Jenkinsfile |
+| Genesis doorway resolution | DONE | `resolveDoorwayHost()` returns cluster-local service per environment |
+| Orchestrator endpoints | DONE | VERSION_ENDPOINTS + HEALTH_ENDPOINTS use `doorway-alpha`/`doorway-staging` |
+| Staging deployment stages | DONE | Edge + App pipelines have dedicated staging deploy stages |
+| dev → staging promotion | DONE | Pushed to dev, ready for merge to staging branch |
 
-**Forcing Function**:
-- Delete shared `edgenode-dev.yaml` after alpha+staging work independently
-- Ingress rules reject cross-environment routing (NetworkPolicy)
-- PVCs ensure data persists (can't use emptyDir anymore)
-- Namespace RBAC prevents cross-environment access
+### What Remains
 
-**Verification**:
+| Item | Priority | Notes |
+|------|----------|-------|
+| Apply staging ConfigMap to K8s | **PRE-MERGE** | `kubectl apply -f elohim-app/manifests/staging/configmap.yaml` |
+| Merge dev → staging | **NEXT** | First staging build will deploy all components |
+| Delete `edgenode-dev.yaml` | AFTER VERIFY | Anti-regression safeguard; delete after staging verified healthy |
+| App ingress namespace migration | LOW | `elohim-app/manifests/ingress.yaml` still uses `ethosengine` namespace |
+| Version-control `namespaces.yaml` | LOW | Namespaces deployed but not in repo |
+| NetworkPolicy for cross-env isolation | LOW | Nice-to-have; not blocking |
+
+**Verification** (after staging merge):
 ```bash
-# Verify namespaces created
-kubectl get namespaces | grep elohim
-# elohim-alpha, elohim-staging, elohim-prod
+# Health checks
+curl -sf https://doorway-alpha.elohim.host/health
+curl -sf https://doorway-staging.elohim.host/health
+curl -sf https://staging.elohim.host
 
-# Verify separate deployments
-kubectl get deployments -n elohim-alpha
-kubectl get deployments -n elohim-staging
-# Should show independent pods
-
-# Verify data persistence
-kubectl delete pod -n elohim-alpha elohim-edgenode-alpha-0
-# After restart, content should still exist (PVC)
-
-# Verify isolation
-kubectl exec -n elohim-alpha ... -- curl http://doorway-staging.elohim.host
-# Should be blocked by NetworkPolicy
+# Version match
+curl -sf https://staging.elohim.host/version.json
+curl -sf https://alpha.elohim.host/version.json
 ```
 
 ---
@@ -342,13 +347,15 @@ kubectl logs edgenode-alpha-0 -c conductor | grep "peer discovered"
 
 ---
 
-## Dependencies Between Sprints (Reordered)
+## Dependencies Between Sprints (Updated)
 
 ```
-Sprint 0 (Schema Versioning) ─── FOUNDATION
+Sprint 3 (K8s Isolation) ─────── ~85% DONE ✓
+    │
+    ├── Finish: merge dev→staging, verify, delete edgenode-dev.yaml
     │
     ▼
-Sprint 3 (K8s Isolation) ─────── PRIORITY: Fix immediate pain
+Sprint 0 (Schema Versioning) ── ~10% DONE, NEXT UP
     │
     ├──► Sprint 1 (Artifact Storage) ───┐
     │                                    │
@@ -366,12 +373,12 @@ Sprint 7 (Network Topology)
 [Sprint 5 (DNA Isolation) - DEFERRED]
 ```
 
-**Recommended Execution**:
-1. **Week 1-2**: Sprint 0 (Schema foundation - lightweight)
-2. **Week 2-4**: Sprint 3 (K8s isolation - immediate value)
-3. **Week 4-5**: Sprints 1+2 in parallel (pipeline decoupling)
-4. **Week 5-6**: Sprint 4 (seeder versioning)
-5. **Week 6-8**: Sprints 6+7 (P2P activation and topology)
+**Recommended Execution** (updated 2026-02-05):
+1. **NOW**: Finish Sprint 3 -- merge dev→staging, verify staging health, delete `edgenode-dev.yaml`
+2. **Next session**: Sprint 0 (Schema foundation -- tolerant readers + schemaVersion)
+3. **Following**: Sprints 1+2 in parallel (pipeline decoupling)
+4. **Then**: Sprint 4 (seeder versioning)
+5. **Future**: Sprints 6+7 (P2P activation and topology)
 
 ---
 
@@ -399,7 +406,10 @@ Each sprint includes safeguards that make regression difficult:
 1. **Sprint 0**: CI lint check rejects required fields without defaults
 2. **Sprint 1**: `fetchHappArtifact()` function deleted entirely
 3. **Sprint 2**: Orchestrator `dependsOn` removed from config
-4. **Sprint 3**: Shared `edgenode-dev.yaml` deleted after staging works
+4. **Sprint 3**: ~~Shared `edgenode-dev.yaml` deleted after staging works~~ -- PENDING: delete after staging verified
+   - DONE: All `doorway-dev` refs eliminated from Jenkinsfiles (can't accidentally route to wrong env)
+   - DONE: Dedicated PVCs per environment (can't use emptyDir anymore)
+   - DONE: Orchestrator endpoints point to per-environment URLs
 5. **Sprint 4**: Old bulk endpoint deprecated with warning logs
 6. **Sprint 5**: DNA builds require explicit trigger flag
 7. **Sprint 6**: `--enable-p2p` required for inter-node sync
@@ -407,21 +417,29 @@ Each sprint includes safeguards that make regression difficult:
 
 ---
 
-## Quick Reference: First Two Sprints
+## Quick Reference: Current Sprint Checklists
 
-### Sprint 0 Checklist (Schema Versioning)
+### Sprint 3 Checklist (K8s Isolation) -- ~85% COMPLETE
+- [x] Create namespaces: elohim-alpha, elohim-staging, elohim-prod
+- [x] Create edgenode-alpha.yaml (from edgenode-dev)
+- [x] Create edgenode-staging.yaml (new)
+- [x] Create PVCs for alpha and staging (embedded in manifests)
+- [x] Update ConfigMaps with new doorway URLs
+- [x] Update Ingress for new DNS entries (edge node ingress in manifests)
+- [x] Update Jenkinsfiles for namespace changes
+- [x] Eliminate all `doorway-dev` references from Jenkinsfiles
+- [x] Update orchestrator VERSION_ENDPOINTS + HEALTH_ENDPOINTS
+- [x] Rename "Deploy Edge Node - Dev" → "Deploy Edge Node - Alpha"
+- [x] Fix SonarQube issues (sophia-renderer, related-concepts, budget-reconciliation)
+- [x] Push all fixes to dev
+- [ ] Apply staging ConfigMap to K8s cluster (`kubectl apply -f elohim-app/manifests/staging/configmap.yaml`)
+- [ ] Merge dev → staging and verify staging health
+- [ ] Delete edgenode-dev.yaml after staging verified healthy
+- [ ] Migrate app ingress from `ethosengine` namespace (low priority)
+
+### Sprint 0 Checklist (Schema Versioning) -- ~10% COMPLETE
+- [~] Add `#[serde(default)]` to all optional InputView fields (89 occurrences exist; audit needed)
 - [ ] Add `schemaVersion` to seed JSON models
-- [ ] Add `#[serde(default)]` to all optional InputView fields
 - [ ] Add `#[serde(flatten)] extra: HashMap<String, Value>` for unknown fields
 - [ ] Generate TypeScript types from ts-rs
 - [ ] Add CI lint check for required fields
-
-### Sprint 3 Checklist (K8s Isolation)
-- [ ] Create namespaces: elohim-alpha, elohim-staging, elohim-prod
-- [ ] Create edgenode-alpha.yaml (from edgenode-dev)
-- [ ] Create edgenode-staging.yaml (new)
-- [ ] Create PVCs for alpha and staging
-- [ ] Update ConfigMaps with new doorway URLs
-- [ ] Update Ingress for new DNS entries
-- [ ] Update Jenkinsfiles for namespace changes
-- [ ] Delete edgenode-dev.yaml after verification

@@ -236,7 +236,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private transformHtmlImageUrls(html: string): string {
     // Match img tags with src attributes containing blob paths
     // Using negated character class without + to avoid backtracking
-    return html.replace(
+    return html.replaceAll(
       /<img([^>]*?)\ssrc=["'](\/?blob\/[^"']*?)["']([^>]*?)>/gi,
       (_match, before, src, after) => {
         const resolvedSrc = this.resolveBlobUrl(src);
@@ -252,7 +252,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     // Regex to find headings
     const headingRegex = /<h([1-6])([^>]*)>(.*?)<\/h\1>/gi;
 
-    const processedHtml = html.replace(headingRegex, (_match, level, attrs, content) => {
+    const processedHtml = html.replaceAll(headingRegex, (_match, level, attrs, content) => {
       // Strip HTML tags from content for TOC text
       // Use a helper function to avoid regex backtracking issues
       const text = this.stripHtmlTags(content).trim();

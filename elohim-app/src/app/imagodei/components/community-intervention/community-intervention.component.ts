@@ -51,10 +51,10 @@ export class CommunityInterventionComponent implements OnInit {
   // ===========================================================================
 
   /** Subject ID for new intervention */
-  readonly subjectIdInput = input<string | undefined>(undefined, { alias: 'subjectId' });
+  readonly subjectId = input<string | undefined>(undefined);
 
   /** Existing intervention ID to view/support */
-  readonly interventionIdInput = input<string | undefined>(undefined, { alias: 'interventionId' });
+  readonly interventionId = input<string | undefined>(undefined);
 
   // ===========================================================================
   // State
@@ -72,7 +72,7 @@ export class CommunityInterventionComponent implements OnInit {
   readonly intervention = signal<CommunityIntervention | null>(null);
 
   // Form state for initiation
-  readonly subjectId = signal('');
+  readonly subjectIdForm = signal('');
   readonly relationshipLevel = signal<RelationshipLevel>('familiar');
   readonly patternDescription = signal('');
   readonly selectedCategories = signal<string[]>([]);
@@ -106,9 +106,9 @@ export class CommunityInterventionComponent implements OnInit {
 
   /** Available relationship levels */
   readonly relationshipLevels: { value: RelationshipLevel; weight: number }[] = [
-    { value: 'intimate', weight: 3.0 },
-    { value: 'trusted', weight: 2.0 },
-    { value: 'familiar', weight: 1.0 },
+    { value: 'intimate', weight: 3 },
+    { value: 'trusted', weight: 2 },
+    { value: 'familiar', weight: 1 },
     { value: 'acquainted', weight: 0.5 },
     { value: 'public', weight: 0.1 },
   ];
@@ -123,7 +123,7 @@ export class CommunityInterventionComponent implements OnInit {
   readonly canSubmit = computed(() => {
     if (this.mode() === 'initiate') {
       return (
-        this.subjectId().length > 0 &&
+        this.subjectIdForm().length > 0 &&
         this.patternDescription().length > 0 &&
         this.selectedCategories().length > 0
       );
@@ -139,15 +139,15 @@ export class CommunityInterventionComponent implements OnInit {
 
   ngOnInit(): void {
     const interventionId =
-      this.route.snapshot.paramMap.get('interventionId') ?? this.interventionIdInput();
-    const subjectId = this.route.snapshot.paramMap.get('subjectId') ?? this.subjectIdInput();
+      this.route.snapshot.paramMap.get('interventionId') ?? this.interventionId();
+    const subjectIdParam = this.route.snapshot.paramMap.get('subjectId') ?? this.subjectId();
 
     if (interventionId) {
       this.mode.set('view');
       this.loadIntervention(interventionId);
-    } else if (subjectId) {
+    } else if (subjectIdParam) {
       this.mode.set('initiate');
-      this.subjectId.set(subjectId);
+      this.subjectIdForm.set(subjectIdParam);
       this.isLoading.set(false);
     } else {
       this.mode.set('initiate');

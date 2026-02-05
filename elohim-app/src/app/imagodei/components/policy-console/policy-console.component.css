@@ -51,6 +51,13 @@
   margin-bottom: var(--space-4, 1rem);
 }
 
+/* Ensure output element displays inline */
+.success-banner output.message,
+.error-banner .message {
+  display: inline;
+  flex: 1;
+}
+
 .error-banner {
   background: var(--error-bg, #fee2e2);
   border: 1px solid var(--error-border, #fecaca);

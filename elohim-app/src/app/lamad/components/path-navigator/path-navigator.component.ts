@@ -63,6 +63,20 @@ interface LessonContext {
 }
 
 /**
+ * Parameters for building section context - groups related data
+ */
+interface SectionContextParams {
+  chapter: PathChapter;
+  chapterIndex: number;
+  module: PathModule;
+  moduleIndex: number;
+  section: PathSection;
+  sectionIndex: number;
+  globalIndex: number;
+  currentConceptIndex: number;
+}
+
+/**
  * PathNavigatorComponent - The main learning interface.
  *
  * Implements a split-view "Course Player" layout:
@@ -565,16 +579,16 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       if (this.stepIndex >= globalIndex && this.stepIndex < globalIndex + conceptCount) {
         const currentConceptIndex = this.stepIndex - globalIndex;
         return {
-          context: this.buildSectionContext(
+          context: this.buildSectionContext({
             chapter,
             chapterIndex,
             module,
             moduleIndex,
             section,
-            si,
+            sectionIndex: si,
             globalIndex,
-            currentConceptIndex
-          ),
+            currentConceptIndex,
+          }),
           nextGlobalIndex: globalIndex + conceptCount,
         };
       }
@@ -586,34 +600,25 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   /**
    * Build lesson context for a specific section.
    */
-  private buildSectionContext(
-    chapter: PathChapter,
-    chapterIndex: number,
-    module: PathModule,
-    moduleIndex: number,
-    section: PathSection,
-    sectionIndex: number,
-    globalIndex: number,
-    currentConceptIndex: number
-  ): LessonContext {
-    const concepts: LessonConcept[] = (section.conceptIds ?? []).map((conceptId, idx) => ({
+  private buildSectionContext(params: SectionContextParams): LessonContext {
+    const concepts: LessonConcept[] = (params.section.conceptIds ?? []).map((conceptId, idx) => ({
       conceptId,
       title: this.formatConceptTitle(conceptId),
       isCompleted: false, // TODO: Load from progress
-      isCurrent: idx === currentConceptIndex,
-      index: globalIndex + idx,
+      isCurrent: idx === params.currentConceptIndex,
+      index: params.globalIndex + idx,
       icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
     }));
 
     return {
-      chapter,
-      chapterIndex,
-      module,
-      moduleIndex,
-      section,
-      sectionIndex,
+      chapter: params.chapter,
+      chapterIndex: params.chapterIndex,
+      module: params.module,
+      moduleIndex: params.moduleIndex,
+      section: params.section,
+      sectionIndex: params.sectionIndex,
       concepts,
-      currentConceptIndex,
+      currentConceptIndex: params.currentConceptIndex,
     };
   }
 
@@ -632,7 +637,16 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     const sections = module.sections ?? [];
     if (sections.length === 0) return null;
 
-    return this.buildSectionContext(chapter, 0, module, 0, sections[0], 0, 0, 0);
+    return this.buildSectionContext({
+      chapter,
+      chapterIndex: 0,
+      module,
+      moduleIndex: 0,
+      section: sections[0],
+      sectionIndex: 0,
+      globalIndex: 0,
+      currentConceptIndex: 0,
+    });
   }
 
   /**

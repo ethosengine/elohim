@@ -865,29 +865,32 @@ export class SophiaRendererComponent
     this.initializeAssessmentMode();
   }
 
-  private parseContent(): unknown | null {
-    let content = this.node?.content;
+  private parseContent(): object | null {
+    let content: string | object = this.node?.content;
 
     // Parse JSON string if needed
     if (typeof content === 'string') {
       try {
-        content = JSON.parse(content);
+        const parsed: unknown = JSON.parse(content);
+        if (typeof parsed === 'object' && parsed !== null) {
+          content = parsed;
+        } else {
+          return null;
+        }
       } catch {
         return null;
       }
     }
 
-    return content;
+    // Final type guard - content should be object at this point
+    return content as object;
   }
 
-  private convertToMoments(content: unknown): Moment[] {
+  private convertToMoments(content: object): Moment[] {
     if (Array.isArray(content)) {
-      return content.map(item => this.toMoment(item));
+      return content.map((item: unknown) => this.toMoment(item as object));
     }
-    if (typeof content === 'object' && content !== null) {
-      return [this.toMoment(content)];
-    }
-    return [];
+    return [this.toMoment(content)];
   }
 
   private initializeAssessmentMode(): void {
@@ -912,7 +915,7 @@ export class SophiaRendererComponent
   /**
    * Convert various content formats to a Sophia Moment.
    */
-  private toMoment(item: unknown): Moment {
+  private toMoment(item: object): Moment {
     const obj = item as Record<string, unknown>;
 
     // Already a Moment format

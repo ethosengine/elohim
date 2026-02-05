@@ -28,8 +28,11 @@ import { map } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 
 import { EconomicEventView } from '@app/elohim/adapters/storage-types.adapter';
-import { LamadEventType } from '@app/elohim/models/economic-event.model';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
+
+// Re-export for backwards compatibility
+export type { LamadEventType } from '@app/elohim/models/economic-event.model';
+import type { LamadEventType } from '@app/elohim/models/economic-event.model';
 
 /**
  * Lamad-specific event types (extends hREA actions with domain semantics)
@@ -47,9 +50,6 @@ export const LamadEventTypes = {
   RECOGNITION_GIVEN: 'recognition-given' as LamadEventType,
   RECOGNITION_RECEIVED: 'recognition-received' as LamadEventType,
 };
-
-// Re-export for backwards compatibility
-export type { LamadEventType };
 
 /**
  * hREA action types

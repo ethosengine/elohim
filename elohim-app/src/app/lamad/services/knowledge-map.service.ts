@@ -616,7 +616,7 @@ export class KnowledgeMapService {
       apply: 0.5, // Attestation gate
       analyze: 0.7,
       evaluate: 0.85,
-      create: 1.0,
+      create: 1,
     };
 
     if (m.masteryLevels.size === 0) {

@@ -1195,15 +1195,11 @@ export class DataLoaderService {
    * Load the path extension index from Holochain.
    */
   getPathExtensionIndex(): Observable<PathExtensionIndex> {
-    if (!this.holochainContent.isAvailable()) {
-      return of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-    }
-
-    return defer(() => from(this.holochainContent.queryPathExtensions({}))).pipe(
+    return this.contentService.queryPathExtensions({}).pipe(
       map(results => ({
         lastUpdated: new Date().toISOString(),
         totalCount: results.length,
-        extensions: results.map(r => this.transformHolochainPathExtensionToIndex(r.pathExtension)),
+        extensions: results.map(r => this.transformPathExtensionToIndex(r)),
       })),
       catchError(_err => {
         return of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() });
@@ -1231,14 +1227,7 @@ export class DataLoaderService {
    * Get extensions for a specific base path.
    */
   getExtensionsForPath(pathId: string): Observable<PathExtension[]> {
-    if (!this.holochainContent.isAvailable()) {
-      return of([]);
-    }
-
-    return defer(() =>
-      from(this.holochainContent.queryPathExtensions({ basePathId: pathId }))
-    ).pipe(
-      map(results => results.map(r => this.transformHolochainPathExtension(r.pathExtension))),
+    return this.contentService.queryPathExtensions({ basePathId: pathId }).pipe(
       catchError(_err => {
         return of([]);
       })
@@ -1246,7 +1235,28 @@ export class DataLoaderService {
   }
 
   /**
+   * Transform PathExtension to PathExtensionIndexEntry.
+   */
+  private transformPathExtensionToIndex(ext: PathExtension): PathExtensionIndexEntry {
+    return {
+      id: ext.id,
+      basePathId: ext.basePathId,
+      basePathTitle: '', // Would need to look up path title
+      title: ext.title,
+      description: ext.description,
+      extendedBy: ext.extendedBy,
+      extenderName: '', // Would need to look up agent name
+      visibility: ext.visibility,
+      insertionCount: ext.insertions?.length ?? 0,
+      annotationCount: ext.annotations?.length ?? 0,
+      forkCount: ext.forks?.length ?? 0,
+      updatedAt: ext.updatedAt,
+    };
+  }
+
+  /**
    * Transform Holochain path extension entry to PathExtensionIndexEntry.
+   * @deprecated Use transformPathExtensionToIndex with ContentService data instead
    */
   private transformHolochainPathExtensionToIndex(hcExt: {
     id: string;

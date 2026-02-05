@@ -641,9 +641,9 @@ export type RelationshipLevel = 'intimate' | 'trusted' | 'familiar' | 'acquainte
  * Weight multipliers for relationship levels
  */
 export const RELATIONSHIP_WEIGHTS: Record<RelationshipLevel, number> = {
-  intimate: 3.0,
-  trusted: 2.0,
-  familiar: 1.0,
+  intimate: 3,
+  trusted: 2,
+  familiar: 1,
   acquainted: 0.5,
   public: 0.1,
 };
@@ -651,7 +651,7 @@ export const RELATIONSHIP_WEIGHTS: Record<RelationshipLevel, number> = {
 /**
  * Threshold required to trigger community intervention
  */
-export const COMMUNITY_INTERVENTION_THRESHOLD = 10.0;
+export const COMMUNITY_INTERVENTION_THRESHOLD = 10;
 
 /**
  * Intervention status lifecycle

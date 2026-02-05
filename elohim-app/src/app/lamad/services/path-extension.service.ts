@@ -280,7 +280,7 @@ export class PathExtensionService {
           rationale,
           source: {
             type: 'self',
-            confidence: 1.0,
+            confidence: 1,
           },
         };
 

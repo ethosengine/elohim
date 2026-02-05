@@ -240,9 +240,9 @@ export const SEARCH_FIELD_WEIGHTS = {
  * Bonus multipliers for exact vs partial matches.
  */
 export const SEARCH_MATCH_BONUSES = {
-  exactMatch: 2.0, // Full word match
+  exactMatch: 2, // Full word match
   prefixMatch: 1.5, // Word starts with query
-  containsMatch: 1.0, // Query found anywhere in word
+  containsMatch: 1, // Query found anywhere in word
 } as const;
 
 /**

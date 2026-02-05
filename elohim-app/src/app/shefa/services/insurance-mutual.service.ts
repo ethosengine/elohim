@@ -39,6 +39,16 @@ import {
 
 import { EconomicService } from './economic.service';
 
+/**
+ * Reasons for flagging a claim for governance review.
+ * Used when adjuster decisions need community oversight.
+ */
+type GovernanceReviewReason =
+  | 'large-claim'
+  | 'unusual-interpretation'
+  | 'pattern-concern'
+  | 'other';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -885,7 +895,7 @@ export class InsuranceMutualService {
     if (flagForGovernance) {
       await this.flagClaimForGovernanceReview(
         claimId,
-        flagReason as 'large-claim' | 'unusual-interpretation' | 'pattern-concern' | 'other',
+        flagReason as GovernanceReviewReason,
         `Adjuster decision. Requires governance review.`
       );
     }
@@ -1128,7 +1138,7 @@ export class InsuranceMutualService {
    */
   async flagClaimForGovernanceReview(
     _claimId: string,
-    _reason: 'large-claim' | 'unusual-interpretation' | 'pattern-concern' | 'other',
+    _reason: GovernanceReviewReason,
     _note?: string
   ): Promise<void> {
     // TODO: Implementation

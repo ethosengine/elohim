@@ -1816,10 +1816,12 @@ export class HolochainContentService {
    */
   private async fetchContentById(id: string): Promise<ContentNode | null> {
     // Try to select a custodian for CDN-like serving (optional optimization)
+    // See issue #TBD for custodian endpoint implementation
     try {
       const _custodian = await this.custodianSelection.selectBestCustodian(id);
       if (_custodian) {
-        // TODO: When doorway service is ready, fetch from custodian endpoint here
+        // Custodian-based serving not yet implemented
+        // Will use custodian endpoint when doorway service supports it
         // const content = await this.fetchFromCustodian(_custodian.custodian.endpoint, id);
         // if (content) return content;
       }

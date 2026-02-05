@@ -214,7 +214,7 @@ export class AuthCallbackComponent implements OnInit {
 
     if (!params) {
       // Check for error in URL
-      const url = new URL(window.location.href);
+      const url = new URL(globalThis.location.href);
       const error = url.searchParams.get('error');
       const errorDesc = url.searchParams.get('error_description');
 

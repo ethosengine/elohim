@@ -358,13 +358,13 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
     return (
       text
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
+        .replaceAll(/[^a-z0-9]+/g, '-')
         // eslint-disable-next-line sonarjs/slow-regex, sonarjs/anchor-precedence -- Safe: slug transformation on user input
-        .replace(/^-+|-+$/g, '')
+        .replaceAll(/^-+|-+$/g, '')
     );
   }
 
   private humanize(slug: string): string {
-    return slug.replaceAll('-', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return slug.replaceAll('-', ' ').replaceAll(/\b\w/g, c => c.toUpperCase());
   }
 }

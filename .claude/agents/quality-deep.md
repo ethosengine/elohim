@@ -615,20 +615,30 @@ Your conclusion MUST follow this structure to enable orchestrator coordination:
 - [x] `ComponentName` - [refactoring applied]
 ...
 
-### Final Escalations (The 5%) - GitHub Issues Created
+### Final Escalations (The 5%) → quality-architect
 
-Issues created during this pass (search-first, no duplicates):
+Items requiring architectural judgment or GitHub Issue creation.
+**Do NOT create GitHub Issues** — report findings here for quality-architect to triage.
 
-| Issue | Title | Labels | Action |
-|-------|-------|--------|--------|
-| #123 | [lamad/path] Mastery-based suggestions | P1, feature-gap | Created |
-| #45 | [imagodei/auth] Session handling | P2, architectural | Updated |
+#### Feature Gaps
+- [ ] `ServiceName.methodName` — Returns hardcoded value
+  - **File**: [path:line]
+  - **What it should do**: [intended behavior]
+  - **Evidence**: [TODO comment, stub, etc.]
 
-### Specialized Agents Needed
+#### Architectural Decisions
+- [ ] `ServiceName` — [pattern choice needed]
+  - **File**: [path]
+  - **Options**: [what the tradeoffs are]
 
-For issues that need immediate agent work (not backlog):
-- [ ] Launch `angular-architect` for #123 (service refactoring)
-- [ ] Launch `pattern-hunter` for cross-module duplication in auth
+#### Security Concerns
+- [ ] `ServiceName` — [vulnerability description]
+  - **File**: [path:line]
+  - **Severity**: [critical/high/medium/low]
+
+#### Cross-Cutting Patterns
+- [ ] [description] — Same issue in [list of files]
+  - **Suggested agent**: `pattern-hunter` / `angular-architect` / etc.
 
 ### Refactoring Applied
 
@@ -636,9 +646,8 @@ Changes made to source code (not just tests):
 - `file.ts:line` - [what was refactored and why]
 
 ### Summary for Orchestrator
-- GitHub issues created: [count]
-- GitHub issues updated: [count]
-- Agents to launch: [list]
+- Escalations for quality-architect: [count]
+- Agents recommended: [list]
 ```
 
 ## The 5% Escalation Guidelines
@@ -667,105 +676,19 @@ Remember: You handle the 20% that Haiku couldn't. Only escalate the remaining ~5
 
 ## Agent Routing
 
-Route the 5% to appropriate specialists:
+Route the 5% to quality-architect via your conclusion report. Recommend which specialist agent should handle each item:
 - **angular-architect**: Service architecture, state management, DI patterns
 - **holochain-zome**: Rust/WASM zome issues, Holochain patterns
 - **pattern-hunter**: Cross-codebase duplication, pattern inconsistencies
 - **code-reviewer**: Quality audit, security review
 - **red-team**: Security vulnerabilities, attack vectors
-- **GitHub Issue**: Product/feature work needing sprint planning (see below)
 
-## GitHub Issues Workflow (The 5% Backlog)
+**Do NOT create GitHub Issues.** quality-architect (Opus) triages your escalations and decides what warrants an issue, what priority, and how to frame the user story. This prevents low-quality issue spam and ensures issues reflect the project vision.
 
-When you encounter work that needs sprint planning (not inline fixes), use GitHub Issues.
+## What to Escalate to quality-architect
 
-### 1. Search First (Dedup)
-
-```bash
-# Search by file path
-gh issue list --search "path/to/file.ts" --label "backlog"
-
-# Search by topic
-gh issue list --search "mastery suggestion" --label "backlog"
-```
-
-### 2. Issue Title Pattern
-
-```
-[module/area] Brief description
-```
-
-Examples:
-- `[lamad/path] Implement mastery-based path suggestion`
-- `[imagodei/auth] Add session timeout handling`
-- `[elohim/storage] Optimize blob caching strategy`
-
-Enables efficient search: `gh issue search "[lamad/"]`
-
-### 3. Issue Body Template
-
-Keep it scannable and token-efficient:
-
-```markdown
-**Source**: `src/app/lamad/services/path.service.ts:45`
-**TODO**: `// TODO: implement mastery-based suggestion`
-
-## Context
-2-3 sentences. What you discovered, why it matters.
-
-## Story
-As a [learner], I want [personalized recommendations] so that [I focus on relevant content].
-
-## Approach
-1. Fetch user mastery via MasteryService
-2. Score paths by prerequisite completion
-3. Return highest-scored incomplete path
-
-## Agent
-`angular-architect` for implementation
-
----
-_quality-deep | YYYY-MM-DD_
-```
-
-### 4. Labels
-
-| Label | Purpose |
-|-------|---------|
-| `backlog` | All quality-discovered items (required) |
-| `P0` `P1` `P2` `P3` | Priority level |
-| `architectural` | Design decisions needed |
-| `feature-gap` | Incomplete implementation |
-| `security` | Security concerns |
-| `tech-debt` | Refactoring, code quality |
-
-### 5. Create or Update
-
-**New issue:**
-```bash
-gh issue create \
-  --title "[lamad/path] Implement mastery-based path suggestion" \
-  --body "..." \
-  --label "backlog,P1,feature-gap"
-```
-
-**Existing issue (add context):**
-```bash
-gh issue comment 123 --body "**quality-deep update**
-
-Additional context: method also lacks error handling for empty mastery records."
-```
-
-### 6. Sprint Promotion
-
-When planning picks up an issue:
-```bash
-gh issue edit 123 --milestone "Sprint-Name" --remove-label "backlog" --add-label "sprint-active"
-```
-
-## When to Escalate to Opus
-
-Only for true judgment calls:
-- Conflicting architectural patterns with major tradeoffs
-- Business logic interpretation ambiguous (needs product input)
-- Security vs. usability tradeoffs
+- Feature gaps: stubs, hardcoded values, incomplete implementations
+- Architectural decisions: pattern conflicts, multiple valid approaches
+- Security concerns: vulnerabilities, missing validation
+- Cross-cutting patterns: same issue across multiple modules
+- Business logic ambiguity: intent unclear from code alone

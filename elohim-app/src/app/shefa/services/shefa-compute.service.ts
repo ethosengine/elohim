@@ -786,7 +786,7 @@ export class ShefaComputeService {
             {
               from: 'infrastructure',
               to: 'care',
-              rate: 1.0,
+              rate: 1,
               source: 'market' as const,
               lastUpdated: new Date().toISOString(),
             },

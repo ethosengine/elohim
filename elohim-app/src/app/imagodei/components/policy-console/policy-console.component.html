@@ -22,9 +22,9 @@
   }
 
   @if (successMessage()) {
-    <div class="success-banner" role="status">
+    <div class="success-banner">
       <span class="icon">&#10003;</span>
-      <span class="message">{{ successMessage() }}</span>
+      <output class="message">{{ successMessage() }}</output>
       <button type="button" class="dismiss-btn" (click)="clearMessages()">&times;</button>
     </div>
   }

@@ -471,8 +471,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .force(
         'link',
         d3
-          // Type assertion needed for D3 force simulation compatibility
-          .forceLink<ClusterNode, ClusterEdge>(edges as ClusterEdge[])
+          .forceLink<ClusterNode, ClusterEdge>(edges)
           .id((d: ClusterNode) => d.id)
           .distance(d => this.getLinkDistance(d))
       )

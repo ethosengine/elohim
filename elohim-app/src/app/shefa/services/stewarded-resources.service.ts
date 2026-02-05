@@ -1312,10 +1312,10 @@ export class StewardedResourceService {
       property: 0.05,
       equipment: 0.05,
       inventory: 0.05,
-      knowledge: 0.0, // Knowledge is unlimited
-      reputation: 0.0, // Reputation is unlimited
+      knowledge: 0, // Knowledge is unlimited
+      reputation: 0, // Reputation is unlimited
       'financial-asset': 0.15, // 15% weight - money important
-      uba: 0.0, // UBA is safety net
+      uba: 0, // UBA is safety net
     };
 
     let totalWeight = 0;
