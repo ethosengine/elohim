@@ -5,7 +5,7 @@
  * an external UMD bundle, ensuring React and Sophia are only loaded when needed.
  */
 
-// @coverage: 51.1% (2026-02-05)
+// @coverage: 45.0% (2026-02-05)
 
 // Import types for local use and re-export for consumers
 import type { Moment, Recognition } from './sophia-moment.model';

@@ -8,7 +8,7 @@
  * which is built separately and loaded at runtime via script tag.
  */
 
-// @coverage: 83.3% (2026-02-05)
+// @coverage: 86.4% (2026-02-05)
 
 // Import types for local use and re-export for consumers
 import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
