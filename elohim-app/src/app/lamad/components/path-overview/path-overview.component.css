@@ -1196,6 +1196,10 @@
 
 /* Section Link Styling */
 .section-link {
+  border: none;
+  font: inherit;
+  width: 100%;
+  text-align: left;
   cursor: pointer;
   text-decoration: none;
   color: inherit;
@@ -1424,6 +1428,11 @@
 }
 
 .concept-item {
+  border: none;
+  font: inherit;
+  width: 100%;
+  text-align: left;
+  background: none;
   display: flex;
   align-items: center;
   padding: 0.5rem 0.75rem;
