@@ -184,15 +184,17 @@ export class StewardedResourceService {
     await this.persistResource(resource);
 
     // Create initialization event
-    await this.economicService.createEvent({
-      action: 'produce',
-      providerId: stewardId,
-      receiverId: stewardId,
-      resourceConformsTo: `${category}/${subcategory}`,
-      resourceQuantityValue: totalCapacity.value,
-      resourceQuantityUnit: totalCapacity.unit,
-      note: `Created stewarded resource: ${name}`,
-    });
+    this.economicService
+      .createEvent({
+        action: 'produce',
+        providerId: stewardId,
+        receiverId: stewardId,
+        resourceConformsTo: `${category}/${subcategory}`,
+        resourceQuantityValue: totalCapacity.value,
+        resourceQuantityUnit: totalCapacity.unit,
+        note: `Created stewarded resource: ${name}`,
+      })
+      .subscribe();
 
     return resource;
   }
@@ -293,14 +295,16 @@ export class StewardedResourceService {
     await this.persistAllocation(resourceId, allocation);
 
     // Create event
-    await this.economicService.createEvent({
-      action: 'transfer',
-      providerId: resourceId,
-      receiverId: resourceId,
-      resourceQuantityValue: allocatedAmount.value,
-      resourceQuantityUnit: allocatedAmount.unit,
-      note: `Allocated ${allocatedAmount.value} ${allocatedAmount.unit} to: ${label}`,
-    });
+    this.economicService
+      .createEvent({
+        action: 'transfer',
+        providerId: resourceId,
+        receiverId: resourceId,
+        resourceQuantityValue: allocatedAmount.value,
+        resourceQuantityUnit: allocatedAmount.unit,
+        note: `Allocated ${allocatedAmount.value} ${allocatedAmount.unit} to: ${label}`,
+      })
+      .subscribe();
 
     return allocation;
   }
@@ -798,12 +802,14 @@ export class StewardedResourceService {
     await this.persistTransitionPath(transitionPath);
 
     // Create proposal event in governance system (using 'produce' to create the proposal)
-    await this.economicService.createEvent({
-      action: 'produce',
-      providerId: stewardId,
-      receiverId: stewardId,
-      note: `Proposed constitutional transition: ${excessAmount} units to commons stewardship`,
-    });
+    this.economicService
+      .createEvent({
+        action: 'produce',
+        providerId: stewardId,
+        receiverId: stewardId,
+        note: `Proposed constitutional transition: ${excessAmount} units to commons stewardship`,
+      })
+      .subscribe();
 
     return transitionPath;
   }
