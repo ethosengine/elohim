@@ -14,7 +14,7 @@ import {
   inject,
 } from '@angular/core';
 
-// @coverage: 23.4% (2026-02-05)
+// @coverage: 22.8% (2026-02-05)
 
 import { Subject } from 'rxjs';
 
