@@ -59,7 +59,7 @@ const MAX_CONCURRENT_HEALTH_CHECKS = 5;
  * Detect if running in Eclipse Che environment
  */
 function isEclipseChe(): boolean {
-  if (typeof globalThis.window === 'undefined') return false;
+  if (typeof window === 'undefined') return false;
   const hostname = globalThis.location.hostname;
   return hostname.includes('.code.ethosengine.com') || hostname.includes('.devspaces.');
 }
@@ -68,7 +68,7 @@ function isEclipseChe(): boolean {
  * Get the Che hc-dev endpoint URL for doorway access
  */
 function getCheHcDevUrl(): string {
-  if (typeof globalThis.window === 'undefined') return '';
+  if (typeof window === 'undefined') return '';
   const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
   return `https://${hostname}`;
 }

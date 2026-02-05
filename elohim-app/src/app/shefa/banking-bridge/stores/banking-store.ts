@@ -172,7 +172,7 @@ export class BankingStore {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        reject(request.error);
+        reject(new Error(String(request.error ?? 'IDB error')));
       };
 
       request.onsuccess = () => {
@@ -247,7 +247,7 @@ export class BankingStore {
   private async wrapRequest<T>(request: IDBRequest<T>): Promise<T> {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
     });
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, afterNextRender } from '@angular/core';
 
 // @coverage: 21.7% (2026-02-05)
 
@@ -221,12 +221,9 @@ export class DataLoaderService {
     private readonly holochainContent: HolochainContentService,
     private readonly idbCache: IndexedDBCacheService
   ) {
-    // Initialize caches in background
-    void this.initCaches();
-
-    // NOTE: Conductor availability tracking removed.
-    // Conductor is no longer used for content resolution - content comes from doorway projection.
-    // Holochain conductor is only used for agent-centric data (identity, attestations, points).
+    // Defer cache initialization until after first render to avoid async in constructor.
+    // Conductor is only used for agent-centric data (identity, attestations, points).
+    afterNextRender(() => void this.initCaches());
   }
 
   /**
@@ -964,13 +961,13 @@ export class DataLoaderService {
   private transformHolochainContentAttestation(
     hcAtt: HolochainContentAttestationEntry
   ): ContentAttestation {
-    const grantedBy = (hcAtt.grantedBy ?? {
+    const grantedBy = hcAtt.grantedBy ?? {
       type: 'system',
       grantorId: 'unknown',
-    }) as ContentAttestation['grantedBy'];
-    const revocation = (hcAtt.revocation ?? undefined) as ContentAttestation['revocation'];
-    const evidence = (hcAtt.evidence ?? undefined) as ContentAttestation['evidence'];
-    const scope = (hcAtt.scope ?? undefined) as ContentAttestation['scope'];
+    };
+    const revocation = hcAtt.revocation ?? undefined;
+    const evidence = hcAtt.evidence ?? undefined;
+    const scope = hcAtt.scope ?? undefined;
     const metadata = (hcAtt.metadata ?? {}) as ContentAttestation['metadata'];
 
     return {

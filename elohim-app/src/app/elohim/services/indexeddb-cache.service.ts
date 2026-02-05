@@ -415,7 +415,7 @@ export class IndexedDBCacheService {
       const request = store.get(key);
 
       request.onsuccess = () => resolve(request.result ?? null);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
     });
   }
 
@@ -461,7 +461,7 @@ export class IndexedDBCacheService {
         resolve(result);
       }
 
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(new Error(String(tx.error ?? 'IDB transaction error')));
     });
   }
 
@@ -480,7 +480,7 @@ export class IndexedDBCacheService {
       const request = store.put(value, key);
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
     });
   }
 
@@ -502,7 +502,7 @@ export class IndexedDBCacheService {
       }
 
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(new Error(String(tx.error ?? 'IDB transaction error')));
     });
   }
 
@@ -521,7 +521,7 @@ export class IndexedDBCacheService {
       const request = store.delete(key);
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
     });
   }
 
@@ -540,7 +540,7 @@ export class IndexedDBCacheService {
       const request = store.clear();
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
     });
   }
 
@@ -559,7 +559,7 @@ export class IndexedDBCacheService {
       const request = store.count();
 
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
     });
   }
 

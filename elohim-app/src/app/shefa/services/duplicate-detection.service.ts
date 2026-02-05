@@ -345,7 +345,7 @@ export class DuplicateDetectionService {
     // In production: return proper SHA256 hash
     let hash = 0;
     for (let i = 0; i < data.length; i++) {
-      const char = data.charCodeAt(i);
+      const char = data.codePointAt(i) ?? 0;
       hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }

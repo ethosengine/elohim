@@ -469,7 +469,7 @@ export class DoorwayClientService {
   private arrayBufferToBase64(bytes: Uint8Array): string {
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
+      binary += String.fromCodePoint(bytes[i]);
     }
     return btoa(binary);
   }

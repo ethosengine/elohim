@@ -883,7 +883,7 @@ export class SophiaRendererComponent
     }
 
     // Final type guard - content should be object at this point
-    return content as object;
+    return content;
   }
 
   private convertToMoments(content: object): Moment[] {

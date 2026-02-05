@@ -558,7 +558,7 @@ export class SearchService {
    * Escape special regex characters.
    */
   private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return str.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   // ===========================================================================

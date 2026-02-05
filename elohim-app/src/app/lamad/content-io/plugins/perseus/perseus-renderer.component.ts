@@ -732,7 +732,7 @@ export class PerseusRendererComponent
     } else {
       // Break streak - reset
       this.currentStreak = 0;
-      this.streakHistory = Array(this.targetStreak).fill(null);
+      this.streakHistory = new Array(this.targetStreak).fill(null);
     }
   }
 

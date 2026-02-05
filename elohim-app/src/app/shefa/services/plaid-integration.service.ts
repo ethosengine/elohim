@@ -445,7 +445,7 @@ export class PlaidIntegrationService {
       const combined = new Uint8Array(
         atob(encryptedToken)
           .split('')
-          .map(char => char.charCodeAt(0))
+          .map(char => char.codePointAt(0) ?? 0)
       );
 
       // Extract components

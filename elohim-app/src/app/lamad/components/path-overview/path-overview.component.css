@@ -917,7 +917,6 @@
 
 .mastery-tier-mastered .mastery-badge,
 .mastery-badge.mastery-tier-mastered {
-  background-color: #fef3c7;
   background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%);
   color: #451a03;
   box-shadow: 0 1px 3px rgb(245 158 11 / 30%);
