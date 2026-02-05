@@ -494,6 +494,7 @@ export class HolochainClientService {
     // Validate connection state and wait if needed
     const connectionValidation = await this.validateConnection(callContext, timer);
     if (!connectionValidation.valid) {
+      // Non-null assertion needed: TypeScript doesn't narrow discriminated unions correctly here
       return connectionValidation.error!;
     }
 
