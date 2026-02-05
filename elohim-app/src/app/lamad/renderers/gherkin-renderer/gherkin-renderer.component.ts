@@ -200,8 +200,8 @@ export class GherkinRendererComponent implements OnChanges {
     // Highlight <placeholders> and "strings"
     // Using possessive-like patterns to avoid backtracking
     return text
-      .replace(/<([^<>]*)>/g, '<span class="placeholder">&lt;$1&gt;</span>')
-      .replace(/"([^"]*)"/g, '<span class="string">"$1"</span>');
+      .replaceAll(/<([^<>]*)>/g, '<span class="placeholder">&lt;$1&gt;</span>')
+      .replaceAll(/"([^"]*)"/g, '<span class="string">"$1"</span>');
   }
 
   private parseGherkin(): void {
@@ -270,8 +270,7 @@ export class GherkinRendererComponent implements OnChanges {
       if (ctx.inDocString) {
         // End doc string
         if (ctx.currentScenario?.steps.length) {
-          ctx.currentScenario.steps[ctx.currentScenario.steps.length - 1].docString =
-            ctx.docStringContent.join('\n');
+          ctx.currentScenario.steps.at(-1)!.docString = ctx.docStringContent.join('\n');
         }
         ctx.docStringContent = [];
         ctx.inDocString = false;
@@ -391,9 +390,11 @@ export class GherkinRendererComponent implements OnChanges {
     if (ctx.currentExample) {
       ctx.currentExample.table.push(cells);
     } else if (ctx.currentScenario?.steps.length) {
-      const lastStep = ctx.currentScenario.steps[ctx.currentScenario.steps.length - 1];
-      lastStep.dataTable ??= [];
-      lastStep.dataTable.push(cells);
+      const lastStep = ctx.currentScenario.steps.at(-1);
+      if (lastStep) {
+        lastStep.dataTable ??= [];
+        lastStep.dataTable.push(cells);
+      }
     }
   }
 

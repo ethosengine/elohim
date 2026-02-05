@@ -95,7 +95,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     const parallaxLayers = this.el.nativeElement.querySelectorAll('.parallax-layer');
     parallaxLayers.forEach((layer: HTMLElement) => {
-      const speed = parseFloat(layer.dataset['speed'] ?? '0.5');
+      const speed = Number.parseFloat(layer.dataset['speed'] ?? '0.5');
       const yPos = -(scrolled * speed);
       this.renderer.setStyle(layer, 'transform', `translate3d(0, ${yPos}px, 0)`);
     });

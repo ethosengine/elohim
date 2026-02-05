@@ -307,7 +307,7 @@ export function createTestStagedTransaction(
     financialAssetId: generateId('asset'),
     timestamp: now,
     type: 'debit',
-    amount: { value: 50.0, unit: 'USD' },
+    amount: { value: 50, unit: 'USD' },
     description: 'Test transaction',
     merchantName: 'Test Merchant',
     category: 'Groceries',

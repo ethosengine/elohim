@@ -14,7 +14,7 @@ import {
   inject,
 } from '@angular/core';
 
-// @coverage: 23.4% (2026-02-05)
+// @coverage: 22.8% (2026-02-05)
 
 import { Subject } from 'rxjs';
 
@@ -702,7 +702,7 @@ export class PerseusRendererComponent
     const choicesSelected = guess?.choicesSelected;
     if (!choicesSelected || !Array.isArray(choicesSelected)) return;
 
-    const selectedIndex = choicesSelected.findIndex(selected => selected);
+    const selectedIndex = choicesSelected.findIndex(Boolean);
     if (selectedIndex < 0 || selectedIndex >= choices.length) return;
 
     const selectedChoice = choices[selectedIndex];
@@ -715,10 +715,8 @@ export class PerseusRendererComponent
 
   private initializeStreakTracking(): void {
     if (this.targetStreak > 0) {
-      this.streakDots = Array(this.targetStreak)
-        .fill(0)
-        .map((_, i) => i);
-      this.streakHistory = Array(this.targetStreak).fill(null);
+      this.streakDots = new Array(this.targetStreak).fill(0).map((_, i) => i);
+      this.streakHistory = new Array(this.targetStreak).fill(null);
     }
   }
 

@@ -346,7 +346,7 @@ describe('ContentMasteryService', () => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'understand');
 
       const mastery = service.getMasterySync(TEST_CONTENT_ID);
-      expect(mastery?.freshness).toBe(1.0);
+      expect(mastery?.freshness).toBe(1);
       expect(mastery?.needsRefresh).toBe(false);
     });
 
@@ -361,14 +361,14 @@ describe('ContentMasteryService', () => {
         lastEngagementAt: '2024-01-01T00:00:00.000Z', // 1 year ago
         lastEngagementType: 'view' as const,
         contentVersionAtMastery: '',
-        freshness: 1.0,
+        freshness: 1,
         needsRefresh: false,
         assessmentEvidence: [],
         privileges: [],
       };
 
       const freshness = service.computeFreshness(oldMastery);
-      expect(freshness).toBeLessThan(1.0);
+      expect(freshness).toBeLessThan(1);
       expect(freshness).toBeGreaterThan(0);
     });
 

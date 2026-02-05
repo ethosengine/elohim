@@ -73,10 +73,10 @@ describe('CommunityInterventionComponent', () => {
 
     it('should show correct weight for relationship level', () => {
       component.setRelationshipLevel('intimate');
-      expect(component.currentWeight()).toBe(3.0);
+      expect(component.currentWeight()).toBe(3);
 
       component.setRelationshipLevel('familiar');
-      expect(component.currentWeight()).toBe(1.0);
+      expect(component.currentWeight()).toBe(1);
 
       component.setRelationshipLevel('public');
       expect(component.currentWeight()).toBe(0.1);
@@ -125,7 +125,7 @@ describe('CommunityInterventionComponent', () => {
       fixture.detectChanges();
 
       expect(component.mode()).toBe('initiate');
-      expect(component.subjectId()).toBe('subject-789');
+      expect(component.subjectIdForm()).toBe('subject-789');
       expect(component.isLoading()).toBe(false);
     });
 
@@ -178,13 +178,13 @@ describe('CommunityInterventionComponent', () => {
   describe('Form Validation', () => {
     it('should validate initiation form with required fields', () => {
       component.mode.set('initiate');
-      component.subjectId.set('');
+      component.subjectIdForm.set('');
       component.patternDescription.set('');
       component.selectedCategories.set([]);
 
       expect(component.canSubmit()).toBe(false);
 
-      component.subjectId.set('subject-123');
+      component.subjectIdForm.set('subject-123');
       component.patternDescription.set('Pattern of harmful behavior');
       component.selectedCategories.set(['harassment']);
 
@@ -236,13 +236,13 @@ describe('CommunityInterventionComponent', () => {
   describe('Computed State', () => {
     it('should calculate current weight based on relationship level', () => {
       component.relationshipLevel.set('intimate');
-      expect(component.currentWeight()).toBe(3.0);
+      expect(component.currentWeight()).toBe(3);
 
       component.relationshipLevel.set('trusted');
-      expect(component.currentWeight()).toBe(2.0);
+      expect(component.currentWeight()).toBe(2);
 
       component.relationshipLevel.set('familiar');
-      expect(component.currentWeight()).toBe(1.0);
+      expect(component.currentWeight()).toBe(1);
 
       component.relationshipLevel.set('acquainted');
       expect(component.currentWeight()).toBe(0.5);
@@ -254,17 +254,17 @@ describe('CommunityInterventionComponent', () => {
     it('should calculate progress percentage toward threshold', () => {
       component.intervention.set({
         ...mockIntervention,
-        totalWeight: 5.0,
+        totalWeight: 5,
       });
 
       const progress = component.progressPercent();
-      expect(progress).toBe((5.0 / 10.0) * 100);
+      expect(progress).toBe((5 / 10) * 100);
     });
 
     it('should cap progress at 100%', () => {
       component.intervention.set({
         ...mockIntervention,
-        totalWeight: 15.0,
+        totalWeight: 15,
       });
 
       expect(component.progressPercent()).toBe(100);
@@ -288,7 +288,7 @@ describe('CommunityInterventionComponent', () => {
     it('should return 0 remaining weight when threshold met', () => {
       component.intervention.set({
         ...mockIntervention,
-        totalWeight: 12.0,
+        totalWeight: 12,
       });
 
       expect(component.remainingWeight()).toBe(0);
@@ -297,14 +297,14 @@ describe('CommunityInterventionComponent', () => {
     it('should return threshold when no intervention', () => {
       component.intervention.set(null);
 
-      expect(component.remainingWeight()).toBe(10.0);
+      expect(component.remainingWeight()).toBe(10);
     });
   });
 
   describe('Submit Initiation', () => {
     beforeEach(() => {
       component.mode.set('initiate');
-      component.subjectId.set('subject-123');
+      component.subjectIdForm.set('subject-123');
       component.patternDescription.set('Harmful pattern');
       component.selectedCategories.set(['harassment']);
     });
@@ -454,7 +454,7 @@ describe('CommunityInterventionComponent', () => {
       expect(component.relationshipLevels).toBeDefined();
       expect(component.relationshipLevels.length).toBe(5);
       expect(component.relationshipLevels[0].value).toBe('intimate');
-      expect(component.relationshipLevels[0].weight).toBe(3.0);
+      expect(component.relationshipLevels[0].weight).toBe(3);
     });
 
     it('should expose intervention categories', () => {
@@ -463,14 +463,14 @@ describe('CommunityInterventionComponent', () => {
     });
 
     it('should expose threshold constant', () => {
-      expect(component.threshold).toBe(10.0);
+      expect(component.threshold).toBe(10);
     });
   });
 
   describe('Edge Cases', () => {
     it('should handle empty subject ID gracefully', () => {
       component.mode.set('initiate');
-      component.subjectId.set('');
+      component.subjectIdForm.set('');
       component.patternDescription.set('Pattern');
       component.selectedCategories.set(['harassment']);
 
@@ -479,7 +479,7 @@ describe('CommunityInterventionComponent', () => {
 
     it('should handle empty pattern description', () => {
       component.mode.set('initiate');
-      component.subjectId.set('subject-123');
+      component.subjectIdForm.set('subject-123');
       component.patternDescription.set('   ');
       component.selectedCategories.set(['harassment']);
 
@@ -492,7 +492,7 @@ describe('CommunityInterventionComponent', () => {
 
     it('should handle no categories selected', () => {
       component.mode.set('initiate');
-      component.subjectId.set('subject-123');
+      component.subjectIdForm.set('subject-123');
       component.patternDescription.set('Pattern');
       component.selectedCategories.set([]);
 
@@ -501,7 +501,7 @@ describe('CommunityInterventionComponent', () => {
 
     it('should allow submission with only custom evidence', () => {
       component.mode.set('initiate');
-      component.subjectId.set('subject-123');
+      component.subjectIdForm.set('subject-123');
       component.patternDescription.set('Pattern');
       component.selectedCategories.set(['harassment']);
       component.evidence.set('Detailed evidence');

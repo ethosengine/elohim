@@ -246,7 +246,7 @@ export class ProfileService {
    * Format attestation ID into human-readable name.
    */
   private formatAttestationName(id: string): string {
-    return id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return id.replaceAll('-', ' ').replaceAll(/\b\w/g, l => l.toUpperCase());
   }
 
   // =========================================================================
@@ -409,7 +409,7 @@ export class ProfileService {
             context: {
               type: 'path_step',
               pathId: progress.pathId,
-              stepIndex: parseInt(stepIndex, 10),
+              stepIndex: Number.parseInt(stepIndex, 10),
             },
           });
         }

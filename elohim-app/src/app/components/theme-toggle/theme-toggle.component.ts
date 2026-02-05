@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 
-// @coverage: 84.2% (2026-02-05)
+// @coverage: 89.5% (2026-02-05)
 
 import { Subscription } from 'rxjs';
 

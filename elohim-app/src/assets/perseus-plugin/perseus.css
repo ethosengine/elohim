@@ -1582,6 +1582,7 @@ body.mobile .perseus-matrix .matrix-input-field {
 body.sat-section .perseus-widget-passage {
   margin-top: 0;
 }
+/* stylelint-disable-next-line selector-type-no-unknown -- VML is legacy IE vector markup, kept for backward compatibility */
 .perseus-widget-plotter svg,
 .perseus-widget-plotter vml {
   position: absolute;

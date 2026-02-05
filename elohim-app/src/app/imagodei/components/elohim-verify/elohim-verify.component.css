@@ -18,7 +18,7 @@
 }
 
 .error-icon {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 1.25rem;
 }
 
@@ -28,7 +28,7 @@
 }
 
 .error-close {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 1.25rem;
   background: none;
   border: none;
@@ -46,7 +46,7 @@
 }
 
 .intro-icon {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 4rem;
   color: var(--primary, #6366f1);
   margin-bottom: 1rem;
@@ -84,7 +84,7 @@
 }
 
 .info-icon {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 1.25rem;
   color: var(--primary, #6366f1);
 }
@@ -179,7 +179,7 @@
   padding: 0.25rem 0.75rem;
   background: var(--surface, #f9fafb);
   border-radius: 0.5rem;
-  font-family: monospace;
+  font-family: 'Courier New', Courier, monospace;
   font-size: 1rem;
   font-weight: 600;
 }
@@ -191,7 +191,7 @@
 }
 
 .timer-icon {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 1rem;
 }
 
@@ -272,7 +272,7 @@
 }
 
 .category-icon {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 1rem;
 }
 
@@ -390,7 +390,7 @@
 }
 
 .result-icon {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 4rem;
   margin-bottom: 1rem;
 }
@@ -484,7 +484,7 @@
 }
 
 .feedback-icon {
-  font-family: 'Material Icons';
+  font-family: 'Material Icons', sans-serif;
   font-size: 1.25rem;
 }
 

@@ -408,33 +408,30 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   private convertToCsv(state: SheafaDashboardState): string {
     const rows: string[] = [];
 
-    // Header
-    rows.push('Dashboard Export');
-    rows.push(`Timestamp,${new Date().toISOString()}`);
-    rows.push(`Operator ID,${state.operatorId}`);
-    rows.push(`Status,${state.status}`);
-    rows.push('');
-
-    // Compute metrics
-    rows.push('Compute Metrics');
-    rows.push(`CPU Usage,${state.computeMetrics.cpu.usagePercent.toFixed(2)}%`);
-    rows.push(`Memory Usage,${state.computeMetrics.memory.usagePercent.toFixed(2)}%`);
-    rows.push(`Storage Usage,${state.computeMetrics.storage.usagePercent.toFixed(2)}%`);
-    rows.push('');
-
-    // Tokens
-    rows.push('Infrastructure Tokens');
-    rows.push(`Balance,${state.infrastructureTokens.balance.tokens.toFixed(2)} tokens`);
+    // Header and all content in a single push
     rows.push(
-      `Earning Rate,${state.infrastructureTokens.earningRate.tokensPerHour.toFixed(4)} tokens/hour`
+      'Dashboard Export',
+      `Timestamp,${new Date().toISOString()}`,
+      `Operator ID,${state.operatorId}`,
+      `Status,${state.status}`,
+      '',
+      // Compute metrics
+      'Compute Metrics',
+      `CPU Usage,${state.computeMetrics.cpu.usagePercent.toFixed(2)}%`,
+      `Memory Usage,${state.computeMetrics.memory.usagePercent.toFixed(2)}%`,
+      `Storage Usage,${state.computeMetrics.storage.usagePercent.toFixed(2)}%`,
+      '',
+      // Tokens
+      'Infrastructure Tokens',
+      `Balance,${state.infrastructureTokens.balance.tokens.toFixed(2)} tokens`,
+      `Earning Rate,${state.infrastructureTokens.earningRate.tokensPerHour.toFixed(4)} tokens/hour`,
+      '',
+      // Protection
+      'Data Protection',
+      `Custodians,${state.familyCommunityProtection.totalCustodians}`,
+      `Protection Level,${state.familyCommunityProtection.protectionLevel}`,
+      ''
     );
-    rows.push('');
-
-    // Protection
-    rows.push('Data Protection');
-    rows.push(`Custodians,${state.familyCommunityProtection.totalCustodians}`);
-    rows.push(`Protection Level,${state.familyCommunityProtection.protectionLevel}`);
-    rows.push('');
 
     return rows.join('\n');
   }

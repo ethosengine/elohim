@@ -103,7 +103,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       if (params['fromPath']) {
         this.returnContext = {
           pathId: params['fromPath'],
-          stepIndex: parseInt(params['returnStep'] ?? '0', 10),
+          stepIndex: Number.parseInt(params['returnStep'] ?? '0', 10),
         };
       }
 
@@ -471,8 +471,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .force(
         'link',
         d3
-          // Type assertion needed for D3 force simulation compatibility
-          .forceLink<ClusterNode, ClusterEdge>(edges as ClusterEdge[])
+          .forceLink<ClusterNode, ClusterEdge>(edges)
           .id((d: ClusterNode) => d.id)
           .distance(d => this.getLinkDistance(d))
       )

@@ -246,7 +246,13 @@
    ============================================================================
    These rules apply when user explicitly selects dark theme via toggle.
    Uses same styles as system dark mode above.
+   NOTE: Duplication is intentional - media queries and attribute selectors
+   cannot be combined. This ensures dark mode works for both:
+   1. System preference (prefers-color-scheme: dark)
+   2. Manual toggle (data-theme='dark')
    ============================================================================ */
+
+/* stylelint-disable no-duplicate-selectors -- Intentional: separate media query and manual theme contexts */
 
 body[data-theme='dark'] .framework-perseus {
   color: var(--lamad-text-primary, #f1f5f9);
@@ -435,6 +441,8 @@ body[data-theme='dark'] .framework-perseus .perseus_dUXUrBDI {
 body[data-theme='dark'] .framework-perseus .graphie-label {
   color: var(--lamad-text-primary, #f1f5f9);
 }
+
+/* stylelint-enable no-duplicate-selectors */
 
 /* ============================================================================
    Section 3: Wonder Blocks CSS Variable Mapping

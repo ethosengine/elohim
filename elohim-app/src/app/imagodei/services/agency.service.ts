@@ -175,7 +175,7 @@ export class AgencyService {
   }
 
   /**
-   * Map Holochain connection state to sovereignty connection status.
+   * Map Holochain connection state to agency connection status.
    */
   private getConnectionStatus(holochainState: string, error: string | null): ConnectionStatus {
     switch (holochainState) {

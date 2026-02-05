@@ -280,7 +280,7 @@ export class PathExtensionService {
           rationale,
           source: {
             type: 'self',
-            confidence: 1.0,
+            confidence: 1,
           },
         };
 
@@ -638,7 +638,7 @@ export class PathExtensionService {
     return steps.filter((_, i) => {
       const baseRef = indexMapping.get(i);
       if (baseRef?.startsWith('base-')) {
-        const baseIndex = parseInt(baseRef.split('-')[1], 10);
+        const baseIndex = Number.parseInt(baseRef.split('-')[1], 10);
         return !excludedIndices.has(baseIndex);
       }
       return true;

@@ -359,17 +359,17 @@ export interface IdentityFreeze {
 export function calculateTrustWeight(intimacyLevel: string): number {
   switch (intimacyLevel) {
     case 'intimate':
-      return 3.0; // Family/very close
+      return 3; // Family/very close
     case 'trusted':
-      return 2.0; // Close friends
+      return 2; // Close friends
     case 'familiar':
-      return 1.0; // Acquaintances
+      return 1; // Acquaintances
     case 'acquainted':
       return 0.5; // Casual connections
     case 'public':
       return 0.1; // Public followers
     default:
-      return 0.0;
+      return 0;
   }
 }
 
@@ -379,8 +379,8 @@ export function calculateTrustWeight(intimacyLevel: string): number {
  * Threshold: weight >= 10.0 triggers auto-freeze
  * Example: 3 intimate (9) + 2 trusted (4) = 13 -> freeze
  */
-export const DEFAULT_FREEZE_THRESHOLD = 10.0;
-export const DEFAULT_REVOKE_THRESHOLD = 25.0;
+export const DEFAULT_FREEZE_THRESHOLD = 10;
+export const DEFAULT_REVOKE_THRESHOLD = 25;
 
 // =============================================================================
 // Display Helpers

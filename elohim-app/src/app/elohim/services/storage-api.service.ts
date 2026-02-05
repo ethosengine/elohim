@@ -663,7 +663,7 @@ export class StorageApiService {
     const body = {
       contentId: input.contentId,
       stewardPresenceId: input.stewardPresenceId,
-      allocationRatio: input.allocationRatio ?? 1.0,
+      allocationRatio: input.allocationRatio ?? 1,
       allocationMethod: input.allocationMethod ?? 'manual',
       contributionType: input.contributionType ?? 'inherited',
       contributionEvidence: input.contributionEvidenceJson
@@ -775,7 +775,7 @@ export class StorageApiService {
     const body = inputs.map(input => ({
       contentId: input.contentId,
       stewardPresenceId: input.stewardPresenceId,
-      allocationRatio: input.allocationRatio ?? 1.0,
+      allocationRatio: input.allocationRatio ?? 1,
       allocationMethod: input.allocationMethod ?? 'manual',
       contributionType: input.contributionType ?? 'inherited',
       contributionEvidence: input.contributionEvidenceJson

@@ -364,7 +364,7 @@ export class BlobFallbackService {
         statusCode,
         type: this.detectUrlType(url),
         responseTimeMs,
-        contentLength: contentLength ? parseInt(contentLength, 10) : undefined,
+        contentLength: contentLength ? Number.parseInt(contentLength, 10) : undefined,
         supportsRangeRequests: acceptRanges !== null && acceptRanges !== 'none',
       };
     } catch (error) {

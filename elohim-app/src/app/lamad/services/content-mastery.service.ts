@@ -288,7 +288,7 @@ export class ContentMasteryService {
       contentId,
       level,
       levelAchievedAt: now,
-      freshness: 1.0, // Fresh when just achieved
+      freshness: 1, // Fresh when just achieved
       lastEngagementAt: now,
       lastEngagementType: engagementType,
     };
@@ -318,7 +318,7 @@ export class ContentMasteryService {
       lastEngagementAt: now,
       lastEngagementType: engagementType,
       contentVersionAtMastery: '',
-      freshness: 1.0,
+      freshness: 1,
       needsRefresh: false,
       assessmentEvidence: current?.assessmentEvidence ?? [],
       privileges: this.computePrivileges(level),

@@ -113,7 +113,7 @@ export class MarkdownParser {
         // Handle arrays (comma-separated or bracket notation)
         if (value.includes(',') || value.startsWith('[')) {
           frontmatter[key] = value
-            .replace(/[[\]]/g, '')
+            .replaceAll(/[[\]]/g, '')
             .split(',')
             .map(v => v.trim());
         } else {
@@ -137,7 +137,7 @@ export class MarkdownParser {
     for (let i = startIndex; i < lines.length; i++) {
       // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing markdown headings
       const match = /^#\s+(.+)$/.exec(lines[i]);
-      if (match) return match[1].trim().replace(/\*\*/g, '');
+      if (match) return match[1].trim().replaceAll('**', '');
     }
     return null;
   }
@@ -170,7 +170,7 @@ export class MarkdownParser {
         }
 
         const level = headingMatch[1].length;
-        const title = headingMatch[2].trim().replace(/\*\*/g, '');
+        const title = headingMatch[2].trim().replaceAll('**', '');
         const anchor = this.generateAnchor(title);
 
         currentSection = {
@@ -298,10 +298,10 @@ export class MarkdownParser {
   private static generateAnchor(text: string): string {
     return text
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/(^-)|(-$)/g, '');
+      .replaceAll(/[^a-z0-9\s-]/g, '')
+      .replaceAll(/\s+/g, '-')
+      .replaceAll(/-+/g, '-')
+      .replaceAll(/(^-)|(-$)/g, '');
   }
 
   /**
@@ -320,7 +320,7 @@ export class MarkdownParser {
       .pop()!
       .replace(/\.md$/, '')
       .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '_');
+      .replaceAll(/[^a-z0-9-]/g, '_');
   }
 
   /**
@@ -329,10 +329,10 @@ export class MarkdownParser {
   private static textToId(type: string, text: string): string {
     const normalized = text
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/(^_)|(_$)/g, '');
+      .replaceAll(/[^a-z0-9\s-]/g, '')
+      .replaceAll(/\s+/g, '_')
+      .replaceAll(/_+/g, '_')
+      .replaceAll(/(^_)|(_$)/g, '');
 
     return `${type}_${normalized}`;
   }

@@ -106,7 +106,7 @@ export class RelationshipService {
     targetId: string,
     forwardType: string,
     inverseType: string,
-    confidence = 1.0
+    confidence = 1
   ): Observable<RelationshipView> {
     return this.storageApi.createRelationship({
       sourceId,

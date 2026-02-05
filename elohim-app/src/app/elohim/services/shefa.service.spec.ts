@@ -902,10 +902,10 @@ describe('ShefaService', () => {
           reconstructionWorkloadPercent: 10,
         },
         reputation: {
-          reliabilityRating: 2.0,
+          reliabilityRating: 2,
           speedRating: 1.5,
           reputationScore: 45,
-          specializationBonus: 0.0,
+          specializationBonus: 0,
           commitmentFulfillment: 0.5,
         },
         economic: {

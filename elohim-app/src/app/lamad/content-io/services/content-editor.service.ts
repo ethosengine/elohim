@@ -309,7 +309,7 @@ export class ContentEditorService {
     // Use crypto.randomUUID if available (modern browsers)
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       // Remove dashes and take first 8 chars for clean alphanumeric ID
-      return `draft-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').substring(0, 8)}`;
+      return `draft-${Date.now()}-${crypto.randomUUID().replaceAll('-', '').substring(0, 8)}`;
     }
     // Fallback: use crypto.getRandomValues
     const array = new Uint32Array(1);
@@ -323,8 +323,8 @@ export class ContentEditorService {
   private generateNodeId(title: string): string {
     return title
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(?:^-|-$)/g, '')
+      .replaceAll(/[^a-z0-9]+/g, '-')
+      .replaceAll(/(?:^-|-$)/g, '')
       .substring(0, 50);
   }
 }

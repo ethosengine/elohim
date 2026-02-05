@@ -288,7 +288,7 @@ export class BlobStreamingService {
       successRate: history.reduce((sum, m) => sum + m.successRate, 0) / history.length,
       avgChunkDurationMs:
         history.reduce((sum, m) => sum + m.avgChunkDurationMs, 0) / history.length,
-      wasCongested: history.filter(m => m.wasCongested).length > 0,
+      wasCongested: history.some(m => m.wasCongested),
     };
   }
 

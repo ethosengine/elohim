@@ -76,10 +76,10 @@ export class AppealWizardComponent implements OnInit {
   // ===========================================================================
 
   /** Grant ID to appeal (from route or input) */
-  readonly grantIdInput = input<string | undefined>(undefined, { alias: 'grantId' });
+  readonly grantId = input<string | undefined>(undefined);
 
   /** Policy ID to appeal */
-  readonly policyIdInput = input<string | undefined>(undefined, { alias: 'policyId' });
+  readonly policyId = input<string | undefined>(undefined);
 
   /** Emitted when appeal is filed */
   readonly appealFiled = output<StewardshipAppeal>();
@@ -195,7 +195,7 @@ export class AppealWizardComponent implements OnInit {
   // ===========================================================================
 
   ngOnInit(): void {
-    const grantId = this.route.snapshot.paramMap.get('grantId') ?? this.grantIdInput();
+    const grantId = this.route.snapshot.paramMap.get('grantId') ?? this.grantId();
 
     if (grantId) {
       void this.loadGrant(grantId);
@@ -321,7 +321,7 @@ export class AppealWizardComponent implements OnInit {
 
       const input: FileAppealInput = {
         grantId: grant.id,
-        policyId: this.policyIdInput(),
+        policyId: this.policyId(),
         appealType: type,
         grounds,
         evidenceJson: JSON.stringify(evidence),

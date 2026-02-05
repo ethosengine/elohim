@@ -418,7 +418,7 @@ export class ElohimAgentService {
         primaryPrinciple: 'Capability boundaries',
         interpretation: 'Elohim may only exercise capabilities they possess',
         valuesWeighed: [],
-        confidence: 1.0,
+        confidence: 1,
       },
       declineReason: reason,
       respondedAt: new Date().toISOString(),

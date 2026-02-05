@@ -98,7 +98,7 @@ export class ExplorationService {
     // Check attestation permissions
     return this.checkAttestations(this.currentAgentId, query.depth).pipe(
       switchMap(attestationCheck => {
-        if (!attestationCheck.allowed) {
+        if (attestationCheck.allowed === false) {
           return this.createError('DEPTH_UNAUTHORIZED', attestationCheck);
         }
 
@@ -107,7 +107,7 @@ export class ExplorationService {
 
         // Check rate limit
         const rateLimitCheck = this.checkRateLimit(this.currentAgentId, 'exploration');
-        if (!rateLimitCheck.allowed) {
+        if (rateLimitCheck.allowed === false) {
           return this.createError('RATE_LIMIT_EXCEEDED', {
             rateLimitStatus: this.getRateLimitStatusSync(this.currentAgentId),
           });
@@ -986,7 +986,7 @@ export class ExplorationService {
   deserializeGraphView(serialized: GraphViewSerialized): GraphView {
     const neighbors = new Map<number, ContentNode[]>();
     for (const [depth, nodes] of Object.entries(serialized.neighbors)) {
-      neighbors.set(parseInt(depth, 10), nodes);
+      neighbors.set(Number.parseInt(depth, 10), nodes);
     }
 
     return {

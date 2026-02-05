@@ -53,7 +53,7 @@ describe('PresenceListComponent', () => {
       lastRecognitionAt: '2024-01-02T00:00:00Z',
       stewardId: 'steward-123',
       stewardshipStartedAt: '2024-01-02T00:00:00Z',
-      stewardshipQualityScore: 95.0,
+      stewardshipQualityScore: 95,
       claimInitiatedAt: null,
       claimVerifiedAt: null,
       claimVerificationMethod: null,

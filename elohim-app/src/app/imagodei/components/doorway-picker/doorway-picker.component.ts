@@ -217,7 +217,7 @@ export class DoorwayPickerComponent implements OnInit {
       // Use different return URL for Tauri (custom URL scheme) vs browser (web origin)
       const returnUrl = this.isTauriEnvironment()
         ? 'elohim://auth/callback'
-        : `${window.location.origin}/auth/callback`;
+        : `${globalThis.location.origin}/auth/callback`;
 
       this.oauthProvider.initiateLogin(doorway.url, returnUrl);
       // Note: This redirects the browser (or opens external browser in Tauri)

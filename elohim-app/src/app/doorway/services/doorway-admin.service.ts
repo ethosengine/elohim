@@ -152,8 +152,8 @@ export class DoorwayAdminService {
     this._connectionState.set('connecting');
 
     // Determine WebSocket URL
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = this.baseUrl ? new URL(this.baseUrl).host : window.location.host;
+    const wsProtocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = this.baseUrl ? new URL(this.baseUrl).host : globalThis.location.host;
     const wsUrl = `${wsProtocol}//${host}/admin/ws`;
 
     this.ws$ = webSocket<DashboardMessage | ClientMessage>({

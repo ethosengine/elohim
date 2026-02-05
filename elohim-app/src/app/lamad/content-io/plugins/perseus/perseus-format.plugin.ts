@@ -373,14 +373,14 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
       // Extract title from source doc path
       const parts = firstItem.metadata.sourceDoc.split('/');
       const filename = parts[parts.length - 1];
-      return filename.replace(/\.[^.]+$/, '').replace(/-/g, ' ');
+      return filename.replace(/\.[^.]+$/, '').replaceAll('-', ' ');
     }
 
     if (items.length === 1 && firstItem?.question?.content) {
       // Use first line of content as title
       const firstLine = firstItem.question.content.split('\n')[0];
       if (firstLine.length < 100) {
-        return firstLine.replace(/[#*_]/g, '').trim();
+        return firstLine.replaceAll(/[#*_]/g, '').trim();
       }
     }
 

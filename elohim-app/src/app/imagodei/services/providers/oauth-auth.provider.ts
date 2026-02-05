@@ -218,7 +218,7 @@ export class OAuthAuthProvider implements AuthProvider {
     const body = {
       grantType: 'authorization_code',
       code,
-      redirectUri: redirectUri ?? `${window.location.origin}/auth/callback`,
+      redirectUri: redirectUri ?? `${globalThis.location.origin}/auth/callback`,
       clientId: 'elohim-app',
     };
 

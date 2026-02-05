@@ -431,8 +431,8 @@ export class TrustBadgeService {
       earnedWeight += weights[attestation.attestationType] ?? 0;
     }
 
-    // Cap at 1.0
-    return Math.min((earnedWeight / totalWeight) * 2, 1.0);
+    // Cap at 1
+    return Math.min((earnedWeight / totalWeight) * 2, 1);
   }
 
   /**

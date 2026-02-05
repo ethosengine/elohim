@@ -60,7 +60,7 @@ export class PolicyConsoleComponent implements OnInit {
   // ===========================================================================
 
   /** Subject ID from route or input */
-  readonly subjectIdInput = input<string | undefined>(undefined, { alias: 'subjectId' });
+  readonly subjectId = input<string | undefined>(undefined);
 
   // ===========================================================================
   // State
@@ -75,7 +75,7 @@ export class PolicyConsoleComponent implements OnInit {
   readonly activeTab = signal<PolicyTab>('content');
 
   /** Subject being edited */
-  readonly subjectId = signal<string | null>(null);
+  readonly currentSubjectId = signal<string | null>(null);
 
   /** Current grant (stewardship relationship) */
   readonly grant = signal<StewardshipGrant | null>(null);
@@ -151,7 +151,7 @@ export class PolicyConsoleComponent implements OnInit {
 
   /** Whether editing own policy */
   readonly isEditingSelf = computed(() => {
-    return !this.subjectId();
+    return !this.currentSubjectId();
   });
 
   /** Display name for subject */
@@ -181,10 +181,10 @@ export class PolicyConsoleComponent implements OnInit {
   ngOnInit(): void {
     // Get subject ID from route or input
     const routeSubjectId = this.route.snapshot.paramMap.get('subjectId');
-    const inputSubjectId = this.subjectIdInput();
+    const inputSubjectId = this.subjectId();
     const subjectId = routeSubjectId ?? inputSubjectId ?? null;
 
-    this.subjectId.set(subjectId);
+    this.currentSubjectId.set(subjectId);
     void this.loadData();
   }
 
@@ -197,7 +197,7 @@ export class PolicyConsoleComponent implements OnInit {
     this.error.set(null);
 
     try {
-      const subjectId = this.subjectId();
+      const subjectId = this.currentSubjectId();
 
       if (subjectId) {
         // Editing another's policy - need grant
@@ -402,7 +402,7 @@ export class PolicyConsoleComponent implements OnInit {
     this.successMessage.set(null);
 
     try {
-      const subjectId = this.subjectId();
+      const subjectId = this.currentSubjectId();
 
       await this.stewardship.upsertPolicy({
         subjectId: subjectId ?? undefined,

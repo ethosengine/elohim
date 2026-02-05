@@ -32,7 +32,7 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
  * 1. Overview - Resume point, current focus, capabilities, journey stats
  * 2. Paths - In progress, completed, suggested
  * 3. Timeline - Chronological events with type filter
- * 4. Network - Sovereignty status, data residency, connection details
+ * 4. Network - Agency status, data residency, connection details
  * 5. Settings - Profile editing, export, reset
  *
  * Features:
@@ -40,7 +40,7 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
  * - Session badge with "Upgrade to save permanently" prompt
  * - Quick stats summary
  * - Avatar support (URL-based for MVP)
- * - Sovereignty/data residency visualization
+ * - Agency/data residency visualization
  */
 @Component({
   selector: 'app-profile-page',
@@ -50,7 +50,7 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
   styleUrls: ['./profile-page.component.css'],
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
-  // Injected services for sovereignty/network tab
+  // Injected services for agency/network tab
   private readonly agencyService = inject(AgencyService);
   private readonly holochainService = inject(HolochainClientService);
   readonly identityService = inject(IdentityService); // Public for template access
@@ -59,7 +59,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   // Tab management
   activeTab: 'overview' | 'paths' | 'timeline' | 'network' | 'settings' = 'overview';
 
-  // Sovereignty state (reactive)
+  // Agency state (reactive)
   readonly agencyState = this.agencyService.agencyState;
   readonly stageInfo = this.agencyService.stageInfo;
   readonly connectionStatus = this.agencyService.connectionStatus;
@@ -213,7 +213,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadData();
 
-    // Handle fragment navigation (e.g., #network from sovereignty badge)
+    // Handle fragment navigation (e.g., #network from agency badge)
     this.route.fragment.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
       if (fragment === 'network') {
         this.activeTab = 'network';
@@ -563,11 +563,11 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   }
 
   // =========================================================================
-  // NETWORK / SOVEREIGNTY HELPERS
+  // NETWORK / AGENCY HELPERS
   // =========================================================================
 
   /**
-   * Get CSS class for sovereignty stage badge.
+   * Get CSS class for agency stage badge.
    */
   getStageBadgeClass(): string {
     const stage = this.agencyState().currentStage;

@@ -24,6 +24,7 @@ import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider
 
 import { StorageClientService } from './storage-client.service';
 
+import type { PathExtension } from '../../lamad/models/path-extension.model';
 import type { ContentQuery } from '@elohim/service/client';
 
 /**
@@ -132,29 +133,14 @@ export interface KnowledgeMapFilters {
 // Path Extension Types
 // =============================================================================
 
-/**
- * Path extension (user customization/fork)
- */
-export interface PathExtension {
-  id: string;
-  basePathId: string;
-  basePathVersion: string;
-  extendedBy: string;
-  title: string;
-  description?: string;
-  insertions?: any[];
-  annotations?: any[];
-  reorderings?: any[];
-  exclusions?: string[];
-  visibility: string;
-  sharedWith?: string[];
-  forkedFrom?: string;
-  forks?: string[];
-  upstreamProposal?: any;
-  stats?: any;
-  createdAt?: string;
-  updatedAt?: string;
-}
+// Re-export canonical types from lamad module
+export type {
+  PathExtension,
+  PathStepInsertion,
+  PathStepAnnotation,
+  PathStepReorder,
+  PathStepExclusion,
+} from '../../lamad/models/path-extension.model';
 
 /**
  * Path extension query filters
@@ -823,18 +809,19 @@ export class ContentService {
   private transformPathExtension(data: any): PathExtension {
     return {
       id: data.id,
-      basePathId: data.basePathId ?? data.basePathId,
-      basePathVersion: data.basePathVersion ?? data.basePathVersion,
-      extendedBy: data.extendedBy ?? data.extendedBy,
+      basePathId: data.basePathId,
+      basePathVersion: data.basePathVersion,
+      extendedBy: data.extendedBy,
       title: data.title ?? '',
       description: data.description,
-      insertions: data.insertions,
-      annotations: data.annotations,
-      reorderings: data.reorderings,
-      exclusions: data.exclusions,
-      visibility: data.visibility ?? 'private',
+      // Transform loose arrays to typed arrays (canonical model requires these)
+      insertions: Array.isArray(data.insertions) ? data.insertions : [],
+      annotations: Array.isArray(data.annotations) ? data.annotations : [],
+      reorderings: Array.isArray(data.reorderings) ? data.reorderings : [],
+      exclusions: Array.isArray(data.exclusions) ? data.exclusions : [],
+      visibility: (data.visibility ?? 'private') as 'private' | 'shared' | 'public',
       sharedWith: data.sharedWith,
-      forkedFrom: data.forkedFrom ?? data.forkedFrom,
+      forkedFrom: data.forkedFrom,
       forks: data.forks,
       upstreamProposal: data.upstreamProposal,
       stats: data.stats,

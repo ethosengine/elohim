@@ -986,7 +986,7 @@ export class GovernanceSignalService {
       familiarity: 0.4,
       competence: 0.6,
       proficiency: 0.8,
-      mastery: 1.0,
+      mastery: 1,
     };
     return levels[mastery.toLowerCase()] ?? 0.5;
   }

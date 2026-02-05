@@ -323,13 +323,13 @@ export function parseExpiryDate(expiresAt: string | number | null | undefined): 
     // Handle numeric timestamps (from server returning u64)
     const numValue = typeof expiresAt === 'number' ? expiresAt : Number(expiresAt);
 
-    if (!isNaN(numValue) && numValue > 0) {
+    if (!Number.isNaN(numValue) && numValue > 0) {
       // Distinguish between seconds and milliseconds timestamps
       // Timestamps in seconds: < 10000000000 (before year 2286)
       // Timestamps in milliseconds: >= 10000000000
       const msTimestamp = numValue < 10000000000 ? numValue * 1000 : numValue;
       const date = new Date(msTimestamp);
-      if (!isNaN(date.getTime())) {
+      if (!Number.isNaN(date.getTime())) {
         return date;
       }
     }
@@ -337,7 +337,7 @@ export function parseExpiryDate(expiresAt: string | number | null | undefined): 
     // Try parsing as ISO string (fallback for non-numeric strings)
     if (typeof expiresAt === 'string') {
       const date = new Date(expiresAt);
-      if (!isNaN(date.getTime())) {
+      if (!Number.isNaN(date.getTime())) {
         return date;
       }
     }

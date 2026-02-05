@@ -147,8 +147,8 @@
   color: var(--yellow-700, #b45309);
 }
 
-/* Sovereignty */
-.sovereignty-section {
+/* Agency */
+.agency-section {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -157,12 +157,12 @@
   border-radius: 8px;
 }
 
-.sovereignty-label {
+.agency-label {
   font-size: 0.9rem;
   color: var(--text-color-secondary, #6c757d);
 }
 
-.sovereignty-value {
+.agency-value {
   font-weight: 500;
   color: var(--text-color, #1a1a2e);
 }

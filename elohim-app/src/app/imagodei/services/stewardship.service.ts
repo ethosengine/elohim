@@ -920,9 +920,9 @@ export class StewardshipService {
   private matchRoutePattern(route: string, pattern: string): boolean {
     // Convert pattern to regex
     const regexPattern = pattern
-      .replace(/\*\*/g, '@@DOUBLE_STAR@@')
-      .replace(/\*/g, '[^/]*')
-      .replace(/@@DOUBLE_STAR@@/g, '.*');
+      .replaceAll('**', '@@DOUBLE_STAR@@')
+      .replaceAll('*', '[^/]*')
+      .replaceAll('@@DOUBLE_STAR@@', '.*');
 
     const regex = new RegExp(`^${regexPattern}$`);
     return regex.test(route);

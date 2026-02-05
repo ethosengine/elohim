@@ -319,7 +319,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
         const [, key, value] = match;
         if (value.includes(',') || value.startsWith('[')) {
           frontmatter[key] = value
-            .replace(/[[\]]/g, '')
+            .replaceAll(/[[\]]/g, '')
             .split(',')
             .map(v => v.trim());
         } else {
@@ -355,11 +355,11 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
 
   private addCoreFields(fields: string[], node: ContentIOExportInput): void {
     if (node.title) {
-      fields.push(`title: "${node.title.replace(/"/g, '\\"')}"`);
+      fields.push(`title: "${node.title.replaceAll('"', '\\"')}"`);
     }
     if (node.description) {
       const desc = this.truncateDescription(node.description, 200);
-      fields.push(`description: "${desc.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`);
+      fields.push(`description: "${desc.replaceAll('"', '\\"').replaceAll('\n', ' ')}"`);
     }
     if (node.contentType) {
       fields.push(`contentType: ${node.contentType}`);
