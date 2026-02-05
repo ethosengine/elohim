@@ -29,6 +29,18 @@ describe('OfflineOperationQueueService', () => {
     service = TestBed.inject(OfflineOperationQueueService);
   });
 
+  afterEach(() => {
+    // Cancel all pending retry timers to prevent tests from hanging
+    const pendingRetries = (service as any).pendingRetries as Map<string, ReturnType<typeof setTimeout>>;
+    pendingRetries.forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    pendingRetries.clear();
+
+    // Clear the queue
+    service.clearQueue();
+  });
+
   describe('Service Creation', () => {
     it('should be created', () => {
       expect(service).toBeTruthy();
