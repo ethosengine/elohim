@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 15.1% (2026-02-04)
+// @coverage: 15.1% (2026-02-05)
 
 import { PerformanceMetricsService } from './performance-metrics.service';
 import { ShefaService } from './shefa.service';

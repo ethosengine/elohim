@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
-// @coverage: 46.7% (2026-02-04)
+// @coverage: 46.7% (2026-02-05)
 
 import { ContentNode } from '../../../models/content-node.model';
 import { ContentFormatRegistryService } from '../../services/content-format-registry.service';

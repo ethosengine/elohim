@@ -1,7 +1,7 @@
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 
-// @coverage: 93.7% (2026-02-04)
+// @coverage: 93.7% (2026-02-05)
 
 import { firstValueFrom } from 'rxjs';
 

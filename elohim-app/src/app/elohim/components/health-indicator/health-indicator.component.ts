@@ -8,7 +8,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, computed } from '@angular/core';
 
-// @coverage: 38.1% (2026-02-04)
+// @coverage: 38.1% (2026-02-05)
 
 import { HealthCheckService, HealthState } from '../../services/health-check.service';
 

@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// @coverage: 19.0% (2026-02-04)
+// @coverage: 19.0% (2026-02-05)
 
 import { ContentNode } from '../../models/content-node.model';
 import { InteractiveRenderer, RendererCompletionEvent } from '../renderer-registry.service';

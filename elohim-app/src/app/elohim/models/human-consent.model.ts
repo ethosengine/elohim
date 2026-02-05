@@ -36,7 +36,7 @@ import {
   type ConsentStateChange as BaseConsentStateChange,
 } from '@app/elohim/models/protocol-core.model';
 
-// @coverage: 66.7% (2026-02-04)
+// @coverage: 66.7% (2026-02-05)
 
 // Re-export for convenience (types only to avoid duplicate values)
 export type { IntimacyLevel, ConsentState };

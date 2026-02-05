@@ -7,7 +7,7 @@
 
 import type { Moment, Recognition } from './sophia-moment.model';
 
-// @coverage: 51.1% (2026-02-04)
+// @coverage: 45.0% (2026-02-05)
 
 // Re-export types for consumers
 export type { Moment, Recognition };

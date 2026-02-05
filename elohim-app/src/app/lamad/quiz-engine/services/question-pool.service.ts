@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 97.2% (2026-02-04)
+// @coverage: 97.2% (2026-02-05)
 
 import { Observable, of, forkJoin, map, catchError, shareReplay } from 'rxjs';
 

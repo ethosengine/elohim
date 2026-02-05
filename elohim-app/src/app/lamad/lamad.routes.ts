@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-// @coverage: 4.8% (2026-02-04)
+// @coverage: 4.8% (2026-02-05)
 
 /**
  * Lamad routing strategy (spec-compliant):

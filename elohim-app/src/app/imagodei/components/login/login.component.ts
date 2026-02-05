@@ -16,7 +16,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-04)
+// @coverage: 100.0% (2026-02-05)
 
 import { type PasswordCredentials, AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
 import { type DoorwayInfo } from '../../models/doorway.model';

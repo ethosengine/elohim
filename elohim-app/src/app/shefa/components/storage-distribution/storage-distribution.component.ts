@@ -12,7 +12,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 
-// @coverage: 47.8% (2026-02-04)
+// @coverage: 47.8% (2026-02-05)
 
 import { Subject, takeUntil } from 'rxjs';
 

@@ -29,7 +29,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 83.7% (2026-02-04)
+// @coverage: 83.7% (2026-02-05)
 
 import { firstValueFrom } from 'rxjs';
 

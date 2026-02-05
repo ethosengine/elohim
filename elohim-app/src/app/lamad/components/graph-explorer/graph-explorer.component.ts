@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 84.6% (2026-02-04)
+// @coverage: 84.6% (2026-02-05)
 
 import { takeUntil } from 'rxjs/operators';
 

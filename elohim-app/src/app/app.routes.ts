@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-// @coverage: 10.0% (2026-02-04)
+// @coverage: 10.0% (2026-02-05)
 
 export const routes: Routes = [
   {

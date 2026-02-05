@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 0.2% (2026-02-05)
+// @coverage: 21.7% (2026-02-05)
 
 import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 

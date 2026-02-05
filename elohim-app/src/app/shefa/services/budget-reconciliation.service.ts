@@ -18,7 +18,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 93.9% (2026-02-04)
+// @coverage: 94.0% (2026-02-05)
 
 import { StagedTransaction, ReconciliationResult } from '../models/transaction-import.model';
 

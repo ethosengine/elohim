@@ -16,7 +16,7 @@ import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
-// @coverage: 29.8% (2026-02-04)
+// @coverage: 29.8% (2026-02-05)
 
 import { getRecoveryStatusDisplay } from '../../models/recovery.model';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';

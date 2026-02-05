@@ -25,7 +25,7 @@ import type {
 } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
 
-// @coverage: 100.0% (2026-02-04)
+// @coverage: 100.0% (2026-02-05)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Session Types

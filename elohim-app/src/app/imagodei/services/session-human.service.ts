@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 94.9% (2026-02-04)
+// @coverage: 0.3% (2026-02-05)
 
 import { BehaviorSubject, Observable } from 'rxjs';
 

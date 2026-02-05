@@ -13,7 +13,7 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-04)
+// @coverage: 100.0% (2026-02-05)
 
 import { isNetworkMode } from '../models/identity.model';
 import { IdentityService } from '../services/identity.service';

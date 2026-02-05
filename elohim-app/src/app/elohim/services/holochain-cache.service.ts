@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 
-// @coverage: 85.6% (2026-02-04)
+// @coverage: 85.6% (2026-02-05)
 
 /**
  * Cache entry metadata

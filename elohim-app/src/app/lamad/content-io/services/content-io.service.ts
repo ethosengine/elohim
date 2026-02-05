@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 73.5% (2026-02-04)
+// @coverage: 73.5% (2026-02-05)
 
 import {
   ContentIOImportResult,

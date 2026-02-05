@@ -216,11 +216,22 @@ clearAfterMigration(): void;
 - Use "meaningful encounters" not "views"
 - Use "steward" not "admin"
 
-### Terminology Evolution Note
+### Terminology Evolution
 
-**TODO:** The codebase currently uses "self-sovereign" terminology (e.g., `IdentityMode = 'self-sovereign'`). This needs to transition to language more aligned with Elohim Protocol ethos. Suggested alternatives:
-- "self-sovereign" → "rooted" or "grounded" (keys on own device)
-- "sovereignty" → "agency" or "stewardship"
-- Consider: "hosted" → "supported", "app-user" → "rooted-user"
+~~**TODO:**~~ **COMPLETED (2026-02-05):** The codebase has transitioned from "sovereignty" terminology to "agency" to better align with Elohim Protocol ethos.
 
-The concept of individual sovereignty conflicts with the communal, interdependent nature of the Elohim Protocol. Identity should emphasize relationship and mutual support rather than isolated self-determination.
+**Refactoring completed**:
+- ✅ `sovereignty.model.ts` → `agency.model.ts`
+- ✅ `sovereignty.service.ts` → `agency.service.ts`
+- ✅ `sovereignty-badge` → `agency-badge` component
+- ✅ `SovereigntyStage` → `AgencyStage` (all types)
+- ✅ `SovereigntyState` → `AgencyState`
+- ✅ `SovereigntyTransition` → `AgencyTransition`
+- ✅ `sovereigntyStage` field → `agencyStage` (IdentityState)
+- ✅ `isMoreSovereign()` → `hasGreaterAgency()` (semantic improvement)
+
+**Philosophy**: The concept of individual sovereignty conflicts with the communal, interdependent nature of the Elohim Protocol. "Agency" emphasizes capacity to act within relational networks rather than isolated self-determination.
+
+**Stage names preserved**: Visitor → Hosted → App User → Node Operator (these describe technical architecture, not philosophical positioning)
+
+**Note**: This was an aggressive refactoring with no backward compatibility - clean break to avoid tech debt.

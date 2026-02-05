@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
-// @coverage: 90.5% (2026-02-04)
+// @coverage: 90.5% (2026-02-05)
 
 import { catchError, takeUntil } from 'rxjs/operators';
 

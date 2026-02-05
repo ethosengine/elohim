@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// @coverage: 99.0% (2026-02-04)
+// @coverage: 99.0% (2026-02-05)
 
 import { Subject, interval, takeUntil } from 'rxjs';
 

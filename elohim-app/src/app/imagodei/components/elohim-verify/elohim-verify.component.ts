@@ -19,7 +19,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, signal, computed, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// @coverage: 28.6% (2026-02-04)
+// @coverage: 28.6% (2026-02-05)
 
 /** Question from the doorway */
 interface VerificationQuestion {

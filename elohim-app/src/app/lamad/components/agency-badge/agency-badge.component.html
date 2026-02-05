@@ -1,8 +1,8 @@
-<!-- Sovereignty Badge: At-a-Glance View -->
-<div class="sovereignty-section">
+<!-- Agency Badge: At-a-Glance View -->
+<div class="agency-section">
   <button
     type="button"
-    class="sovereignty-header"
+    class="agency-header"
     (click)="toggleExpand()"
     [attr.aria-expanded]="expanded()"
   >
@@ -40,7 +40,7 @@
   </div>
 
   <!-- Expanded Details -->
-  <div class="sovereignty-details" *ngIf="expanded()">
+  <div class="agency-details" *ngIf="expanded()">
     <p class="stage-description">{{ stageInfo().description }}</p>
 
     <!-- Connection Details (when connected) -->
@@ -106,7 +106,7 @@
   </div>
 
   <!-- Actions -->
-  <div class="sovereignty-actions">
+  <div class="agency-actions">
     <button type="button" class="action-link" (click)="onViewDetails()">
       View Details
       <span class="material-icons">arrow_forward</span>

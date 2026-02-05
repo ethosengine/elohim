@@ -28,7 +28,7 @@ import type {
   QuestionDifficulty,
 } from '../../content-io/plugins/sophia/sophia-moment.model';
 
-// @coverage: 31.0% (2026-02-04)
+// @coverage: 31.0% (2026-02-05)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Question Pool

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 94.6% (2026-02-04)
+// @coverage: 94.6% (2026-02-05)
 
 import { Observable } from 'rxjs';
 

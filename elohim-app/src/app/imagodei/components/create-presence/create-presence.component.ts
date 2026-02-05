@@ -17,7 +17,7 @@ import { Component, inject, signal, computed, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-04)
+// @coverage: 100.0% (2026-02-05)
 
 import { ContentService } from '@app/lamad/services/content.service';
 

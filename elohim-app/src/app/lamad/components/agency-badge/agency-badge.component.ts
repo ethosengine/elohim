@@ -1,7 +1,7 @@
 /**
- * Sovereignty Badge Component
+ * Agency Badge Component
  *
- * Compact at-a-glance view of user's sovereignty status for the profile tray.
+ * Compact at-a-glance view of user's agency status for the profile tray.
  * Shows current stage, connection status, and provides link to detailed view.
  */
 
@@ -9,20 +9,20 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal, output, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-04)
+// @coverage: 100.0% (2026-02-05)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
-import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+import { AgencyService } from '@app/imagodei/services/agency.service';
 
 @Component({
-  selector: 'app-sovereignty-badge',
+  selector: 'app-agency-badge',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './sovereignty-badge.component.html',
-  styleUrl: './sovereignty-badge.component.css',
+  templateUrl: './agency-badge.component.html',
+  styleUrl: './agency-badge.component.css',
 })
-export class SovereigntyBadgeComponent {
-  private readonly sovereigntyService = inject(SovereigntyService);
+export class AgencyBadgeComponent {
+  private readonly agencyService = inject(AgencyService);
   private readonly holochainService = inject(HolochainClientService);
   private readonly router = inject(Router);
 
@@ -35,12 +35,12 @@ export class SovereigntyBadgeComponent {
   /** Emit when user wants to upgrade */
   readonly upgrade = output<void>();
 
-  // Computed values from sovereignty service
-  readonly state = this.sovereigntyService.sovereigntyState;
-  readonly stageInfo = this.sovereigntyService.stageInfo;
-  readonly connectionStatus = this.sovereigntyService.connectionStatus;
-  readonly summary = computed(() => this.sovereigntyService.getStageSummary());
-  readonly canUpgrade = this.sovereigntyService.canUpgrade;
+  // Computed values from agency service
+  readonly state = this.agencyService.agencyState;
+  readonly stageInfo = this.agencyService.stageInfo;
+  readonly connectionStatus = this.agencyService.connectionStatus;
+  readonly summary = computed(() => this.agencyService.getStageSummary());
+  readonly canUpgrade = this.agencyService.canUpgrade;
 
   /** Connection state for Edge Node details */
   readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());

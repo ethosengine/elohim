@@ -16,7 +16,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 3.5% (2026-02-05)
+// @coverage: 20.3% (2026-02-05)
 
 import { ContentNode } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';

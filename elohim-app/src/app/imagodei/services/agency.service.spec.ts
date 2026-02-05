@@ -1,13 +1,13 @@
 /**
- * SovereigntyService Tests
+ * AgencyService Tests
  *
- * Tests sovereignty stage detection and state computation.
+ * Tests agency stage detection and state computation.
  */
 
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
-import { SovereigntyService } from './sovereignty.service';
+import { AgencyService } from './agency.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import type {
   EdgeNodeDisplayInfo,
@@ -15,8 +15,8 @@ import type {
   HolochainConnection,
 } from '../../elohim/models/holochain-connection.model';
 
-describe('SovereigntyService', () => {
-  let service: SovereigntyService;
+describe('AgencyService', () => {
+  let service: AgencyService;
   let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
   let connectionSignal: ReturnType<typeof signal<HolochainConnection>>;
 
@@ -64,12 +64,12 @@ describe('SovereigntyService', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        SovereigntyService,
+        AgencyService,
         { provide: HolochainClientService, useValue: mockHolochainClient },
       ],
     });
 
-    service = TestBed.inject(SovereigntyService);
+    service = TestBed.inject(AgencyService);
   });
 
   // ==========================================================================
@@ -354,7 +354,7 @@ describe('SovereigntyService', () => {
       });
       mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.dataResidency.length).toBeGreaterThan(0);
       expect(state.dataResidency.some((d) => d.locationLabel.includes('Browser'))).toBe(true);
     });
@@ -373,7 +373,7 @@ describe('SovereigntyService', () => {
         createMockDisplayInfo('connected', 'wss://edge.elohim.network')
       );
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.dataResidency.length).toBeGreaterThan(0);
       expect(state.dataResidency.some((d) => d.locationLabel.includes('Elohim Server') || d.locationLabel.includes('DHT Network'))).toBe(true);
     });
@@ -392,7 +392,7 @@ describe('SovereigntyService', () => {
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.dataResidency.length).toBeGreaterThan(0);
       expect(state.dataResidency.some((d) => d.locationLabel.includes('Device'))).toBe(true);
     });
@@ -415,7 +415,7 @@ describe('SovereigntyService', () => {
       });
       mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.keys).toEqual([]);
     });
 
@@ -434,7 +434,7 @@ describe('SovereigntyService', () => {
         agentPubKey: 'agent-pub-key-123456789',
       });
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.keys.length).toBeGreaterThan(0);
       const agentKey = state.keys.find((k) => k.type === 'agent-pubkey');
       expect(agentKey).toBeDefined();
@@ -456,7 +456,7 @@ describe('SovereigntyService', () => {
         agentPubKey: 'agent-pub-key-very-long-string-here',
       });
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       const agentKey = state.keys.find((k) => k.type === 'agent-pubkey');
       expect(agentKey?.truncated).toContain('...');
     });
@@ -476,7 +476,7 @@ describe('SovereigntyService', () => {
         agentPubKey: 'agent-pub-key-123',
       });
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       const signingKey = state.keys.find((k) => k.type === 'signing-key');
       expect(signingKey?.canExport).toBe(false);
     });
@@ -496,7 +496,7 @@ describe('SovereigntyService', () => {
         agentPubKey: 'agent-pub-key-123',
       });
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       const signingKey = state.keys.find((k) => k.type === 'signing-key');
       expect(signingKey?.canExport).toBe(true);
     });
@@ -519,7 +519,7 @@ describe('SovereigntyService', () => {
       });
       mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.migrationAvailable).toBe(true);
       expect(state.migrationTarget).toBe('hosted');
     });
@@ -538,7 +538,7 @@ describe('SovereigntyService', () => {
         createMockDisplayInfo('connected', 'wss://edge.elohim.network')
       );
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.migrationAvailable).toBe(true);
       expect(state.migrationTarget).toBe('app-user');
     });
@@ -562,7 +562,7 @@ describe('SovereigntyService', () => {
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.migrationAvailable).toBe(false);
       expect(state.migrationTarget).toBeUndefined();
     });
@@ -707,7 +707,7 @@ describe('SovereigntyService', () => {
         connectedAt,
       });
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.networkStats).toBeDefined();
       expect(state.networkStats?.connectedSince).toBe(connectedAt);
       // TODO(test-generator): [MEDIUM] Network stats are hardcoded to 0
@@ -729,7 +729,7 @@ describe('SovereigntyService', () => {
       });
       mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
 
-      const state = service.sovereigntyState();
+      const state = service.agencyState();
       expect(state.networkStats).toBeUndefined();
     });
   });

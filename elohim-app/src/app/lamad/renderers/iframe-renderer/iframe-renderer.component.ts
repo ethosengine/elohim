@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
-// @coverage: 80.7% (2026-02-04)
+// @coverage: 80.7% (2026-02-05)
 
 import { environment } from '../../../../environments/environment';
 import { ContentNode } from '../../models/content-node.model';

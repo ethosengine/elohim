@@ -8,7 +8,7 @@
 
 import { Type } from '@angular/core';
 
-// @coverage: 98.6% (2026-02-04)
+// @coverage: 98.6% (2026-02-05)
 
 import {
   BaseContentFormatPlugin,

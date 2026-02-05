@@ -1,11 +1,11 @@
 /**
- * Sovereignty Service
+ * Agency Service
  *
- * Computes the current sovereignty state for a user by aggregating
+ * Computes the current agency state for a user by aggregating
  * data from session management and Holochain connection services.
  *
  * This service provides a unified view of:
- * - Current sovereignty stage (Visitor → Hosted → App User → Node Operator)
+ * - Current agency stage (Visitor → Hosted → App User → Node Operator)
  * - Data residency (where is my data stored?)
  * - Connection status (am I connected to the network?)
  * - Key/credential information
@@ -14,33 +14,33 @@
 
 import { Injectable, computed, inject } from '@angular/core';
 
-// @coverage: 88.9% (2026-02-04)
+// @coverage: 1.2% (2026-02-05)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type KeyLocation } from '../models/identity.model';
 import {
-  type SovereigntyState,
-  type SovereigntyStage,
+  type AgencyState,
+  type AgencyStage,
   type ConnectionStatus,
   type KeyInfo,
   type DataResidencyItem,
-  SOVEREIGNTY_STAGES,
+  AGENCY_STAGES,
   getNextStage,
   getVisitorDataResidency,
   getHostedDataResidency,
   getAppUserDataResidency,
-} from '../models/sovereignty.model';
+} from '../models/agency.model';
 
 @Injectable({
   providedIn: 'root',
 })
-export class SovereigntyService {
+export class AgencyService {
   private readonly holochainService = inject(HolochainClientService);
 
   /**
-   * Computed sovereignty state based on current connections and session.
+   * Computed agency state based on current connections and session.
    */
-  readonly sovereigntyState = computed<SovereigntyState>(() => {
+  readonly agencyState = computed<AgencyState>(() => {
     const holochainConnection = this.holochainService.connection();
     const holochainState = holochainConnection.state;
     const displayInfo = this.holochainService.getDisplayInfo();
@@ -62,7 +62,7 @@ export class SovereigntyService {
 
     return {
       currentStage,
-      stageInfo: SOVEREIGNTY_STAGES[currentStage],
+      stageInfo: AGENCY_STAGES[currentStage],
       connectionStatus,
       dataResidency,
       keys,
@@ -84,25 +84,25 @@ export class SovereigntyService {
   /**
    * Quick access to current stage.
    */
-  readonly currentStage = computed(() => this.sovereigntyState().currentStage);
+  readonly currentStage = computed(() => this.agencyState().currentStage);
 
   /**
    * Quick access to stage info.
    */
-  readonly stageInfo = computed(() => this.sovereigntyState().stageInfo);
+  readonly stageInfo = computed(() => this.agencyState().stageInfo);
 
   /**
    * Quick access to connection status.
    */
-  readonly connectionStatus = computed(() => this.sovereigntyState().connectionStatus);
+  readonly connectionStatus = computed(() => this.agencyState().connectionStatus);
 
   /**
    * Whether user can upgrade to next stage.
    */
-  readonly canUpgrade = computed(() => this.sovereigntyState().migrationAvailable);
+  readonly canUpgrade = computed(() => this.agencyState().migrationAvailable);
 
   /**
-   * Determine sovereignty stage based on connection state and conductor location.
+   * Determine agency stage based on connection state and conductor location.
    *
    * Stage Detection Logic:
    * - visitor: No Holochain connection, session-only or anonymous
@@ -110,7 +110,7 @@ export class SovereigntyService {
    * - app-user: Connected to local conductor on user's device (self-sovereign keys)
    * - node-operator: Local conductor that also hosts other humans
    */
-  private determineStage(holochainState: string, hasStoredCredentials: boolean): SovereigntyStage {
+  private determineStage(holochainState: string, hasStoredCredentials: boolean): AgencyStage {
     const displayInfo = this.holochainService.getDisplayInfo();
 
     if (holochainState === 'connected') {
@@ -218,9 +218,9 @@ export class SovereigntyService {
   }
 
   /**
-   * Get data residency items based on sovereignty stage.
+   * Get data residency items based on agency stage.
    */
-  private getDataResidency(stage: SovereigntyStage): DataResidencyItem[] {
+  private getDataResidency(stage: AgencyStage): DataResidencyItem[] {
     switch (stage) {
       case 'visitor':
         return getVisitorDataResidency();
@@ -238,7 +238,7 @@ export class SovereigntyService {
    * Get key information for display.
    */
   private getKeyInfo(
-    stage: SovereigntyStage,
+    stage: AgencyStage,
     displayInfo: ReturnType<HolochainClientService['getDisplayInfo']>
   ): KeyInfo[] {
     if (stage === 'visitor') {
@@ -269,9 +269,9 @@ export class SovereigntyService {
   }
 
   /**
-   * Determine key location based on sovereignty stage.
+   * Determine key location based on agency stage.
    */
-  private getKeyLocation(stage: SovereigntyStage): KeyLocation {
+  private getKeyLocation(stage: AgencyStage): KeyLocation {
     switch (stage) {
       case 'visitor':
         return 'none';
@@ -289,7 +289,7 @@ export class SovereigntyService {
   /**
    * Get key location display info.
    */
-  private getKeyLocationInfo(stage: SovereigntyStage, location: KeyLocation): KeyInfo | null {
+  private getKeyLocationInfo(stage: AgencyStage, location: KeyLocation): KeyInfo | null {
     switch (location) {
       case 'custodial':
         return {
@@ -344,13 +344,13 @@ export class SovereigntyService {
    * Get summary text for data location.
    */
   getDataSummary(): string {
-    const state = this.sovereigntyState();
+    const state = this.agencyState();
     const locations = new Set(state.dataResidency.map(d => d.locationLabel));
     return `${state.dataResidency.length} categories in ${Array.from(locations).join(', ')}`;
   }
 
   /**
-   * Get summary text for sovereignty stage (for compact display).
+   * Get summary text for agency stage (for compact display).
    */
   getStageSummary(): { data: string; progress: string } {
     const stage = this.currentStage();

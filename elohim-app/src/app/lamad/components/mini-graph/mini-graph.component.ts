@@ -14,7 +14,7 @@ import {
   ChangeDetectorRef,
 } from '@angular/core';
 
-// @coverage: 43.4% (2026-02-04)
+// @coverage: 43.4% (2026-02-05)
 
 import { takeUntil } from 'rxjs/operators';
 

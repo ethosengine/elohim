@@ -11,7 +11,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 
-// @coverage: 87.5% (2026-02-04)
+// @coverage: 87.5% (2026-02-05)
 
 import { takeUntil } from 'rxjs/operators';
 

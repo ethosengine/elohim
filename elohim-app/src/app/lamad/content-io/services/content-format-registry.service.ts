@@ -1,6 +1,6 @@
 import { Injectable, Type } from '@angular/core';
 
-// @coverage: 89.1% (2026-02-04)
+// @coverage: 89.1% (2026-02-05)
 
 import { ContentNode } from '../../models/content-node.model';
 import {

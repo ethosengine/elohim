@@ -16,7 +16,7 @@ import {
   inject,
 } from '@angular/core';
 
-// @coverage: 62.1% (2026-02-04)
+// @coverage: 62.1% (2026-02-05)
 
 import {
   registerPerseusElement,

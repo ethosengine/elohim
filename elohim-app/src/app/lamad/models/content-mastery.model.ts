@@ -16,7 +16,7 @@
 
 import type { MasteryLevel } from '@app/elohim/models/agent.model';
 
-// @coverage: 30.0% (2026-02-04)
+// @coverage: 30.0% (2026-02-05)
 
 // Re-export for convenience
 export type { MasteryLevel } from '@app/elohim/models/agent.model';

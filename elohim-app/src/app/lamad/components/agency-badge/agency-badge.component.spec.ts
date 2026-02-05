@@ -1,24 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { SovereigntyBadgeComponent } from './sovereignty-badge.component';
-import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+import { AgencyBadgeComponent } from './agency-badge.component';
+import { AgencyService } from '@app/imagodei/services/agency.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { signal, computed } from '@angular/core';
 
-describe('SovereigntyBadgeComponent', () => {
-  let component: SovereigntyBadgeComponent;
-  let fixture: ComponentFixture<SovereigntyBadgeComponent>;
+describe('AgencyBadgeComponent', () => {
+  let component: AgencyBadgeComponent;
+  let fixture: ComponentFixture<AgencyBadgeComponent>;
   let routerSpy: jasmine.SpyObj<Router>;
-  let sovereigntySpy: jasmine.SpyObj<SovereigntyService>;
+  let agencySpy: jasmine.SpyObj<AgencyService>;
   let holochainSpy: jasmine.SpyObj<HolochainClientService>;
 
   beforeEach(async () => {
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
-    sovereigntySpy = jasmine.createSpyObj(
-      'SovereigntyService',
+    agencySpy = jasmine.createSpyObj(
+      'AgencyService',
       ['getStageSummary'],
       {
-        sovereigntyState: signal({
+        agencyState: signal({
           currentStage: 'citizen',
           networked: true,
           edgeNodeConnected: true,
@@ -36,7 +36,7 @@ describe('SovereigntyBadgeComponent', () => {
         canUpgrade: signal(false),
       }
     );
-    sovereigntySpy.getStageSummary.and.returnValue({
+    agencySpy.getStageSummary.and.returnValue({
       data: 'Test summary',
       progress: '0%',
     });
@@ -64,15 +64,15 @@ describe('SovereigntyBadgeComponent', () => {
     });
 
     await TestBed.configureTestingModule({
-      imports: [SovereigntyBadgeComponent],
+      imports: [AgencyBadgeComponent],
       providers: [
         { provide: Router, useValue: routerSpy },
-        { provide: SovereigntyService, useValue: sovereigntySpy },
+        { provide: AgencyService, useValue: agencySpy },
         { provide: HolochainClientService, useValue: holochainSpy },
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(SovereigntyBadgeComponent);
+    fixture = TestBed.createComponent(AgencyBadgeComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -97,7 +97,7 @@ describe('SovereigntyBadgeComponent', () => {
       expect(component.upgrade.emit).toBeDefined();
     });
 
-    it('should expose sovereignty service signals', () => {
+    it('should expose agency service signals', () => {
       expect(component.state).toBeDefined();
       expect(component.stageInfo).toBeDefined();
       expect(component.connectionStatus).toBeDefined();

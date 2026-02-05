@@ -7,7 +7,7 @@
 
 import { ContentType, ContentFormat } from '../models/content-node.model';
 
-// @coverage: 69.4% (2026-02-04)
+// @coverage: 69.4% (2026-02-05)
 
 /**
  * Icon mappings for content types.

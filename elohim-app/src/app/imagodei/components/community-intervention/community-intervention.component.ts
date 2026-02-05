@@ -20,7 +20,7 @@ import { Component, OnInit, inject, signal, computed, input } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 
-// @coverage: 92.0% (2026-02-04)
+// @coverage: 92.0% (2026-02-05)
 
 import {
   type CommunityIntervention,

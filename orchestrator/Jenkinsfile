@@ -41,8 +41,8 @@ import groovy.transform.Field
         dependsOn: ['elohim-holochain'],
         triggersGenesis: true,
         deploymentCheck: [
-            dev: 'https://doorway-dev.elohim.host/health',
-            staging: 'https://doorway-dev.elohim.host/health',  // staging shares doorway-dev
+            dev: 'https://doorway-alpha.elohim.host/health',
+            staging: 'https://doorway-staging.elohim.host/health',
             prod: 'https://doorway.elohim.host/health'
         ]
     ],
@@ -78,17 +78,18 @@ import groovy.transform.Field
 ]
 
 // Environment-specific endpoints for version checking
-// Note: alpha and staging share doorway-dev
 @Field def VERSION_ENDPOINTS = [
-    'doorway-dev': 'https://doorway-dev.elohim.host/version',
+    'doorway-alpha': 'https://doorway-alpha.elohim.host/version',
+    'doorway-staging': 'https://doorway-staging.elohim.host/version',
     'doorway-prod': 'https://doorway.elohim.host/version',
-    'app-dev': 'https://alpha.elohim.host/version.json',
+    'app-alpha': 'https://alpha.elohim.host/version.json',
     'app-staging': 'https://staging.elohim.host/version.json',
     'app-prod': 'https://elohim.host/version.json'
 ]
 
 @Field def HEALTH_ENDPOINTS = [
-    'doorway-dev': 'https://doorway-dev.elohim.host/health',
+    'doorway-alpha': 'https://doorway-alpha.elohim.host/health',
+    'doorway-staging': 'https://doorway-staging.elohim.host/health',
     'doorway-prod': 'https://doorway.elohim.host/health',
     'alpha': 'https://alpha.elohim.host',
     'staging': 'https://staging.elohim.host',
@@ -112,7 +113,7 @@ def getRemediationHint(String p) {
     ['elohim-holochain':'Check RUSTFLAGS, cargo build locally',
      'elohim-edge':'Check hApp artifact, Harbor creds',
      'elohim':'Run npm run build locally',
-     'elohim-genesis':'Check doorway-dev.elohim.host/health',
+     'elohim-genesis':'Check doorway-alpha.elohim.host/health or doorway-staging.elohim.host/health',
      'elohim-steward':'Check Tauri build, hApp artifact'][p] ?: 'Check logs'
 }
 def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 ? 'HIGH' : u > 0 ? 'MEDIUM' : 'LOW' }

@@ -23,7 +23,7 @@ import type {
   AggregatedReflection,
 } from '../../content-io/plugins/sophia/sophia-element-loader';
 
-// @coverage: 92.9% (2026-02-04)
+// @coverage: 92.9% (2026-02-05)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Instrument ID

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, computed, signal } from '@angular/core';
 
-// @coverage: 30.2% (2026-02-04)
+// @coverage: 30.2% (2026-02-05)
 
 import { HolochainClientService } from '../../services/holochain-client.service';
 import { HolochainContentService } from '../../services/holochain-content.service';

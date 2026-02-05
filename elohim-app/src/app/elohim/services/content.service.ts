@@ -12,7 +12,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 0.6% (2026-02-05)
+// @coverage: 83.1% (2026-02-05)
 
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 

@@ -16,7 +16,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 
-// @coverage: 32.5% (2026-02-04)
+// @coverage: 32.5% (2026-02-05)
 
 import { takeUntil, tap } from 'rxjs/operators';
 

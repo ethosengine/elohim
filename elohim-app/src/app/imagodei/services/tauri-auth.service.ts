@@ -13,7 +13,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
-// @coverage: 92.2% (2026-02-04)
+// @coverage: 92.2% (2026-02-05)
 
 import { environment } from '../../../environments/environment';
 

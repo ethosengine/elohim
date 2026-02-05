@@ -1,10 +1,11 @@
 /**
- * Sovereignty Model - Human-centered data ownership representation.
+ * Agency Model - Human-centered autonomy representation.
  *
  * Philosophy:
- * - Make data sovereignty visible and understandable
+ * - Make human agency visible and understandable
  * - Show users where their data lives and who controls it
  * - Provide clear upgrade paths for more autonomy
+ * - Emphasize capacity to act within relational networks
  *
  * Four-Stage Progression:
  * 1. Visitor - Browser session, anonymous, no persistence
@@ -14,15 +15,15 @@
  */
 
 /**
- * The four stages of human sovereignty in the Elohim network.
+ * The four stages of human agency in data ownership within the Elohim network.
  */
-export type SovereigntyStage = 'visitor' | 'hosted' | 'app-user' | 'node-operator';
+export type AgencyStage = 'visitor' | 'hosted' | 'app-user' | 'node-operator';
 
 /**
- * Detailed information about each sovereignty stage.
+ * Detailed information about each agency stage.
  */
-export interface SovereigntyStageInfo {
-  stage: SovereigntyStage;
+export interface AgencyStageInfo {
+  stage: AgencyStage;
   label: string;
   tagline: string;
   description: string;
@@ -118,25 +119,25 @@ export interface MigrationProgress {
 }
 
 /**
- * Complete sovereignty state for a user.
+ * Complete agency state for a user.
  */
-export interface SovereigntyState {
-  currentStage: SovereigntyStage;
-  stageInfo: SovereigntyStageInfo;
+export interface AgencyState {
+  currentStage: AgencyStage;
+  stageInfo: AgencyStageInfo;
   connectionStatus: ConnectionStatus;
   dataResidency: DataResidencyItem[];
   keys: KeyInfo[];
   hasStoredCredentials: boolean;
   networkStats?: NetworkStats;
   migrationAvailable: boolean;
-  migrationTarget?: SovereigntyStage;
+  migrationTarget?: AgencyStage;
   migrationProgress?: MigrationProgress;
 }
 
 /**
  * Stage definitions with human-friendly descriptions.
  */
-export const SOVEREIGNTY_STAGES: Record<SovereigntyStage, SovereigntyStageInfo> = {
+export const AGENCY_STAGES: Record<AgencyStage, AgencyStageInfo> = {
   visitor: {
     stage: 'visitor',
     label: 'Visitor',
@@ -169,7 +170,7 @@ export const SOVEREIGNTY_STAGES: Record<SovereigntyStage, SovereigntyStageInfo> 
     limitations: [
       'Keys managed by Elohim',
       'Dependent on Elohim servers',
-      'Less sovereign than self-hosting',
+      'Less agency than self-hosting',
     ],
     order: 2,
   },
@@ -195,10 +196,10 @@ export const SOVEREIGNTY_STAGES: Record<SovereigntyStage, SovereigntyStageInfo> 
     label: 'Node Operator',
     tagline: 'Always-on infrastructure',
     description:
-      'You run your own always-on Holochain node. Maximum sovereignty and network contribution.',
+      'You run your own always-on Holochain node. Maximum agency and network contribution.',
     icon: 'dns',
     benefits: [
-      'Maximum sovereignty',
+      'Maximum agency',
       'Always-on participation',
       'Support the network',
       'Host others in your trust network',
@@ -215,17 +216,17 @@ export const SOVEREIGNTY_STAGES: Record<SovereigntyStage, SovereigntyStageInfo> 
 /**
  * Get the next upgrade stage.
  */
-export function getNextStage(current: SovereigntyStage): SovereigntyStage | null {
-  const order = SOVEREIGNTY_STAGES[current].order;
-  const next = Object.values(SOVEREIGNTY_STAGES).find(s => s.order === order + 1);
+export function getNextStage(current: AgencyStage): AgencyStage | null {
+  const order = AGENCY_STAGES[current].order;
+  const next = Object.values(AGENCY_STAGES).find(s => s.order === order + 1);
   return next?.stage ?? null;
 }
 
 /**
- * Check if a stage is more sovereign than another.
+ * Check if a stage has greater agency than another.
  */
-export function isMoreSovereign(a: SovereigntyStage, b: SovereigntyStage): boolean {
-  return SOVEREIGNTY_STAGES[a].order > SOVEREIGNTY_STAGES[b].order;
+export function hasGreaterAgency(a: AgencyStage, b: AgencyStage): boolean {
+  return AGENCY_STAGES[a].order > AGENCY_STAGES[b].order;
 }
 
 /**

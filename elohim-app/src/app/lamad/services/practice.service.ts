@@ -18,7 +18,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 37.9% (2026-02-04)
+// @coverage: 37.9% (2026-02-05)
 
 import { map, tap, catchError } from 'rxjs/operators';
 

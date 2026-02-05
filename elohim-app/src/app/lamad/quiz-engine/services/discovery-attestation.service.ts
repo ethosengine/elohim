@@ -15,7 +15,7 @@
 
 import { Injectable, signal, computed } from '@angular/core';
 
-// @coverage: 17.4% (2026-02-04)
+// @coverage: 17.4% (2026-02-05)
 
 import { type Attestation } from '@app/imagodei/models/attestations.model';
 

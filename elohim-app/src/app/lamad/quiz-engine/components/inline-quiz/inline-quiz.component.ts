@@ -12,7 +12,7 @@ import {
   computed,
 } from '@angular/core';
 
-// @coverage: 48.8% (2026-02-04)
+// @coverage: 48.8% (2026-02-05)
 
 import { Subject, takeUntil } from 'rxjs';
 

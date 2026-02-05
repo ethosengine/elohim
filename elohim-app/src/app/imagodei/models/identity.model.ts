@@ -26,9 +26,9 @@
  * - hardware: Keys in hardware security module (maximum security)
  */
 
-import type { SovereigntyStage } from './sovereignty.model';
+import type { AgencyStage } from './agency.model';
 
-// @coverage: 93.3% (2026-02-04)
+// @coverage: 20.0% (2026-02-05)
 
 // =============================================================================
 // Identity Mode
@@ -196,11 +196,11 @@ export interface IdentityState {
   profile: HumanProfile | null;
   /** Attestations earned by this human */
   attestations: string[];
-  /** Current sovereignty stage */
-  sovereigntyStage: SovereigntyStage;
+  /** Current agency stage */
+  agencyStage: AgencyStage;
 
   // =========================================================================
-  // Key Management (for sovereignty progression)
+  // Key Management (for agency progression)
   // =========================================================================
 
   /** Where cryptographic keys are stored */
@@ -305,7 +305,7 @@ export const INITIAL_IDENTITY_STATE: IdentityState = {
   did: null,
   profile: null,
   attestations: [],
-  sovereigntyStage: 'visitor',
+  agencyStage: 'visitor',
 
   // Key management - no keys for anonymous
   keyLocation: 'none',
@@ -360,9 +360,9 @@ export interface MigrationState {
   /** Direction of migration */
   direction: MigrationDirection;
   /** Source stage */
-  fromStage: SovereigntyStage;
+  fromStage: AgencyStage;
   /** Target stage */
-  toStage: SovereigntyStage;
+  toStage: AgencyStage;
   /** Current step description */
   currentStep?: string;
   /** Progress percentage (0-100) */
@@ -396,8 +396,8 @@ export interface MigrationResult {
   success: boolean;
   /** New human ID if identity changed */
   newHumanId?: string;
-  /** New sovereignty stage achieved */
-  newStage?: SovereigntyStage;
+  /** New agency stage achieved */
+  newStage?: AgencyStage;
   /** Error message if failed */
   error?: string;
   /** Warnings during migration */
@@ -443,13 +443,13 @@ export interface TransitionRequirement {
 }
 
 /**
- * Defines a possible sovereignty transition.
+ * Defines a possible agency transition.
  */
-export interface SovereigntyTransition {
+export interface AgencyTransition {
   /** Source stage */
-  from: SovereigntyStage;
+  from: AgencyStage;
   /** Target stage */
-  to: SovereigntyStage;
+  to: AgencyStage;
   /** Direction of transition */
   direction: MigrationDirection;
   /** Human-readable title */

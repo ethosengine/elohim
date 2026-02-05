@@ -11,7 +11,7 @@
  *   - elohim-happ-installer (bootstrap sidecar)
  *
  * Environment Architecture:
- *   - dev branch → doorway-dev.elohim.host (serves alpha + staging apps)
+ *   - dev branch → doorway-alpha.elohim.host (alpha), doorway-staging.elohim.host (staging)
  *   - main branch → doorway.elohim.host (serves production app only)
  *
  * Trigger behavior:
@@ -672,7 +672,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Deploy Edge Node - Dev') {
+        stage('Deploy Edge Node - Alpha') {
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
@@ -708,7 +708,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             if (!shouldDeploy) {
                                 echo "No new images pushed and no force flags - checking edge node health..."
-                                if (checkEdgeNodeHealth('https://doorway-dev.elohim.host')) {
+                                if (checkEdgeNodeHealth('https://doorway-alpha.elohim.host')) {
                                     echo "Edge node is healthy - skipping deployment"
                                     env.EDGE_NODE_HEALTHY = 'true'
                                     return

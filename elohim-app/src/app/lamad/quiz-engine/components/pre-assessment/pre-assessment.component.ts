@@ -10,7 +10,7 @@ import {
   computed,
 } from '@angular/core';
 
-// @coverage: 22.2% (2026-02-04)
+// @coverage: 22.2% (2026-02-05)
 
 import { SkipAheadResult } from '../../services/path-adaptation.service';
 

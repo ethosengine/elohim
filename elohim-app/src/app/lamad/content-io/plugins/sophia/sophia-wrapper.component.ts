@@ -33,7 +33,7 @@ import {
   inject,
 } from '@angular/core';
 
-// @coverage: 29.9% (2026-02-04)
+// @coverage: 29.9% (2026-02-05)
 
 import {
   registerSophiaElement,

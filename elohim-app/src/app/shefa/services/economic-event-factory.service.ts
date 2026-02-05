@@ -16,7 +16,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 90.2% (2026-02-04)
+// @coverage: 90.2% (2026-02-05)
 
 import { StagedTransaction } from '../models/transaction-import.model';
 

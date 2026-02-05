@@ -20,7 +20,7 @@
 import { ReachLevel } from './protocol-core.model';
 import { ATTESTATION_BADGE_CONFIG, REACH_BADGE_CONFIG, WARNING_CONFIG } from './trust-badge-config';
 
-// @coverage: 88.4% (2026-02-04)
+// @coverage: 88.4% (2026-02-05)
 
 // ContentAttestationType is lamad-specific - we define a minimal type here
 // for cross-pillar trust display. Full type lives in @app/lamad.

@@ -1,6 +1,6 @@
 import { Injectable, Optional, OnDestroy } from '@angular/core';
 
-// @coverage: 62.7% (2026-02-04)
+// @coverage: 62.7% (2026-02-05)
 
 import { map, tap, switchMap, take, takeUntil } from 'rxjs/operators';
 

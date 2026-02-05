@@ -9,14 +9,14 @@
  * This service wraps:
  * - SessionHumanService for localStorage-based sessions
  * - HolochainClientService for Holochain zome calls
- * - SovereigntyService for sovereignty stage tracking
+ * - AgencyService for agency stage tracking
  *
  * It does NOT replace these services - they remain available for direct use.
  */
 
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 
-// @coverage: 63.5% (2026-02-04)
+// @coverage: 1.6% (2026-02-05)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
@@ -36,7 +36,7 @@ import {
 import { AuthService } from './auth.service';
 import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { SessionHumanService } from './session-human.service';
-import { SovereigntyService } from './sovereignty.service';
+import { AgencyService } from './agency.service';
 
 // Re-export utility functions for consumers
 export { isNetworkMode, getInitials } from '../models/identity.model';
@@ -256,7 +256,7 @@ export class IdentityService {
   // Dependencies
   private readonly holochainClient = inject(HolochainClientService);
   private readonly sessionHumanService = inject(SessionHumanService);
-  private readonly sovereigntyService = inject(SovereigntyService);
+  private readonly agencyService = inject(AgencyService);
   private readonly authService = inject(AuthService);
   private readonly passwordProvider = inject(PasswordAuthProvider);
 
@@ -416,7 +416,7 @@ export class IdentityService {
         displayName: session.displayName,
         agentPubKey: session.linkedAgentPubKey ?? null,
         did,
-        sovereigntyStage: 'visitor',
+        agencyStage: 'visitor',
 
         // Session-specific state
         keyLocation: 'none',
@@ -549,7 +549,7 @@ export class IdentityService {
     const conductorInfo = this.detectConductorType();
     const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
     const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-    const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+    const agencyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
 
     // Check if session exists alongside Holochain
     const session = this.sessionHumanService.getSession();
@@ -572,7 +572,7 @@ export class IdentityService {
       did,
       profile: mapToProfile(sessionResult.human),
       attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
-      sovereigntyStage,
+      agencyStage,
 
       // Key management
       keyLocation,
@@ -588,7 +588,7 @@ export class IdentityService {
       hasPendingMigration: session?.sessionState === 'upgrading',
 
       // Hosting costs
-      hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
+      hostingCost: agencyStage === 'hosted' ? this.getDefaultHostingCost() : null,
       nodeOperatorIncome: null, // Node operator income tracking not yet implemented
 
       isLoading: false,
@@ -695,7 +695,7 @@ export class IdentityService {
         did,
         profile: null,
         attestations: [],
-        sovereigntyStage: 'visitor',
+        agencyStage: 'visitor',
 
         // Key management - no keys in session mode
         keyLocation: 'none',
@@ -793,7 +793,7 @@ export class IdentityService {
         did,
         profile,
         attestations: [],
-        sovereigntyStage: 'hosted',
+        agencyStage: 'hosted',
         keyLocation: 'custodial',
         canExportKeys: true,
         keyBackup: null,
@@ -869,7 +869,7 @@ export class IdentityService {
         did,
         profile,
         attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
-        sovereigntyStage: 'app-user',
+        agencyStage: 'app-user',
         keyLocation: 'device',
         canExportKeys: false,
         keyBackup: null,
@@ -1099,7 +1099,7 @@ export class IdentityService {
     const conductorInfo = this.detectConductorType();
     const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
     const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-    const sovereigntyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
+    const agencyStage = conductorInfo.isLocal ? 'app-user' : 'hosted';
 
     // Generate DID for authenticated identity
     const did = generateDID(identityMode, sessionResult.human.id, sessionResult.agentPubkey, null);
@@ -1113,12 +1113,12 @@ export class IdentityService {
       did,
       profile: mapToProfile(sessionResult.human),
       attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
-      sovereigntyStage,
+      agencyStage,
       keyLocation,
       canExportKeys: keyLocation === 'custodial',
       isLocalConductor: conductorInfo.isLocal,
       conductorUrl: conductorInfo.url,
-      hostingCost: sovereigntyStage === 'hosted' ? this.getDefaultHostingCost() : null,
+      hostingCost: agencyStage === 'hosted' ? this.getDefaultHostingCost() : null,
       isLoading: false,
       error: null,
     });

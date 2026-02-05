@@ -23,7 +23,7 @@
 
 import type { QuizResult } from './quiz-session.model';
 
-// @coverage: 66.7% (2026-02-04)
+// @coverage: 66.7% (2026-02-05)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Attempt Record

@@ -1,12 +1,12 @@
-/* Sovereignty Badge Component Styles */
+/* Agency Badge Component Styles */
 
-.sovereignty-section {
+.agency-section {
   padding: 0.75rem;
   border-top: 1px solid var(--lamad-border);
 }
 
 /* Header Row */
-.sovereignty-header {
+.agency-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -16,11 +16,11 @@
   transition: background-color 0.2s;
 }
 
-.sovereignty-header:hover {
+.agency-header:hover {
   background: var(--lamad-surface-hover);
 }
 
-.sovereignty-header:focus {
+.agency-header:focus {
   outline: 2px solid var(--lamad-accent-primary);
   outline-offset: 2px;
 }
@@ -167,7 +167,7 @@
 }
 
 /* Expanded Details */
-.sovereignty-details {
+.agency-details {
   padding: 0.75rem;
   background: var(--lamad-surface);
   border-radius: 8px;
@@ -308,7 +308,7 @@
 }
 
 /* Actions */
-.sovereignty-actions {
+.agency-actions {
   display: flex;
   gap: 0.5rem;
 }

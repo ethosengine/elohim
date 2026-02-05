@@ -12,7 +12,7 @@
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 48.0% (2026-02-04)
+// @coverage: 48.0% (2026-02-05)
 
 import { firstValueFrom } from 'rxjs';
 

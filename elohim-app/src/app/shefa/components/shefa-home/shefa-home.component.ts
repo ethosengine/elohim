@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 98.6% (2026-02-04)
+// @coverage: 98.6% (2026-02-05)
 
 import { EconomicEvent, REAAction } from '@app/elohim/models';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';

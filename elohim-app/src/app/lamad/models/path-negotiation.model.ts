@@ -19,7 +19,7 @@
 
 import type { IntimacyLevel } from '@app/elohim/models/human-consent.model';
 
-// @coverage: 75.0% (2026-02-04)
+// @coverage: 75.0% (2026-02-05)
 
 // =========================================================================
 // Negotiation Status

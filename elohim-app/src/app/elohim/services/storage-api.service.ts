@@ -33,7 +33,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 
-// @coverage: 67.9% (2026-02-04)
+// @coverage: 0.6% (2026-02-05)
 
 import { catchError, map, timeout } from 'rxjs/operators';
 

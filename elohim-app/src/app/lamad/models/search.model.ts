@@ -10,7 +10,7 @@
 
 import { TrustLevel } from '@app/elohim/models/trust-badge.model';
 
-// @coverage: 66.7% (2026-02-04)
+// @coverage: 66.7% (2026-02-05)
 
 import { ContentType, ContentReach } from './content-node.model';
 

@@ -18,7 +18,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 
-// @coverage: 61.1% (2026-02-04)
+// @coverage: 61.1% (2026-02-05)
 
 import { firstValueFrom } from 'rxjs';
 
