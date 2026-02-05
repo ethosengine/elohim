@@ -93,8 +93,8 @@ export interface ContentGraph {
 // Knowledge Map Types
 // =============================================================================
 
-// Re-export canonical KnowledgeMap from lamad module (imported above)
-export type { KnowledgeMap };
+// Re-export canonical KnowledgeMap from lamad module
+export type { KnowledgeMap } from '../../lamad/models/knowledge-map.model';
 
 /**
  * Knowledge map query filters
@@ -112,8 +112,8 @@ export interface KnowledgeMapFilters {
 // Path Extension Types
 // =============================================================================
 
-// Re-export canonical types from lamad module (imported above)
-export type { PathExtension };
+// Re-export canonical types from lamad module
+export type { PathExtension } from '../../lamad/models/path-extension.model';
 export type {
   PathStepInsertion,
   PathStepAnnotation,

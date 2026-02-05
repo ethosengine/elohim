@@ -268,12 +268,7 @@
             <thead>
               <tr>
                 <th class="sortable">
-                  <button
-                    type="button"
-                    (click)="setSort('nodeId')"
-                    class="sort-button"
-                    aria-label="Sort by Node ID"
-                  >
+                  <button type="button" (click)="setSort('nodeId')" class="sort-button">
                     Node ID
                     @if (sortField() === 'nodeId') {
                       <span class="sort-icon">
@@ -283,12 +278,7 @@
                   </button>
                 </th>
                 <th class="sortable">
-                  <button
-                    type="button"
-                    (click)="setSort('status')"
-                    class="sort-button"
-                    aria-label="Sort by Status"
-                  >
+                  <button type="button" (click)="setSort('status')" class="sort-button">
                     Status
                     @if (sortField() === 'status') {
                       <span class="sort-icon">
@@ -298,12 +288,7 @@
                   </button>
                 </th>
                 <th class="sortable">
-                  <button
-                    type="button"
-                    (click)="setSort('stewardTier')"
-                    class="sort-button"
-                    aria-label="Sort by Tier"
-                  >
+                  <button type="button" (click)="setSort('stewardTier')" class="sort-button">
                     Tier
                     @if (sortField() === 'stewardTier') {
                       <span class="sort-icon">
@@ -313,12 +298,7 @@
                   </button>
                 </th>
                 <th class="sortable">
-                  <button
-                    type="button"
-                    (click)="setSort('trustScore')"
-                    class="sort-button"
-                    aria-label="Sort by Trust"
-                  >
+                  <button type="button" (click)="setSort('trustScore')" class="sort-button">
                     Trust
                     @if (sortField() === 'trustScore') {
                       <span class="sort-icon">
@@ -328,12 +308,7 @@
                   </button>
                 </th>
                 <th class="sortable">
-                  <button
-                    type="button"
-                    (click)="setSort('combinedScore')"
-                    class="sort-button"
-                    aria-label="Sort by Score"
-                  >
+                  <button type="button" (click)="setSort('combinedScore')" class="sort-button">
                     Score
                     @if (sortField() === 'combinedScore') {
                       <span class="sort-icon">

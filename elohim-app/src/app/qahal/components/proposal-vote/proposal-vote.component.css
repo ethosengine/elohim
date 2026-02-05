@@ -115,7 +115,7 @@
 
 .sla-timer.breached {
   background: rgb(244 67 54 / 20%);
-  color: #b71c1c;
+  color: #5d0f0f;
 }
 
 @keyframes pulse-critical {
