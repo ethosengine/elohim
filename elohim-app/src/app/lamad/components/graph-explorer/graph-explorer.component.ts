@@ -103,7 +103,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       if (params['fromPath']) {
         this.returnContext = {
           pathId: params['fromPath'],
-          stepIndex: parseInt(params['returnStep'] ?? '0', 10),
+          stepIndex: Number.parseInt(params['returnStep'] ?? '0', 10),
         };
       }
 

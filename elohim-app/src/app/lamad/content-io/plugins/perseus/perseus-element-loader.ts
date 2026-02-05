@@ -8,12 +8,10 @@
  * which is built separately and loaded at runtime via script tag.
  */
 
-import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
-
 // @coverage: 83.3% (2026-02-05)
 
 // Re-export types for consumers
-export type { PerseusItem, PerseusScoreResult };
+export type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
 
 /**
  * Interface for the Perseus custom element.
@@ -41,13 +39,14 @@ const PERSEUS_ELEMENT_TAG = 'perseus-question';
 // Configuration for CSS URLs
 const getPerseusStylesUrl = (): string => {
   return (
-    ((window as any)['__PERSEUS_STYLES_URL__'] as string) || '/assets/perseus-plugin/perseus.css'
+    ((globalThis as any)['__PERSEUS_STYLES_URL__'] as string) ||
+    '/assets/perseus-plugin/perseus.css'
   );
 };
 
 const getPerseusThemeOverridesUrl = (): string => {
   return (
-    ((window as any)['__PERSEUS_THEME_OVERRIDES_URL__'] as string) ||
+    ((globalThis as any)['__PERSEUS_THEME_OVERRIDES_URL__'] as string) ||
     '/assets/perseus-plugin/perseus-theme-overrides.css'
   );
 };
@@ -88,7 +87,7 @@ function loadPerseusCSS(): void {
 const CACHE_BUST = Date.now();
 const getPerseusPluginUrl = (): string => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customUrl = (window as any)['__PERSEUS_PLUGIN_URL__'] as string;
+  const customUrl = (globalThis as any)['__PERSEUS_PLUGIN_URL__'] as string;
   if (customUrl) return customUrl;
   return `/assets/perseus-plugin/perseus-plugin.umd.js?v=${CACHE_BUST}`;
 };
@@ -118,7 +117,7 @@ async function loadScript(url: string): Promise<void> {
  */
 async function ensureReactLoaded(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const win = window as any;
+  const win = globalThis as any;
 
   if (win.React && win.ReactDOM) {
     return;

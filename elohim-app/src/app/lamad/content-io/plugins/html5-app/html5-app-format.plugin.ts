@@ -365,6 +365,6 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
   }
 
   private humanize(slug: string): string {
-    return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return slug.replaceAll('-', ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 }
