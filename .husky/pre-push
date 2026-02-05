@@ -1,0 +1,92 @@
+#!/usr/bin/env sh
+# Pre-push hook: Runs build check + unit tests before allowing push.
+# Bypass: HUSKY=0 git push  (or: git push --no-verify)
+#
+# This prevents pushing broken code that wastes CI time.
+# Build check catches type errors; tests catch logic errors.
+
+APP_DIR="elohim-app"
+
+# Only gate if elohim-app source files changed
+# Compare local branch tip against remote tracking branch
+REMOTE="$1"
+URL="$2"
+
+# Read push info from stdin (format: local_ref local_sha remote_ref remote_sha)
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+  # Skip delete pushes
+  if [ "$LOCAL_SHA" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  # Determine what changed
+  if [ "$REMOTE_SHA" = "0000000000000000000000000000000000000000" ]; then
+    # New branch - check all files against main
+    CHANGED=$(git diff --name-only HEAD~10 HEAD 2>/dev/null || echo "$APP_DIR/")
+  else
+    CHANGED=$(git diff --name-only "$REMOTE_SHA" "$LOCAL_SHA" 2>/dev/null || echo "$APP_DIR/")
+  fi
+
+  # Check if elohim-app files changed
+  if echo "$CHANGED" | grep -q "^$APP_DIR/"; then
+    echo ""
+    echo "============================================"
+    echo "  PRE-PUSH GATE: elohim-app changes detected"
+    echo "============================================"
+    echo ""
+
+    # Step 1: Build check (type errors, template errors)
+    echo "[1/2] Running build check..."
+    START=$(date +%s)
+
+    cd "$APP_DIR" || exit 1
+    npx ng build --configuration=development 2>&1
+    BUILD_EXIT=$?
+    cd ..
+
+    END=$(date +%s)
+    ELAPSED=$((END - START))
+
+    if [ $BUILD_EXIT -ne 0 ]; then
+      echo ""
+      echo "BUILD FAILED (${ELAPSED}s)"
+      echo "Fix build errors before pushing."
+      echo "Bypass: HUSKY=0 git push"
+      exit 1
+    fi
+    echo "Build passed (${ELAPSED}s)"
+
+    # Step 2: Unit tests (headless)
+    echo ""
+    echo "[2/2] Running unit tests..."
+    START=$(date +%s)
+
+    cd "$APP_DIR" || exit 1
+    npx ng test --watch=false --browsers=ChromeHeadlessCI 2>&1
+    TEST_EXIT=$?
+    cd ..
+
+    END=$(date +%s)
+    ELAPSED=$((END - START))
+
+    if [ $TEST_EXIT -ne 0 ]; then
+      echo ""
+      echo "TESTS FAILED (${ELAPSED}s)"
+      echo "Fix failing tests before pushing."
+      echo "Bypass: HUSKY=0 git push"
+      exit 1
+    fi
+    echo "Tests passed (${ELAPSED}s)"
+
+    echo ""
+    echo "============================================"
+    echo "  PRE-PUSH GATE: ALL CLEAR"
+    echo "============================================"
+    echo ""
+
+    # Only need to check once - break after first relevant ref
+    break
+  fi
+done
+
+exit 0
