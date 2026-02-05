@@ -111,7 +111,7 @@ export class PathContextService {
       this.contextStack.push(context);
     }
 
-    this.activeContext$.next(this.contextStack.at(-1));
+    this.activeContext$.next(this.contextStack.at(-1) ?? null);
   }
 
   /**

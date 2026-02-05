@@ -1,6 +1,6 @@
 import { Injectable, inject, afterNextRender } from '@angular/core';
 
-// @coverage: 22.0% (2026-02-05)
+// @coverage: 20.7% (2026-02-05)
 
 import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 
@@ -1102,11 +1102,12 @@ export class DataLoaderService {
    * Transform KnowledgeMap to KnowledgeMapIndexEntry.
    */
   private transformKnowledgeMapToIndex(map: KnowledgeMap): KnowledgeMapIndexEntry {
+    const subjectName = 'subject' in map ? map.subject.subjectName : (map as any).subjectName ?? '';
     return {
       id: map.id,
       mapType: map.mapType,
       title: map.title,
-      subjectName: map.subject.subjectName,
+      subjectName,
       ownerId: map.ownerId,
       ownerName: '', // Would need to look up agent name
       visibility: map.visibility,
@@ -1452,8 +1453,28 @@ export class DataLoaderService {
     }
 
     return this.contentService.getRelationships(contentId, direction).pipe(
-      map(results => results ?? [])
+      map(results => (results ?? []).map(r => this.transformToContentRelationship(r)))
     );
+  }
+
+  /**
+   * Transform ContentService Relationship to ContentRelationship model.
+   */
+  private transformToContentRelationship(rel: {
+    id: string;
+    sourceId: string;
+    targetId: string;
+    relationshipType: string;
+    confidence?: number;
+    metadata?: Record<string, unknown>;
+  }): ContentRelationship {
+    return {
+      id: rel.id,
+      sourceNodeId: rel.sourceId,
+      targetNodeId: rel.targetId,
+      relationshipType: rel.relationshipType as ContentRelationshipType,
+      metadata: rel.metadata,
+    };
   }
 
   /**
@@ -1509,11 +1530,96 @@ export class DataLoaderService {
   private buildGraphFromHolochain(): Observable<ContentGraph> {
     // Get content graph starting from manifesto root
     return this.contentService.getContentGraph('manifesto').pipe(
-      map(graph => graph ?? this.createEmptyGraph()),
+      map(graph => {
+        if (!graph) {
+          return this.createEmptyGraph();
+        }
+        // Transform the simplified graph structure to the full ContentGraph model
+        return this.transformSimplifiedGraph(graph);
+      }),
       catchError(_err => {
         return of(this.createEmptyGraph());
       })
     );
+  }
+
+  /**
+   * Transform simplified ContentGraph from ContentService to full model.
+   */
+  private transformSimplifiedGraph(simpleGraph: {
+    rootId: string;
+    related: Array<{
+      contentId: string;
+      relationshipType: string;
+      confidence: number;
+      children: any[];
+    }>;
+    totalNodes: number;
+  }): ContentGraph {
+    const nodes = new Map<string, ContentNode>();
+    const relationships = new Map<string, ContentRelationship>();
+    const nodesByType = new Map<string, Set<string>>();
+    const nodesByTag = new Map<string, Set<string>>();
+    const nodesByCategory = new Map<string, Set<string>>();
+    const adjacency = new Map<string, Set<string>>();
+    const reverseAdjacency = new Map<string, Set<string>>();
+
+    // Note: The simplified graph only has IDs, not full content nodes.
+    // For full node data, would need to batch fetch via batchGetContent.
+    // For now, just build the relationship structure.
+
+    const processNode = (
+      nodeData: { contentId: string; relationshipType: string; children: any[] },
+      parentId?: string
+    ): void => {
+      const nodeId = nodeData.contentId;
+
+      // Add relationship from parent if exists
+      if (parentId) {
+        const relId = `${parentId}-${nodeId}`;
+        relationships.set(relId, {
+          id: relId,
+          sourceNodeId: parentId,
+          targetNodeId: nodeId,
+          relationshipType: nodeData.relationshipType as ContentRelationshipType,
+        });
+
+        // Update adjacency
+        if (!adjacency.has(parentId)) adjacency.set(parentId, new Set());
+        adjacency.get(parentId)!.add(nodeId);
+
+        if (!reverseAdjacency.has(nodeId)) reverseAdjacency.set(nodeId, new Set());
+        reverseAdjacency.get(nodeId)!.add(parentId);
+      }
+
+      // Process children recursively
+      if (nodeData.children && nodeData.children.length > 0) {
+        for (const child of nodeData.children) {
+          processNode(child, nodeId);
+        }
+      }
+    };
+
+    // Process all related nodes
+    for (const related of simpleGraph.related) {
+      processNode(related, simpleGraph.rootId);
+    }
+
+    return {
+      nodes,
+      relationships,
+      nodesByType,
+      nodesByTag,
+      nodesByCategory,
+      adjacency,
+      reverseAdjacency,
+      metadata: {
+        nodeCount: simpleGraph.totalNodes,
+        relationshipCount: relationships.size,
+        lastUpdated: new Date().toISOString(),
+        version: '1.0.0',
+      },
+    };
   }
 
   /**

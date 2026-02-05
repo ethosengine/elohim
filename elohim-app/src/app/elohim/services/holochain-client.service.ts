@@ -20,9 +20,15 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 38.7% (2026-02-05)
+// @coverage: 38.8% (2026-02-05)
 
-import { AdminWebsocket, type AgentPubKey, type CellId, type AppInfo } from '@holochain/client';
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  type AgentPubKey,
+  type CellId,
+  type AppInfo,
+} from '@holochain/client';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -39,7 +45,7 @@ import {
 } from '../models/holochain-connection.model';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 
-import { LoggerService } from './logger.service';
+import { LoggerService, type LogTimer } from './logger.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
 
 import type { ConnectionConfig } from '@elohim/service/connection';
@@ -527,9 +533,9 @@ export class HolochainClientService {
    */
   private async validateConnection(
     callContext: Record<string, unknown>,
-    timer: { end: (context: unknown) => void; elapsed: () => number }
+    timer: LogTimer
   ): Promise<
-    | { valid: true; appWs: AppAgentWebsocket; cellIds: Map<string, CellId> }
+    | { valid: true; appWs: AppWebsocket; cellIds: Map<string, CellId> }
     | { valid: false; error: ZomeCallResult<never> }
   > {
     const { state } = this.connectionSignal();
@@ -580,7 +586,7 @@ export class HolochainClientService {
     cellIds: Map<string, CellId>,
     roleName: string,
     callContext: Record<string, unknown>,
-    timer: { end: (context: unknown) => void; elapsed: () => number }
+    timer: LogTimer
   ): { success: true; cellId: CellId } | { success: false; error: ZomeCallResult<never> } {
     const cellId = cellIds.get(roleName);
     if (!cellId) {
@@ -602,11 +608,11 @@ export class HolochainClientService {
    * Execute the zome call and handle errors.
    */
   private async executeZomeCall<T>(
-    appWs: AppAgentWebsocket,
+    appWs: AppWebsocket,
     cellId: CellId,
     input: ZomeCallInput,
     callContext: Record<string, unknown>,
-    timer: { end: (context: unknown) => void; elapsed: () => number }
+    timer: LogTimer
   ): Promise<ZomeCallResult<T>> {
     try {
       const result = await appWs.callZome({
@@ -632,7 +638,7 @@ export class HolochainClientService {
   private handleZomeCallError(
     err: unknown,
     callContext: Record<string, unknown>,
-    timer: { end: (context: unknown) => void; elapsed: () => number }
+    timer: LogTimer
   ): ZomeCallResult<never> {
     const errorMessage = err instanceof Error ? err.message : 'Zome call failed';
     this.metrics.recordQuery(timer.elapsed(), false);
@@ -800,7 +806,6 @@ export class HolochainClientService {
     });
 
     return { success: false, error: errorMessage };
-  }
   }
 
   /**

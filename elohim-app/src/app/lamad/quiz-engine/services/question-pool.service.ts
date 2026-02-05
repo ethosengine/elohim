@@ -1,11 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 97.2% (2026-02-05)
+// @coverage: 96.5% (2026-02-05)
 
 import { Observable, of, forkJoin, map, catchError, shareReplay } from 'rxjs';
 
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
+import { LearningPath } from '../../models/learning-path.model';
 import { PathService } from '../../services/path.service';
 import {
   createEmptyPool,

@@ -13,7 +13,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
-// @coverage: 94.4% (2026-02-05)
+// @coverage: 94.6% (2026-02-05)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
@@ -274,7 +274,11 @@ export class RegisterComponent implements OnInit {
       // Success - navigate to return URL
       void this.router.navigate([this.returnUrl]);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      // Convert generic/unknown errors to user-friendly message
+      let errorMessage = 'Registration failed';
+      if (err instanceof Error && err.message !== 'Unknown error') {
+        errorMessage = err.message;
+      }
       this.error.set(errorMessage);
     } finally {
       this.isRegistering.set(false);
@@ -326,7 +330,11 @@ export class RegisterComponent implements OnInit {
         this.error.set(result.error ?? 'Migration failed');
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Migration failed';
+      // Convert generic/unknown errors to user-friendly message
+      let errorMessage = 'Migration failed';
+      if (err instanceof Error && err.message !== 'Unknown error') {
+        errorMessage = err.message;
+      }
       this.error.set(errorMessage);
     } finally {
       this.isMigrating.set(false);

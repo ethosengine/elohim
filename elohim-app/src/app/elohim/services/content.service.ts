@@ -24,6 +24,7 @@ import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider
 
 import { StorageClientService } from './storage-client.service';
 
+import type { KnowledgeMap } from '../../lamad/models/knowledge-map.model';
 import type { PathExtension } from '../../lamad/models/path-extension.model';
 import type { ContentQuery } from '@elohim/service/client';
 
@@ -92,30 +93,8 @@ export interface ContentGraph {
 // Knowledge Map Types
 // =============================================================================
 
-/**
- * Knowledge map (domain, self, person, collective)
- */
-export interface KnowledgeMap {
-  id: string;
-  mapType: string;
-  ownerId: string;
-  title: string;
-  description?: string;
-  subjectType: string;
-  subjectId: string;
-  subjectName: string;
-  visibility: string;
-  sharedWith?: string[];
-  nodes: any; // Graph node data
-  pathIds?: string[];
-  overallAffinity: number;
-  contentGraphId?: string;
-  masteryLevels?: Record<string, number>;
-  goals?: any[];
-  metadata?: Record<string, any>;
-  createdAt?: string;
-  updatedAt?: string;
-}
+// Re-export canonical KnowledgeMap from lamad module (imported above)
+export type { KnowledgeMap };
 
 /**
  * Knowledge map query filters
@@ -133,9 +112,9 @@ export interface KnowledgeMapFilters {
 // Path Extension Types
 // =============================================================================
 
-// Re-export canonical types from lamad module
+// Re-export canonical types from lamad module (imported above)
+export type { PathExtension };
 export type {
-  PathExtension,
   PathStepInsertion,
   PathStepAnnotation,
   PathStepReorder,
@@ -786,17 +765,16 @@ export class ContentService {
       ownerId: data.ownerId ?? data.ownerId,
       title: data.title ?? '',
       description: data.description,
-      subjectType: data.subjectType ?? data.subjectType,
-      subjectId: data.subjectId ?? data.subjectId,
-      subjectName: data.subjectName ?? data.subjectName,
+      subject: {
+        type: (data.subjectType ?? data.subjectType) as 'content-graph' | 'agent' | 'organization',
+        subjectId: data.subjectId ?? data.subjectId,
+        subjectName: data.subjectName ?? data.subjectName,
+      },
       visibility: data.visibility ?? 'private',
       sharedWith: data.sharedWith,
       nodes: data.nodes,
       pathIds: data.pathIds,
       overallAffinity: data.overallAffinity ?? data.overallAffinity ?? 0,
-      contentGraphId: data.contentGraphId ?? data.contentGraphId,
-      masteryLevels: data.masteryLevels,
-      goals: data.goals,
       metadata: data.metadata,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
