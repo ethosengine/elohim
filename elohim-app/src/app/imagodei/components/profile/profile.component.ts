@@ -29,8 +29,8 @@ import {
 } from '@app/lamad/quiz-engine/models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
-import { IdentityService } from '../../services/identity.service';
 import { AgencyService } from '../../services/agency.service';
+import { IdentityService } from '../../services/identity.service';
 
 @Component({
   selector: 'app-profile',

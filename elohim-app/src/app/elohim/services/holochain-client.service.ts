@@ -50,6 +50,8 @@ import { PerformanceMetricsService } from './performance-metrics.service';
 
 import type { ConnectionConfig } from '@elohim/service/connection';
 
+const CONNECTION_FAILED = 'Connection failed';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -790,8 +792,9 @@ export class HolochainClientService {
     let errorMessage = 'REST call failed';
 
     if (err instanceof HttpErrorResponse) {
-      if (err.error?.error) {
-        errorMessage = err.error.error;
+      const errorBody = err.error as Record<string, unknown> | null;
+      if (errorBody?.['error'] && typeof errorBody['error'] === 'string') {
+        errorMessage = errorBody['error'];
       } else if (err.message) {
         errorMessage = err.message;
       }

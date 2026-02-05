@@ -230,8 +230,8 @@ export class BlobVerificationService {
       // The elohim-wasm package should be built with wasm-pack and available
       // Use variable to prevent Vite from statically resolving (optional dependency)
       const wasmModulePath = '@elohim/wasm';
-      const wasm = await import(/* @vite-ignore */ wasmModulePath);
-      await wasm.default(); // Initialize WASM
+      const wasm = (await import(/* @vite-ignore */ wasmModulePath)) as Record<string, unknown>;
+      await (wasm['default'] as () => Promise<void>)(); // Initialize WASM
       this.wasmModule = wasm as unknown as ElohimWasmModule;
       this.wasmAvailable = true;
 

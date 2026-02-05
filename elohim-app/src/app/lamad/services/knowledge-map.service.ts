@@ -510,8 +510,8 @@ export class KnowledgeMapService {
         }
 
         // Extract suggested updates from Elohim response
-        const payload = response.payload as any;
-        if (payload?.type !== 'knowledge-map-update') {
+        const payload = response.payload as Record<string, unknown> | undefined;
+        if (payload?.['type'] !== 'knowledge-map-update') {
           return [];
         }
 

@@ -54,6 +54,23 @@ export interface QuestionResponse {
   answeredAt: string;
 }
 
+/** Shape of assessment content stored in ContentNode.content (JSON parsed). */
+interface AssessmentContentShape {
+  sections?: { questions?: AssessmentQuestion[] }[];
+  questions?: AssessmentQuestion[];
+  interpretation?: {
+    method?: string;
+    dimensions?: string[];
+    outcomes?: { name: string; [key: string]: string }[];
+  };
+}
+
+interface AssessmentQuestion {
+  id: string;
+  subscales?: string[];
+  reverseScored?: boolean;
+}
+
 /**
  * In-progress assessment session.
  */
@@ -124,8 +141,8 @@ export class AssessmentService {
       map(assessment => {
         if (!assessment) return false;
 
-        const metadata = assessment.metadata as any;
-        const prerequisite = metadata?.prerequisiteAttestation;
+        const metadata = assessment.metadata as Record<string, unknown> | undefined;
+        const prerequisite = metadata?.['prerequisiteAttestation'] as string | undefined;
 
         if (!prerequisite) return true; // No prerequisite
 
@@ -247,10 +264,11 @@ export class AssessmentService {
       map(assessment => {
         if (!assessment) return null;
 
-        const content = assessment.content as any;
+        const content = assessment.content as unknown as AssessmentContentShape | undefined;
         const scores = this.computeScores(session.responses, content);
         const interpretation = this.computeInterpretation(scores, content);
 
+        const metadata = assessment.metadata as Record<string, unknown> | undefined;
         const result: AssessmentResult = {
           assessmentId: session.assessmentId,
           agentId: session.agentId,
@@ -259,7 +277,7 @@ export class AssessmentService {
           responses: session.responses,
           scores,
           interpretation,
-          attestationGranted: (assessment.metadata as any)?.attestationId,
+          attestationGranted: metadata?.['attestationId'] as string | undefined,
         };
 
         // Save result
@@ -284,15 +302,18 @@ export class AssessmentService {
    */
   private computeScores(
     responses: Record<string, QuestionResponse>,
-    content: any
+    content: AssessmentContentShape | undefined
   ): Record<string, number> {
     const scores: Record<string, number> = {};
 
     // Simple scoring: aggregate by subscale
-    const sections = content.sections ?? [];
-    const questions = content.questions ?? [];
+    const sections = content?.sections ?? [];
+    const questions = content?.questions ?? [];
 
-    const allQuestions = [...questions, ...sections.flatMap((s: any) => s.questions ?? [])];
+    const allQuestions: AssessmentQuestion[] = [
+      ...questions,
+      ...sections.flatMap(s => s.questions ?? []),
+    ];
 
     for (const question of allQuestions) {
       const response = responses[question.id];
@@ -313,17 +334,17 @@ export class AssessmentService {
   /**
    * Compute interpretation based on scores and assessment configuration.
    */
-  private computeInterpretation(scores: Record<string, number>, content: any): string | undefined {
-    const interpretation = content.interpretation;
+  private computeInterpretation(
+    scores: Record<string, number>,
+    content: AssessmentContentShape | undefined
+  ): string | undefined {
+    const interpretation = content?.interpretation;
     if (!interpretation) return undefined;
 
     if (interpretation.method === 'quadrant') {
       // E.g., attachment style
-      const dimensions = interpretation.dimensions as string[];
-      const outcomes = interpretation.outcomes as {
-        name: string;
-        [key: string]: string;
-      }[];
+      const dimensions = interpretation.dimensions ?? [];
+      const outcomes = interpretation.outcomes ?? [];
 
       if (dimensions.length === 2) {
         const [dim1, dim2] = dimensions;
@@ -389,7 +410,7 @@ export class AssessmentService {
     const agentId = this.sessionUser.getSessionId() || 'anonymous';
     const key = `${this.STORAGE_PREFIX}attestations-${agentId}`;
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+    return data ? (JSON.parse(data) as string[]) : [];
   }
 
   /**
@@ -422,7 +443,7 @@ export class AssessmentService {
   private loadSessionFromStorage(agentId: string, assessmentId: string): AssessmentSession | null {
     const key = `${this.STORAGE_PREFIX}session-${agentId}-${assessmentId}`;
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
+    return data ? (JSON.parse(data) as AssessmentSession) : null;
   }
 
   private clearSessionFromStorage(agentId: string, assessmentId: string): void {
@@ -442,7 +463,7 @@ export class AssessmentService {
   private loadResultFromStorage(agentId: string, assessmentId: string): AssessmentResult | null {
     const key = `${this.STORAGE_PREFIX}result-${agentId}-${assessmentId}`;
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
+    return data ? (JSON.parse(data) as AssessmentResult) : null;
   }
 
   private loadAllResultsFromStorage(agentId: string): AssessmentResult[] {

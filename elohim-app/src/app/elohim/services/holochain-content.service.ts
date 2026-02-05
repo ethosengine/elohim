@@ -1898,7 +1898,7 @@ export class HolochainContentService {
     const entry = output.content;
 
     // Use parsed metadata from Rust API
-    const metadata: ContentMetadata = (entry.metadata as any) ?? {};
+    const metadata: ContentMetadata = (entry.metadata as ContentMetadata) ?? {};
 
     return {
       id: entry.id,

@@ -19,6 +19,9 @@ import { LearningPath } from '../models/learning-path.model';
 
 /**
  * Content index entry (metadata only).
+ *
+ * Core fields are always present. Optional fields are populated
+ * by DataLoaderService.getContentIndex() from ContentNode data.
  */
 export interface ContentIndexEntry {
   id: string;
@@ -26,6 +29,29 @@ export interface ContentIndexEntry {
   description: string;
   contentType: ContentType;
   tags: string[];
+
+  // Extended fields from DataLoaderService.getContentIndex()
+  reach?: ContentReach;
+  trustScore?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  flags?: string[];
+  attestationTypes?: string[];
+
+  // Rich media fields (from Keen/import data)
+  url?: string;
+  name?: string;
+  publisher?: string;
+  category?: string;
+  contributorPresenceId?: string;
+}
+
+/** Shape returned by DataLoaderService.getContentIndex(). */
+interface ContentIndex {
+  nodes: ContentIndexEntry[];
+  totalCount: number;
+  byType: Record<string, ContentIndexEntry[]>;
+  lastUpdated: string;
 }
 
 /**
@@ -137,7 +163,8 @@ export class ContentService {
    */
   searchContent(query: string): Observable<ContentIndexEntry[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         if (!query || query.trim().length === 0) {
           return index.nodes ?? [];
         }
@@ -158,7 +185,8 @@ export class ContentService {
    */
   getContentByType(contentType: ContentType): Observable<ContentIndexEntry[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         return (index.nodes ?? []).filter(
           (node: ContentIndexEntry) => node.contentType === contentType
         );
@@ -171,7 +199,8 @@ export class ContentService {
    */
   getContentByTag(tag: string): Observable<ContentIndexEntry[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         const lowerTag = tag.toLowerCase();
         return (index.nodes ?? []).filter((node: ContentIndexEntry) =>
           node.tags?.some((t: string) => t.toLowerCase() === lowerTag)
@@ -185,7 +214,8 @@ export class ContentService {
    */
   getAllTags(): Observable<string[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         const tagSet = new Set<string>();
         (index.nodes ?? []).forEach((node: ContentIndexEntry) => {
           node.tags?.forEach((tag: string) => tagSet.add(tag));
@@ -200,7 +230,8 @@ export class ContentService {
    */
   getAllContentTypes(): Observable<ContentType[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         const typeSet = new Set<ContentType>();
         (index.nodes ?? []).forEach((node: ContentIndexEntry) => {
           if (node.contentType) {
@@ -423,9 +454,12 @@ export class ContentService {
    * Use case: Displaying rich media cards on a category overview page.
    */
   getContentPreviewsForCategory(category: string): Observable<ContentPreview[]> {
-    return this.dataLoader
-      .getContentIndex()
-      .pipe(map(index => this.filterAndMapToPreview(index.nodes ?? [], category)));
+    return this.dataLoader.getContentIndex().pipe(
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
+        return this.filterAndMapToPreview(index.nodes ?? [], category);
+      })
+    );
   }
 
   /**
@@ -474,11 +508,12 @@ export class ContentService {
         }
 
         return this.dataLoader.getContentIndex().pipe(
-          map(index => {
+          map((raw: unknown) => {
+            const index = raw as ContentIndex;
             const nodes = index.nodes ?? [];
             return nodes
-              .filter((n: any) => relatedIds.includes(n.id))
-              .map((n: any) => this.mapIndexEntryToPreview(n));
+              .filter((n: ContentIndexEntry) => relatedIds.includes(n.id))
+              .map((n: ContentIndexEntry) => this.mapIndexEntryToPreview(n));
           })
         );
       }),
@@ -512,7 +547,7 @@ export class ContentService {
   /**
    * Filter content index entries by category and map to ContentPreview.
    */
-  private filterAndMapToPreview(nodes: any[], categoryId: string): ContentPreview[] {
+  private filterAndMapToPreview(nodes: ContentIndexEntry[], categoryId: string): ContentPreview[] {
     // Normalize categoryId (handle both "governance" and "governance-epic" formats)
     const normalizedCategoryId = categoryId.replace('-epic', '').replace('_', '-');
 
@@ -535,7 +570,7 @@ export class ContentService {
   /**
    * Map a content index entry to ContentPreview.
    */
-  private mapIndexEntryToPreview(entry: any): ContentPreview {
+  private mapIndexEntryToPreview(entry: ContentIndexEntry): ContentPreview {
     const preview: ContentPreview = {
       id: entry.id,
       title: entry.name ?? entry.title, // Prefer 'name' for display if available
@@ -640,7 +675,7 @@ export class ContentService {
         }
 
         // Build ActivityPub object
-        const apObject: any = {
+        const apObject: Record<string, unknown> = {
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: content.activityPubType,
           id: content.did ?? `https://elohim-protocol.org/content/${content.id}`,
@@ -653,12 +688,12 @@ export class ContentService {
 
         // Add author if available
         if (content.authorId) {
-          apObject.attributedTo = content.authorId;
+          apObject['attributedTo'] = content.authorId;
         }
 
         // Add tags
         if (content.tags && content.tags.length > 0) {
-          apObject.tag = content.tags.map(tag => ({
+          apObject['tag'] = content.tags.map(tag => ({
             type: 'Hashtag',
             name: `#${tag}`,
           }));
@@ -758,8 +793,8 @@ export class ContentService {
    * Helper to build ActivityPub object from content.
    * Extracted for reuse between methods.
    */
-  private buildActivityPubObject(content: ContentNode): any {
-    const apObject: any = {
+  private buildActivityPubObject(content: ContentNode): Record<string, unknown> {
+    const apObject: Record<string, unknown> = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       type: content.activityPubType,
       id: content.did ?? `https://elohim-protocol.org/content/${content.id}`,
@@ -771,11 +806,11 @@ export class ContentService {
     };
 
     if (content.authorId) {
-      apObject.attributedTo = content.authorId;
+      apObject['attributedTo'] = content.authorId;
     }
 
     if (content.tags && content.tags.length > 0) {
-      apObject.tag = content.tags.map(tag => ({
+      apObject['tag'] = content.tags.map(tag => ({
         type: 'Hashtag',
         name: `#${tag}`,
       }));

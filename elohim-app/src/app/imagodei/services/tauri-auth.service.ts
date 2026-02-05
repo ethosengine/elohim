@@ -194,23 +194,8 @@ export class TauriAuthService {
         throw new Error(`Session API error: ${response.status}`);
       }
 
-      const session = await response.json();
-      // Convert snake_case to camelCase
-      return {
-        id: session.id,
-        humanId: session.humanId,
-        agentPubKey: session.agentPubKey,
-        doorwayUrl: session.doorwayUrl,
-        doorwayId: session.doorwayId,
-        identifier: session.identifier,
-        displayName: session.displayName,
-        profileImageHash: session.profileImageHash,
-        isActive: session.isActive,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
-        lastSyncedAt: session.lastSyncedAt,
-        bootstrapUrl: session.bootstrapUrl,
-      };
+      const session = (await response.json()) as LocalSession;
+      return session;
     } catch (err) {
       // Session retrieval failure is non-critical - returns null to allow app to continue
       // This can happen if sidecar is not running or network is unavailable
@@ -252,7 +237,7 @@ export class TauriAuthService {
         throw new Error(`Token exchange failed: ${error}`);
       }
 
-      const tokenData = await tokenResponse.json();
+      const tokenData = (await tokenResponse.json()) as { access_token: string };
       const accessToken = tokenData.access_token;
 
       // Step 2: Get native handoff info
@@ -337,22 +322,7 @@ export class TauriAuthService {
       throw new Error(`Failed to create session: ${error}`);
     }
 
-    const session = await response.json();
-    return {
-      id: session.id,
-      humanId: session.humanId,
-      agentPubKey: session.agentPubKey,
-      doorwayUrl: session.doorwayUrl,
-      doorwayId: session.doorwayId,
-      identifier: session.identifier,
-      displayName: session.displayName,
-      profileImageHash: session.profileImageHash,
-      isActive: session.isActive,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      lastSyncedAt: session.lastSyncedAt,
-      bootstrapUrl: session.bootstrapUrl,
-    };
+    return (await response.json()) as LocalSession;
   }
 
   /**

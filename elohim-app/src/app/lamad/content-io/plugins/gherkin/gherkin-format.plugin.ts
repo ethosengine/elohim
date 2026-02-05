@@ -101,6 +101,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
   // Export
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Interface requires Promise return but no async work needed
   async export(node: ContentIOExportInput): Promise<string> {
     // If content is already valid Gherkin, return it
     if (typeof node.content === 'string' && this.looksLikeGherkin(node.content)) {

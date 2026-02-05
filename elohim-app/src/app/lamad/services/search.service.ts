@@ -11,6 +11,7 @@ import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 
 import { ContentType, ContentReach } from '../models/content-node.model';
+import { PathIndexEntry } from '../models/learning-path.model';
 import {
   SearchQuery,
   SearchResult,
@@ -29,6 +30,8 @@ import {
 } from '../models/search.model';
 
 import { ContentIndexEntry } from './content.service';
+
+import type { ContentAttestationType } from '../models/content-attestation.model';
 
 /**
  * SearchService - Enhanced content search with relevance scoring and facets.
@@ -86,8 +89,10 @@ export class SearchService {
       pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] }))),
     }).pipe(
       map(({ contentIndex, pathIndex }) => {
-        const contentNodes = contentIndex.nodes ?? [];
-        const paths = pathIndex.paths ?? [];
+        const ci = contentIndex as { nodes?: ContentIndexEntry[] };
+        const pi = pathIndex as { paths?: PathIndexEntry[] };
+        const contentNodes = ci.nodes ?? [];
+        const paths = pi.paths ?? [];
 
         // Score and filter content nodes
         const scoredContentResults = this.scoreAndFilter(contentNodes, query);
@@ -127,7 +132,7 @@ export class SearchService {
           executionTimeMs: Date.now() - startTime,
         };
       }),
-      catchError(err => {
+      catchError(_err => {
         return of({
           ...createEmptyResults(query),
           executionTimeMs: Date.now() - startTime,
@@ -139,7 +144,7 @@ export class SearchService {
   /**
    * Score and filter paths, converting them to SearchResult format.
    */
-  private scoreAndFilterPaths(paths: any[], query: SearchQuery): SearchResult[] {
+  private scoreAndFilterPaths(paths: PathIndexEntry[], query: SearchQuery): SearchResult[] {
     const results: SearchResult[] = [];
     const searchText = (query.text ?? '').toLowerCase().trim();
     const searchWords = searchText.split(/\s+/).filter(w => w.length > 0);
@@ -154,6 +159,8 @@ export class SearchService {
     }
 
     for (const path of paths) {
+      // Runtime paths may carry createdAt/updatedAt even though PathIndexEntry doesn't declare them
+      const pathRecord = path as unknown as Record<string, unknown>;
       // Convert path to a node-like format for filtering
       const pathAsNode = {
         id: path.id,
@@ -163,8 +170,8 @@ export class SearchService {
         tags: path.tags ?? [],
         reach: 'commons' as ContentReach, // Paths are typically commons
         trustScore: 1.0,
-        createdAt: path.createdAt,
-        updatedAt: path.updatedAt,
+        createdAt: pathRecord['createdAt'] as string | undefined,
+        updatedAt: pathRecord['updatedAt'] as string | undefined,
       };
 
       // Apply filters (reuse existing filter logic)
@@ -193,8 +200,8 @@ export class SearchService {
         relevanceScore: score,
         matchedFields,
         highlights,
-        createdAt: path.createdAt,
-        updatedAt: path.updatedAt,
+        createdAt: pathRecord['createdAt'] as string | undefined,
+        updatedAt: pathRecord['updatedAt'] as string | undefined,
       });
     }
 
@@ -215,8 +222,10 @@ export class SearchService {
       pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] }))),
     }).pipe(
       map(({ contentIndex, pathIndex }) => {
-        const nodes = contentIndex.nodes ?? [];
-        const paths = pathIndex.paths ?? [];
+        const ci = contentIndex as { nodes?: ContentIndexEntry[] };
+        const pi = pathIndex as { paths?: PathIndexEntry[] };
+        const nodes = ci.nodes ?? [];
+        const paths = pi.paths ?? [];
         const query = partialQuery.toLowerCase().trim();
         const suggestions: SearchSuggestion[] = [];
         const seen = new Set<string>();
@@ -265,7 +274,7 @@ export class SearchService {
    * Add path title suggestions to the suggestions array.
    */
   private addPathTitleSuggestions(
-    paths: any[],
+    paths: PathIndexEntry[],
     query: string,
     suggestions: SearchSuggestion[],
     seen: Set<string>,
@@ -291,7 +300,7 @@ export class SearchService {
    */
   private addTagSuggestions(
     nodes: ContentIndexEntry[],
-    paths: any[],
+    paths: PathIndexEntry[],
     query: string,
     suggestions: SearchSuggestion[],
     seen: Set<string>,
@@ -320,7 +329,7 @@ export class SearchService {
    */
   private collectMatchingTags(
     nodes: ContentIndexEntry[],
-    paths: any[],
+    paths: PathIndexEntry[],
     query: string
   ): Map<string, number> {
     const tagCounts = new Map<string, number>();
@@ -352,10 +361,11 @@ export class SearchService {
    */
   getTagCloud(): Observable<{ tag: string; count: number }[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map(rawIndex => {
+        const idx = rawIndex as { nodes?: ContentIndexEntry[] };
         const tagCounts = new Map<string, number>();
 
-        for (const node of index.nodes ?? []) {
+        for (const node of idx.nodes ?? []) {
           for (const tag of node.tags ?? []) {
             tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
           }
@@ -403,15 +413,15 @@ export class SearchService {
         description: node.description,
         contentType: node.contentType,
         tags: node.tags ?? [],
-        reach: (node as any).reach ?? 'commons',
-        trustScore: (node as any).trustScore ?? 1.0,
+        reach: node.reach ?? 'commons',
+        trustScore: node.trustScore ?? 1.0,
         trustLevel,
-        hasFlags: ((node as any).flags ?? []).length > 0,
+        hasFlags: (node.flags ?? []).length > 0,
         relevanceScore: score,
         matchedFields,
         highlights,
-        createdAt: (node as any).createdAt,
-        updatedAt: (node as any).updatedAt,
+        createdAt: node.createdAt,
+        updatedAt: node.updatedAt,
       });
     }
 
@@ -439,7 +449,7 @@ export class SearchService {
 
   private passesReachLevelFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
     if (!query.reachLevels || query.reachLevels.length === 0) return true;
-    const nodeReach = (node as any).reach ?? 'commons';
+    const nodeReach = node.reach ?? 'commons';
     return query.reachLevels.includes(nodeReach);
   }
 
@@ -472,13 +482,13 @@ export class SearchService {
 
   private passesTrustScoreFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
     if (query.minTrustScore === undefined) return true;
-    const trustScore = (node as any).trustScore ?? 1.0;
+    const trustScore = node.trustScore ?? 1.0;
     return trustScore >= query.minTrustScore;
   }
 
   private passesFlaggedFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
     if (!query.excludeFlagged) return true;
-    const flags = (node as any).flags ?? [];
+    const flags = node.flags ?? [];
     return flags.length === 0;
   }
 
@@ -740,9 +750,9 @@ export class SearchService {
    * Compute trust level for a node.
    */
   private computeTrustLevel(node: ContentIndexEntry): TrustLevel {
-    const attestationTypes = (node as any).attestationTypes ?? [];
-    const hasFlags = ((node as any).flags ?? []).length > 0;
-    return calculateTrustLevel((node as any).reach ?? 'commons', attestationTypes, hasFlags);
+    const attestationTypes = (node.attestationTypes ?? []) as ContentAttestationType[];
+    const hasFlags = (node.flags ?? []).length > 0;
+    return calculateTrustLevel(node.reach ?? 'commons', attestationTypes, hasFlags);
   }
 
   /**

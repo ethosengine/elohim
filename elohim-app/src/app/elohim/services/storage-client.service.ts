@@ -123,7 +123,7 @@ export class StorageClientService {
     const url = this.getBlobUrl(blobHash);
     return this.http.get(url, { responseType: 'arraybuffer' }).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError(error => this.handleError('fetchBlob', error))
+      catchError((error: HttpErrorResponse) => this.handleError('fetchBlob', error))
     );
   }
 
@@ -153,7 +153,7 @@ export class StorageClientService {
 
     return this.http.get<StorageContentNode>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError(error => {
+      catchError((error: HttpErrorResponse) => {
         if (error.status === 404) return of(null);
         return this.handleError('getContent', error);
       })
@@ -181,7 +181,7 @@ export class StorageClientService {
 
     return this.http.get<ListResponse<StorageContentNode>>(url).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError(error => this.handleError('queryContent', error))
+      catchError((error: HttpErrorResponse) => this.handleError('queryContent', error))
     );
   }
 
@@ -199,7 +199,7 @@ export class StorageClientService {
 
     return this.http.get<StoragePath>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError(error => {
+      catchError((error: HttpErrorResponse) => {
         if (error.status === 404) return of(null);
         return this.handleError('getPath', error);
       })
@@ -218,7 +218,7 @@ export class StorageClientService {
 
     return this.http.get<ListResponse<StoragePath>>(endpoint).pipe(
       timeout(this.defaultTimeoutMs),
-      catchError(error => this.handleError('getAllPaths', error))
+      catchError((error: HttpErrorResponse) => this.handleError('getAllPaths', error))
     );
   }
 
@@ -279,9 +279,13 @@ export class StorageClientService {
    * Backend returns errors as: { "error": "message" }
    */
   private handleError(operation: string, error: HttpErrorResponse): Observable<never> {
-    const errorBody = error.error;
+    const errorBody = error.error as Record<string, unknown> | null;
     // Backend returns {"error": "..."}, not {"message": "..."}
-    const message = errorBody?.error ?? errorBody?.message ?? error.message ?? 'Request failed';
+    const message =
+      (errorBody?.['error'] as string) ??
+      (errorBody?.['message'] as string) ??
+      error.message ??
+      'Request failed';
     return throwError(() => new Error(`${operation}: ${message}`));
   }
 
@@ -301,7 +305,7 @@ export class StorageClientService {
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000), // 2 min for bulk ops
-      catchError(error => this.handleError('bulkCreateContent', error))
+      catchError((error: HttpErrorResponse) => this.handleError('bulkCreateContent', error))
     );
   }
 
@@ -317,7 +321,7 @@ export class StorageClientService {
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000),
-      catchError(error => this.handleError('bulkCreatePaths', error))
+      catchError((error: HttpErrorResponse) => this.handleError('bulkCreatePaths', error))
     );
   }
 
@@ -333,7 +337,7 @@ export class StorageClientService {
 
     return this.http.post<BulkCreateResult>(endpoint, items).pipe(
       timeout(120000),
-      catchError(error => this.handleError('bulkCreateRelationships', error))
+      catchError((error: HttpErrorResponse) => this.handleError('bulkCreateRelationships', error))
     );
   }
 }

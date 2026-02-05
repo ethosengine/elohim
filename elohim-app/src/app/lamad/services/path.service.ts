@@ -32,6 +32,19 @@ export interface AccessCheckResult {
   reason?: string;
 }
 
+/** Metrics for a single chapter, used by getPathOverview. */
+interface ChapterMetricsResult {
+  chapter: PathChapter;
+  completedSteps: number;
+  totalSteps: number;
+  stepCompletionPercentage: number;
+  totalUniqueContent: number;
+  completedUniqueContent: number;
+  contentCompletionPercentage: number;
+  sharedContentCompleted: number;
+  isComplete: boolean;
+}
+
 /**
  * PathService - Manages learning path navigation and implements fog-of-war access control.
  *
@@ -521,9 +534,11 @@ export class PathService {
     );
   }
 
-  private buildConceptStepMap(steps: any[]): Map<string, number[]> {
+  private buildConceptStepMap(
+    steps: (PathStep & { sharedConcepts?: string[] })[]
+  ): Map<string, number[]> {
     const conceptMap = new Map<string, number[]>();
-    steps.forEach((step: any, stepIndex) => {
+    steps.forEach((step, stepIndex) => {
       if (step.sharedConcepts && Array.isArray(step.sharedConcepts)) {
         step.sharedConcepts.forEach((conceptId: string) => {
           if (!conceptMap.has(conceptId)) {
@@ -896,7 +911,7 @@ export class PathService {
     chapters: PathChapter[],
     progress: AgentProgress | null,
     completedContentIds: Set<string>
-  ): any[] {
+  ): ChapterMetricsResult[] {
     let absoluteStepIndex = 0;
     return chapters.map(chapter => {
       const metrics = this.calculateSingleChapterMetrics(

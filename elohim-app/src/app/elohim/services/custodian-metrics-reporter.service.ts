@@ -23,6 +23,22 @@ import { ShefaService } from './shefa.service';
  * - Transforms to Shefa format and publishes to DHT
  */
 
+/** Shape of metrics snapshot from PerformanceMetricsService.getMetricsForReport() */
+interface MetricsSnapshot {
+  health: {
+    uptimePercent: number;
+    availability: boolean;
+    responseTimeP50Ms: number;
+    responseTimeP95Ms: number;
+    responseTimeP99Ms: number;
+    errorRate: number;
+  };
+  computation: {
+    cpuUsagePercent: number;
+    memoryUsagePercent: number;
+  };
+}
+
 export interface MetricsReportingStats {
   reportsAttempted: number;
   reportsSuccessful: number;
@@ -191,12 +207,13 @@ export class CustodianMetricsReporterService {
 
         return true;
       } else {
-        throw new Error('Report failed: ' + (result.error ?? 'Unknown error'));
+        const UNKNOWN_ERROR = 'Unknown error';
+        throw new Error('Report failed: ' + (result.error ?? UNKNOWN_ERROR));
       }
     } catch (err) {
       s.reportsFailed++;
-      const errorMessage =
-        err instanceof Error ? (err.message ?? 'Unknown error') : 'Unknown error';
+      const UNKNOWN_ERROR = 'Unknown error';
+      const errorMessage = err instanceof Error ? (err.message ?? UNKNOWN_ERROR) : UNKNOWN_ERROR;
       s.lastError = errorMessage;
 
       // Exponential backoff for retries
@@ -246,7 +263,7 @@ export class CustodianMetricsReporterService {
    *
    * Based on reliability, speed, error rate, and SLA compliance
    */
-  private calculateReputationScore(metricsSnapshot: any): number {
+  private calculateReputationScore(metricsSnapshot: MetricsSnapshot): number {
     const uptimePercent = metricsSnapshot.health.uptimePercent;
     const latencyMs = metricsSnapshot.health.responseTimeP95Ms;
     const errorRate = metricsSnapshot.health.errorRate; // 0-1

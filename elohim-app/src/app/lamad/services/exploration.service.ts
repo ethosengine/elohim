@@ -150,13 +150,13 @@ export class ExplorationService {
           })
         );
       }),
-      catchError(err => {
+      catchError((err: unknown) => {
         this.logEvent({
           type: 'query-failed',
           timestamp: new Date().toISOString(),
           agentId: this.currentAgentId,
           query,
-          error: err,
+          error: err as ExplorationError,
         });
         return throwError(() => err);
       })

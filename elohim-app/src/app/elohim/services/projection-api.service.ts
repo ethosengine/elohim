@@ -144,10 +144,10 @@ export class ProjectionAPIService {
 
     const url = this.buildApiUrl(`/Content/${encodeURIComponent(id)}`);
 
-    return this.http.get<any>(url).pipe(
+    return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
       map(data => this.transformContent(data)),
-      catchError(err => this.handleContentError(err, `getContent(${id})`)),
+      catchError((err: HttpErrorResponse) => this.handleContentError(err, `getContent(${id})`)),
       shareReplay(1)
     );
   }
@@ -173,12 +173,12 @@ export class ProjectionAPIService {
 
     const url = this.buildApiUrl('/Content');
 
-    return this.http.get<any[]>(url, { params }).pipe(
+    return this.http.get<Record<string, unknown>[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
       map(data => (data ?? []).map(c => this.transformContent(c))),
       // Apply client-side filters
       map(contents => this.applyContentFilters(contents, filters)),
-      catchError(err => this.handleContentArrayError(err, 'queryContent'))
+      catchError((err: HttpErrorResponse) => this.handleContentArrayError(err, 'queryContent'))
     );
   }
 
@@ -258,10 +258,10 @@ export class ProjectionAPIService {
 
     const url = this.buildApiUrl(`/LearningPath/${encodeURIComponent(id)}`);
 
-    return this.http.get<any>(url).pipe(
+    return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
       map(data => this.transformPath(data)),
-      catchError(err => this.handlePathError(err, `getPath(${id})`)),
+      catchError((err: HttpErrorResponse) => this.handlePathError(err, `getPath(${id})`)),
       shareReplay(1)
     );
   }
@@ -295,12 +295,12 @@ export class ProjectionAPIService {
 
     const url = this.buildApiUrl('/LearningPath');
 
-    return this.http.get<any[]>(url, { params }).pipe(
+    return this.http.get<Record<string, unknown>[]>(url, { params }).pipe(
       timeout(this.defaultTimeout),
       map(data => (data ?? []).map(p => this.transformPath(p))),
       // Apply client-side filters
       map(paths => this.applyPathFilters(paths, filters)),
-      catchError(err => this.handlePathArrayError(err, 'queryPaths'))
+      catchError((err: HttpErrorResponse) => this.handlePathArrayError(err, 'queryPaths'))
     );
   }
 
@@ -378,7 +378,9 @@ export class ProjectionAPIService {
       .pipe(
         timeout(this.defaultTimeout),
         map(response => (response.data ?? []).map(c => this.transformContent(c))),
-        catchError(err => this.handleContentArrayError(err, `getRelated(${nodeId})`))
+        catchError((err: HttpErrorResponse) =>
+          this.handleContentArrayError(err, `getRelated(${nodeId})`)
+        )
       );
   }
 
@@ -396,7 +398,7 @@ export class ProjectionAPIService {
 
     return this.http.get<ProjectionStats>(`${this.baseUrl}/stats`).pipe(
       timeout(this.defaultTimeout),
-      catchError(err => this.handleStatsError(err, 'getStats'))
+      catchError((err: HttpErrorResponse) => this.handleStatsError(err, 'getStats'))
     );
   }
 

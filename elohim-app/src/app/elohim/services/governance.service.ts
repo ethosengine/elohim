@@ -91,6 +91,8 @@ export interface DiscussionMessage {
  * - Escalation paths are constitutional
  * - Feedback loops are visible
  */
+const ACTIVE_CHALLENGE_STATUSES = ['acknowledged', 'under-review'];
+
 @Injectable({ providedIn: 'root' })
 export class GovernanceService {
   private readonly STORAGE_PREFIX = 'lamad-governance-';
@@ -132,9 +134,8 @@ export class GovernanceService {
       this.getDiscussions(),
     ]).pipe(
       map(([challenges, proposals, precedents, discussions]) => ({
-        activeChallenges: challenges.filter(c =>
-          ['acknowledged', 'under-review'].includes(c.status)
-        ).length,
+        activeChallenges: challenges.filter(c => ACTIVE_CHALLENGE_STATUSES.includes(c.status))
+          .length,
         votingProposals: proposals.filter(p => p.status === 'voting').length,
         recentPrecedents: precedents.filter(p => p.status === 'active').length,
         activeDiscussions: discussions.filter(d => d.status === 'active').length,
@@ -172,7 +173,7 @@ export class GovernanceService {
    */
   isEntityChallenged(entityType: string, entityId: string): Observable<boolean> {
     return this.getChallengesForEntity(entityType, entityId).pipe(
-      map(challenges => challenges.some(c => ['acknowledged', 'under-review'].includes(c.status)))
+      map(challenges => challenges.some(c => ACTIVE_CHALLENGE_STATUSES.includes(c.status)))
     );
   }
 
@@ -442,7 +443,9 @@ export class GovernanceService {
     // Save to localStorage
     const key = `${this.STORAGE_PREFIX}discussion-messages-${message.discussionId}`;
     const existing = localStorage.getItem(key);
-    const messages = existing ? JSON.parse(existing) : [];
+    const messages: Record<string, unknown>[] = existing
+      ? (JSON.parse(existing) as Record<string, unknown>[])
+      : [];
     messages.push(newMessage);
 
     try {
@@ -482,7 +485,7 @@ export class GovernanceService {
       map(challenges =>
         challenges.filter(c => {
           if (!c.slaDeadline) return false;
-          if (!['acknowledged', 'under-review'].includes(c.status)) return false;
+          if (!ACTIVE_CHALLENGE_STATUSES.includes(c.status)) return false;
 
           const deadline = new Date(c.slaDeadline);
           return deadline <= cutoff;
@@ -521,7 +524,9 @@ export class GovernanceService {
   private saveLocalChallenge(challenge: ChallengeRecord): void {
     const key = `${this.STORAGE_PREFIX}local-challenges`;
     const existing = localStorage.getItem(key);
-    const challenges = existing ? JSON.parse(existing) : [];
+    const challenges: ChallengeRecord[] = existing
+      ? (JSON.parse(existing) as ChallengeRecord[])
+      : [];
     challenges.push(challenge);
 
     try {
@@ -534,7 +539,7 @@ export class GovernanceService {
   private saveLocalProposal(proposal: ProposalRecord): void {
     const key = `${this.STORAGE_PREFIX}local-proposals`;
     const existing = localStorage.getItem(key);
-    const proposals = existing ? JSON.parse(existing) : [];
+    const proposals: ProposalRecord[] = existing ? (JSON.parse(existing) as ProposalRecord[]) : [];
     proposals.push(proposal);
 
     try {

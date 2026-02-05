@@ -17,7 +17,6 @@ import { Injectable, computed, inject } from '@angular/core';
 // @coverage: 88.9% (2026-02-05)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { type KeyLocation } from '../models/identity.model';
 import {
   type AgencyState,
   type AgencyStage,
@@ -30,6 +29,7 @@ import {
   getHostedDataResidency,
   getAppUserDataResidency,
 } from '../models/agency.model';
+import { type KeyLocation } from '../models/identity.model';
 
 @Injectable({
   providedIn: 'root',
@@ -165,8 +165,8 @@ export class AgencyService {
     try {
       const nodeConfig = localStorage.getItem('elohim_node_operator_config');
       if (nodeConfig) {
-        const config = JSON.parse(nodeConfig);
-        return config.isNodeOperator === true && config.hostedHumanCount > 0;
+        const config = JSON.parse(nodeConfig) as Record<string, unknown>;
+        return config['isNodeOperator'] === true && (config['hostedHumanCount'] as number) > 0;
       }
     } catch {
       // Ignore parse errors

@@ -42,6 +42,8 @@ import { DataLoaderService } from './data-loader.service';
  * 3. Spiral detection: Request monitoring → Get intervention suggestions
  * 4. Path analysis: Request analysis → Get improvement suggestions
  */
+const CAPABILITY_ATTESTATION_RECOMMENDATION = CAPABILITY_ATTESTATION_RECOMMENDATION;
+
 @Injectable({ providedIn: 'root' })
 export class ElohimAgentService {
   private readonly elohimCache = new Map<string, ElohimAgent>();
@@ -225,9 +227,9 @@ export class ElohimAgentService {
     const request: ElohimRequest = {
       requestId: this.generateRequestId(),
       targetElohimId: 'auto',
-      capability: 'attestation-recommendation',
+      capability: CAPABILITY_ATTESTATION_RECOMMENDATION,
       params: {
-        type: 'attestation-recommendation',
+        type: CAPABILITY_ATTESTATION_RECOMMENDATION,
         contentId,
         requestedAttestationType: attestationType,
         evidence,
@@ -269,7 +271,7 @@ export class ElohimAgentService {
       case 'content-safety-review':
         return this.handleContentReview(request, elohim, baseResponse);
 
-      case 'attestation-recommendation':
+      case CAPABILITY_ATTESTATION_RECOMMENDATION:
         return this.handleAttestationRecommendation(request, elohim, baseResponse);
 
       default:
@@ -342,7 +344,7 @@ export class ElohimAgentService {
       crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 > 0.2 ? 'grant' : 'defer'; // Demo data generation
 
     const payload: AttestationRecommendation = {
-      type: 'attestation-recommendation',
+      type: CAPABILITY_ATTESTATION_RECOMMENDATION,
       contentId: params.contentId,
       recommend: recommend as 'grant' | 'deny' | 'defer',
       attestationType: params.requestedAttestationType,
@@ -397,7 +399,7 @@ export class ElohimAgentService {
     const times: Partial<Record<ElohimCapability, number>> = {
       'content-safety-review': 1500,
       'accuracy-verification': 2000,
-      'attestation-recommendation': 1200,
+      CAPABILITY_ATTESTATION_RECOMMENDATION: 1200,
       'knowledge-map-synthesis': 3000,
       'spiral-detection': 800,
       'path-analysis': 2500,

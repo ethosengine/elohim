@@ -456,7 +456,7 @@ export class DoorwayRegistryService {
       const raw = localStorage.getItem(DOORWAY_CACHE_KEY);
       if (!raw) return null;
 
-      const cache = JSON.parse(raw);
+      const cache = JSON.parse(raw) as { expiresAt: string; doorways: DoorwayInfo[] };
       const expiresAt = new Date(cache.expiresAt);
 
       if (expiresAt > new Date()) {

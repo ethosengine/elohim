@@ -269,17 +269,17 @@ export class AffinityTrackingService implements OnDestroy {
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        const parsed = JSON.parse(stored);
+        const parsed = JSON.parse(stored) as Record<string, unknown>;
         // Ensure lastUpdated is ISO 8601 string (migration from Date objects)
-        if (parsed.lastUpdated && typeof parsed.lastUpdated !== 'string') {
-          parsed.lastUpdated = new Date(parsed.lastUpdated).toISOString();
+        if (parsed['lastUpdated'] && typeof parsed['lastUpdated'] !== 'string') {
+          parsed['lastUpdated'] = new Date(parsed['lastUpdated'] as string | number).toISOString();
         }
         // Migrate old userId field to humanId
-        if (parsed.userId && !parsed.humanId) {
-          parsed.humanId = parsed.userId;
-          delete parsed.userId;
+        if (parsed['userId'] && !parsed['humanId']) {
+          parsed['humanId'] = parsed['userId'];
+          delete parsed['userId'];
         }
-        return parsed;
+        return parsed as unknown as HumanAffinity;
       }
     } catch {
       // localStorage read failure - will use default affinity

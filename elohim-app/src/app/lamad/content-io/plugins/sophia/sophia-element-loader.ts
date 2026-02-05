@@ -5,7 +5,7 @@
  * an external UMD bundle, ensuring React and Sophia are only loaded when needed.
  */
 
-// @coverage: 51.1% (2026-02-05)
+// @coverage: 45.0% (2026-02-05)
 
 // Import types for local use and re-export for consumers
 import type { Moment, Recognition } from './sophia-moment.model';
@@ -32,6 +32,23 @@ export interface SophiaQuestionElement extends HTMLElement {
   restoreState(state: unknown): void;
 }
 
+/** Typed accessor for runtime globals set before bundle loads. */
+interface SophiaGlobals {
+  __SOPHIA_STYLES_URL__?: string;
+  __SOPHIA_THEME_OVERRIDES_URL__?: string;
+  __SOPHIA_PLUGIN_URL__?: string;
+  __REACT_URL__?: string;
+  __REACT_DOM_URL__?: string;
+  React?: unknown;
+  ReactDOM?: unknown;
+  SophiaElement?: {
+    Sophia?: { configure?: (config: Record<string, unknown>) => void };
+    getPrimarySubscale?: (subscaleTotals: Record<string, number>) => string | undefined;
+  };
+}
+
+const _globals = globalThis as unknown as SophiaGlobals;
+
 // Track loading state
 let loadPromise: Promise<void> | null = null;
 let isRegistered = false;
@@ -45,16 +62,12 @@ const SOPHIA_ELEMENT_TAG = 'sophia-question';
 
 // CSS URLs
 const getSophiaStylesUrl = (): string => {
-  return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((globalThis as any)['__SOPHIA_STYLES_URL__'] as string) || '/assets/sophia-plugin/index.css'
-  );
+  return _globals.__SOPHIA_STYLES_URL__ ?? '/assets/sophia-plugin/index.css';
 };
 
 const getSophiaThemeOverridesUrl = (): string => {
   return (
-    ((globalThis as any)['__SOPHIA_THEME_OVERRIDES_URL__'] as string) ||
-    '/assets/sophia-plugin/sophia-theme-overrides.css'
+    _globals.__SOPHIA_THEME_OVERRIDES_URL__ ?? '/assets/sophia-plugin/sophia-theme-overrides.css'
   );
 };
 
@@ -90,8 +103,7 @@ function loadSophiaCSS(): void {
 // Cache-bust once per page load
 const CACHE_BUST = Date.now();
 const getSophiaPluginUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customUrl = (globalThis as any)['__SOPHIA_PLUGIN_URL__'] as string;
+  const customUrl = _globals.__SOPHIA_PLUGIN_URL__;
   if (customUrl) return customUrl;
   return `/assets/sophia-plugin/sophia-element.umd.js?v=${CACHE_BUST}`;
 };
@@ -117,17 +129,11 @@ async function loadScript(url: string): Promise<void> {
 
 // React URLs - local assets for offline support, CDN fallback for development
 const getReactUrl = (): string => {
-  return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((globalThis as any)['__REACT_URL__'] as string) || '/assets/react/react.production.min.js'
-  );
+  return _globals.__REACT_URL__ ?? '/assets/react/react.production.min.js';
 };
 
 const getReactDomUrl = (): string => {
-  return (
-    ((globalThis as any)['__REACT_DOM_URL__'] as string) ||
-    '/assets/react/react-dom.production.min.js'
-  );
+  return _globals.__REACT_DOM_URL__ ?? '/assets/react/react-dom.production.min.js';
 };
 
 // CDN fallback URLs
@@ -138,10 +144,7 @@ const REACT_DOM_CDN_URL = 'https://unpkg.com/react-dom@18/umd/react-dom.producti
  * Load React from local assets, falling back to CDN if local fails.
  */
 async function ensureReactLoaded(): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const win = globalThis as any;
-
-  if (win.React && win.ReactDOM) {
+  if (_globals.React && _globals.ReactDOM) {
     return;
   }
 
@@ -153,7 +156,7 @@ async function ensureReactLoaded(): Promise<void> {
     await loadScript(localReactUrl);
     await loadScript(localReactDomUrl);
 
-    if (win.React && win.ReactDOM) {
+    if (_globals.React && _globals.ReactDOM) {
       return;
     }
   } catch {
@@ -164,7 +167,7 @@ async function ensureReactLoaded(): Promise<void> {
   await loadScript(REACT_CDN_URL);
   await loadScript(REACT_DOM_CDN_URL);
 
-  if (!win.React || !win.ReactDOM) {
+  if (!_globals.React || !_globals.ReactDOM) {
     throw new Error('Failed to load React from both local assets and CDN');
   }
 }
@@ -205,21 +208,18 @@ export async function registerSophiaElement(): Promise<void> {
       }
 
       // Configure Sophia with debug logging for development
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SophiaElement = (globalThis as any).SophiaElement;
-      if (SophiaElement?.Sophia?.configure) {
+      const sophiaElement = _globals.SophiaElement;
+      if (sophiaElement?.Sophia?.configure) {
         // Use 'attribute' mode because elohim-app sets data-theme="light|dark|device"
         // Class mode wouldn't work because our classes are 'theme-light' not 'light'
         // When data-theme="device", Sophia falls back to system preference (correct behavior)
-        SophiaElement.Sophia.configure({
+        sophiaElement.Sophia.configure({
           theme: 'auto',
           detectThemeFrom: 'attribute',
           logLevel: 'debug',
         });
-      } else {
-        // Sophia.configure not available - using default configuration
-        console.debug('[SophiaLoader] Sophia.configure not available, using defaults');
       }
+      // else: Sophia.configure not available - using default configuration
 
       isRegistered = true;
     } catch (error) {
@@ -449,8 +449,7 @@ export interface DimensionalProfile {
  * Returns null if the sophia element hasn't been loaded yet.
  */
 export function getPsycheAPI(): PsycheAPI | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sophiaElement = (globalThis as any).SophiaElement;
+  const sophiaElement = _globals.SophiaElement;
 
   if (!sophiaElement) {
     return null;
@@ -458,10 +457,7 @@ export function getPsycheAPI(): PsycheAPI | null {
 
   // Get getPrimarySubscale from SophiaElement (re-exported from sophia-core)
   const getPrimarySubscaleFn = sophiaElement.getPrimarySubscale;
-  if (!getPrimarySubscaleFn) {
-    // getPrimarySubscale not available in this version of SophiaElement
-    console.debug('[SophiaLoader] getPrimarySubscale not available in SophiaElement');
-  }
+  // getPrimarySubscale may not be available in all versions of SophiaElement
 
   // Create a facade using available SophiaElement exports + local implementations
   return {

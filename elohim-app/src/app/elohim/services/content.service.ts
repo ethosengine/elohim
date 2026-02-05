@@ -24,8 +24,8 @@ import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider
 
 import { StorageClientService } from './storage-client.service';
 
-import type { KnowledgeMap } from '../../lamad/models/knowledge-map.model';
-import type { PathExtension } from '../../lamad/models/path-extension.model';
+import type { KnowledgeMap, KnowledgeMapType } from '../../lamad/models/knowledge-map.model';
+import type { PathExtension, UpstreamProposal } from '../../lamad/models/path-extension.model';
 import type { ContentQuery } from '@elohim/service/client';
 
 /**
@@ -132,6 +132,155 @@ export interface PathExtensionFilters {
   offset?: number;
 }
 
+// =============================================================================
+// Raw API Response Types (for type-safe transforms)
+// =============================================================================
+
+/** Raw content data from storage/API before transformation */
+interface RawContentData {
+  id: string;
+  docId?: string;
+  contentType?: string;
+  title?: string;
+  description?: string;
+  contentBody?: string;
+  content?: string;
+  contentFormat?: string;
+  tags?: string[];
+  relatedNodeIds?: string[];
+  metadata?: Record<string, unknown>;
+  authorId?: string;
+  reach?: string;
+  trustScore?: number;
+  estimatedMinutes?: number;
+  thumbnailUrl?: string | null;
+  blobCid?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Raw path step from storage/API */
+interface RawStepData {
+  id?: string;
+  pathId?: string;
+  chapterId?: string;
+  title?: string;
+  description?: string;
+  stepType?: string;
+  resourceId?: string;
+  resourceType?: string;
+  orderIndex?: number;
+  estimatedDuration?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Raw chapter from storage/API */
+interface RawChapterData {
+  id?: string;
+  title?: string;
+  description?: string;
+  orderIndex?: number;
+  estimatedDuration?: string;
+  steps?: RawStepData[];
+}
+
+/** Raw path data from storage/API before transformation */
+interface RawPathData {
+  id: string;
+  docId?: string;
+  version?: string;
+  title?: string;
+  description?: string;
+  purpose?: string;
+  difficulty?: string;
+  estimatedDuration?: string;
+  visibility?: string;
+  pathType?: string;
+  thumbnailUrl?: string | null;
+  thumbnailAlt?: string;
+  tags?: string[];
+  createdBy?: string;
+  contributors?: string[];
+  steps?: RawStepData[];
+  chapters?: RawChapterData[];
+  stepCount?: number;
+  chapterCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  metadata?: Record<string, unknown>;
+  path?: RawPathData;
+  ungroupedSteps?: RawStepData[];
+}
+
+/** Raw relationship from storage/API */
+interface RawRelationshipData {
+  id?: string;
+  sourceId?: string;
+  targetId?: string;
+  relationshipType?: string;
+  confidence?: number;
+  inferenceSource?: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+}
+
+/** Raw content graph node */
+interface RawContentGraphNodeData {
+  contentId?: string;
+  relationshipType?: string;
+  confidence?: number;
+  children?: RawContentGraphNodeData[];
+}
+
+/** Raw content graph from storage/API */
+interface RawContentGraphData {
+  rootId?: string;
+  related?: RawContentGraphNodeData[];
+  totalNodes?: number;
+}
+
+/** Raw knowledge map from storage/API */
+interface RawKnowledgeMapData {
+  id: string;
+  mapType?: string;
+  ownerId?: string;
+  title?: string;
+  description?: string;
+  subjectType?: string;
+  subjectId?: string;
+  subjectName?: string;
+  visibility?: string;
+  sharedWith?: string[];
+  nodes?: KnowledgeMap['nodes'];
+  pathIds?: string[];
+  overallAffinity?: number;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Raw path extension from storage/API */
+interface RawPathExtensionData {
+  id: string;
+  basePathId?: string;
+  basePathVersion?: string;
+  extendedBy?: string;
+  title?: string;
+  description?: string;
+  insertions?: PathExtension['insertions'];
+  annotations?: PathExtension['annotations'];
+  reorderings?: PathExtension['reorderings'];
+  exclusions?: PathExtension['exclusions'];
+  visibility?: string;
+  sharedWith?: string[];
+  forkedFrom?: string;
+  forks?: string[];
+  upstreamProposal?: UpstreamProposal;
+  stats?: PathExtension['stats'];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ContentService {
   private readonly client: ElohimClient = inject(ELOHIM_CLIENT);
@@ -156,7 +305,7 @@ export class ContentService {
     const cached = this.contentCache.get(id);
     if (cached) return cached;
 
-    const obs = from(this.client.get<any>('content', id)).pipe(
+    const obs = from(this.client.get<RawContentData>('content', id)).pipe(
       switchMap(data => {
         if (!data) return of(null);
 
@@ -165,9 +314,8 @@ export class ContentService {
         const contentBody = data.contentBody ?? '';
 
         const isBlobReference =
-          contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
+          contentBody.startsWith('sha256:') ?? contentBody.startsWith('sha256-');
         const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 
         if (needsBlobFetch && blobCid) {
@@ -227,7 +375,7 @@ export class ContentService {
       offset: filters.offset,
     };
 
-    return from(this.client.query<ContentNode>(query)).pipe(
+    return from(this.client.query<RawContentData>(query)).pipe(
       map(items => items.map(c => this.transformContent(c))),
       map(items => this.applyLocalFilters(items, filters)),
       catchError(_err => {
@@ -240,7 +388,7 @@ export class ContentService {
    * Batch get multiple content nodes
    */
   batchGetContent(ids: string[]): Observable<Map<string, ContentNode>> {
-    return from(this.client.getBatch<ContentNode>('content', ids)).pipe(
+    return from(this.client.getBatch<RawContentData>('content', ids)).pipe(
       map(results => {
         const map = new Map<string, ContentNode>();
         for (const [id, content] of results) {
@@ -277,7 +425,7 @@ export class ContentService {
     const cached = this.pathCache.get(id);
     if (cached) return cached;
 
-    const obs = from(this.client.get<LearningPath>('path', id)).pipe(
+    const obs = from(this.client.get<RawPathData>('path', id)).pipe(
       map(data => (data ? this.transformPath(data) : null)),
       catchError(_err => {
         return of(null);
@@ -301,7 +449,7 @@ export class ContentService {
       offset: filters.offset,
     };
 
-    return from(this.client.query<LearningPath>(query)).pipe(
+    return from(this.client.query<RawPathData>(query)).pipe(
       map(items => items.map(p => this.transformPath(p))),
       map(items => this.applyPathFilters(items, filters)),
       catchError(_err => {
@@ -337,7 +485,9 @@ export class ContentService {
       params.set('relationshipType', relationshipType);
     }
 
-    return from(this.client.fetch<{ items: any[] }>(`/db/relationships?${params}`)).pipe(
+    return from(
+      this.client.fetch<{ items: RawRelationshipData[] }>(`/db/relationships?${params}`)
+    ).pipe(
       map(response => (response?.items ?? []).map(r => this.transformRelationship(r))),
       catchError(_err => {
         return of([]);
@@ -357,7 +507,7 @@ export class ContentService {
       url += `?types=${relationshipTypes.join(',')}`;
     }
 
-    return from(this.client.fetch<any>(url)).pipe(
+    return from(this.client.fetch<RawContentGraphData>(url)).pipe(
       map(data => (data ? this.transformContentGraph(data) : null)),
       catchError(_err => {
         return of(null);
@@ -373,7 +523,7 @@ export class ContentService {
    * Get a knowledge map by ID
    */
   getKnowledgeMap(id: string): Observable<KnowledgeMap | null> {
-    return from(this.client.fetch<any>(`/db/knowledge-maps/${id}`)).pipe(
+    return from(this.client.fetch<RawKnowledgeMapData>(`/db/knowledge-maps/${id}`)).pipe(
       map(data => (data ? this.transformKnowledgeMap(data) : null)),
       catchError(_err => {
         return of(null);
@@ -393,8 +543,10 @@ export class ContentService {
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.offset) params.set('offset', String(filters.offset));
 
-    return from(this.client.fetch<{ items: any[] }>(`/db/knowledge-maps?${params}`)).pipe(
-      map(response => (response?.items ?? []).map((m: any) => this.transformKnowledgeMap(m))),
+    return from(
+      this.client.fetch<{ items: RawKnowledgeMapData[] }>(`/db/knowledge-maps?${params}`)
+    ).pipe(
+      map(response => (response?.items ?? []).map(m => this.transformKnowledgeMap(m))),
       catchError(_err => {
         return of([]);
       })
@@ -409,7 +561,7 @@ export class ContentService {
    * Get a path extension by ID
    */
   getPathExtension(id: string): Observable<PathExtension | null> {
-    return from(this.client.fetch<any>(`/db/path-extensions/${id}`)).pipe(
+    return from(this.client.fetch<RawPathExtensionData>(`/db/path-extensions/${id}`)).pipe(
       map(data => (data ? this.transformPathExtension(data) : null)),
       catchError(_err => {
         return of(null);
@@ -428,8 +580,10 @@ export class ContentService {
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.offset) params.set('offset', String(filters.offset));
 
-    return from(this.client.fetch<{ items: any[] }>(`/db/path-extensions?${params}`)).pipe(
-      map(response => (response?.items ?? []).map((e: any) => this.transformPathExtension(e))),
+    return from(
+      this.client.fetch<{ items: RawPathExtensionData[] }>(`/db/path-extensions?${params}`)
+    ).pipe(
+      map(response => (response?.items ?? []).map(e => this.transformPathExtension(e))),
       catchError(_err => {
         return of([]);
       })
@@ -487,7 +641,7 @@ export class ContentService {
   /**
    * Transform raw data to ContentNode model
    */
-  private transformContent(data: any): ContentNode {
+  private transformContent(data: RawContentData): ContentNode {
     const contentFormat = data.contentFormat ?? 'markdown';
     const rawContent = data.contentBody ?? data.content ?? '';
 
@@ -540,7 +694,7 @@ export class ContentService {
 
     // Try to parse as JSON
     try {
-      const parsed = JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
       // Only return parsed object if it's actually an object
       if (parsed && typeof parsed === 'object') {
         return parsed;
@@ -560,27 +714,30 @@ export class ContentService {
    * 2. Nested: { path: {...}, chapters: [...], ungrouped_steps: [...] }
    * 3. Metadata: { path: {..., metadata: { chapters: [...] } } }
    */
-  private transformPath(data: any): LearningPath {
+  private transformPath(data: RawPathData): LearningPath {
     // Handle nested response format from elohim-storage
     const pathData = data.path ?? data;
     // Chapters can be at top-level, in path data, or in metadata
-    const rawChapters = data.chapters ?? pathData.chapters ?? pathData.metadata?.chapters ?? [];
+    const metadataChapters = (pathData.metadata?.['chapters'] ?? []) as RawChapterData[];
+    const rawChapters = data.chapters ?? pathData.chapters ?? metadataChapters;
     const ungroupedSteps = data.ungroupedSteps ?? [];
 
     // Transform chapters with their steps
-    const chapters = rawChapters.map((ch: any) => ({
+    const chapters = rawChapters.map((ch: RawChapterData) => ({
       id: ch.id,
       title: ch.title ?? '',
       description: ch.description ?? '',
+      order: ch.orderIndex ?? 0,
       orderIndex: ch.orderIndex ?? 0,
       estimatedDuration: ch.estimatedDuration ?? ch.estimatedDuration,
-      steps: (ch.steps ?? []).map((s: any) => this.transformStep(s)),
+      steps: (ch.steps ?? []).map((s: RawStepData) => this.transformStep(s)),
     }));
 
     // Collect all steps from chapters + ungrouped
+    type TransformedChapter = (typeof chapters)[number];
     const allSteps = [
-      ...chapters.flatMap((ch: any) => ch.steps),
-      ...ungroupedSteps.map((s: any) => this.transformStep(s)),
+      ...chapters.flatMap((ch: TransformedChapter) => ch.steps),
+      ...ungroupedSteps.map((s: RawStepData) => this.transformStep(s)),
     ];
 
     return {
@@ -610,7 +767,8 @@ export class ContentService {
   /**
    * Transform a step from snake_case to camelCase
    */
-  private transformStep(step: any): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Bridge type: raw storage steps have extra fields beyond PathStep
+  private transformStep(step: RawStepData): any {
     return {
       id: step.id,
       pathId: step.pathId ?? step.pathId,
@@ -620,7 +778,7 @@ export class ContentService {
       stepTitle: step.title ?? '',
       stepNarrative: step.description ?? '',
       description: step.description ?? '',
-      stepType: step.stepType ?? 'learn',
+      stepType: step.stepType ?? 'content',
       resourceId: step.resourceId ?? step.resourceId ?? '',
       resourceType: step.resourceType ?? step.resourceType ?? 'content',
       order: step.orderIndex ?? 0,
@@ -719,14 +877,14 @@ export class ContentService {
   /**
    * Transform raw relationship data
    */
-  private transformRelationship(data: any): Relationship {
+  private transformRelationship(data: RawRelationshipData): Relationship {
     return {
-      id: data.id,
-      sourceId: data.sourceId ?? data.sourceId,
-      targetId: data.targetId ?? data.targetId,
-      relationshipType: data.relationshipType ?? data.relationshipType,
+      id: data.id ?? '',
+      sourceId: data.sourceId ?? '',
+      targetId: data.targetId ?? '',
+      relationshipType: data.relationshipType ?? '',
       confidence: data.confidence ?? 1.0,
-      inferenceSource: data.inferenceSource ?? data.inferenceSource ?? 'explicit',
+      inferenceSource: data.inferenceSource ?? 'explicit',
       metadata: data.metadata,
       createdAt: data.createdAt,
     };
@@ -735,61 +893,61 @@ export class ContentService {
   /**
    * Transform raw content graph data
    */
-  private transformContentGraph(data: any): ContentGraph {
+  private transformContentGraph(data: RawContentGraphData): ContentGraph {
     return {
-      rootId: data.rootId ?? data.rootId,
-      related: (data.related ?? []).map((node: any) => this.transformContentGraphNode(node)),
-      totalNodes: data.totalNodes ?? data.totalNodes ?? 0,
+      rootId: data.rootId ?? '',
+      related: (data.related ?? []).map(node => this.transformContentGraphNode(node)),
+      totalNodes: data.totalNodes ?? 0,
     };
   }
 
   /**
    * Transform content graph node recursively
    */
-  private transformContentGraphNode(data: any): ContentGraphNode {
+  private transformContentGraphNode(data: RawContentGraphNodeData): ContentGraphNode {
     return {
-      contentId: data.contentId ?? data.contentId,
-      relationshipType: data.relationshipType ?? data.relationshipType,
+      contentId: data.contentId ?? '',
+      relationshipType: data.relationshipType ?? '',
       confidence: data.confidence ?? 1.0,
-      children: (data.children ?? []).map((child: any) => this.transformContentGraphNode(child)),
+      children: (data.children ?? []).map(child => this.transformContentGraphNode(child)),
     };
   }
 
   /**
    * Transform raw knowledge map data
    */
-  private transformKnowledgeMap(data: any): KnowledgeMap {
+  private transformKnowledgeMap(data: RawKnowledgeMapData): KnowledgeMap {
     return {
-      id: data.id,
-      mapType: data.mapType ?? data.mapType,
-      ownerId: data.ownerId ?? data.ownerId,
+      id: data.id ?? '',
+      mapType: (data.mapType ?? 'content-graph') as KnowledgeMapType,
+      ownerId: data.ownerId ?? '',
       title: data.title ?? '',
       description: data.description,
       subject: {
-        type: (data.subjectType ?? data.subjectType) as 'content-graph' | 'agent' | 'organization',
-        subjectId: data.subjectId ?? data.subjectId,
-        subjectName: data.subjectName ?? data.subjectName,
+        type: (data.subjectType ?? 'content-graph') as 'content-graph' | 'agent' | 'organization',
+        subjectId: data.subjectId ?? '',
+        subjectName: data.subjectName ?? '',
       },
-      visibility: data.visibility ?? 'private',
+      visibility: (data.visibility ?? 'private') as 'private' | 'mutual' | 'shared' | 'public',
       sharedWith: data.sharedWith,
-      nodes: data.nodes,
-      pathIds: data.pathIds,
-      overallAffinity: data.overallAffinity ?? data.overallAffinity ?? 0,
+      nodes: data.nodes ?? [],
+      pathIds: data.pathIds ?? [],
+      overallAffinity: data.overallAffinity ?? 0,
       metadata: data.metadata,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
+      createdAt: data.createdAt ?? '',
+      updatedAt: data.updatedAt ?? '',
     };
   }
 
   /**
    * Transform raw path extension data
    */
-  private transformPathExtension(data: any): PathExtension {
+  private transformPathExtension(data: RawPathExtensionData): PathExtension {
     return {
-      id: data.id,
-      basePathId: data.basePathId,
-      basePathVersion: data.basePathVersion,
-      extendedBy: data.extendedBy,
+      id: data.id ?? '',
+      basePathId: data.basePathId ?? '',
+      basePathVersion: data.basePathVersion ?? '',
+      extendedBy: data.extendedBy ?? '',
       title: data.title ?? '',
       description: data.description,
       // Transform loose arrays to typed arrays (canonical model requires these)
@@ -803,8 +961,8 @@ export class ContentService {
       forks: data.forks,
       upstreamProposal: data.upstreamProposal,
       stats: data.stats,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
+      createdAt: data.createdAt ?? '',
+      updatedAt: data.updatedAt ?? '',
     };
   }
 }

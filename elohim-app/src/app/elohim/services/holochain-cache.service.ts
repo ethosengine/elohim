@@ -315,7 +315,7 @@ export class HolochainCacheService {
    */
   getByTag(tag: string): CacheEntry[] {
     return this.query(entry => {
-      const tags = entry.metadata?.['tags'];
+      const tags: unknown = entry.metadata?.['tags'];
       return Array.isArray(tags) && tags.includes(tag);
     });
   }

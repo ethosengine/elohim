@@ -142,12 +142,16 @@ export class ElohimVerifyComponent implements OnDestroy {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error ?? 'Failed to start verification');
+        const err = (await response.json()) as Record<string, unknown>;
+        throw new Error((err['error'] as string) ?? 'Failed to start verification');
       }
 
-      const data = await response.json();
-      this.sessionId.set(data.sessionId);
+      const data = (await response.json()) as {
+        sessionId?: string;
+        questions?: VerificationQuestion[];
+        timeLimitSeconds?: number;
+      };
+      this.sessionId.set(data.sessionId ?? '');
       this.questions.set(data.questions ?? []);
       this.timeLimitSeconds.set(data.timeLimitSeconds ?? 300);
       this.timeRemaining.set(data.timeLimitSeconds ?? 300);
@@ -155,8 +159,8 @@ export class ElohimVerifyComponent implements OnDestroy {
       this.currentQuestionIndex.set(0);
       this.currentStep.set('questions');
       this.startTimer();
-    } catch (e: any) {
-      this.error.set(e.message ?? 'Failed to start verification');
+    } catch (e: unknown) {
+      this.error.set(e instanceof Error ? e.message : 'Failed to start verification');
     } finally {
       this.isLoading.set(false);
     }
@@ -211,15 +215,15 @@ export class ElohimVerifyComponent implements OnDestroy {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error ?? 'Failed to submit answers');
+        const err = (await response.json()) as Record<string, unknown>;
+        throw new Error((err['error'] as string) ?? 'Failed to submit answers');
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as VerificationResult;
       this.result.set(data);
       this.currentStep.set('result');
-    } catch (e: any) {
-      this.error.set(e.message ?? 'Failed to submit answers');
+    } catch (e: unknown) {
+      this.error.set(e instanceof Error ? e.message : 'Failed to submit answers');
       this.currentStep.set('questions');
       this.startTimer(); // Resume timer on error
     } finally {

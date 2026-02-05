@@ -301,8 +301,10 @@ export function calculateCompleteness(pool: QuestionPool): number {
   const { bloomsDistribution, difficultyDistribution } = pool.metadata;
 
   // Total target questions
-  const bloomsTotal = Object.values(bloomsDistribution).reduce((a, b) => a + b, 0);
-  const difficultyTotal = Object.values(difficultyDistribution).reduce((a, b) => a + b, 0);
+  const bloomsValues = Object.values(bloomsDistribution) as number[];
+  const bloomsTotal = bloomsValues.reduce((a, b) => a + b, 0);
+  const difficultyValues = Object.values(difficultyDistribution) as number[];
+  const difficultyTotal = difficultyValues.reduce((a, b) => a + b, 0);
   const targetTotal = Math.max(bloomsTotal, difficultyTotal);
 
   if (targetTotal === 0) return 100;

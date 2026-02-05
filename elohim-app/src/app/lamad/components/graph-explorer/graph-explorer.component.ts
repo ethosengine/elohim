@@ -102,13 +102,13 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
       if (params['fromPath']) {
         this.returnContext = {
-          pathId: params['fromPath'],
-          stepIndex: Number.parseInt(params['returnStep'] ?? '0', 10),
+          pathId: params['fromPath'] as string,
+          stepIndex: Number.parseInt((params['returnStep'] as string) ?? '0', 10),
         };
       }
 
       if (params['focus']) {
-        this.focusNodeId = params['focus'];
+        this.focusNodeId = params['focus'] as string;
       }
 
       // Check for view mode override
@@ -189,8 +189,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     this.zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 3])
-      .on('zoom', event => {
-        this.svg.select('g.graph-content').attr('transform', event.transform);
+      .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+        this.svg.select('g.graph-content').attr('transform', event.transform.toString());
       });
 
     this.svg.call(this.zoom);
@@ -628,10 +628,10 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
     // Update positions on tick
     this.simulation.on('tick', () => {
       link
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
+        .attr('x1', (d: d3.SimulationLinkDatum<ClusterNode>) => (d.source as ClusterNode).x ?? 0)
+        .attr('y1', (d: d3.SimulationLinkDatum<ClusterNode>) => (d.source as ClusterNode).y ?? 0)
+        .attr('x2', (d: d3.SimulationLinkDatum<ClusterNode>) => (d.target as ClusterNode).x ?? 0)
+        .attr('y2', (d: d3.SimulationLinkDatum<ClusterNode>) => (d.target as ClusterNode).y ?? 0);
 
       node.attr('transform', d => `translate(${d.x},${d.y})`);
     });
@@ -649,7 +649,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
   /**
    * Get link distance based on cluster levels.
    */
-  private getLinkDistance(link: any): number {
+  private getLinkDistance(link: d3.SimulationLinkDatum<ClusterNode>): number {
     const source = link.source as ClusterNode;
     const target = link.target as ClusterNode;
 

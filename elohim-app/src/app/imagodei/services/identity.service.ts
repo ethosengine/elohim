@@ -33,10 +33,10 @@ import {
   isNetworkMode,
 } from '../models/identity.model';
 
+import { AgencyService } from './agency.service';
 import { AuthService } from './auth.service';
 import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { SessionHumanService } from './session-human.service';
-import { AgencyService } from './agency.service';
 
 // Re-export utility functions for consumers
 export { isNetworkMode, getInitials } from '../models/identity.model';

@@ -177,7 +177,7 @@ export class SophiaFormatPlugin extends BaseContentFormatPlugin {
 
   override detectFormat(content: string): number | null {
     try {
-      const parsed = JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
       if (this.validateContent(parsed)) {
         // Check for sophia-specific markers
         const obj = parsed as Record<string, unknown>;

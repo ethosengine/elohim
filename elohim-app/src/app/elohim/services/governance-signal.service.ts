@@ -120,6 +120,8 @@ const MAX_PATH_CACHE_SIZE = 50;
  * MVP Implementation: localStorage with Observable patterns
  * Holochain Migration: DHT entries with links for aggregation
  */
+const SIGNAL_GRADUATED_FEEDBACK = 'graduated-feedback';
+
 @Injectable({ providedIn: 'root' })
 export class GovernanceSignalService {
   private readonly logger = inject(LoggerService).createChild('GovernanceSignal');
@@ -275,12 +277,12 @@ export class GovernanceSignalService {
       createdAt: new Date().toISOString(),
     };
 
-    const saved = this.saveSignal('graduated-feedback', contentId, feedbackRecord);
+    const saved = this.saveSignal(SIGNAL_GRADUATED_FEEDBACK, contentId, feedbackRecord);
 
     if (saved) {
       this.invalidateCache(contentId);
       this.emitSignalChange({
-        type: 'graduated-feedback',
+        type: SIGNAL_GRADUATED_FEEDBACK,
         contentId,
         signalId: feedbackRecord.id,
         agentId,

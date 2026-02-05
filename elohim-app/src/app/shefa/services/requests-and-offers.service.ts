@@ -21,6 +21,8 @@
  * - Observer Protocol: Track completed work, reputation
  */
 
+/* eslint-disable @typescript-eslint/require-await -- Phase 1: query/lookup stubs return Promise<T> without async work */
+
 import { Injectable } from '@angular/core';
 
 // @coverage: 59.7% (2026-02-05)

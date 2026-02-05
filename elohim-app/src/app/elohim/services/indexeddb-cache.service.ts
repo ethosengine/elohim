@@ -32,13 +32,6 @@ interface CacheEntry<T> {
   version: number; // Schema version for invalidation
 }
 
-interface CacheMetadata {
-  version: number;
-  lastCleanup: number;
-  contentCount: number;
-  pathCount: number;
-}
-
 // =============================================================================
 // Configuration
 // =============================================================================

@@ -837,8 +837,8 @@ export class SessionHumanService {
     try {
       const stored = localStorage.getItem(affinityKey);
       if (stored) {
-        const parsed = JSON.parse(stored);
-        affinity = parsed.affinity ?? {};
+        const parsed = JSON.parse(stored) as Record<string, unknown>;
+        affinity = (parsed['affinity'] as Record<string, number>) ?? {};
       }
     } catch {
       // Ignore

@@ -157,8 +157,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Subscribe to route param changes
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
-      this.pathId = params['pathId'];
-      const parsed = Number.parseInt(params['stepIndex'], 10);
+      this.pathId = params['pathId'] as string;
+      const parsed = Number.parseInt(params['stepIndex'] as string, 10);
       this.stepIndex = Number.isNaN(parsed) ? 0 : parsed;
       this.loadContext();
     });
@@ -390,8 +390,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     return total;
   }
 
-  private handleError(err: any): void {
-    this.error = err.message ?? 'Failed to load learning path';
+  private handleError(err: unknown): void {
+    this.error = err instanceof Error ? err.message : 'Failed to load learning path';
     this.isLoading = false;
   }
 

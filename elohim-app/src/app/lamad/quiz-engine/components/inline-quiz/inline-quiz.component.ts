@@ -573,7 +573,9 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   protected streakDots = computed(() => {
     const state = this.streakState();
     if (!state) {
-      return new Array(this.targetStreak).fill({ filled: false, current: false, incorrect: false });
+      return new Array<{ filled: boolean; current: boolean; incorrect: boolean }>(
+        this.targetStreak
+      ).fill({ filled: false, current: false, incorrect: false });
     }
 
     const progress = getStreakProgress(state);

@@ -56,7 +56,9 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     combineLatest([
-      this.dataLoader.getContentIndex().pipe(map(index => index.nodes ?? [])),
+      this.dataLoader
+        .getContentIndex()
+        .pipe(map(index => ((index as { nodes?: ContentNode[] }).nodes ?? []) as ContentNode[])),
       this.affinityService.affinity$,
     ])
       .pipe(takeUntil(this.destroy$))

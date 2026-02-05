@@ -382,7 +382,9 @@ export class BankingStore {
   async getRulesByAgent(stewardId: string): Promise<TransactionRuleLocal[]> {
     const store = await this.getStore(STORES.RULES);
     const index = store.index('stewardId');
-    const rules = await this.wrapRequest(index.getAll(stewardId));
+    const rules = await this.wrapRequest(
+      index.getAll(stewardId) as IDBRequest<TransactionRuleLocal[]>
+    );
     // Sort by priority (higher first)
     return rules.sort((a, b) => b.priority - a.priority);
   }

@@ -15,6 +15,8 @@
  * relies on Observer protocol for risk assessment data.
  */
 
+/* eslint-disable @typescript-eslint/require-await -- Phase 1: most methods are TODO stubs returning Promise<T> without async work */
+
 import { Injectable } from '@angular/core';
 
 // @coverage: 33.6% (2026-02-05)
@@ -191,14 +193,12 @@ export class InsuranceMutualService {
   // Helper methods for enrollment
   // ─────────────────────────────────────────────────────────────────
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getMember(memberId: string): Promise<REAAgent | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return mock
     return { id: memberId, name: 'Member', type: 'human' } as REAAgent;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getQahalCoverageTemplate(_qahalId: string): Promise<{
     defaultRisks: CoveredRisk[];
     deductible: Measure;
@@ -226,7 +226,6 @@ export class InsuranceMutualService {
     // TODO: Persist to Holochain DHT
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getMemberRiskProfile(_memberId: string): Promise<MemberRiskProfile | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return null (will be fetched in real implementation)

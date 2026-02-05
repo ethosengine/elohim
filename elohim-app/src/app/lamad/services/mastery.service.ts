@@ -86,7 +86,7 @@ export class MasteryService {
     contentIds: string[]
   ): Observable<Map<string, ContentMasteryView>> {
     if (contentIds.length === 0) {
-      return of(new Map());
+      return of(new Map<string, ContentMasteryView>());
     }
 
     // Fetch all mastery for this human then filter
