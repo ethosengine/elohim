@@ -267,75 +267,80 @@
           <table class="nodes-table">
             <thead>
               <tr>
-                <th
-                  (click)="setSort('nodeId')"
-                  (keydown.enter)="setSort('nodeId')"
-                  tabindex="0"
-                  role="button"
-                  class="sortable"
-                >
-                  Node ID
-                  @if (sortField() === 'nodeId') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button
+                    type="button"
+                    (click)="setSort('nodeId')"
+                    class="sort-button"
+                    aria-label="Sort by Node ID"
+                  >
+                    Node ID
+                    @if (sortField() === 'nodeId') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th
-                  (click)="setSort('status')"
-                  (keydown.enter)="setSort('status')"
-                  tabindex="0"
-                  role="button"
-                  class="sortable"
-                >
-                  Status
-                  @if (sortField() === 'status') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button
+                    type="button"
+                    (click)="setSort('status')"
+                    class="sort-button"
+                    aria-label="Sort by Status"
+                  >
+                    Status
+                    @if (sortField() === 'status') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th
-                  (click)="setSort('stewardTier')"
-                  (keydown.enter)="setSort('stewardTier')"
-                  tabindex="0"
-                  role="button"
-                  class="sortable"
-                >
-                  Tier
-                  @if (sortField() === 'stewardTier') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button
+                    type="button"
+                    (click)="setSort('stewardTier')"
+                    class="sort-button"
+                    aria-label="Sort by Tier"
+                  >
+                    Tier
+                    @if (sortField() === 'stewardTier') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th
-                  (click)="setSort('trustScore')"
-                  (keydown.enter)="setSort('trustScore')"
-                  tabindex="0"
-                  role="button"
-                  class="sortable"
-                >
-                  Trust
-                  @if (sortField() === 'trustScore') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button
+                    type="button"
+                    (click)="setSort('trustScore')"
+                    class="sort-button"
+                    aria-label="Sort by Trust"
+                  >
+                    Trust
+                    @if (sortField() === 'trustScore') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th
-                  (click)="setSort('combinedScore')"
-                  (keydown.enter)="setSort('combinedScore')"
-                  tabindex="0"
-                  role="button"
-                  class="sortable"
-                >
-                  Score
-                  @if (sortField() === 'combinedScore') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button
+                    type="button"
+                    (click)="setSort('combinedScore')"
+                    class="sort-button"
+                    aria-label="Sort by Score"
+                  >
+                    Score
+                    @if (sortField() === 'combinedScore') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
                 <th>Last Heartbeat</th>
                 <th>Region</th>

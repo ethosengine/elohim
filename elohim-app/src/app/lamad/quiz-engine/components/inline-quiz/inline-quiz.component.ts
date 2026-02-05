@@ -647,7 +647,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
     }
 
     // Update streak
-    const questionId = this.currentQuestion()!.id;
+    const questionId = this.currentQuestion().id;
     const newState = this.streakTracker.recordAnswer(this.contentId, questionId, correct);
 
     if (newState) {

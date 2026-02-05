@@ -489,7 +489,7 @@ describe('LoginComponent', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      mockAuthService.login.and.returnValue(Promise.reject('Unknown error'));
+      mockAuthService.login.and.returnValue(Promise.reject(new Error('Unknown error')));
 
       await component.onLogin();
 

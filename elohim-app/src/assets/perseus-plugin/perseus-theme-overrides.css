@@ -256,6 +256,23 @@
 
 body[data-theme='dark'] .framework-perseus {
   color: var(--lamad-text-primary, #f1f5f9);
+  --wb-semanticColor-core-foreground-neutral-default: var(--lamad-text-primary, #f1f5f9);
+  --wb-semanticColor-core-foreground-neutral-subtle: var(--lamad-text-secondary, #cbd5e1);
+  --wb-semanticColor-core-foreground-knockout-default: #ffffff;
+  --wb-semanticColor-core-border-neutral-strong: rgba(148, 163, 184, 0.5);
+  --wb-semanticColor-core-border-neutral-subtle: var(--lamad-border, rgba(148, 163, 184, 0.2));
+  --wb-semanticColor-core-border-neutral-default: var(--lamad-border, rgba(148, 163, 184, 0.3));
+  --wb-semanticColor-core-background-base-default: var(--lamad-bg-primary, #0f172a);
+  --wb-semanticColor-core-background-neutral-strong: var(--lamad-bg-tertiary, #334155);
+  --wb-semanticColor-core-background-instructive-default: var(--lamad-accent-primary, #6366f1);
+  --wb-semanticColor-core-foreground-instructive-default: var(--lamad-accent-primary, #6366f1);
+  --wb-semanticColor-core-foreground-instructive-strong: var(--lamad-accent-secondary, #8b5cf6);
+  --wb-semanticColor-core-foreground-success-strong: var(--lamad-success, #10b981);
+  --wb-semanticColor-core-border-success-default: var(--lamad-success, #10b981);
+  --wb-semanticColor-core-background-success-strong: var(--lamad-success, #10b981);
+  --wb-semanticColor-core-border-disabled-strong: var(--lamad-text-muted, #64748b);
+  --wb-semanticColor-core-transparent: transparent;
+  --perseus-widget-background-color: var(--lamad-bg-primary, #0f172a);
 }
 
 body[data-theme='dark'] .framework-perseus .paragraph,
@@ -519,26 +536,6 @@ body[data-theme='light'] .framework-perseus {
     --wb-semanticColor-core-transparent: transparent;
     --perseus-widget-background-color: var(--lamad-bg-primary, #0f172a);
   }
-}
-
-body[data-theme='dark'] .framework-perseus {
-  --wb-semanticColor-core-foreground-neutral-default: var(--lamad-text-primary, #f1f5f9);
-  --wb-semanticColor-core-foreground-neutral-subtle: var(--lamad-text-secondary, #cbd5e1);
-  --wb-semanticColor-core-foreground-knockout-default: #ffffff;
-  --wb-semanticColor-core-border-neutral-strong: rgba(148, 163, 184, 0.5);
-  --wb-semanticColor-core-border-neutral-subtle: var(--lamad-border, rgba(148, 163, 184, 0.2));
-  --wb-semanticColor-core-border-neutral-default: var(--lamad-border, rgba(148, 163, 184, 0.3));
-  --wb-semanticColor-core-background-base-default: var(--lamad-bg-primary, #0f172a);
-  --wb-semanticColor-core-background-neutral-strong: var(--lamad-bg-tertiary, #334155);
-  --wb-semanticColor-core-background-instructive-default: var(--lamad-accent-primary, #6366f1);
-  --wb-semanticColor-core-foreground-instructive-default: var(--lamad-accent-primary, #6366f1);
-  --wb-semanticColor-core-foreground-instructive-strong: var(--lamad-accent-secondary, #8b5cf6);
-  --wb-semanticColor-core-foreground-success-strong: var(--lamad-success, #10b981);
-  --wb-semanticColor-core-border-success-default: var(--lamad-success, #10b981);
-  --wb-semanticColor-core-background-success-strong: var(--lamad-success, #10b981);
-  --wb-semanticColor-core-border-disabled-strong: var(--lamad-text-muted, #64748b);
-  --wb-semanticColor-core-transparent: transparent;
-  --perseus-widget-background-color: var(--lamad-bg-primary, #0f172a);
 }
 
 /* ============================================================================

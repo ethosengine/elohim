@@ -136,8 +136,8 @@ export class HolochainClientService {
    */
   private isCheEnvironment(): boolean {
     return (
-      window.location.hostname.includes('.devspaces.') ||
-      window.location.hostname.includes('.code.ethosengine.com')
+      globalThis.location.hostname.includes('.devspaces.') ||
+      globalThis.location.hostname.includes('.code.ethosengine.com')
     );
   }
 
@@ -152,7 +152,7 @@ export class HolochainClientService {
     // https://<workspace>-<endpoint>.code.ethosengine.com
     // Example: mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com
     // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
-    const currentUrl = new URL(window.location.href);
+    const currentUrl = new URL(globalThis.location.href);
 
     // Replace '-angular-dev' suffix with '-hc-dev' in the hostname
     const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
@@ -481,36 +481,67 @@ export class HolochainClientService {
    * - 'imagodei' - Identity & Relationships DNA
    */
   async callZome<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
-    const { state } = this.connectionSignal();
-    let { appWs, cellIds } = this.connectionSignal();
+    const roleName = input.roleName ?? 'lamad';
+    const callContext = this.createCallContext(input, roleName);
+    const timer = this.logger.startTimer('zome-call');
 
-    // Generate correlation ID for this request (for tracing)
+    // Validate connection state and wait if needed
+    const connectionValidation = await this.validateConnection(callContext, timer);
+    if (!connectionValidation.valid) {
+      return connectionValidation.error!;
+    }
+
+    const { appWs, cellIds } = connectionValidation;
+
+    // Look up the correct cell ID for this role
+    const cellIdResult = this.getCellIdForRole(cellIds, roleName, callContext, timer);
+    if (!cellIdResult.success) {
+      return cellIdResult.error!;
+    }
+
+    // Execute the zome call
+    return this.executeZomeCall(appWs, cellIdResult.cellId!, input, callContext, timer);
+  }
+
+  /**
+   * Generate correlation ID and create call context for tracing.
+   */
+  private createCallContext(input: ZomeCallInput, roleName: string): Record<string, unknown> {
     const randomBytes = crypto.getRandomValues(new Uint8Array(6));
     const randomStr = Array.from(randomBytes)
       .map(b => b.toString(36))
       .join('')
       .substring(0, 6);
     const correlationId = `zome-${Date.now()}-${randomStr}`;
-    const callContext = {
+
+    return {
       correlationId,
       zomeName: input.zomeName,
       fnName: input.fnName,
-      roleName: input.roleName ?? 'lamad',
+      roleName,
     };
+  }
 
-    // Use logger timer for automatic duration tracking
-    const timer = this.logger.startTimer('zome-call');
-
-    // Default to 'lamad' role if not specified (backwards compatibility)
-    const roleName = input.roleName ?? 'lamad';
+  /**
+   * Validate connection state and wait if needed.
+   */
+  private async validateConnection(
+    callContext: Record<string, unknown>,
+    timer: { end: (context: unknown) => void; elapsed: () => number }
+  ): Promise<
+    | { valid: true; appWs: AppAgentWebsocket; cellIds: Map<string, CellId> }
+    | { valid: false; error: ZomeCallResult<never> }
+  > {
+    const { state } = this.connectionSignal();
+    let { appWs, cellIds } = this.connectionSignal();
 
     // Return immediately if in disconnected or error state
     if (state === 'disconnected' || state === 'error') {
       timer.end({ ...callContext, success: false, reason: 'not_connected' });
       this.metrics.recordQuery(timer.elapsed(), false);
       return {
-        success: false,
-        error: 'Not connected to Holochain conductor',
+        valid: false,
+        error: { success: false, error: 'Not connected to Holochain conductor' },
       };
     }
 
@@ -522,8 +553,8 @@ export class HolochainClientService {
         timer.end({ ...callContext, success: false, reason: 'timeout' });
         this.metrics.recordQuery(timer.elapsed(), false);
         return {
-          success: false,
-          error: 'Connection timed out',
+          valid: false,
+          error: { success: false, error: 'Connection timed out' },
         };
       }
       // Re-read connection state after waiting
@@ -534,12 +565,23 @@ export class HolochainClientService {
       timer.end({ ...callContext, success: false, reason: 'no_connection' });
       this.metrics.recordQuery(timer.elapsed(), false);
       return {
-        success: false,
-        error: 'Not connected to Holochain conductor',
+        valid: false,
+        error: { success: false, error: 'Not connected to Holochain conductor' },
       };
     }
 
-    // Look up the correct cell ID for this role
+    return { valid: true, appWs, cellIds };
+  }
+
+  /**
+   * Look up the cell ID for the specified role.
+   */
+  private getCellIdForRole(
+    cellIds: Map<string, CellId>,
+    roleName: string,
+    callContext: Record<string, unknown>,
+    timer: { end: (context: unknown) => void; elapsed: () => number }
+  ): { success: true; cellId: CellId } | { success: false; error: ZomeCallResult<never> } {
     const cellId = cellIds.get(roleName);
     if (!cellId) {
       const availableRoles = Array.from(cellIds.keys()).join(', ');
@@ -547,10 +589,25 @@ export class HolochainClientService {
       this.metrics.recordQuery(timer.elapsed(), false);
       return {
         success: false,
-        error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}`,
+        error: {
+          success: false,
+          error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}`,
+        },
       };
     }
+    return { success: true, cellId };
+  }
 
+  /**
+   * Execute the zome call and handle errors.
+   */
+  private async executeZomeCall<T>(
+    appWs: AppAgentWebsocket,
+    cellId: CellId,
+    input: ZomeCallInput,
+    callContext: Record<string, unknown>,
+    timer: { end: (context: unknown) => void; elapsed: () => number }
+  ): Promise<ZomeCallResult<T>> {
     try {
       const result = await appWs.callZome({
         cell_id: cellId,
@@ -560,40 +617,43 @@ export class HolochainClientService {
       });
 
       // Record successful query
-      const duration = timer.elapsed();
-      this.metrics.recordQuery(duration, true);
+      this.metrics.recordQuery(timer.elapsed(), true);
       timer.end({ ...callContext, success: true });
 
-      return {
-        success: true,
-        data: result as T,
-      };
+      return { success: true, data: result as T };
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Zome call failed';
-      const duration = timer.elapsed();
-      this.metrics.recordQuery(duration, false);
-
-      // Detect connection-related errors and only log once
-      const isConnectionError =
-        errorMessage.includes('Websocket') ||
-        errorMessage.includes('InvalidToken') ||
-        errorMessage.includes('not open') ||
-        errorMessage.includes('not connected');
-
-      if (isConnectionError) {
-        if (!this.connectionErrorLogged) {
-          this.logger.error('Connection error (subsequent errors suppressed)', err, callContext);
-          this.connectionErrorLogged = true;
-        }
-      } else {
-        this.logger.error('Zome call failed', err, callContext);
-      }
-
-      return {
-        success: false,
-        error: errorMessage,
-      };
+      return this.handleZomeCallError(err, callContext, timer);
     }
+  }
+
+  /**
+   * Handle zome call errors with connection error suppression.
+   */
+  private handleZomeCallError(
+    err: unknown,
+    callContext: Record<string, unknown>,
+    timer: { end: (context: unknown) => void; elapsed: () => number }
+  ): ZomeCallResult<never> {
+    const errorMessage = err instanceof Error ? err.message : 'Zome call failed';
+    this.metrics.recordQuery(timer.elapsed(), false);
+
+    // Detect connection-related errors and only log once
+    const isConnectionError =
+      errorMessage.includes('Websocket') ||
+      errorMessage.includes('InvalidToken') ||
+      errorMessage.includes('not open') ||
+      errorMessage.includes('not connected');
+
+    if (isConnectionError) {
+      if (!this.connectionErrorLogged) {
+        this.logger.error('Connection error (subsequent errors suppressed)', err, callContext);
+        this.connectionErrorLogged = true;
+      }
+    } else {
+      this.logger.error('Zome call failed', err, callContext);
+    }
+
+    return { success: false, error: errorMessage };
   }
 
   /**
@@ -606,48 +666,96 @@ export class HolochainClientService {
    * Endpoint: POST /api/v1/zome/{dna_hash}/{zome_name}/{fn_name}
    */
   async callZomeRest<T>(input: ZomeCallInput): Promise<ZomeCallResult<T>> {
-    const { state } = this.connectionSignal();
-    let { cellIds } = this.connectionSignal();
     const startTime = Date.now();
-
-    // Default to 'lamad' role if not specified
     const roleName = input.roleName ?? 'lamad';
 
-    // Need cellIds for DNA hash lookup
+    // Ensure we have cell IDs for DNA hash lookup
+    const cellIdsResult = await this.ensureCellIds(startTime);
+    if (!cellIdsResult.success) {
+      return cellIdsResult.error!;
+    }
+
+    const { cellIds } = cellIdsResult;
+
+    // Look up the correct cell ID for this role
+    const cellIdResult = this.lookupCellId(cellIds, roleName, startTime);
+    if (!cellIdResult.success) {
+      return cellIdResult.error!;
+    }
+
+    // Build REST API URL
+    const dnaHash = this.uint8ArrayToBase64(cellIdResult.cellId![0]);
+    const restUrl = this.resolveRestUrl(dnaHash, input.zomeName, input.fnName);
+
+    // Execute the REST call
+    return this.executeRestCall(restUrl, input, startTime);
+  }
+
+  /**
+   * Ensure cell IDs are available, waiting for connection if needed.
+   */
+  private async ensureCellIds(
+    startTime: number
+  ): Promise<
+    | { success: true; cellIds: Map<string, CellId> }
+    | { success: false; error: ZomeCallResult<never> }
+  > {
+    const { state } = this.connectionSignal();
+    let { cellIds } = this.connectionSignal();
+
     if (cellIds.size === 0) {
       // If not connected but connecting, wait for connection
       if (state === 'connecting' || state === 'authenticating') {
         const connected = await this.waitForConnection();
         if (!connected) {
-          const duration = Date.now() - startTime;
-          this.metrics.recordQuery(duration, false);
-          return { success: false, error: 'Connection timed out' };
+          this.metrics.recordQuery(Date.now() - startTime, false);
+          return { success: false, error: { success: false, error: 'Connection timed out' } };
         }
         // Re-read connection state after waiting
         ({ cellIds } = this.connectionSignal());
       } else {
-        const duration = Date.now() - startTime;
-        this.metrics.recordQuery(duration, false);
-        return { success: false, error: 'Not connected - no cell IDs available' };
+        this.metrics.recordQuery(Date.now() - startTime, false);
+        return {
+          success: false,
+          error: { success: false, error: 'Not connected - no cell IDs available' },
+        };
       }
     }
 
-    // Look up the correct cell ID for this role
+    return { success: true, cellIds };
+  }
+
+  /**
+   * Look up cell ID for a specific role.
+   */
+  private lookupCellId(
+    cellIds: Map<string, CellId>,
+    roleName: string,
+    startTime: number
+  ): { success: true; cellId: CellId } | { success: false; error: ZomeCallResult<never> } {
     const cellId = cellIds.get(roleName);
     if (!cellId) {
-      const duration = Date.now() - startTime;
-      this.metrics.recordQuery(duration, false);
+      this.metrics.recordQuery(Date.now() - startTime, false);
       const availableRoles = Array.from(cellIds.keys()).join(', ');
       return {
         success: false,
-        error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}`,
+        error: {
+          success: false,
+          error: `No cell found for role '${roleName}'. Available roles: ${availableRoles}`,
+        },
       };
     }
+    return { success: true, cellId };
+  }
 
-    // Build REST API URL
-    const dnaHash = this.uint8ArrayToBase64(cellId[0]);
-    const restUrl = this.resolveRestUrl(dnaHash, input.zomeName, input.fnName);
-
+  /**
+   * Execute REST API call and handle errors.
+   */
+  private async executeRestCall<T>(
+    restUrl: string,
+    input: ZomeCallInput,
+    startTime: number
+  ): Promise<ZomeCallResult<T>> {
     try {
       const response = await firstValueFrom(
         this.http.post<T>(restUrl, input.payload ?? null, {
@@ -657,34 +765,42 @@ export class HolochainClientService {
         })
       );
 
-      // Record successful REST call
-      const duration = Date.now() - startTime;
-      this.metrics.recordQuery(duration, true);
-
+      this.metrics.recordQuery(Date.now() - startTime, true);
       return { success: true, data: response };
     } catch (err) {
-      let errorMessage = 'REST call failed';
-      if (err instanceof HttpErrorResponse) {
-        if (err.error?.error) {
-          errorMessage = err.error.error;
-        } else if (err.message) {
-          errorMessage = err.message;
-        }
-      } else if (err instanceof Error) {
+      return this.handleRestCallError(err, input, startTime);
+    }
+  }
+
+  /**
+   * Handle REST call errors and extract error messages.
+   */
+  private handleRestCallError(
+    err: unknown,
+    input: ZomeCallInput,
+    startTime: number
+  ): ZomeCallResult<never> {
+    let errorMessage = 'REST call failed';
+
+    if (err instanceof HttpErrorResponse) {
+      if (err.error?.error) {
+        errorMessage = err.error.error;
+      } else if (err.message) {
         errorMessage = err.message;
       }
-
-      // Record failed REST call
-      const duration = Date.now() - startTime;
-      this.metrics.recordQuery(duration, false);
-
-      this.logger.error('REST call failed', undefined, {
-        zomeName: input.zomeName,
-        fnName: input.fnName,
-        error: errorMessage,
-      });
-      return { success: false, error: errorMessage };
+    } else if (err instanceof Error) {
+      errorMessage = err.message;
     }
+
+    this.metrics.recordQuery(Date.now() - startTime, false);
+    this.logger.error('REST call failed', undefined, {
+      zomeName: input.zomeName,
+      fnName: input.fnName,
+      error: errorMessage,
+    });
+
+    return { success: false, error: errorMessage };
+  }
   }
 
   /**
@@ -831,11 +947,13 @@ export class HolochainClientService {
     let cellIdDisplay: { dnaHash: string; agentPubKey: string } | null = null;
     let dnaHash: string | null = null;
 
-    if (conn.cellId) {
-      dnaHash = this.uint8ArrayToBase64(conn.cellId[0]);
+    // Use the primary cell (lamad role) for display info
+    const primaryCellId = conn.cellIds.get('lamad');
+    if (primaryCellId) {
+      dnaHash = this.uint8ArrayToBase64(primaryCellId[0]);
       cellIdDisplay = {
         dnaHash,
-        agentPubKey: this.uint8ArrayToBase64(conn.cellId[1]),
+        agentPubKey: this.uint8ArrayToBase64(primaryCellId[1]),
       };
     }
 

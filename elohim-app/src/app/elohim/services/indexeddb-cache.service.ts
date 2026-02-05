@@ -363,12 +363,12 @@ export class IndexedDBCacheService {
    */
   private async openDatabase(): Promise<boolean> {
     return new Promise(resolve => {
-      if (!('indexedDB' in window)) {
+      if (!('indexedDB' in globalThis)) {
         resolve(false);
         return;
       }
 
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = globalThis.indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
         resolve(false);

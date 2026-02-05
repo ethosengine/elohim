@@ -47,7 +47,7 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
   private getEffectiveTheme(): 'light' | 'dark' {
     if (this.currentTheme === 'device') {
       // Check system preference
-      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      return globalThis.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     return this.currentTheme;
   }

@@ -221,74 +221,130 @@ export class SearchService {
         const suggestions: SearchSuggestion[] = [];
         const seen = new Set<string>();
 
-        // Suggest matching content titles
-        for (const node of nodes) {
-          if (suggestions.length >= limit) break;
+        // Add content title suggestions
+        this.addContentTitleSuggestions(nodes, query, suggestions, seen, limit);
 
-          const titleLower = node.title.toLowerCase();
-          if (titleLower.includes(query) && !seen.has(titleLower)) {
-            seen.add(titleLower);
-            suggestions.push({
-              text: node.title,
-              type: 'title',
-              highlight: this.highlightMatch(node.title, query),
-            });
-          }
-        }
+        // Add path title suggestions
+        this.addPathTitleSuggestions(paths, query, suggestions, seen, limit);
 
-        // Suggest matching path titles
-        for (const path of paths) {
-          if (suggestions.length >= limit) break;
-
-          const titleLower = path.title.toLowerCase();
-          if (titleLower.includes(query) && !seen.has(titleLower)) {
-            seen.add(titleLower);
-            suggestions.push({
-              text: path.title,
-              type: 'path',
-              highlight: this.highlightMatch(path.title, query),
-            });
-          }
-        }
-
-        // Suggest matching tags (from both content and paths)
-        const tagCounts = new Map<string, number>();
-        for (const node of nodes) {
-          for (const tag of node.tags ?? []) {
-            if (tag.toLowerCase().includes(query)) {
-              tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-            }
-          }
-        }
-        for (const path of paths) {
-          for (const tag of path.tags ?? []) {
-            if (tag.toLowerCase().includes(query)) {
-              tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-            }
-          }
-        }
-
-        // Sort tags by count and add to suggestions
-        const sortedTags = Array.from(tagCounts.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, limit - suggestions.length);
-
-        for (const [tag, count] of sortedTags) {
-          if (!seen.has(tag.toLowerCase())) {
-            seen.add(tag.toLowerCase());
-            suggestions.push({
-              text: tag,
-              type: 'tag',
-              resultCount: count,
-              highlight: this.highlightMatch(tag, query),
-            });
-          }
-        }
+        // Add tag suggestions
+        this.addTagSuggestions(nodes, paths, query, suggestions, seen, limit);
 
         return { query: partialQuery, suggestions };
       }),
       catchError(() => of({ query: partialQuery, suggestions: [] }))
     );
+  }
+
+  /**
+   * Add content title suggestions to the suggestions array.
+   */
+  private addContentTitleSuggestions(
+    nodes: ContentIndexEntry[],
+    query: string,
+    suggestions: SearchSuggestion[],
+    seen: Set<string>,
+    limit: number
+  ): void {
+    for (const node of nodes) {
+      if (suggestions.length >= limit) break;
+
+      const titleLower = node.title.toLowerCase();
+      if (titleLower.includes(query) && !seen.has(titleLower)) {
+        seen.add(titleLower);
+        suggestions.push({
+          text: node.title,
+          type: 'title',
+          highlight: this.highlightMatch(node.title, query),
+        });
+      }
+    }
+  }
+
+  /**
+   * Add path title suggestions to the suggestions array.
+   */
+  private addPathTitleSuggestions(
+    paths: any[],
+    query: string,
+    suggestions: SearchSuggestion[],
+    seen: Set<string>,
+    limit: number
+  ): void {
+    for (const path of paths) {
+      if (suggestions.length >= limit) break;
+
+      const titleLower = path.title.toLowerCase();
+      if (titleLower.includes(query) && !seen.has(titleLower)) {
+        seen.add(titleLower);
+        suggestions.push({
+          text: path.title,
+          type: 'path',
+          highlight: this.highlightMatch(path.title, query),
+        });
+      }
+    }
+  }
+
+  /**
+   * Add tag suggestions to the suggestions array.
+   */
+  private addTagSuggestions(
+    nodes: ContentIndexEntry[],
+    paths: any[],
+    query: string,
+    suggestions: SearchSuggestion[],
+    seen: Set<string>,
+    limit: number
+  ): void {
+    const tagCounts = this.collectMatchingTags(nodes, paths, query);
+    const sortedTags = Array.from(tagCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit - suggestions.length);
+
+    for (const [tag, count] of sortedTags) {
+      if (!seen.has(tag.toLowerCase())) {
+        seen.add(tag.toLowerCase());
+        suggestions.push({
+          text: tag,
+          type: 'tag',
+          resultCount: count,
+          highlight: this.highlightMatch(tag, query),
+        });
+      }
+    }
+  }
+
+  /**
+   * Collect matching tags from nodes and paths with their occurrence counts.
+   */
+  private collectMatchingTags(
+    nodes: ContentIndexEntry[],
+    paths: any[],
+    query: string
+  ): Map<string, number> {
+    const tagCounts = new Map<string, number>();
+
+    for (const node of nodes) {
+      this.countMatchingTags(node.tags ?? [], query, tagCounts);
+    }
+
+    for (const path of paths) {
+      this.countMatchingTags(path.tags ?? [], query, tagCounts);
+    }
+
+    return tagCounts;
+  }
+
+  /**
+   * Count matching tags and add to the tagCounts map.
+   */
+  private countMatchingTags(tags: string[], query: string, tagCounts: Map<string, number>): void {
+    for (const tag of tags) {
+      if (tag.toLowerCase().includes(query)) {
+        tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+      }
+    }
   }
 
   /**

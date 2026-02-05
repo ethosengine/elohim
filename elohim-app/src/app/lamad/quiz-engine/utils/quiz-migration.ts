@@ -84,7 +84,7 @@ export function migrateQuizToPerseus(node: LegacyContentNode): PerseusItem[] {
     }
   }
 
-  const quiz = content as LegacyQuizContent;
+  const quiz = content;
   if (!quiz.questions || !Array.isArray(quiz.questions)) {
     return [];
   }

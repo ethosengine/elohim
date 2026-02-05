@@ -99,7 +99,7 @@ export class LocalSourceChainService {
   createEntry<T>(entryType: LamadEntryType, content: T): SourceChainEntry<T> {
     const agentId = this.getAgentId();
     const entries = this.entriesSubject.value;
-    const prevEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+    const prevEntry = entries.length > 0 ? entries.at(-1)! : null;
 
     const entry: SourceChainEntry<T> = {
       entryHash: this.generateEntryHash(),
@@ -143,7 +143,7 @@ export class LocalSourceChainService {
    */
   getLatestEntryByType<T>(entryType: LamadEntryType): SourceChainEntry<T> | null {
     const entries = this.getEntriesByType<T>(entryType);
-    return entries.length > 0 ? entries[entries.length - 1] : null;
+    return entries.length > 0 ? entries.at(-1)! : null;
   }
 
   /**
@@ -190,7 +190,7 @@ export class LocalSourceChainService {
    */
   getHeadEntry(): SourceChainEntry | null {
     const entries = this.entriesSubject.value;
-    return entries.length > 0 ? entries[entries.length - 1] : null;
+    return entries.length > 0 ? entries.at(-1)! : null;
   }
 
   /**
@@ -371,7 +371,7 @@ export class LocalSourceChainService {
     propertyValue: unknown
   ): SourceChainEntry<T> | null {
     const entries = this.findEntriesByContentProperty<T>(entryType, propertyName, propertyValue);
-    return entries.length > 0 ? entries[entries.length - 1] : null;
+    return entries.length > 0 ? entries.at(-1)! : null;
   }
 
   // =========================================================================
@@ -405,7 +405,7 @@ export class LocalSourceChainService {
 
     const entries = this.entriesSubject.value;
     const links = this.linksSubject.value.filter(l => !l.deleted);
-    const head = entries.length > 0 ? entries[entries.length - 1] : null;
+    const head = entries.length > 0 ? entries.at(-1)! : null;
 
     const existingMetadata = this.getMetadata();
 

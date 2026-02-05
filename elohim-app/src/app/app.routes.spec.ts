@@ -52,8 +52,9 @@ describe('App Routes', () => {
   });
 
   it('should have a 404 catch-all route as last route', () => {
-    const lastRoute = routes[routes.length - 1];
-    expect(lastRoute.path).toBe('**');
-    expect(lastRoute.loadComponent).toBeDefined();
+    const lastRoute = routes.at(-1);
+    expect(lastRoute).toBeDefined();
+    expect(lastRoute?.path).toBe('**');
+    expect(lastRoute?.loadComponent).toBeDefined();
   });
 });

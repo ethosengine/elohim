@@ -314,7 +314,7 @@ export class HealthCheckService implements OnDestroy {
 
     try {
       // Check if Cache API is available (for service worker caching)
-      if ('caches' in window) {
+      if ('caches' in globalThis) {
         const cacheNames = await caches.keys();
         const blobCaches = cacheNames.filter(n => n.includes('blob'));
 

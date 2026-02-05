@@ -99,7 +99,7 @@
     --lamad-text-primary: #0f172a;
     --lamad-text-secondary: #334155;
     --lamad-text-tertiary: #475569;
-    --lamad-text-muted: #64748b;
+    --lamad-text-muted: #525252;
 
     --lamad-border: rgba(15, 23, 42, 0.15);
     --lamad-border-hover: rgba(15, 23, 42, 0.3);
@@ -559,7 +559,7 @@ body[data-theme='light'] {
   --lamad-text-primary: #0f172a;
   --lamad-text-secondary: #334155;
   --lamad-text-tertiary: #475569;
-  --lamad-text-muted: #64748b;
+  --lamad-text-muted: #525252;
 
   --lamad-border: rgba(15, 23, 42, 0.15);
   --lamad-border-hover: rgba(15, 23, 42, 0.3);

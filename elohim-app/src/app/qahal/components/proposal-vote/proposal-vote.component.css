@@ -50,22 +50,22 @@
 
 .proposal-type-badge.constitutional {
   background: rgb(156 39 176 / 15%);
-  color: #9c27b0;
+  color: #7b1fa2;
 }
 
 .proposal-type-badge.policy {
   background: rgb(33 150 243 / 15%);
-  color: #2196f3;
+  color: #1976d2;
 }
 
 .proposal-type-badge.operational {
   background: rgb(76 175 80 / 15%);
-  color: #4caf50;
+  color: #388e3c;
 }
 
 .proposal-type-badge.resource {
   background: rgb(255 152 0 / 15%);
-  color: #ff9800;
+  color: #f57c00;
 }
 
 .proposal-title {
@@ -99,23 +99,23 @@
 
 .sla-timer.on-track {
   background: rgb(76 175 80 / 10%);
-  color: #4caf50;
+  color: #2e7d32;
 }
 
 .sla-timer.warning {
   background: rgb(255 152 0 / 10%);
-  color: #ff9800;
+  color: #e65100;
 }
 
 .sla-timer.critical {
   background: rgb(244 67 54 / 10%);
-  color: #f44336;
+  color: #c62828;
   animation: pulse-critical 2s ease-in-out infinite;
 }
 
 .sla-timer.breached {
   background: rgb(244 67 54 / 20%);
-  color: #c62828;
+  color: #b71c1c;
 }
 
 @keyframes pulse-critical {

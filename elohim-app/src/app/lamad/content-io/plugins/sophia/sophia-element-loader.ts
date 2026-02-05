@@ -243,7 +243,7 @@ export function isSophiaElementRegistered(): boolean {
  * Get the Sophia element by querying the DOM.
  */
 export function getSophiaElement(container: HTMLElement): SophiaQuestionElement | null {
-  return container.querySelector(SOPHIA_ELEMENT_TAG) as SophiaQuestionElement | null;
+  return container.querySelector(SOPHIA_ELEMENT_TAG);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -329,7 +329,7 @@ export class QuizSessionService {
     // Calculate time spent on this question
     const startTime =
       session.responses.length > 0
-        ? new Date(session.responses[session.responses.length - 1].answeredAt).getTime()
+        ? new Date(session.responses.at(-1)!.answeredAt).getTime()
         : new Date(session.timing.startedAt ?? session.timing.createdAt).getTime();
     const timeSpentMs = Date.now() - startTime;
 

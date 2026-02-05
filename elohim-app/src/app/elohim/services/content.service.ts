@@ -661,7 +661,7 @@ export class ContentService {
       const types = Array.isArray(filters.contentType)
         ? filters.contentType
         : [filters.contentType];
-      result = result.filter(c => types.includes(c.contentType as ContentType));
+      result = result.filter(c => types.includes(c.contentType));
     }
 
     if (filters.reach) {

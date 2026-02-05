@@ -280,7 +280,7 @@ describe('AuthCallbackComponent', () => {
         state: 'test-state',
       });
 
-      mockOAuthProvider.handleCallback.and.returnValue(Promise.reject('String error'));
+      mockOAuthProvider.handleCallback.and.returnValue(Promise.reject(new Error('String error')));
 
       fixture.detectChanges();
       await fixture.whenStable();

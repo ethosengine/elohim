@@ -55,7 +55,7 @@
 
 .expand-icon {
   font-size: 0.625rem;
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
 }
 
 /* Status colors */
@@ -72,7 +72,7 @@
 }
 
 .status-unknown .indicator-dot {
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
 }
 
 /* Details panel */
@@ -183,7 +183,7 @@
 
 .check-item.status-unknown .check-icon {
   background: var(--bg-muted, #e5e5e5);
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
 }
 
 .check-info {
@@ -209,7 +209,7 @@
 
 .check-duration {
   font-size: 0.75rem;
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
   flex-shrink: 0;
 }
 
@@ -222,5 +222,5 @@
 
 .last-checked {
   font-size: 0.75rem;
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
 }

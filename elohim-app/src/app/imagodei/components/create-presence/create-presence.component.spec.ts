@@ -802,7 +802,7 @@ describe('CreatePresenceComponent', () => {
 
     it('should handle non-Error exception', async () => {
       component.displayName.set('John Doe');
-      mockPresenceService.createPresence.and.returnValue(Promise.reject('String error'));
+      mockPresenceService.createPresence.and.returnValue(Promise.reject(new Error('String error')));
 
       await component.onSubmit();
 

@@ -47,14 +47,14 @@
   *ngIf="showMediationDialog"
   (click)="closeMediationDialog()"
   (keydown.escape)="closeMediationDialog()"
-  tabindex="0"
-  role="button"
+  role="presentation"
+  tabindex="-1"
 >
   <div
     class="mediation-dialog"
     (click)="$event.stopPropagation()"
     (keydown)="$event.stopPropagation()"
-    tabindex="0"
+    tabindex="-1"
   >
     <div class="mediation-header">
       <span class="mediation-icon">⚖️</span>

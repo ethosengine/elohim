@@ -112,12 +112,12 @@ export class HolochainCacheService {
   private async initDatabase(): Promise<void> {
     return new Promise((resolve, reject) => {
       // Check if IndexedDB is available
-      if (!window.indexedDB) {
+      if (!globalThis.indexedDB) {
         resolve();
         return;
       }
 
-      const request = window.indexedDB.open(this.DB_NAME, 1);
+      const request = globalThis.indexedDB.open(this.DB_NAME, 1);
 
       request.onerror = () => {
         reject(new Error(String(request.error ?? 'IDB error')));

@@ -331,16 +331,16 @@ export class DataLoaderService {
   }
 
   /**
-   * Load path overview from Holochain REST API (fallback).
+   * Load path overview from content service (uses doorway projection).
    */
   private getPathOverviewFromHolochain(pathId: string): Observable<LearningPath> {
-    return defer(() => from(this.holochainContent.getPathOverviewRest(pathId))).pipe(
+    return this.contentService.getPath(pathId).pipe(
       timeout(10000),
       map(result => {
         if (!result) {
           throw new Error(`Path not found: ${pathId}`);
         }
-        return this.transformHolochainPathOverview(result);
+        return result;
       }),
       catchError(err => {
         this.logger.warn('Path overview failed', { pathId, error: err.message ?? err });
@@ -1064,18 +1064,18 @@ export class DataLoaderService {
   // =========================================================================
 
   /**
-   * Load the knowledge map index from Holochain.
+   * Load the knowledge map index from content service.
    */
   getKnowledgeMapIndex(): Observable<KnowledgeMapIndex> {
     if (!this.holochainContent.isAvailable()) {
       return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
     }
 
-    return defer(() => from(this.holochainContent.queryKnowledgeMaps({}))).pipe(
+    return this.contentService.queryKnowledgeMaps({}).pipe(
       map(results => ({
         lastUpdated: new Date().toISOString(),
         totalCount: results.length,
-        maps: results.map(r => this.transformHolochainKnowledgeMapToIndex(r.knowledgeMap)),
+        maps: results.map(km => this.transformKnowledgeMapToIndex(km)),
       })),
       catchError(_err => {
         return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
@@ -1084,19 +1084,36 @@ export class DataLoaderService {
   }
 
   /**
-   * Load a specific knowledge map from Holochain.
+   * Load a specific knowledge map from content service.
    */
   getKnowledgeMap(mapId: string): Observable<KnowledgeMap | null> {
     if (!this.holochainContent.isAvailable()) {
       return of(null);
     }
 
-    return defer(() => from(this.holochainContent.getKnowledgeMapById(mapId))).pipe(
-      map(result => (result ? this.transformHolochainKnowledgeMap(result.knowledgeMap) : null)),
+    return this.contentService.getKnowledgeMap(mapId).pipe(
       catchError(_err => {
         return of(null);
       })
     );
+  }
+
+  /**
+   * Transform KnowledgeMap to KnowledgeMapIndexEntry.
+   */
+  private transformKnowledgeMapToIndex(map: KnowledgeMap): KnowledgeMapIndexEntry {
+    return {
+      id: map.id,
+      mapType: map.mapType,
+      title: map.title,
+      subjectName: map.subject.subjectName,
+      ownerId: map.ownerId,
+      ownerName: '', // Would need to look up agent name
+      visibility: map.visibility,
+      overallAffinity: map.overallAffinity,
+      nodeCount: map.nodes.length,
+      updatedAt: map.updatedAt,
+    };
   }
 
   /**
@@ -1205,15 +1222,14 @@ export class DataLoaderService {
   }
 
   /**
-   * Load a specific path extension from Holochain.
+   * Load a specific path extension from content service.
    */
   getPathExtension(extensionId: string): Observable<PathExtension | null> {
     if (!this.holochainContent.isAvailable()) {
       return of(null);
     }
 
-    return defer(() => from(this.holochainContent.getPathExtensionById(extensionId))).pipe(
-      map(result => (result ? this.transformHolochainPathExtension(result.pathExtension) : null)),
+    return this.contentService.getPathExtension(extensionId).pipe(
       catchError(_err => {
         return of(null);
       })
@@ -1435,9 +1451,9 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return defer(() =>
-      from(this.holochainContent.getRelationships({ content_id: contentId, direction }))
-    ).pipe(map(results => results.map(r => this.transformHolochainRelationship(r.relationship))));
+    return this.contentService.getRelationships(contentId, direction).pipe(
+      map(results => results ?? [])
+    );
   }
 
   /**
@@ -1488,17 +1504,12 @@ export class DataLoaderService {
   }
 
   /**
-   * Build ContentGraph from Holochain content and relationships.
+   * Build ContentGraph from content service.
    */
   private buildGraphFromHolochain(): Observable<ContentGraph> {
     // Get content graph starting from manifesto root
-    return defer(() => from(this.holochainContent.getContentGraph('manifesto'))).pipe(
-      map(hcGraph => {
-        if (!hcGraph) {
-          return this.createEmptyGraph();
-        }
-        return this.transformHolochainGraph(hcGraph);
-      }),
+    return this.contentService.getContentGraph('manifesto').pipe(
+      map(graph => graph ?? this.createEmptyGraph()),
       catchError(_err => {
         return of(this.createEmptyGraph());
       })
@@ -1727,7 +1738,7 @@ export class DataLoaderService {
       return of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() });
     }
 
-    return this.holochainContent.getContentByType('assessment', 500).pipe(
+    return this.contentService.queryContent({ contentType: 'assessment', limit: 500 }).pipe(
       map(contentNodes => {
         const assessments: AssessmentIndexEntry[] = contentNodes.map(node => {
           const meta = (node.metadata ?? {}) as Record<string, unknown>;
@@ -2206,12 +2217,7 @@ export class DataLoaderService {
     clusterMapping: Map<string, string>
   ): Observable<ClusterConnectionSummary> {
     if (conceptIds.length === 0) {
-      return of({
-        clusterId: '',
-        outgoingByCluster: new Map(),
-        incomingByCluster: new Map(),
-        totalConnections: 0,
-      });
+      return of(this.createEmptyClusterConnectionSummary());
     }
 
     // Query relationships for all concepts in the cluster
@@ -2220,51 +2226,98 @@ export class DataLoaderService {
     );
 
     return forkJoin(relationshipQueries).pipe(
-      map(relationshipArrays => {
-        const outgoingByCluster = new Map<string, ClusterConnectionData>();
-        const incomingByCluster = new Map<string, ClusterConnectionData>();
-        let totalConnections = 0;
-
-        for (let i = 0; i < conceptIds.length; i++) {
-          const sourceConceptId = conceptIds[i];
-          const relationships = relationshipArrays[i];
-
-          for (const rel of relationships) {
-            const isOutgoing = rel.sourceNodeId === sourceConceptId;
-            const otherNodeId = isOutgoing ? rel.targetNodeId : rel.sourceNodeId;
-
-            // Look up which cluster the other node belongs to
-            const otherClusterId = clusterMapping.get(otherNodeId);
-            if (!otherClusterId) continue; // Skip nodes not in our cluster mapping
-
-            const targetMap = isOutgoing ? outgoingByCluster : incomingByCluster;
-
-            if (!targetMap.has(otherClusterId)) {
-              targetMap.set(otherClusterId, {
-                sourceClusterId: '', // Will be set by caller
-                targetClusterId: otherClusterId,
-                connectionCount: 0,
-                relationshipTypes: [],
-              });
-            }
-
-            const connection = targetMap.get(otherClusterId)!;
-            connection.connectionCount++;
-            totalConnections++;
-
-            if (!connection.relationshipTypes.includes(rel.relationshipType)) {
-              connection.relationshipTypes.push(rel.relationshipType);
-            }
-          }
-        }
-
-        return {
-          clusterId: '', // Caller sets this
-          outgoingByCluster,
-          incomingByCluster,
-          totalConnections,
-        };
-      })
+      map(relationshipArrays =>
+        this.aggregateClusterConnections(conceptIds, relationshipArrays, clusterMapping)
+      )
     );
+  }
+
+  /**
+   * Create an empty cluster connection summary.
+   */
+  private createEmptyClusterConnectionSummary(): ClusterConnectionSummary {
+    return {
+      clusterId: '',
+      outgoingByCluster: new Map(),
+      incomingByCluster: new Map(),
+      totalConnections: 0,
+    };
+  }
+
+  /**
+   * Aggregate relationship data into cluster connections.
+   */
+  private aggregateClusterConnections(
+    conceptIds: string[],
+    relationshipArrays: ContentRelationship[][],
+    clusterMapping: Map<string, string>
+  ): ClusterConnectionSummary {
+    const outgoingByCluster = new Map<string, ClusterConnectionData>();
+    const incomingByCluster = new Map<string, ClusterConnectionData>();
+    let totalConnections = 0;
+
+    for (let i = 0; i < conceptIds.length; i++) {
+      const sourceConceptId = conceptIds[i];
+      const relationships = relationshipArrays[i];
+
+      for (const rel of relationships) {
+        const connectionInfo = this.processRelationship(rel, sourceConceptId, clusterMapping);
+        if (!connectionInfo) continue;
+
+        const targetMap = connectionInfo.isOutgoing ? outgoingByCluster : incomingByCluster;
+        this.updateClusterConnection(targetMap, connectionInfo.clusterId, rel.relationshipType);
+        totalConnections++;
+      }
+    }
+
+    return {
+      clusterId: '', // Caller sets this
+      outgoingByCluster,
+      incomingByCluster,
+      totalConnections,
+    };
+  }
+
+  /**
+   * Process a single relationship to determine cluster membership.
+   * Returns null if the related node is not in the cluster mapping.
+   */
+  private processRelationship(
+    rel: ContentRelationship,
+    sourceConceptId: string,
+    clusterMapping: Map<string, string>
+  ): { isOutgoing: boolean; clusterId: string } | null {
+    const isOutgoing = rel.sourceNodeId === sourceConceptId;
+    const otherNodeId = isOutgoing ? rel.targetNodeId : rel.sourceNodeId;
+    const otherClusterId = clusterMapping.get(otherNodeId);
+
+    if (!otherClusterId) return null;
+
+    return { isOutgoing, clusterId: otherClusterId };
+  }
+
+  /**
+   * Update or create connection data for a cluster.
+   */
+  private updateClusterConnection(
+    targetMap: Map<string, ClusterConnectionData>,
+    clusterId: string,
+    relationshipType: string
+  ): void {
+    if (!targetMap.has(clusterId)) {
+      targetMap.set(clusterId, {
+        sourceClusterId: '', // Will be set by caller
+        targetClusterId: clusterId,
+        connectionCount: 0,
+        relationshipTypes: [],
+      });
+    }
+
+    const connection = targetMap.get(clusterId)!;
+    connection.connectionCount++;
+
+    if (!connection.relationshipTypes.includes(relationshipType)) {
+      connection.relationshipTypes.push(relationshipType);
+    }
   }
 }
