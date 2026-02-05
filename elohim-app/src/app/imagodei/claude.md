@@ -234,7 +234,8 @@ clearAfterMigration(): void;
 
 **Stage names updated**:
 - ✅ "App User" → "App Steward" (2026-02-05)
-- Progression now: Visitor → Hosted → App Steward → Node Operator
-- Rationale: "User" is transactional; "Steward" emphasizes care and relationship
+- ✅ "Node Operator" → "Node Steward" (2026-02-05)
+- **Final progression**: Visitor → Hosted → App Steward → Node Steward
+- Rationale: Both "User" and "Operator" are transactional; "Steward" emphasizes care, relationship, and responsibility throughout all stages
 
 **Note**: This was an aggressive refactoring with no backward compatibility - clean break to avoid tech debt.

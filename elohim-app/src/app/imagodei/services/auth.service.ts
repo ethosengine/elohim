@@ -24,7 +24,7 @@
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 0.8% (2026-02-05)
+// @coverage: 93.6% (2026-02-05)
 
 import {
   type AuthState,

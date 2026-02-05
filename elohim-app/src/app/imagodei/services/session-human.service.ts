@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 0.3% (2026-02-05)
+// @coverage: 94.9% (2026-02-05)
 
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -723,7 +723,7 @@ export class SessionHumanService {
   /**
    * Start an upgrade intent (user begins but hasn't completed upgrade).
    */
-  startUpgradeIntent(targetStage: 'hosted' | 'app-steward' | 'node-operator'): void {
+  startUpgradeIntent(targetStage: 'hosted' | 'app-steward' | 'node-steward'): void {
     const session = this.sessionSubject.value;
     if (!session) return;
 

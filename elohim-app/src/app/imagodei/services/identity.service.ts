@@ -16,7 +16,7 @@
 
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 
-// @coverage: 1.6% (2026-02-05)
+// @coverage: 63.5% (2026-02-05)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
@@ -1159,7 +1159,7 @@ export class IdentityService {
       agentPubKey,
       did,
       displayName: humanId, // Use humanId as fallback display name
-      sovereigntyStage: 'hosted',
+      agencyStage: 'hosted',
       keyLocation: 'custodial',
       canExportKeys: true,
       isLocalConductor: false,

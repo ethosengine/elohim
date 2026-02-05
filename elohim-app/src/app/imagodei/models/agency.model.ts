@@ -11,13 +11,13 @@
  * 1. Visitor - Browser session, anonymous, no persistence
  * 2. Hosted User - Custodial keys on server, full DHT participation
  * 3. App Steward - Local Holochain on device, intermittent connectivity
- * 4. Node Operator - Always-on infrastructure, full network participation
+ * 4. Node Steward - Always-on infrastructure, full network participation
  */
 
 /**
  * The four stages of human agency in data ownership within the Elohim network.
  */
-export type AgencyStage = 'visitor' | 'hosted' | 'app-steward' | 'node-operator';
+export type AgencyStage = 'visitor' | 'hosted' | 'app-steward' | 'node-steward';
 
 /**
  * Detailed information about each agency stage.
@@ -191,9 +191,9 @@ export const AGENCY_STAGES: Record<AgencyStage, AgencyStageInfo> = {
     order: 3,
   },
 
-  'node-operator': {
-    stage: 'node-operator',
-    label: 'Node Operator',
+  'node-steward': {
+    stage: 'node-steward',
+    label: 'Node Steward',
     tagline: 'Always-on infrastructure',
     description:
       'You run your own always-on Holochain node. Maximum agency and network contribution.',

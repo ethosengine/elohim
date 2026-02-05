@@ -8,7 +8,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { IdentityService } from './identity.service';
 import { AuthService } from './auth.service';
 import { SessionHumanService } from './session-human.service';
-import { SovereigntyService } from './sovereignty.service';
+import { AgencyService } from './agency.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { DoorwayRegistryService } from './doorway-registry.service';
@@ -41,7 +41,7 @@ describe('IdentityService', () => {
   let service: IdentityService;
   let mockAuthService: jasmine.SpyObj<AuthService>;
   let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
-  let mockSovereigntyService: jasmine.SpyObj<SovereigntyService>;
+  let mockAgencyService: jasmine.SpyObj<AgencyService>;
   let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
   let mockPasswordProvider: jasmine.SpyObj<PasswordAuthProvider>;
   let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
@@ -152,7 +152,7 @@ describe('IdentityService', () => {
     mockSessionHumanService.getSession.and.returnValue(null);
 
     // Create mock sovereignty service
-    mockSovereigntyService = jasmine.createSpyObj('SovereigntyService', [], {
+    mockAgencyService = jasmine.createSpyObj('AgencyService', [], {
       sovereigntyState: jasmine.createSpy().and.returnValue({ currentStage: 'visitor' }),
       currentStage: jasmine.createSpy().and.returnValue('visitor'),
     });
@@ -188,7 +188,7 @@ describe('IdentityService', () => {
         IdentityService,
         { provide: AuthService, useValue: mockAuthService },
         { provide: SessionHumanService, useValue: mockSessionHumanService },
-        { provide: SovereigntyService, useValue: mockSovereigntyService },
+        { provide: AgencyService, useValue: mockAgencyService },
         { provide: HolochainClientService, useValue: mockHolochainClient },
         { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
@@ -269,7 +269,7 @@ describe('IdentityService', () => {
           IdentityService,
           { provide: AuthService, useValue: mockAuthService },
           { provide: SessionHumanService, useValue: mockSessionHumanService },
-          { provide: SovereigntyService, useValue: mockSovereigntyService },
+          { provide: AgencyService, useValue: mockAgencyService },
           { provide: HolochainClientService, useValue: mockHolochainClient },
           { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
           { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
@@ -1095,7 +1095,7 @@ describe('IdentityService', () => {
           IdentityService,
           { provide: AuthService, useValue: mockAuthService },
           { provide: SessionHumanService, useValue: mockSessionHumanService },
-          { provide: SovereigntyService, useValue: mockSovereigntyService },
+          { provide: AgencyService, useValue: mockAgencyService },
           { provide: HolochainClientService, useValue: mockHolochainClient },
           { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
           { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },

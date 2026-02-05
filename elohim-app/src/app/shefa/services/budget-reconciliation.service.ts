@@ -146,6 +146,7 @@ export class BudgetReconciliationService {
         newHealthStatus: 'healthy',
         reconciled: false,
         timestamp: new Date().toISOString(),
+        alerts: [],
       };
     }
 

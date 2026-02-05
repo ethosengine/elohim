@@ -20,7 +20,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 0.4% (2026-02-05)
+// @coverage: 38.7% (2026-02-05)
 
 import { AdminWebsocket, type AgentPubKey, type CellId, type AppInfo } from '@holochain/client';
 import { firstValueFrom } from 'rxjs';

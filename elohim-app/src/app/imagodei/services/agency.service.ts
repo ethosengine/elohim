@@ -5,7 +5,7 @@
  * data from session management and Holochain connection services.
  *
  * This service provides a unified view of:
- * - Current agency stage (Visitor → Hosted → App Steward → Node Operator)
+ * - Current agency stage (Visitor → Hosted → App Steward → Node Steward)
  * - Data residency (where is my data stored?)
  * - Connection status (am I connected to the network?)
  * - Key/credential information
@@ -14,7 +14,7 @@
 
 import { Injectable, computed, inject } from '@angular/core';
 
-// @coverage: 1.2% (2026-02-05)
+// @coverage: 88.9% (2026-02-05)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type KeyLocation } from '../models/identity.model';
@@ -108,7 +108,7 @@ export class AgencyService {
    * - visitor: No Holochain connection, session-only or anonymous
    * - hosted: Connected to remote edge node (custodial keys)
    * - app-steward: Connected to local conductor on user's device (self-sovereign keys)
-   * - node-operator: Local conductor that also hosts other humans
+   * - node-steward: Local conductor that also hosts other humans
    */
   private determineStage(holochainState: string, hasStoredCredentials: boolean): AgencyStage {
     const displayInfo = this.holochainService.getDisplayInfo();
@@ -118,11 +118,11 @@ export class AgencyService {
       const isLocalConductor = this.isLocalConductor(displayInfo.appUrl);
 
       if (isLocalConductor) {
-        // Local conductor - either app-steward or node-operator
-        // For now, detect node-operator based on configuration
+        // Local conductor - either app-steward or node-steward
+        // For now, detect node-steward based on configuration
         // In the future, check if hosting other humans via DHT query
-        const isNodeOperator = this.detectNodeOperatorStatus();
-        return isNodeOperator ? 'node-operator' : 'app-steward';
+        const isNodeSteward = this.detectNodeOperatorStatus();
+        return isNodeSteward ? 'node-steward' : 'app-steward';
       }
 
       // Remote conductor = Hosted User
@@ -227,7 +227,7 @@ export class AgencyService {
       case 'hosted':
         return getHostedDataResidency();
       case 'app-steward':
-      case 'node-operator':
+      case 'node-steward':
         return getAppUserDataResidency();
       default:
         return getVisitorDataResidency();
@@ -279,7 +279,7 @@ export class AgencyService {
         return 'custodial'; // Keys held by edge node
       case 'app-steward':
         return 'device'; // Keys on local conductor
-      case 'node-operator':
+      case 'node-steward':
         return 'device'; // Could be 'hardware' if using HSM
       default:
         return 'none';
@@ -305,7 +305,7 @@ export class AgencyService {
           type: 'signing-key',
           label: 'Signing Key',
           value: 'On your device',
-          truncated: stage === 'node-operator' ? 'Steward (Node)' : 'Steward',
+          truncated: stage === 'node-steward' ? 'Steward (Node)' : 'Steward',
           canExport: true,
           canRevoke: true,
         };
@@ -362,7 +362,7 @@ export class AgencyService {
         return { data: 'DHT Network', progress: 'Saved' };
       case 'app-steward':
         return { data: 'Your Device', progress: 'Saved' };
-      case 'node-operator':
+      case 'node-steward':
         return { data: 'Your Node', progress: 'Always-on' };
       default:
         return { data: 'Unknown', progress: 'Unknown' };

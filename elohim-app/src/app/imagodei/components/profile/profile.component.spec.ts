@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 
 import { ProfileComponent } from './profile.component';
 import { IdentityService } from '../../services/identity.service';
-import { SovereigntyService } from '../../services/sovereignty.service';
+import { AgencyService } from '../../services/agency.service';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 import type { HumanProfile } from '../../models/identity.model';
 
@@ -12,7 +12,7 @@ describe('ProfileComponent', () => {
   let component: ProfileComponent;
   let fixture: ComponentFixture<ProfileComponent>;
   let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockSovereigntyService: jasmine.SpyObj<SovereigntyService>;
+  let mockAgencyService: jasmine.SpyObj<AgencyService>;
   let mockDiscoveryService: jasmine.SpyObj<DiscoveryAttestationService>;
   let mockRouter: jasmine.SpyObj<Router>;
 
@@ -41,8 +41,8 @@ describe('ProfileComponent', () => {
       }
     );
 
-    mockSovereigntyService = jasmine.createSpyObj(
-      'SovereigntyService',
+    mockAgencyService = jasmine.createSpyObj(
+      'AgencyService',
       [],
       {
         currentStage: signal('discovery'),
@@ -68,7 +68,7 @@ describe('ProfileComponent', () => {
       imports: [ProfileComponent],
       providers: [
         { provide: IdentityService, useValue: mockIdentityService },
-        { provide: SovereigntyService, useValue: mockSovereigntyService },
+        { provide: AgencyService, useValue: mockAgencyService },
         { provide: DiscoveryAttestationService, useValue: mockDiscoveryService },
         { provide: Router, useValue: mockRouter },
       ],

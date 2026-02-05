@@ -28,7 +28,7 @@
 
 import type { AgencyStage } from './agency.model';
 
-// @coverage: 20.0% (2026-02-05)
+// @coverage: 93.3% (2026-02-05)
 
 // =============================================================================
 // Identity Mode
@@ -211,7 +211,7 @@ export interface IdentityState {
   keyBackup: KeyBackupStatus | null;
 
   // =========================================================================
-  // Conductor Information (for app-steward/node-operator detection)
+  // Conductor Information (for app-steward/node-steward detection)
   // =========================================================================
 
   /** Whether connected to a local conductor (vs remote edge node) */
@@ -266,7 +266,7 @@ export interface HostingCostSummary {
 }
 
 /**
- * Node operator hosting income (for node-operators who host others).
+ * Node steward hosting income (for node stewards who host others).
  *
  * Philosophy:
  * - Node operators provide infrastructure for hosted humans

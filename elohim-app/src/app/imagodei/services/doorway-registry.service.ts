@@ -20,7 +20,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 3.0% (2026-02-05)
+// @coverage: 77.8% (2026-02-05)
 
 import { catchError, of, timeout, firstValueFrom } from 'rxjs';
 

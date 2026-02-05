@@ -5,7 +5,7 @@ import { ProfileService } from '@app/elohim/services/profile.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { SovereigntyService } from '@app/imagodei/services/sovereignty.service';
+import { AgencyService } from '@app/imagodei/services/agency.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { signal } from '@angular/core';
 import { of, BehaviorSubject } from 'rxjs';
@@ -18,7 +18,7 @@ describe('ProfilePageComponent', () => {
   let holochainSpy: jasmine.SpyObj<HolochainClientService>;
   let identityServiceSpy: jasmine.SpyObj<IdentityService>;
   let sessionHumanSpy: jasmine.SpyObj<SessionHumanService>;
-  let sovereigntySpy: jasmine.SpyObj<SovereigntyService>;
+  let agencySpy: jasmine.SpyObj<AgencyService>;
   let masteryServiceSpy: jasmine.SpyObj<ContentMasteryService>;
 
   beforeEach(async () => {
@@ -100,8 +100,8 @@ describe('ProfilePageComponent', () => {
     sessionHumanSpy.getAllPathProgress.and.returnValue([]);
     sessionHumanSpy.getActivityHistory.and.returnValue([]);
 
-    sovereigntySpy = jasmine.createSpyObj('SovereigntyService', [], {
-      sovereigntyState: signal({
+    agencySpy = jasmine.createSpyObj('AgencyService', [], {
+      agencyState: signal({
         currentStage: 'session-visitor',
         canUpgrade: false,
       }),
@@ -152,7 +152,7 @@ describe('ProfilePageComponent', () => {
         { provide: HolochainClientService, useValue: holochainSpy },
         { provide: IdentityService, useValue: identityServiceSpy },
         { provide: SessionHumanService, useValue: sessionHumanSpy },
-        { provide: SovereigntyService, useValue: sovereigntySpy },
+        { provide: AgencyService, useValue: agencySpy },
         { provide: ContentMasteryService, useValue: masteryServiceSpy },
       ],
     }).compileComponents();
@@ -176,7 +176,7 @@ describe('ProfilePageComponent', () => {
     });
 
     it('should have reactive state signals', () => {
-      expect(component.sovereigntyState).toBeDefined();
+      expect(component.agencyState).toBeDefined();
       expect(component.stageInfo).toBeDefined();
       expect(component.connectionStatus).toBeDefined();
       expect(component.canUpgrade).toBeDefined();

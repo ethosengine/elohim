@@ -153,7 +153,7 @@ export type SessionAccessLevel =
  */
 export interface UpgradeIntent {
   /** Target agency stage */
-  targetStage: 'hosted' | 'app-steward' | 'node-operator';
+  targetStage: 'hosted' | 'app-steward' | 'node-steward';
   /** When upgrade process started */
   startedAt: string;
   /** Current step in upgrade process */

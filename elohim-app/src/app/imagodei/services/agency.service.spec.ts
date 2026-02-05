@@ -187,7 +187,7 @@ describe('AgencyService', () => {
       localStorage.clear();
     });
 
-    it('should detect node-operator stage when configured', () => {
+    it('should detect node-steward stage when configured', () => {
       // Set up node operator config
       localStorage.setItem(
         'elohim_node_operator_config',
@@ -207,10 +207,10 @@ describe('AgencyService', () => {
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
-      expect(service.currentStage()).toBe('node-operator');
+      expect(service.currentStage()).toBe('node-steward');
     });
 
-    it('should not detect node-operator when hostedHumanCount is 0', () => {
+    it('should not detect node-steward when hostedHumanCount is 0', () => {
       localStorage.setItem(
         'elohim_node_operator_config',
         JSON.stringify({ isNodeOperator: true, hostedHumanCount: 0 })
@@ -543,7 +543,7 @@ describe('AgencyService', () => {
       expect(state.migrationTarget).toBe('app-steward');
     });
 
-    it('should indicate no migration from node-operator (final stage)', () => {
+    it('should indicate no migration from node-steward (final stage)', () => {
       localStorage.setItem(
         'elohim_node_operator_config',
         JSON.stringify({ isNodeOperator: true, hostedHumanCount: 5 })
@@ -664,7 +664,7 @@ describe('AgencyService', () => {
     });
 
     it('should generate stage summary for app-user', () => {
-      // Clear localStorage to ensure we're not in node-operator mode
+      // Clear localStorage to ensure we're not in node-steward mode
       localStorage.clear();
 
       connectionSignal.set({
