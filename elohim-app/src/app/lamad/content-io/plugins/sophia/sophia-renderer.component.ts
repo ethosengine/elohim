@@ -928,7 +928,10 @@ export class SophiaRendererComponent
           : 'mastery';
 
       return {
-        id: obj['id'] ? String(obj['id']) : this.generateMomentId(),
+        id:
+          typeof obj['id'] === 'string' || typeof obj['id'] === 'number'
+            ? String(obj['id'])
+            : this.generateMomentId(),
         purpose,
         content: obj['question'] as Moment['content'],
         hints: obj['hints'] as Moment['hints'],
