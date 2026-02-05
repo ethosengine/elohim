@@ -311,7 +311,7 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: #cbd5e1;
   background: rgb(99 102 241 / 20%);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
@@ -319,7 +319,7 @@
 
 .tooltip-type.cluster-type {
   background: rgb(99 102 241 / 30%);
-  color: #a5b4fc;
+  color: #e0e7ff;
 }
 
 .tooltip-state {
@@ -331,32 +331,32 @@
 
 .tooltip-state.state-unseen {
   background: rgb(100 116 139 / 30%);
-  color: #94a3b8;
+  color: #cbd5e1;
 }
 
 .tooltip-state.state-in-progress {
   background: rgb(250 204 21 / 20%);
-  color: #facc15;
+  color: #fef08a;
 }
 
 .tooltip-state.state-proficient {
   background: rgb(251 191 36 / 20%);
-  color: #fbbf24;
+  color: #fde047;
 }
 
 .tooltip-state.state-recommended {
   background: rgb(34 197 94 / 20%);
-  color: #22c55e;
+  color: #86efac;
 }
 
 .tooltip-state.state-review {
   background: rgb(249 115 22 / 20%);
-  color: #f97316;
+  color: #fdba74;
 }
 
 .tooltip-state.state-locked {
   background: rgb(71 85 105 / 30%);
-  color: #64748b;
+  color: #cbd5e1;
 }
 
 .tooltip-title {
@@ -441,7 +441,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: #f97316;
+  color: #fdba74;
   background: rgb(249 115 22 / 10%);
   padding: 0.75rem;
   border-radius: 8px;

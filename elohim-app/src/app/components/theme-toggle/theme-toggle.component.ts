@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 
-// @coverage: 89.5% (2026-02-05)
+// @coverage: 84.2% (2026-02-05)
 
 import { Subscription } from 'rxjs';
 
@@ -47,7 +47,7 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
   private getEffectiveTheme(): 'light' | 'dark' {
     if (this.currentTheme === 'device') {
       // Check system preference
-      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      return globalThis.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     return this.currentTheme;
   }

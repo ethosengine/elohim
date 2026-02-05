@@ -366,13 +366,13 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
     });
   }
 
-  private extractTitle(items: PerseusItem[], fallback: string): string {
+  private extractTitle(items: PerseusItem[], _fallback: string): string {
     // Try to get title from first item's metadata or question content
     const firstItem = items[0];
     if (firstItem?.metadata?.sourceDoc) {
       // Extract title from source doc path
       const parts = firstItem.metadata.sourceDoc.split('/');
-      const filename = parts[parts.length - 1];
+      const filename = parts.at(-1)!;
       return filename.replace(/\.[^.]+$/, '').replaceAll('-', ' ');
     }
 

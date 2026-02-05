@@ -570,20 +570,6 @@
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%);
 }
 
-.chapter-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 0.75rem;
-}
-
-.chapter-header h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--lamad-text-primary, #111827);
-  margin: 0;
-}
-
 .chapter-meta {
   font-size: 0.85rem;
   color: var(--lamad-text-secondary, #6b7280);
@@ -917,7 +903,6 @@
 
 .mastery-tier-mastered .mastery-badge,
 .mastery-badge.mastery-tier-mastered {
-  background-color: #fef3c7;
   background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%);
   color: #451a03;
   box-shadow: 0 1px 3px rgb(245 158 11 / 30%);
@@ -1197,6 +1182,10 @@
 
 /* Section Link Styling */
 .section-link {
+  border: none;
+  font: inherit;
+  width: 100%;
+  text-align: left;
   cursor: pointer;
   text-decoration: none;
   color: inherit;
@@ -1352,6 +1341,7 @@
 .module-card {
   background: var(--lamad-bg-secondary, #f9fafb);
   border: 1px solid var(--lamad-border, #e5e7eb);
+  border-left: 3px solid var(--lamad-accent-primary, #6366f1);
   border-radius: 0.5rem;
   padding: 1rem;
   transition: border-color 0.2s;
@@ -1359,13 +1349,6 @@
 
 .module-card:hover {
   border-color: var(--lamad-accent-primary, #6366f1);
-}
-
-.module-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
 }
 
 .module-title {
@@ -1402,12 +1385,9 @@
 .section-card {
   background: var(--lamad-surface, #fff);
   border: 1px solid var(--lamad-border, #e5e7eb);
+  border-left: 2px solid var(--lamad-border, #d1d5db);
   border-radius: 0.375rem;
   padding: 0.75rem 1rem;
-}
-
-.section-header {
-  margin-bottom: 0.5rem;
 }
 
 .section-title {
@@ -1425,6 +1405,11 @@
 }
 
 .concept-item {
+  border: none;
+  font: inherit;
+  width: 100%;
+  text-align: left;
+  background: none;
   display: flex;
   align-items: center;
   padding: 0.5rem 0.75rem;
@@ -1496,14 +1481,6 @@
 }
 
 /* Nested Visual Hierarchy Indicators */
-.module-card {
-  border-left: 3px solid var(--lamad-accent-primary, #6366f1);
-}
-
-.section-card {
-  border-left: 2px solid var(--lamad-border, #d1d5db);
-}
-
 .section-card:hover {
   border-left-color: var(--lamad-accent-primary, #6366f1);
 }

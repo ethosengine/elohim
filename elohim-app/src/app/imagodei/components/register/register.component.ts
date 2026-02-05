@@ -13,7 +13,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
-// @coverage: 94.4% (2026-02-05)
+// @coverage: 94.7% (2026-02-05)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
@@ -52,6 +52,9 @@ export class RegisterComponent implements OnInit {
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  /** Error message for migration failures */
+  private readonly MIGRATION_FAILED_ERROR = 'Migration failed';
 
   // ==========================================================================
   // Form State
@@ -154,7 +157,8 @@ export class RegisterComponent implements OnInit {
 
     // Get return URL from query params
     this.route.queryParams.subscribe(params => {
-      this.returnUrl = params['returnUrl'] ?? '/';
+      const returnUrlParam = params['returnUrl'] as string | undefined;
+      this.returnUrl = returnUrlParam ?? '/';
     });
 
     // Skip doorway selection if already chosen
@@ -189,40 +193,10 @@ export class RegisterComponent implements OnInit {
    * If session data exists, automatically migrate it to preserve user's progress.
    */
   async onRegister(): Promise<void> {
-    if (!this.isConnected()) {
-      this.error.set('Not connected to network. Please wait for connection.');
-      return;
-    }
-
-    if (!this.form.displayName.trim()) {
-      this.error.set('Please enter a display name.');
-      return;
-    }
-
-    // Validate email
-    if (!this.form.email.trim()) {
-      this.error.set('Please enter your email address.');
-      return;
-    }
-
-    if (!this.isValidEmail(this.form.email)) {
-      this.error.set('Please enter a valid email address.');
-      return;
-    }
-
-    // Validate password
-    if (!this.form.password) {
-      this.error.set('Please enter a password.');
-      return;
-    }
-
-    if (this.form.password.length < 8) {
-      this.error.set('Password must be at least 8 characters.');
-      return;
-    }
-
-    if (this.form.password !== this.form.confirmPassword) {
-      this.error.set('Passwords do not match.');
+    // Validate form inputs
+    const validationError = this.validateRegistrationForm();
+    if (validationError) {
+      this.error.set(validationError);
       return;
     }
 
@@ -234,37 +208,9 @@ export class RegisterComponent implements OnInit {
       const hasSessionToMigrate = this.hasSession() && this.canMigrate();
 
       if (hasSessionToMigrate) {
-        // Use migration flow to preserve session progress
-        // Migration service will handle identity creation + auth credentials
-        const overrides: Partial<RegisterHumanRequest> = {
-          displayName: this.form.displayName.trim(),
-          bio: this.form.bio.trim() || undefined,
-          affinities: this.parseAffinities(this.form.affinities),
-          profileReach: this.form.profileReach,
-          location: this.form.location.trim() || undefined,
-          email: this.form.email.trim().toLowerCase(),
-          password: this.form.password,
-        };
-
-        const migrationResult = await this.migrationService.migrate(overrides);
-
-        if (!migrationResult.success) {
-          throw new Error(migrationResult.error ?? 'Migration failed');
-        }
+        await this.performMigrationRegistration();
       } else {
-        // No session data - standard registration via doorway
-        // Doorway handles identity creation + auth credentials atomically
-        const request: RegisterHumanRequest = {
-          displayName: this.form.displayName.trim(),
-          bio: this.form.bio.trim() || undefined,
-          affinities: this.parseAffinities(this.form.affinities),
-          profileReach: this.form.profileReach,
-          location: this.form.location.trim() || undefined,
-          email: this.form.email.trim().toLowerCase(),
-          password: this.form.password,
-        };
-
-        await this.identityService.registerHuman(request);
+        await this.performStandardRegistration();
       }
 
       // Clear password from form for security
@@ -274,7 +220,11 @@ export class RegisterComponent implements OnInit {
       // Success - navigate to return URL
       void this.router.navigate([this.returnUrl]);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      // Convert generic/unknown errors to user-friendly message
+      let errorMessage = 'Registration failed';
+      if (err instanceof Error && err.message !== 'Unknown error') {
+        errorMessage = err.message;
+      }
       this.error.set(errorMessage);
     } finally {
       this.isRegistering.set(false);
@@ -323,10 +273,14 @@ export class RegisterComponent implements OnInit {
         // (we redirect to onRegister() at the start of this function)
         void this.router.navigate([this.returnUrl]);
       } else {
-        this.error.set(result.error ?? 'Migration failed');
+        this.error.set(result.error ?? this.MIGRATION_FAILED_ERROR);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Migration failed';
+      // Convert generic/unknown errors to user-friendly message
+      let errorMessage = this.MIGRATION_FAILED_ERROR;
+      if (err instanceof Error && err.message !== 'Unknown error') {
+        errorMessage = err.message;
+      }
       this.error.set(errorMessage);
     } finally {
       this.isMigrating.set(false);
@@ -386,10 +340,87 @@ export class RegisterComponent implements OnInit {
   // ==========================================================================
 
   /**
+   * Validate registration form inputs.
+   * Returns error message if validation fails, null if valid.
+   */
+  private validateRegistrationForm(): string | null {
+    if (!this.isConnected()) {
+      return 'Not connected to network. Please wait for connection.';
+    }
+
+    if (!this.form.displayName.trim()) {
+      return 'Please enter a display name.';
+    }
+
+    if (!this.form.email.trim()) {
+      return 'Please enter your email address.';
+    }
+
+    if (!this.isValidEmail(this.form.email)) {
+      return 'Please enter a valid email address.';
+    }
+
+    if (!this.form.password) {
+      return 'Please enter a password.';
+    }
+
+    if (this.form.password.length < 8) {
+      return 'Password must be at least 8 characters.';
+    }
+
+    if (this.form.password !== this.form.confirmPassword) {
+      return 'Passwords do not match.';
+    }
+
+    return null;
+  }
+
+  /**
+   * Perform registration with session migration.
+   */
+  private async performMigrationRegistration(): Promise<void> {
+    const overrides: Partial<RegisterHumanRequest> = {
+      displayName: this.form.displayName.trim(),
+      bio: this.form.bio.trim() || undefined,
+      affinities: this.parseAffinities(this.form.affinities),
+      profileReach: this.form.profileReach,
+      location: this.form.location.trim() || undefined,
+      email: this.form.email.trim().toLowerCase(),
+      password: this.form.password,
+    };
+
+    const migrationResult = await this.migrationService.migrate(overrides);
+
+    if (!migrationResult.success) {
+      throw new Error(migrationResult.error ?? this.MIGRATION_FAILED_ERROR);
+    }
+  }
+
+  /**
+   * Perform standard registration without migration.
+   */
+  private async performStandardRegistration(): Promise<void> {
+    const request: RegisterHumanRequest = {
+      displayName: this.form.displayName.trim(),
+      bio: this.form.bio.trim() || undefined,
+      affinities: this.parseAffinities(this.form.affinities),
+      profileReach: this.form.profileReach,
+      location: this.form.location.trim() || undefined,
+      email: this.form.email.trim().toLowerCase(),
+      password: this.form.password,
+    };
+
+    await this.identityService.registerHuman(request);
+  }
+
+  /**
    * Validate email format.
+   * Uses possessive quantifiers to prevent catastrophic backtracking.
    */
   private isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Basic email validation: local@domain.tld
+    // Limits: local part max 64 chars, domain max 253 chars (RFC 5321)
+    const emailRegex = /^[^\s@]{1,64}@[^\s@]{1,253}\.[^\s@]{2,}$/;
     return emailRegex.test(email);
   }
 

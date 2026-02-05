@@ -42,8 +42,19 @@
 </div>
 
 <!-- Mediation Dialog -->
-<div class="mediation-overlay" *ngIf="showMediationDialog" (click)="closeMediationDialog()">
-  <div class="mediation-dialog" (click)="$event.stopPropagation()">
+<div
+  class="mediation-overlay"
+  *ngIf="showMediationDialog"
+  (click)="closeMediationDialog()"
+  (keydown.escape)="closeMediationDialog()"
+  tabindex="-1"
+>
+  <div
+    class="mediation-dialog"
+    (click)="$event.stopPropagation()"
+    (keydown)="$event.stopPropagation()"
+    tabindex="-1"
+  >
     <div class="mediation-header">
       <span class="mediation-icon">⚖️</span>
       <h3>A Moment of Reflection</h3>

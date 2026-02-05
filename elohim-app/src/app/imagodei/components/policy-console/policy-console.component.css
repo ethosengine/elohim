@@ -173,7 +173,7 @@
 }
 
 .chain-arrow {
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
   font-size: 1.25rem;
 }
 
@@ -569,7 +569,7 @@
 .coming-soon {
   padding: var(--space-8, 2rem);
   text-align: center;
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
   font-style: italic;
 }
 

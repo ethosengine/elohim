@@ -483,7 +483,7 @@ export function getInitials(displayName: string): string {
   if (parts.length === 1) {
     return parts[0].substring(0, 2).toUpperCase();
   }
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (parts[0][0] + parts.at(-1)![0]).toUpperCase();
 }
 
 /**

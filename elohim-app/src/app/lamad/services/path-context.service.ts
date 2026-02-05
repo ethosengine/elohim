@@ -75,7 +75,7 @@ export class PathContextService {
    * Check if we're currently in a detour from a path.
    */
   get isInDetour(): boolean {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     return (current?.detourStack?.length ?? 0) > 0;
   }
 
@@ -83,7 +83,7 @@ export class PathContextService {
    * Get current detour depth.
    */
   get detourDepth(): number {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     return current?.detourStack?.length ?? 0;
   }
 
@@ -111,7 +111,7 @@ export class PathContextService {
       this.contextStack.push(context);
     }
 
-    this.activeContext$.next(this.contextStack[this.contextStack.length - 1]);
+    this.activeContext$.next(this.contextStack.at(-1) ?? null);
   }
 
   /**
@@ -122,7 +122,7 @@ export class PathContextService {
    * @param chapterTitle - Optional new chapter title
    */
   updatePosition(stepIndex: number, chapterTitle?: string): void {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     if (!current) return;
 
     current.stepIndex = stepIndex;
@@ -141,7 +141,7 @@ export class PathContextService {
    * @param detourInfo - Information about the detour
    */
   startDetour(detourInfo: DetourInfo): void {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     if (!current) {
       // Not in a path context - detour without path context is just navigation
       return;
@@ -161,7 +161,7 @@ export class PathContextService {
    * @returns Route segments to navigate to, or null if not in a detour
    */
   returnFromDetour(): string[] | null {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     if (!current?.detourStack?.length) {
       return null;
     }
@@ -185,7 +185,7 @@ export class PathContextService {
    * @returns Route segments to navigate to the path, or null if not in a path
    */
   returnToPath(): string[] | null {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     if (!current) {
       return null;
     }
@@ -203,7 +203,7 @@ export class PathContextService {
    */
   exitPath(): void {
     this.contextStack.pop();
-    const newContext = this.contextStack[this.contextStack.length - 1] ?? null;
+    const newContext = this.contextStack.at(-1) ?? null;
     this.activeContext$.next(newContext);
   }
 
@@ -220,7 +220,7 @@ export class PathContextService {
    * Useful for displaying navigation history.
    */
   getBreadcrumbs(): BreadcrumbItem[] {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     if (!current) return [];
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -267,7 +267,7 @@ export class PathContextService {
    * Get a summary of the current context for display.
    */
   getContextSummary(): PathContextSummary | null {
-    const current = this.contextStack[this.contextStack.length - 1];
+    const current = this.contextStack.at(-1);
     if (!current) return null;
 
     return {

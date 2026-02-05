@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
 
-// @coverage: 56.0% (2026-02-05)
+// @coverage: 88.0% (2026-02-05)
 
 import { AnalyticsService } from '../../services/analytics.service';
 import { ConfigService } from '../../services/config.service';

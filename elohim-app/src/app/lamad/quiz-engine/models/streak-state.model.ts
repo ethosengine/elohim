@@ -264,7 +264,7 @@ export function getStreakProgress(state: StreakState): StreakProgress {
     if (i < state.currentStreak) {
       indicatorState = 'correct';
     } else if (i === state.currentStreak && state.recentAnswers.length > 0) {
-      const lastAnswer = state.recentAnswers[state.recentAnswers.length - 1];
+      const lastAnswer = state.recentAnswers.at(-1)!;
       if (!lastAnswer.correct && i === 0) {
         indicatorState = 'incorrect';
       }

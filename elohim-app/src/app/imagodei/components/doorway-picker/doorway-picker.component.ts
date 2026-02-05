@@ -231,7 +231,7 @@ export class DoorwayPickerComponent implements OnInit {
    * Detect if running in Tauri native app.
    */
   private isTauriEnvironment(): boolean {
-    return typeof window !== 'undefined' && '__TAURI__' in window;
+    return typeof globalThis !== 'undefined' && '__TAURI__' in globalThis;
   }
 
   toggleCustomInput(): void {

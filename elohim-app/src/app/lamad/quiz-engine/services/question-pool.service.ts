@@ -1,11 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 97.2% (2026-02-05)
+// @coverage: 96.5% (2026-02-05)
 
 import { Observable, of, forkJoin, map, catchError, shareReplay } from 'rxjs';
 
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 
+import { LearningPath } from '../../models/learning-path.model';
 import { PathService } from '../../services/path.service';
 import {
   createEmptyPool,
@@ -146,28 +147,7 @@ export class QuestionPoolService {
           return this.createEmptyHierarchicalSource(pathId, currentSectionId);
         }
 
-        // Find all content IDs up to and including current section
-        const eligibleContentIds: string[] = [];
-        let foundCurrentSection = false;
-
-        // Traverse path hierarchy
-        for (const chapter of path.chapters ?? []) {
-          for (const module of chapter.modules ?? []) {
-            for (const section of module.sections ?? []) {
-              // Add all concept IDs from this section
-              if (section.conceptIds) {
-                eligibleContentIds.push(...section.conceptIds);
-              }
-
-              if (section.id === currentSectionId) {
-                foundCurrentSection = true;
-                break;
-              }
-            }
-            if (foundCurrentSection) break;
-          }
-          if (foundCurrentSection) break;
-        }
+        const eligibleContentIds = this.collectEligibleContentIds(path, currentSectionId);
 
         return {
           currentContentId: currentSectionId,
@@ -184,6 +164,32 @@ export class QuestionPoolService {
         return source;
       })
     );
+  }
+
+  /**
+   * Collect all content IDs from path sections up to and including the current section.
+   *
+   * Traverses the path hierarchy (chapters → modules → sections) and gathers
+   * concept IDs until the target section is found.
+   */
+  private collectEligibleContentIds(path: LearningPath, currentSectionId: string): string[] {
+    const eligibleContentIds: string[] = [];
+
+    for (const chapter of path.chapters ?? []) {
+      for (const module of chapter.modules ?? []) {
+        for (const section of module.sections ?? []) {
+          if (section.conceptIds) {
+            eligibleContentIds.push(...section.conceptIds);
+          }
+
+          if (section.id === currentSectionId) {
+            return eligibleContentIds;
+          }
+        }
+      }
+    }
+
+    return eligibleContentIds;
   }
 
   /**

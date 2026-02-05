@@ -694,7 +694,7 @@ describe('RegisterComponent', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      mockIdentityService.registerHuman.and.returnValue(Promise.reject('Unknown error'));
+      mockIdentityService.registerHuman.and.returnValue(Promise.reject(new Error('Unknown error')));
 
       await component.onRegister();
 

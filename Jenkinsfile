@@ -1153,8 +1153,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Deploy
                             sh "kubectl apply -f elohim-ui-playground/manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-ui-playground-alpha -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-ui-playground-alpha -n ethosengine --timeout=300s'
+                            sh "kubectl rollout restart deployment/elohim-ui-playground-alpha -n elohim-alpha"
+                            sh 'kubectl rollout status deployment/elohim-ui-playground-alpha -n elohim-alpha --timeout=300s'
 
                             echo 'UI Playground Alpha deployment completed!'
                         }

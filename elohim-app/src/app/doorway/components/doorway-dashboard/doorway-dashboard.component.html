@@ -267,45 +267,55 @@
           <table class="nodes-table">
             <thead>
               <tr>
-                <th (click)="setSort('nodeId')" class="sortable">
-                  Node ID
-                  @if (sortField() === 'nodeId') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button type="button" (click)="setSort('nodeId')" class="sort-button">
+                    Node ID
+                    @if (sortField() === 'nodeId') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th (click)="setSort('status')" class="sortable">
-                  Status
-                  @if (sortField() === 'status') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button type="button" (click)="setSort('status')" class="sort-button">
+                    Status
+                    @if (sortField() === 'status') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th (click)="setSort('stewardTier')" class="sortable">
-                  Tier
-                  @if (sortField() === 'stewardTier') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button type="button" (click)="setSort('stewardTier')" class="sort-button">
+                    Tier
+                    @if (sortField() === 'stewardTier') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th (click)="setSort('trustScore')" class="sortable">
-                  Trust
-                  @if (sortField() === 'trustScore') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button type="button" (click)="setSort('trustScore')" class="sort-button">
+                    Trust
+                    @if (sortField() === 'trustScore') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
-                <th (click)="setSort('combinedScore')" class="sortable">
-                  Score
-                  @if (sortField() === 'combinedScore') {
-                    <span class="sort-icon">
-                      {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
-                    </span>
-                  }
+                <th class="sortable">
+                  <button type="button" (click)="setSort('combinedScore')" class="sort-button">
+                    Score
+                    @if (sortField() === 'combinedScore') {
+                      <span class="sort-icon">
+                        {{ sortDirection() === 'asc' ? '&#9650;' : '&#9660;' }}
+                      </span>
+                    }
+                  </button>
                 </th>
                 <th>Last Heartbeat</th>
                 <th>Region</th>

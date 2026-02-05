@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 59.5% (2026-02-05)
+// @coverage: 58.2% (2026-02-05)
 
 import { BehaviorSubject, Observable, catchError, map, from, of } from 'rxjs';
 
@@ -589,55 +589,68 @@ export class ContentMasteryService {
    * @returns Migration result with counts and errors
    */
   async migrateToBackend(): Promise<MigrationResult> {
-    const result: MigrationResult = {
-      migrated: 0,
-      failed: 0,
-      success: false,
-      errors: [],
-    };
+    const result = this.createEmptyMigrationResult();
 
     if (!this.isBackendAvailable()) {
       result.errors.push('Backend not available');
       return result;
     }
 
-    // Get all local mastery records
     const localRecords = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
     if (localRecords.length === 0) {
       result.success = true;
       return result;
     }
 
-    // Group by contentId (keep latest per content)
+    const latestByContent = this.groupRecordsByContentId(localRecords);
+    await this.migrateRecords(latestByContent, result);
+
+    result.success = result.failed === 0;
+    return result;
+  }
+
+  /**
+   * Create an empty migration result object.
+   */
+  private createEmptyMigrationResult(): MigrationResult {
+    return {
+      migrated: 0,
+      failed: 0,
+      success: false,
+      errors: [],
+    };
+  }
+
+  /**
+   * Group mastery records by content ID, keeping only the latest per content.
+   */
+  private groupRecordsByContentId(
+    localRecords: SourceChainEntry<MasteryRecordContent>[]
+  ): Map<string, SourceChainEntry<MasteryRecordContent>> {
     const latestByContent = new Map<string, SourceChainEntry<MasteryRecordContent>>();
+
     for (const entry of localRecords) {
       const contentId = entry.content.contentId;
       const existing = latestByContent.get(contentId);
+
       if (!existing || new Date(entry.timestamp) > new Date(existing.timestamp)) {
         latestByContent.set(contentId, entry);
       }
     }
 
-    // Migrate each unique content mastery
+    return latestByContent;
+  }
+
+  /**
+   * Migrate a batch of mastery records to the backend.
+   */
+  private async migrateRecords(
+    latestByContent: Map<string, SourceChainEntry<MasteryRecordContent>>,
+    result: MigrationResult
+  ): Promise<void> {
     for (const [contentId, entry] of latestByContent) {
       try {
-        // Initialize mastery on backend
-        const initialized = await this.backend.initializeMastery(contentId);
-        if (!initialized) {
-          result.failed++;
-          result.errors.push(`Failed to initialize mastery for ${contentId}`);
-          continue;
-        }
-
-        // If level is beyond 'seen', we need to record assessments to reach it
-        // For now, we just record the engagement type
-        if (entry.content.level !== 'not_started' && entry.content.level !== 'seen') {
-          await this.backend.recordEngagement({
-            content_id: contentId,
-            engagement_type: entry.content.lastEngagementType,
-          });
-        }
-
+        await this.migrateSingleRecord(contentId, entry);
         result.migrated++;
       } catch (err) {
         result.failed++;
@@ -645,9 +658,34 @@ export class ContentMasteryService {
         result.errors.push(`${contentId}: ${errorMsg}`);
       }
     }
+  }
 
-    result.success = result.failed === 0;
-    return result;
+  /**
+   * Migrate a single mastery record to the backend.
+   */
+  private async migrateSingleRecord(
+    contentId: string,
+    entry: SourceChainEntry<MasteryRecordContent>
+  ): Promise<void> {
+    const initialized = await this.backend.initializeMastery(contentId);
+    if (!initialized) {
+      throw new Error(`Failed to initialize mastery for ${contentId}`);
+    }
+
+    // If level is beyond 'seen', record the engagement type
+    if (this.shouldRecordEngagement(entry.content.level)) {
+      await this.backend.recordEngagement({
+        content_id: contentId,
+        engagement_type: entry.content.lastEngagementType,
+      });
+    }
+  }
+
+  /**
+   * Determine if engagement should be recorded based on mastery level.
+   */
+  private shouldRecordEngagement(level: string): boolean {
+    return level !== 'not_started' && level !== 'seen';
   }
 
   /**

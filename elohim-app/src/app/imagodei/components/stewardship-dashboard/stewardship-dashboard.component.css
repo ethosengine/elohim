@@ -194,7 +194,7 @@
 
 .allocation-count {
   font-size: 0.875rem;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
 }
 
 /* Empty State */
@@ -208,7 +208,7 @@
 
 .empty-icon {
   font-size: 3rem;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
   margin-bottom: 1rem;
 }
 
@@ -226,7 +226,7 @@
 
 .empty-state .hint {
   font-size: 0.875rem;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
   margin-top: 0.5rem;
 }
 
@@ -294,7 +294,7 @@
 
 .content-id {
   font-size: 0.75rem;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
   font-family: monospace;
 }
 
@@ -360,7 +360,7 @@
 
 .state-badge[data-state='gray'] {
   background: var(--surface-ground, #f5f5f5);
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
 }
 
 .col-actions {
@@ -522,19 +522,19 @@
   .col-ratio::before {
     content: 'Share: ';
     font-size: 0.8rem;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #525252);
   }
 
   .col-recognition::before {
     content: 'Recognition: ';
     font-size: 0.8rem;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #525252);
   }
 
   .col-state::before {
     content: 'Status: ';
     font-size: 0.8rem;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #525252);
   }
 }
 

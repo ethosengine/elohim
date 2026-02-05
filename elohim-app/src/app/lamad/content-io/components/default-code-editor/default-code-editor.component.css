@@ -171,7 +171,7 @@
 
 .input-hint {
   font-size: 0.75rem;
-  color: var(--text-tertiary, #999);
+  color: var(--text-tertiary, #525252);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
@@ -222,7 +222,7 @@
   font-family: 'SF Mono', Monaco, Inconsolata, 'Fira Code', monospace;
   font-size: 0.8125rem;
   line-height: 1.5;
-  color: var(--text-tertiary, #999);
+  color: var(--text-tertiary, #525252);
 }
 
 .content-textarea {
@@ -247,7 +247,7 @@
 }
 
 .content-textarea::placeholder {
-  color: var(--text-tertiary, #999);
+  color: var(--text-tertiary, #525252);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */

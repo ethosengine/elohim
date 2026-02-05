@@ -396,7 +396,7 @@
   gap: 1rem;
 }
 
-.path-card {
+.path-list .path-card {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -1333,7 +1333,7 @@
   gap: 1rem;
 }
 
-.path-card {
+.paths-grid .path-card {
   display: flex;
   flex-direction: column;
   padding: 1.25rem;
@@ -1343,21 +1343,21 @@
   transition: all 0.2s;
 }
 
-.path-card:hover {
+.paths-grid .path-card:hover {
   border-color: #ddd;
   box-shadow: 0 4px 12px rgb(0 0 0 / 5%);
 }
 
-.path-card--in-progress {
+.paths-grid .path-card--in-progress {
   border-left: 3px solid #ff9800;
 }
 
-.path-card--completed {
+.paths-grid .path-card--completed {
   border-left: 3px solid #4caf50;
   background: #f8fdf8;
 }
 
-.path-card--suggested {
+.paths-grid .path-card--suggested {
   border-left: 3px solid #667eea;
   background: #f8f9ff;
 }

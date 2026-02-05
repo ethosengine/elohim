@@ -573,7 +573,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
   protected streakDots = computed(() => {
     const state = this.streakState();
     if (!state) {
-      return Array(this.targetStreak).fill({ filled: false, current: false, incorrect: false });
+      return new Array(this.targetStreak).fill({ filled: false, current: false, incorrect: false });
     }
 
     const progress = getStreakProgress(state);
@@ -647,7 +647,7 @@ export class InlineQuizComponent implements OnInit, OnDestroy {
     }
 
     // Update streak
-    const questionId = this.currentQuestion()!.id;
+    const questionId = this.currentQuestion().id;
     const newState = this.streakTracker.recordAnswer(this.contentId, questionId, correct);
 
     if (newState) {

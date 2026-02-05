@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 
-// @coverage: 85.6% (2026-02-05)
+// @coverage: 70.1% (2026-02-05)
 
 /**
  * Cache entry metadata
@@ -92,10 +92,18 @@ export class HolochainCacheService {
   private db: IDBDatabase | null = null;
 
   /** Initialization promise */
-  private readonly initPromise: Promise<void>;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
-    this.initPromise = this.initDatabase();
+    // Defer initialization to avoid async in constructor
+  }
+
+  /**
+   * Ensure database is initialized before operations
+   */
+  private ensureInitialized(): Promise<void> {
+    this.initPromise ??= this.initDatabase();
+    return this.initPromise;
   }
 
   /**
@@ -104,15 +112,15 @@ export class HolochainCacheService {
   private async initDatabase(): Promise<void> {
     return new Promise((resolve, reject) => {
       // Check if IndexedDB is available
-      if (!window.indexedDB) {
+      if (!globalThis.indexedDB) {
         resolve();
         return;
       }
 
-      const request = window.indexedDB.open(this.DB_NAME, 1);
+      const request = globalThis.indexedDB.open(this.DB_NAME, 1);
 
       request.onerror = () => {
-        reject(request.error);
+        reject(new Error(String(request.error ?? 'IDB error')));
       };
 
       request.onsuccess = () => {
@@ -138,7 +146,7 @@ export class HolochainCacheService {
    */
   async get<T = any>(key: string): Promise<T | null> {
     // Ensure database is initialized
-    await this.initPromise;
+    await this.ensureInitialized();
 
     // Try L1 (memory)
     const memEntry = this.memoryCache.get(key);
@@ -246,7 +254,7 @@ export class HolochainCacheService {
           const store = transaction.objectStore(this.STORE_NAME);
           const request = store.clear();
 
-          request.onerror = () => reject(request.error);
+          request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
           request.onsuccess = () => resolve();
         });
       } catch {
@@ -375,7 +383,7 @@ export class HolochainCacheService {
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.get(key);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
       request.onsuccess = () => resolve(request.result ?? null);
     });
   }
@@ -394,7 +402,7 @@ export class HolochainCacheService {
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.put(entry);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
       request.onsuccess = () => resolve();
     });
   }
@@ -413,7 +421,7 @@ export class HolochainCacheService {
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.delete(key);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
       request.onsuccess = () => resolve();
     });
   }

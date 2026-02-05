@@ -27,7 +27,6 @@ import {
   type AuthCredentials,
   type AuthResult,
   type AuthFailure,
-  type OAuthCredentials,
 } from '../../models/auth.model';
 import { DoorwayRegistryService } from '../doorway-registry.service';
 
@@ -94,7 +93,7 @@ export class OAuthAuthProvider implements AuthProvider {
       };
     }
 
-    const oauthCreds = credentials as OAuthCredentials;
+    const oauthCreds = credentials;
 
     // The 'token' field contains the authorization code for OAuth
     // This is called from the callback handler
@@ -109,7 +108,7 @@ export class OAuthAuthProvider implements AuthProvider {
    */
   initiateLogin(doorwayUrl: string, returnUrl?: string): void {
     const state = this.generateState();
-    const redirectUri = returnUrl ?? `${window.location.origin}/auth/callback`;
+    const redirectUri = returnUrl ?? `${globalThis.location.origin}/auth/callback`;
 
     // Store state for verification on callback
     const oauthState: OAuthState = {
@@ -133,7 +132,7 @@ export class OAuthAuthProvider implements AuthProvider {
     this.isFlowInProgress.set(true);
 
     // Redirect browser to doorway's authorize endpoint
-    window.location.href = authorizeUrl;
+    globalThis.location.href = authorizeUrl;
   }
 
   /**
@@ -306,7 +305,7 @@ export class OAuthAuthProvider implements AuthProvider {
    * Call this on app init to detect OAuth redirects.
    */
   hasPendingCallback(): boolean {
-    const url = new URL(window.location.href);
+    const url = new URL(globalThis.location.href);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
 
@@ -321,7 +320,7 @@ export class OAuthAuthProvider implements AuthProvider {
    * Get callback parameters from current URL.
    */
   getCallbackParams(): { code: string; state: string } | null {
-    const url = new URL(window.location.href);
+    const url = new URL(globalThis.location.href);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
@@ -339,14 +338,14 @@ export class OAuthAuthProvider implements AuthProvider {
    * Clear callback parameters from URL without navigation.
    */
   clearCallbackParams(): void {
-    const url = new URL(window.location.href);
+    const url = new URL(globalThis.location.href);
     url.searchParams.delete('code');
     url.searchParams.delete('state');
     url.searchParams.delete('error');
     url.searchParams.delete('errorDescription');
 
     // Replace current URL without navigation
-    window.history.replaceState({}, '', url.toString());
+    globalThis.history.replaceState({}, '', url.toString());
   }
 
   /**

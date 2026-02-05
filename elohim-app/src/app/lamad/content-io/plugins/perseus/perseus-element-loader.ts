@@ -197,7 +197,7 @@ export function isPerseusElementRegistered(): boolean {
  * Type-safe helper for Angular components.
  */
 export function getPerseusElement(container: HTMLElement): PerseusQuestionElement | null {
-  return container.querySelector(PERSEUS_ELEMENT_TAG) as PerseusQuestionElement | null;
+  return container.querySelector(PERSEUS_ELEMENT_TAG);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

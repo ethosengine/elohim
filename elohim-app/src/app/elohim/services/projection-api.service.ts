@@ -11,7 +11,7 @@
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 88.9% (2026-02-05)
+// @coverage: 88.4% (2026-02-05)
 
 import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
 
@@ -115,7 +115,11 @@ export class ProjectionAPIService {
   /** Build URL with optional API key */
   private buildApiUrl(path: string): string {
     const url = `${this.baseUrl}${path}`;
-    return this.apiKey ? `${url}${path.includes('?') ? '&' : '?'}apiKey=${this.apiKey}` : url;
+    if (!this.apiKey) {
+      return url;
+    }
+    const separator = path.includes('?') ? '&' : '?';
+    return `${url}${separator}apiKey=${this.apiKey}`;
   }
 
   /** Default timeout for projection API calls */
@@ -198,7 +202,7 @@ export class ProjectionAPIService {
       const types = Array.isArray(filters.contentType)
         ? filters.contentType
         : [filters.contentType];
-      result = result.filter(c => types.includes(c.contentType as ContentType));
+      result = result.filter(c => types.includes(c.contentType));
     }
     if (filters.tags?.length) {
       result = result.filter(c => filters.tags!.every(tag => c.tags?.includes(tag)));

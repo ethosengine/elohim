@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: elohim-ui-playground-alpha
-  namespace: ethosengine
+  namespace: elohim-alpha
   labels:
     app: elohim-ui-playground-alpha
 spec:

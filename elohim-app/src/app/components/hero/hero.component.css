@@ -112,8 +112,8 @@
 .back-to-logo-button,
 .deep-dive-button,
 .intro-video-button {
-  background: rgb(255 255 255 / 10%);
-  border: 2px solid rgb(255 255 255 / 30%);
+  background: rgb(0 0 0 / 40%);
+  border: 2px solid rgb(255 255 255 / 50%);
   color: white;
   padding: 12px 24px;
   font-family: 'Noto Sans', sans-serif;
@@ -131,8 +131,8 @@
 .back-to-logo-button:hover,
 .deep-dive-button:hover,
 .intro-video-button:hover {
-  background: rgb(255 255 255 / 20%);
-  border-color: rgb(255 255 255 / 50%);
+  background: rgb(0 0 0 / 60%);
+  border-color: rgb(255 255 255 / 70%);
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgb(255 255 255 / 20%);
 }

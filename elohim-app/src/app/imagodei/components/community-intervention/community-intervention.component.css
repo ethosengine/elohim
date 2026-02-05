@@ -176,7 +176,7 @@
 }
 
 .progress-stats .separator {
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
 }
 
 .progress-stats .target {

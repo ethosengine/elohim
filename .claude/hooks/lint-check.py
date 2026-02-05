@@ -190,6 +190,68 @@ def get_coverage_signal(file_path: str) -> str:
     return ''
 
 
+def check_type_signature_change(file_path: str) -> str:
+    """
+    Detect if the edited file contains type signature patterns that could
+    break callers. Returns a warning string if risky patterns found.
+
+    This is a zero-cost pattern match on the file content - no compilation.
+    Catches issues like:
+    - Changing Error | unknown to Error (breaks catch block callers)
+    - export type { X } from without local import (breaks local usage)
+    - Interface field type changes (breaks consumers)
+    """
+    if not file_path.endswith('.ts') or file_path.endswith('.spec.ts'):
+        return ''
+
+    try:
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        warnings = []
+
+        # Check for export-type-from without corresponding local import
+        # Pattern: export type { X } from './mod' where X is used in the file body
+        export_from_matches = re.findall(
+            r'export\s+type\s*\{([^}]+)\}\s*from\s*[\'"]', content
+        )
+        for match in export_from_matches:
+            exported_names = [n.strip() for n in match.split(',')]
+            for name in exported_names:
+                if not name:
+                    continue
+                # Check if the name is used locally beyond the export line
+                # Look for usage patterns: `: Name`, `Name |`, `| Name`, `Name[]`, `<Name`
+                usage_pattern = rf'(?<!export\s+type\s*\{{[^}}]*)(?::\s*{re.escape(name)}(?:\s*[|;\[\]<>,\)}}])|[|<]\s*{re.escape(name)}(?:\s*[|;\[\]>,\)}}]))'
+                # Simpler: just count occurrences beyond import/export lines
+                lines = content.split('\n')
+                usage_count = 0
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped.startswith('import ') or stripped.startswith('export type {'):
+                        continue
+                    if re.search(rf'\b{re.escape(name)}\b', stripped):
+                        usage_count += 1
+                if usage_count > 0:
+                    # Check if there's also a local import
+                    has_local_import = bool(re.search(
+                        rf'import\s+type\s*\{{[^}}]*\b{re.escape(name)}\b[^}}]*\}}\s*from',
+                        content
+                    ))
+                    if not has_local_import:
+                        warnings.append(
+                            f"export-type-from '{name}' used locally but not imported - will cause TS2304"
+                        )
+
+        if warnings:
+            basename = os.path.basename(file_path)
+            return f"[TypeGuard] {basename}: " + '; '.join(warnings)
+
+        return ''
+    except Exception:
+        return ''
+
+
 def main():
     try:
         # Read hook input from stdin (Claude Code hook protocol)
@@ -217,10 +279,15 @@ def main():
         # Check coverage for TypeScript files
         coverage_output = get_coverage_signal(file_path)
 
+        # Check for type signature changes that could break callers
+        typeguard_output = check_type_signature_change(file_path)
+
         # Combine outputs
         context_parts = []
         if lint_output:
             context_parts.append(f"[Lint] {basename}:\n{lint_output}")
+        if typeguard_output:
+            context_parts.append(typeguard_output)
         if coverage_output:
             context_parts.append(coverage_output)
 

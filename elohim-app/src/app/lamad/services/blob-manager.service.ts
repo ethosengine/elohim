@@ -9,9 +9,9 @@
  * - Error handling and recovery
  * - Metadata retrieval from Holochain DHT
  *
- * TODO: [HOLOCHAIN-ZOME] Zome call payloads in this service use snake_case
- * (e.g., content_id) because Holochain zomes are Rust and expect snake_case
- * field names. This cannot be changed without updating the Rust zomes.
+ * Note: Zome call payloads in this service use snake_case (e.g., content_id)
+ * because Holochain zomes are Rust and expect snake_case field names.
+ * This cannot be changed without updating the Rust zomes.
  */
 
 import { Injectable, Injector } from '@angular/core';

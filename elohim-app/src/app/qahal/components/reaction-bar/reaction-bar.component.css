@@ -313,7 +313,7 @@
 }
 
 .alternative-btn:hover {
-  background: var(--success, #27ae60);
+  background: var(--success, #1e8449);
   color: white;
 }
 
@@ -340,7 +340,7 @@
 }
 
 .btn-reconsider {
-  background: var(--success, #27ae60);
+  background: var(--success, #1e8449);
   color: white;
   border: none;
 }

@@ -25,9 +25,9 @@
  * ```
  */
 
-import { Injectable, signal, computed, inject, OnDestroy } from '@angular/core';
+import { Injectable, signal, computed, inject, OnDestroy, afterNextRender } from '@angular/core';
 
-// @coverage: 80.2% (2026-02-05)
+// @coverage: 80.4% (2026-02-05)
 
 import { HolochainClientService } from './holochain-client.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
@@ -124,13 +124,13 @@ export class HealthCheckService implements OnDestroy {
   readonly isChecking = computed(() => this._isChecking());
 
   constructor() {
-    // Start with initial check
-    void this.refresh();
-
-    // Set up automatic periodic checks
-    this.autoCheckInterval = setInterval(() => {
+    // Defer health monitoring until after first render to avoid async in constructor
+    afterNextRender(() => {
       void this.refresh();
-    }, AUTO_CHECK_INTERVAL);
+      this.autoCheckInterval = setInterval(() => {
+        void this.refresh();
+      }, AUTO_CHECK_INTERVAL);
+    });
   }
 
   ngOnDestroy(): void {
@@ -314,7 +314,7 @@ export class HealthCheckService implements OnDestroy {
 
     try {
       // Check if Cache API is available (for service worker caching)
-      if ('caches' in window) {
+      if ('caches' in globalThis) {
         const cacheNames = await caches.keys();
         const blobCaches = cacheNames.filter(n => n.includes('blob'));
 

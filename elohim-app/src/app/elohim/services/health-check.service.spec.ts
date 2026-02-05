@@ -542,13 +542,24 @@ describe('HealthCheckService', () => {
   });
 
   describe('Cleanup', () => {
-    it('should stop auto-check on destroy', () => {
-      // Create a spy on clearInterval
-      spyOn(window, 'clearInterval');
+    it('should stop auto-check on destroy when interval is active', () => {
+      // Simulate afterNextRender having set up the interval
+      (service as any).autoCheckInterval = setInterval(() => {}, 60000);
+      spyOn(globalThis, 'clearInterval').and.callThrough();
 
       service.ngOnDestroy();
 
-      expect(window.clearInterval).toHaveBeenCalled();
+      expect(globalThis.clearInterval).toHaveBeenCalled();
+      expect((service as any).autoCheckInterval).toBeNull();
+    });
+
+    it('should handle destroy when no interval is set', () => {
+      // afterNextRender hasn't fired (e.g. service-only test) - no interval to clear
+      spyOn(globalThis, 'clearInterval');
+
+      service.ngOnDestroy();
+
+      expect(globalThis.clearInterval).not.toHaveBeenCalled();
     });
   });
 

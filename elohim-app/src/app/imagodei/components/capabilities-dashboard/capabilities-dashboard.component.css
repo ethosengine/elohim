@@ -345,7 +345,7 @@
 .steward-meta {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--text-muted, #999);
+  color: var(--text-muted, #525252);
 }
 
 .steward-meta span {

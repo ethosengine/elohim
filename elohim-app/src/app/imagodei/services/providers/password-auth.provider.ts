@@ -28,7 +28,6 @@ import {
   type AuthFailure,
   type AuthResponse,
   type AuthErrorResponse,
-  type PasswordCredentials,
   type RegisterAuthRequest,
   type LoginRequest,
 } from '../../models/auth.model';
@@ -50,8 +49,8 @@ export class PasswordAuthProvider implements AuthProvider {
    */
   private isCheEnvironment(): boolean {
     return (
-      window.location.hostname.includes('.devspaces.') ||
-      window.location.hostname.includes('.code.ethosengine.com')
+      globalThis.location.hostname.includes('.devspaces.') ||
+      globalThis.location.hostname.includes('.code.ethosengine.com')
     );
   }
 
@@ -64,7 +63,7 @@ export class PasswordAuthProvider implements AuthProvider {
 
     // Replace current endpoint suffix with hc-dev
     // e.g., ...-angular-dev.code.ethosengine.com -> ...-hc-dev.code.ethosengine.com
-    const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
+    const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
     return `https://${hostname}`;
   }
 
@@ -138,7 +137,7 @@ export class PasswordAuthProvider implements AuthProvider {
       };
     }
 
-    const passwordCreds = credentials as PasswordCredentials;
+    const passwordCreds = credentials;
     const url = `${this.getAuthBaseUrl()}/auth/login`;
 
     const body: LoginRequest = {

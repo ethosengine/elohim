@@ -14,7 +14,7 @@ import {
   inject,
 } from '@angular/core';
 
-// @coverage: 22.8% (2026-02-05)
+// @coverage: 22.9% (2026-02-05)
 
 import { Subject } from 'rxjs';
 
@@ -732,7 +732,7 @@ export class PerseusRendererComponent
     } else {
       // Break streak - reset
       this.currentStreak = 0;
-      this.streakHistory = Array(this.targetStreak).fill(null);
+      this.streakHistory = new Array(this.targetStreak).fill(null);
     }
   }
 

@@ -90,9 +90,29 @@ Do NOT create GitHub Issues — quality-architect handles that.
 Report escalations in Second-Pass Complete format.
 ```
 
+## Pre-flight Check
+
+Run at the start of every quality session to establish baseline:
+
+```bash
+python3 .claude/hooks/pre-flight-check.py
+```
+
+This checks:
+1. **Git status** - uncommitted changes that could interfere
+2. **Build health** - is the build green? (if RED, fix build first)
+3. **Coverage annotations** - how many files below 70% threshold
+
+The script exits 0 (green) or 1 (red build). A JSON report is saved to `/tmp/pre-flight-report.json`.
+
+**If build is RED**: Fix build errors BEFORE starting quality work. Quality agents can't distinguish pre-existing errors from regressions they introduce.
+
 ## Quick Start
 
 ```bash
+# Pre-flight check (always run first)
+python3 .claude/hooks/pre-flight-check.py
+
 # Regenerate lint manifest
 .claude/scripts/extract-lint-issues.sh
 
@@ -286,6 +306,20 @@ grep -r "@coverage:" elohim-app/src --include="*.ts" | grep -v ".spec.ts" | wc -
 | **Batch test run** | - | npm test | **Yes** |
 
 All test execution happens in batch via `npm test` before commit, which also updates coverage annotations.
+
+## Quality Gates
+
+### PostToolUse Hook (automatic)
+`.claude/hooks/lint-check.py` runs after every Edit/Write on elohim-app files:
+- **Lint check**: ESLint/Stylelint on edited file
+- **TypeGuard**: Detects `export type { X } from` without local `import type` (catches TS2304)
+- **Coverage signal**: Warns if file is below 70% threshold
+
+### Pre-push Hook (git)
+`.husky/pre-push` runs before `git push` when elohim-app files changed:
+1. Build check (`ng build --configuration=development`)
+2. Unit tests (`ng test --browsers=ChromeHeadlessCI`)
+- Bypass: `HUSKY=0 git push` or `git push --no-verify`
 
 ## GitHub Issues Workflow (The 5%)
 

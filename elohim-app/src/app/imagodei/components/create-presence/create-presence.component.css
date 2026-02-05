@@ -134,7 +134,7 @@
 
 .hint {
   font-size: 0.85rem;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
 }
 
 /* Identifiers */
@@ -179,7 +179,7 @@
   padding: 0;
   margin-left: 0.25rem;
   cursor: pointer;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
   transition: color 0.2s;
 }
 
@@ -233,7 +233,7 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
   transition: color 0.2s;
 }
 
@@ -297,7 +297,7 @@
 
 .result-id {
   font-size: 0.8rem;
-  color: var(--text-tertiary, #888);
+  color: var(--text-tertiary, #525252);
 }
 
 /* Buttons */

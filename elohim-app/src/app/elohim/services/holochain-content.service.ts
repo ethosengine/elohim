@@ -91,7 +91,7 @@ export interface HolochainContentStats {
 /**
  * Query input for content by type
  *
- * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Note: Uses snake_case because this is a Holochain zome payload.
  * Zomes are Rust and expect snake_case field names. This cannot be changed without
  * updating the Rust zome and running a DNA migration.
  */
@@ -125,7 +125,7 @@ export interface BatchGetContentOutput {
 /**
  * Input for paginated content query by type
  *
- * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Note: Uses snake_case because this is a Holochain zome payload.
  * Zomes are Rust and expect snake_case field names. This cannot be changed without
  * updating the Rust zome and running a DNA migration.
  */
@@ -138,7 +138,7 @@ export interface PaginatedByTypeInput {
 /**
  * Input for paginated content query by tag
  *
- * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Note: Uses snake_case because this is a Holochain zome payload.
  * Zomes are Rust and expect snake_case field names. This cannot be changed without
  * updating the Rust zome and running a DNA migration.
  */
@@ -439,7 +439,7 @@ export interface HolochainRelationshipOutput {
 /**
  * Input for querying relationships
  *
- * TODO: [HOLOCHAIN-ZOME] Uses snake_case because this is a Holochain zome payload.
+ * Note: Uses snake_case because this is a Holochain zome payload.
  * Zomes are Rust and expect snake_case field names. This cannot be changed without
  * updating the Rust zome and running a DNA migration.
  */

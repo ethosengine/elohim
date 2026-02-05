@@ -924,7 +924,7 @@ export function transformEventToWire(
   event: EconomicEvent,
   appId = 'shefa'
 ): Omit<EconomicEventWire, 'createdAt'> {
-  const metadata = event.metadata as Record<string, unknown> | undefined;
+  const metadata = event.metadata;
 
   return {
     id: event.id,
