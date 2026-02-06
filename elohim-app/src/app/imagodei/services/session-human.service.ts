@@ -382,7 +382,7 @@ export class SessionHumanService {
     try {
       const stored = localStorage.getItem(key);
       if (stored) {
-        activities = JSON.parse(stored);
+        activities = JSON.parse(stored) as SessionActivity[];
       }
     } catch {
       activities = [];
@@ -432,7 +432,7 @@ export class SessionHumanService {
     try {
       const stored = localStorage.getItem(key);
       if (stored) {
-        return JSON.parse(stored);
+        return JSON.parse(stored) as SessionActivity[];
       }
     } catch {
       // Ignore
@@ -455,7 +455,7 @@ export class SessionHumanService {
     try {
       const stored = localStorage.getItem(key);
       if (stored) {
-        return JSON.parse(stored);
+        return JSON.parse(stored) as SessionPathProgress;
       }
     } catch {
       // Ignore
@@ -500,7 +500,7 @@ export class SessionHumanService {
         try {
           const data = localStorage.getItem(key);
           if (data) {
-            progress.push(JSON.parse(data));
+            progress.push(JSON.parse(data) as SessionPathProgress);
           }
         } catch {
           // Skip malformed entries
@@ -837,8 +837,8 @@ export class SessionHumanService {
     try {
       const stored = localStorage.getItem(affinityKey);
       if (stored) {
-        const parsed = JSON.parse(stored);
-        affinity = parsed.affinity ?? {};
+        const parsed = JSON.parse(stored) as Record<string, unknown>;
+        affinity = (parsed['affinity'] as Record<string, number>) ?? {};
       }
     } catch {
       // Ignore
@@ -917,7 +917,7 @@ export class SessionHumanService {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        return JSON.parse(stored) as SessionHuman;
       }
     } catch (err) {
       // Session parse failure is non-critical - falls back to null for visitor mode
@@ -960,7 +960,7 @@ export class SessionHumanService {
     try {
       const stored = localStorage.getItem(key);
       if (stored) {
-        this.upgradePromptsSubject.next(JSON.parse(stored));
+        this.upgradePromptsSubject.next(JSON.parse(stored) as HolochainUpgradePrompt[]);
       }
     } catch {
       // Ignore

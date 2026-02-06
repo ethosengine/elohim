@@ -33,10 +33,12 @@ import {
   isNetworkMode,
 } from '../models/identity.model';
 
+import { AgencyService } from './agency.service';
 import { AuthService } from './auth.service';
 import { PasswordAuthProvider } from './providers/password-auth.provider';
 import { SessionHumanService } from './session-human.service';
-import { AgencyService } from './agency.service';
+
+const STAGE_APP_STEWARD = 'app-steward';
 
 // Re-export utility functions for consumers
 export { isNetworkMode, getInitials } from '../models/identity.model';
@@ -549,7 +551,7 @@ export class IdentityService {
     const conductorInfo = this.detectConductorType();
     const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
     const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-    const agencyStage = conductorInfo.isLocal ? 'app-steward' : 'hosted';
+    const agencyStage = conductorInfo.isLocal ? STAGE_APP_STEWARD : 'hosted';
 
     // Check if session exists alongside Holochain
     const session = this.sessionHumanService.getSession();
@@ -869,7 +871,7 @@ export class IdentityService {
         did,
         profile,
         attestations: sessionResult.attestations.map(a => a.attestation.attestationType),
-        agencyStage: 'app-steward',
+        agencyStage: STAGE_APP_STEWARD,
         keyLocation: 'device',
         canExportKeys: false,
         keyBackup: null,
@@ -1099,7 +1101,7 @@ export class IdentityService {
     const conductorInfo = this.detectConductorType();
     const identityMode = conductorInfo.isLocal ? 'steward' : 'hosted';
     const keyLocation = conductorInfo.isLocal ? 'device' : 'custodial';
-    const agencyStage = conductorInfo.isLocal ? 'app-steward' : 'hosted';
+    const agencyStage = conductorInfo.isLocal ? STAGE_APP_STEWARD : 'hosted';
 
     // Generate DID for authenticated identity
     const did = generateDID(identityMode, sessionResult.human.id, sessionResult.agentPubkey, null);

@@ -8,7 +8,7 @@
  * which is built separately and loaded at runtime via script tag.
  */
 
-// @coverage: 83.3% (2026-02-05)
+// @coverage: 86.4% (2026-02-05)
 
 // Import types for local use and re-export for consumers
 import type { PerseusItem, PerseusScoreResult } from './perseus-item.model';
@@ -29,6 +29,17 @@ export interface PerseusQuestionElement extends HTMLElement {
   restoreState(state: unknown): void;
 }
 
+/** Typed accessor for runtime globals set before bundle loads. */
+interface PerseusGlobals {
+  __PERSEUS_STYLES_URL__?: string;
+  __PERSEUS_THEME_OVERRIDES_URL__?: string;
+  __PERSEUS_PLUGIN_URL__?: string;
+  React?: unknown;
+  ReactDOM?: unknown;
+}
+
+const _globals = globalThis as unknown as PerseusGlobals;
+
 // Track loading state
 let loadPromise: Promise<void> | null = null;
 let isRegistered = false;
@@ -39,16 +50,12 @@ const PERSEUS_ELEMENT_TAG = 'perseus-question';
 
 // Configuration for CSS URLs
 const getPerseusStylesUrl = (): string => {
-  return (
-    ((globalThis as any)['__PERSEUS_STYLES_URL__'] as string) ||
-    '/assets/perseus-plugin/perseus.css'
-  );
+  return _globals.__PERSEUS_STYLES_URL__ ?? '/assets/perseus-plugin/perseus.css';
 };
 
 const getPerseusThemeOverridesUrl = (): string => {
   return (
-    ((globalThis as any)['__PERSEUS_THEME_OVERRIDES_URL__'] as string) ||
-    '/assets/perseus-plugin/perseus-theme-overrides.css'
+    _globals.__PERSEUS_THEME_OVERRIDES_URL__ ?? '/assets/perseus-plugin/perseus-theme-overrides.css'
   );
 };
 
@@ -87,8 +94,7 @@ function loadPerseusCSS(): void {
 // Cache-bust once per page load, not per call
 const CACHE_BUST = Date.now();
 const getPerseusPluginUrl = (): string => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const customUrl = (globalThis as any)['__PERSEUS_PLUGIN_URL__'] as string;
+  const customUrl = _globals.__PERSEUS_PLUGIN_URL__;
   if (customUrl) return customUrl;
   return `/assets/perseus-plugin/perseus-plugin.umd.js?v=${CACHE_BUST}`;
 };
@@ -117,10 +123,7 @@ async function loadScript(url: string): Promise<void> {
  * Load React from CDN if not already available.
  */
 async function ensureReactLoaded(): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const win = globalThis as any;
-
-  if (win.React && win.ReactDOM) {
+  if (_globals.React && _globals.ReactDOM) {
     return;
   }
 
@@ -128,7 +131,7 @@ async function ensureReactLoaded(): Promise<void> {
   await loadScript('https://unpkg.com/react@18/umd/react.production.min.js');
   await loadScript('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js');
 
-  if (!win.React || !win.ReactDOM) {
+  if (!_globals.React || !_globals.ReactDOM) {
     throw new Error('Failed to load React from CDN');
   }
 

@@ -19,7 +19,7 @@ export class DomInteractionService {
    * Setup scroll indicator that scrolls to one viewport height
    * @param elementRef - Element reference containing the scroll indicator
    */
-  setupScrollIndicator(elementRef: ElementRef): void {
+  setupScrollIndicator(elementRef: ElementRef<HTMLElement>): void {
     setTimeout(() => {
       const scrollIndicator = elementRef.nativeElement.querySelector('.scroll-indicator');
       if (scrollIndicator) {
@@ -37,7 +37,7 @@ export class DomInteractionService {
    * Setup hero title animation interaction
    * @param elementRef - Element reference containing the hero title
    */
-  setupHeroTitleAnimation(elementRef: ElementRef): void {
+  setupHeroTitleAnimation(elementRef: ElementRef<HTMLElement>): void {
     setTimeout(() => {
       const heroTitle = elementRef.nativeElement.querySelector('.hero h1');
       if (heroTitle) {

@@ -15,6 +15,8 @@
  * relies on Observer protocol for risk assessment data.
  */
 
+/* eslint-disable @typescript-eslint/require-await -- Phase 1: most methods are TODO stubs returning Promise<T> without async work */
+
 import { Injectable } from '@angular/core';
 
 // @coverage: 33.6% (2026-02-05)
@@ -191,14 +193,12 @@ export class InsuranceMutualService {
   // Helper methods for enrollment
   // ─────────────────────────────────────────────────────────────────
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getMember(memberId: string): Promise<REAAgent | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return mock
     return { id: memberId, name: 'Member', type: 'human' } as REAAgent;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getQahalCoverageTemplate(_qahalId: string): Promise<{
     defaultRisks: CoveredRisk[];
     deductible: Measure;
@@ -226,7 +226,6 @@ export class InsuranceMutualService {
     // TODO: Persist to Holochain DHT
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- Async wrapper for stub implementation (TODO: Holochain integration)
   private async getMemberRiskProfile(_memberId: string): Promise<MemberRiskProfile | null> {
     // TODO: Fetch from Holochain / service layer
     // For now, return null (will be fetched in real implementation)
@@ -272,15 +271,15 @@ export class InsuranceMutualService {
     const allMemberEvents = await firstValueFrom(
       this.economicService.getEventsForAgent(memberId, 'provider')
     );
-    const relevantEventTypes = [
+    const relevantEventTypes = new Set([
       'preventive-care-completed',
       'community-support-provided',
       'claim-filed',
       'risk-reduction-verified',
-    ];
+    ]);
     const memberEvents = allMemberEvents.filter(e => {
       const eventType = e.metadata?.['lamadEventType'];
-      return typeof eventType === 'string' && relevantEventTypes.includes(eventType);
+      return typeof eventType === 'string' && relevantEventTypes.has(eventType);
     });
 
     // Step 3: Extract care maintenance score from preventive events
@@ -1656,7 +1655,7 @@ function calculateCommunityConnectednessScore(supportEvents: EconomicEvent[]): n
  */
 function calculateHistoricalClaimsRate(claimEvents: EconomicEvent[], previousRate: number): number {
   // Assume 1-year assessment period
-  const currentRate = Math.min(1.0, claimEvents.length / 10);
+  const currentRate = Math.min(1, claimEvents.length / 10);
 
   // Exponential smoothing: 70% old rate, 30% new rate
   const smoothedRate = previousRate * 0.7 + currentRate * 0.3;

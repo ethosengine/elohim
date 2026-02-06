@@ -134,6 +134,15 @@ export interface AgencyState {
   migrationProgress?: MigrationProgress;
 }
 
+// Data residency constants (used across stage definitions)
+const LABEL_LEARNING_PROGRESS = 'Learning Progress';
+const LOC_BROWSER_STORAGE: DataLocation = 'browser-storage';
+const LOC_LABEL_BROWSER_STORAGE = 'Browser Storage';
+const CAT_CONTENT_AFFINITY: DataCategory = 'content-affinity';
+const LABEL_CONTENT_AFFINITY = 'Content Affinity';
+const LOC_LABEL_DHT_NETWORK = 'DHT Network';
+const LOC_LOCAL_HOLOCHAIN: DataLocation = 'local-holochain';
+
 /**
  * Stage definitions with human-friendly descriptions.
  */
@@ -247,10 +256,10 @@ export function getVisitorDataResidency(): DataResidencyItem[] {
     },
     {
       category: 'progress',
-      label: 'Learning Progress',
+      label: LABEL_LEARNING_PROGRESS,
       description: 'Paths started, steps completed',
-      location: 'browser-storage',
-      locationLabel: 'Browser Storage',
+      location: LOC_BROWSER_STORAGE,
+      locationLabel: LOC_LABEL_BROWSER_STORAGE,
       icon: 'school',
       controlledBy: 'user',
       exportable: true,
@@ -260,19 +269,19 @@ export function getVisitorDataResidency(): DataResidencyItem[] {
       category: 'preferences',
       label: 'Preferences',
       description: 'Display name, theme, settings',
-      location: 'browser-storage',
-      locationLabel: 'Browser Storage',
+      location: LOC_BROWSER_STORAGE,
+      locationLabel: LOC_LABEL_BROWSER_STORAGE,
       icon: 'settings',
       controlledBy: 'user',
       exportable: true,
       deletable: true,
     },
     {
-      category: 'content-affinity',
-      label: 'Content Affinity',
+      category: CAT_CONTENT_AFFINITY,
+      label: LABEL_CONTENT_AFFINITY,
       description: 'What content resonates with you',
-      location: 'browser-storage',
-      locationLabel: 'Browser Storage',
+      location: LOC_BROWSER_STORAGE,
+      locationLabel: LOC_LABEL_BROWSER_STORAGE,
       icon: 'favorite',
       controlledBy: 'user',
       exportable: true,
@@ -299,10 +308,10 @@ export function getHostedDataResidency(): DataResidencyItem[] {
     },
     {
       category: 'progress',
-      label: 'Learning Progress',
+      label: LABEL_LEARNING_PROGRESS,
       description: 'Paths, steps, attestations',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'school',
       controlledBy: 'network',
       exportable: true,
@@ -313,18 +322,18 @@ export function getHostedDataResidency(): DataResidencyItem[] {
       label: 'Preferences',
       description: 'Profile, settings',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'settings',
       controlledBy: 'network',
       exportable: true,
       deletable: true,
     },
     {
-      category: 'content-affinity',
-      label: 'Content Affinity',
+      category: CAT_CONTENT_AFFINITY,
+      label: LABEL_CONTENT_AFFINITY,
       description: 'Engagement patterns',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'favorite',
       controlledBy: 'network',
       exportable: true,
@@ -335,7 +344,7 @@ export function getHostedDataResidency(): DataResidencyItem[] {
       label: 'Relationships',
       description: 'Connections, endorsements',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'people',
       controlledBy: 'network',
       exportable: true,
@@ -346,7 +355,7 @@ export function getHostedDataResidency(): DataResidencyItem[] {
       label: 'Credentials',
       description: 'Attestations, badges',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'verified',
       controlledBy: 'network',
       exportable: true,
@@ -364,7 +373,7 @@ export function getAppUserDataResidency(): DataResidencyItem[] {
       category: 'identity',
       label: 'Identity Keys',
       description: 'Cryptographic identity (steward)',
-      location: 'local-holochain',
+      location: LOC_LOCAL_HOLOCHAIN,
       locationLabel: 'Your Device',
       icon: 'vpn_key',
       controlledBy: 'user',
@@ -373,10 +382,10 @@ export function getAppUserDataResidency(): DataResidencyItem[] {
     },
     {
       category: 'progress',
-      label: 'Learning Progress',
+      label: LABEL_LEARNING_PROGRESS,
       description: 'Paths, steps, attestations',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'school',
       controlledBy: 'user',
       exportable: true,
@@ -386,7 +395,7 @@ export function getAppUserDataResidency(): DataResidencyItem[] {
       category: 'preferences',
       label: 'Preferences',
       description: 'Profile, settings',
-      location: 'local-holochain',
+      location: LOC_LOCAL_HOLOCHAIN,
       locationLabel: 'Your Device + DHT',
       icon: 'settings',
       controlledBy: 'user',
@@ -394,10 +403,10 @@ export function getAppUserDataResidency(): DataResidencyItem[] {
       deletable: true,
     },
     {
-      category: 'content-affinity',
-      label: 'Content Affinity',
+      category: CAT_CONTENT_AFFINITY,
+      label: LABEL_CONTENT_AFFINITY,
       description: 'Engagement patterns',
-      location: 'local-holochain',
+      location: LOC_LOCAL_HOLOCHAIN,
       locationLabel: 'Your Device',
       icon: 'favorite',
       controlledBy: 'user',
@@ -409,7 +418,7 @@ export function getAppUserDataResidency(): DataResidencyItem[] {
       label: 'Relationships',
       description: 'Connections, endorsements',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'people',
       controlledBy: 'user',
       exportable: true,
@@ -420,7 +429,7 @@ export function getAppUserDataResidency(): DataResidencyItem[] {
       label: 'Credentials',
       description: 'Attestations, badges',
       location: 'dht',
-      locationLabel: 'DHT Network',
+      locationLabel: LOC_LABEL_DHT_NETWORK,
       icon: 'user',
       controlledBy: 'user',
       exportable: true,

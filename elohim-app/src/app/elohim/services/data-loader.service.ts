@@ -284,8 +284,8 @@ export class DataLoaderService {
           });
         }
       }),
-      catchError(err => {
-        const errMsg = err.message ?? String(err);
+      catchError((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
         if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
           this.logger.warn('Path not found (may be stale reference)', { pathId });
         } else {
@@ -342,8 +342,11 @@ export class DataLoaderService {
         }
         return result;
       }),
-      catchError(err => {
-        this.logger.warn('Path overview failed', { pathId, error: err.message ?? err });
+      catchError((err: unknown) => {
+        this.logger.warn('Path overview failed', {
+          pathId,
+          error: err instanceof Error ? err.message : String(err),
+        });
         throw err;
       }),
       shareReplay(1)
@@ -412,9 +415,10 @@ export class DataLoaderService {
           });
         }
       }),
-      catchError(err => {
-        this.logger.warn('Error loading content', { resourceId, error: err.message ?? err });
-        return of(this.createPlaceholderContent(resourceId, err.message));
+      catchError((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn('Error loading content', { resourceId, error: errMsg });
+        return of(this.createPlaceholderContent(resourceId, errMsg));
       })
     );
   }
@@ -455,15 +459,16 @@ export class DataLoaderService {
         }
         return contentMap;
       }),
-      catchError(err => {
+      catchError((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
         this.logger.warn('Batch load error', {
           count: resourceIds.length,
-          error: err.message ?? err,
+          error: errMsg,
         });
         // Return placeholders for all
         const contentMap = new Map<string, ContentNode>();
         for (const id of resourceIds) {
-          contentMap.set(id, this.createPlaceholderContent(id, err.message));
+          contentMap.set(id, this.createPlaceholderContent(id, errMsg));
         }
         return of(contentMap);
       })
@@ -518,7 +523,9 @@ export class DataLoaderService {
       contentType: 'placeholder',
       title: `Content Not Found: ${resourceId}`,
       description: errorMessage ?? `The content "${resourceId}" could not be loaded.`,
-      content: `This content is not yet available. It may not have been seeded or there was an error loading it.\n\nResource ID: ${resourceId}${errorMessage ? `\nError: ${errorMessage}` : ''}`,
+      content:
+        `This content is not yet available. It may not have been seeded or there was an error loading it.\n\nResource ID: ${resourceId}` +
+        (errorMessage ? '\nError: ' + errorMessage : ''),
       contentFormat: 'markdown',
       tags: ['missing', 'placeholder'],
       relatedNodeIds: [],
@@ -667,7 +674,7 @@ export class DataLoaderService {
         id: p.id,
         title: p.title,
         description: p.description ?? '',
-        difficulty: p.difficulty as any,
+        difficulty: p.difficulty,
         estimatedDuration: p.estimatedDuration ?? '',
         stepCount: this.calculateStepCount(p),
         tags: p.tags ?? [],
@@ -685,7 +692,7 @@ export class DataLoaderService {
    */
   private calculateStepCount(path: LearningPath): number {
     // Check if raw data includes pre-computed stepCount (from doorway)
-    const rawStepCount = (path as any).stepCount ?? (path as any).stepCount;
+    const rawStepCount = (path as unknown as Record<string, unknown>)['stepCount'];
     if (typeof rawStepCount === 'number' && rawStepCount > 0) {
       return rawStepCount;
     }
@@ -732,8 +739,11 @@ export class DataLoaderService {
 
     return defer(() => from(this.holochainContent.getAgentById(agentId))).pipe(
       map(result => (result ? this.transformHolochainAgent(result.agent) : null)),
-      catchError(err => {
-        this.logger.warn('Failed to load agent', { agentId, error: err.message ?? err });
+      catchError((err: unknown) => {
+        this.logger.warn('Failed to load agent', {
+          agentId,
+          error: err instanceof Error ? err.message : String(err),
+        });
         return of(null);
       })
     );
@@ -1102,7 +1112,10 @@ export class DataLoaderService {
    * Transform KnowledgeMap to KnowledgeMapIndexEntry.
    */
   private transformKnowledgeMapToIndex(map: KnowledgeMap): KnowledgeMapIndexEntry {
-    const subjectName = 'subject' in map ? map.subject.subjectName : (map as any).subjectName ?? '';
+    const subjectName =
+      'subject' in map
+        ? map.subject.subjectName
+        : (((map as unknown as Record<string, unknown>)['subjectName'] as string) ?? '');
     return {
       id: map.id,
       mapType: map.mapType,
@@ -1452,9 +1465,9 @@ export class DataLoaderService {
       return of([]);
     }
 
-    return this.contentService.getRelationships(contentId, direction).pipe(
-      map(results => (results ?? []).map(r => this.transformToContentRelationship(r)))
-    );
+    return this.contentService
+      .getRelationships(contentId, direction)
+      .pipe(map(results => (results ?? []).map(r => this.transformToContentRelationship(r))));
   }
 
   /**
@@ -1493,9 +1506,7 @@ export class DataLoaderService {
     ) as Record<string, unknown>;
 
     // Store confidence in metadata since ContentRelationship doesn't have a confidence field
-    if (hcRel.confidence !== undefined && hcRel.confidence !== null) {
-      metadata['confidence'] = hcRel.confidence;
-    }
+    metadata['confidence'] = hcRel.confidence;
 
     return {
       id: hcRel.id,
@@ -1548,12 +1559,12 @@ export class DataLoaderService {
    */
   private transformSimplifiedGraph(simpleGraph: {
     rootId: string;
-    related: Array<{
+    related: {
       contentId: string;
       relationshipType: string;
       confidence: number;
-      children: any[];
-    }>;
+      children: unknown[];
+    }[];
     totalNodes: number;
   }): ContentGraph {
     const nodes = new Map<string, ContentNode>();
@@ -1816,7 +1827,7 @@ export class DataLoaderService {
   private createEmptyGraph(): ContentGraph {
     return {
       nodes: new Map<string, ContentNode>(),
-      relationships: new Map<string, any>(),
+      relationships: new Map<string, ContentRelationship>(),
       nodesByType: new Map<string, Set<string>>(),
       nodesByTag: new Map<string, Set<string>>(),
       nodesByCategory: new Map<string, Set<string>>(),

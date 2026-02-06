@@ -262,13 +262,13 @@ export class BankingStore {
 
   async getConnection(id: string): Promise<PlaidConnectionLocal | undefined> {
     const store = await this.getStore(STORES.CONNECTIONS);
-    return this.wrapRequest(store.get(id));
+    return this.wrapRequest(store.get(id) as IDBRequest<PlaidConnectionLocal | undefined>);
   }
 
   async getConnectionsByAgent(stewardId: string): Promise<PlaidConnectionLocal[]> {
     const store = await this.getStore(STORES.CONNECTIONS);
     const index = store.index('stewardId');
-    return this.wrapRequest(index.getAll(stewardId));
+    return this.wrapRequest(index.getAll(stewardId) as IDBRequest<PlaidConnectionLocal[]>);
   }
 
   async deleteConnection(id: string): Promise<void> {
@@ -287,19 +287,19 @@ export class BankingStore {
 
   async getBatch(id: string): Promise<ImportBatchLocal | undefined> {
     const store = await this.getStore(STORES.BATCHES);
-    return this.wrapRequest(store.get(id));
+    return this.wrapRequest(store.get(id) as IDBRequest<ImportBatchLocal | undefined>);
   }
 
   async getBatchesByConnection(connectionId: string): Promise<ImportBatchLocal[]> {
     const store = await this.getStore(STORES.BATCHES);
     const index = store.index('connectionId');
-    return this.wrapRequest(index.getAll(connectionId));
+    return this.wrapRequest(index.getAll(connectionId) as IDBRequest<ImportBatchLocal[]>);
   }
 
   async getBatchesByStatus(status: ImportBatchLocal['status']): Promise<ImportBatchLocal[]> {
     const store = await this.getStore(STORES.BATCHES);
     const index = store.index('status');
-    return this.wrapRequest(index.getAll(status));
+    return this.wrapRequest(index.getAll(status) as IDBRequest<ImportBatchLocal[]>);
   }
 
   async deleteBatch(id: string): Promise<void> {
@@ -325,13 +325,13 @@ export class BankingStore {
 
   async getStaged(id: string): Promise<StagedTransactionLocal | undefined> {
     const store = await this.getStore(STORES.STAGED);
-    return this.wrapRequest(store.get(id));
+    return this.wrapRequest(store.get(id) as IDBRequest<StagedTransactionLocal | undefined>);
   }
 
   async getStagedByBatch(batchId: string): Promise<StagedTransactionLocal[]> {
     const store = await this.getStore(STORES.STAGED);
     const index = store.index('batchId');
-    return this.wrapRequest(index.getAll(batchId));
+    return this.wrapRequest(index.getAll(batchId) as IDBRequest<StagedTransactionLocal[]>);
   }
 
   async getStagedByStatus(
@@ -339,7 +339,7 @@ export class BankingStore {
   ): Promise<StagedTransactionLocal[]> {
     const store = await this.getStore(STORES.STAGED);
     const index = store.index('reviewStatus');
-    return this.wrapRequest(index.getAll(status));
+    return this.wrapRequest(index.getAll(status) as IDBRequest<StagedTransactionLocal[]>);
   }
 
   async getStagedPending(): Promise<StagedTransactionLocal[]> {
@@ -349,7 +349,9 @@ export class BankingStore {
   async checkDuplicate(plaidTransactionId: string): Promise<StagedTransactionLocal | undefined> {
     const store = await this.getStore(STORES.STAGED);
     const index = store.index('plaidTransactionId');
-    return this.wrapRequest(index.get(plaidTransactionId));
+    return this.wrapRequest(
+      index.get(plaidTransactionId) as IDBRequest<StagedTransactionLocal | undefined>
+    );
   }
 
   async deleteStaged(id: string): Promise<void> {
@@ -376,13 +378,15 @@ export class BankingStore {
 
   async getRule(id: string): Promise<TransactionRuleLocal | undefined> {
     const store = await this.getStore(STORES.RULES);
-    return this.wrapRequest(store.get(id));
+    return this.wrapRequest(store.get(id) as IDBRequest<TransactionRuleLocal | undefined>);
   }
 
   async getRulesByAgent(stewardId: string): Promise<TransactionRuleLocal[]> {
     const store = await this.getStore(STORES.RULES);
     const index = store.index('stewardId');
-    const rules = await this.wrapRequest(index.getAll(stewardId));
+    const rules = await this.wrapRequest(
+      index.getAll(stewardId) as IDBRequest<TransactionRuleLocal[]>
+    );
     // Sort by priority (higher first)
     return rules.sort((a, b) => b.priority - a.priority);
   }
@@ -409,13 +413,13 @@ export class BankingStore {
   async getCorrectionsByMerchant(merchantName: string): Promise<CorrectionRecordLocal[]> {
     const store = await this.getStore(STORES.CORRECTIONS);
     const index = store.index('merchantName');
-    return this.wrapRequest(index.getAll(merchantName));
+    return this.wrapRequest(index.getAll(merchantName) as IDBRequest<CorrectionRecordLocal[]>);
   }
 
   async getCorrectionsByAgent(stewardId: string): Promise<CorrectionRecordLocal[]> {
     const store = await this.getStore(STORES.CORRECTIONS);
     const index = store.index('stewardId');
-    return this.wrapRequest(index.getAll(stewardId));
+    return this.wrapRequest(index.getAll(stewardId) as IDBRequest<CorrectionRecordLocal[]>);
   }
 
   // ==========================================================================

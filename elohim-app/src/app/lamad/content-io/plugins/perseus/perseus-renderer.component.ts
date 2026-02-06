@@ -14,7 +14,7 @@ import {
   inject,
 } from '@angular/core';
 
-// @coverage: 22.9% (2026-02-05)
+// @coverage: 22.4% (2026-02-05)
 
 import { Subject } from 'rxjs';
 
@@ -578,12 +578,12 @@ export class PerseusRendererComponent
 
     // ContentNode.content should be PerseusItem[] (array of Perseus items)
     // Handle: array, single item, or JSON string
-    let content = this.node.content;
+    let content: unknown = this.node.content;
 
     // Parse JSON string if needed
     if (typeof content === 'string') {
       try {
-        content = JSON.parse(content);
+        content = JSON.parse(content) as unknown;
       } catch {
         return;
       }
@@ -716,7 +716,7 @@ export class PerseusRendererComponent
   private initializeStreakTracking(): void {
     if (this.targetStreak > 0) {
       this.streakDots = new Array(this.targetStreak).fill(0).map((_, i) => i);
-      this.streakHistory = new Array(this.targetStreak).fill(null);
+      this.streakHistory = new Array<boolean | null>(this.targetStreak).fill(null);
     }
   }
 
@@ -732,7 +732,7 @@ export class PerseusRendererComponent
     } else {
       // Break streak - reset
       this.currentStreak = 0;
-      this.streakHistory = new Array(this.targetStreak).fill(null);
+      this.streakHistory = new Array<boolean | null>(this.targetStreak).fill(null);
     }
   }
 

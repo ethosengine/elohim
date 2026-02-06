@@ -41,6 +41,8 @@ import {
  *
  * This service requires intimate-level consent with valid attestations.
  */
+const NEGOTIATION_NOT_FOUND = 'Negotiation not found';
+
 @Injectable({ providedIn: 'root' })
 export class PathNegotiationService {
   private readonly negotiationsSubject = new BehaviorSubject<PathNegotiation[]>([]);
@@ -162,7 +164,7 @@ export class PathNegotiationService {
   ): Observable<PathNegotiation> {
     const negotiation = this.findNegotiationById(negotiationId);
     if (!negotiation) {
-      return throwError(() => new Error('Negotiation not found'));
+      return throwError(() => new Error(NEGOTIATION_NOT_FOUND));
     }
 
     const currentAgentId = this.getCurrentAgentId();
@@ -206,7 +208,7 @@ export class PathNegotiationService {
   declineNegotiation(negotiationId: string, reason?: string): Observable<void> {
     const negotiation = this.findNegotiationById(negotiationId);
     if (!negotiation) {
-      return throwError(() => new Error('Negotiation not found'));
+      return throwError(() => new Error(NEGOTIATION_NOT_FOUND));
     }
 
     const currentAgentId = this.getCurrentAgentId();
@@ -317,7 +319,7 @@ export class PathNegotiationService {
   ): Observable<ProposedPathStructure> {
     const negotiation = this.findNegotiationById(negotiationId);
     if (!negotiation) {
-      return throwError(() => new Error('Negotiation not found'));
+      return throwError(() => new Error(NEGOTIATION_NOT_FOUND));
     }
 
     if (negotiation.status !== 'negotiating') {
@@ -418,7 +420,7 @@ export class PathNegotiationService {
   acceptGeneratedPath(acceptance: PathAcceptance): Observable<PathNegotiation> {
     const negotiation = this.findNegotiationById(acceptance.negotiationId);
     if (!negotiation) {
-      return throwError(() => new Error('Negotiation not found'));
+      return throwError(() => new Error(NEGOTIATION_NOT_FOUND));
     }
 
     if (!negotiation.proposedPathStructure) {
@@ -511,7 +513,7 @@ export class PathNegotiationService {
   ): Observable<PathNegotiation> {
     const negotiation = this.findNegotiationById(negotiationId);
     if (!negotiation) {
-      return throwError(() => new Error('Negotiation not found'));
+      return throwError(() => new Error(NEGOTIATION_NOT_FOUND));
     }
 
     if (!isNegotiationActive(negotiation.status)) {

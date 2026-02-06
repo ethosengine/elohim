@@ -299,7 +299,7 @@ export class EconomicEventFactoryService {
    * 3. Link to FinancialAsset
    * 4. Emit EconomicEventCreated signal
    */
-  private createEvent(
+  private async createEvent(
     request: CreateEventRequest,
     staged: StagedTransaction
   ): Promise<EconomicEvent> {

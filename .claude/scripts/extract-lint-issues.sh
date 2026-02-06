@@ -48,7 +48,17 @@ TIER_MAP=$(cat <<'TIER_EOF'
   "sonarjs/no-duplicate-string": "contextual",
   "sonarjs/no-nested-conditional": "contextual",
   "sonarjs/todo-tag": "judgment",
-  "sonarjs/no-identical-functions": "judgment"
+  "sonarjs/no-identical-functions": "judgment",
+  "@typescript-eslint/no-unnecessary-type-assertion": "mechanical",
+  "@typescript-eslint/await-thenable": "mechanical",
+  "@typescript-eslint/max-params": "contextual",
+  "unicorn/prefer-set-has": "contextual",
+  "unicorn/no-zero-fractions": "mechanical",
+  "unicorn/prefer-number-properties": "mechanical",
+  "unicorn/prefer-code-point": "mechanical",
+  "unicorn/prefer-array-index-of": "mechanical",
+  "unicorn/no-typeof-undefined": "mechanical",
+  "unicorn/prefer-export-from": "mechanical"
 }
 TIER_EOF
 )
@@ -81,7 +91,17 @@ FIX_HINTS=$(cat <<'HINTS_EOF'
   "sonarjs/no-duplicate-string": "Extract repeated string into a constant",
   "sonarjs/no-identical-functions": "Extract common logic into a shared function",
   "alpha-value-notation": "Use percentage for alpha: rgb(0 0 0 / 50%) not rgb(0 0 0 / 0.5)",
-  "color-function-notation": "Use modern syntax: rgb(255 255 255) not rgba(255, 255, 255, 1)"
+  "color-function-notation": "Use modern syntax: rgb(255 255 255) not rgba(255, 255, 255, 1)",
+  "@typescript-eslint/no-unnecessary-type-assertion": "Remove redundant `as Type` or `!` assertion - TypeScript already knows the type",
+  "@typescript-eslint/await-thenable": "Remove `await` - the value is not a Promise/Thenable",
+  "@typescript-eslint/max-params": "Extract parameters into an options object",
+  "unicorn/prefer-set-has": "Convert array to `new Set([...])` and use `.has()` instead of `.includes()`",
+  "unicorn/no-zero-fractions": "Replace `0.0` with `0`, `1.0` with `1`, etc.",
+  "unicorn/prefer-number-properties": "Use `Number.isNaN()` instead of `isNaN()`, `Number.parseInt()` instead of `parseInt()`",
+  "unicorn/prefer-code-point": "Use `String.fromCodePoint()` instead of `String.fromCharCode()`",
+  "unicorn/prefer-array-index-of": "Use `.indexOf()` instead of `.findIndex()` for simple values",
+  "unicorn/no-typeof-undefined": "Use `=== undefined` instead of `typeof x === 'undefined'`",
+  "unicorn/prefer-export-from": "Use `export { Foo } from './bar'` instead of importing then re-exporting"
 }
 HINTS_EOF
 )

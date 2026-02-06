@@ -374,15 +374,15 @@ export class BudgetReconciliationService {
    * Retrieves a budget
    * Retrieval will be integrated with BudgetService
    */
-  private async getBudget(budgetId: string): Promise<FlowBudget> {
+  private getBudget(budgetId: string): FlowBudget {
     // BudgetService integration pending
     return this.createMockBudget(budgetId, '');
   }
 
   /**
-   * Creates a mock budget for testing (async wrapper)
+   * Creates a mock budget for testing
    */
-  private async createMockBudget(budgetId: string, stewardId: string): Promise<FlowBudget> {
+  private createMockBudget(budgetId: string, stewardId: string): FlowBudget {
     return this.createMockBudgetSync(budgetId, stewardId);
   }
 

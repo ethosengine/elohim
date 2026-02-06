@@ -64,12 +64,12 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
       this.node.contentFormat === ('quiz-json' as any) ||
       this.node.contentType === 'assessment'
     ) {
-      let content = this.node.content;
+      let content: unknown = this.node.content;
 
       // Parse if it's a string
       if (typeof content === 'string') {
         try {
-          content = JSON.parse(content);
+          content = JSON.parse(content) as unknown;
         } catch {
           // JSON parse failed - invalid quiz content, skip rendering
           return;

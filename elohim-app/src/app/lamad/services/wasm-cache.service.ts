@@ -38,7 +38,6 @@ import {
   TsBlobCache,
   TsChunkCache,
 } from '@elohim/service/cache/reach-aware-cache';
-import { ReachLevel, MasteryLevel } from '@elohim/service/cache/types';
 
 import type {
   IReachAwareCache,
@@ -51,7 +50,6 @@ import type {
 } from '@elohim/service/cache/types';
 
 // Re-export constants for convenience
-export { ReachLevel, MasteryLevel };
 
 /** Service state */
 export type CacheServiceState = 'uninitialized' | 'initializing' | 'ready' | 'error';
@@ -438,3 +436,5 @@ export class WasmCacheService implements OnDestroy {
     this.stateSubject.complete();
   }
 }
+
+export { ReachLevel, MasteryLevel } from '@elohim/service/cache/types';

@@ -443,14 +443,14 @@ export interface MasteryStatsWire {
 export function transformMasteryFromWire(wire: ContentMasteryWire): ContentMastery {
   let assessmentEvidence: AssessmentEvidence[] = [];
   try {
-    assessmentEvidence = JSON.parse(wire.assessment_evidence_json || '[]');
+    assessmentEvidence = JSON.parse(wire.assessment_evidence_json || '[]') as AssessmentEvidence[];
   } catch {
     // Ignore parse errors
   }
 
   let privileges: ContentPrivilege[] = [];
   try {
-    privileges = JSON.parse(wire.privileges_json || '[]');
+    privileges = JSON.parse(wire.privileges_json || '[]') as ContentPrivilege[];
   } catch {
     // Ignore parse errors
   }

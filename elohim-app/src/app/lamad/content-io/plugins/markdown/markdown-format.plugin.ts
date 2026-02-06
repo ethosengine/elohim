@@ -86,6 +86,7 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
   // Export
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Interface requires Promise return but no async work needed
   async export(node: ContentIOExportInput): Promise<string> {
     const lines: string[] = [];
 
@@ -355,11 +356,11 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
 
   private addCoreFields(fields: string[], node: ContentIOExportInput): void {
     if (node.title) {
-      fields.push(`title: "${node.title.replaceAll('"', '\\"')}"`);
+      fields.push(`title: "${node.title.replaceAll('"', String.raw`\"`)}"`);
     }
     if (node.description) {
       const desc = this.truncateDescription(node.description, 200);
-      fields.push(`description: "${desc.replaceAll('"', '\\"').replaceAll('\n', ' ')}"`);
+      fields.push(`description: "${desc.replaceAll('"', String.raw`\"`).replaceAll('\n', ' ')}"`);
     }
     if (node.contentType) {
       fields.push(`contentType: ${node.contentType}`);
@@ -376,9 +377,9 @@ export class MarkdownFormatPlugin implements ContentFormatPlugin {
   private addMetadataFields(fields: string[], metadata?: Record<string, unknown>): void {
     if (!metadata) return;
 
-    const skipKeys = ['sections', 'wordCount', 'headingCount'];
+    const skipKeys = new Set(['sections', 'wordCount', 'headingCount']);
     for (const [key, value] of Object.entries(metadata)) {
-      if (skipKeys.includes(key) || value === null || value === undefined) continue;
+      if (skipKeys.has(key) || value === null || value === undefined) continue;
       const formattedValue = this.formatMetadataValue(value);
       if (formattedValue !== null) {
         fields.push(`${key}: ${formattedValue}`);

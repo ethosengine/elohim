@@ -247,10 +247,10 @@ export class OAuthAuthProvider implements AuthProvider {
   /**
    * Logout - clear any OAuth state.
    */
-  logout(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/require-await -- Interface requires Promise<void> but no async work needed
+  async logout(): Promise<void> {
     sessionStorage.removeItem(OAUTH_STATE_KEY);
     this.isFlowInProgress.set(false);
-    return Promise.resolve();
   }
 
   /**

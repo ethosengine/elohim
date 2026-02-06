@@ -100,6 +100,7 @@ export class TauriAuthService {
    * Check if running in Tauri environment.
    */
   isTauriEnvironment(): boolean {
+    // eslint-disable-next-line unicorn/prefer-global-this -- window is correct here: Tauri extends Window, not globalThis
     return typeof window !== 'undefined' && '__TAURI__' in window;
   }
 
@@ -148,15 +149,18 @@ export class TauriAuthService {
    * Set up Tauri event listeners for OAuth callbacks.
    */
   private async setupEventListeners(): Promise<void> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     if (!window.__TAURI__?.event) {
       return;
     }
 
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     const { listen } = window.__TAURI__.event;
 
     // Listen for OAuth callback from deep link
     this.unsubscribeOAuthCallback = await listen<OAuthCallbackPayload>(
       'oauth-callback',
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises -- callback must be async to await OAuth flow
       async event => {
         await this.handleOAuthCallback(event.payload);
       }
@@ -194,23 +198,7 @@ export class TauriAuthService {
         throw new Error(`Session API error: ${response.status}`);
       }
 
-      const session = await response.json();
-      // Convert snake_case to camelCase
-      return {
-        id: session.id,
-        humanId: session.humanId,
-        agentPubKey: session.agentPubKey,
-        doorwayUrl: session.doorwayUrl,
-        doorwayId: session.doorwayId,
-        identifier: session.identifier,
-        displayName: session.displayName,
-        profileImageHash: session.profileImageHash,
-        isActive: session.isActive,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
-        lastSyncedAt: session.lastSyncedAt,
-        bootstrapUrl: session.bootstrapUrl,
-      };
+      return (await response.json()) as LocalSession;
     } catch (err) {
       // Session retrieval failure is non-critical - returns null to allow app to continue
       // This can happen if sidecar is not running or network is unavailable
@@ -252,7 +240,7 @@ export class TauriAuthService {
         throw new Error(`Token exchange failed: ${error}`);
       }
 
-      const tokenData = await tokenResponse.json();
+      const tokenData = (await tokenResponse.json()) as { access_token: string };
       const accessToken = tokenData.access_token;
 
       // Step 2: Get native handoff info
@@ -337,22 +325,7 @@ export class TauriAuthService {
       throw new Error(`Failed to create session: ${error}`);
     }
 
-    const session = await response.json();
-    return {
-      id: session.id,
-      humanId: session.humanId,
-      agentPubKey: session.agentPubKey,
-      doorwayUrl: session.doorwayUrl,
-      doorwayId: session.doorwayId,
-      identifier: session.identifier,
-      displayName: session.displayName,
-      profileImageHash: session.profileImageHash,
-      isActive: session.isActive,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      lastSyncedAt: session.lastSyncedAt,
-      bootstrapUrl: session.bootstrapUrl,
-    };
+    return (await response.json()) as LocalSession;
   }
 
   /**

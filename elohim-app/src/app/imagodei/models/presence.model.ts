@@ -240,12 +240,12 @@ export function formatRecognitionScore(score: number): string {
 export function parseExternalIdentifiers(json: string): ExternalIdentifier[] {
   if (!json) return [];
   try {
-    const parsed = JSON.parse(json);
+    const parsed: unknown = JSON.parse(json);
     if (Array.isArray(parsed)) {
-      return parsed;
+      return parsed as ExternalIdentifier[];
     }
     // Handle object format { provider: value }
-    if (typeof parsed === 'object') {
+    if (typeof parsed === 'object' && parsed !== null) {
       return Object.entries(parsed).map(([provider, value]) => ({
         provider,
         value: String(value),

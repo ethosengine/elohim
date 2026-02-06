@@ -41,6 +41,13 @@ import {
  * From API Spec:
  * "The same navigation/affinity mechanics apply to all three [map types]."
  */
+const DEMO_LEARNER = 'demo-learner';
+const STEWARD_ONLY = 'steward-only';
+const ERR_NOT_FOUND = 'NOT_FOUND';
+const ERR_UNAUTHORIZED = 'UNAUTHORIZED';
+const MSG_MAP_NOT_FOUND = 'Map not found';
+const MSG_CANNOT_EDIT = 'Cannot edit this map';
+
 @Injectable({ providedIn: 'root' })
 export class KnowledgeMapService {
   // In-memory map storage (prototype - production uses Holochain)
@@ -52,7 +59,7 @@ export class KnowledgeMapService {
   public readonly myMaps$ = this.myMapsSubject.asObservable();
 
   // Current agent ID (from auth service in production)
-  private currentAgentId = 'demo-learner';
+  private currentAgentId = DEMO_LEARNER;
 
   constructor(
     private readonly dataLoader: DataLoaderService,
@@ -121,7 +128,7 @@ export class KnowledgeMapService {
 
     if (!this.canView(m)) {
       return throwError(() => ({
-        code: 'UNAUTHORIZED',
+        code: ERR_UNAUTHORIZED,
         message: 'You do not have permission to view this map',
       }));
     }
@@ -295,8 +302,8 @@ export class KnowledgeMapService {
         },
       ],
       governance: params.governance ?? {
-        approvalModel: 'steward-only',
-        membershipControl: 'steward-only',
+        approvalModel: STEWARD_ONLY,
+        membershipControl: STEWARD_ONLY,
       },
       domains: [],
       collectiveAttestations: [],
@@ -321,11 +328,11 @@ export class KnowledgeMapService {
     return this.getMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Map not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: MSG_MAP_NOT_FOUND }));
         }
 
         if (!this.canEdit(m)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this map' }));
+          return throwError(() => ({ code: ERR_UNAUTHORIZED, message: MSG_CANNOT_EDIT }));
         }
 
         const newNode: KnowledgeNode = {
@@ -354,16 +361,16 @@ export class KnowledgeMapService {
     return this.getMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Map not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: MSG_MAP_NOT_FOUND }));
         }
 
         if (!this.canEdit(m)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this map' }));
+          return throwError(() => ({ code: ERR_UNAUTHORIZED, message: MSG_CANNOT_EDIT }));
         }
 
         const nodeIndex = m.nodes.findIndex(n => n.id === nodeId);
         if (nodeIndex === -1) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Node not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: 'Node not found' }));
         }
 
         m.nodes[nodeIndex] = { ...m.nodes[nodeIndex], ...updates };
@@ -383,11 +390,11 @@ export class KnowledgeMapService {
     return this.getMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Map not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: MSG_MAP_NOT_FOUND }));
         }
 
         if (!this.canEdit(m)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this map' }));
+          return throwError(() => ({ code: ERR_UNAUTHORIZED, message: MSG_CANNOT_EDIT }));
         }
 
         m.nodes = m.nodes.filter(n => n.id !== nodeId);
@@ -407,11 +414,11 @@ export class KnowledgeMapService {
     return this.getDomainMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Domain map not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: 'Domain map not found' }));
         }
 
         if (!this.canEdit(m)) {
-          return throwError(() => ({ code: 'UNAUTHORIZED', message: 'Cannot edit this map' }));
+          return throwError(() => ({ code: ERR_UNAUTHORIZED, message: MSG_CANNOT_EDIT }));
         }
 
         m.masteryLevels.set(contentNodeId, level);
@@ -435,7 +442,7 @@ export class KnowledgeMapService {
     return this.getPersonMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Person map not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: 'Person map not found' }));
         }
 
         // In production: send notification to subject
@@ -452,13 +459,13 @@ export class KnowledgeMapService {
     return this.getPersonMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Person map not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: 'Person map not found' }));
         }
 
         // Only the subject can grant consent
         if (m.subject.subjectId !== this.currentAgentId) {
           return throwError(() => ({
-            code: 'UNAUTHORIZED',
+            code: ERR_UNAUTHORIZED,
             message: 'Only the subject can grant consent',
           }));
         }
@@ -485,7 +492,7 @@ export class KnowledgeMapService {
     return this.getMap(mapId).pipe(
       switchMap(m => {
         if (!m) {
-          return throwError(() => ({ code: 'NOT_FOUND', message: 'Map not found' }));
+          return throwError(() => ({ code: ERR_NOT_FOUND, message: MSG_MAP_NOT_FOUND }));
         }
 
         // Invoke Elohim with knowledge-map-synthesis capability
@@ -510,8 +517,8 @@ export class KnowledgeMapService {
         }
 
         // Extract suggested updates from Elohim response
-        const payload = response.payload as any;
-        if (payload?.type !== 'knowledge-map-update') {
+        const payload = response.payload as Record<string, unknown> | undefined;
+        if (payload?.['type'] !== 'knowledge-map-update') {
           return [];
         }
 
@@ -688,7 +695,7 @@ export class KnowledgeMapService {
         subjectId: 'elohim-protocol-graph',
         subjectName: 'The Elohim Protocol',
       },
-      ownerId: 'demo-learner',
+      ownerId: DEMO_LEARNER,
       title: 'My Elohim Protocol Journey',
       description: 'Personal knowledge map tracking my understanding of the Elohim Protocol',
       visibility: 'private',
@@ -740,7 +747,7 @@ export class KnowledgeMapService {
       title: 'Collective Learning Insights',
       description: 'Shared knowledge and insights from the learning community',
       visibility: 'shared',
-      sharedWith: ['demo-learner'],
+      sharedWith: [DEMO_LEARNER],
       nodes: [
         {
           id: 'cnode-faq',
@@ -756,10 +763,10 @@ export class KnowledgeMapService {
       overallAffinity: 0.85,
       members: [
         { agentId: 'steward-curriculum', role: 'steward', joinedAt: now, contributionCount: 15 },
-        { agentId: 'demo-learner', role: 'contributor', joinedAt: now, contributionCount: 2 },
+        { agentId: DEMO_LEARNER, role: 'contributor', joinedAt: now, contributionCount: 2 },
       ],
       governance: {
-        approvalModel: 'steward-only',
+        approvalModel: STEWARD_ONLY,
         membershipControl: 'member-invite',
       },
       domains: [

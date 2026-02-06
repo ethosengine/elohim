@@ -12,7 +12,7 @@ import { HolochainContentService } from './elohim/services/holochain-content.ser
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
-// @coverage: 93.9% (2026-02-05)
+// @coverage: 90.9% (2026-02-05)
 
 /** Connection retry configuration */
 interface RetryConfig {

@@ -7,6 +7,12 @@ import { ConfigService } from './config.service';
 
 const GA_TRACKING_ID = 'G-NSL7PVP55B' as const;
 
+/** Window augmented with Google Analytics globals */
+interface GAWindow extends Window {
+  dataLayer: unknown[][];
+  gtag: (...args: unknown[]) => void;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -42,9 +48,10 @@ export class AnalyticsService {
     if (!window) return;
 
     // Initialize dataLayer and gtag
-    (window as any).dataLayer = (window as any).dataLayer ?? [];
-    (window as any).gtag = (...args: unknown[]) => {
-      (window as any).dataLayer.push(args);
+    const gaWindow = window as unknown as GAWindow;
+    gaWindow.dataLayer = gaWindow.dataLayer ?? [];
+    gaWindow.gtag = (...args: unknown[]) => {
+      gaWindow.dataLayer.push(args);
     };
 
     // Load script
@@ -54,8 +61,8 @@ export class AnalyticsService {
 
     // Configure GA
     script.onload = () => {
-      (window as any).gtag('js', new Date());
-      (window as any).gtag('config', GA_TRACKING_ID);
+      gaWindow.gtag('js', new Date());
+      gaWindow.gtag('config', GA_TRACKING_ID);
     };
 
     this.document.head.appendChild(script);

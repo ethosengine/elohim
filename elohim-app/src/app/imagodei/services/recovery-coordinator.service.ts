@@ -139,8 +139,8 @@ export class RecoveryCoordinatorService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message ?? 'Failed to initiate recovery');
+        const error = (await response.json()) as Record<string, unknown>;
+        throw new Error((error['message'] as string) ?? 'Failed to initiate recovery');
       }
 
       const request: RecoveryRequest = await response.json();
@@ -287,7 +287,7 @@ export class RecoveryCoordinatorService {
 
       if (!response.ok) throw new Error('Failed to load recovery queue');
 
-      const data = await response.json();
+      const data = (await response.json()) as { requests?: PendingRecoveryRequest[] };
       this._pendingRequests.set(data.requests ?? []);
     } catch {
       // Failed to load recovery queue - will retry on next call (non-critical)
@@ -343,7 +343,7 @@ export class RecoveryCoordinatorService {
 
       if (!response.ok) return [];
 
-      const data = await response.json();
+      const data = (await response.json()) as { questions?: InterviewQuestion[] };
       return data.questions ?? [];
     } catch {
       // Failed to generate questions - return empty array
@@ -374,7 +374,7 @@ export class RecoveryCoordinatorService {
 
       if (!response.ok) return null;
 
-      const data = await response.json();
+      const data = (await response.json()) as { response: InterviewResponse };
 
       // Update interview with new response
       this._conductingInterview.update(i =>

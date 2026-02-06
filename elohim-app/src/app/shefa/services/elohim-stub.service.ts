@@ -247,8 +247,6 @@ Instructions: For each transaction, determine the most appropriate category base
    * Logs the prompt and returns rule-based decision.
    */
   adjudicateClaim(request: AdjudicationRequest): Observable<AdjudicationResponse> {
-    const startTime = Date.now();
-
     // Build the prompt that would be sent to the AI
     const prompt = this.buildAdjudicationPrompt(request);
 

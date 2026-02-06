@@ -273,7 +273,7 @@ export class DuplicateDetectionService {
 
     // Amount similarity (±$1.00 = full points)
     const amountDiff = Math.abs(candidate.amount - txn.amount);
-    const amountScore = Math.max(0, 15 * (1 - amountDiff / 1.0));
+    const amountScore = Math.max(0, 15 * (1 - amountDiff / 1));
     score += amountScore;
 
     // Date similarity (±7 days = full points)

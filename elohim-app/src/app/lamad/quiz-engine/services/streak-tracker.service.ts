@@ -287,11 +287,11 @@ export class StreakTrackerService {
 
     // Update subject
     let subject = this.streakSubjects.get(contentId);
-    if (!subject) {
+    if (subject) {
+      subject.next(state);
+    } else {
       subject = new BehaviorSubject(state);
       this.streakSubjects.set(contentId, subject);
-    } else {
-      subject.next(state);
     }
 
     // Persist

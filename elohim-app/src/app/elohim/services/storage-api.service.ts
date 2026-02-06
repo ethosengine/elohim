@@ -204,7 +204,7 @@ export class StorageApiService {
       sourceId: input.sourceId,
       targetId: input.targetId,
       relationshipType: input.relationshipType,
-      confidence: input.confidence ?? 1.0,
+      confidence: input.confidence ?? 1,
       inferenceSource: input.inferenceSource ?? 'author',
       createInverse: input.createInverse ?? false,
       inverseType: input.inverseType,

@@ -107,14 +107,15 @@ export class SeoService {
       .subscribe(data => {
         // If route has seo data, apply it
         if (data['seo']) {
-          this.updateSeo(data['seo']);
+          this.updateSeo(data['seo'] as SeoConfig);
         } else if (data['title']) {
           // Simple title from route data
-          this.setTitle(data['title']);
+          const title = data['title'] as string;
+          this.setTitle(title);
           // Reset to defaults for other meta
           this.updateMetaDescription(DEFAULTS.defaultDescription);
           this.updateOpenGraphTags({
-            ogTitle: data['title'],
+            ogTitle: title,
             ogDescription: DEFAULTS.defaultDescription,
           });
         }

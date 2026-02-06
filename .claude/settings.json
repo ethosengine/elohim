@@ -36,6 +36,16 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "matcher": "mcp__sonarqube__search_sonar_issues_in_projects",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sonar-issues-guard.py\"",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "PostToolUse": [

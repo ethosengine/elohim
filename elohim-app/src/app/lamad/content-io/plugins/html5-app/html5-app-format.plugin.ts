@@ -313,16 +313,20 @@ export class Html5AppFormatPlugin implements ContentFormatPlugin {
 
   detectFormat(content: string): number | null {
     try {
-      const parsed = JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
 
-      // Check for Html5AppContent structure
-      if (typeof parsed.appId === 'string' && typeof parsed.entryPoint === 'string') {
-        return 0.9; // High confidence
-      }
+      if (typeof parsed === 'object' && parsed !== null) {
+        const obj = parsed as Record<string, unknown>;
 
-      // Check for ContentNode with html5-app format
-      if (parsed.contentFormat === 'html5-app') {
-        return 0.95;
+        // Check for Html5AppContent structure
+        if (typeof obj['appId'] === 'string' && typeof obj['entryPoint'] === 'string') {
+          return 0.9; // High confidence
+        }
+
+        // Check for ContentNode with html5-app format
+        if (obj['contentFormat'] === 'html5-app') {
+          return 0.95;
+        }
       }
     } catch {
       return null;

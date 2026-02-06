@@ -64,15 +64,6 @@ import type {
 } from '@elohim/service/cache/write-buffer';
 
 // Re-export types and enums for convenience
-export {
-  WritePriority,
-  WriteOpType,
-  type IWriteBuffer,
-  type WriteOperation,
-  type WriteBatch,
-  type BatchResult,
-  type WriteBufferStats,
-};
 
 /** Service state */
 export type BufferServiceState = 'uninitialized' | 'initializing' | 'ready' | 'flushing' | 'error';
@@ -868,3 +859,13 @@ export class WriteBufferService implements OnDestroy {
     this.backpressureSubject.complete();
   }
 }
+
+export {
+  WritePriority,
+  type IWriteBuffer,
+  WriteOpType,
+  type WriteOperation,
+  type BatchResult,
+  type WriteBatch,
+  type WriteBufferStats,
+} from '@elohim/service/cache/write-buffer';

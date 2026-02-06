@@ -29,17 +29,12 @@
 import {
   IntimacyLevel,
   ConsentState,
-  INTIMACY_LEVEL_VALUES,
-  hasMinimumIntimacy,
-  getNextIntimacyLevel,
-  isConsentActive,
   type ConsentStateChange as BaseConsentStateChange,
 } from '@app/elohim/models/protocol-core.model';
 
 // @coverage: 66.7% (2026-02-05)
 
 // Re-export for convenience (types only to avoid duplicate values)
-export type { IntimacyLevel, ConsentState };
 
 // =========================================================================
 // Human Consent Record
@@ -269,4 +264,12 @@ export function canElevate(consent: HumanConsent): boolean {
 }
 
 // Re-export utility functions from protocol-core for convenience
-export { INTIMACY_LEVEL_VALUES, hasMinimumIntimacy, getNextIntimacyLevel, isConsentActive };
+
+export {
+  INTIMACY_LEVEL_VALUES,
+  getNextIntimacyLevel,
+  hasMinimumIntimacy,
+  type IntimacyLevel,
+  isConsentActive,
+  type ConsentState,
+} from '@app/elohim/models/protocol-core.model';

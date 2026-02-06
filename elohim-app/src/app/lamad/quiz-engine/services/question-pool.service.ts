@@ -107,7 +107,7 @@ export class QuestionPoolService {
    */
   getPoolsForContents(contentIds: string[]): Observable<Map<string, QuestionPool>> {
     if (contentIds.length === 0) {
-      return of(new Map());
+      return of(new Map<string, QuestionPool>());
     }
 
     const poolObservables = contentIds.map(id =>
@@ -487,7 +487,7 @@ export class QuestionPoolService {
         // Parse content if it's a string
         if (typeof content.content === 'string') {
           try {
-            return JSON.parse(content.content);
+            return JSON.parse(content.content) as Record<string, unknown>;
           } catch {
             return null;
           }

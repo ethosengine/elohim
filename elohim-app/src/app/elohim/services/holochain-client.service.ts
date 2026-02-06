@@ -50,6 +50,8 @@ import { PerformanceMetricsService } from './performance-metrics.service';
 
 import type { ConnectionConfig } from '@elohim/service/connection';
 
+const CONNECTION_FAILED = 'Connection failed';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -227,8 +229,8 @@ export class HolochainClientService {
 
       return { success: true, apps: appIds };
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Connection failed';
-      this.logger.error('Connection failed', err, { mode });
+      const errorMessage = err instanceof Error ? err.message : CONNECTION_FAILED;
+      this.logger.error(CONNECTION_FAILED, err, { mode });
 
       this.updateState({
         state: 'error',
@@ -273,7 +275,7 @@ export class HolochainClientService {
       const result = await this.strategy.connect(connectionConfig);
 
       if (!result.success) {
-        throw new Error(result.error ?? 'Connection failed');
+        throw new Error(result.error ?? CONNECTION_FAILED);
       }
 
       // Update state from strategy result
@@ -309,7 +311,7 @@ export class HolochainClientService {
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
-      this.logger.error('Connection failed', err, { strategy: this.strategy.name });
+      this.logger.error(CONNECTION_FAILED, err, { strategy: this.strategy.name });
 
       this.updateState({
         state: 'error',
@@ -399,22 +401,26 @@ export class HolochainClientService {
 
     this.updateState({ state: 'reconnecting' as HolochainConnectionState });
 
-    this.reconnectTimeout = setTimeout(async () => {
-      try {
-        await this.connect();
-        // Success - reset retry count
-        this.reconnectConfig.currentRetries = 0;
-        this.isReconnecting = false;
-        this.logger.info('Reconnection successful');
-      } catch (err) {
-        this.logger.warn('Reconnection attempt failed', {
-          attempt: this.reconnectConfig.currentRetries,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        // Schedule another attempt
-        this.scheduleReconnect();
-      }
-    }, delay);
+    this.reconnectTimeout = setTimeout(
+      () =>
+        void (async () => {
+          try {
+            await this.connect();
+            // Success - reset retry count
+            this.reconnectConfig.currentRetries = 0;
+            this.isReconnecting = false;
+            this.logger.info('Reconnection successful');
+          } catch (err) {
+            this.logger.warn('Reconnection attempt failed', {
+              attempt: this.reconnectConfig.currentRetries,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            // Schedule another attempt
+            this.scheduleReconnect();
+          }
+        })(),
+      delay
+    );
   }
 
   /**
@@ -495,7 +501,7 @@ export class HolochainClientService {
     const connectionValidation = await this.validateConnection(callContext, timer);
     if (!connectionValidation.valid) {
       // Non-null assertion needed: TypeScript doesn't narrow discriminated unions correctly here
-      return connectionValidation.error!;
+      return connectionValidation.error;
     }
 
     const { appWs, cellIds } = connectionValidation;
@@ -503,11 +509,11 @@ export class HolochainClientService {
     // Look up the correct cell ID for this role
     const cellIdResult = this.getCellIdForRole(cellIds, roleName, callContext, timer);
     if (!cellIdResult.success) {
-      return cellIdResult.error!;
+      return cellIdResult.error;
     }
 
     // Execute the zome call
-    return this.executeZomeCall(appWs, cellIdResult.cellId!, input, callContext, timer);
+    return this.executeZomeCall(appWs, cellIdResult.cellId, input, callContext, timer);
   }
 
   /**
@@ -679,7 +685,7 @@ export class HolochainClientService {
     // Ensure we have cell IDs for DNA hash lookup
     const cellIdsResult = await this.ensureCellIds(startTime);
     if (!cellIdsResult.success) {
-      return cellIdsResult.error!;
+      return cellIdsResult.error;
     }
 
     const { cellIds } = cellIdsResult;
@@ -687,11 +693,11 @@ export class HolochainClientService {
     // Look up the correct cell ID for this role
     const cellIdResult = this.lookupCellId(cellIds, roleName, startTime);
     if (!cellIdResult.success) {
-      return cellIdResult.error!;
+      return cellIdResult.error;
     }
 
     // Build REST API URL
-    const dnaHash = this.uint8ArrayToBase64(cellIdResult.cellId![0]);
+    const dnaHash = this.uint8ArrayToBase64(cellIdResult.cellId[0]);
     const restUrl = this.resolveRestUrl(dnaHash, input.zomeName, input.fnName);
 
     // Execute the REST call
@@ -790,8 +796,9 @@ export class HolochainClientService {
     let errorMessage = 'REST call failed';
 
     if (err instanceof HttpErrorResponse) {
-      if (err.error?.error) {
-        errorMessage = err.error.error;
+      const errorBody = err.error as Record<string, unknown> | null;
+      if (errorBody?.['error'] && typeof errorBody['error'] === 'string') {
+        errorMessage = errorBody['error'];
       } else if (err.message) {
         errorMessage = err.message;
       }

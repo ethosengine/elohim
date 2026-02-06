@@ -310,21 +310,26 @@ export class PerseusFormatPlugin implements ContentFormatPlugin {
 
     // Must be valid JSON
     try {
-      const parsed = JSON.parse(content);
-      const items = Array.isArray(parsed) ? parsed : [parsed];
+      const parsed: unknown = JSON.parse(content);
+      const items: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
 
       // Check for Perseus-specific structure
       for (const item of items) {
-        if (item.question?.widgets) {
+        if (typeof item !== 'object' || item === null) continue;
+        const obj = item as Record<string, unknown>;
+        const question = obj['question'] as Record<string, unknown> | undefined;
+
+        if (question?.['widgets']) {
           confidence += 0.4;
         }
-        if (item.question?.content?.includes('[[☃')) {
+        if (typeof question?.['content'] === 'string' && question['content'].includes('[[☃')) {
           confidence += 0.3; // Widget placeholder syntax
         }
-        if (item.metadata?.assessesContentId) {
+        const metadata = obj['metadata'] as Record<string, unknown> | undefined;
+        if (metadata?.['assessesContentId']) {
           confidence += 0.2;
         }
-        if (item.hints) {
+        if (obj['hints']) {
           confidence += 0.1;
         }
       }

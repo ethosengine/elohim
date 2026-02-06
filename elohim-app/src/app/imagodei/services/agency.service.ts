@@ -17,7 +17,6 @@ import { Injectable, computed, inject } from '@angular/core';
 // @coverage: 88.9% (2026-02-05)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
-import { type KeyLocation } from '../models/identity.model';
 import {
   type AgencyState,
   type AgencyStage,
@@ -30,6 +29,12 @@ import {
   getHostedDataResidency,
   getAppUserDataResidency,
 } from '../models/agency.model';
+import { type KeyLocation } from '../models/identity.model';
+
+const STAGE_NODE_STEWARD: AgencyStage = 'node-steward';
+const STAGE_APP_STEWARD: AgencyStage = 'app-steward';
+const KEY_TYPE_SIGNING = 'signing-key';
+const KEY_LABEL_SIGNING = 'Signing Key';
 
 @Injectable({
   providedIn: 'root',
@@ -122,7 +127,7 @@ export class AgencyService {
         // For now, detect node-steward based on configuration
         // In the future, check if hosting other humans via DHT query
         const isNodeSteward = this.detectNodeOperatorStatus();
-        return isNodeSteward ? 'node-steward' : 'app-steward';
+        return isNodeSteward ? STAGE_NODE_STEWARD : STAGE_APP_STEWARD;
       }
 
       // Remote conductor = Hosted User
@@ -165,8 +170,8 @@ export class AgencyService {
     try {
       const nodeConfig = localStorage.getItem('elohim_node_operator_config');
       if (nodeConfig) {
-        const config = JSON.parse(nodeConfig);
-        return config.isNodeOperator === true && config.hostedHumanCount > 0;
+        const config = JSON.parse(nodeConfig) as Record<string, unknown>;
+        return config['isNodeOperator'] === true && (config['hostedHumanCount'] as number) > 0;
       }
     } catch {
       // Ignore parse errors
@@ -226,8 +231,8 @@ export class AgencyService {
         return getVisitorDataResidency();
       case 'hosted':
         return getHostedDataResidency();
-      case 'app-steward':
-      case 'node-steward':
+      case STAGE_APP_STEWARD:
+      case STAGE_NODE_STEWARD:
         return getAppUserDataResidency();
       default:
         return getVisitorDataResidency();
@@ -277,9 +282,9 @@ export class AgencyService {
         return 'none';
       case 'hosted':
         return 'custodial'; // Keys held by edge node
-      case 'app-steward':
+      case STAGE_APP_STEWARD:
         return 'device'; // Keys on local conductor
-      case 'node-steward':
+      case STAGE_NODE_STEWARD:
         return 'device'; // Could be 'hardware' if using HSM
       default:
         return 'none';
@@ -293,8 +298,8 @@ export class AgencyService {
     switch (location) {
       case 'custodial':
         return {
-          type: 'signing-key',
-          label: 'Signing Key',
+          type: KEY_TYPE_SIGNING,
+          label: KEY_LABEL_SIGNING,
           value: 'Held by Edge Node',
           truncated: 'Custodial',
           canExport: false,
@@ -302,17 +307,17 @@ export class AgencyService {
         };
       case 'device':
         return {
-          type: 'signing-key',
-          label: 'Signing Key',
+          type: KEY_TYPE_SIGNING,
+          label: KEY_LABEL_SIGNING,
           value: 'On your device',
-          truncated: stage === 'node-steward' ? 'Steward (Node)' : 'Steward',
+          truncated: stage === STAGE_NODE_STEWARD ? 'Steward (Node)' : 'Steward',
           canExport: true,
           canRevoke: true,
         };
       case 'hardware':
         return {
-          type: 'signing-key',
-          label: 'Signing Key',
+          type: KEY_TYPE_SIGNING,
+          label: KEY_LABEL_SIGNING,
           value: 'Hardware Security Module',
           truncated: 'Hardware Protected',
           canExport: false, // Hardware keys can't be exported
@@ -320,8 +325,8 @@ export class AgencyService {
         };
       case 'browser':
         return {
-          type: 'signing-key',
-          label: 'Signing Key',
+          type: KEY_TYPE_SIGNING,
+          label: KEY_LABEL_SIGNING,
           value: 'Browser Storage',
           truncated: 'Browser (Less Secure)',
           canExport: true,
@@ -360,9 +365,9 @@ export class AgencyService {
         return { data: 'Browser only', progress: 'Temporary' };
       case 'hosted':
         return { data: 'DHT Network', progress: 'Saved' };
-      case 'app-steward':
+      case STAGE_APP_STEWARD:
         return { data: 'Your Device', progress: 'Saved' };
-      case 'node-steward':
+      case STAGE_NODE_STEWARD:
         return { data: 'Your Node', progress: 'Always-on' };
       default:
         return { data: 'Unknown', progress: 'Unknown' };

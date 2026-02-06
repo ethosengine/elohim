@@ -154,8 +154,8 @@ function toCreatePayload(request: CreatePresenceRequest): CreatePresencePayload 
 function parseJsonArray(json: string): string[] {
   if (!json) return [];
   try {
-    const parsed = JSON.parse(json);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(json);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
   } catch {
     return [];
   }
@@ -164,6 +164,8 @@ function parseJsonArray(json: string): string[] {
 // =============================================================================
 // Presence Service
 // =============================================================================
+
+const NOT_CONNECTED = 'Not connected to network';
 
 @Injectable({ providedIn: 'root' })
 export class PresenceService {
@@ -211,7 +213,7 @@ export class PresenceService {
    */
   async createPresence(request: CreatePresenceRequest): Promise<ContributorPresenceView> {
     if (!this.holochainClient.isConnected()) {
-      throw new Error('Not connected to network');
+      throw new Error(NOT_CONNECTED);
     }
 
     this.loadingSignal.set(true);
@@ -257,7 +259,7 @@ export class PresenceService {
     commitmentNote?: string
   ): Promise<ContributorPresenceView> {
     if (!this.holochainClient.isConnected()) {
-      throw new Error('Not connected to network');
+      throw new Error(NOT_CONNECTED);
     }
 
     const agentPubKey = this.identityService.agentPubKey();
@@ -351,7 +353,7 @@ export class PresenceService {
    */
   async initiateClaim(request: InitiateClaimRequest): Promise<ContributorPresenceView> {
     if (!this.holochainClient.isConnected()) {
-      throw new Error('Not connected to network');
+      throw new Error(NOT_CONNECTED);
     }
 
     this.loadingSignal.set(true);
@@ -395,7 +397,7 @@ export class PresenceService {
    */
   async verifyClaim(presenceId: string): Promise<ContributorPresenceView> {
     if (!this.holochainClient.isConnected()) {
-      throw new Error('Not connected to network');
+      throw new Error(NOT_CONNECTED);
     }
 
     this.loadingSignal.set(true);

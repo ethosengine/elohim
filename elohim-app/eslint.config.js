@@ -8,6 +8,7 @@ const importPlugin = require("eslint-plugin-import");
 const prettierPlugin = require("eslint-plugin-prettier");
 const prettierConfig = require("eslint-config-prettier");
 const sonarjs = require("eslint-plugin-sonarjs");
+const unicorn = require("eslint-plugin-unicorn").default;
 
 module.exports = tseslint.config(
   {
@@ -35,6 +36,7 @@ module.exports = tseslint.config(
       "@angular-eslint": angular,
       "import": importPlugin,
       "prettier": prettierPlugin,
+      "unicorn": unicorn,
       // Note: sonarjs plugin is registered by sonarjs.configs.recommended in extends
     },
     languageOptions: {
@@ -100,6 +102,11 @@ module.exports = tseslint.config(
       "@typescript-eslint/no-floating-promises": "error",       // Unhandled promises must be awaited
       "@typescript-eslint/promise-function-async": "warn",      // Functions returning promises should be async
       "@typescript-eslint/require-await": "error",              // S2486/S4123 - async functions need await
+
+      // Type assertion hygiene
+      "@typescript-eslint/no-unnecessary-type-assertion": "error", // S4325 - Redundant as/! assertions
+      "@typescript-eslint/await-thenable": "error",             // S4123 - Await non-thenable
+      "@typescript-eslint/max-params": ["error", { max: 7 }],  // S107 - Too many parameters
 
       // Deprecated APIs - matches S1874
       "@typescript-eslint/no-deprecated": "warn",               // S1874 - Deprecated API usage
@@ -181,6 +188,28 @@ module.exports = tseslint.config(
 
       // Keep this off - arrow functions in RxJS pipes are idiomatic
       "sonarjs/no-nested-functions": "off",
+
+      // ============================================================
+      // UNICORN RULES - SonarQube Parity (typescript:S77xx series)
+      // ============================================================
+      "unicorn/prefer-set-has": "error",                        // S7776 - Use Set.has() over Array.includes()
+      "unicorn/no-zero-fractions": "error",                     // S7748 - Remove .0 from numbers
+      "unicorn/prefer-number-properties": "error",              // S7773 - Number.isNaN over isNaN
+      "unicorn/prefer-code-point": "error",                     // S7758 - codePointAt over charCodeAt
+      "unicorn/prefer-array-index-of": "error",                 // S7753 - indexOf over findIndex
+      "unicorn/no-typeof-undefined": "error",                   // S7741 - === undefined over typeof
+      "unicorn/prefer-export-from": "error",                    // S7763 - Re-export directly
+      "unicorn/prefer-global-this": "error",                     // S7764 - globalThis over window
+      "unicorn/no-negated-condition": "error",                   // S7735 - Swap branches to remove negation
+      "unicorn/no-array-push-push": "error",                     // S7778 - Single push call
+      "unicorn/prefer-string-raw": "error",                      // S7780 - String.raw for backslashes
+      "unicorn/prefer-blob-reading-methods": "error",            // S7756 - Blob.text() over FileReader
+      "unicorn/prefer-dom-node-remove": "error",                 // S7762 - child.remove() over parent.removeChild
+      "unicorn/prefer-array-some": "error",                      // S7765/S7754 - .some() over .find() for boolean
+      "unicorn/prefer-negative-index": "error",                  // S7771 - .slice(-n)
+      "unicorn/prefer-at": "error",                              // S7755 - .at(-1) over [arr.length-1]
+      "unicorn/prefer-structured-clone": "error",                // S7784 - structuredClone over JSON roundtrip
+      "unicorn/prefer-top-level-await": "off",                   // S7785 - Off: Angular modules don't support TLA
 
       // ============================================================
       // PRETTIER

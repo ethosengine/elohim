@@ -62,9 +62,9 @@ export class MarkdownParser {
     // Extract metadata
     const metadata: ContentMetadata = {
       ...frontmatter,
-      category: frontmatter?.['category'] ?? this.inferCategory(title, tags),
-      authors: frontmatter?.['authors'] ?? [],
-      version: frontmatter?.['version'] ?? '1.0',
+      category: (frontmatter?.['category'] as string) ?? this.inferCategory(title, tags),
+      authors: (frontmatter?.['authors'] as string[]) ?? [],
+      version: (frontmatter?.['version'] as string) ?? '1.0',
       wordCount: this.countWords(content),
       headingCount: sections.length,
       sections, // Keep sections in metadata for viewers that might want them
@@ -96,14 +96,14 @@ export class MarkdownParser {
   /**
    * Extract YAML frontmatter from markdown
    */
-  private static extractFrontmatter(lines: string[]): Record<string, any> | null {
+  private static extractFrontmatter(lines: string[]): Record<string, unknown> | null {
     if (lines[0]?.trim() !== '---') return null;
 
     const endIndex = lines.findIndex((line, i) => i > 0 && line.trim() === '---');
     if (endIndex === -1) return null;
 
     const frontmatterLines = lines.slice(1, endIndex);
-    const frontmatter: Record<string, any> = {};
+    const frontmatter: Record<string, unknown> = {};
 
     for (const line of frontmatterLines) {
       // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured YAML frontmatter
@@ -235,14 +235,17 @@ export class MarkdownParser {
   /**
    * Extract tags from frontmatter or @tags in content
    */
-  private static extractTags(frontmatter: Record<string, any> | null, content: string): string[] {
+  private static extractTags(
+    frontmatter: Record<string, unknown> | null,
+    content: string
+  ): string[] {
     const tags = new Set<string>();
 
     // From frontmatter
     if (frontmatter?.['tags']) {
       const fmTags = Array.isArray(frontmatter['tags'])
-        ? frontmatter['tags']
-        : [frontmatter['tags']];
+        ? (frontmatter['tags'] as string[])
+        : [frontmatter['tags'] as string];
       fmTags.forEach(tag => tags.add(tag));
     }
 
@@ -309,10 +312,10 @@ export class MarkdownParser {
    */
   private static generateNodeId(
     sourcePath: string,
-    frontmatter: Record<string, any> | null
+    frontmatter: Record<string, unknown> | null
   ): string {
     // Prefer ID from frontmatter
-    if (frontmatter?.['id']) return frontmatter['id'];
+    if (frontmatter?.['id']) return frontmatter['id'] as string;
 
     // Fallback to path-based ID
     return sourcePath

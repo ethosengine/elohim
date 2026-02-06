@@ -89,6 +89,8 @@ const _CHECK_TIMEOUT = 5_000;
 // Service Implementation
 // =============================================================================
 
+const UNKNOWN_ERROR = 'Unknown error';
+
 @Injectable({ providedIn: 'root' })
 export class HealthCheckService implements OnDestroy {
   private readonly holochainClient = inject(HolochainClientService);
@@ -259,7 +261,7 @@ export class HealthCheckService implements OnDestroy {
       return {
         name,
         status: 'unhealthy',
-        message: `Check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        message: `Check failed: ${error instanceof Error ? error.message : UNKNOWN_ERROR}`,
         lastChecked: new Date().toISOString(),
         durationMs: Math.round(performance.now() - start),
       };
@@ -301,7 +303,7 @@ export class HealthCheckService implements OnDestroy {
       return {
         name,
         status: 'degraded',
-        message: `Check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        message: `Check failed: ${error instanceof Error ? error.message : UNKNOWN_ERROR}`,
         lastChecked: new Date().toISOString(),
         durationMs: Math.round(performance.now() - start),
       };
@@ -343,7 +345,7 @@ export class HealthCheckService implements OnDestroy {
       return {
         name,
         status: 'degraded',
-        message: `Check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        message: `Check failed: ${error instanceof Error ? error.message : UNKNOWN_ERROR}`,
         lastChecked: new Date().toISOString(),
         durationMs: Math.round(performance.now() - start),
       };
@@ -371,8 +373,11 @@ export class HealthCheckService implements OnDestroy {
         };
       }
 
-      // Check network connection info if available
-      const connection = (navigator as any).connection;
+      // Check network connection info if available (Network Information API)
+      const navWithConnection = navigator as Navigator & {
+        connection?: { effectiveType?: string; downlink?: number };
+      };
+      const connection = navWithConnection.connection;
       if (connection) {
         const effectiveType = connection.effectiveType;
         const downlink = connection.downlink;
@@ -416,7 +421,7 @@ export class HealthCheckService implements OnDestroy {
       return {
         name,
         status: 'unknown',
-        message: `Check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        message: `Check failed: ${error instanceof Error ? error.message : UNKNOWN_ERROR}`,
         lastChecked: new Date().toISOString(),
         durationMs: Math.round(performance.now() - start),
       };

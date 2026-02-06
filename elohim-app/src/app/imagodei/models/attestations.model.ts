@@ -68,7 +68,7 @@ export interface Attestation {
   revocable: boolean;
 
   /** Metadata for domain-specific extensions */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**

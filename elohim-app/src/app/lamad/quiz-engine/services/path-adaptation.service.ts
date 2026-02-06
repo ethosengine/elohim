@@ -743,19 +743,20 @@ export class PathAdaptationService {
       const json = localStorage.getItem(this.STORAGE_PREFIX + key);
       if (!json) return null;
 
-      const parsed = JSON.parse(json);
+      const parsed = JSON.parse(json) as Record<string, unknown>;
+      const skipAheadRaw = parsed['skipAhead'] as Record<string, unknown> | undefined;
       return {
         ...parsed,
-        gates: new Map(parsed.gates),
-        completedSections: new Set(parsed.completedSections),
-        skippedSections: new Set(parsed.skippedSections),
-        skipAhead: parsed.skipAhead
+        gates: new Map(parsed['gates'] as Iterable<[string, GateStatus]>),
+        completedSections: new Set(parsed['completedSections'] as Iterable<string>),
+        skippedSections: new Set(parsed['skippedSections'] as Iterable<string>),
+        skipAhead: skipAheadRaw
           ? {
-              ...parsed.skipAhead,
-              conceptScores: new Map(parsed.skipAhead.conceptScores),
+              ...skipAheadRaw,
+              conceptScores: new Map(skipAheadRaw['conceptScores'] as Iterable<[string, number]>),
             }
           : undefined,
-      };
+      } as PathAdaptationState;
     } catch {
       // localStorage read failure is non-critical
       return null;

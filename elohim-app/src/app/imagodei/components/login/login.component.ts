@@ -90,7 +90,7 @@ export class LoginComponent implements OnInit {
 
     // Get return URL from query params
     this.route.queryParams.subscribe(params => {
-      this.returnUrl = params['returnUrl'] ?? '/';
+      this.returnUrl = (params['returnUrl'] as string) ?? '/';
     });
 
     // Pre-fill identifier if remembered

@@ -167,6 +167,8 @@ interface HolochainGateRevenueSummary {
 // Service Implementation
 // =============================================================================
 
+const STEWARD_NOT_AVAILABLE = 'Steward service not available';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -229,7 +231,7 @@ export class StewardService {
    */
   createCredential(input: CreateStewardCredentialInput): Observable<StewardCredential> {
     if (!this.isAvailable()) {
-      throw new Error('Steward service not available');
+      throw new Error(STEWARD_NOT_AVAILABLE);
     }
 
     return defer(() => from(this.doCreateCredential(input))).pipe(
@@ -313,7 +315,7 @@ export class StewardService {
    */
   createGate(input: CreatePremiumGateInput): Observable<PremiumGate> {
     if (!this.isAvailable()) {
-      throw new Error('Steward service not available');
+      throw new Error(STEWARD_NOT_AVAILABLE);
     }
 
     return defer(() => from(this.doCreateGate(input))).pipe(
@@ -406,7 +408,7 @@ export class StewardService {
    */
   grantAccess(input: GrantAccessInput): Observable<AccessGrant> {
     if (!this.isAvailable()) {
-      throw new Error('Steward service not available');
+      throw new Error(STEWARD_NOT_AVAILABLE);
     }
 
     return defer(() => from(this.doGrantAccess(input))).pipe(

@@ -300,9 +300,9 @@ export class BlobManagerService {
           wasCached: false,
         };
       }),
-      catchError(error => {
+      catchError((error: unknown) => {
         return throwError(() => ({
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           blob: blobMetadata,
           phase: 'download',
         }));
@@ -477,7 +477,7 @@ export class BlobManagerService {
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    a.remove();
     this.revokeBlobUrl(url);
   }
 

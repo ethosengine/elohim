@@ -62,6 +62,11 @@ import {
  * }
  * ```
  */
+const ERR_INVALID_QUERY = 'INVALID_QUERY';
+const TIER_PATH_CREATOR = 'path-creator';
+const TIER_ADVANCED_RESEARCHER = 'advanced-researcher';
+const MSG_GRAPH_NOT_LOADED = 'Graph not loaded';
+
 @Injectable({ providedIn: 'root' })
 export class ExplorationService {
   // Rate limit tracking per agent
@@ -118,7 +123,7 @@ export class ExplorationService {
           take(1),
           switchMap(graph => {
             if (!graph || graph.nodes.size === 0) {
-              return throwError(() => this.buildError('INVALID_QUERY', 'Graph not loaded'));
+              return throwError(() => this.buildError(ERR_INVALID_QUERY, MSG_GRAPH_NOT_LOADED));
             }
 
             // Find focus node
@@ -150,13 +155,13 @@ export class ExplorationService {
           })
         );
       }),
-      catchError(err => {
+      catchError((err: unknown) => {
         this.logEvent({
           type: 'query-failed',
           timestamp: new Date().toISOString(),
           agentId: this.currentAgentId,
           query,
-          error: err,
+          error: err as ExplorationError,
         });
         return throwError(() => err);
       })
@@ -177,11 +182,11 @@ export class ExplorationService {
     return this.checkAttestations(this.currentAgentId, 3).pipe(
       switchMap(attestationCheck => {
         if (
-          attestationCheck.tier !== 'path-creator' &&
-          attestationCheck.tier !== 'advanced-researcher'
+          attestationCheck.tier !== TIER_PATH_CREATOR &&
+          attestationCheck.tier !== TIER_ADVANCED_RESEARCHER
         ) {
           return this.createError('PATHFINDING_UNAUTHORIZED', {
-            requiredAttestation: 'path-creator',
+            requiredAttestation: TIER_PATH_CREATOR,
           });
         }
 
@@ -200,7 +205,7 @@ export class ExplorationService {
           take(1),
           switchMap(graph => {
             if (!graph || graph.nodes.size === 0) {
-              return throwError(() => this.buildError('INVALID_QUERY', 'Graph not loaded'));
+              return throwError(() => this.buildError(ERR_INVALID_QUERY, MSG_GRAPH_NOT_LOADED));
             }
 
             // Verify both nodes exist
@@ -255,7 +260,7 @@ export class ExplorationService {
             estimatedNodes: 0,
             estimatedTimeMs: 0,
             resourceCredits: 0,
-            rateLimitImpact: 'Graph not loaded',
+            rateLimitImpact: MSG_GRAPH_NOT_LOADED,
             canExecute: false,
             blockedReason: 'query-too-expensive' as const,
           };
@@ -281,24 +286,24 @@ export class ExplorationService {
             attestationRequired: requiredAttestation ?? undefined,
             rateLimitImpact: `${agentStatus.explorationRemaining} of ${agentStatus.explorationLimit} queries remaining this hour`,
             canExecute: canAfford,
-            blockedReason: !canAfford
-              ? this.getBlockedReason(depth, agentStatus.maxDepth)
-              : undefined,
+            blockedReason: canAfford
+              ? undefined
+              : this.getBlockedReason(depth, agentStatus.maxDepth),
           };
         }
 
         if (operation === 'findPath') {
           const canAfford =
-            agentStatus.tier === 'path-creator' && agentStatus.pathfindingRemaining > 0;
+            agentStatus.tier === TIER_PATH_CREATOR && agentStatus.pathfindingRemaining > 0;
 
           return {
             estimatedNodes: graph.nodes.size, // Worst case: traverse all nodes
             estimatedTimeMs: graph.nodes.size * 0.1,
             resourceCredits: 10, // Pathfinding is expensive
-            attestationRequired: 'path-creator',
+            attestationRequired: TIER_PATH_CREATOR,
             rateLimitImpact: `${agentStatus.pathfindingRemaining} of ${agentStatus.pathfindingLimit} pathfinding queries remaining`,
             canExecute: canAfford,
-            blockedReason: !canAfford ? ('insufficient-attestation' as const) : undefined,
+            blockedReason: canAfford ? undefined : ('insufficient-attestation' as const),
           };
         }
 
@@ -767,13 +772,13 @@ export class ExplorationService {
         let maxDepth = 1;
 
         if (
-          attestations.includes('path-creator') ||
+          attestations.includes(TIER_PATH_CREATOR) ||
           attestations.includes('curriculum-architect')
         ) {
-          tier = 'path-creator';
+          tier = TIER_PATH_CREATOR;
           maxDepth = 3;
-        } else if (attestations.includes('advanced-researcher')) {
-          tier = 'advanced-researcher';
+        } else if (attestations.includes(TIER_ADVANCED_RESEARCHER)) {
+          tier = TIER_ADVANCED_RESEARCHER;
           maxDepth = 3;
         } else if (attestations.includes('graph-researcher')) {
           tier = 'graph-researcher';
@@ -781,9 +786,9 @@ export class ExplorationService {
         }
 
         const allowed = requestedDepth <= maxDepth;
-        const requiredAttestation = !allowed
-          ? DEPTH_ATTESTATION_REQUIREMENTS[requestedDepth]
-          : undefined;
+        const requiredAttestation = allowed
+          ? undefined
+          : DEPTH_ATTESTATION_REQUIREMENTS[requestedDepth];
 
         return {
           allowed,

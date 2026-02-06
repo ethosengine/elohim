@@ -24,6 +24,10 @@ import { BehaviorSubject, Observable, Subject, interval, takeUntil, map } from '
  * - Mediation response: 1 hour
  * - Escalation response: 4 hours
  */
+const GOVERNANCE_COUNCIL = 'governance-council';
+const RESOLVED_ON_TIME = 'resolved-on-time';
+const RESOLVED_LATE = 'resolved-late';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -44,7 +48,7 @@ export class SlaMonitorService implements OnDestroy {
         resolutionDays: 7,
         warningThresholdPercent: 75,
         criticalThresholdPercent: 90,
-        escalationPath: ['assigned-elohim', 'governance-council', 'network-stewards'],
+        escalationPath: ['assigned-elohim', GOVERNANCE_COUNCIL, 'network-stewards'],
       },
     ],
     [
@@ -54,7 +58,7 @@ export class SlaMonitorService implements OnDestroy {
         resolutionDays: 7, // Default voting period
         warningThresholdPercent: 50,
         criticalThresholdPercent: 75,
-        escalationPath: ['proposer', 'governance-council'],
+        escalationPath: ['proposer', GOVERNANCE_COUNCIL],
       },
     ],
     [
@@ -64,7 +68,7 @@ export class SlaMonitorService implements OnDestroy {
         resolutionDays: 1,
         warningThresholdPercent: 50,
         criticalThresholdPercent: 75,
-        escalationPath: ['mediator-pool', 'governance-council'],
+        escalationPath: ['mediator-pool', GOVERNANCE_COUNCIL],
       },
     ],
     [
@@ -74,7 +78,7 @@ export class SlaMonitorService implements OnDestroy {
         resolutionDays: 2,
         warningThresholdPercent: 75,
         criticalThresholdPercent: 90,
-        escalationPath: ['content-steward', 'governance-council'],
+        escalationPath: ['content-steward', GOVERNANCE_COUNCIL],
       },
     ],
     [
@@ -84,7 +88,7 @@ export class SlaMonitorService implements OnDestroy {
         resolutionDays: 14,
         warningThresholdPercent: 80,
         criticalThresholdPercent: 95,
-        escalationPath: ['content-governance', 'governance-council'],
+        escalationPath: ['content-governance', GOVERNANCE_COUNCIL],
       },
     ],
   ]);
@@ -189,7 +193,7 @@ export class SlaMonitorService implements OnDestroy {
     const now = new Date();
 
     sla.resolvedAt = now.toISOString();
-    sla.status = this.isWithinDeadline(sla) ? 'resolved-on-time' : 'resolved-late';
+    sla.status = this.isWithinDeadline(sla) ? RESOLVED_ON_TIME : RESOLVED_LATE;
     sla.metadata = {
       ...sla.metadata,
       resolution: resolution.outcome,
@@ -202,7 +206,7 @@ export class SlaMonitorService implements OnDestroy {
     this.updateAverageResolution(resolutionHours);
     this.metrics.currentActive--;
 
-    if (sla.status === 'resolved-late') {
+    if (sla.status === RESOLVED_LATE) {
       this.metrics.breachCount++;
       this.updateOnTimeRate();
     }
@@ -287,9 +291,7 @@ export class SlaMonitorService implements OnDestroy {
       map(slas =>
         slas.find(
           s =>
-            s.entityId === entityId &&
-            s.status !== 'resolved-on-time' &&
-            s.status !== 'resolved-late'
+            s.entityId === entityId && s.status !== RESOLVED_ON_TIME && s.status !== RESOLVED_LATE
         )
       )
     );
@@ -316,7 +318,7 @@ export class SlaMonitorService implements OnDestroy {
     return this.activeSlas$.pipe(
       map(slas =>
         slas.filter(s => {
-          if (s.status === 'resolved-on-time' || s.status === 'resolved-late') return false;
+          if (s.status === RESOLVED_ON_TIME || s.status === RESOLVED_LATE) return false;
           const config = this.slaConfig.get(s.entityType);
           if (!config) return false;
 
@@ -357,7 +359,7 @@ export class SlaMonitorService implements OnDestroy {
     const now = new Date();
 
     for (const sla of current) {
-      if (sla.status === 'resolved-on-time' || sla.status === 'resolved-late') continue;
+      if (sla.status === RESOLVED_ON_TIME || sla.status === RESOLVED_LATE) continue;
 
       const config = this.slaConfig.get(sla.entityType);
       if (!config) continue;
@@ -542,7 +544,7 @@ export class SlaMonitorService implements OnDestroy {
         const items = JSON.parse(data) as SlaItem[];
         // Filter out old resolved items
         const active = items.filter(
-          s => s.status !== 'resolved-on-time' && s.status !== 'resolved-late'
+          s => s.status !== RESOLVED_ON_TIME && s.status !== RESOLVED_LATE
         );
         this.activeSlas$.next(active);
         this.metrics.currentActive = active.length;
@@ -571,8 +573,8 @@ export type SlaStatus =
   | 'critical'
   | 'escalated'
   | 'breached'
-  | 'resolved-on-time'
-  | 'resolved-late';
+  | typeof RESOLVED_ON_TIME
+  | typeof RESOLVED_LATE;
 
 export type SlaPriority = 'low' | 'normal' | 'high' | 'critical';
 

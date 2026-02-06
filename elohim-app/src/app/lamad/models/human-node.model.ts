@@ -43,14 +43,12 @@ import {
   type IntimacyLevel,
   type ConsentState,
   type GovernanceLayer,
-  type ReachLevel,
   type GeographicContext,
 } from '@app/elohim/models/protocol-core.model';
 
 // @coverage: 22.2% (2026-02-05)
 
 // Re-export core types for convenience
-export type { IntimacyLevel, ConsentState, GovernanceLayer, ReachLevel, GeographicContext };
 
 // =========================================================================
 // Relationship Types
@@ -452,3 +450,11 @@ export function isHighTrustRelationship(type: RelationshipType): boolean {
   const intimacy = RELATIONSHIP_DEFAULT_INTIMACY[type];
   return intimacy === 'intimate' || intimacy === 'trusted';
 }
+
+export {
+  type ReachLevel,
+  type IntimacyLevel,
+  type GeographicContext,
+  type ConsentState,
+  type GovernanceLayer,
+} from '@app/elohim/models/protocol-core.model';
