@@ -225,6 +225,10 @@ spec:
           env:
             - name: RUST_LOG
               value: "warn,doorway=info"
+            - name: STORAGE_URL
+              value: "http://localhost:8090"
+            - name: THRESHOLD_URL
+              value: "http://localhost:80"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
@@ -286,6 +290,81 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "200m"
+        # elohim-storage - Blob storage and import processing sidecar
+        # Handles heavy R/W operations, forwards to conductor
+        - name: elohim-storage
+          image: harbor.ethosengine.com/ethosengine/elohim-storage:BUILD_NUMBER_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: RUST_LOG
+              value: "warn,elohim_storage=info"
+            - name: HOLOCHAIN_ADMIN_URL
+              value: "ws://localhost:4444"
+            - name: HOLOCHAIN_APP_URL
+              value: "ws://localhost:4445"
+            - name: HOLOCHAIN_APP_ID
+              value: "elohim"
+            - name: ENABLE_IMPORT_API
+              value: "true"
+            - name: ENABLE_CONTENT_DB
+              value: "true"
+            - name: IMPORT_CHUNK_SIZE
+              value: "50"
+            - name: IMPORT_CHUNK_DELAY_MS
+              value: "300"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: storage-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 30
+        # Doorway Operator Dashboard - Angular app for node operators
+        # Provides: federated OAuth, node metrics, configuration UI
+        - name: doorway-app
+          image: harbor.ethosengine.com/ethosengine/doorway-app:BUILD_NUMBER_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: operator-ui
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: DOORWAY_API_URL
+              value: "http://localhost:8080"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
       volumes:
         # Shared volume for hApp (fetched by init container)
         - name: happ-volume
@@ -320,6 +399,16 @@ spec:
     - name: gateway-ws
       port: 8080
       targetPort: 8080
+      protocol: TCP
+    # elohim-storage SQLite DB API (for fast seeding)
+    - name: storage-db
+      port: 8090
+      targetPort: 8090
+      protocol: TCP
+    # Doorway Operator Dashboard
+    - name: operator-ui
+      port: 8081
+      targetPort: 80
       protocol: TCP
   selector:
     app: elohim-edgenode
