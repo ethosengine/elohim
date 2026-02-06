@@ -342,7 +342,9 @@ spec:
             steps {
                 script {
                     def validTrigger = currentBuild.getBuildCauses().any { cause ->
-                        cause._class.contains('UserIdCause') || cause._class.contains('UpstreamCause')
+                        cause._class.contains('UserIdCause') ||
+                        cause._class.contains('UpstreamCause') ||
+                        cause._class.contains('BranchIndexingCause')
                     }
                     if (!validTrigger) {
                         echo "⏭️ PIPELINE SKIPPED - Use orchestrator or manual trigger"
