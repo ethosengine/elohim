@@ -223,6 +223,8 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            - name: DEV_MODE
+              value: "true"
             - name: RUST_LOG
               value: "warn,doorway=info"
             - name: STORAGE_URL
