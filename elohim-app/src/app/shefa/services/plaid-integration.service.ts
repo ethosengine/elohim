@@ -51,6 +51,54 @@ interface DerivedKey {
   salt: Uint8Array;
 }
 
+/** Shape of a Plaid account object returned from the API */
+interface PlaidAccountRaw {
+  accountId: string;
+  name: string;
+  subtype: string;
+  balances?: { current?: number; isoCurrencyCode?: string };
+}
+
+/** Shape of Plaid /accounts/get response */
+interface PlaidAccountsResponse {
+  accounts?: PlaidAccountRaw[];
+}
+
+/** Shape of Plaid /item/get response */
+interface PlaidItemResponse {
+  institution?: { institutionId: string; name: string };
+}
+
+/** Shape of Plaid /transactions/get response */
+interface PlaidTransactionsResponse {
+  transactions?: PlaidTransaction[];
+  nextCursor?: string;
+}
+
+/** Shape of Plaid /transactions/sync response */
+interface PlaidTransactionSyncResponse {
+  added?: PlaidTransaction[];
+  modified?: PlaidTransaction[];
+  nextCursor?: string;
+}
+
+/** Shape of Plaid /transactions/get request body */
+interface PlaidTransactionsRequest {
+  access_token: string;
+  start_date: string;
+  end_date: string;
+  options: { include_personal_finance_category: boolean; include_counterparties: boolean };
+  cursor?: string;
+  count?: number;
+}
+
+/** Shape of Plaid /transactions/sync request body */
+interface PlaidTransactionSyncRequest {
+  access_token: string;
+  options: { include_personal_finance_category: boolean; include_counterparties: boolean };
+  cursor?: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -138,7 +186,7 @@ export class PlaidIntegrationService {
       }
 
       // Get institution and account details
-      const itemResponse = await firstValueFrom(
+      const itemResponse: PlaidItemResponse | undefined = await firstValueFrom(
         this.getItemDetails(accessTokenResponse.accessToken)
       );
 
@@ -148,7 +196,8 @@ export class PlaidIntegrationService {
       // Get account details
       const accountsResponse = await this.getAccounts(accessTokenResponse.accessToken);
 
-      const linkedAccounts = (accountsResponse?.accounts ?? []).map((account: any) => ({
+      const accounts = accountsResponse?.accounts ?? [];
+      const linkedAccounts = accounts.map((account: PlaidAccountRaw) => ({
         plaidAccountId: account.accountId,
         plaidAccountName: account.name,
         plaidAccountSubtype: account.subtype,
@@ -186,11 +235,13 @@ export class PlaidIntegrationService {
   private exchangePublicToken(
     publicToken: string
   ): Observable<{ accessToken: string; itemId: string }> {
+    const env = environment as Record<string, unknown>;
+    const plaid = (env['plaid'] as Record<string, string> | undefined) ?? {};
     const requestBody = {
       public_token: publicToken,
       // Note: environment.plaid not in Environment type - using placeholders
-      client_id: (environment as any).plaid?.clientId ?? 'PLAID_CLIENT_ID',
-      secret: (environment as any).plaid?.secret ?? 'PLAID_SECRET',
+      client_id: plaid['clientId'] ?? 'PLAID_CLIENT_ID',
+      secret: plaid['secret'] ?? 'PLAID_SECRET',
     };
 
     return this.callPlaidAPI<{ accessToken: string; itemId: string }>(
@@ -281,8 +332,8 @@ export class PlaidIntegrationService {
     endDate: string,
     cursor?: string,
     count?: number
-  ): Observable<any> {
-    const requestBody: any = {
+  ): Observable<PlaidTransactionsResponse> {
+    const requestBody: PlaidTransactionsRequest = {
       access_token: accessToken,
       start_date: startDate,
       end_date: endDate,
@@ -290,16 +341,11 @@ export class PlaidIntegrationService {
         include_personal_finance_category: true,
         include_counterparties: true,
       },
+      cursor,
+      count,
     };
 
-    if (cursor) {
-      requestBody.cursor = cursor;
-    }
-    if (count) {
-      requestBody.count = count;
-    }
-
-    return this.callPlaidAPI('/transactions/get', requestBody).pipe(
+    return this.callPlaidAPI<PlaidTransactionsResponse>('/transactions/get', requestBody).pipe(
       retry({
         count: 3,
         delay: 1000,
@@ -310,20 +356,20 @@ export class PlaidIntegrationService {
   /**
    * Internal: Uses sync API for incremental transaction updates
    */
-  private getTransactionSync(accessToken: string, cursor?: string): Observable<any> {
-    const requestBody: any = {
+  private getTransactionSync(
+    accessToken: string,
+    cursor?: string
+  ): Observable<PlaidTransactionSyncResponse> {
+    const requestBody: PlaidTransactionSyncRequest = {
       access_token: accessToken,
       options: {
         include_personal_finance_category: true,
         include_counterparties: true,
       },
+      cursor,
     };
 
-    if (cursor) {
-      requestBody.cursor = cursor;
-    }
-
-    return this.callPlaidAPI('/transactions/sync', requestBody);
+    return this.callPlaidAPI<PlaidTransactionSyncResponse>('/transactions/sync', requestBody);
   }
 
   // ============================================================================
@@ -333,16 +379,18 @@ export class PlaidIntegrationService {
   /**
    * Gets account details for a connection (names, types, balances)
    */
-  async getAccounts(accessToken: string): Promise<any> {
+  async getAccounts(accessToken: string): Promise<PlaidAccountsResponse> {
     const decryptedToken = await this.decryptAccessToken(accessToken);
-    return firstValueFrom(this.callPlaidAPI('/accounts/get', { access_token: decryptedToken }));
+    return firstValueFrom(
+      this.callPlaidAPI<PlaidAccountsResponse>('/accounts/get', { access_token: decryptedToken })
+    );
   }
 
   /**
    * Gets item (institution) details
    */
-  private getItemDetails(accessToken: string): Observable<any> {
-    return this.callPlaidAPI('/item/get', {
+  private getItemDetails(accessToken: string): Observable<PlaidItemResponse> {
+    return this.callPlaidAPI<PlaidItemResponse>('/item/get', {
       access_token: accessToken,
     });
   }
@@ -528,7 +576,10 @@ export class PlaidIntegrationService {
   /**
    * Makes a call to Plaid API with proper headers and error handling
    */
-  private callPlaidAPI<T = any>(endpoint: string, body: any): Observable<T> {
+  private callPlaidAPI<T = unknown>(
+    endpoint: string,
+    body: Record<string, unknown>
+  ): Observable<T> {
     const headers = new HttpHeaders({
       'Content-Type': 'application/json',
     });
@@ -537,7 +588,7 @@ export class PlaidIntegrationService {
 
     return this.http.post<T>(url, body, { headers }).pipe(
       timeout(10000), // 10 second timeout
-      catchError(error => {
+      catchError((error: unknown) => {
         return throwError(() => error);
       })
     );

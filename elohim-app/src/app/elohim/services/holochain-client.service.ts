@@ -229,8 +229,8 @@ export class HolochainClientService {
 
       return { success: true, apps: appIds };
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Connection failed';
-      this.logger.error('Connection failed', err, { mode });
+      const errorMessage = err instanceof Error ? err.message : CONNECTION_FAILED;
+      this.logger.error(CONNECTION_FAILED, err, { mode });
 
       this.updateState({
         state: 'error',
@@ -275,7 +275,7 @@ export class HolochainClientService {
       const result = await this.strategy.connect(connectionConfig);
 
       if (!result.success) {
-        throw new Error(result.error ?? 'Connection failed');
+        throw new Error(result.error ?? CONNECTION_FAILED);
       }
 
       // Update state from strategy result
@@ -311,7 +311,7 @@ export class HolochainClientService {
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
-      this.logger.error('Connection failed', err, { strategy: this.strategy.name });
+      this.logger.error(CONNECTION_FAILED, err, { strategy: this.strategy.name });
 
       this.updateState({
         state: 'error',
@@ -401,22 +401,26 @@ export class HolochainClientService {
 
     this.updateState({ state: 'reconnecting' as HolochainConnectionState });
 
-    this.reconnectTimeout = setTimeout(async () => {
-      try {
-        await this.connect();
-        // Success - reset retry count
-        this.reconnectConfig.currentRetries = 0;
-        this.isReconnecting = false;
-        this.logger.info('Reconnection successful');
-      } catch (err) {
-        this.logger.warn('Reconnection attempt failed', {
-          attempt: this.reconnectConfig.currentRetries,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        // Schedule another attempt
-        this.scheduleReconnect();
-      }
-    }, delay);
+    this.reconnectTimeout = setTimeout(
+      () =>
+        void (async () => {
+          try {
+            await this.connect();
+            // Success - reset retry count
+            this.reconnectConfig.currentRetries = 0;
+            this.isReconnecting = false;
+            this.logger.info('Reconnection successful');
+          } catch (err) {
+            this.logger.warn('Reconnection attempt failed', {
+              attempt: this.reconnectConfig.currentRetries,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            // Schedule another attempt
+            this.scheduleReconnect();
+          }
+        })(),
+      delay
+    );
   }
 
   /**

@@ -523,7 +523,9 @@ export class DataLoaderService {
       contentType: 'placeholder',
       title: `Content Not Found: ${resourceId}`,
       description: errorMessage ?? `The content "${resourceId}" could not be loaded.`,
-      content: `This content is not yet available. It may not have been seeded or there was an error loading it.\n\nResource ID: ${resourceId}${errorMessage ? `\nError: ${errorMessage}` : ''}`,
+      content:
+        `This content is not yet available. It may not have been seeded or there was an error loading it.\n\nResource ID: ${resourceId}` +
+        (errorMessage ? '\nError: ' + errorMessage : ''),
       contentFormat: 'markdown',
       tags: ['missing', 'placeholder'],
       relatedNodeIds: [],
@@ -1504,9 +1506,7 @@ export class DataLoaderService {
     ) as Record<string, unknown>;
 
     // Store confidence in metadata since ContentRelationship doesn't have a confidence field
-    if (hcRel.confidence !== undefined && hcRel.confidence !== null) {
-      metadata['confidence'] = hcRel.confidence;
-    }
+    metadata['confidence'] = hcRel.confidence;
 
     return {
       id: hcRel.id,
@@ -1559,12 +1559,12 @@ export class DataLoaderService {
    */
   private transformSimplifiedGraph(simpleGraph: {
     rootId: string;
-    related: Array<{
+    related: {
       contentId: string;
       relationshipType: string;
       confidence: number;
-      children: any[];
-    }>;
+      children: unknown[];
+    }[];
     totalNodes: number;
   }): ContentGraph {
     const nodes = new Map<string, ContentNode>();

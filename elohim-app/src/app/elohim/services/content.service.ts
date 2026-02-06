@@ -670,6 +670,7 @@ export class ContentService {
    * Parse content body for structured formats.
    * Formats like html5-app, perseus, quiz-json store JSON objects as strings.
    */
+  // eslint-disable-next-line sonarjs/function-return-type -- Intentionally returns string or parsed object
   private parseContentBody(content: string, contentFormat: string): string | object {
     // Formats that store structured JSON content
     const structuredFormats = [

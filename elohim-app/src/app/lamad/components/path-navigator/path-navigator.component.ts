@@ -89,6 +89,8 @@ interface SectionContextParams {
  *
  * Route: /lamad/path/:pathId/step/:stepIndex
  */
+const NAV_FAILED_MSG = 'Navigation failed:';
+
 @Component({
   selector: 'app-path-navigator',
   standalone: true,
@@ -670,7 +672,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     this.router
       .navigate([this.PATH_ROUTE, this.pathId, 'step', globalIndex])
       .catch((err: unknown) => {
-        console.error('Navigation failed:', err);
+        console.error(NAV_FAILED_MSG, err);
       });
   }
 
@@ -681,7 +683,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     // Emit progress signal before navigating
     this.emitProgressSignal();
     this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', index]).catch((err: unknown) => {
-      console.error('Navigation failed:', err);
+      console.error(NAV_FAILED_MSG, err);
     });
   }
 
@@ -699,7 +701,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
   goToPathOverview(): void {
     this.router.navigate([this.PATH_ROUTE, this.pathId]).catch((err: unknown) => {
-      console.error('Navigation failed:', err);
+      console.error(NAV_FAILED_MSG, err);
     });
   }
 
@@ -816,7 +818,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
     // Navigate to the content
     this.router.navigate(['/lamad/resource', contentId]).catch((err: unknown) => {
-      console.error('Navigation failed:', err);
+      console.error(NAV_FAILED_MSG, err);
     });
   }
 
@@ -845,7 +847,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
         },
       })
       .catch((err: unknown) => {
-        console.error('Navigation failed:', err);
+        console.error(NAV_FAILED_MSG, err);
       });
   }
 

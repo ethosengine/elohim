@@ -49,9 +49,11 @@ export interface MigrationResult {
  * - Privileges unlock at specific Bloom's levels
  *
  * Source Chain Entries:
- * - 'mastery-record': Each mastery level achievement
+ * - ENTRY_TYPE_MASTERY_RECORD: Each mastery level achievement
  * - Links from content → mastery records via 'mastery-for-content'
  */
+const ENTRY_TYPE_MASTERY_RECORD = 'mastery-record';
+
 @Injectable({ providedIn: 'root' })
 export class ContentMasteryService {
   private readonly masteryCache = new Map<string, ContentMastery>();
@@ -113,7 +115,8 @@ export class ContentMasteryService {
    * Load all mastery records from source chain into cache.
    */
   private loadMasteryCache(): void {
-    const entries = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    const entries =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
 
     // Group by contentId, keeping latest entry for each
     const masteryMap = new Map<string, ContentMastery>();
@@ -294,7 +297,7 @@ export class ContentMasteryService {
     };
 
     const entry = this.sourceChain.createEntry<MasteryRecordContent>(
-      'mastery-record',
+      ENTRY_TYPE_MASTERY_RECORD,
       masteryContent
     );
 
@@ -596,7 +599,8 @@ export class ContentMasteryService {
       return result;
     }
 
-    const localRecords = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    const localRecords =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
     if (localRecords.length === 0) {
       result.success = true;
       return result;
@@ -693,7 +697,8 @@ export class ContentMasteryService {
    */
   hasPendingMigration(): boolean {
     if (!this.isBackendAvailable()) return false;
-    const localRecords = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    const localRecords =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
     return localRecords.length > 0;
   }
 
@@ -701,7 +706,8 @@ export class ContentMasteryService {
    * Get count of records pending migration.
    */
   getPendingMigrationCount(): number {
-    const localRecords = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    const localRecords =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
     // Group by contentId to get unique count
     const uniqueContentIds = new Set(localRecords.map(r => r.content.contentId));
     return uniqueContentIds.size;

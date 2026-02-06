@@ -41,6 +41,11 @@ import {
  * From API Spec:
  * "The same navigation/affinity mechanics apply to all three [map types]."
  */
+const DEMO_LEARNER = 'demo-learner';
+const STEWARD_ONLY = 'steward-only';
+const ERR_NOT_FOUND = 'NOT_FOUND';
+const ERR_UNAUTHORIZED = 'UNAUTHORIZED';
+
 @Injectable({ providedIn: 'root' })
 export class KnowledgeMapService {
   // In-memory map storage (prototype - production uses Holochain)

@@ -16,7 +16,7 @@ export interface MockContentService {
 }
 
 export function createMockContentService(): MockContentService {
-  return jasmine.createSpyObj('ContentService', [
+  return jasmine.createSpyObj<MockContentService>('ContentService', [
     'getContent',
     'getContentByPath',
     'listContent',
@@ -40,7 +40,7 @@ export interface MockAuthService {
 }
 
 export function createMockAuthService(): MockAuthService {
-  const mock = jasmine.createSpyObj('AuthService', [
+  const mock = jasmine.createSpyObj<MockAuthService>('AuthService', [
     'login',
     'logout',
     'isAuthenticated',
@@ -72,7 +72,7 @@ export interface MockStorageClientService {
 }
 
 export function createMockStorageClient(): MockStorageClientService {
-  const mock = jasmine.createSpyObj('StorageClientService', [
+  const mock = jasmine.createSpyObj<MockStorageClientService>('StorageClientService', [
     'get',
     'put',
     'delete',
@@ -100,7 +100,7 @@ export interface MockHolochainClientService {
 }
 
 export function createMockHolochainClient(): MockHolochainClientService {
-  const mock = jasmine.createSpyObj('HolochainClientService', [
+  const mock = jasmine.createSpyObj<MockHolochainClientService>('HolochainClientService', [
     'connect',
     'disconnect',
     'callZome',
@@ -126,7 +126,7 @@ export interface MockDoorwayClientService {
 }
 
 export function createMockDoorwayClient(): MockDoorwayClientService {
-  const mock = jasmine.createSpyObj('DoorwayClientService', [
+  const mock = jasmine.createSpyObj<MockDoorwayClientService>('DoorwayClientService', [
     'getStatus',
     'callEndpoint',
     'isAvailable',
@@ -151,7 +151,7 @@ export interface MockPathService {
 }
 
 export function createMockPathService(): MockPathService {
-  return jasmine.createSpyObj('PathService', [
+  return jasmine.createSpyObj<MockPathService>('PathService', [
     'getPath',
     'getPathSteps',
     'getCurrentStep',
@@ -171,7 +171,7 @@ export interface MockMasteryService {
 }
 
 export function createMockMasteryService(): MockMasteryService {
-  const mock = jasmine.createSpyObj('MasteryService', [
+  const mock = jasmine.createSpyObj<MockMasteryService>('MasteryService', [
     'getMastery',
     'updateMastery',
     'getPathMastery',
@@ -194,7 +194,7 @@ export interface MockPresenceService {
 }
 
 export function createMockPresenceService(): MockPresenceService {
-  const mock = jasmine.createSpyObj('PresenceService', [
+  const mock = jasmine.createSpyObj<MockPresenceService>('PresenceService', [
     'setPresence',
     'getPresence',
     'subscribeToPresence',
@@ -218,7 +218,7 @@ export interface MockStorageApiService {
 }
 
 export function createMockStorageApiService(): MockStorageApiService {
-  const mock = jasmine.createSpyObj('StorageApiService', [
+  const mock = jasmine.createSpyObj<MockStorageApiService>('StorageApiService', [
     'createEconomicEvent',
     'getEconomicEvents',
     'updateEconomicEvent',

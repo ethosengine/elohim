@@ -66,6 +66,13 @@ import { DataLoaderService } from './data-loader.service';
  * });
  * ```
  */
+const ATT_GOVERNANCE_RATIFIED: ContentAttestationType = 'governance-ratified';
+const ATT_PEER_REVIEWED: ContentAttestationType = 'peer-reviewed';
+const ATT_STEWARD_APPROVED: ContentAttestationType = 'steward-approved';
+const ATT_SAFETY_REVIEWED: ContentAttestationType = 'safety-reviewed';
+const ATT_COMMUNITY_ENDORSED: ContentAttestationType = 'community-endorsed';
+const ATT_AUTHOR_VERIFIED: ContentAttestationType = 'author-verified';
+
 @Injectable({ providedIn: 'root' })
 export class TrustBadgeService {
   constructor(
@@ -313,13 +320,13 @@ export class TrustBadgeService {
   private getPrimaryBadge(reach: ContentReach, attestations: ContentAttestation[]): BadgeDisplay {
     // Priority order for primary badge
     const priorityOrder: ContentAttestationType[] = [
-      'governance-ratified',
+      ATT_GOVERNANCE_RATIFIED,
       'curriculum-canonical',
-      'peer-reviewed',
-      'steward-approved',
-      'safety-reviewed',
-      'community-endorsed',
-      'author-verified',
+      ATT_PEER_REVIEWED,
+      ATT_STEWARD_APPROVED,
+      ATT_SAFETY_REVIEWED,
+      ATT_COMMUNITY_ENDORSED,
+      ATT_AUTHOR_VERIFIED,
     ];
 
     // Find highest priority attestation
@@ -411,17 +418,17 @@ export class TrustBadgeService {
     }
 
     // Weight each attestation type
-    const weights: Record<ContentAttestationType, number> = {
-      'governance-ratified': 0.5,
+    const weights: Partial<Record<ContentAttestationType, number>> = {
+      [ATT_GOVERNANCE_RATIFIED]: 0.5,
       'curriculum-canonical': 0.4,
-      'peer-reviewed': 0.4,
-      'steward-approved': 0.3,
-      'safety-reviewed': 0.2,
+      [ATT_PEER_REVIEWED]: 0.4,
+      [ATT_STEWARD_APPROVED]: 0.3,
+      [ATT_SAFETY_REVIEWED]: 0.2,
       'accuracy-verified': 0.2,
-      'community-endorsed': 0.15,
+      [ATT_COMMUNITY_ENDORSED]: 0.15,
       'accessibility-checked': 0.1,
       'license-cleared': 0.1,
-      'author-verified': 0.1,
+      [ATT_AUTHOR_VERIFIED]: 0.1,
     };
 
     const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
@@ -457,7 +464,7 @@ export class TrustBadgeService {
 
     // Endorse - available to community members
     const hasEndorsed = attestations.some(
-      a => a.attestationType === 'community-endorsed' && a.grantedBy.grantorId === currentAgentId
+      a => a.attestationType === ATT_COMMUNITY_ENDORSED && a.grantedBy.grantorId === currentAgentId
     );
 
     if (!hasEndorsed && currentAgentId) {
@@ -581,13 +588,13 @@ export class TrustBadgeService {
 
     const requirements: Record<ContentReach, ContentAttestationType[]> = {
       private: [],
-      invited: ['author-verified'],
-      local: ['author-verified'],
-      neighborhood: ['author-verified', 'community-endorsed'],
-      municipal: ['steward-approved', 'community-endorsed', 'safety-reviewed'],
-      bioregional: ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
-      regional: ['peer-reviewed', 'governance-ratified'],
-      commons: ['governance-ratified', 'safety-reviewed', 'license-cleared'],
+      invited: [ATT_AUTHOR_VERIFIED],
+      local: [ATT_AUTHOR_VERIFIED],
+      neighborhood: [ATT_AUTHOR_VERIFIED, ATT_COMMUNITY_ENDORSED],
+      municipal: [ATT_STEWARD_APPROVED, ATT_COMMUNITY_ENDORSED, ATT_SAFETY_REVIEWED],
+      bioregional: [ATT_STEWARD_APPROVED, ATT_PEER_REVIEWED, ATT_SAFETY_REVIEWED],
+      regional: [ATT_PEER_REVIEWED, ATT_GOVERNANCE_RATIFIED],
+      commons: [ATT_GOVERNANCE_RATIFIED, ATT_SAFETY_REVIEWED, 'license-cleared'],
     };
 
     const needed = requirements[nextReach] || [];
