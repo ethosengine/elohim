@@ -1,0 +1,9 @@
+Scenario: Adult learns to recognize and value her own care contributions
+    Given Sarah has internalized that parenting is "not working"
+    And society devalues the care labor she performs
+    When Sarah uses the Value Scanner over time
+    Then she should develop new understanding of her contributions
+    And she should see meal planning, emotional labor, household coordination as valuable work
+    And quantified care contributions should shift her self-concept
+    And she should gain language to articulate her care work to others
+    And cultural transformation should begin with Sarah's own understanding

@@ -1,0 +1,10 @@
+Scenario: Transitioning work experience to career aligned with care values
+    Given Kenji's current work is survival job, not career goal
+    And he wants future work aligned with environmental care
+    When the workplace_elohim supports career development
+    Then it should help him connect current work skills to future career
+    And it should support him finding work aligned with care economy values
+    And it should recognize his environmental science education as preparing for care work
+    And it should help him transition toward meaningful career
+    And the system should support students developing care-aligned career paths
+    And Kenji's work trajectory should move toward work that serves flourishing

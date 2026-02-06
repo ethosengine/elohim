@@ -1,0 +1,10 @@
+Scenario: Manager proposes operational changes requiring democratic approval
+    Given Marcus identifies efficiency improvement opportunity
+    And corporate model would have him implement changes by fiat
+    When Marcus wants to implement the operational change
+    Then Marcus presents proposal to worker council with clear rationale
+    And workers deliberate on benefits and potential downsides
+    And workers ask clarifying questions Marcus answers transparently
+    And workers vote on whether to adopt the change
+    And if approved, Marcus coordinates implementation
+    And if rejected, Marcus accepts decision and proposes alternatives

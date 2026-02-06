@@ -1,0 +1,10 @@
+Scenario: Building neighborhood relationships across demographic differences
+    Given Kenji's neighborhood includes diverse ages, incomes, and backgrounds
+    And care economy requires bridging difference
+    When Kenji builds relationships with non-student neighbors
+    Then the neighborhood_elohim should recognize cross-demographic care work
+    And it should value relationships with elderly neighbors, families, workers
+    And it should show how diverse relationships strengthen neighborhood
+    And bridging work should be recognized as care contribution
+    And the system should foster inclusive neighborhood community
+    And students should learn to build community across difference

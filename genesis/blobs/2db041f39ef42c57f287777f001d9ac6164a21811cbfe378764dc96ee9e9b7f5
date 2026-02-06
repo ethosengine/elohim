@@ -1,0 +1,8 @@
+Scenario: Recognizing paid work as community care contribution
+    Given I work 50+ hours per week preparing food for people
+    And my labor serves community nourishment and flourishing
+    When the community assesses care contributions
+    Then the protocol should recognize my work as care labor
+    And accumulate care tokens reflecting my service to community
+    And make visible that all work serving others is care economy participation
+    And reframe employment from pure extraction to community contribution

@@ -1,0 +1,9 @@
+Scenario: Parent tracks implementation of new safety policies
+    Given the school board passed new student safety protocols
+    And promised implementation at all schools by September
+    When September arrives and the parent's school lacks the protocols
+    Then the Observer alerts parent about implementation failure
+    And shows which schools have implemented vs which haven't
+    And reveals pattern of under-resourced schools being deprioritized
+    And parent can demand accountability for child safety commitments
+    And policy passage doesn't mean policy implementation without tracking

@@ -1,0 +1,10 @@
+Scenario: Informal elder checking and support network
+    Given multiple seniors live in the neighborhood
+    And Margaret is in the "younger" senior cohort
+    When the neighborhood_elohim coordinates elder support
+    Then Margaret should help check on older neighbors
+    And she should receive checking from younger neighbors
+    And gradual transitions in care needs should be supported
+    And no senior should be isolated or unseen
+    And neighborhood should notice if something is wrong
+    And informal care networks should prevent crisis

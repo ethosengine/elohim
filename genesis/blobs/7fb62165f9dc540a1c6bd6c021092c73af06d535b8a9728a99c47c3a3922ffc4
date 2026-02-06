@@ -1,0 +1,9 @@
+Scenario: Equitable labor distribution negotiated with care economy data
+    Given Sarah feels she's doing more than her fair share
+    And her partner may not see the full scope of her labor
+    When they discuss household labor distribution
+    Then the household_elohim should provide specific contribution data
+    And Sarah's invisible labor should be quantified explicitly
+    And both partners should see objective assessment
+    And negotiations should be based on facts, not perceptions
+    And equitable arrangements should be reachable through visibility

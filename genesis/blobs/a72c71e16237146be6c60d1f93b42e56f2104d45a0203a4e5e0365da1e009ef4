@@ -1,0 +1,9 @@
+Scenario: Politician builds coalition for education funding increase
+    Given the politician champions education investment
+    And needs public support for tax increase
+    When the Observer identifies coalition building opportunities
+    Then they see parents across political spectrum support smaller class sizes
+    And identify business community concern about workforce preparation
+    And connect with educators who can explain funding impacts
+    And facilitate coalition across traditional political divides
+    And build broad-based campaign for education investment

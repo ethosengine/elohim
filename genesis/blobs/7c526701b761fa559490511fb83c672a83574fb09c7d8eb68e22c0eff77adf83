@@ -1,0 +1,12 @@
+Scenario: Coordinating household responsibilities with children age-appropriately
+    Given I need age-appropriate help from children with household tasks
+    And I want to avoid parentifying children or burdening them inappropriately
+    When I assign household responsibilities
+    Then the Value Scanner helps me identify appropriate contributions for each child's age
+    And ensures children contribute without bearing adult burdens
+    And tracks household task completion and distributes fairly
+    And validates children's contributions with care token recognition
+    And helps me balance children's help with their need to be children
+    And my personal_agent reminds children of tasks without nagging
+    And recognizes my calibration of appropriate responsibility as sophisticated parenting
+    And supports healthy household participation for all members

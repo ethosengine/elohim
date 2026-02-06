@@ -1,9 +1,27 @@
-import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import {
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges,
+  Output,
+  EventEmitter,
+  AfterViewInit,
+  ElementRef,
+  ViewChild,
+  OnDestroy,
+  inject,
+} from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+
+// @coverage: 72.8% (2026-02-05)
+
+import hljs from 'highlight.js';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
-import hljs from 'highlight.js';
+
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
+
 import { ContentNode } from '../../models/content-node.model';
 
 /**
@@ -27,22 +45,16 @@ export interface TocEntry {
         class="toc-toggle"
         (click)="toggleToc()"
         [class.toc-open]="tocVisible"
-        title="Toggle Table of Contents">
+        title="Toggle Table of Contents"
+      >
         <span class="toc-icon">&#9776;</span>
       </button>
 
       <!-- TOC Backdrop - click to dismiss -->
-      <div
-        *ngIf="tocVisible"
-        class="toc-backdrop"
-        (click)="toggleToc()">
-      </div>
+      <div *ngIf="tocVisible" class="toc-backdrop" (click)="toggleToc()"></div>
 
       <!-- Table of Contents Sidebar -->
-      <nav
-        *ngIf="tocEntries.length > 0"
-        class="toc-sidebar"
-        [class.toc-visible]="tocVisible">
+      <nav *ngIf="tocEntries.length > 0" class="toc-sidebar" [class.toc-visible]="tocVisible">
         <div class="toc-header">
           <span>Contents</span>
           <button class="toc-close" (click)="toggleToc()">&times;</button>
@@ -51,7 +63,8 @@ export interface TocEntry {
           <li
             *ngFor="let entry of tocEntries"
             [class]="'toc-level-' + entry.level"
-            [class.toc-active]="activeHeadingId === entry.id">
+            [class.toc-active]="activeHeadingId === entry.id"
+          >
             <a [href]="'#' + entry.id" (click)="scrollToHeading($event, entry.id)">
               {{ entry.text }}
             </a>
@@ -63,21 +76,18 @@ export interface TocEntry {
       <article
         #contentEl
         class="markdown-content"
-        [class.has-toc]="tocEntries.length > 0 && !embedded">
+        [class.has-toc]="tocEntries.length > 0 && !embedded"
+      >
         <div [innerHTML]="renderedContent"></div>
       </article>
 
       <!-- Back to Top Button -->
-      <button
-        *ngIf="showBackToTop"
-        class="back-to-top"
-        (click)="scrollToTop()"
-        title="Back to top">
+      <button *ngIf="showBackToTop" class="back-to-top" (click)="scrollToTop()" title="Back to top">
         &uarr;
       </button>
     </div>
   `,
-  styleUrls: ['./markdown-renderer.component.css']
+  styleUrls: ['./markdown-renderer.component.css'],
 })
 export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDestroy {
   @Input() node!: ContentNode;
@@ -96,6 +106,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   private readonly marked: Marked;
   private scrollListener?: () => void;
   private headingElements: HTMLElement[] = [];
+  private readonly storageClient = inject(StorageClientService);
 
   constructor(private readonly sanitizer: DomSanitizer) {
     // Configure marked with syntax highlighting
@@ -105,20 +116,60 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
         highlight(code, lang) {
           const language = hljs.getLanguage(lang) ? lang : 'plaintext';
           return hljs.highlight(code, { language }).value;
-        }
+        },
       })
     );
 
     // Configure marked options
     this.marked.setOptions({
       gfm: true,
-      breaks: false
+      breaks: false,
     });
+
+    // Configure custom renderer to transform blob URLs in images
+    this.marked.use({
+      renderer: {
+        image: token => {
+          // Transform blob URLs to full doorway URLs
+          const resolvedHref = this.resolveBlobUrl(token.href);
+          const title = token.title ? ` title="${token.title}"` : '';
+          return `<img src="${resolvedHref}" alt="${token.text}"${title}>`;
+        },
+      },
+    });
+  }
+
+  /**
+   * Resolve blob URL references to full URLs.
+   * Transforms /blob/hash and blob/hash to strategy-aware full URLs.
+   */
+  private resolveBlobUrl(url: string): string {
+    if (!url) return url;
+
+    // Already a full URL - pass through
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+
+    // Handle /blob/{hash} format
+    if (url.startsWith('/blob/')) {
+      const blobHash = url.slice(6);
+      return this.storageClient.getBlobUrl(blobHash);
+    }
+
+    // Handle blob/{hash} format (no leading slash)
+    if (url.startsWith('blob/')) {
+      const blobHash = url.slice(5);
+      return this.storageClient.getBlobUrl(blobHash);
+    }
+
+    // Not a blob URL, return as-is
+    return url;
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['node'] && this.node) {
-      this.renderMarkdown();
+      void this.renderMarkdown();
     }
   }
 
@@ -160,17 +211,38 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     }
 
     // Parse markdown to HTML
-    const html = await this.marked.parse(this.node.content);
+    let html = await this.marked.parse(this.node.content);
+
+    // Post-process to transform any raw HTML img src attributes
+    html = this.transformHtmlImageUrls(html);
 
     // Extract TOC and add heading IDs
     const { processedHtml, toc } = this.processHeadings(html);
 
     this.tocEntries = toc;
+    // Security: HTML is generated from trusted markdown content stored in backend
+    // eslint-disable-next-line sonarjs/no-angular-bypass-sanitization
     this.renderedContent = this.sanitizer.bypassSecurityTrustHtml(processedHtml);
     this.tocGenerated.emit(toc);
 
     // Update heading elements after view updates
     setTimeout(() => this.cacheHeadingElements(), 0);
+  }
+
+  /**
+   * Transform image src attributes in raw HTML to resolve blob URLs.
+   * Handles <img src="/blob/..."> patterns that bypass marked's renderer.
+   */
+  private transformHtmlImageUrls(html: string): string {
+    // Match img tags with src attributes containing blob paths
+    // Using negated character class without + to avoid backtracking
+    return html.replaceAll(
+      /<img([^>]*?)\ssrc=["'](\/?blob\/[^"']*?)["']([^>]*?)>/gi,
+      (_match, before, src, after) => {
+        const resolvedSrc = this.resolveBlobUrl(src);
+        return `<img${before} src="${resolvedSrc}"${after}>`;
+      }
+    );
   }
 
   private processHeadings(html: string): { processedHtml: string; toc: TocEntry[] } {
@@ -180,12 +252,13 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     // Regex to find headings
     const headingRegex = /<h([1-6])([^>]*)>(.*?)<\/h\1>/gi;
 
-    const processedHtml = html.replace(headingRegex, (match, level, attrs, content) => {
+    const processedHtml = html.replaceAll(headingRegex, (_match, level, attrs, content) => {
       // Strip HTML tags from content for TOC text
-      const text = content.replace(/<[^>]+>/g, '').trim();
+      // Use a helper function to avoid regex backtracking issues
+      const text = this.stripHtmlTags(content).trim();
 
       // Generate unique ID
-      let id = this.generateId(text);
+      const id = this.generateId(text);
       let uniqueId = id;
       let counter = 1;
       while (usedIds.has(uniqueId)) {
@@ -198,7 +271,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       toc.push({
         id: uniqueId,
         text,
-        level: parseInt(level, 10)
+        level: Number.parseInt(level, 10),
       });
 
       // Return heading with ID and anchor link
@@ -211,12 +284,22 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
     return { processedHtml, toc };
   }
 
+  /**
+   * Strip HTML tags from a string without using regex backtracking.
+   * Uses DOM parser for reliable tag stripping.
+   */
+  private stripHtmlTags(html: string): string {
+    // Use DOM to safely strip HTML tags - avoids regex backtracking
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent ?? '';
+  }
+
   private generateId(text: string): string {
     return text
       .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
+      .replaceAll(/[^\w\s-]/g, '')
+      .replaceAll(/\s+/g, '-')
+      .replaceAll(/-+/g, '-')
       .substring(0, 50);
   }
 

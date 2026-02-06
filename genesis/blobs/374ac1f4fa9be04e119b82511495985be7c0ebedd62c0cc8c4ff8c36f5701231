@@ -1,0 +1,10 @@
+Scenario: Rapid appeal review during regional crisis
+    Given a regional crisis requires many urgent agent decisions
+    And I need to appeal a crisis-related decision quickly
+    When Regional Constitutional Council convenes emergency session
+    Then they balance speed with deliberation quality
+    And They evaluate if emergency protocols were properly invoked
+    And They examine if crisis urgency justified departures from normal process
+    And They provide expedited review (48-72 hours) while maintaining rigor
+    And They create precedent for crisis governance
+    And My appeal ensures democratic accountability even under emergency conditions

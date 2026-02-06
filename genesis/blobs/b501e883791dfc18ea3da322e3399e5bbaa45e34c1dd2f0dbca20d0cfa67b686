@@ -1,0 +1,9 @@
+Scenario: Individual grief processing supported amid ongoing loss
+    Given James experiences anticipatory grief constantly
+    And he's losing David slowly while providing daily care
+    When the personal_agent recognizes James's grief
+    Then it should connect him to grief support resources
+    And it should acknowledge the unique pain of progressive loss
+    And it should support his emotional processing
+    And grief should be recognized as ongoing burden, not one-time event
+    And the protocol should hold space for James's devastating loss

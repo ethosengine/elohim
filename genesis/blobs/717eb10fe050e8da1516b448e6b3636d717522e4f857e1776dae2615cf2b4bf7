@@ -1,0 +1,11 @@
+Scenario: Managing neighborhood social challenges
+    Given some neighborhood kids sometimes tease Jordan
+    And Jordan finds the teasing hurtful and confusing
+    When the teasing incidents occur
+    Then the personal_agent helps Jordan process feelings
+    And the neighborhood_elohim can facilitate education if appropriate
+    And supportive neighbors might intervene to protect Jordan
+    And Jordan learns strategies for responding with dignity
+    And the community addresses ableism through education
+    And Jordan's safety and dignity are prioritized
+    And Jordan receives support to continue neighborhood participation

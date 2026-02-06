@@ -1,0 +1,10 @@
+Scenario: Municipal recognition of senior volunteer contributions
+    Given Margaret volunteers extensively in municipal programs
+    And her labor subsidizes municipal service provision
+    When the municipality_elohim tracks volunteer contributions
+    Then municipal government should see aggregate senior volunteer value
+    And policy should reflect dependence on senior volunteer labor
+    And seniors should be recognized as essential to municipal function
+    And Margaret's contributions should give her standing in municipal affairs
+    And volunteer labor should inform resource allocation
+    And senior productivity should be visible to government

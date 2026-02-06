@@ -1,0 +1,10 @@
+Scenario: Journalist investigates school discipline disparities
+    Given parents report Black students face harsher discipline
+    And the journalist investigates discipline practices
+    When the Observer analyzes discipline data by race
+    Then the journalist sees Black students suspended at 3.5x rate
+    And documents same behaviors leading to suspension for Black students, warnings for white
+    And tracks individual administrators with extreme disparity patterns
+    And compares to districts using restorative justice successfully
+    And publishes investigation exposing discriminatory discipline
+    And pattern recognition reveals school-to-prison pipeline

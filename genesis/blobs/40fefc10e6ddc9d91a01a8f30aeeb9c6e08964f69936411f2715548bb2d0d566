@@ -1,0 +1,10 @@
+Scenario: Recognizing different resource contributions to household
+    Given Kenji contributes time and labor but limited money
+    And one roommate might contribute more financially but less labor
+    When the household_elohim tracks all forms of contribution
+    Then it should value both care labor and financial contributions
+    And it should recognize Kenji's cooking as economic contribution
+    And it should show equivalence: "Kenji's cooking worth $X in meal prep time saved"
+    And it should prevent assumption that money is only real contribution
+    And the system should value diverse contribution types
+    And household equity should include labor, time, and money

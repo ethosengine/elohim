@@ -1,0 +1,10 @@
+Scenario: Child understands privacy in community context
+    Given Emma's data contributes to neighborhood patterns
+    And she is learning about privacy concepts
+    When Emma's anonymized data is aggregated
+    Then she should understand her information is protected
+    And her personal_agent should explain community data carefully
+    And the agent should say "Your choices help the neighborhood, but your privacy is protected"
+    And she should learn about balance between community good and privacy
+    And data ethics education should be age-appropriate
+    And she should understand collective benefit need not compromise privacy

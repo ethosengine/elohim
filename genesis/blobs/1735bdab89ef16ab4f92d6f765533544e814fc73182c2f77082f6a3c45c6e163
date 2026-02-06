@@ -1,0 +1,11 @@
+Scenario: Local events adapted for elderly participation
+    Given neighborhood events are important for community connection
+    And Helen's limitations affect her ability to participate
+    When neighborhood events are planned
+    Then the neighborhood_elohim should advocate for accessibility
+    And events should include seating, accessible locations, and quiet spaces
+    And transportation should be coordinated for those with mobility limits
+    And Helen should be able to participate in neighborhood life
+    And adaptation should enable, not separate
+    And the protocol should ensure elderly inclusion in community events
+    And neighborhood culture should include all ages and capabilities

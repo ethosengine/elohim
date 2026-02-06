@@ -1,0 +1,11 @@
+Scenario: Coordinating with parental authority while maintaining grandparent role
+    Given Sarah is the parent with primary authority over children
+    And Margaret needs to honor Sarah's parenting choices
+    When the family_elohim coordinates care boundaries
+    Then it should help Margaret align with Sarah's values and rules
+    And it should preserve Margaret's unique grandparent identity
+    And it should navigate between parental authority and grandparent autonomy
+    And Margaret should not be subordinate (taking orders) or superior (overriding choices)
+    And family_elohim should help them work as partners in child-rearing
+    And relationship should be mutually respectful and collaborative
+    And complex multigenerational dynamics should be coordinated skillfully

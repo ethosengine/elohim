@@ -1,0 +1,9 @@
+Scenario: Bulk purchasing coordination with neighbors for cost savings
+    Given Maria operates on severe budget constraints
+    And bulk purchasing saves money but requires coordination
+    When neighbors organize bulk buying cooperatives
+    Then the neighborhood_elohim should coordinate collective purchasing
+    And it should help Maria access wholesale prices through group orders
+    And it should facilitate cost-sharing and distribution logistics
+    And bulk buying should reduce Maria's grocery costs meaningfully
+    And neighborhood economic cooperation should help single-parent resource constraints

@@ -1,0 +1,8 @@
+Scenario: Supporting bioregional food security and resilience
+    Given bioregions need resilient local food systems
+    And my food preparation skills contribute to food security
+    When I want to support bioregional food resilience
+    Then the protocol should connect me to community food security initiatives
+    And help me contribute skills to mutual aid food programs
+    And recognize that local food systems support community and ecological resilience
+    And build bioregional capacity for food sovereignty

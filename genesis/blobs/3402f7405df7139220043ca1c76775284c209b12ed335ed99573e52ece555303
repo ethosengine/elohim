@@ -1,0 +1,11 @@
+Scenario: Retired grandparent presence strengthens neighborhood resilience
+    Given Margaret is home during weekdays when many neighbors work
+    And her presence provides neighborhood stability and observation
+    When the neighborhood_elohim tracks resident engagement
+    Then it should recognize Margaret's daytime presence as valuable
+    And it should value retired residents' neighborhood stewardship
+    And it should recognize she provides informal neighborhood watch
+    And her availability strengthens neighborhood safety and connection
+    And retired elders should be seen as neighborhood assets
+    And presence and engagement should accumulate care tokens
+    And neighborhood benefits from Margaret's availability

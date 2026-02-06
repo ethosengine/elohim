@@ -1,6 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
+
+// @coverage: 100.0% (2026-02-05)
+
 import { SeoService } from '../../services/seo.service';
 
 /**
@@ -17,14 +20,14 @@ import { SeoService } from '../../services/seo.service';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './not-found.component.html',
-  styleUrl: './not-found.component.css'
+  styleUrl: './not-found.component.css',
 })
 export class NotFoundComponent implements OnInit {
   private readonly seoService = inject(SeoService);
   private readonly router = inject(Router);
 
   /** The attempted URL path */
-  attemptedUrl: string = '';
+  attemptedUrl = '';
 
   ngOnInit(): void {
     this.attemptedUrl = this.router.url;
@@ -35,8 +38,8 @@ export class NotFoundComponent implements OnInit {
       description: 'The page you are looking for could not be found.',
       noIndex: true,
       openGraph: {
-        ogType: 'website'
-      }
+        ogType: 'website',
+      },
     });
   }
 
@@ -44,20 +47,20 @@ export class NotFoundComponent implements OnInit {
    * Navigate to home page
    */
   goHome(): void {
-    this.router.navigate(['/']);
+    void this.router.navigate(['/']);
   }
 
   /**
    * Navigate to Lamad learning platform
    */
   goToLamad(): void {
-    this.router.navigate(['/lamad']);
+    void this.router.navigate(['/lamad']);
   }
 
   /**
    * Go back to previous page
    */
   goBack(): void {
-    window.history.back();
+    globalThis.history.back();
   }
 }

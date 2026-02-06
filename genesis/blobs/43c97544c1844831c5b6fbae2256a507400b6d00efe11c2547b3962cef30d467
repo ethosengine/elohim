@@ -1,0 +1,9 @@
+Scenario: Customer notices quality improvement through worker ownership
+    Given corporate model pressured quality cuts for profit maximization
+    And Ms. Johnson accepted mediocre quality as inevitable for fast food
+    When worker ownership aligns incentives with quality
+    Then food tastes better because workers care about product they own
+    And vegetables are fresh (from Johnson Farm, not corporate distributor)
+    And cleanliness improves through worker pride in ownership
+    And quality exceeds previous corporate standards while prices remain affordable
+    And community_elohim documents quality improvements for customer awareness

@@ -1,0 +1,9 @@
+Scenario: Democratic workplace implements innovation suggested by worker
+    Given Emma has identified a workflow optimization
+    And corporate system previously prohibited worker-initiated changes
+    When Emma proposes the optimization at worker council meeting
+    Then workers deliberate on implementation feasibility
+    And workers vote to pilot Emma's optimization for two weeks
+    And results are measured and shared transparently
+    And if successful, Emma's innovation is permanently adopted
+    And Emma receives recognition and compensation for the contribution

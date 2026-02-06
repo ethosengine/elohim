@@ -1,0 +1,167 @@
+@epic:value_scanner
+@user_type:retired
+@governance_layer:community
+@related_users:volunteer,senior,worker,organizer,neighbor,elder
+@related_layers:neighborhood,municipality,individual,household
+@elohim_agents:personal_agent,community_elohim
+
+Feature: Community Layer Value Recognition for Retired Person
+  As a retired person in the value scanner system
+  Operating at the community governance layer
+  I want my volunteer labor and community leadership recognized as valuable contribution
+  So that retired people are understood as community builders, not economic dependents
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the retired user "Frank" is registered in the system
+    And Frank is 70 years old, retired from construction
+    And Frank volunteers 20 hours/week with Habitat for Humanity
+    And the community governance context is active
+    And the community_elohim coordinates community care economy
+    And Frank's construction skills serve community housing needs
+
+  Scenario: Skilled volunteer labor valued at market rates for community contribution
+    Given Frank volunteers 20 hours/week with Habitat for Humanity
+    And he provides skilled construction labor
+    And this work has clear market value (~$40/hour for skilled trades)
+    When the community_elohim tracks volunteer contributions
+    Then Frank's volunteer labor should be quantified specifically
+    And market value should be calculated (~$20k/year contribution)
+    And his skilled labor should be recognized as substantial community asset
+    And community care tokens should accumulate from volunteer work
+    And Frank should see quantified value of his contribution
+    And the narrative of retired as "not contributing" should be countered
+    And community should recognize his volunteer work as real economic value
+
+  Scenario: Habitat for Humanity work recognized as housing care economy contribution
+    Given Frank's volunteer work builds housing for families in need
+    And his construction expertise enables affordable housing
+    When the community_elohim tracks housing care economy
+    Then Frank's work should be recognized as addressing housing crisis
+    And building homes should be valued as community care contribution
+    And his labor should be connected to housing outcomes (families housed)
+    And community should see that Frank's work creates housing that policy fails to provide
+    And volunteer construction should be understood as care economy infrastructure
+    And Frank should experience his work as meaningful community contribution
+
+  Scenario: Coordinating volunteer participation with other life commitments
+    Given Frank volunteers 20 hours/week
+    And he also provides family care and participates in neighborhood governance
+    When the community_elohim coordinates his participation
+    Then it should integrate volunteer work with other commitments
+    And help Frank maintain sustainable participation level
+    And prevent volunteer burnout through overcommitment
+    And coordinate scheduling across community, family, and neighborhood
+    And support Frank in balancing diverse care contributions
+    And enable long-term sustainable volunteer engagement
+
+  Scenario: Retired residents as experienced community leaders and organizers
+    Given Frank has decades of community experience
+    And he understands community dynamics and history
+    When the community_elohim facilitates leadership
+    Then Frank's accumulated experience should position him for leadership
+    And his knowledge should inform community organizing and policy
+    And community should actively seek his participation in decision-making
+    And decades of community investment should confer legitimate authority
+    And elder leadership should be welcomed and valued
+    And Frank should experience himself as community leader, not marginal participant
+
+  Scenario: Mentoring younger volunteers in construction and community work
+    Given Frank has both construction expertise and volunteering experience
+    And younger volunteers need skill development and guidance
+    When the community_elohim coordinates mentoring
+    Then it should connect Frank to volunteers seeking construction skills
+    And facilitate teaching and skill transmission
+    And recognize mentoring as multiplying Frank's contribution
+    And value teaching labor as care contribution
+    And build community capacity through intergenerational skill sharing
+    And Frank should experience meaningful role as mentor and teacher
+
+  Scenario: Community care tokens accumulate from sustained volunteer participation
+    Given Frank has volunteered consistently over years
+    And his contributions are substantial and ongoing
+    When the community_elohim calculates care tokens
+    Then tokens should accumulate from Frank's volunteer hours
+    And skill level should affect token value (skilled trades valued highly)
+    And sustained participation should be recognized over time
+    And accumulated tokens should represent Frank's community standing
+    And tokens should create claims on community resources and support
+    And his years of contribution should be visible and valued
+
+  Scenario: Connecting retired residents to volunteer opportunities matching their skills
+    Given Frank has construction expertise
+    And community has diverse volunteer needs
+    When the community_elohim matches volunteers to opportunities
+    Then it should identify opportunities utilizing Frank's specific skills
+    And surface construction-related needs beyond Habitat
+    And coordinate with organizations seeking skilled volunteers
+    And help Frank find meaningful work aligned with expertise
+    And maximize community benefit from his particular capabilities
+    And enable Frank to contribute at highest skill level
+
+  Scenario: Volunteer work accessibility for aging participants
+    Given Frank is 70 and managing age-related physical changes
+    And he wants to continue contributing through volunteer work
+    When the community_elohim coordinates accessibility
+    Then it should match Frank to work appropriate for his capabilities
+    And surface modifications that enable continued participation
+    And recognize when physical limitations require adaptation
+    And help transition to less physically demanding roles if needed
+    And protect Frank's safety while maximizing contribution
+    And enable continued meaningful participation throughout aging
+
+  Scenario: Community governance includes retired residents as active participants
+    Given Frank and other retired residents have time for civic engagement
+    And they have accumulated community knowledge and experience
+    When the community_elohim facilitates governance
+    Then it should actively include retired residents in decision-making
+    And their time availability should enable substantial governance participation
+    And their experience should inform community policy and planning
+    And community decisions should benefit from elder wisdom
+    And retired residents should be understood as governance resources, not dependents
+    And Frank should participate in shaping community direction
+
+  Scenario: Retired residents build care economy infrastructure through organizing
+    Given Frank and other retired residents have time for organizing
+    And care economy requires coordination and infrastructure
+    When the community_elohim supports infrastructure building
+    Then it should enable retired residents to organize care economy systems
+    And coordinate tool libraries, skill shares, mutual aid networks
+    And facilitate care coordination that benefits all community members
+    And recognize organizing labor as valuable care contribution
+    And retired residents should be understood as infrastructure builders
+    And Frank should help establish care economy as normal community practice
+
+  Scenario: Community education and skill-sharing led by retired residents
+    Given Frank has decades of construction knowledge
+    And community members need practical skills
+    When the community_elohim coordinates education
+    Then it should facilitate Frank teaching construction workshops
+    And coordinate skill-sharing sessions utilizing retired residents' expertise
+    And recognize teaching as valuable community care contribution
+    And enable knowledge transmission from experienced to learning members
+    And build community capacity through elder knowledge sharing
+    And Frank should experience meaningful teaching role
+
+  Scenario: Community resource allocation recognizes volunteer contributions
+    Given Frank provides substantial volunteer labor
+    And community resources are limited
+    When the community_elohim influences resource allocation
+    Then Frank's contributions should be visible in allocation decisions
+    And his care tokens should provide access to community resources
+    And volunteers should not face additional burden from low income
+    And community resources should flow to contributors equitably
+    And Frank's volunteer work should be recognized through material support
+    And care economy should function as mutual aid, not charity
+
+  Scenario: Visibility of aggregate retired resident contributions transforms perception
+    Given Frank is one of many retired residents contributing substantial volunteer labor
+    And aggregate impact is significant but invisible in traditional metrics
+    When the community_elohim surfaces aggregate data
+    Then it should quantify total volunteer labor from retired residents
+    And calculate combined market value (potentially millions annually)
+    And demonstrate that retired residents are massive community asset
+    And counter narrative of elders as economic burden
+    And transform community understanding of retirement contributions
+    And support policy that recognizes and values retired resident participation
+    And Frank should see himself as part of powerful community infrastructure

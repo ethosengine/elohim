@@ -1,0 +1,10 @@
+Scenario: Teen coordinates with neighbors for mutual benefit
+    Given Jasmine's neighbor Mrs. Rodriguez is elderly and has limited mobility
+    And Jasmine regularly does grocery shopping
+    When Jasmine offers to shop for Mrs. Rodriguez
+    Then the neighborhood_elohim should facilitate the coordination
+    And track Jasmine's care contribution to neighborhood care economy
+    And enable Mrs. Rodriguez to reciprocate through care tokens or other care
+    And build neighborhood bonds through visible care exchange
+    And demonstrate that care economy operates across age groups
+    And recognize that Jasmine's care work has real value to neighborhood wellbeing

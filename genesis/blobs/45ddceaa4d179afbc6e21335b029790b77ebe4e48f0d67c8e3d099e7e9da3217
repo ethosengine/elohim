@@ -1,0 +1,9 @@
+Scenario: Contributing to household chores with dignity
+    Given Jordan is responsible for helping with dinner dishes
+    When Jordan completes their dishwashing task
+    Then the Value Scanner records Jordan's household contribution
+    And Jordan accumulates care tokens for their household labor
+    And the interface celebrates Jordan's contribution with positive feedback
+    And Jordan's work is valued equally to housemates' contributions
+    And the household labor distribution is visible to all housemates
+    And Jordan experiences being a valued household member, not a client

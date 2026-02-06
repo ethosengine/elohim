@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-steven-sloman",
+  "contentType": "contributor",
+  "title": "Steven Sloman",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Steven Sloman\n\n**Role:** author\n\n**Works:** The Knowledge Illusion\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-media-00-book-the-knowledge-illusi"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-01-church-dilemma"
+  },
+  "createdAt": "2025-11-28T21:10:19.190323",
+  "updatedAt": "2025-12-24T03:05:26.079Z",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Steven Sloman",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-steven-sloman",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Steven Sloman - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-steven-sloman",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Steven Sloman",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.190323",
+    "dateModified": "2025-11-28T21:10:19.190324",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

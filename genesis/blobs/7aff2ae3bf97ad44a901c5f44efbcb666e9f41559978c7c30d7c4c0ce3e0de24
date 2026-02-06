@@ -1,0 +1,10 @@
+Scenario: Board member understands community priorities on curriculum controversy
+    Given board faces decision on proposed curriculum adoption
+    And board meetings dominated by organized groups advocating strong positions
+    And board wants to understand broader parent and educator perspectives
+    When the board member seeks community accountability data from Observer
+    Then they receive survey data from representative sample of district families
+    And see teacher professional judgment on curriculum separate from union position
+    And access student learning outcome data from districts using proposed curriculum
+    And understand concerns of diverse communities beyond organized advocacy
+    And community accountability helps board make decision aligned with broader interests

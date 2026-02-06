@@ -1,0 +1,9 @@
+Scenario: Responsible developer demonstrates regional housing contribution
+    Given a developer builds affordable housing across the region
+    And wants regional approval bodies to recognize consistent track record
+    When the Observer surfaces regional development patterns
+    Then the developer shows: 600 affordable units built across five municipalities
+    And demonstrates 85% occupancy by local workforce
+    And proves commitment to regional affordability not just luxury development
+    And regional reputation supports new project approvals
+    And consistent value creation becomes visible at scale

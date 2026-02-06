@@ -1,0 +1,10 @@
+Scenario: Community support for parent mental health and well-being
+    Given parenting is intense work with high burnout risk
+    And Sarah needs community support to sustain care work
+    When the community_elohim assesses parent well-being
+    Then it should connect Sarah to mental health resources
+    And it should provide respite care and support services
+    And the community should invest in parent sustainability
+    And parent well-being should be recognized as community priority
+    And the system should prevent parent burnout through community care
+    And supporting parents should be understood as supporting children

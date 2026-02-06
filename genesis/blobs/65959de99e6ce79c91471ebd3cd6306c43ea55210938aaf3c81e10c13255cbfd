@@ -1,0 +1,9 @@
+Scenario: Special education or support service coordination across siblings
+    Given one or more of Maria's children may need educational support services
+    And she must coordinate any special needs alone across multiple children
+    When children require special education services or support
+    Then the educational_elohim should help Maria coordinate across children and schools
+    And schools should recognize she's managing support needs without co-parent
+    And scheduling of meetings and services should accommodate her work constraints
+    And single parents should receive extra support for complex special education navigation
+    And Maria should be able to advocate effectively for children's needs despite time limitations

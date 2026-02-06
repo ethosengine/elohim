@@ -1,4 +1,33 @@
-// Best practice: Return values instead of setting env directly
+/**
+ * Elohim App Pipeline
+ *
+ * Builds and deploys the Angular web application to alpha/staging/production.
+ * Triggered by orchestrator when elohim-app/ or elohim-library/ files change.
+ *
+ * What this pipeline builds:
+ *   - elohim-app Angular application
+ *   - UI Playground (dev branches only, when elohim-ui-playground/** changes)
+ *   - Docker images pushed to Harbor registry
+ *
+ * Environment Architecture:
+ *   - dev, feat-*, claude branches → alpha.elohim.host
+ *   - staging* → staging.elohim.host
+ *   - main → elohim.host (production)
+ *
+ * Trigger behavior:
+ *   - Only runs when triggered by orchestrator or manual
+ *   - Shows NOT_BUILT when triggered directly by webhook
+ *
+ * Artifact dependency:
+ *   - Fetches holochain-cache-core WASM from elohim-holochain pipeline
+ *
+ * @see orchestrator/Jenkinsfile for central trigger logic
+ */
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
 def loadBuildVars() {
     def rootEnv = "${env.WORKSPACE}/build.env"
     def path = fileExists(rootEnv) ? rootEnv : 'build.env'
@@ -29,6 +58,217 @@ def withBuildVars(props, Closure body) {
         body()
     }
 }
+
+// Helper to determine SonarQube project config based on branch
+// Returns: [projectKey: String, shouldEnforce: Boolean, env: String]
+@NonCPS
+def getSonarProjectConfig() {
+    def targetBranch = env.CHANGE_TARGET ?: env.BRANCH_NAME
+
+    if (targetBranch == 'main') {
+        return [projectKey: 'elohim-app', shouldEnforce: true, env: 'prod']
+    } else if (targetBranch == 'staging' || targetBranch ==~ /staging-.+/) {
+        return [projectKey: 'elohim-app-staging', shouldEnforce: false, env: 'staging']
+    } else {
+        return [projectKey: 'elohim-app-alpha', shouldEnforce: false, env: 'alpha']
+    }
+}
+
+// ============================================================================
+// STAGE HELPER METHODS (to reduce bytecode size)
+// ============================================================================
+
+def deployAppToEnvironment(String environment, String namespace, String deploymentName, String manifestPath, String imageTag) {
+    echo "Deploying to ${environment}: ${imageTag}"
+
+    // Validate ConfigMap exists
+    sh "kubectl get configmap elohim-config-${environment} -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
+
+    // Update deployment manifest with image tag
+    sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml"
+
+    // Preview manifest
+    sh """
+        echo '==== Deployment manifest preview ===='
+        grep 'image:' ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml
+        echo '===================================='
+    """
+
+    // Deploy and rollout
+    sh "kubectl apply -f ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml"
+    sh "kubectl rollout restart deployment/${deploymentName} -n ${namespace}"
+    sh "kubectl rollout status deployment/${deploymentName} -n ${namespace} --timeout=300s"
+
+    // Verify deployed image
+    sh """
+        echo '==== Verifying deployed image ===='
+        kubectl get deployment ${deploymentName} -n ${namespace} -o jsonpath='{.spec.template.spec.containers[0].image}'
+        echo ''
+        echo '=================================='
+    """
+
+    echo "${environment} deployment completed!"
+}
+
+def buildSophiaPlugin() {
+    // First, build the sophia monorepo (submodule) since its packages aren't on npm
+    echo 'Building sophia monorepo packages...'
+
+    // Initialize and update submodule if needed
+    sh '''
+        git submodule update --init --recursive sophia || true
+    '''
+
+    dir('sophia') {
+        sh '''
+            # Install pnpm if not available
+            if ! command -v pnpm &> /dev/null; then
+                npm install -g pnpm
+            fi
+
+            # Install dependencies
+            pnpm install --frozen-lockfile
+
+            # Build all packages (creates dist/ in each package)
+            pnpm build
+
+            # Build UMD bundle separately (uses different rollup config)
+            # Must run AFTER main build to overwrite the incorrectly-generated ESM file
+            pnpm --filter @ethosengine/sophia-element build:umd
+
+            echo "✅ Sophia packages built successfully"
+            ls -la packages/sophia/dist/ || true
+            ls -la packages/sophia-element/dist/ || true
+
+            # Verify UMD bundle is actually UMD format (not ESM)
+            if head -c 50 packages/sophia-element/dist/sophia-element.umd.js | grep -q "^import "; then
+                echo "ERROR: sophia-element.umd.js contains ESM syntax instead of UMD"
+                exit 1
+            fi
+            echo "✅ UMD bundle format verified"
+        '''
+    }
+
+    // Copy sophia-element UMD bundle and CSS to elohim-app assets
+    echo 'Copying sophia-element to elohim-app assets...'
+    sh '''
+        mkdir -p elohim-app/src/assets/sophia-plugin
+
+        # Copy UMD bundle from sophia-element
+        cp sophia/packages/sophia-element/dist/sophia-element.umd.js elohim-app/src/assets/sophia-plugin/
+
+        # Copy base CSS from main sophia package
+        cp sophia/packages/sophia/dist/index.css elohim-app/src/assets/sophia-plugin/
+
+        # Copy UMD CSS if it exists (generated by rollup)
+        cp sophia/packages/sophia-element/dist/sophia-element.umd.css elohim-app/src/assets/sophia-plugin/ 2>/dev/null || true
+
+        # Create stub CSS files for theme overrides (actual theming is via Sophia.configure() API)
+        echo "/* Sophia theme overrides - Configure via Sophia.configure() API */" > elohim-app/src/assets/sophia-plugin/sophia-theme-overrides.css
+        echo "/* Sophia styles - bundled in UMD */" > elohim-app/src/assets/sophia-plugin/sophia.css
+
+        echo "✅ Sophia plugin assets copied to elohim-app"
+        ls -la elohim-app/src/assets/sophia-plugin/
+    '''
+}
+
+def runE2ETests(String environment, String baseUrl, String gitCommitHash) {
+    echo "Running E2E tests against ${environment}"
+    env.E2E_TESTS_RAN = 'true'
+
+    // Install Cypress if needed
+    sh '''
+        if [ ! -d "node_modules/cypress" ]; then
+            npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
+        fi
+    '''
+
+    // Verify environment is up
+    sh """
+        timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" ${baseUrl} | grep -q "200\\|302\\|301"; do
+            sleep 5
+        done'
+        echo "✅ ${environment} site is responding"
+    """
+
+    // Run tests
+    sh """#!/bin/bash
+        export CYPRESS_baseUrl=${baseUrl}
+        export CYPRESS_ENV=${environment}
+        export CYPRESS_EXPECTED_GIT_HASH=${gitCommitHash}
+        export NO_COLOR=1
+        export DISPLAY=:99
+
+        Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
+        XVFB_PID=\\\$!
+        sleep 2
+
+        npx cypress verify > /dev/null
+        mkdir -p cypress/reports
+
+        npx cypress run \\
+            --headless \\
+            --browser chromium \\
+            --spec "cypress/e2e/staging-validation.feature"
+
+        kill \\\$XVFB_PID 2>/dev/null || true
+    """
+
+    echo "✅ ${environment} validation passed!"
+}
+
+def publishE2EReports(String environment) {
+    if (env.E2E_TESTS_RAN == 'true') {
+        echo '📊 Publishing cucumber reports...'
+
+        if (environment == 'staging') {
+            sh 'echo "DEBUG: Contents of cypress directory:"'
+            sh 'find cypress -type f -name "*" 2>/dev/null || echo "cypress directory not found"'
+            sh 'echo "DEBUG: Contents of cypress/reports directory:"'
+            sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
+            sh 'echo "DEBUG: Current working directory: $(pwd)"'
+            sh 'echo "DEBUG: Absolute path to cucumber report: $(pwd)/cypress/reports/cucumber-report.json"'
+            sh 'test -f cypress/reports/cucumber-report.json && echo "DEBUG: File exists and is readable" || echo "DEBUG: File does not exist or is not readable"'
+        }
+
+        if (fileExists('cypress/reports/cucumber-report.json')) {
+            cucumber([
+                reportTitle: "E2E Test Results (${environment})",
+                fileIncludePattern: 'cucumber-report.json',
+                jsonReportDirectory: 'cypress/reports',
+                buildStatus: 'FAILURE',
+                failedFeaturesNumber: -1,
+                failedScenariosNumber: -1,
+                failedStepsNumber: -1,
+                skippedStepsNumber: -1,
+                pendingStepsNumber: -1,
+                undefinedStepsNumber: -1
+            ])
+            echo 'Cucumber reports published successfully'
+        } else {
+            echo 'No cucumber reports found to publish'
+        }
+    } else {
+        echo 'E2E tests did not run - skipping cucumber report publishing'
+    }
+
+    // Archive test artifacts
+    if (env.E2E_TESTS_RAN == 'true') {
+        if (fileExists('cypress/screenshots')) {
+            archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
+        }
+        if (fileExists('cypress/videos')) {
+            archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
+        }
+        if (fileExists('cypress/reports/cucumber-report.json')) {
+            archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
+        }
+    }
+}
+
+// ============================================================================
+// END HELPER METHODS
+// ============================================================================
 
 pipeline {
     agent {
@@ -86,33 +326,59 @@ spec:
         // Only set static values here
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
     }
-    
+
+    options {
+        // Skip default checkout - it uses sparse checkout with 0% files
+        // We do explicit full checkout in the Checkout stage
+        skipDefaultCheckout(true)
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
+    }
+
+    // No triggers - orchestrator handles all webhook events
+    // triggers { }
+
     stages {
-        stage('Checkout') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    changeRequest()
+        stage('Check Trigger') {
+            steps {
+                script {
+                    def validTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UserIdCause') ||
+                        cause._class.contains('UpstreamCause') ||
+                        cause._class.contains('BranchIndexingCause')
+                    }
+                    if (!validTrigger) {
+                        echo "⏭️ PIPELINE SKIPPED - Use orchestrator or manual trigger"
+                        currentBuild.result = 'NOT_BUILT'
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                    }
                 }
             }
+        }
+
+        stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
                         // Configure git safe directory before any git operations
                         sh 'git config --global --add safe.directory "*"'
 
-                        checkout scm
-
-                        // Ensure clean git state to prevent cached workspace issues
-                        sh 'git clean -fdx'
-                        sh 'git reset --hard HEAD'
+                        // Explicit checkout - bypass sparse checkout config in job
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
+                            extensions: [
+                                [$class: 'CloneOption', shallow: false, noTags: true],
+                                [$class: 'CleanBeforeCheckout']
+                            ],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/ethosengine/elohim.git',
+                                credentialsId: 'ee-bot-pat'
+                            ]]
+                        ])
 
                         echo "Building branch: ${env.BRANCH_NAME}"
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
@@ -126,10 +392,10 @@ spec:
         }
 
         stage('Setup Version') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
-                        // Configure git safe directory before any git operations
                         sh 'git config --global --add safe.directory "*"'
 
                         echo "DEBUG - Setup Version: Starting"
@@ -139,22 +405,30 @@ spec:
                         if (!fileExists('VERSION')) {
                             error "VERSION file not found in workspace"
                         }
-                        
-                        // Read base version
-                        def baseVersion = readFile('VERSION').trim()
-                        echo "DEBUG - Base version: '${baseVersion}'"
-                        
-                        if (!baseVersion) {
-                            error "VERSION file is empty"
+
+                        // Parse VERSION file in key-value format (APP_VERSION=x.x.x, HAPP_VERSION=x.x.x)
+                        def versionContent = readFile('VERSION').trim()
+                        def versionMap = [:]
+                        versionContent.split('\n').each { line ->
+                            def parts = line.split('=')
+                            if (parts.length == 2) {
+                                versionMap[parts[0].trim()] = parts[1].trim()
+                            }
                         }
-                        
+                        def baseVersion = versionMap['APP_VERSION'] ?: versionMap['HAPP_VERSION'] ?: '1.0.0'
+                        echo "DEBUG - Base version: '${baseVersion}'"
+
+                        if (!baseVersion) {
+                            error "VERSION file is empty or malformed"
+                        }
+
                         // Get git hash
                         def gitHash = sh(
                             script: 'git rev-parse --short HEAD',
                             returnStdout: true
                         ).trim()
                         echo "DEBUG - Git hash: '${gitHash}'"
-                        
+
                         // Sync package.json version
                         dir('elohim-app') {
                             sh "npm version '${baseVersion}' --no-git-tag-version"
@@ -170,18 +444,18 @@ spec:
                             : "${baseVersion}-${sanitizedBranch}-${gitHash}"
 
                         echo "DEBUG - Image tag: '${imageTag}'"
-                        
+
                         // Write build.env file
                         def buildEnvContent = """BASE_VERSION=${baseVersion}
 GIT_COMMIT_HASH=${gitHash}
 IMAGE_TAG=${imageTag}
 BRANCH_NAME=${env.BRANCH_NAME}"""
-                        
+
                         writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
-                        
+
                         // Verify file was written
                         sh "cat '${env.WORKSPACE}/build.env'"
-                        
+
                         // Archive for debugging
                         archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
                         
@@ -191,39 +465,171 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
         
-        stage('Install Dependencies') {
+        stage('Fetch WASM Cache Core') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
-                container('builder'){
-                    dir('elohim-app') {
-                        script {
-                            echo 'Installing npm dependencies'
-                            sh 'npm ci'
+                container('builder') {
+                    script {
+                        echo 'Fetching holochain-cache-core WASM module from Harbor...'
+
+                        def wasmDir = 'holochain/holochain-cache-core/pkg'
+
+                        // Read HAPP_VERSION from VERSION file
+                        def versionContent = readFile('VERSION').trim()
+                        def versionMap = [:]
+                        versionContent.split('\n').each { line ->
+                            def parts = line.split('=')
+                            if (parts.length == 2) {
+                                versionMap[parts[0].trim()] = parts[1].trim()
+                            }
+                        }
+                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
+                        // Compute Harbor tag using same logic as DNA pipeline producer
+                        def happVersion
+                        if (env.BRANCH_NAME == 'main') {
+                            happVersion = baseVersion
+                        } else {
+                            def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+                            happVersion = "${baseVersion}-${sanitizedBranch}-${gitHash}"
+                        }
+
+                        echo "Using HAPP_VERSION: ${happVersion}"
+
+                        // Install oras CLI if not present
+                        sh '''
+                            if ! command -v oras &> /dev/null; then
+                                echo "Installing oras CLI..."
+                                curl -sLO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
+                                tar -xzf oras_1.1.0_linux_amd64.tar.gz
+                                chmod +x oras
+                                mv oras /usr/local/bin/
+                                rm oras_1.1.0_linux_amd64.tar.gz
+                            fi
+                        '''
+
+                        // Fetch WASM from Harbor
+                        def fetched = false
+                        withCredentials([usernamePassword(
+                            credentialsId: 'harbor-robot-registry',
+                            usernameVariable: 'HARBOR_USER',
+                            passwordVariable: 'HARBOR_PASS'
+                        )]) {
+                            def result = sh(script: """
+                                oras login harbor.ethosengine.com -u \$HARBOR_USER -p \$HARBOR_PASS
+                                mkdir -p '${wasmDir}'
+                                cd '${wasmDir}'
+                                oras pull harbor.ethosengine.com/ethosengine/elohim-wasm-cache-core:${happVersion}
+                            """, returnStatus: true)
+                            fetched = (result == 0)
+                        }
+
+                        if (!fetched) {
+                            echo """
+                            ⚠️ Could not fetch holochain-cache-core WASM from Harbor.
+                            App will use TypeScript fallback (slightly slower but functional).
+                            To enable WASM: Run holochain DNA pipeline to push artifacts to Harbor.
+                            """
+                        }
+
+                        if (fileExists("${wasmDir}/holochain_cache_core.js")) {
+                            echo "✅ holochain-cache-core WASM module ready"
+                            sh "ls -lh ${wasmDir}/"
+                        } else {
+                            echo "⚠️ WASM module not available - TypeScript fallback will be used"
                         }
                     }
                 }
             }
         }
-        
+
+        stage('Install Dependencies') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder'){
+                    dir('elohim-library') {
+                        script {
+                            echo 'Installing elohim-library dependencies (required for elohim-service imports)'
+                            sh 'npm ci'
+                        }
+                    }
+                    dir('holochain/sdk/storage-client-ts') {
+                        script {
+                            echo 'Building storage-client-ts (required for @elohim/storage-client/generated types)'
+                            sh 'npm ci && npm run build'
+                            sh 'ls -la dist/ dist/generated/'
+                        }
+                    }
+                    dir('elohim-app') {
+                        script {
+                            echo 'Installing npm dependencies'
+                            sh 'npm ci'
+
+                            // Copy WASM files from fetched location to node_modules
+                            // This is needed because Angular expects WASM in node_modules/holochain-cache-core
+                            def wasmSrc = '../holochain/holochain-cache-core/pkg'
+                            def wasmDest = 'node_modules/holochain-cache-core'
+                            if (fileExists(wasmSrc)) {
+                                echo 'Copying holochain-cache-core WASM to node_modules...'
+                                sh """
+                                    mkdir -p '${wasmDest}'
+                                    cp -v '${wasmSrc}'/*.js '${wasmDest}/' 2>/dev/null || true
+                                    cp -v '${wasmSrc}'/*.wasm '${wasmDest}/' 2>/dev/null || true
+                                    cp -v '${wasmSrc}'/*.ts '${wasmDest}/' 2>/dev/null || true
+                                    ls -la '${wasmDest}/' || true
+                                """
+                            } else {
+                                echo "⚠️ WASM source not found at ${wasmSrc} - TypeScript fallback will be used"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Sophia Plugin') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps { container('builder') { script { buildSophiaPlugin() } } }
+        }
+
         stage('Build App') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     dir('elohim-app') {
                         script {
                             def props = loadBuildVars()
-                            
+
                             withBuildVars(props) {
                                 echo 'Building Angular application'
                                 echo "Using git hash: ${GIT_COMMIT_HASH}"
                                 echo "Using image tag: ${IMAGE_TAG}"
-                                
+
                                 // Replace placeholders
                                 sh """
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.prod.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.staging.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.alpha.ts
                                 """
-                                
-                                sh 'npm run build'
+
+                                // Determine build configuration based on branch
+                                // For PR builds, CHANGE_TARGET contains the target branch (e.g., 'dev')
+                                // For direct branch builds, use BRANCH_NAME
+                                def targetBranch = env.CHANGE_TARGET ?: env.BRANCH_NAME
+                                def sourceBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME
+
+                                def buildConfig = 'production'
+                                if (targetBranch == 'staging' || targetBranch ==~ /staging-.+/ ||
+                                    sourceBranch == 'staging' || sourceBranch ==~ /staging-.+/) {
+                                    buildConfig = 'staging'
+                                } else if (targetBranch == 'dev' || targetBranch ==~ /feat-.+/ || targetBranch ==~ /claude\/.+/ || targetBranch.contains('alpha') ||
+                                           sourceBranch == 'dev' || sourceBranch ==~ /feat-.+/ || sourceBranch ==~ /claude\/.+/ || sourceBranch.contains('alpha')) {
+                                    buildConfig = 'alpha'
+                                }
+
+                                echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
+                                sh "npm run build -- --configuration=${buildConfig}"
                                 sh 'ls -la dist/'
                             }
                         }
@@ -233,6 +639,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Unit Test') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -247,43 +654,70 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('SonarQube Analysis') {
             when {
-                anyOf {
-                    branch 'main'
-                    branch 'staging'
-                    // Run on PRs targeting staging or main (regardless of source branch)
-                    changeRequest target: 'staging'
-                    changeRequest target: 'main'
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'main'
+                        branch 'staging'
+                        branch 'dev'
+                        expression { env.BRANCH_NAME ==~ /staging-.+/ }
+                        expression { env.BRANCH_NAME ==~ /feat-.+/ }
+                        expression { env.BRANCH_NAME ==~ /claude\/.+/ }
+                        changeRequest target: 'main'
+                        changeRequest target: 'staging'
+                        changeRequest target: 'dev'
+                    }
                 }
             }
             steps {
                 container('builder'){
                     dir('elohim-app') {
                         script {
+                            def sonarConfig = getSonarProjectConfig()
+                            echo "SonarQube Analysis: project=${sonarConfig.projectKey}, env=${sonarConfig.env}, enforce=${sonarConfig.shouldEnforce}"
+
                             withSonarQubeEnv('ee-sonarqube') {
-                                sh '''
+                                sh """
                                 sonar-scanner \
-                                    -Dsonar.projectKey=elohim-app \
+                                    -Dsonar.projectKey=${sonarConfig.projectKey} \
                                     -Dsonar.sources=src \
                                     -Dsonar.tests=src \
                                     -Dsonar.test.inclusions=**/*.spec.ts \
                                     -Dsonar.typescript.lcov.reportPaths=coverage/elohim-app/lcov.info \
                                     -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info \
                                     -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**,**/parsers/**,**/*.routes.ts \
-                                    -Dsonar.qualitygate.wait=true \
-                                    -Dsonar.qualitygate.timeout=240
-                                '''
+                                    -Dsonar.qualitygate.wait=false
+                                """
                             }
 
                             echo "Waiting for SonarQube quality gate..."
-                            timeout(time: 4, unit: 'MINUTES') {
-                                def qg = waitForQualityGate()
-                                if (qg.status != 'OK') {
-                                    // Log the failure but don't block - coverage threshold managed on SonarQube server
-                                    echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
-                                    echo "Review coverage at: ${env.SONAR_HOST_URL}/dashboard?id=elohim-app"
-                                    // Uncomment to enforce: error "SonarQube Quality Gate failed: ${qg.status}"
+                            try {
+                                timeout(time: 10, unit: 'MINUTES') {
+                                    def qg = waitForQualityGate abortPipeline: false
+                                    if (qg.status != 'OK') {
+                                        if (sonarConfig.shouldEnforce) {
+                                            // Production: Block deployment on quality gate failure
+                                            error "❌ SonarQube Quality Gate FAILED: ${qg.status}\nReview issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                        } else {
+                                            // Alpha/Staging: Log warning but don't block
+                                            echo "⚠️ SonarQube Quality Gate status: ${qg.status}"
+                                            echo "Review issues at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                            currentBuild.result = 'UNSTABLE'
+                                        }
+                                    } else {
+                                        echo "✅ SonarQube quality gate passed (${sonarConfig.env})"
+                                    }
                                 }
-                                echo "✅ SonarQube analysis complete"
+                            } catch (Exception e) {
+                                echo "⚠️ SonarQube quality gate check failed: ${e.message}"
+                                echo "This may be due to webhook configuration issues."
+                                echo "Review results at: ${env.SONAR_HOST_URL}/dashboard?id=${sonarConfig.projectKey}"
+                                if (sonarConfig.shouldEnforce) {
+                                    currentBuild.result = 'UNSTABLE'
+                                    echo "⚠️ Marking build UNSTABLE - production quality gate could not be verified"
+                                } else {
+                                    echo "Continuing pipeline..."
+                                }
                             }
                         }
                     }
@@ -292,14 +726,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Image') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-                        
-                        // Validate required variables
                         if (!props.IMAGE_TAG || !props.GIT_COMMIT_HASH || !props.BASE_VERSION) {
-                            error "Missing required build variables: IMAGE_TAG='${props.IMAGE_TAG}', GIT_COMMIT_HASH='${props.GIT_COMMIT_HASH}', BASE_VERSION='${props.BASE_VERSION}'"
+                            error "Missing required build variables"
                         }
                         
                         withBuildVars(props) {
@@ -316,8 +749,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # Create build context
                                 mkdir -p /tmp/build-context
                                 cp -r elohim-app /tmp/build-context/
-                                cp images/Dockerfile /tmp/build-context/
-                                cp images/nginx.conf /tmp/build-context/
+                                cp elohim-app/images/Dockerfile /tmp/build-context/
+                                cp elohim-app/images/nginx.conf /tmp/build-context/
                                 
                                 # Build image
                                 cd /tmp/build-context
@@ -342,11 +775,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor Registry') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-                        
                         withBuildVars(props) {
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 echo 'Logging into Harbor registry'
@@ -377,11 +810,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Harbor Security Scan') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 echo "Triggering Harbor scan for: ${IMAGE_TAG}"
@@ -431,16 +864,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Install UI Playground Dependencies') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -458,16 +884,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build UI Playground') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -489,16 +908,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build UI Playground Image') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -519,8 +931,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # Create build context
                                 mkdir -p /tmp/build-context-playground
                                 cp -r elohim-library /tmp/build-context-playground/
-                                cp images/Dockerfile.ui-playground /tmp/build-context-playground/Dockerfile
-                                cp images/nginx-ui-playground.conf /tmp/build-context-playground/
+                                cp elohim-ui-playground/images/Dockerfile.ui-playground /tmp/build-context-playground/Dockerfile
+                                cp elohim-ui-playground/images/nginx-ui-playground.conf /tmp/build-context-playground/
 
                                 # Build image
                                 cd /tmp/build-context-playground
@@ -545,16 +957,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Push UI Playground to Harbor Registry') {
             when {
                 allOf {
-                    not { branch 'main' }
-                    not { branch 'staging' }
-                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
-                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    not { branch 'main' }; not { branch 'staging' }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -591,114 +996,139 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        // Note: Holochain infrastructure (holochain/**) is built by a separate pipeline
+        // (elohim-edge) that triggers independently via webhook when holochain files change.
+        // This avoids duplicate builds and allows parallel execution.
+
         stage('Deploy to Staging') {
             when {
-                anyOf {
-                    branch 'staging'
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf { branch 'staging'; expression { env.BRANCH_NAME ==~ /staging-.+/ } }
                 }
             }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
-                            echo "Deploying to Staging: ${IMAGE_TAG}"
-
-                            // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-staging -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-staging ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment.yaml > manifests/staging-deployment-${IMAGE_TAG}.yaml"
-
-                            // Verify the image tag in the manifest
-                            sh """
-                                echo '==== Deployment manifest preview ===='
-                                grep 'image:' manifests/staging-deployment-${IMAGE_TAG}.yaml
-                                echo '===================================='
-                            """
-
-                            // Deploy
-                            sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
-
-                            // Verify the deployment is using the correct image
-                            sh """
-                                echo '==== Verifying deployed image ===='
-                                kubectl get deployment elohim-site-staging -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
-                                echo ''
-                                echo '=================================='
-                            """
-
-                            echo 'Staging deployment completed!'
+                            deployAppToEnvironment('staging', 'elohim-staging', 'elohim-site-staging',
+                                'elohim-app/manifests/staging-deployment.yaml', IMAGE_TAG)
                         }
                     }
                 }
             }
         }
 
-        stage('Deploy to Alpha') {
+        stage('🚀 Deploy to Alpha') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    expression { return env.BRANCH_NAME.contains('alpha') }
-                    // Also check CHANGE_BRANCH for PR builds
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
                 }
             }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
-                            echo "Deploying to Alpha: ${IMAGE_TAG}"
-
-                            // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-alpha -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-alpha ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/alpha-deployment.yaml > manifests/alpha-deployment-${IMAGE_TAG}.yaml"
-
-                            // Verify the image tag in the manifest
-                            sh """
-                                echo '==== Deployment manifest preview ===='
-                                grep 'image:' manifests/alpha-deployment-${IMAGE_TAG}.yaml
-                                echo '===================================='
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            🚀 DEPLOYING ELOHIM APP TO ALPHA
+                            ═══════════════════════════════════════════════════════════
+                            Image Tag: ${IMAGE_TAG}
+                            Git Hash: ${GIT_COMMIT_HASH}
+                            Target: https://alpha.elohim.host
+                            ═══════════════════════════════════════════════════════════
                             """
 
-                            // Deploy
-                            sh "kubectl apply -f manifests/alpha-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site-alpha -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site-alpha -n ethosengine --timeout=300s'
+                            deployAppToEnvironment('alpha', 'elohim-alpha', 'elohim-site-alpha',
+                                'elohim-app/manifests/alpha-deployment.yaml', IMAGE_TAG)
 
-                            // Verify the deployment is using the correct image
-                            sh """
-                                echo '==== Verifying deployed image ===='
-                                kubectl get deployment elohim-site-alpha -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
-                                echo ''
-                                echo '=================================='
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            ✅ ALPHA DEPLOYMENT COMPLETE
+                            ═══════════════════════════════════════════════════════════
+                            App URL: https://alpha.elohim.host
+                            Image: ${IMAGE_TAG}
+                            ═══════════════════════════════════════════════════════════
                             """
-
-                            echo 'Alpha deployment completed!'
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Verify Holochain Health') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        VERIFYING HOLOCHAIN INFRASTRUCTURE
+                        ═══════════════════════════════════════════════════════════
+                        Alpha app uses: doorway-alpha.elohim.host
+                        Seeding is managed by: elohim-genesis pipeline
+                        ═══════════════════════════════════════════════════════════
+                        """
+
+                        // Check if holochain edge node is running
+                        def holochainStatus = sh(
+                            script: '''
+                                kubectl get deployment elohim-edgenode-dev -n ethosengine -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0"
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        if (holochainStatus == "1") {
+                            echo "Holochain Edge Node: Running"
+                        } else {
+                            echo "Holochain Edge Node: Not available (${holochainStatus} replicas)"
+                            echo "Run elohim-edge pipeline with FORCE_DEPLOY=true"
+                        }
+
+                        // Check holochain connectivity with retry
+                        def holochainHealth = "000"
+                        for (int i = 0; i < 3; i++) {
+                            holochainHealth = sh(
+                                script: '''
+                                    timeout 10s curl -sf -o /dev/null -w "%{http_code}" https://doorway-alpha.elohim.host/health 2>/dev/null || echo "000"
+                                ''',
+                                returnStdout: true
+                            ).trim()
+
+                            if (holochainHealth == "200") break
+                            if (i < 2) {
+                                echo "Health check attempt ${i+1} failed, retrying..."
+                                sleep 5
+                            }
+                        }
+
+                        if (holochainHealth == "200") {
+                            echo "Holochain Gateway: Healthy"
+                        } else {
+                            echo "Holochain Gateway: Unhealthy (HTTP ${holochainHealth})"
+                            echo "App will work but holochain features may be unavailable"
+                            echo "Run elohim-edge pipeline with FORCE_DEPLOY=true to fix"
+                        }
+
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        HOLOCHAIN STATUS
+                        ═══════════════════════════════════════════════════════════
+                        Edge Node: ${holochainStatus == "1" ? "Running" : "Unavailable"}
+                        Gateway: ${holochainHealth == "200" ? "Healthy" : "Unhealthy"}
+
+                        Note: Database seeding is managed by elohim-genesis pipeline.
+                        To force seed, run that pipeline with FORCE_SEED=true.
+                        ═══════════════════════════════════════════════════════════
+                        """
                     }
                 }
             }
@@ -707,23 +1137,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Deploy UI Playground to Alpha') {
             when {
                 allOf {
-                    anyOf {
-                        branch 'dev'
-                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                        expression { return env.BRANCH_NAME.contains('alpha') }
-                        // Also check CHANGE_BRANCH for PR builds
-                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
-                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
-                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
-                    }
-                    anyOf {
-                        changeset "elohim-library/**"
-                        changeset "elohim-ui-playground/**"
-                        changeset "images/Dockerfile.ui-playground"
-                        changeset "images/nginx-ui-playground.conf"
-                        changeset "manifests/alpha-deployment-ui-playground.yaml"
-                    }
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
+                    changeset "elohim-ui-playground/**"
                 }
             }
             steps {
@@ -735,12 +1151,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             echo "Deploying UI Playground to Alpha: ${IMAGE_TAG}"
 
                             // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/alpha-deployment-ui-playground.yaml > manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-ui-playground/manifests/alpha-deployment-ui-playground.yaml > elohim-ui-playground/manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
 
                             // Deploy
-                            sh "kubectl apply -f manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-ui-playground-alpha -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-ui-playground-alpha -n ethosengine --timeout=300s'
+                            sh "kubectl apply -f elohim-ui-playground/manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-ui-playground-alpha -n elohim-alpha"
+                            sh 'kubectl rollout status deployment/elohim-ui-playground-alpha -n elohim-alpha --timeout=300s'
 
                             echo 'UI Playground Alpha deployment completed!'
                         }
@@ -751,17 +1167,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('E2E Testing - Alpha Validation') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
-                    expression { return env.BRANCH_NAME.contains('alpha') }
-                    // Also check CHANGE_BRANCH for PR builds
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /alpha-.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
                 }
             }
             steps {
@@ -769,50 +1177,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     dir('elohim-app') {
                         script {
                             def props = loadBuildVars()
-
                             withBuildVars(props) {
-                                echo 'Running E2E tests against alpha'
-                                env.E2E_TESTS_RAN = 'true'
-
-                                // Install Cypress if needed
-                                sh '''
-                                    if [ ! -d "node_modules/cypress" ]; then
-                                        npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
-                                    fi
-                                '''
-
-                                // Verify alpha is up
-                                sh '''
-                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://alpha.elohim.host | grep -q "200\\|302\\|301"; do
-                                        sleep 5
-                                    done'
-                                    echo "✅ Alpha site is responding"
-                                '''
-
-                                // Run tests
-                                sh """#!/bin/bash
-                                    export CYPRESS_baseUrl=https://alpha.elohim.host
-                                    export CYPRESS_ENV=alpha
-                                    export CYPRESS_EXPECTED_GIT_HASH=${GIT_COMMIT_HASH}
-                                    export NO_COLOR=1
-                                    export DISPLAY=:99
-
-                                    Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
-                                    XVFB_PID=\$!
-                                    sleep 2
-
-                                    npx cypress verify > /dev/null
-                                    mkdir -p cypress/reports
-
-                                    npx cypress run \\
-                                        --headless \\
-                                        --browser chromium \\
-                                        --spec "cypress/e2e/staging-validation.feature"
-
-                                    kill \$XVFB_PID 2>/dev/null || true
-                                """
-
-                                echo '✅ Alpha validation passed!'
+                                runE2ETests('alpha', 'https://alpha.elohim.host', env.GIT_COMMIT_HASH)
                             }
                         }
                     }
@@ -825,41 +1191,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 always {
                     dir('elohim-app') {
                         script {
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                echo '📊 Publishing cucumber reports...'
-
-                                // Publish cucumber reports
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                    cucumber([
-                                        reportTitle: 'E2E Test Results (Alpha)',
-                                        fileIncludePattern: 'cucumber-report.json',
-                                        jsonReportDirectory: 'cypress/reports',
-                                        buildStatus: 'FAILURE',
-                                        failedFeaturesNumber: -1,
-                                        failedScenariosNumber: -1,
-                                        failedStepsNumber: -1,
-                                        skippedStepsNumber: -1,
-                                        pendingStepsNumber: -1,
-                                        undefinedStepsNumber: -1
-                                    ])
-                                    echo 'Cucumber reports published successfully'
-                                } else {
-                                    echo 'No cucumber reports found to publish'
-                                }
-                            }
-
-                            // Archive test artifacts
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                if (fileExists('cypress/screenshots')) {
-                                    archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/videos')) {
-                                    archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                    archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
-                                }
-                            }
+                            publishE2EReports('alpha')
                         }
                     }
                 }
@@ -872,10 +1204,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('E2E Testing - Staging Validation') {
             when {
-                anyOf {
-                    branch 'staging'
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf { branch 'staging'; expression { env.BRANCH_NAME ==~ /staging-.+/ } }
                 }
             }
             steps {
@@ -883,50 +1214,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     dir('elohim-app') {
                         script {
                             def props = loadBuildVars()
-
                             withBuildVars(props) {
-                                echo 'Running E2E tests against staging'
-                                env.E2E_TESTS_RAN = 'true'
-
-                                // Install Cypress if needed
-                                sh '''
-                                    if [ ! -d "node_modules/cypress" ]; then
-                                        npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
-                                    fi
-                                '''
-
-                                // Verify staging is up
-                                sh '''
-                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do
-                                        sleep 5
-                                    done'
-                                    echo "✅ Staging site is responding"
-                                '''
-
-                                // Run tests
-                                sh """#!/bin/bash
-                                    export CYPRESS_baseUrl=https://staging.elohim.host
-                                    export CYPRESS_ENV=staging
-                                    export CYPRESS_EXPECTED_GIT_HASH=${GIT_COMMIT_HASH}
-                                    export NO_COLOR=1
-                                    export DISPLAY=:99
-
-                                    Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
-                                    XVFB_PID=\$!
-                                    sleep 2
-
-                                    npx cypress verify > /dev/null
-                                    mkdir -p cypress/reports
-
-                                    npx cypress run \\
-                                        --headless \\
-                                        --browser chromium \\
-                                        --spec "cypress/e2e/staging-validation.feature"
-
-                                    kill \$XVFB_PID 2>/dev/null || true
-                                """
-
-                                echo '✅ Staging validation passed!'
+                                runE2ETests('staging', 'https://staging.elohim.host', env.GIT_COMMIT_HASH)
                             }
                         }
                     }
@@ -939,56 +1228,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 always {
                     dir('elohim-app') {
                         script {
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                echo '📊 Publishing cucumber reports...'
-                                
-                                // Debug: Show what files exist in cypress directory
-                                sh 'echo "DEBUG: Contents of cypress directory:"'
-                                sh 'find cypress -type f -name "*" 2>/dev/null || echo "cypress directory not found"'
-                                
-                                // Debug: Show specifically what's in reports directory
-                                sh 'echo "DEBUG: Contents of cypress/reports directory:"'
-                                sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
-                                
-                                // Debug: Show absolute paths for cucumber plugin
-                                sh 'echo "DEBUG: Current working directory: $(pwd)"'
-                                sh 'echo "DEBUG: Absolute path to cucumber report: $(pwd)/cypress/reports/cucumber-report.json"'
-                                sh 'test -f cypress/reports/cucumber-report.json && echo "DEBUG: File exists and is readable" || echo "DEBUG: File does not exist or is not readable"'
-                                
-                                // Publish cucumber reports using cucumber plugin
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                cucumber([
-                                    reportTitle: 'E2E Test Results',
-                                    fileIncludePattern: 'cucumber-report.json',
-                                    jsonReportDirectory: 'cypress/reports',
-                                    buildStatus: 'FAILURE',
-                                    failedFeaturesNumber: -1,
-                                    failedScenariosNumber: -1,
-                                    failedStepsNumber: -1,
-                                    skippedStepsNumber: -1,
-                                    pendingStepsNumber: -1,
-                                    undefinedStepsNumber: -1
-                                ])
-                                    echo 'Cucumber reports published successfully with cucumber plugin'
-                                } else {
-                                    echo 'No cucumber reports found to publish'
-                                }
-                            } else {
-                                echo 'E2E tests did not run - skipping cucumber report publishing'
-                            }
-                            
-                            // Archive test artifacts if E2E tests ran
-                            if (env.E2E_TESTS_RAN == 'true') {
-                                if (fileExists('cypress/screenshots')) {
-                                    archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/videos')) {
-                                    archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
-                                }
-                                if (fileExists('cypress/reports/cucumber-report.json')) {
-                                    archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
-                                }
-                            }
+                            publishE2EReports('staging')
                         }
                     }
                 }
@@ -1000,34 +1240,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Deploy to Prod') {
-            when {
-                branch 'main'
-            }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; branch 'main' } }
             steps {
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-
                         withBuildVars(props) {
-                            echo "Deploying to Production: ${IMAGE_TAG}"
-
-                            // Validate configmap
-                            sh '''
-                                kubectl get configmap elohim-config-prod -n ethosengine || {
-                                    echo "❌ ERROR: elohim-config-prod ConfigMap missing"
-                                    exit 1
-                                }
-                            '''
-
-                            // Deploy
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f manifests/prod-deployment-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-site -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
-
-                            echo 'Production deployment completed!'
+                            deployAppToEnvironment('prod', 'elohim-prod', 'elohim-site',
+                                'elohim-app/manifests/prod-deployment.yaml', IMAGE_TAG)
                         }
                     }
                 }
@@ -1035,13 +1255,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Cleanup') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder'){
                     script {
-                        echo 'Cleaning up workspace'
-                        dir('elohim-app') {
-                            sh 'rm -rf node_modules || true'
-                        }
+                        dir('elohim-app') { sh 'rm -rf node_modules || true' }
                     }
                 }
             }

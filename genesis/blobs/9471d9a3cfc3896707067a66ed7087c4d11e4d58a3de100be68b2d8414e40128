@@ -1,0 +1,9 @@
+Scenario: Seasonal bioregional coordination provides year-round local food supply
+    Given individual farms have limited seasonal production windows
+    And year-round local food requires bioregional coordination across climate zones
+    When democratic farms coordinate seasonal production bioregionally
+    Then farms in different microclimates provide sequential seasonal supply
+    And storage and preservation extend local food availability
+    And bioregional network reduces dependence on distant, fossil-fuel-intensive supply chains
+    And food miles decrease dramatically through bioregional coordination
+    And bioregional_elohim coordinates seasonal planning and distribution logistics

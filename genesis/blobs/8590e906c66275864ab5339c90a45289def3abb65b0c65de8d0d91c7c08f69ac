@@ -1,0 +1,9 @@
+Scenario: Developer track record on environmental commitments
+    Given a developer promised tree preservation in previous projects
+    And claimed environmental mitigation would offset impacts
+    When the Observer tracks environmental commitment delivery
+    Then analysis shows: 67% of preserved trees died within two years
+    And mitigation site was not maintained as required
+    And environmental monitoring was incomplete and inadequate
+    And pattern shows promises made to gain approval not kept in practice
+    And accountability creates pressure for genuine environmental stewardship

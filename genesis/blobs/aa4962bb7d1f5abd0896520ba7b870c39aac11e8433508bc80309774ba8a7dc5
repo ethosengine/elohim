@@ -1,0 +1,10 @@
+Scenario: Environmental commissioner tracks city's climate action plan implementation
+    Given city adopted climate action plan with specific reduction targets and timelines
+    And annual progress reports from staff emphasize achievements
+    And commissioner wants objective assessment of whether city is on track
+    When the commissioner uses Observer accountability tracking
+    Then they see actual emissions reductions versus plan targets over time
+    And discover city is not on track to meet 2030 goals
+    And find some action items completed while highest-impact measures delayed
+    And access comparison showing peer cities making faster progress
+    And accountability tracking reveals gap between plan commitments and implementation

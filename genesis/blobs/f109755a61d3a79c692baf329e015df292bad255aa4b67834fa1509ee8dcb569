@@ -1,0 +1,12 @@
+Scenario: Setting boundaries with institutions and service providers
+    Given I am navigating multiple social service systems
+    And some institutional demands feel invasive or harmful
+    When I identify a boundary I need to maintain
+    Then the Value Scanner helps me understand my rights
+    And provides language for asserting my boundaries
+    And tracks instances where institutions violate my boundaries
+    And connects me to advocacy support when needed
+    And validates that boundary-setting is healthy and appropriate
+    And my personal_agent coaches me through difficult conversations
+    And recognizes that protecting my wellbeing is my right
+    And supports me in saying "no" when necessary

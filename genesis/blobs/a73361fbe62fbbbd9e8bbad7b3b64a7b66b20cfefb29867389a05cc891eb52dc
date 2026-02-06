@@ -1,0 +1,10 @@
+Scenario: Homeschooling recognized as full educational provision
+    Given some parents provide complete education at home
+    And homeschooling is intensive educational labor
+    When the educational_elohim tracks homeschooling work
+    Then it should recognize full-time teaching by parents
+    And homeschooling should accumulate substantial care tokens
+    And the system should value parent-provided education fully
+    And homeschooling parents should have economic support for educational work
+    And care economy should recognize diverse educational approaches
+    And parent teaching should be valued regardless of institutional setting

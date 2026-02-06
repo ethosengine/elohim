@@ -1,0 +1,9 @@
+Scenario: Workers gradually assume democratic governance responsibilities
+    Given Rosa previously made all strategic business decisions alone
+    And workers need to develop governance capacity and confidence
+    When democratic transition timeline begins
+    Then early phase: Rosa proposes decisions, workers approve and learn rationale
+    And middle phase: workers propose decisions, Rosa advises and supports
+    And late phase: workers decide democratically, Rosa consults only when requested
+    And workplace_elohim tracks governance capacity growth over transition period
+    And power genuinely transfers without hierarchical recapture

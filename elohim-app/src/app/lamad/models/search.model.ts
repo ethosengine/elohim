@@ -8,8 +8,11 @@
  * - Pagination support
  */
 
+import { TrustLevel } from '@app/elohim/models/trust-badge.model';
+
+// @coverage: 66.7% (2026-02-05)
+
 import { ContentType, ContentReach } from './content-node.model';
-import { TrustLevel } from './trust-badge.model';
 
 // ============================================================================
 // Search Query
@@ -60,12 +63,12 @@ export interface SearchQuery {
  * SearchSortOption - How to sort results.
  */
 export type SearchSortOption =
-  | 'relevance'    // Default: by match score
-  | 'title'        // Alphabetical by title
-  | 'trustScore'   // By trust score
-  | 'reach'        // By reach level
-  | 'newest'       // By creation date
-  | 'updated';     // By last update
+  | 'relevance' // Default: by match score
+  | 'title' // Alphabetical by title
+  | 'trustScore' // By trust score
+  | 'reach' // By reach level
+  | 'newest' // By creation date
+  | 'updated'; // By last update
 
 // ============================================================================
 // Search Results
@@ -143,7 +146,7 @@ export interface SearchHighlight {
   snippet: string;
 
   /** Start/end positions of matches within snippet */
-  matchRanges: Array<{ start: number; end: number }>;
+  matchRanges: { start: number; end: number }[];
 }
 
 /**
@@ -230,16 +233,16 @@ export interface FacetCount<T> {
 export const SEARCH_FIELD_WEIGHTS = {
   title: 10,
   tags: 5,
-  description: 2
+  description: 2,
 } as const;
 
 /**
  * Bonus multipliers for exact vs partial matches.
  */
 export const SEARCH_MATCH_BONUSES = {
-  exactMatch: 2.0,      // Full word match
-  prefixMatch: 1.5,     // Word starts with query
-  containsMatch: 1.0    // Query found anywhere in word
+  exactMatch: 2, // Full word match
+  prefixMatch: 1.5, // Word starts with query
+  containsMatch: 1, // Query found anywhere in word
 } as const;
 
 /**
@@ -250,7 +253,7 @@ export const DEFAULT_SEARCH_CONFIG = {
   maxPageSize: 100,
   maxHighlightSnippetLength: 150,
   maxHighlightsPerField: 3,
-  maxFacetTags: 20
+  maxFacetTags: 20,
 } as const;
 
 // ============================================================================
@@ -265,7 +268,7 @@ export interface SearchSuggestion {
   text: string;
 
   /** Type of suggestion */
-  type: 'query' | 'tag' | 'title' | 'contentType';
+  type: 'query' | 'tag' | 'title' | 'contentType' | 'path';
 
   /** Number of results this would return */
   resultCount?: number;
@@ -298,7 +301,7 @@ export function createEmptyQuery(): SearchQuery {
     sortBy: 'relevance',
     sortDirection: 'desc',
     page: 1,
-    pageSize: DEFAULT_SEARCH_CONFIG.pageSize
+    pageSize: DEFAULT_SEARCH_CONFIG.pageSize,
   };
 }
 
@@ -319,9 +322,9 @@ export function createEmptyResults(query: SearchQuery): SearchResults {
       byReach: [],
       byTrustLevel: [],
       byTag: [],
-      byFlagStatus: { flagged: 0, unflagged: 0 }
+      byFlagStatus: { flagged: 0, unflagged: 0 },
     },
-    executionTimeMs: 0
+    executionTimeMs: 0,
   };
 }
 
@@ -332,7 +335,10 @@ export function createEmptyResults(query: SearchQuery): SearchResults {
 export function highlightMatches(text: string, query: string): string {
   if (!query || !text) return text;
 
-  const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+  const words = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(w => w.length > 0);
   let result = text;
 
   for (const word of words) {
@@ -347,7 +353,7 @@ export function highlightMatches(text: string, query: string): string {
  * Escape special regex characters.
  */
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 /**
@@ -357,11 +363,11 @@ export function extractSnippet(
   text: string,
   query: string,
   maxLength: number = DEFAULT_SEARCH_CONFIG.maxHighlightSnippetLength
-): { snippet: string; matchRanges: Array<{ start: number; end: number }> } {
+): { snippet: string; matchRanges: { start: number; end: number }[] } {
   if (!query || !text) {
     return {
       snippet: text.slice(0, maxLength) + (text.length > maxLength ? '...' : ''),
-      matchRanges: []
+      matchRanges: [],
     };
   }
 
@@ -372,7 +378,7 @@ export function extractSnippet(
   if (firstMatchIndex === -1) {
     return {
       snippet: text.slice(0, maxLength) + (text.length > maxLength ? '...' : ''),
-      matchRanges: []
+      matchRanges: [],
     };
   }
 
@@ -386,7 +392,7 @@ export function extractSnippet(
   if (end < text.length) snippet = snippet + '...';
 
   // Find all match ranges in snippet
-  const matchRanges: Array<{ start: number; end: number }> = [];
+  const matchRanges: { start: number; end: number }[] = [];
   const snippetLower = snippet.toLowerCase();
   let searchStart = 0;
 

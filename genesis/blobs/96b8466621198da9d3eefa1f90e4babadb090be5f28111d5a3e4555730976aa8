@@ -1,0 +1,9 @@
+Scenario: Municipal community investment fund amplifies private capital
+    Given community investment pools have limited capital for large conversions
+    And municipal economic development funds could support democratic ownership
+    When city creates municipal community investment fund
+    Then Patricia's private investment is matched by public funds
+    And combined capital enables larger conversions (grocery stores, manufacturers)
+    And public-private partnership supports democratic economy at scale
+    And taxpayer money supports community wealth-building, not corporate extraction
+    And municipality_elohim manages public-private community investment coordination

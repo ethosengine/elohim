@@ -1,0 +1,10 @@
+Scenario: Peer-to-peer senior learning communities
+    Given seniors learn effectively from each other
+    And shared experience creates effective learning environment
+    When the educational_elohim facilitates peer learning
+    Then senior learning communities should be supported
+    And peers should teach each other in reciprocal exchanges
+    And shared wisdom should be valued educational resource
+    And learning should be collaborative and social
+    And senior education should build community alongside knowledge
+    And peer education should be recognized as care contribution

@@ -1,0 +1,10 @@
+Scenario: Mentoring younger community members and professionals
+    Given Margaret has decades of nursing experience and life wisdom
+    And younger professionals and community members can learn from her
+    When Margaret mentors or teaches in community
+    Then the community_elohim should recognize mentoring as care work
+    And it should value intergenerational knowledge transmission
+    And it should connect Margaret with mentoring opportunities
+    And her wisdom and experience should benefit next generation
+    And mentoring should accumulate care tokens
+    And community should benefit from elder mentorship

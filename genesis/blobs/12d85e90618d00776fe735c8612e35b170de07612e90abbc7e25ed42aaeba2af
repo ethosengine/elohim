@@ -1,0 +1,11 @@
+Scenario: Global data infrastructure with privacy and sovereignty protection
+    Given I need access to data across nations for research
+    And I must respect privacy, sovereignty, and data justice
+    When global research infrastructure is designed
+    Then I work with: federated data systems respecting national sovereignty
+    And I use: differential privacy protecting individual anonymity
+    And I ensure: community data ownership and benefit sharing
+    And I implement: ethical review and consent protocols
+    And I advocate: for open access to research findings
+    And I practice: data justice not data colonialism
+    And My methodology demonstrates: how to study globally while respecting locally

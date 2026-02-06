@@ -1,0 +1,11 @@
+Scenario: Climate crisis disproportionately harms disabled people
+    Given disabled people are especially vulnerable to climate impacts
+    And emergency systems often fail disabled people
+    When climate adaptation is planned
+    Then the bioregional_elohim should center disabled people in climate planning
+    And Alex's perspective should inform climate justice strategies
+    And emergency preparedness should account for disability needs
+    And climate solutions should be accessible to disabled people
+    And the protocol should recognize disability as environmental justice issue
+    And Alex's expertise about vulnerability should guide climate work
+    And resilience planning should protect most vulnerable community members

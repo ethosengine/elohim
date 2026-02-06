@@ -1,0 +1,10 @@
+Scenario: Municipal food assistance programs accessed with dignity
+    Given Margaret's budget is tight at $150/week
+    And municipal SNAP or food assistance may be available
+    When the municipality_elohim identifies assistance eligibility
+    Then Margaret should be informed without stigma
+    And enrollment should be simple and dignified
+    And her care contributions should be visible alongside receiving benefits
+    And the framing should be community resource access
+    And participation should feel like claiming entitlement, not begging
+    And municipal assistance should support fixed-income seniors

@@ -1,0 +1,9 @@
+Scenario: Responsible developer advocates for sensible state housing policy
+    Given state housing regulations create barriers to affordable development
+    And a responsible developer wants to build more affordable housing
+    When the Observer provides state policy navigation and advocacy tools
+    Then the developer understands state regulatory framework
+    And identifies which regulations genuinely protect community versus serve NIMBYism
+    And engages in transparent policy advocacy for streamlined affordable housing approval
+    And makes case based on evidence not just developer profit
+    And transparent advocacy distinguishes from corrupt lobbying

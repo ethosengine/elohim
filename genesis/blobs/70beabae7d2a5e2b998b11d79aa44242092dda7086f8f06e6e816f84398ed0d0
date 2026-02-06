@@ -1,0 +1,9 @@
+Scenario: Customer participates in community stakeholder governance processes
+    Given democratic businesses can include community members in governance
+    And Ms. Johnson has community knowledge and cares about neighborhood
+    When stakeholder participation is offered to engaged customers
+    Then she attends quarterly stakeholder meetings providing input
+    And suggests senior meal program addressing neighborhood isolation
+    And votes on community program priorities (advisory role)
+    And participation connects her individual needs to collective governance
+    And community_elohim facilitates stakeholder participation ensuring worker autonomy

@@ -1,0 +1,12 @@
+Scenario: Participating in community mutual aid networks
+    Given community has mutual aid networks for resources, skills, childcare, support
+    And mutual aid operates on reciprocity and solidarity
+    When I engage with community mutual aid
+    Then the Value Scanner connects me to local mutual aid networks
+    And facilitates both my receiving and my contributing
+    And tracks mutual aid participation with care tokens
+    And helps me navigate mutual aid culture and expectations
+    And validates that mutual aid is community care, not individual charity
+    And my personal_agent coordinates my mutual aid relationships
+    And recognizes mutual aid as alternative to degrading institutional charity
+    And supports genuine reciprocity and collective care

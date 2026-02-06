@@ -1,0 +1,10 @@
+Scenario: Bulk buying and package reduction practices
+    Given Margaret learned to buy bulk to reduce packaging
+    And package reduction serves both budget and ecology
+    When Margaret shops with minimal packaging
+    Then the bioregional_elohim should track packaging reduction
+    And bulk buying should be recognized as ecological practice
+    And Margaret's practices should inform community purchasing
+    And package waste should be minimized
+    And bioregional resource flows should be optimized
+    And frugality should align with ecological goals

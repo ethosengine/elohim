@@ -1,0 +1,11 @@
+Scenario: Neighborhood care tokens recognize local contributions
+    Given Robert contributes to neighborhood care economy
+    And his contributions strengthen neighborhood for everyone
+    When neighborhood_elohim tracks care tokens
+    Then it should recognize his neighborhood care contributions
+    And value his help for elderly neighbors, resource sharing, and leadership
+    And accumulate tokens that reflect his neighborhood care work
+    And connect tokens to neighborhood governance voice
+    And demonstrate that care contributions create social capital
+    And recognize that neighborhood care is genuine economic contribution
+    And build neighborhood through reciprocal care recognition

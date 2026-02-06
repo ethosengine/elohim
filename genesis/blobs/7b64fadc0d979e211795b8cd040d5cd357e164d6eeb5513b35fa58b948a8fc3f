@@ -1,0 +1,9 @@
+Scenario: Caregiver leave policies protect employment during crises
+    Given caregiving crises occur unpredictably
+    And James may need to take sudden leave for David's care
+    When the workplace_elohim advocates for leave policies
+    Then caregiver leave should be available like parental leave
+    And leave should be protected employment, not termination risk
+    And James should access leave without penalty
+    And workplace should recognize adult care like child care
+    And caregiver leave should be employment protection

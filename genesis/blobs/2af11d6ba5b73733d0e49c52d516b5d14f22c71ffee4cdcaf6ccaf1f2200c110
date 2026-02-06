@@ -1,0 +1,9 @@
+Scenario: Politician navigates union relations with constituent worker focus
+    Given the politician receives support from labor unions
+    And business groups warn against union influence
+    When the Observer provides balanced labor relations analysis
+    Then they see how unionization affects worker wages and conditions
+    And understand union priorities versus broader worker constituent needs
+    And identify where union advocacy aligns with constituent interests
+    And review economic impacts of unionization across industries
+    And navigate union relations focused on worker constituent wellbeing

@@ -1,0 +1,967 @@
+/**
+ * Elohim Edge Infrastructure Pipeline (elohim-edge)
+ *
+ * Builds container images and deploys Edge Node to dev/prod environments.
+ * Triggered by orchestrator when doorway/, holochain/elohim-storage/, holochain/edgenode/, or holochain/manifests/ change.
+ *
+ * What this pipeline builds:
+ *   - elohim-doorway (HTTP gateway)
+ *   - elohim-storage (blob storage sidecar)
+ *   - elohim-edgenode (Holochain conductor)
+ *   - elohim-happ-installer (bootstrap sidecar)
+ *
+ * Environment Architecture:
+ *   - dev branch → doorway-alpha.elohim.host (alpha), doorway-staging.elohim.host (staging)
+ *   - main branch → doorway.elohim.host (serves production app only)
+ *
+ * Trigger behavior:
+ *   - Only runs when triggered by orchestrator or manual
+ *   - Shows NOT_BUILT when triggered directly by webhook
+ *
+ * Artifact dependency:
+ *   - Fetches elohim.happ from elohim-holochain pipeline
+ *   - Fallback: current branch → dev → main
+ *
+ * @see orchestrator/Jenkinsfile for central trigger logic
+ * @see holochain/dna/Jenkinsfile for DNA builds
+ */
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+def loadBuildVars() {
+    def rootEnv = "${env.WORKSPACE}/build.env"
+    def path = fileExists(rootEnv) ? rootEnv : 'build.env'
+
+    if (!fileExists(path)) {
+        echo "WARNING: build.env not found at ${path}, using defaults"
+        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+        return [
+            BASE_VERSION: 'dev',
+            GIT_COMMIT_HASH: gitHash,
+            IMAGE_TAG: "dev-${sanitizedBranch}-${gitHash}",
+            BRANCH_NAME: env.BRANCH_NAME
+        ]
+    }
+
+    return readProperties(file: path)
+}
+
+def withBuildVars(props, Closure body) {
+    withEnv([
+        "BASE_VERSION=${props.BASE_VERSION ?: ''}",
+        "GIT_COMMIT_HASH=${props.GIT_COMMIT_HASH ?: ''}",
+        "IMAGE_TAG=${props.IMAGE_TAG ?: ''}",
+        "BRANCH_NAME=${props.BRANCH_NAME ?: env.BRANCH_NAME}"
+    ]) {
+        body()
+    }
+}
+
+/**
+ * Parse VERSION file in key-value format (APP_VERSION=x.x.x, HAPP_VERSION=x.x.x)
+ * Returns a map of version keys to values
+ */
+def parseVersionFile() {
+    def versionContent = readFile('VERSION').trim()
+    def versionMap = [:]
+    versionContent.split('\n').each { line ->
+        def parts = line.split('=')
+        if (parts.length == 2) {
+            versionMap[parts[0].trim()] = parts[1].trim()
+        }
+    }
+    return versionMap
+}
+
+/**
+ * Compute the Harbor image tag using the same logic as the producer (DNA pipeline)
+ * On main branch: baseVersion (e.g., 1.0.0)
+ * On other branches: baseVersion-branch-gitHash (e.g., 1.0.0-dev-f0268fc9)
+ */
+def computeHarborTag() {
+    def versionMap = parseVersionFile()
+    def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
+    if (env.BRANCH_NAME == 'main') {
+        return baseVersion
+    } else {
+        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+        return "${baseVersion}-${sanitizedBranch}-${gitHash}"
+    }
+}
+
+/**
+ * Fetch hApp artifact from Harbor registry
+ * Returns true if hApp was successfully fetched, false otherwise
+ */
+def fetchHappFromHarbor(String destPath, String version = null) {
+    // Compute version tag using same logic as DNA pipeline producer
+    if (!version) {
+        version = computeHarborTag()
+    }
+
+    echo "Fetching hApp from Harbor: harbor.ethosengine.com/ethosengine/elohim-happ:${version}"
+
+    // Install oras CLI if not present
+    sh '''
+        if ! command -v oras &> /dev/null; then
+            echo "Installing oras CLI..."
+            curl -sLO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
+            tar -xzf oras_1.1.0_linux_amd64.tar.gz
+            chmod +x oras
+            mv oras /usr/local/bin/
+            rm oras_1.1.0_linux_amd64.tar.gz
+        fi
+    '''
+
+    def success = false
+    withCredentials([usernamePassword(
+        credentialsId: 'harbor-robot-registry',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS'
+    )]) {
+        def destDir = sh(script: "dirname '${destPath}'", returnStdout: true).trim()
+        def destFile = sh(script: "basename '${destPath}'", returnStdout: true).trim()
+        def result = sh(script: """
+            oras login harbor.ethosengine.com -u \$HARBOR_USER -p \$HARBOR_PASS
+            mkdir -p '${destDir}'
+            cd '${destDir}'
+            oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${version}
+            # Rename if needed (oras downloads as elohim.happ)
+            if [ -f elohim.happ ] && [ "elohim.happ" != "${destFile}" ]; then
+                mv elohim.happ '${destFile}'
+            fi
+            ls -la
+        """, returnStatus: true)
+
+        if (result == 0 && fileExists(destPath)) {
+            echo "✅ hApp fetched from Harbor: ${version}"
+            success = true
+        }
+    }
+
+    if (!success) {
+        echo "❌ Failed to fetch hApp from Harbor"
+    }
+    return success
+}
+
+/**
+ * Check if edge node is healthy
+ */
+def checkEdgeNodeHealth(String url) {
+    def result = sh(
+        script: "curl -sf -o /dev/null -w '%{http_code}' '${url}/health' 2>/dev/null || echo '000'",
+        returnStdout: true
+    ).trim()
+    return result == '200'
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  nodeSelector:
+    node-type: operations
+  tolerations:
+    - key: "workload-type"
+      operator: "Equal"
+      value: "build"
+      effect: "NoSchedule"
+  volumes:
+    - name: containerd-sock
+      hostPath:
+        path: /var/snap/microk8s/common/run/containerd.sock
+        type: Socket
+    - name: buildkit-run
+      emptyDir: {}
+    - name: nix-store
+      persistentVolumeClaim:
+        claimName: nix-cache-holochain
+    - name: cargo-cache
+      persistentVolumeClaim:
+        claimName: cargo-cache-holochain
+  containers:
+    - name: builder
+      image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      command: [cat]
+      tty: true
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "2"
+          ephemeral-storage: "5Gi"
+        limits:
+          memory: "8Gi"
+          cpu: "4"
+          ephemeral-storage: "10Gi"
+      volumeMounts:
+        - name: containerd-sock
+          mountPath: /run/containerd/containerd.sock
+        - name: buildkit-run
+          mountPath: /run/buildkit
+        - name: cargo-cache
+          mountPath: /root/.cargo
+    - name: buildkitd
+      image: moby/buildkit:v0.12.5
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "1Gi"
+          cpu: "1"
+      args:
+        - --addr
+        - unix:///run/buildkit/buildkitd.sock
+        - --oci-worker=true
+        - --containerd-worker=false
+      volumeMounts:
+        - name: containerd-sock
+          mountPath: /run/containerd/containerd.sock
+        - name: buildkit-run
+          mountPath: /run/buildkit
+'''
+        }
+    }
+
+    environment {
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+        HAPP_NAME = "elohim"
+        PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+        // Pipeline state tracking
+        IMAGES_PUSHED = 'false'
+        HAPP_AVAILABLE = 'false'
+        EDGE_NODE_HEALTHY = 'false'
+    }
+
+    parameters {
+        booleanParam(
+            name: 'FORCE_BUILD',
+            defaultValue: false,
+            description: 'Force rebuild of all images even without code changes'
+        )
+        booleanParam(
+            name: 'FORCE_DEPLOY',
+            defaultValue: false,
+            description: 'Force deployment even if no new images (restarts pods with existing images)'
+        )
+    }
+
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        preserveStashes(buildCount: 5)
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
+    }
+
+    // No triggers - orchestrator handles all webhook events
+
+    stages {
+        stage('Check Trigger') {
+            steps {
+                script {
+                    // Only allow manual triggers or orchestrator triggers
+                    def validTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UserIdCause') ||      // Manual trigger
+                        cause._class.contains('UpstreamCause')       // Triggered by orchestrator
+                    }
+
+                    if (!validTrigger) {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        ⏭️ PIPELINE SKIPPED - USE ORCHESTRATOR
+                        ═══════════════════════════════════════════════════════════
+                        This pipeline is managed by elohim-orchestrator.
+                        Direct webhook triggers are disabled.
+
+                        To trigger this pipeline:
+                        1. Push to GitHub → orchestrator analyzes → triggers this
+                        2. Or manually: Build with Parameters
+
+                        Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+                        currentBuild.result = 'NOT_BUILT'
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                    }
+                }
+            }
+        }
+
+        stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+                        checkout scm
+                        sh 'git clean -fdx'
+                        sh 'git reset --hard HEAD'
+
+                        echo "Building Holochain infrastructure for branch: ${env.BRANCH_NAME}"
+                    }
+                }
+            }
+        }
+
+        stage('Setup Version') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+
+                        // Parse VERSION file in key-value format
+                        def versionMap = parseVersionFile()
+                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
+                        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+
+                        def imageTag = (env.BRANCH_NAME == 'main')
+                            ? baseVersion
+                            : "${baseVersion}-${sanitizedBranch}-${gitHash}"
+
+                        def buildEnvContent = """BASE_VERSION=${baseVersion}
+GIT_COMMIT_HASH=${gitHash}
+IMAGE_TAG=${imageTag}
+BRANCH_NAME=${env.BRANCH_NAME}"""
+
+                        writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
+                        archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
+                    }
+                }
+            }
+        }
+
+        stage('Setup Nix Cache') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        echo 'Configuring Nix with Holochain Cachix...'
+
+                        sh '''
+                            nix --version
+                            echo "Nix config:"
+                            nix show-config | grep -E "(substituters|trusted-public-keys)" || true
+
+                            echo ""
+                            echo "Testing cache connectivity..."
+                            nix-store --query --requisites /nix/store/*.drv 2>/dev/null | head -5 || echo "Cache ready"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // NOTE: Build WASM Cache Core and Build DNA stages moved to holochain/dna/Jenkinsfile
+        // This pipeline now only builds infrastructure (container images)
+
+        stage('Build Doorway') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building Doorway Gateway: ${IMAGE_TAG}"
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                # Build from repo root with doorway/Dockerfile
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t elohim-doorway:${IMAGE_TAG} \\
+                                    -f doorway/Dockerfile .
+
+                                nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} elohim-doorway:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Doorway App') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building Doorway Operator Dashboard: ${IMAGE_TAG}"
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                cd doorway-app
+
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t doorway-app:${IMAGE_TAG} \\
+                                    -f Dockerfile .
+
+                                nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} doorway-app:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Storage') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building elohim-storage: ${IMAGE_TAG}"
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                cd holochain/elohim-storage
+
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                    nerdctl -n k8s.io build \\
+                                    -t elohim-storage:${IMAGE_TAG} \\
+                                    -f Dockerfile .
+
+                                nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} elohim-storage:${GIT_COMMIT_HASH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Edge Node Image') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building Edge Node image: ${IMAGE_TAG}"
+
+                            // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
+                            echo "Fetching hApp from elohim-holochain pipeline..."
+                            def haveHapp = fetchHappFromHarbor('holochain/edgenode/elohim.happ')
+
+                            if (haveHapp) {
+                                env.HAPP_AVAILABLE = 'true'
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+
+                                    buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                    cd holochain/edgenode
+
+                                    BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                        nerdctl -n k8s.io build \\
+                                        -t elohim-edgenode:${IMAGE_TAG} \\
+                                        -f Dockerfile .
+
+                                    nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} elohim-edgenode:${GIT_COMMIT_HASH}
+                                """
+                                echo "Edge Node image built successfully"
+                            } else {
+                                echo "Skipping Edge Node image build - no hApp available"
+                                echo "Run the pipeline with FORCE_BUILD after ensuring DNA artifacts exist"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build hApp Installer') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Building hApp Installer image: ${IMAGE_TAG}"
+
+                            // Fetch hApp from elohim-holochain pipeline (DNA is built separately)
+                            echo "Fetching hApp from elohim-holochain pipeline..."
+                            def haveHapp = fetchHappFromHarbor('holochain/edgenode/scripts/elohim.happ')
+
+                            if (haveHapp) {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+
+                                    buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                    cd holochain/edgenode/scripts
+
+                                    BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                        nerdctl -n k8s.io build \\
+                                        -t elohim-happ-installer:${IMAGE_TAG} \\
+                                        -f Dockerfile .
+
+                                    nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} elohim-happ-installer:${GIT_COMMIT_HASH}
+                                """
+                                echo "hApp Installer image built successfully"
+                            } else {
+                                // This stage was triggered but no hApp is available
+                                error """
+                                ═══════════════════════════════════════════════════════════
+                                CANNOT BUILD HAPP INSTALLER: No hApp artifact available
+                                ═══════════════════════════════════════════════════════════
+                                Could not fetch hApp from elohim-holochain pipeline.
+
+                                Ensure elohim-holochain pipeline has run successfully first.
+                                Check: https://jenkins.ethosengine.com/job/elohim-holochain/
+                                ═══════════════════════════════════════════════════════════
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Push to Harbor') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                                sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
+
+                                def edgeNodePushed = sh(
+                                    script: """
+                                        if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
+                                            echo "Pushing Edge Node image..."
+                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
+                                            exit 0
+                                        else
+                                            echo "Edge Node image not found, skipping push"
+                                            exit 1
+                                        fi
+                                    """,
+                                    returnStatus: true
+                                ) == 0
+
+                                if (edgeNodePushed) {
+                                    env.IMAGES_PUSHED = 'true'
+                                }
+
+                                sh """
+                                    if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
+                                        echo "Pushing Doorway image..."
+                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "Doorway image not found, skipping push"
+                                    fi
+                                """
+
+                                sh """
+                                    if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
+                                        echo "Pushing elohim-storage image..."
+                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "elohim-storage image not found, skipping push"
+                                    fi
+                                """
+
+                                sh """
+                                    if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
+                                        echo "Pushing hApp Installer image..."
+                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "hApp Installer image not found, skipping push"
+                                    fi
+                                """
+
+                                sh """
+                                    if nerdctl -n k8s.io images | grep -q "doorway-app.*${IMAGE_TAG}"; then
+                                        echo "Pushing Doorway App image..."
+                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${IMAGE_TAG}
+                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
+
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
+                                    else
+                                        echo "Doorway App image not found, skipping push"
+                                    fi
+                                """
+
+                                if (env.BRANCH_NAME == 'dev') {
+                                    sh """
+                                        if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:dev-latest
+                                        fi
+
+                                        if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:dev-latest
+                                        fi
+
+                                        if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:dev-latest
+                                        fi
+
+                                        if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:dev-latest
+                                        fi
+
+                                        if nerdctl -n k8s.io images | grep -q "doorway-app.*${IMAGE_TAG}"; then
+                                            nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:dev-latest
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:dev-latest
+                                        fi
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Edge Node - Alpha') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'dev'
+                        allOf {
+                            anyOf {
+                                changeset "doorway/**"
+                                changeset "holochain/elohim-storage/**"
+                                changeset "holochain/edgenode/**"
+                                changeset "holochain/manifests/**"
+                            }
+                            anyOf {
+                                expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                                expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                            }
+                        }
+                        expression { return params.FORCE_DEPLOY == true }
+                        expression { return params.FORCE_BUILD == true }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            // Check if we have a reason to deploy
+                            def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
+                                               (params.FORCE_DEPLOY == true) ||
+                                               (params.FORCE_BUILD == true)
+
+                            if (!shouldDeploy) {
+                                echo "No new images pushed and no force flags - checking edge node health..."
+                                if (checkEdgeNodeHealth('https://doorway-alpha.elohim.host')) {
+                                    echo "Edge node is healthy - skipping deployment"
+                                    env.EDGE_NODE_HEALTHY = 'true'
+                                    return
+                                }
+
+                                // Edge node unhealthy - check if we have images to deploy
+                                echo "Edge node unhealthy - checking if dev-latest images exist in Harbor..."
+                                def imageExists = sh(
+                                    script: '''
+                                        curl -sf -o /dev/null \
+                                            "https://harbor.ethosengine.com/v2/ethosengine/elohim-edgenode/manifests/dev-latest" \
+                                            2>/dev/null
+                                    ''',
+                                    returnStatus: true
+                                ) == 0
+
+                                if (!imageExists) {
+                                    echo """
+                                    ═══════════════════════════════════════════════════════════
+                                    CANNOT AUTO-HEAL: No images available in Harbor
+                                    ═══════════════════════════════════════════════════════════
+                                    Edge node is unhealthy but no dev-latest images exist.
+
+                                    To fix this, run the pipeline with FORCE_BUILD=true after
+                                    ensuring the DNA has been successfully built and archived.
+
+                                    Current hApp availability: ${env.HAPP_AVAILABLE}
+                                    ═══════════════════════════════════════════════════════════
+                                    """
+                                    // Don't fail the pipeline - just skip deployment
+                                    return
+                                }
+
+                                echo "Found dev-latest images - attempting auto-heal restart"
+                                shouldDeploy = true
+                            }
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            DEPLOYING EDGE NODE TO DEV
+                            ═══════════════════════════════════════════════════════════
+                            Image Tag: ${IMAGE_TAG}
+                            Images Pushed: ${env.IMAGES_PUSHED}
+                            Force Deploy: ${params.FORCE_DEPLOY}
+                            ═══════════════════════════════════════════════════════════
+                            """
+
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-alpha.yaml > holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-alpha -n elohim-alpha"
+                            sh "kubectl rollout status deployment/elohim-edgenode-alpha -n elohim-alpha --timeout=300s"
+
+                            sh 'sleep 15'
+
+                            def healthy = checkEdgeNodeHealth('https://doorway-alpha.elohim.host')
+                            if (healthy) {
+                                env.EDGE_NODE_HEALTHY = 'true'
+                                echo "Edge Node Alpha deployed and healthy: https://doorway-alpha.elohim.host"
+                            } else {
+                                echo "Edge Node deployed but health check failed - may need more time"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Edge Node - Staging') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'staging'
+                        expression { return env.BRANCH_NAME ==~ /staging-.+/ }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying Edge Node to Staging: ${IMAGE_TAG}"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-staging.yaml > holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-staging -n elohim-staging"
+                            sh "kubectl rollout status deployment/elohim-edgenode-staging -n elohim-staging --timeout=300s"
+                            sh 'sleep 15'
+                            if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
+                                echo "Edge Node Staging deployed and healthy"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // NOTE: Seeding is now handled by genesis/Jenkinsfile (separate pipeline)
+        // Run genesis pipeline manually after deployment or on schedule
+
+        stage('Deploy Edge Node - Prod') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        branch 'main'
+                        allOf {
+                            expression { return params.FORCE_DEPLOY == true }
+                            branch 'main'
+                        }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
+                                               (params.FORCE_DEPLOY == true) ||
+                                               (params.FORCE_BUILD == true)
+
+                            if (!shouldDeploy) {
+                                if (checkEdgeNodeHealth('https://doorway.elohim.host')) {
+                                    echo "Prod edge node is healthy - skipping deployment"
+                                    return
+                                }
+
+                                // Edge node unhealthy - check if we have images to deploy
+                                echo "Prod edge node unhealthy - checking if latest images exist in Harbor..."
+                                def imageExists = sh(
+                                    script: '''
+                                        curl -sf -o /dev/null \
+                                            "https://harbor.ethosengine.com/v2/ethosengine/elohim-edgenode/manifests/latest" \
+                                            2>/dev/null
+                                    ''',
+                                    returnStatus: true
+                                ) == 0
+
+                                if (!imageExists) {
+                                    echo """
+                                    ═══════════════════════════════════════════════════════════
+                                    CANNOT AUTO-HEAL PROD: No images available in Harbor
+                                    ═══════════════════════════════════════════════════════════
+                                    Production edge node is unhealthy but no latest images exist.
+
+                                    To fix: Run pipeline on main branch with FORCE_BUILD=true
+                                    ═══════════════════════════════════════════════════════════
+                                    """
+                                    return
+                                }
+
+                                echo "Found latest images - attempting auto-heal restart"
+                                shouldDeploy = true
+                            }
+
+                            echo """
+                            ═══════════════════════════════════════════════════════════
+                            DEPLOYING EDGE NODE TO PRODUCTION
+                            ═══════════════════════════════════════════════════════════
+                            Image Tag: ${IMAGE_TAG}
+                            ═══════════════════════════════════════════════════════════
+                            """
+
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-prod.yaml > holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
+                            sh "kubectl apply -f holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-edgenode-prod -n elohim-prod"
+                            sh "kubectl rollout status deployment/elohim-edgenode-prod -n elohim-prod --timeout=300s"
+
+                            sh 'sleep 15'
+
+                            if (checkEdgeNodeHealth('https://doorway.elohim.host')) {
+                                echo "Edge Node Prod deployed and healthy: https://doorway.elohim.host"
+                            } else {
+                                echo "Edge Node deployed but health check failed"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            sh """
+                                nerdctl -n k8s.io rmi elohim-edgenode:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-doorway:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-storage:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-happ-installer:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io system prune -af --volumes || true
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                def props = loadBuildVars()
+
+                def summary = """
+                ═══════════════════════════════════════════════════════════
+                HOLOCHAIN PIPELINE SUMMARY
+                ═══════════════════════════════════════════════════════════
+                Branch: ${env.BRANCH_NAME}
+                Image Tag: ${props.IMAGE_TAG ?: 'N/A'}
+
+                Pipeline State:
+                  - hApp Available: ${env.HAPP_AVAILABLE == 'true' ? 'Yes' : 'No'}
+                  - Images Pushed: ${env.IMAGES_PUSHED == 'true' ? 'Yes' : 'Skipped'}
+                  - Edge Node Healthy: ${env.EDGE_NODE_HEALTHY == 'true' ? 'Yes' : 'Unknown'}
+
+                Parameters Used:
+                  - Force Build: ${params.FORCE_BUILD}
+                  - Force Deploy: ${params.FORCE_DEPLOY}
+
+                Note: Seeding handled by genesis/Jenkinsfile
+                ═══════════════════════════════════════════════════════════
+                """
+
+                echo summary
+
+                currentBuild.description = [
+                    env.HAPP_AVAILABLE == 'true' ? 'hApp:OK' : 'hApp:NO',
+                    env.IMAGES_PUSHED == 'true' ? 'Push:OK' : 'Push:Skip',
+                    env.EDGE_NODE_HEALTHY == 'true' ? 'Deploy:OK' : 'Deploy:?'
+                ].join(' | ')
+            }
+        }
+        success {
+            echo "Holochain infrastructure pipeline completed successfully"
+        }
+        failure {
+            echo "Holochain infrastructure pipeline failed"
+            echo "Check the logs above for details. Common issues:"
+            echo "  - hApp artifact not found: Run with FORCE_BUILD after DNA build succeeds"
+            echo "  - Nix build timeout: First build needs more time for cache population"
+            echo "  - Edge node unhealthy: Check Kubernetes pod logs"
+        }
+    }
+}

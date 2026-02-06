@@ -1,0 +1,9 @@
+Scenario: Activist connects workplace justice to municipal budget
+    Given city approved $5M tax break for developer
+    But refused to fund $500K worker center
+    When the Observer makes budget trade-offs visible
+    Then the activist exposes value priorities (corporate welfare vs worker support)
+    And shows developer already profitable without subsidy
+    And demonstrates worker center's community economic impact
+    And organizes campaign to redirect public resources
+    And municipal priorities become labor justice battleground

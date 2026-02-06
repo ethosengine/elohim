@@ -1,0 +1,12 @@
+Scenario: Creating new household norms and governance after leaving abuse
+    Given my household previously operated under abusive dynamics
+    And I am rebuilding household culture based on safety and respect
+    When I establish new household rules and norms
+    Then the Value Scanner supports my authority as household decision-maker
+    And helps me create age-appropriate structures for children
+    And documents household agreements and expectations
+    And tracks what's working and what needs adjustment
+    And provides resources on healthy household dynamics
+    And my personal_agent reminds household members of established norms
+    And validates that rebuilding takes time and iteration
+    And recognizes my household governance work as valuable labor

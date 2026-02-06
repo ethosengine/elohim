@@ -1,0 +1,10 @@
+Scenario: Teaching repair and maintenance reduces waste and consumption
+    Given Frank knows how to repair buildings, equipment, and systems
+    And repair culture counters disposability and resource extraction
+    When the bioregional_elohim coordinates repair knowledge sharing
+    Then it should facilitate Frank teaching repair skills
+    And help community members learn to maintain their homes
+    And recognize repair education as ecological care contribution
+    And reduce consumption through extended equipment lifespan
+    And build bioregional self-sufficiency through skill transmission
+    And Frank's knowledge should serve waste reduction and resilience

@@ -1,0 +1,12 @@
+Scenario: Receiving community support framed as reciprocal care, not charity
+    Given I need substantial support with resources, childcare, and crisis navigation
+    And I worry about being seen as "taker" or burden
+    When I access community support through care economy network
+    Then the Value Scanner frames support as reciprocal care, not charity
+    And recognizes my parenting labor as valuable care contribution
+    And validates that everyone needs support during vulnerability
+    And connects me to support based on my care economy participation
+    And ensures support is offered with dignity and respect
+    And my personal_agent helps me access help without shame
+    And tracks my ongoing care contributions even during crisis
+    And validates that receiving support when needed is how care economy works

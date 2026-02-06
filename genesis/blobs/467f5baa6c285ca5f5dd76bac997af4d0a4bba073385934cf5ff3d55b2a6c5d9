@@ -1,0 +1,12 @@
+Scenario: Maintaining children's educational continuity during housing transitions
+    Given I am moving between temporary housing or shelters
+    And my children need stable educational engagement despite housing instability
+    When we experience housing transitions
+    Then the Value Scanner helps me understand children's educational rights (McKinney-Vento)
+    And coordinates school enrollment, transfers, and records
+    And ensures children can continue at current school if educationally beneficial
+    And arranges transportation if needed for school continuity
+    And tracks educational transitions and helps minimize disruption
+    And my personal_agent manages school documentation and deadlines
+    And recognizes educational coordination as substantial parenting labor
+    And validates that maintaining school stability protects children

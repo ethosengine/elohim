@@ -1,0 +1,11 @@
+Scenario: Reciprocal care flows challenge narrative of one-directional dependence
+    Given family relationships often assume disabled people only receive care
+    And Alex actually provides substantial care to family
+    When the family_elohim tracks care contributions
+    Then Alex's care work for family should be made visible
+    And Alex provides emotional support, advice, practical help to family members
+    And care should be recognized as flowing in multiple directions
+    And the narrative that Alex only takes should be countered with data
+    And family should see Alex as care contributor, not just recipient
+    And reciprocity should be made undeniable through quantification
+    And cultural assumptions should be challenged by visible reality

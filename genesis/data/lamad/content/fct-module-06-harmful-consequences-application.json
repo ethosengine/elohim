@@ -1,0 +1,50 @@
+{
+  "id": "fct-module-06-harmful-consequences-application",
+  "contentType": "practice",
+  "title": "Application: Minimizing Harmful Consequences",
+  "description": "Practical application and action steps",
+  "content": "**Instructions:** \\* We must see ourselves as Christans in a universal sense, if we are growing because other smaller congregations aren't as resourced are as capable as we are, or poaching from other christian communities, does not count toward growth as a body.   \n\\--As such, we should develop some ministry which seeks the development and success of other communities of christians, what we do well MUST be shared with the body, the full body, of Christ.  \n\\-- Church planting, building campaings, or relocating in such a way which chases and subsists primarly from our culture of suburban development needs to stop.   \n\n\\* We need to minimize the operational burdens of all \"infrastructure\" where we can, large buildings, debt-servicing, huge energy bills, transportation, health-care cost, risk-transfer.\n\n\\* We need a positive model for political discernment of the body which is judged by real measurable outcomes not lipservice to stated goals, we cannot be a community which serves the poor, prisoners, immigrants, orphans, and widows, while voting for a political representatives who impoverish, imprison, criminalize, orphan, and widow.  ( We cannot continue sinning, \\[or advocate for consequences\\], so that grace may abound )\n\n\\* Our lives must reflect our identity as christians,   \n\\--if we-members are working in industry that is generating externalities, we could dedicate capacity to helping people re-align their vocation with those values, without penalty or disruption.   \n\\--if we-members are living in such a way that is generating externalities (Parable of the Polygons), we should encourage people to make active choices and not rely on passive hope that someone will happen upon what a life well lived looks like.\n**PracticeType:** application",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "application",
+    "practice",
+    "fct",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "fct-practice",
+    "sourceModule": "fct-module-06-harmful-consequences"
+  },
+  "createdAt": "2025-11-28T21:10:19.207003",
+  "updatedAt": "2025-12-26T21:04:01.829Z",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Minimizing Harmful Consequences",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Minimizing Harmful Consequences - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-application",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "Application: Minimizing Harmful Consequences",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.207003",
+    "dateModified": "2025-11-28T21:10:19.207004",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

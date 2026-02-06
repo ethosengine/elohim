@@ -1,0 +1,9 @@
+Scenario: Teacher tracks board member voting patterns
+    Given teachers need to identify genuine board allies
+    And can't easily track votes across meetings
+    When the Observer tracks and analyzes board member votes
+    Then teachers see which members consistently support teaching conditions
+    And identify which members prioritize administrative recommendations over teacher input
+    And can target advocacy to persuadable members
+    And recognize true allies for coalition building
+    And board accountability becomes visible and actionable

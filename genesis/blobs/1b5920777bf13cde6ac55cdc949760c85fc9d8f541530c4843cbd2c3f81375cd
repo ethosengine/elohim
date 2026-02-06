@@ -1,0 +1,9 @@
+Scenario: Investment returns include documented environmental benefits
+    Given traditional investment ignores or externalizes environmental impacts
+    And Patricia wants to know investment's ecological effects
+    When democratic businesses document environmental stewardship
+    Then impact reports include: carbon sequestered, water quality protected, biodiversity supported
+    And environmental benefits are measured using bioregional ecological indicators
+    And investment returns are financial plus ecological restoration
+    And capital allocation becomes ecological stewardship tool
+    And bioregional_elohim provides environmental impact measurement and reporting

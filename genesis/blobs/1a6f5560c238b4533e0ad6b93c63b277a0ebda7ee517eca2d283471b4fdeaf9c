@@ -1,0 +1,9 @@
+Scenario: Corporate-mandated operational procedures are evaluated and selectively preserved
+    Given franchise required standardized procedures (some useful, others extractive)
+    And workers had no voice in which procedures served quality vs. extraction
+    When democratic governance reviews all franchise operational requirements
+    Then health and safety protocols are preserved and improved
+    And useful training structures are kept while eliminating degrading aspects
+    And extractive mechanisms (bathroom time limits, speedup metrics) are eliminated
+    And workers decide democratically which standards serve quality and dignity
+    And workplace_elohim documents procedural changes and rationale

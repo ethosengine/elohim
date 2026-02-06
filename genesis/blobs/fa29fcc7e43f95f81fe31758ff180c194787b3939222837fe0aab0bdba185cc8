@@ -1,0 +1,12 @@
+Scenario: Connecting with peer support from others experiencing similar vulnerability
+    Given I need connection with people who understand domestic violence, housing crisis, or similar challenges
+    And peer support reduces isolation and provides practical wisdom
+    When I seek peer support through community network
+    Then the community_elohim connects me to peer support groups
+    And identifies others with shared experiences willing to connect
+    And facilitates mutual support relationships
+    And validates that peer support is different from professional services
+    And protects privacy while enabling genuine connection
+    And my personal_agent helps me participate in peer community
+    And recognizes peer support relationships as care economy contribution
+    And celebrates mutual understanding and solidarity

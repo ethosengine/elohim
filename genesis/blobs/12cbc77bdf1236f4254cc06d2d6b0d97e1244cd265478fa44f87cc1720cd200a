@@ -1,0 +1,10 @@
+Scenario: Community opportunities surfaced based on teen's care patterns
+    Given Jasmine has demonstrated leadership through her care contributions
+    And the community is recruiting for youth advisory board
+    When the community_elohim analyzes needs and capabilities
+    Then it should surface the opportunity to Jasmine
+    And explain why she's a good match: "Your care contributions demonstrate the leadership they're seeking"
+    And connect her care work to civic opportunities
+    And help her see pathways from care contribution to community leadership
+    And demonstrate that care economy participation opens doors
+    And recognize her capabilities rather than just her potential

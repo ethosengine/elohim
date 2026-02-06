@@ -1,0 +1,9 @@
+Scenario: Journalist detects pollution pattern across watershed
+    Given the journalist investigates water quality concerns
+    And pollution affects communities across watershed
+    When the Observer tracks environmental data across jurisdictions
+    Then the journalist sees contamination pattern from industrial facility upstream
+    And maps affected communities downstream across state lines
+    And documents regulatory agencies failing to coordinate enforcement
+    And shows company violated permits in multiple states
+    And publishes regional investigation forcing coordinated response

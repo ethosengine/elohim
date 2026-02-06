@@ -1,0 +1,10 @@
+Scenario: Bioregional food systems supported by teen participation
+    Given Jasmine's bioregion has local farms and food producers
+    And supporting local agriculture strengthens bioregional resilience
+    When she chooses local food through the Value Scanner
+    Then bioregional_elohim should track support for local food systems
+    And recognize that her purchases sustain regional agriculture
+    And show how local food choices support bioregional economy
+    And connect her consumption to farmer livelihoods and land stewardship
+    And help her understand food system as part of bioregional care economy
+    And demonstrate that her choices affect ecosystem and economy together

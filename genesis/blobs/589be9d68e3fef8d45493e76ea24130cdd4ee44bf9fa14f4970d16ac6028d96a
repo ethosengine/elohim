@@ -1,0 +1,10 @@
+Scenario: Study group coordination as care economy practice
+    Given Kenji participates in study groups with peers
+    And study groups require coordination, hosting, and emotional labor
+    When the educational_elohim tracks study group participation
+    Then it should recognize hosting study group as care contribution
+    And it should value coordinating schedules and managing group dynamics
+    And it should accumulate care tokens for creating learning spaces
+    And study group labor should be visible and valued
+    And the system should recognize collective learning as care economy
+    And academic collaboration should be understood as mutual care

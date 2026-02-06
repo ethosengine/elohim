@@ -1,0 +1,10 @@
+Scenario: Construction waste reduction and material reuse
+    Given construction generates substantial waste
+    And Frank has knowledge of material reuse and salvage
+    When the bioregional_elohim tracks construction waste
+    Then it should help Frank minimize waste in Habitat projects
+    And facilitate salvaging and reusing materials
+    And recognize waste reduction as ecological care contribution
+    And teach construction waste minimization to others
+    And quantify environmental benefit of material reuse
+    And Frank's expertise should reduce construction environmental impact

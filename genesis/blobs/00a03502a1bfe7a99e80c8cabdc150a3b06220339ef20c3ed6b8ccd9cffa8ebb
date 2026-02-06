@@ -1,0 +1,10 @@
+Scenario: Buying quality that lasts reduces ecological impact
+    Given Margaret learned to buy fewer, better things
+    And durability reduces waste and resource extraction
+    When Margaret makes purchasing decisions
+    Then her personal_agent should support quality-over-quantity choices
+    And the bioregional_elohim should track durability practices
+    And buying quality should be recognized as ecological stewardship
+    And Margaret's knowledge of durability should inform others
+    And consumption patterns should favor longevity
+    And throwaway culture should be countered by senior wisdom

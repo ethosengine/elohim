@@ -1,0 +1,9 @@
+Scenario: Developer employment impacts on community economics
+    Given a developer's project will employ 150 construction workers
+    And claims significant economic impact on local economy
+    When the Observer analyzes actual community economic impacts
+    Then analysis shows: most workers spend earnings in home communities not locally
+    And temporary jobs create temporary spending not sustained economic benefit
+    And few local businesses benefit from construction employment
+    And honest economic analysis reveals limited community benefit
+    And employment claims need scrutiny about actual community economics

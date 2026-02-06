@@ -1,0 +1,11 @@
+Scenario: Privacy control remains with Frank as autonomous adult
+    Given Frank's care contribution and health data is being tracked
+    And this information is sensitive and personal
+    When Frank determines data sharing preferences
+    Then he must have complete control over all his data
+    And he should choose what's shared with family, organizations, or community
+    And he can demonstrate care value to family if he wishes
+    And he can maintain complete privacy if he prefers
+    And health data sharing must be explicitly consented
+    And volunteer coordination can share relevant information
+    And Frank's autonomy over his information must be absolute

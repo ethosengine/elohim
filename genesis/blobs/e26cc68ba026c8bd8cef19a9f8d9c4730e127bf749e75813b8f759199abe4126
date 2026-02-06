@@ -1,0 +1,11 @@
+Scenario: Collaborating with Mayor Jamal on participatory action research
+    Given I want research to serve community not just extract data
+    And Mayor Jamal wants evidence to improve local governance
+    When we co-design research questions and methods
+    Then community priorities shape what we study
+    And Local residents participate in data collection
+    And We jointly interpret findings considering context I might miss
+    And Research addresses actual needs not just academic curiosity
+    And Riverside learns from comparative findings across communities
+    And Results improve local implementation immediately
+    And Research relationship respects community autonomy and knowledge

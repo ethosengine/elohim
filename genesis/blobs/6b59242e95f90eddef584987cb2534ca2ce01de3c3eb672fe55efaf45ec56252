@@ -1,0 +1,11 @@
+Scenario: Aging in place supported by neighborhood care economy
+    Given Helen wants to remain in her home and neighborhood
+    And successful aging in place requires community support
+    When the neighborhood_elohim coordinates care resources
+    Then it should connect Helen to local support services
+    And informal care networks should be strengthened
+    And volunteer help should be matched to Helen's needs
+    And Helen's accumulated contributions should create claims on support
+    And care should flow as reciprocity, not charity
+    And the protocol should demonstrate that neighborhoods can support aging in place
+    And community care economy should enable elders to remain home

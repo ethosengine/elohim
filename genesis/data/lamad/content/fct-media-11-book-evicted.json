@@ -1,0 +1,56 @@
+{
+  "id": "fct-media-11-book-evicted",
+  "contentType": "book",
+  "title": "Evicted",
+  "description": "Book by Matthew Desmond",
+  "content": "# Evicted\n\n**Author:** Matthew Desmond\n**Format:** book",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "mediaType": "book",
+    "author": "Matthew Desmond"
+  },
+  "_contributor": "Matthew Desmond",
+  "createdAt": "2025-11-28T21:10:19.219816",
+  "updatedAt": "2025-12-26T21:04:01.800Z",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Evicted",
+    "ogDescription": "Book by Matthew Desmond",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-evicted",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Evicted - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-evicted",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Evicted",
+    "description": "Book by Matthew Desmond",
+    "dateCreated": "2025-11-28T21:10:19.219816",
+    "dateModified": "2025-11-28T21:10:19.219817",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Matthew Desmond"
+    }
+  }
+}

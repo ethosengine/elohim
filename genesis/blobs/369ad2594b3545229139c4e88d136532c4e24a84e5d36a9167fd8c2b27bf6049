@@ -1,0 +1,10 @@
+Scenario: Repair and mending skills reduce waste
+    Given Margaret knows how to repair clothing, household items, equipment
+    And repair culture counters disposability
+    When the bioregional_elohim tracks repair practices
+    Then Margaret's mending and repair should be recognized
+    And skills should be valued as ecological care contribution
+    And repair knowledge should be shared with younger generations
+    And community repair culture should be strengthened
+    And disposability should be countered by repair practices
+    And Margaret's skills should serve bioregional sustainability

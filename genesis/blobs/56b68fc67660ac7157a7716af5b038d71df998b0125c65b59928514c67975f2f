@@ -1,0 +1,59 @@
+@epic:social_medium
+@user_type:activist
+@governance_layer:individual
+@related_users:community_moderator,content_creator
+@related_layers:community,affinity_network
+@elohim_agents:protection_agent,sanctuary_agent
+
+Feature: Individual Digital Sovereignty for Activist
+  As an activist in the social_medium system
+  Operating at the individual governance layer
+  I want to maintain my digital sovereignty and personal security
+  So that I can organize for change without fear of surveillance or suppression
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the activist user is registered in the system
+    And the individual governance context is active
+    And the activist has personal node with encrypted storage
+
+  Scenario: Activist establishes protected digital identity
+    Given the activist is setting up their personal node
+    When they configure their activist identity with privacy controls
+    And they designate trusted sanctuary institutions for backup
+    And they enable multi-factor authentication with biometric verification
+    Then their identity is cryptographically secured on their personal node
+    And their data is encrypted end-to-end
+    And sanctuary protocols are established with designated institutions
+    And the system confirms digital sovereignty is established
+
+  Scenario: Activist detects surveillance attempt and activates sanctuary
+    Given the activist is organizing a climate justice campaign
+    And they have shared organizing documents with their local group
+    When the system detects repeated unauthorized access attempts to their node
+    And the protection agent identifies a pattern indicating state surveillance
+    Then the activist receives immediate alert with threat assessment
+    And sanctuary protocol options are presented
+    And the activist can choose to fragment data across sanctuary institutions
+    And organizing continues through secure channels
+    And the community is alerted to heightened security measures
+
+  Scenario: Activist manages multiple digital identities safely
+    Given the activist works on both local neighborhood issues and sensitive human rights cases
+    When they create separate personas for different organizing contexts
+    Then each persona has independent privacy settings
+    And connections between personas are cryptographically isolated
+    And the activist can switch contexts without cross-contamination
+    And each persona's contributions earn reach independently
+    And protection protocols apply to all personas
+
+  Scenario: Activist recovers data after device seizure
+    Given the activist's device was confiscated during a protest
+    And their data was pre-distributed to sanctuary institutions
+    When the activist obtains new hardware and initiates recovery
+    And they authenticate through biometric and social verification
+    And the sanctuary institutions verify the activist's safety and free will
+    Then all organizing data, contacts, and history are restored
+    And the compromised device's access is permanently revoked
+    And the activist resumes organizing with full digital sovereignty
+    And the network logs the rights violation for documentation

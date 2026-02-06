@@ -1,0 +1,10 @@
+Scenario: Teen understands education itself as care work
+    Given Jasmine invests time and effort in her education
+    And education develops capability to serve future flourishing
+    When educational_elohim frames her learning
+    Then education should be understood as care work for her future self
+    And investment in capability building should be recognized as care labor
+    And she should learn that education serves collective as well as individual good
+    And understand that her developing capabilities will serve community needs
+    And see education as part of care economy, not separate from it
+    And internalize that learning is valuable beyond market return

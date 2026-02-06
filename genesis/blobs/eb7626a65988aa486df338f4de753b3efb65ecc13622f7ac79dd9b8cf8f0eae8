@@ -1,0 +1,9 @@
+Scenario: Learning adult family care from parents' modeling
+    Given Aisha's parents demonstrate care economy practices
+    And she's learning adult family participation
+    When Aisha observes family care patterns
+    Then the family_elohim should make parental care work visible
+    And Aisha should learn what adult family care looks like
+    And intergenerational knowledge transfer should occur
+    And she should understand family care as lifelong practice
+    And the system should facilitate learning from family elders

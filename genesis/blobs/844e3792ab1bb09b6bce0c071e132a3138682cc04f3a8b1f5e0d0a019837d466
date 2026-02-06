@@ -1,0 +1,10 @@
+Scenario: Foundation for lifelong value literacy begins at age 5
+    Given Tommy is forming foundational beliefs about economics
+    And early learning shapes lifelong patterns
+    When Tommy completes the Pure Discovery phase
+    Then he should have internalized that care creates value
+    And he should understand that his choices matter to others
+    And he should experience himself as capable care contributor
+    And he should expect technology to serve human flourishing
+    And he should have alternative to consumer capitalism as baseline
+    And his generation should grow up assuming care economy is normal

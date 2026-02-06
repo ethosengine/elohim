@@ -1,0 +1,9 @@
+Scenario: Journalist exposes lobbying influence on environmental regulation
+    Given state considers weakening pollution regulations
+    And the journalist investigates who benefits
+    When the Observer tracks lobbying activity and legislative relationships
+    Then the journalist sees industry lobbying expenditures of $4M
+    And documents campaign contributions to committee members
+    And identifies revolving door between industry and regulatory agency
+    And shows pattern of weakened enforcement benefiting donors
+    And publishes investigation exposing regulatory capture

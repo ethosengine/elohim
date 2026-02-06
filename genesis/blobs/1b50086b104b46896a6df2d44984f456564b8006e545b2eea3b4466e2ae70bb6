@@ -1,0 +1,11 @@
+Scenario: Family privacy protects Alex from unwanted disclosure
+    Given Alex's disability status is sensitive information
+    And some family members might share Alex's private information
+    When family members access shared family systems
+    Then Alex should control what information family can access
+    And the family_elohim should prevent unauthorized disclosure
+    And Alex's medical information should never be shared without consent
+    And family should not be able to discuss Alex's private matters in shared spaces
+    And privacy violations should be prevented systematically
+    And Alex should be protected from family gossip or oversharing
+    And confidentiality should be enforced even within family

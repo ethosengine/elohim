@@ -1,0 +1,9 @@
+Scenario: Environmental impact visible in consumption decisions
+    Given Sarah wants to minimize environmental harm
+    And impact information is often hidden from consumers
+    When Sarah scans products
+    Then the bioregional_elohim should display environmental impact data
+    And it should show carbon footprint, water use, soil health, biodiversity effects
+    And it should make ecological costs visible alongside monetary costs
+    And Sarah should make informed choices about environmental impact
+    And visibility should enable environmentally conscious consumption

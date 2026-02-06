@@ -1,0 +1,9 @@
+Scenario: Mayor verifies lobbyist claims with independent evidence
+    Given business lobbyists claim regulations will kill jobs
+    And present alarming economic projections
+    When the Observer fact-checks lobbying claims
+    Then they see similar regulations in comparable cities
+    And review actual economic impacts versus predicted disasters
+    And identify which lobbyist projections proved accurate historically
+    And evaluate claims against track record
+    And resist manipulation through evidence-based analysis

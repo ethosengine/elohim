@@ -1,0 +1,10 @@
+Scenario: Public transportation access supports senior independence
+    Given Margaret can no longer afford car ownership
+    And she needs transportation for medical appointments, shopping, and social life
+    When the municipality_elohim provides transportation information
+    Then accessible public transit should be available
+    And senior fare programs should be communicated clearly
+    And transportation should enable Margaret's continued independence
+    And mobility should be supported as key to aging in community
+    And municipal transit should be optimized for senior access
+    And affordable transportation should preserve autonomy

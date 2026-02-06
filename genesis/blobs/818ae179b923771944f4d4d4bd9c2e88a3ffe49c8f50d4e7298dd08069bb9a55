@@ -1,0 +1,10 @@
+Scenario: Setting boundaries around family involvement
+    Given Jordan's father often visits unannounced at the group home
+    And Jordan values the visits but wants more notice
+    When Jordan expresses desire for planned visits
+    Then the personal_agent helps Jordan communicate boundaries
+    And the interface provides simple language for boundary expression
+    And the family_elohim communicates Jordan's preference to father
+    And Jordan's father learns to respect Jordan's adult boundaries
+    And Jordan's autonomy is supported through boundary maintenance
+    And the relationship improves through mutual respect

@@ -1,0 +1,8 @@
+Scenario: Participating in food sovereignty initiatives
+    Given corporate food systems extract from workers and communities
+    And alternative food systems can support local care economy
+    When I want to participate in food sovereignty organizing
+    Then the protocol should connect me to food justice initiatives
+    And support participation in food co-ops, community agriculture, or food policy
+    And recognize my expertise as food worker in food systems transformation
+    And build bioregional food systems aligned with care economy

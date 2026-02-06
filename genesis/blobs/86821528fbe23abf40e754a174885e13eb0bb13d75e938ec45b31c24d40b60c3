@@ -1,0 +1,10 @@
+Scenario: Temporary residency patterns and neighborhood turnover
+    Given student neighborhoods have high turnover
+    And institutional knowledge is lost with each cohort
+    When the neighborhood_elohim manages turnover
+    Then it should preserve neighborhood practices across student generations
+    And it should help new students learn neighborhood norms quickly
+    And it should maintain neighborhood continuity despite turnover
+    And transient residents should still build lasting neighborhood patterns
+    And the system should stabilize high-turnover neighborhoods
+    And neighborhood culture should persist beyond individual residents

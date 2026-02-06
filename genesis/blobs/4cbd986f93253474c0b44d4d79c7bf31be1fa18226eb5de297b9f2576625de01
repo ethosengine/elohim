@@ -1,0 +1,10 @@
+Scenario: Participating in neighborhood mutual aid networks
+    Given Margaret has time, skills, and motivation to help neighbors
+    And she also has needs that neighbors can help with
+    When the neighborhood_elohim coordinates mutual aid
+    Then Margaret should be connected to reciprocal care networks
+    And her contributions (childcare help, elder checking, skills) should be tracked
+    And support she receives (technology help, heavy lifting, transportation) should be tracked
+    And the framing should be mutual aid, not charity in either direction
+    And Margaret both gives and receives in neighborhood care economy
+    And dignity should be preserved through reciprocity framework

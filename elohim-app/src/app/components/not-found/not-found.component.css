@@ -26,10 +26,9 @@
   font-size: 8rem;
   font-weight: 800;
   background: var(--lamad-accent-gradient);
-  -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  opacity: 0.15;
+  opacity: 15%;
   position: absolute;
   user-select: none;
 }
@@ -52,13 +51,14 @@
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 20px rgb(99 102 241 / 50%);
 }
 
 @keyframes spin {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -125,7 +125,7 @@ h1 {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 12px rgb(99 102 241 / 40%);
 }
 
 .btn-secondary {
@@ -194,7 +194,7 @@ h1 {
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (width <= 640px) {
   .error-code {
     font-size: 5rem;
   }

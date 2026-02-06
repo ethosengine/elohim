@@ -1,0 +1,8 @@
+Scenario: Sharing care work across sibling network
+    Given siblings may have different capacities for family care
+    And my work schedule limits my hands-on participation
+    When the family needs ongoing care coordination
+    Then the protocol should help distribute care work fairly
+    And recognize that my employment constraints affect availability
+    And identify where I can contribute given my limitations
+    And support negotiation toward equitable family care distribution

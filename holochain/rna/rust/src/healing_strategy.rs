@@ -1,0 +1,387 @@
+//! Pluggable Healing Strategies
+//!
+//! Different applications may need different healing approaches:
+//! - Some may want to always try the previous DNA bridge first
+//! - Some may prefer local self-repair first
+//! - Some may try multiple strategies in sequence
+//! - Some may use custom strategies entirely
+//!
+//! This module defines the strategy pattern so healing behavior can be
+//! configured at startup without modifying the RNA framework.
+
+use serde_json::Value;
+
+/// Result of a healing attempt
+#[derive(Debug, Clone)]
+pub struct HealingResult<T> {
+    /// The healed entry if successful
+    pub entry: Option<T>,
+    /// Whether this came from previous DNA (true) or local repair (false)
+    pub was_migrated: bool,
+    /// How many healing attempts were made
+    pub attempts: u32,
+    /// Any warnings or notes about the healing
+    pub notes: Vec<String>,
+}
+
+/// Decides how to attempt healing for a specific entry type
+pub trait HealingStrategy: Send + Sync {
+    /// Attempt to heal an entry of a given type
+    ///
+    /// # Arguments
+    /// * `entry_type` - Type of entry (e.g., "content", "learning_path")
+    /// * `entry_id` - ID of the entry to heal
+    /// * `current_entry` - Current entry if it exists (may be degraded)
+    /// * `context` - Context containing bridge and other healing tools
+    ///
+    /// # Returns
+    /// Option<Vec<u8>> - Healed entry as bytes, or None if healing failed
+    fn heal(
+        &self,
+        entry_type: &str,
+        entry_id: &str,
+        current_entry: Option<Vec<u8>>,
+        context: &HealingContext<'_>,
+    ) -> Result<Option<HealingResult<Vec<u8>>>, String>;
+
+    /// Description of this strategy for logging
+    fn description(&self) -> &str;
+}
+
+/// Interface for entry validation
+pub trait ValidationProvider: Send + Sync {
+    fn validate_json(&self, entry_type: &str, data: &Value) -> Result<(), String>;
+}
+
+/// Interface for entry transcription between DNA versions
+pub trait TranscriptionProvider: Send + Sync {
+    /// Transcribe data from previous DNA version into self (current DNA)
+    fn transcribe_from_prev(&self, entry_type: &str, data: &Value) -> Result<Value, String>;
+}
+
+/// Interface for reference resolution
+pub trait ReferenceResolutionProvider: Send + Sync {
+    fn resolve_reference(&self, entry_type: &str, id: &str) -> Result<bool, String>;
+}
+
+/// Context provided to healing strategies
+///
+/// This gives strategies everything they need to perform healing without
+/// being tightly coupled to specific implementations.
+pub struct HealingContext<'a> {
+    /// Provider for entry validation
+    pub validator: &'a dyn ValidationProvider,
+
+    /// Provider for transcription between DNA versions
+    pub transcriber: &'a dyn TranscriptionProvider,
+
+    /// Provider for reference resolution
+    pub reference_resolver: &'a dyn ReferenceResolutionProvider,
+
+    /// Function to call the previous DNA bridge (if available)
+    pub prev_bridge_caller: Option<&'a dyn Fn(&str, &str, Value) -> Result<Value, String>>,
+
+    /// Maximum number of healing attempts
+    pub max_attempts: u32,
+
+    /// Whether to mark entries that fail validation as Degraded or fail completely
+    pub allow_degradation: bool,
+}
+
+/// Try previous DNA bridge first, fall back to self-repair
+pub struct BridgeFirstStrategy;
+
+impl HealingStrategy for BridgeFirstStrategy {
+    fn heal(
+        &self,
+        entry_type: &str,
+        entry_id: &str,
+        current_entry: Option<Vec<u8>>,
+        context: &HealingContext<'_>,
+    ) -> Result<Option<HealingResult<Vec<u8>>>, String> {
+        let mut result = HealingResult {
+            entry: None,
+            was_migrated: false,
+            attempts: 0,
+            notes: Vec::new(),
+        };
+
+        // 1. Try previous DNA bridge
+        if let Some(bridge_caller) = context.prev_bridge_caller {
+            result.attempts += 1;
+
+            match bridge_caller(
+                entry_type,
+                entry_id,
+                serde_json::json!({"id": entry_id}),
+            ) {
+                Ok(prev_data) => {
+                    result.notes.push("Retrieved from previous DNA bridge".to_string());
+
+                    // Validate previous data
+                    if let Err(e) = context.validator.validate_json(entry_type, &prev_data) {
+                        result.notes.push(format!("Previous data validation failed: {}", e));
+                        if !context.allow_degradation {
+                            return Err(e);
+                        }
+                    }
+
+                    // Transcribe from previous to current
+                    match context.transcriber.transcribe_from_prev(entry_type, &prev_data) {
+                        Ok(current_data) => {
+                            result.entry = Some(current_data.to_string().into_bytes());
+                            result.was_migrated = true;
+                            result.notes.push("Successfully transcribed to current".to_string());
+                            return Ok(Some(result));
+                        }
+                        Err(e) => {
+                            result.notes.push(format!("Transcription failed: {}", e));
+                            if !context.allow_degradation {
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    result.notes.push("Previous DNA bridge not available or entry not found".to_string());
+                }
+            }
+        }
+
+        // 2. Try self-repair on current entry if it exists
+        if let Some(entry_data) = current_entry {
+            result.attempts += 1;
+            result.notes.push("Attempting self-repair on current entry".to_string());
+
+            // Try to parse and validate
+            if let Ok(entry_json) = serde_json::from_slice::<Value>(&entry_data) {
+                if context.validator.validate_json(entry_type, &entry_json).is_ok() {
+                    result.entry = Some(entry_data);
+                    result.notes.push("Current entry self-repaired successfully".to_string());
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        // 3. If we're here, healing failed
+        Ok(None)
+    }
+
+    fn description(&self) -> &str {
+        "Try previous DNA bridge first, fall back to self-repair"
+    }
+}
+
+/// Try self-repair first, only use previous DNA bridge as fallback
+pub struct SelfRepairFirstStrategy;
+
+impl HealingStrategy for SelfRepairFirstStrategy {
+    fn heal(
+        &self,
+        entry_type: &str,
+        entry_id: &str,
+        current_entry: Option<Vec<u8>>,
+        context: &HealingContext<'_>,
+    ) -> Result<Option<HealingResult<Vec<u8>>>, String> {
+        let mut result = HealingResult {
+            entry: None,
+            was_migrated: false,
+            attempts: 0,
+            notes: Vec::new(),
+        };
+
+        // 1. Try self-repair first
+        if let Some(entry_data) = current_entry {
+            result.attempts += 1;
+            result.notes.push("Attempting self-repair on current entry".to_string());
+
+            if let Ok(entry_json) = serde_json::from_slice::<Value>(&entry_data) {
+                if context.validator.validate_json(entry_type, &entry_json).is_ok() {
+                    result.entry = Some(entry_data);
+                    result.notes.push("Current entry self-repaired successfully".to_string());
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        // 2. Fall back to previous DNA bridge
+        if let Some(ref bridge_caller) = context.prev_bridge_caller {
+            result.attempts += 1;
+            result.notes.push("Falling back to previous DNA bridge".to_string());
+
+            match bridge_caller(
+                entry_type,
+                entry_id,
+                serde_json::json!({"id": entry_id}),
+            ) {
+                Ok(prev_data) => {
+                    if context.validator.validate_json(entry_type, &prev_data).is_ok() {
+                        match context.transcriber.transcribe_from_prev(entry_type, &prev_data) {
+                            Ok(current_data) => {
+                                result.entry = Some(current_data.to_string().into_bytes());
+                                result.was_migrated = true;
+                                result.notes.push("Successfully healed from previous DNA".to_string());
+                                return Ok(Some(result));
+                            }
+                            Err(e) => {
+                                result.notes.push(format!("Transcription failed: {}", e));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    result.notes.push(format!("Previous DNA bridge failed: {}", e));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn description(&self) -> &str {
+        "Try self-repair first, fall back to previous DNA bridge"
+    }
+}
+
+/// Never use previous DNA bridge, only local self-repair
+pub struct LocalRepairOnlyStrategy;
+
+impl HealingStrategy for LocalRepairOnlyStrategy {
+    fn heal(
+        &self,
+        entry_type: &str,
+        _entry_id: &str,
+        current_entry: Option<Vec<u8>>,
+        context: &HealingContext<'_>,
+    ) -> Result<Option<HealingResult<Vec<u8>>>, String> {
+        let mut result = HealingResult {
+            entry: None,
+            was_migrated: false,
+            attempts: 0,
+            notes: Vec::new(),
+        };
+
+        if let Some(entry_data) = current_entry {
+            result.attempts += 1;
+
+            if let Ok(entry_json) = serde_json::from_slice::<Value>(&entry_data) {
+                if context.validator.validate_json(entry_type, &entry_json).is_ok() {
+                    result.entry = Some(entry_data);
+                    result.notes.push("Repaired locally".to_string());
+                    return Ok(Some(result));
+                } else if context.allow_degradation {
+                    result.entry = Some(entry_data);
+                    result.notes.push("Marked as degraded, local repair incomplete".to_string());
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn description(&self) -> &str {
+        "Local self-repair only, no previous DNA bridge"
+    }
+}
+
+/// Accept any current entry as-is, never attempt healing
+pub struct NoHealingStrategy;
+
+impl HealingStrategy for NoHealingStrategy {
+    fn heal(
+        &self,
+        _entry_type: &str,
+        _entry_id: &str,
+        current_entry: Option<Vec<u8>>,
+        _context: &HealingContext<'_>,
+    ) -> Result<Option<HealingResult<Vec<u8>>>, String> {
+        let result = current_entry.map(|entry| HealingResult {
+            entry: Some(entry),
+            was_migrated: false,
+            attempts: 0,
+            notes: vec!["No healing attempted, accepted entry as-is".to_string()],
+        });
+
+        Ok(result)
+    }
+
+    fn description(&self) -> &str {
+        "No healing, accept entries as-is"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockValidator;
+    impl ValidationProvider for MockValidator {
+        fn validate_json(&self, _entry_type: &str, _data: &Value) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    struct MockTranscriber;
+    impl TranscriptionProvider for MockTranscriber {
+        fn transcribe_from_prev(&self, _entry_type: &str, data: &Value) -> Result<Value, String> {
+            Ok(data.clone())
+        }
+    }
+
+    struct MockResolver;
+    impl ReferenceResolutionProvider for MockResolver {
+        fn resolve_reference(&self, _entry_type: &str, _id: &str) -> Result<bool, String> {
+            Ok(true)
+        }
+    }
+
+    fn mock_context() -> HealingContext<'static> {
+        static VALIDATOR: MockValidator = MockValidator;
+        static TRANSCRIBER: MockTranscriber = MockTranscriber;
+        static RESOLVER: MockResolver = MockResolver;
+
+        HealingContext {
+            prev_bridge_caller: None,
+            validator: &VALIDATOR,
+            transcriber: &TRANSCRIBER,
+            reference_resolver: &RESOLVER,
+            max_attempts: 3,
+            allow_degradation: true,
+        }
+    }
+
+    #[test]
+    fn test_bridge_first_with_no_prev() {
+        let strategy = BridgeFirstStrategy;
+        let context = mock_context();
+
+        let result = strategy.heal("content", "id-1", None, &context).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_self_repair_first_with_current_entry() {
+        let strategy = SelfRepairFirstStrategy;
+        let context = mock_context();
+        let current_entry = Some(b"{}".to_vec());
+
+        let result = strategy
+            .heal("content", "id-1", current_entry, &context)
+            .unwrap();
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_no_healing_strategy() {
+        let strategy = NoHealingStrategy;
+        let context = mock_context();
+        let current_entry = Some(b"{}".to_vec());
+
+        let result = strategy
+            .heal("content", "id-1", current_entry, &context)
+            .unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().attempts, 0);
+    }
+}

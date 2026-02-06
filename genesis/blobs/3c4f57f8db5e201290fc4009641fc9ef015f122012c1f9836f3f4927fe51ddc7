@@ -1,0 +1,11 @@
+Scenario: Deliberating multi-community coordination case
+    Given an appeal involves agent decisions across several communities
+    And different communities have conflicting local calibrations
+    When our regional council reviews the inter-community conflict
+    Then we evaluate: how subsidiarity applies across boundaries
+    And we examine: if regional coordination is constitutionally required
+    And we consider: if local diversity should be harmonized or preserved
+    And we consult: community leaders about local context
+    And we establish: regional minimums while respecting variation
+    And we create: precedent for multi-layer governance coherence
+    And our judgment: enables communities to coordinate democratically

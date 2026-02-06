@@ -11,10 +11,11 @@
  * not as consumption metrics, but as a narrative of growth.
  */
 
+import { MasteryLevel } from '@app/elohim/models/agent.model';
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+
 import { ContentType } from './content-node.model';
-import { MasteryLevel } from './agent.model';
-import { OpenGraphMetadata } from './open-graph.model';
-import { JsonLdMetadata } from './json-ld.model';
 
 /**
  * Human Profile Summary
@@ -201,14 +202,14 @@ export interface TimelineEvent {
 }
 
 export type TimelineEventType =
-  | 'journey_started'      // Began a new learning path
-  | 'journey_completed'    // Finished a learning path
-  | 'step_completed'       // Completed a step
-  | 'capability_earned'    // Earned an attestation
+  | 'journey_started' // Began a new learning path
+  | 'journey_completed' // Finished a learning path
+  | 'step_completed' // Completed a step
+  | 'capability_earned' // Earned an attestation
   | 'meaningful_encounter' // Marked content with high affinity
-  | 'note_created'         // Added a personal reflection
-  | 'return_visit'         // Returned after absence (commitment)
-  | 'first_exploration';   // First content viewed (journey begins)
+  | 'note_created' // Added a personal reflection
+  | 'return_visit' // Returned after absence (commitment)
+  | 'first_exploration'; // First content viewed (journey begins)
 
 /**
  * Content Engagement

@@ -1,0 +1,376 @@
+// =============================================================================
+// Migration Module for {{DNA_NAME}}
+// =============================================================================
+//
+// # RNA Metaphor
+//
+// In biology:
+// - DNA stores genetic information (your integrity zome - immutable rules)
+// - RNA transcribes DNA and coordinates protein synthesis (this module)
+// - Codons map nucleotide triplets to amino acids (transform functions)
+// - Ribosomes read RNA and build proteins (import functions)
+//
+// This module is the "RNA" of your DNA - it transcribes data from one
+// version to another during migrations.
+//
+// # Usage
+//
+// 1. Bundle both v1 and v2 DNAs in happ.yaml:
+//    ```yaml
+//    roles:
+//      - name: my-dna           # Current version (v2)
+//        dna: { bundled: ./my-dna.dna }
+//      - name: my-dna-previous  # Previous version (v1)
+//        dna: { bundled: ./archive/my-dna-v1.dna }
+//    ```
+//
+// 2. From v2, call: migrate_from_previous("my-dna-previous")
+//
+// 3. Or use the TypeScript orchestrator for external coordination
+//
+// # Customization
+//
+// 1. Update SCHEMA_VERSION when making breaking changes
+// 2. Customize transform_*() functions for your schema changes
+// 3. Add your entry types to MigrationExport struct
+// 4. Implement export_all_*() functions for each entry type
+// =============================================================================
+
+use hdk::prelude::*;
+use std::collections::HashMap;
+
+// Import your entry types here:
+// use crate::{MyEntry, CreateMyEntryInput, create_my_entry};
+
+// =============================================================================
+// Schema Version
+// =============================================================================
+
+/// Schema version - increment when making breaking changes to entry types
+///
+/// Format: "v{major}" where major increments for any integrity zome change
+pub const SCHEMA_VERSION: &str = "v1";
+
+// =============================================================================
+// Migration Report Structures
+// =============================================================================
+
+/// Complete migration report
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MigrationReport {
+    pub source_version: String,
+    pub target_version: String,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+    pub entry_counts: HashMap<String, MigrationCounts>,
+    pub errors: Vec<MigrationError>,
+    pub verification: MigrationVerification,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct MigrationCounts {
+    pub exported: u32,
+    pub transformed: u32,
+    pub imported: u32,
+    pub skipped: u32,
+    pub failed: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MigrationError {
+    pub entry_type: String,
+    pub entry_id: Option<String>,
+    pub phase: String,
+    pub message: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct MigrationVerification {
+    pub passed: bool,
+    pub count_checks: HashMap<String, CountCheck>,
+    pub reference_integrity: bool,
+    pub notes: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CountCheck {
+    pub expected: u32,
+    pub actual: u32,
+    pub passed: bool,
+}
+
+impl MigrationReport {
+    pub fn new(source_version: String, target_version: String) -> Self {
+        let now = sys_time()
+            .ok()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|| "unknown".to_string());
+        Self {
+            source_version,
+            target_version,
+            started_at: now,
+            completed_at: None,
+            entry_counts: HashMap::new(),
+            errors: Vec::new(),
+            verification: MigrationVerification::default(),
+        }
+    }
+
+    pub fn record_success(&mut self, entry_type: &str) {
+        let counts = self.entry_counts.entry(entry_type.to_string()).or_default();
+        counts.imported += 1;
+    }
+
+    pub fn record_skip(&mut self, entry_type: &str) {
+        let counts = self.entry_counts.entry(entry_type.to_string()).or_default();
+        counts.skipped += 1;
+    }
+
+    pub fn record_failure(&mut self, entry_type: &str, entry_id: Option<String>, message: String) {
+        let counts = self.entry_counts.entry(entry_type.to_string()).or_default();
+        counts.failed += 1;
+        self.errors.push(MigrationError {
+            entry_type: entry_type.to_string(),
+            entry_id,
+            phase: "Import".to_string(),
+            message,
+        });
+    }
+
+    pub fn complete(&mut self) {
+        let now = sys_time()
+            .ok()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|| "unknown".to_string());
+        self.completed_at = Some(now);
+    }
+}
+
+// =============================================================================
+// Export Structures
+// =============================================================================
+
+/// Complete export for migration - add your entry types here
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MigrationExport {
+    pub schema_version: String,
+    pub exported_at: String,
+    // Add your entry types:
+    // pub my_entries: Vec<MyEntryOutput>,
+    // pub other_entries: Vec<OtherEntryOutput>,
+}
+
+// =============================================================================
+// Transform Functions (Codons)
+// =============================================================================
+//
+// Each transform function is a "codon" - mapping one pattern to another.
+// Customize these for your schema changes:
+//
+// - Adding a new field:
+//     new_entry.new_field = old.metadata_json
+//         .and_then(|m| serde_json::from_str::<Value>(&m).ok())
+//         .and_then(|v| v.get("new_field").cloned())
+//         .unwrap_or_default();
+//
+// - Removing a field:
+//     Just don't include it in the new struct
+//
+// - Renaming a field:
+//     new_entry.new_name = old.old_name;
+//
+// - Changing a type:
+//     new_entry.count = old.count_string.parse().unwrap_or(0);
+
+// Example transform function - customize for your entry types:
+//
+// fn transform_my_entry_v1_to_current(v1_entry: MyEntryV1) -> MyEntry {
+//     MyEntry {
+//         id: v1_entry.id,
+//         title: v1_entry.title,
+//         // New field with default
+//         created_at: v1_entry.metadata_json
+//             .and_then(|m| serde_json::from_str::<serde_json::Value>(&m).ok())
+//             .and_then(|v| v.get("created_at").and_then(|v| v.as_str()).map(|s| s.to_string()))
+//             .unwrap_or_else(|| "unknown".to_string()),
+//         // Pass through unchanged fields
+//         description: v1_entry.description,
+//         content: v1_entry.content,
+//     }
+// }
+
+// =============================================================================
+// Export Functions
+// =============================================================================
+
+/// Export schema version for compatibility checking
+#[hdk_extern]
+pub fn export_schema_version(_: ()) -> ExternResult<String> {
+    Ok(SCHEMA_VERSION.to_string())
+}
+
+/// Export all data for migration
+///
+/// This is called by the TypeScript orchestrator or v2's migration zome
+/// to get all data that needs to be migrated.
+#[hdk_extern]
+pub fn export_for_migration(_: ()) -> ExternResult<MigrationExport> {
+    let now = sys_time()?;
+
+    Ok(MigrationExport {
+        schema_version: SCHEMA_VERSION.to_string(),
+        exported_at: format!("{:?}", now),
+        // Add your exports:
+        // my_entries: export_all_my_entries()?,
+    })
+}
+
+// Add export functions for each entry type:
+//
+// fn export_all_my_entries() -> ExternResult<Vec<MyEntryOutput>> {
+//     let filter = ChainQueryFilter::new()
+//         .entry_type(UnitEntryTypes::MyEntry.try_into()?);
+//     let records = query(filter)?;
+//
+//     let entries = records
+//         .into_iter()
+//         .filter_map(|record| {
+//             let entry: MyEntry = record.entry().to_app_option().ok()??;
+//             Some(MyEntryOutput {
+//                 action_hash: record.action_address().clone(),
+//                 entry_hash: record.action().entry_hash()?.clone(),
+//                 entry,
+//             })
+//         })
+//         .collect();
+//
+//     Ok(entries)
+// }
+
+// =============================================================================
+// Import Functions (Ribosomes)
+// =============================================================================
+
+/// Import pre-exported data into current DNA
+///
+/// Called by the TypeScript orchestrator after exporting from v1.
+/// Handles idempotency (skips if entry already exists).
+#[hdk_extern]
+pub fn import_migrated(data: MigrationExport) -> ExternResult<MigrationReport> {
+    let mut report = MigrationReport::new(data.schema_version, SCHEMA_VERSION.to_string());
+
+    // Import each entry type:
+    //
+    // for entry_output in data.my_entries {
+    //     let entry = entry_output.entry;
+    //
+    //     // Check if exists (idempotency)
+    //     if get_my_entry_by_id(&entry.id)?.is_some() {
+    //         report.record_skip("MyEntry");
+    //         continue;
+    //     }
+    //
+    //     // Transform if needed
+    //     let transformed = transform_my_entry_v1_to_current(entry);
+    //
+    //     // Create entry
+    //     match create_my_entry(CreateMyEntryInput::from(transformed)) {
+    //         Ok(_) => report.record_success("MyEntry"),
+    //         Err(e) => report.record_failure("MyEntry", Some(entry.id), format!("{:?}", e)),
+    //     }
+    // }
+
+    report.complete();
+    Ok(report)
+}
+
+// =============================================================================
+// Verification
+// =============================================================================
+
+/// Expected counts for verification
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExpectedCounts {
+    // Add your entry types:
+    // pub my_entry_count: u32,
+}
+
+/// Verify migration completeness
+#[hdk_extern]
+pub fn verify_migration(expected: ExpectedCounts) -> ExternResult<MigrationVerification> {
+    let mut verification = MigrationVerification::default();
+    verification.passed = true;
+
+    // Add count checks for each entry type:
+    //
+    // let my_entry_count = get_my_entry_count()?;
+    // let check = CountCheck {
+    //     expected: expected.my_entry_count,
+    //     actual: my_entry_count,
+    //     passed: my_entry_count >= expected.my_entry_count,
+    // };
+    // if !check.passed {
+    //     verification.passed = false;
+    //     verification.notes.push(format!(
+    //         "MyEntry count mismatch: expected {}, got {}",
+    //         expected.my_entry_count, my_entry_count
+    //     ));
+    // }
+    // verification.count_checks.insert("MyEntry".to_string(), check);
+
+    // Check reference integrity (all links point to valid entries)
+    verification.reference_integrity = true; // Implement as needed
+
+    Ok(verification)
+}
+
+// =============================================================================
+// Bridge Call Helper (tRNA)
+// =============================================================================
+
+/// Call a function on another DNA role via bridge
+///
+/// Use this if you want to do migration entirely within the zome
+/// (alternative to TypeScript orchestration).
+#[allow(dead_code)]
+fn bridge_call<I, O>(role_name: &str, zome_name: &str, fn_name: &str, payload: I) -> ExternResult<O>
+where
+    I: Serialize + std::fmt::Debug,
+    O: serde::de::DeserializeOwned + std::fmt::Debug,
+{
+    let response = call(
+        CallTargetCell::OtherRole(role_name.to_string()),
+        ZomeName::from(zome_name),
+        FunctionName::from(fn_name),
+        None,
+        payload,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(result) => {
+            let output: O = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode bridge call response: {:?}",
+                    e
+                )))
+            })?;
+            Ok(output)
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized to call target DNA".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error in bridge call: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Countersigning error: {}",
+                err
+            ))))
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed".to_string()
+        ))),
+    }
+}

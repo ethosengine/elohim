@@ -1,458 +1,93 @@
 /* Global styles for elohim.host landing page */
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 :root {
-    /* Space theme colors - Dark Mode (Default) */
-    --space-black: #000000;
-    --atmosphere-dark: #0a0a0a;
-    --atmosphere-mid: #1a1a2e;
-    --atmosphere-light: #16213e;
-    --text-light: #F3F4F6;
+  /* Space theme colors - Dark Mode (Default) */
+  --space-black: #000000;
+  --atmosphere-dark: #0a0a0a;
+  --atmosphere-mid: #1a1a2e;
+  --atmosphere-light: #16213e;
+  --text-light: #f3f4f6;
 
-    /* Accent colors for interactive elements */
-    --primary: #6B46C1;
-    --secondary: #EC4899;
-    --accent: #10B981;
+  /* Accent colors for interactive elements */
+  --primary: #6b46c1;
+  --secondary: #ec4899;
+  --accent: #10b981;
 
-    /* Footer earthy theme colors */
-    --forest-dark: rgb(26, 35, 31);
-    --forest-light: rgb(36, 49, 41);
-    --leaf-light: rgb(201, 212, 197);
-    --tech-glow: rgb(127, 203, 238);
-    --tech-accent: rgba(127, 203, 238, 0.15);
-    --tech-bright: rgba(127, 203, 238, 0.8);
-    --earthy-orange: rgb(217, 124, 43);
-    --earthy-orange-light: rgba(217, 124, 43, 0.8);
+  /* Footer earthy theme colors */
+  --forest-dark: rgb(26, 35, 31);
+  --forest-light: rgb(36, 49, 41);
+  --leaf-light: rgb(201, 212, 197);
+  --tech-glow: rgb(127, 203, 238);
+  --tech-accent: rgba(127, 203, 238, 0.15);
+  --tech-bright: rgba(127, 203, 238, 0.8);
+  --earthy-orange: rgb(217, 124, 43);
+  --earthy-orange-light: rgba(217, 124, 43, 0.8);
 
-    /* Lamad Learning Platform - Clean Professional Theme (Dark Mode Default) */
-    --lamad-bg-primary: #0f172a;
-    --lamad-bg-secondary: #1e293b;
-    --lamad-bg-tertiary: #334155;
-    --lamad-surface: rgba(30, 41, 59, 0.8);
-    --lamad-surface-hover: rgba(51, 65, 85, 0.9);
+  /* Lamad Learning Platform - Clean Professional Theme (Dark Mode Default) */
+  --lamad-bg-primary: #0f172a;
+  --lamad-bg-secondary: #1e293b;
+  --lamad-bg-tertiary: #334155;
+  --lamad-surface: rgba(30, 41, 59, 0.8);
+  --lamad-surface-hover: rgba(51, 65, 85, 0.9);
 
-    --lamad-text-primary: #f1f5f9;
-    --lamad-text-secondary: #cbd5e1;
-    --lamad-text-tertiary: #94a3b8;
-    --lamad-text-muted: #64748b;
+  --lamad-text-primary: #f1f5f9;
+  --lamad-text-secondary: #cbd5e1;
+  --lamad-text-tertiary: #94a3b8;
+  --lamad-text-muted: #64748b;
 
-    --lamad-border: rgba(148, 163, 184, 0.2);
-    --lamad-border-hover: rgba(148, 163, 184, 0.4);
+  --lamad-border: rgba(148, 163, 184, 0.2);
+  --lamad-border-hover: rgba(148, 163, 184, 0.4);
 
-    --lamad-accent-primary: #6366f1;
-    --lamad-accent-secondary: #8b5cf6;
-    --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --lamad-accent-primary: #6366f1;
+  --lamad-accent-secondary: #8b5cf6;
+  --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
 
-    --lamad-success: #10b981;
-    --lamad-warning: #f59e0b;
-    --lamad-info: #3b82f6;
+  --lamad-success: #10b981;
+  --lamad-warning: #f59e0b;
+  --lamad-info: #3b82f6;
+
+  /* ============================================================================
+       Responsive Breakpoints
+       ============================================================================
+       Standard breakpoints for consistent responsive design across components.
+       Usage: @media (max-width: 768px) or use these values as reference.
+       ============================================================================ */
+  --bp-sm: 480px; /* Small mobile */
+  --bp-md: 768px; /* Tablet / Large mobile */
+  --bp-lg: 1024px; /* Desktop */
+  --bp-xl: 1280px; /* Large desktop */
 }
 
 /* Light Theme - Activates based on device preference */
 @media (prefers-color-scheme: light) {
-    :root {
-        /* Sky theme colors - Light Mode */
-        --space-black: #e3f2fd;
-        --atmosphere-dark: #bbdefb;
-        --atmosphere-mid: #90caf9;
-        --atmosphere-light: #64b5f6;
-        --text-light: #1a1a1a;
-
-        /* Accent colors for interactive elements - nature-inspired for beautiful day */
-        --primary: #1976d2;
-        --secondary: #f57c00;
-        --accent: #00897b;
-
-        /* Footer soft meadow theme colors - desaturated for beautiful day aesthetic */
-        --forest-dark: rgb(195, 205, 180);
-        --forest-light: rgb(235, 240, 225);
-        --leaf-light: rgb(40, 55, 30);
-        --tech-glow: rgb(15, 85, 150);
-        --tech-accent: rgba(15, 85, 150, 0.15);
-        --tech-bright: rgba(15, 85, 150, 0.95);
-        --earthy-orange: rgb(175, 85, 30);
-        --earthy-orange-light: rgba(175, 85, 30, 0.8);
-
-        /* Lamad Learning Platform - Clean Professional Theme (Light Mode) */
-        --lamad-bg-primary: #ffffff;
-        --lamad-bg-secondary: #f8fafc;
-        --lamad-bg-tertiary: #f1f5f9;
-        --lamad-surface: rgba(255, 255, 255, 0.95);
-        --lamad-surface-hover: rgba(248, 250, 252, 1);
-
-        --lamad-text-primary: #0f172a;
-        --lamad-text-secondary: #334155;
-        --lamad-text-tertiary: #475569;
-        --lamad-text-muted: #64748b;
-
-        --lamad-border: rgba(15, 23, 42, 0.15);
-        --lamad-border-hover: rgba(15, 23, 42, 0.3);
-
-        --lamad-accent-primary: #4f46e5;
-        --lamad-accent-secondary: #7c3aed;
-        --lamad-accent-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
-
-        --lamad-success: #059669;
-        --lamad-warning: #d97706;
-        --lamad-info: #2563eb;
-    }
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: 
-        radial-gradient(ellipse at 20% 30%, rgba(107, 70, 193, 0.15) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 70%, rgba(236, 72, 153, 0.12) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.1) 0%, transparent 60%),
-        linear-gradient(135deg, var(--atmosphere-dark) 0%, var(--atmosphere-mid) 50%, var(--atmosphere-light) 100%);
-    color: var(--text-light);
-    overflow-x: hidden;
-    cursor: default;
-}
-
-/* Global fixed starry sky background - appears bright on black, subtle on gradient */
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background:
-        radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.9), transparent),
-        radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
-        radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,1), transparent),
-        radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.7), transparent),
-        radial-gradient(2px 2px at 160px 30px, rgba(255,255,255,0.9), transparent),
-        radial-gradient(1px 1px at 200px 90px, rgba(255,255,255,0.8), transparent),
-        radial-gradient(2px 2px at 240px 50px, rgba(255,255,255,0.85), transparent),
-        radial-gradient(1px 1px at 280px 20px, rgba(255,255,255,0.9), transparent),
-        radial-gradient(1px 1px at 320px 100px, rgba(255,255,255,1), transparent),
-        radial-gradient(2px 2px at 360px 60px, rgba(255,255,255,0.75), transparent);
-    background-repeat: repeat;
-    background-size: 400px 200px;
-    animation: twinkle 8s linear infinite;
-    pointer-events: none;
-    z-index: -5;
-    mix-blend-mode: screen;
-}
-
-@keyframes twinkle {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 0.85; }
-}
-
-/* Light mode: Clear blue sky without clouds and softer atmospheric gradients */
-@media (prefers-color-scheme: light) {
-    body {
-        background:
-            radial-gradient(ellipse at 20% 30%, rgba(255, 250, 205, 0.3) 0%, transparent 50%),
-            radial-gradient(ellipse at 80% 70%, rgba(135, 206, 235, 0.2) 0%, transparent 50%),
-            radial-gradient(ellipse at 50% 100%, rgba(195, 205, 180, 0.25) 0%, transparent 60%),
-            linear-gradient(135deg, var(--atmosphere-dark) 0%, var(--atmosphere-mid) 50%, var(--atmosphere-light) 100%);
-    }
-
-    body::before {
-        /* Hide the stars overlay for a clean, clear blue sky */
-        display: none;
-    }
-}
-
-
-/* Smooth scrolling */
-html {
-    scroll-behavior: smooth;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--primary), var(--secondary));
-    border-radius: 4px;
-}
-
-/* Light mode scrollbar */
-@media (prefers-color-scheme: light) {
-    ::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.05);
-    }
-}
-
-/* Global float animation - used by hero component */
-@keyframes float {
-    0%, 100% { transform: translate3d(0, 0, 0); }
-    50% { transform: translate3d(0, -10px, 0); }
-}
-
-/* Bounce animation - used by hero component scroll indicator */
-@keyframes bounce {
-    0%, 100% { transform: translate3d(-50%, 0, 0); }
-    50% { transform: translate3d(-50%, 10px, 0); }
-}
-
-/* Section Styles */
-.section {
-    min-height: 100vh;
-    padding: 5rem 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-}
-
-.section-content {
-    max-width: 900px;
-    width: 100%;
-    opacity: 0;
-    transform: translateY(30px);
-    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-    will-change: transform, opacity;
-}
-
-.section-content.visible {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-}
-
-.section h2 {
-    font-size: clamp(2rem, 5vw, 3.5rem);
-    margin-bottom: 2rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.section p {
-    font-size: 1.2rem;
-    line-height: 1.8;
-    margin-bottom: 1.5rem;
-    opacity: 0.9;
-}
-
-
-/* Cards */
-.card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
-    margin: 3rem 0;
-}
-
-.card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 2rem;
-    transition: all 0.3s ease;
-    opacity: 0;
-    transform: translateY(20px);
-    will-change: transform, opacity;
-}
-
-.card.visible {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-}
-
-.card.visible:nth-child(1) { transition-delay: 0ms; }
-.card.visible:nth-child(2) { transition-delay: 100ms; }
-.card.visible:nth-child(3) { transition-delay: 200ms; }
-.card.visible:nth-child(4) { transition-delay: 300ms; }
-.card.visible:nth-child(5) { transition-delay: 400ms; }
-.card.visible:nth-child(6) { transition-delay: 500ms; }
-
-.card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translate3d(0, -5px, 0);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-}
-
-.card h3 {
-    color: var(--accent);
-    margin-bottom: 1rem;
-    font-size: 1.3rem;
-}
-
-/* Light mode card styles */
-@media (prefers-color-scheme: light) {
-    .card {
-        background: rgba(255, 255, 255, 0.85);
-        border: 1px solid rgba(0, 0, 0, 0.15);
-    }
-
-    .card:hover {
-        background: rgba(255, 255, 255, 0.95);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-    }
-}
-
-
-/* Quote */
-.quote {
-    font-size: 1.5rem;
-    font-style: italic;
-    text-align: center;
-    margin: 3rem 0;
-    padding: 2rem;
-    border-left: 4px solid var(--secondary);
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
-}
-
-.quote-author {
-    font-size: 1rem;
-    font-style: normal;
-    margin-top: 1rem;
-    opacity: 0.7;
-}
-
-/* Light mode quote styles */
-@media (prefers-color-scheme: light) {
-    .quote {
-        background: rgba(255, 255, 255, 0.65);
-        border-left-color: var(--secondary);
-    }
-}
-
-/* Vision Section */
-.vision-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin: 3rem 0;
-}
-
-.vision-item {
-    padding: 1.5rem;
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.1), rgba(236, 72, 153, 0.1));
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.3s ease;
-}
-
-.vision-item:hover {
-    transform: scale3d(1.05, 1.05, 1);
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
-}
-
-/* Light mode vision items */
-@media (prefers-color-scheme: light) {
-    .vision-item {
-        background: linear-gradient(135deg, rgba(135, 206, 235, 0.2), rgba(255, 250, 205, 0.2));
-        border: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .vision-item:hover {
-        background: linear-gradient(135deg, rgba(135, 206, 235, 0.35), rgba(255, 250, 205, 0.35));
-    }
-}
-
-/* CTA Section */
-.cta {
-    text-align: center;
-    padding: 5rem 2rem;
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
-    border-radius: 24px;
-    margin: 3rem 0;
-}
-
-.cta h3 {
-    font-size: 2.5rem;
-    margin-bottom: 2rem;
-}
-
-.cta-button {
-    display: inline-block;
-    padding: 1rem 3rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    text-decoration: none;
-    border-radius: 50px;
-    font-size: 1.2rem;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    box-shadow: 0 10px 30px rgba(107, 70, 193, 0.3);
-}
-
-.cta-button:hover {
-    transform: translate3d(0, -3px, 0);
-    box-shadow: 0 15px 40px rgba(107, 70, 193, 0.4);
-}
-
-/* Light mode CTA styles */
-@media (prefers-color-scheme: light) {
-    .cta {
-        background: linear-gradient(135deg, rgba(255, 250, 205, 0.4), rgba(195, 205, 180, 0.3));
-    }
-
-    .cta-button {
-        box-shadow: 0 10px 30px rgba(94, 53, 177, 0.3);
-    }
-
-    .cta-button:hover {
-        box-shadow: 0 15px 40px rgba(94, 53, 177, 0.4);
-    }
-}
-
-/* Footer */
-footer {
-    text-align: center;
-    padding: 3rem;
-}
-
-/* Mobile Responsiveness */
-@media (max-width: 768px) {
-    .hero h1 {
-        font-size: 2.5rem;
-    }
-
-    .hero p {
-        font-size: 1.2rem;
-    }
-
-    .section h2 {
-        font-size: 2rem;
-    }
-
-    .card-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Manual Theme Overrides - These take precedence over media queries */
-
-/* Light Theme Override - Applied when user manually selects light theme */
-body[data-theme="light"] {
+  :root {
+    /* Sky theme colors - Light Mode */
     --space-black: #e3f2fd;
     --atmosphere-dark: #bbdefb;
     --atmosphere-mid: #90caf9;
     --atmosphere-light: #64b5f6;
     --text-light: #1a1a1a;
-    --primary: #5e35b1;
-    --secondary: #d81b60;
+
+    /* Accent colors for interactive elements - nature-inspired for beautiful day */
+    --primary: #1976d2;
+    --secondary: #f57c00;
     --accent: #00897b;
-    --forest-dark: rgb(46, 125, 50);
-    --forest-light: rgb(102, 187, 106);
-    --leaf-light: rgb(27, 94, 32);
-    --tech-glow: rgb(1, 87, 155);
-    --tech-accent: rgba(1, 87, 155, 0.15);
-    --tech-bright: rgba(1, 87, 155, 0.9);
-    --earthy-orange: rgb(230, 81, 0);
-    --earthy-orange-light: rgba(230, 81, 0, 0.8);
+
+    /* Footer soft meadow theme colors - desaturated for beautiful day aesthetic */
+    --forest-dark: rgb(195, 205, 180);
+    --forest-light: rgb(235, 240, 225);
+    --leaf-light: rgb(40, 55, 30);
+    --tech-glow: rgb(15, 85, 150);
+    --tech-accent: rgba(15, 85, 150, 0.15);
+    --tech-bright: rgba(15, 85, 150, 0.95);
+    --earthy-orange: rgb(175, 85, 30);
+    --earthy-orange-light: rgba(175, 85, 30, 0.8);
 
     /* Lamad Learning Platform - Clean Professional Theme (Light Mode) */
     --lamad-bg-primary: #ffffff;
@@ -464,7 +99,7 @@ body[data-theme="light"] {
     --lamad-text-primary: #0f172a;
     --lamad-text-secondary: #334155;
     --lamad-text-tertiary: #475569;
-    --lamad-text-muted: #64748b;
+    --lamad-text-muted: #525252;
 
     --lamad-border: rgba(15, 23, 42, 0.15);
     --lamad-border-hover: rgba(15, 23, 42, 0.3);
@@ -476,136 +111,752 @@ body[data-theme="light"] {
     --lamad-success: #059669;
     --lamad-warning: #d97706;
     --lamad-info: #2563eb;
+  }
 }
 
-body[data-theme="light"]::before {
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background:
+    radial-gradient(ellipse at 20% 30%, rgba(107, 70, 193, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(236, 72, 153, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.1) 0%, transparent 60%),
+    linear-gradient(
+      135deg,
+      var(--atmosphere-dark) 0%,
+      var(--atmosphere-mid) 50%,
+      var(--atmosphere-light) 100%
+    );
+  color: var(--text-light);
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* Global fixed starry sky background - appears bright on black, subtle on gradient */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(2px 2px at 20px 30px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(2px 2px at 160px 30px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 200px 90px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(2px 2px at 240px 50px, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(1px 1px at 280px 20px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 320px 100px, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(2px 2px at 360px 60px, rgba(255, 255, 255, 0.75), transparent);
+  background-repeat: repeat;
+  background-size: 400px 200px;
+  animation: twinkle 8s linear infinite;
+  pointer-events: none;
+  z-index: -5;
+  mix-blend-mode: screen;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* Light mode: Clear blue sky without clouds and softer atmospheric gradients */
+@media (prefers-color-scheme: light) {
+  body {
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(255, 250, 205, 0.3) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(135, 206, 235, 0.2) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 100%, rgba(195, 205, 180, 0.25) 0%, transparent 60%),
+      linear-gradient(
+        135deg,
+        var(--atmosphere-dark) 0%,
+        var(--atmosphere-mid) 50%,
+        var(--atmosphere-light) 100%
+      );
+  }
+
+  body::before {
+    /* Hide the stars overlay for a clean, clear blue sky */
     display: none;
+  }
 }
 
-body[data-theme="light"] ::-webkit-scrollbar-track {
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ============================================================================
+   Accessibility: Focus Visibility
+   ============================================================================
+   Provides visible focus indicators for keyboard navigation while hiding
+   them for mouse users. This is critical for WCAG 2.1 compliance.
+   ============================================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--lamad-accent-primary, #6366f1);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ============================================================================
+   Accessibility: Skip Navigation Link
+   ============================================================================
+   Allows keyboard users to skip repetitive navigation and jump directly
+   to main content. Hidden until focused.
+   ============================================================================ */
+
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 10000;
+}
+
+.skip-link:focus {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  width: auto;
+  height: auto;
+  padding: 0.75rem 1.5rem;
+  background: var(--lamad-accent-primary, #6366f1);
+  color: white;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--primary), var(--secondary));
+  border-radius: 4px;
+}
+
+/* Light mode scrollbar */
+@media (prefers-color-scheme: light) {
+  ::-webkit-scrollbar-track {
     background: rgba(0, 0, 0, 0.05);
+  }
 }
 
-body[data-theme="light"] .card {
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+/* Global float animation - used by hero component */
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
 }
 
-body[data-theme="light"] .card:hover {
-    background: rgba(255, 255, 255, 0.9);
+/* Bounce animation - used by hero component scroll indicator */
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  50% {
+    transform: translate3d(-50%, 10px, 0);
+  }
+}
+
+/* Section Styles */
+.section {
+  min-height: 100vh;
+  padding: 5rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.section-content {
+  max-width: 900px;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(30px);
+  transition:
+    opacity 0.8s ease-out,
+    transform 0.8s ease-out;
+  will-change: transform, opacity;
+}
+
+.section-content.visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.section h2 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  margin-bottom: 2rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.section p {
+  font-size: 1.2rem;
+  line-height: 1.8;
+  margin-bottom: 1.5rem;
+  opacity: 0.9;
+}
+
+/* Cards */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin: 3rem 0;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: translateY(20px);
+  will-change: transform, opacity;
+}
+
+.card.visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.card.visible:nth-child(1) {
+  transition-delay: 0ms;
+}
+.card.visible:nth-child(2) {
+  transition-delay: 100ms;
+}
+.card.visible:nth-child(3) {
+  transition-delay: 200ms;
+}
+.card.visible:nth-child(4) {
+  transition-delay: 300ms;
+}
+.card.visible:nth-child(5) {
+  transition-delay: 400ms;
+}
+.card.visible:nth-child(6) {
+  transition-delay: 500ms;
+}
+
+.card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translate3d(0, -5px, 0);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.card h3 {
+  color: var(--accent);
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+/* Light mode card styles */
+@media (prefers-color-scheme: light) {
+  .card {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+  }
+
+  .card:hover {
+    background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  }
 }
 
-body[data-theme="light"] .quote {
-    background: rgba(255, 255, 255, 0.5);
+/* Quote */
+.quote {
+  font-size: 1.5rem;
+  font-style: italic;
+  text-align: center;
+  margin: 3rem 0;
+  padding: 2rem;
+  border-left: 4px solid var(--secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.quote-author {
+  font-size: 1rem;
+  font-style: normal;
+  margin-top: 1rem;
+  opacity: 0.7;
+}
+
+/* Light mode quote styles */
+@media (prefers-color-scheme: light) {
+  .quote {
+    background: rgba(255, 255, 255, 0.65);
     border-left-color: var(--secondary);
+  }
 }
 
-body[data-theme="light"] .vision-item {
-    background: linear-gradient(135deg, rgba(94, 53, 177, 0.15), rgba(216, 27, 96, 0.15));
+/* Vision Section */
+.vision-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 3rem 0;
+}
+
+.vision-item {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(107, 70, 193, 0.1), rgba(236, 72, 153, 0.1));
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.vision-item:hover {
+  transform: scale3d(1.05, 1.05, 1);
+  background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
+}
+
+/* Light mode vision items */
+@media (prefers-color-scheme: light) {
+  .vision-item {
+    background: linear-gradient(135deg, rgba(135, 206, 235, 0.2), rgba(255, 250, 205, 0.2));
     border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  .vision-item:hover {
+    background: linear-gradient(135deg, rgba(135, 206, 235, 0.35), rgba(255, 250, 205, 0.35));
+  }
 }
 
-body[data-theme="light"] .vision-item:hover {
-    background: linear-gradient(135deg, rgba(94, 53, 177, 0.25), rgba(216, 27, 96, 0.25));
+/* CTA Section */
+.cta {
+  text-align: center;
+  padding: 5rem 2rem;
+  background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
+  border-radius: 24px;
+  margin: 3rem 0;
 }
 
-body[data-theme="light"] .cta {
-    background: linear-gradient(135deg, rgba(94, 53, 177, 0.2), rgba(216, 27, 96, 0.2));
+.cta h3 {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
 }
 
-body[data-theme="light"] .cta-button {
+.cta-button {
+  display: inline-block;
+  padding: 1rem 3rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  text-decoration: none;
+  border-radius: 50px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 30px rgba(107, 70, 193, 0.3);
+}
+
+.cta-button:hover {
+  transform: translate3d(0, -3px, 0);
+  box-shadow: 0 15px 40px rgba(107, 70, 193, 0.4);
+}
+
+/* Light mode CTA styles */
+@media (prefers-color-scheme: light) {
+  .cta {
+    background: linear-gradient(135deg, rgba(255, 250, 205, 0.4), rgba(195, 205, 180, 0.3));
+  }
+
+  .cta-button {
     box-shadow: 0 10px 30px rgba(94, 53, 177, 0.3);
+  }
+
+  .cta-button:hover {
+    box-shadow: 0 15px 40px rgba(94, 53, 177, 0.4);
+  }
 }
 
-body[data-theme="light"] .cta-button:hover {
-    box-shadow: 0 15px 40px rgba(94, 53, 177, 0.4);
+/* Footer */
+footer {
+  text-align: center;
+  padding: 3rem;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .hero p {
+    font-size: 1.2rem;
+  }
+
+  .section h2 {
+    font-size: 2rem;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Manual Theme Overrides - These take precedence over media queries */
+
+/* Light Theme Override - Applied when user manually selects light theme */
+body[data-theme='light'] {
+  --space-black: #e3f2fd;
+  --atmosphere-dark: #bbdefb;
+  --atmosphere-mid: #90caf9;
+  --atmosphere-light: #64b5f6;
+  --text-light: #1a1a1a;
+  --primary: #5e35b1;
+  --secondary: #d81b60;
+  --accent: #00897b;
+  --forest-dark: rgb(46, 125, 50);
+  --forest-light: rgb(102, 187, 106);
+  --leaf-light: rgb(27, 94, 32);
+  --tech-glow: rgb(1, 87, 155);
+  --tech-accent: rgba(1, 87, 155, 0.15);
+  --tech-bright: rgba(1, 87, 155, 0.9);
+  --earthy-orange: rgb(230, 81, 0);
+  --earthy-orange-light: rgba(230, 81, 0, 0.8);
+
+  /* Lamad Learning Platform - Clean Professional Theme (Light Mode) */
+  --lamad-bg-primary: #ffffff;
+  --lamad-bg-secondary: #f8fafc;
+  --lamad-bg-tertiary: #f1f5f9;
+  --lamad-surface: rgba(255, 255, 255, 0.95);
+  --lamad-surface-hover: rgba(248, 250, 252, 1);
+
+  --lamad-text-primary: #0f172a;
+  --lamad-text-secondary: #334155;
+  --lamad-text-tertiary: #475569;
+  --lamad-text-muted: #525252;
+
+  --lamad-border: rgba(15, 23, 42, 0.15);
+  --lamad-border-hover: rgba(15, 23, 42, 0.3);
+
+  --lamad-accent-primary: #4f46e5;
+  --lamad-accent-secondary: #7c3aed;
+  --lamad-accent-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+  --lamad-success: #059669;
+  --lamad-warning: #d97706;
+  --lamad-info: #2563eb;
+}
+
+body[data-theme='light']::before {
+  display: none;
+}
+
+body[data-theme='light'] ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+body[data-theme='light'] .card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body[data-theme='light'] .card:hover {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+body[data-theme='light'] .quote {
+  background: rgba(255, 255, 255, 0.5);
+  border-left-color: var(--secondary);
+}
+
+body[data-theme='light'] .vision-item {
+  background: linear-gradient(135deg, rgba(94, 53, 177, 0.15), rgba(216, 27, 96, 0.15));
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body[data-theme='light'] .vision-item:hover {
+  background: linear-gradient(135deg, rgba(94, 53, 177, 0.25), rgba(216, 27, 96, 0.25));
+}
+
+body[data-theme='light'] .cta {
+  background: linear-gradient(135deg, rgba(94, 53, 177, 0.2), rgba(216, 27, 96, 0.2));
+}
+
+body[data-theme='light'] .cta-button {
+  box-shadow: 0 10px 30px rgba(94, 53, 177, 0.3);
+}
+
+body[data-theme='light'] .cta-button:hover {
+  box-shadow: 0 15px 40px rgba(94, 53, 177, 0.4);
 }
 
 /* Dark Theme Override - Applied when user manually selects dark theme */
 /* Dark is already the default, so we just need to ensure it stays dark */
-body[data-theme="dark"] {
-    --space-black: #000000;
-    --atmosphere-dark: #0a0a0a;
-    --atmosphere-mid: #1a1a2e;
-    --atmosphere-light: #16213e;
-    --text-light: #F3F4F6;
-    --primary: #6B46C1;
-    --secondary: #EC4899;
-    --accent: #10B981;
-    --forest-dark: rgb(26, 35, 31);
-    --forest-light: rgb(36, 49, 41);
-    --leaf-light: rgb(201, 212, 197);
-    --tech-glow: rgb(127, 203, 238);
-    --tech-accent: rgba(127, 203, 238, 0.15);
-    --tech-bright: rgba(127, 203, 238, 0.8);
-    --earthy-orange: rgb(217, 124, 43);
-    --earthy-orange-light: rgba(217, 124, 43, 0.8);
+body[data-theme='dark'] {
+  --space-black: #000000;
+  --atmosphere-dark: #0a0a0a;
+  --atmosphere-mid: #1a1a2e;
+  --atmosphere-light: #16213e;
+  --text-light: #f3f4f6;
+  --primary: #6b46c1;
+  --secondary: #ec4899;
+  --accent: #10b981;
+  --forest-dark: rgb(26, 35, 31);
+  --forest-light: rgb(36, 49, 41);
+  --leaf-light: rgb(201, 212, 197);
+  --tech-glow: rgb(127, 203, 238);
+  --tech-accent: rgba(127, 203, 238, 0.15);
+  --tech-bright: rgba(127, 203, 238, 0.8);
+  --earthy-orange: rgb(217, 124, 43);
+  --earthy-orange-light: rgba(217, 124, 43, 0.8);
 
-    /* Lamad Learning Platform - Clean Professional Theme (Dark Mode) */
-    --lamad-bg-primary: #0f172a;
-    --lamad-bg-secondary: #1e293b;
-    --lamad-bg-tertiary: #334155;
-    --lamad-surface: rgba(30, 41, 59, 0.8);
-    --lamad-surface-hover: rgba(51, 65, 85, 0.9);
+  /* Lamad Learning Platform - Clean Professional Theme (Dark Mode) */
+  --lamad-bg-primary: #0f172a;
+  --lamad-bg-secondary: #1e293b;
+  --lamad-bg-tertiary: #334155;
+  --lamad-surface: rgba(30, 41, 59, 0.8);
+  --lamad-surface-hover: rgba(51, 65, 85, 0.9);
 
-    --lamad-text-primary: #f1f5f9;
-    --lamad-text-secondary: #cbd5e1;
-    --lamad-text-tertiary: #94a3b8;
-    --lamad-text-muted: #64748b;
+  --lamad-text-primary: #f1f5f9;
+  --lamad-text-secondary: #cbd5e1;
+  --lamad-text-tertiary: #94a3b8;
+  --lamad-text-muted: #64748b;
 
-    --lamad-border: rgba(148, 163, 184, 0.2);
-    --lamad-border-hover: rgba(148, 163, 184, 0.4);
+  --lamad-border: rgba(148, 163, 184, 0.2);
+  --lamad-border-hover: rgba(148, 163, 184, 0.4);
 
-    --lamad-accent-primary: #6366f1;
-    --lamad-accent-secondary: #8b5cf6;
-    --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --lamad-accent-primary: #6366f1;
+  --lamad-accent-secondary: #8b5cf6;
+  --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
 
-    --lamad-success: #10b981;
-    --lamad-warning: #f59e0b;
-    --lamad-info: #3b82f6;
+  --lamad-success: #10b981;
+  --lamad-warning: #f59e0b;
+  --lamad-info: #3b82f6;
 }
 
-body[data-theme="dark"]::before {
-    display: block;
+body[data-theme='dark']::before {
+  display: block;
 }
 
-body[data-theme="dark"] ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+body[data-theme='dark'] ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-body[data-theme="dark"] .card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+body[data-theme='dark'] .card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-body[data-theme="dark"] .card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+body[data-theme='dark'] .card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
-body[data-theme="dark"] .quote {
-    background: rgba(255, 255, 255, 0.03);
-    border-left-color: var(--secondary);
+body[data-theme='dark'] .quote {
+  background: rgba(255, 255, 255, 0.03);
+  border-left-color: var(--secondary);
 }
 
-body[data-theme="dark"] .vision-item {
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.1), rgba(236, 72, 153, 0.1));
-    border: 1px solid rgba(255, 255, 255, 0.1);
+body[data-theme='dark'] .vision-item {
+  background: linear-gradient(135deg, rgba(107, 70, 193, 0.1), rgba(236, 72, 153, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-body[data-theme="dark"] .vision-item:hover {
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
+body[data-theme='dark'] .vision-item:hover {
+  background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
 }
 
-body[data-theme="dark"] .cta {
-    background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
+body[data-theme='dark'] .cta {
+  background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
 }
 
-body[data-theme="dark"] .cta-button {
-    box-shadow: 0 10px 30px rgba(107, 70, 193, 0.3);
+body[data-theme='dark'] .cta-button {
+  box-shadow: 0 10px 30px rgba(107, 70, 193, 0.3);
 }
 
-body[data-theme="dark"] .cta-button:hover {
-    box-shadow: 0 15px 40px rgba(107, 70, 193, 0.4);
+body[data-theme='dark'] .cta-button:hover {
+  box-shadow: 0 15px 40px rgba(107, 70, 193, 0.4);
 }
+
+/* ============================================================================
+   Accessibility Utilities
+   ============================================================================
+   Global utility classes for accessibility improvements.
+   ============================================================================ */
+
+/* Screen reader only - visually hidden but accessible to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================================================
+   Touch Target Utilities
+   ============================================================================
+   Global utility classes for ensuring touch-friendly tap targets.
+   iOS Human Interface Guidelines and WCAG 2.2 recommend minimum 44x44px.
+   ============================================================================ */
+
+/* Apply to buttons, links, and other tappable elements */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Larger touch target for primary actions */
+.touch-target-lg {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Inline touch targets (for link text that shouldn't be too wide) */
+.touch-target-inline {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* On touch devices, ensure interactive elements meet minimums */
+@media (pointer: coarse) {
+  /* Buttons should be touch-friendly */
+  button:not([class*='touch']),
+  [role='button']:not([class*='touch']) {
+    min-height: 44px;
+  }
+
+  /* Links in navigation or action areas */
+  nav a,
+  .nav-link,
+  .action-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ============================================================================
+   Table Scroll Wrapper Utility
+   ============================================================================
+   Use .table-scroll-wrapper around tables to enable horizontal scrolling
+   on mobile devices while maintaining readable table content.
+   ============================================================================ */
+
+.table-scroll-wrapper {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+.table-scroll-wrapper table {
+  margin-bottom: 0;
+}
+
+/* ============================================================================
+   Accessibility: Reduced Motion
+   ============================================================================
+   Respects user preference for reduced motion. Users who have enabled
+   "reduce motion" in their OS settings will see minimal or no animations.
+   This is critical for users with vestibular disorders or motion sensitivity.
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   Focused View Mode (Immersive Content Display)
+   ============================================================================
+   CSS-based fullscreen mode for distraction-free content viewing.
+   Activated via .focused-view-active class on container elements.
+   Uses fixed positioning to fill viewport while hiding app navigation.
+   ============================================================================ */
+
+.focused-view-container {
+  position: relative;
+}
+
+.focused-view-active {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 1000;
+  background: var(--lamad-bg-primary, #ffffff);
+  overflow: auto;
+  transition: all 0.3s ease;
+}
+
+/* Lock body scroll when focused view is active */
+body.focused-view-mode {
+  overflow: hidden;
+}
+
+/* Hide app navigation elements in focused view */
+body.focused-view-mode .elohim-navigator,
+body.focused-view-mode .app-navigation,
+body.focused-view-mode .lamad-nav,
+body.focused-view-mode app-header,
+body.focused-view-mode .site-header {
+  display: none !important;
+}
+
+/* ============================================================================
+   Sophia Quiz Theme Support
+   ============================================================================
+   Sophia (assessment) theme overrides are loaded lazily by the
+   sophia-element-loader.ts when the first quiz is rendered.
+   This reduces initial page load and keeps quiz-specific styles
+   in one maintainable location.
+
+   Theme overrides include:
+   - Dark mode text/background colors
+   - Wonder Blocks CSS variable mappings
+   - Multiple choice button fixes
+   - Aphrodite (CSS-in-JS) overrides
+   ============================================================================ */

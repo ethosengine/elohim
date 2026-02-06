@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Nix
+result
+.direnv/
+
+# UI build (populated by CI)
+ui/*
+!ui/.gitkeep
+
+# hApp bundle (populated by CI)
+workdir/*.happ
+workdir/*.dna
+!workdir/.gitkeep
+!workdir/happ.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

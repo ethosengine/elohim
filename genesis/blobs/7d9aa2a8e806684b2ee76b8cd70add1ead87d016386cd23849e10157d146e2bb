@@ -1,0 +1,11 @@
+Scenario: Disability community mutual aid networks coordinate support
+    Given disabled people practice mutual aid extensively
+    And peer support networks are essential for survival and flourishing
+    When the community_elohim tracks disability community care flows
+    Then mutual aid within disability community should be highly valued
+    And Alex's participation in peer networks should accumulate tokens
+    And care should be recognized as flowing in multiple directions
+    And disability mutual aid should be seen as care economy infrastructure
+    And the protocol should honor interdependence as community practice
+    And peer support should be valued as essential care work
+    And disabled people's care for each other should be made visible

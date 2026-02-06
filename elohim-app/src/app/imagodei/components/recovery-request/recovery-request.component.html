@@ -1,0 +1,269 @@
+<div class="recovery-container">
+  <div class="recovery-card">
+    <!-- Header -->
+    <div class="recovery-header">
+      <span class="material-icons header-icon">security</span>
+      <h1>Identity Recovery</h1>
+      <p class="subtitle">Recover your identity through the Elohim network</p>
+    </div>
+
+    <!-- No Doorway Selected -->
+    @if (!hasDoorway()) {
+      <div class="doorway-notice">
+        <span class="material-icons">info</span>
+        <div class="notice-content">
+          <strong>Select a Doorway First</strong>
+          <p>You need to select a doorway to initiate recovery.</p>
+          <button type="button" class="btn btn-primary" (click)="selectDoorway()">
+            Select Doorway
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Error Display -->
+    @if (error()) {
+      <div class="error-banner" role="alert">
+        <span class="material-icons">error_outline</span>
+        <span>{{ error() }}</span>
+        <button type="button" class="dismiss-btn" (click)="clearError()">Dismiss</button>
+      </div>
+    }
+
+    <!-- Step 1: Claim Identity -->
+    @if (currentStep() === 'claim' && hasDoorway()) {
+      <div class="step-content">
+        <div class="step-indicator">
+          <div class="step active">1</div>
+          <div class="step-line"></div>
+          <div class="step">2</div>
+          <div class="step-line"></div>
+          <div class="step">3</div>
+        </div>
+
+        <h2>Claim Your Identity</h2>
+        <p class="step-description">
+          Enter your known identifier or display name. Elohim network members will interview you to
+          verify your identity.
+        </p>
+
+        <form class="claim-form" (ngSubmit)="initiateRecovery()">
+          <div class="form-group">
+            <label for="identity">Your Identifier or Display Name</label>
+            <input
+              id="identity"
+              type="text"
+              [(ngModel)]="claimedIdentity"
+              name="identity"
+              placeholder="e.g., your@email.com or Your Name"
+              required
+              [disabled]="isLoading()"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="context">Additional Context (Optional)</label>
+            <textarea
+              id="context"
+              [(ngModel)]="additionalContext"
+              name="context"
+              placeholder="Any details that might help interviewers verify your identity..."
+              rows="3"
+              [disabled]="isLoading()"
+            ></textarea>
+          </div>
+
+          <div class="info-box">
+            <span class="material-icons">info</span>
+            <p>
+              Recovery requires attestations from network members. They will ask questions about
+              your activity history to verify you are who you claim.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            class="btn btn-primary full-width"
+            [disabled]="isLoading() || !claimedIdentity.trim()"
+          >
+            @if (isLoading()) {
+              <span class="spinner"></span>
+              Initiating...
+            } @else {
+              Request Recovery
+            }
+          </button>
+        </form>
+      </div>
+    }
+
+    <!-- Step 2: Awaiting Attestations -->
+    @if (currentStep() === 'awaiting') {
+      <div class="step-content">
+        <div class="step-indicator">
+          <div class="step completed">
+            <span class="material-icons">check</span>
+          </div>
+          <div class="step-line active"></div>
+          <div class="step active">2</div>
+          <div class="step-line"></div>
+          <div class="step">3</div>
+        </div>
+
+        <h2>Awaiting Verification</h2>
+        <p class="step-description">
+          Your recovery request is being reviewed by Elohim network members. They will conduct
+          interviews to verify your identity.
+        </p>
+
+        <!-- Progress -->
+        <div class="progress-section">
+          <div class="progress-header">
+            <span>Attestation Progress</span>
+            <span class="progress-text">{{ getAttestationText() }}</span>
+          </div>
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              [class.denied]="isDenied()"
+              [style.width.%]="getProgressPercentage()"
+            ></div>
+          </div>
+
+          @if (isDenied()) {
+            <div class="denied-notice">
+              <span class="material-icons">warning</span>
+              <p>Your recovery request was denied. You may try again with different context.</p>
+            </div>
+          }
+        </div>
+
+        <!-- Status -->
+        @if (activeRequest(); as request) {
+          <div class="status-section">
+            <div class="status-row">
+              <span class="status-label">Status</span>
+              <span
+                class="status-value"
+                [style.color]="getRecoveryStatusDisplay(request.status).color"
+              >
+                <span class="material-icons">
+                  {{ getRecoveryStatusDisplay(request.status).icon }}
+                </span>
+                {{ getRecoveryStatusDisplay(request.status).label }}
+              </span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Created</span>
+              <span class="status-value">{{ request.createdAt | date: 'medium' }}</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">Expires</span>
+              <span class="status-value">{{ request.expiresAt | date: 'medium' }}</span>
+            </div>
+          </div>
+
+          <!-- Attestations -->
+          @if (request.attestations.length > 0) {
+            <div class="attestations-section">
+              <h3>Attestations Received</h3>
+              <div class="attestations-list">
+                @for (att of request.attestations; track att.id) {
+                  <div class="attestation-item" [ngClass]="att.decision">
+                    <span class="material-icons">
+                      {{
+                        att.decision === 'affirm'
+                          ? 'check_circle'
+                          : att.decision === 'deny'
+                            ? 'cancel'
+                            : 'remove_circle'
+                      }}
+                    </span>
+                    <div class="attestation-info">
+                      <span class="attester-name">{{ att.attesterDisplayName }}</span>
+                      <span class="attestation-time">{{ att.timestamp | date: 'short' }}</span>
+                    </div>
+                    <span class="confidence">{{ att.confidence }}% confidence</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+
+        <div class="action-buttons">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="cancelRecovery()"
+            [disabled]="isLoading()"
+          >
+            Cancel Request
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Step 3: Complete Recovery -->
+    @if (currentStep() === 'complete') {
+      <div class="step-content">
+        <div class="step-indicator">
+          <div class="step completed">
+            <span class="material-icons">check</span>
+          </div>
+          <div class="step-line completed"></div>
+          <div class="step completed">
+            <span class="material-icons">check</span>
+          </div>
+          <div class="step-line completed"></div>
+          <div class="step active">3</div>
+        </div>
+
+        <div class="success-icon">
+          <span class="material-icons">verified</span>
+        </div>
+
+        <h2>Recovery Approved</h2>
+        <p class="step-description">
+          The Elohim network has verified your identity. You can now complete the recovery process
+          to restore access.
+        </p>
+
+        @if (credential(); as cred) {
+          <div class="credential-info">
+            <div class="info-row">
+              <span class="info-label">Recovery ID</span>
+              <span class="info-value">{{ cred.id }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Valid Until</span>
+              <span class="info-value">{{ cred.expiresAt | date: 'medium' }}</span>
+            </div>
+          </div>
+        }
+
+        <button
+          type="button"
+          class="btn btn-primary full-width"
+          (click)="completeRecovery()"
+          [disabled]="isLoading()"
+        >
+          @if (isLoading()) {
+            <span class="spinner"></span>
+            Completing...
+          } @else {
+            Complete Recovery
+          }
+        </button>
+      </div>
+    }
+
+    <!-- Footer -->
+    <div class="recovery-footer">
+      <p>
+        Need help?
+        <a href="/support" class="help-link">Contact Support</a>
+      </p>
+    </div>
+  </div>
+</div>

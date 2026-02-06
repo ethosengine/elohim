@@ -1,0 +1,11 @@
+Scenario: Analyzing technical expert influence on council decisions
+    Given councils rely on experts like Dr. Okonkwo for technical understanding
+    And I question whether experts dominate rather than inform
+    When I analyze correlation between expert testimony and council decisions
+    Then I examine: how often councils follow expert recommendations
+    And I identify: cases where councils override expert advice
+    And I assess: whether expert testimony quality predicts council confidence
+    And I explore: whether some experts influence more than others
+    And I investigate: warning signs of expert capture vs healthy advice
+    And My research reveals: whether technical-democratic balance is working
+    And Findings inform: expert testimony guidelines and council training

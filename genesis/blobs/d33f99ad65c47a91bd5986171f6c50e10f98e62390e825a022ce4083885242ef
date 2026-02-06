@@ -1,0 +1,9 @@
+Scenario: No mandatory overtime that conflicts with solo parenting obligations
+    Given Maria must be available for her children's pickup, dinner, homework, bedtime
+    And she has no partner to cover evening parenting when she works late
+    When workplace demands overtime or schedule extensions
+    Then the workplace_elohim should flag conflicts with parenting obligations
+    And Maria should be able to refuse overtime without retaliation
+    And employers should understand single parents have non-negotiable care obligations
+    And work demands should not force choice between job and children's basic needs
+    And Maria should maintain employment boundaries necessary for parenting

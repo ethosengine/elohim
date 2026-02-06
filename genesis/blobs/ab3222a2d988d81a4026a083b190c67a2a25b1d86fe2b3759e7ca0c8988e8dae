@@ -1,0 +1,8 @@
+Scenario: Citizen identifies environmental justice patterns
+    Given the citizen is concerned about neighborhood air quality
+    When the Observer analyzes pollution and green space distribution
+    Then the citizen sees industrial permits cluster in low-income areas
+    And parks and trees concentrate in wealthy neighborhoods
+    And environmental burden patterns become undeniable
+    And can advocate for equitable environmental policy
+    And environmental racism becomes visible and challengeable

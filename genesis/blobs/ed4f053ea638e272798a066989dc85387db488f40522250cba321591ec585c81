@@ -1,0 +1,11 @@
+Scenario: Intergenerational neighborhood connections maintain elder standing
+    Given Helen interacts with neighbors of all ages
+    And longtime residents have neighborhood wisdom
+    When neighborhood governance decisions are made
+    Then Helen's voice should carry weight as longtime resident
+    And her knowledge of neighborhood history should inform decisions
+    And younger neighbors should be connected to Helen for wisdom
+    And intergenerational relationships should be facilitated
+    And the neighborhood_elohim should surface opportunities for elder mentoring
+    And Helen should experience continued relevance in neighborhood life
+    And the protocol should maintain elder standing in community

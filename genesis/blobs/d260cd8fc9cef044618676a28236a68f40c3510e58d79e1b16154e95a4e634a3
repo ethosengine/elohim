@@ -1,0 +1,9 @@
+Scenario: Crisis coordination across municipal infrastructure
+    Given opioid overdose cluster occurs in downtown
+    When Municipal Elohim detects crisis pattern
+    Then agent coordinates emergency services, health services, and social support
+    And agent identifies who needs help across multiple systems
+    And agent enables rapid mutual aid mobilization
+    And Jamal maintains human judgment for crisis decisions
+    And agents inform while humans decide under uncertainty
+    And coordinated response saves lives

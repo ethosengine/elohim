@@ -1,5 +1,7 @@
 import { ContentNode } from '../models/content-node.model';
 
+// @coverage: 97.8% (2026-02-05)
+
 /**
  * Gherkin step (Given/When/Then/And/But)
  */
@@ -64,7 +66,11 @@ export class GherkinParser {
     const lines = content.split('\n');
     const parseContext = { currentLine: 0 };
 
-    const { tags, featureTitle, descriptionLines } = this.parseFeatureHeader(lines, parseContext, sourcePath);
+    const { tags, featureTitle, descriptionLines } = this.parseFeatureHeader(
+      lines,
+      parseContext,
+      sourcePath
+    );
     const featureId = this.generateId(sourcePath, 'feature');
     const background = this.parseBackground(lines, parseContext);
     const scenarios = this.parseScenarios(lines, parseContext, sourcePath, featureId, tags);
@@ -86,7 +92,7 @@ export class GherkinParser {
       scenarioIds: scenarios.map(s => s.id),
       featureDescription: descriptionLines.join('\n'),
       background,
-      gherkinContent: content
+      gherkinContent: content,
     };
 
     return { feature, scenarios };
@@ -100,6 +106,7 @@ export class GherkinParser {
     const tags = this.extractTags(lines[parseContext.currentLine]);
     if (tags.length > 0) parseContext.currentLine++;
 
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     const featureMatch = /^Feature:\s*(.+)$/.exec(lines[parseContext.currentLine] ?? '');
     if (!featureMatch) {
       throw new Error(`Invalid feature file: ${sourcePath}`);
@@ -152,7 +159,13 @@ export class GherkinParser {
     const scenarios: ScenarioNode[] = [];
 
     while (parseContext.currentLine < lines.length) {
-      const scenario = this.parseSingleScenario(lines, parseContext, sourcePath, featureId, featureTags);
+      const scenario = this.parseSingleScenario(
+        lines,
+        parseContext,
+        sourcePath,
+        featureId,
+        featureTags
+      );
       if (scenario) {
         scenarios.push(scenario);
       }
@@ -171,7 +184,10 @@ export class GherkinParser {
     const scenarioTags = this.extractTags(lines[parseContext.currentLine]);
     if (scenarioTags.length > 0) parseContext.currentLine++;
 
-    const scenarioMatch = /^\s*(Scenario|Scenario Outline):\s*(.+)$/.exec(lines[parseContext.currentLine] ?? '');
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
+    const scenarioMatch = /^\s*(Scenario|Scenario Outline):\s*(.+)$/.exec(
+      lines[parseContext.currentLine] ?? ''
+    );
     if (!scenarioMatch) {
       parseContext.currentLine++;
       return null;
@@ -202,7 +218,7 @@ export class GherkinParser {
       epicIds,
       scenarioType,
       steps,
-      examples
+      examples,
     };
   }
 
@@ -227,31 +243,38 @@ export class GherkinParser {
     parseContext: { currentLine: number },
     scenarioType: string
   ): ScenarioExamples[] | undefined {
-    if (scenarioType !== 'scenario_outline' || !/^\s*Examples:/.exec(lines[parseContext.currentLine] ?? '')) {
+    if (
+      scenarioType !== 'scenario_outline' ||
+      !/^\s*Examples:/.exec(lines[parseContext.currentLine] ?? '')
+    ) {
       return undefined;
     }
 
     const examples = this.parseExamples(lines, parseContext.currentLine);
-    while (parseContext.currentLine < lines.length && !/^\s*(Scenario|@)/.exec(lines[parseContext.currentLine])) {
+    while (
+      parseContext.currentLine < lines.length &&
+      !/^\s*(Scenario|@)/.exec(lines[parseContext.currentLine])
+    ) {
       parseContext.currentLine++;
     }
     return examples;
   }
 
   private static parseStep(line: string): GherkinStep | null {
+    // eslint-disable-next-line sonarjs/slow-regex -- Safe: parsing structured Gherkin content
     const stepMatch = /^\s*(Given|When|Then|And|But)\s+(.+)$/.exec(line);
     if (!stepMatch) return null;
 
     return {
       keyword: stepMatch[1],
-      text: stepMatch[2].trim()
+      text: stepMatch[2].trim(),
     };
   }
 
   private static parseExamples(lines: string[], startLine: number): ScenarioExamples[] {
     const examples: ScenarioExamples = {
       headers: [],
-      rows: []
+      rows: [],
     };
 
     let currentLine = startLine + 1;
@@ -276,7 +299,7 @@ export class GherkinParser {
   }
 
   private static extractTags(line: string): string[] {
-    const tagMatch = /^\s*(@[\w-]+(?:\s+@[\w-]+)*)/.exec(line ?? '');
+    const tagMatch = /^\s*(@[\w:-]+(?:\s+@[\w:-]+)*)/.exec(line ?? '');
     if (!tagMatch) return [];
 
     return tagMatch[1]
@@ -286,9 +309,7 @@ export class GherkinParser {
   }
 
   private static extractEpicIds(tags: string[]): string[] {
-    return tags
-      .filter(tag => tag.startsWith('epic:'))
-      .map(tag => tag.substring(5));
+    return tags.filter(tag => tag.startsWith('epic:')).map(tag => tag.substring(5));
   }
 
   private static generateId(sourcePath: string, type: string, title?: string): string {
@@ -301,8 +322,8 @@ export class GherkinParser {
     if (title) {
       const titlePart = title
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/(^_)|(_$)/g, '');
+        .replaceAll(/[^a-z0-9]+/g, '_')
+        .replaceAll(/(^_)|(_$)/g, '');
       return `${type}_${pathPart}_${titlePart}`;
     }
 

@@ -1,0 +1,10 @@
+Scenario: Seasonal eating aligned with bioregional food production
+    Given seasonal local food is often more affordable
+    And Marcus needs to maximize his limited budget
+    When Marcus plans meals
+    Then the personal_agent should highlight seasonal options
+    And it should explain what grows locally in current season
+    And it should help him choose foods aligned with bioregional production
+    And economic and ecological goals should align
+    And he should learn that eating seasonally reduces costs and environmental impact
+    And bioregional awareness should develop through practical benefit

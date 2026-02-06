@@ -1,0 +1,10 @@
+Scenario: Connecting with IDD peers for mutual support
+    Given Jordan wants to meet other IDD community members
+    And peer connection is essential for Jordan's wellbeing
+    When Jordan uses the peer connection feature
+    Then the interface shows nearby IDD peers with similar interests
+    And profiles use accessible format (pictures, simple descriptions)
+    And Jordan can express interest in connecting
+    And the community_elohim facilitates introductions with support
+    And Jordan builds friendships with people who truly understand
+    And Jordan experiences IDD community belonging and pride

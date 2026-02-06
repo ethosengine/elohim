@@ -1,0 +1,10 @@
+Scenario: Peer collaboration framed as care economy practice
+    Given Jasmine collaborates with classmates on group projects
+    And peer learning is valuable educational practice
+    When educational_elohim tracks collaborative learning
+    Then it should frame peer collaboration as care economy
+    And recognize that students teaching each other is care work
+    And value collaborative learning as mutual care
+    And help students understand that knowledge sharing creates collective value
+    And build expectation that learning is community practice, not individual competition
+    And demonstrate care economy principles in educational contexts

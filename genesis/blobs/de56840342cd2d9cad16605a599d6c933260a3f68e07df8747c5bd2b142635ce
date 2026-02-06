@@ -1,0 +1,11 @@
+Scenario: Appeal escalation path when community review insufficient
+    Given Community Elohim review upheld the original decision
+    And I remain convinced my constitutional rights were violated
+    When I choose to escalate beyond community layer
+    Then I can request peer agent review (three Family Elohim from other families)
+    And If still unsatisfied, I can escalate to Regional Constitutional Council
+    And Each layer brings fresh perspective and greater scrutiny
+    And The escalation path is accessible without legal expertise
+    And Timelines are maintained (peer review within 1 week, regional within 1 month)
+    And Higher layers don't just rubber-stamp lower decisions
+    And Genuine independent review happens at each escalation level

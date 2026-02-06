@@ -1,0 +1,12 @@
+Scenario: Parent care coordinated equitably with siblings
+    Given Robert's parents require increasing care support
+    And Robert has two siblings: Sarah and Michael
+    And care coordination across siblings is often fraught
+    When family_elohim coordinates sibling care contributions
+    Then it should track each sibling's care contributions
+    And make contributions visible to all siblings
+    And surface when distribution becomes inequitable
+    And facilitate discussion: "Robert has handled 65% of medical coordination this quarter"
+    And help siblings negotiate fair distribution based on capacity
+    And prevent resentment from invisible labor imbalances
+    And support siblings in maintaining relationships while coordinating care

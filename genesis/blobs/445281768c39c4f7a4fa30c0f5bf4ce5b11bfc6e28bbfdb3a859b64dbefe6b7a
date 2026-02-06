@@ -1,0 +1,9 @@
+Scenario: Community medical equipment lending supported by care economy
+    Given David needs increasing assistive equipment as disease progresses
+    And purchasing equipment is financially impossible
+    When James needs medical equipment
+    Then the community_elohim should connect to equipment lending libraries
+    And his care contributions should give standing to access equipment
+    And borrowing should be dignified and based on care economy
+    And community should pool medical resources for caregiver access
+    And equipment access should reduce financial burden

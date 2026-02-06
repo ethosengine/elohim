@@ -1,0 +1,10 @@
+Scenario: Family care during crisis and exceptional needs
+    Given family members sometimes have crisis needs
+    And Sarah might need to care for sick parent or struggling sibling
+    When family crisis occurs
+    Then the family_elohim should coordinate emergency care response
+    And it should show who has capacity to help
+    And it should recognize crisis care as extraordinary contribution
+    And temporary intensive care should be specially valued
+    And the system should enable family mutual aid during crisis
+    And care economy should support family resilience

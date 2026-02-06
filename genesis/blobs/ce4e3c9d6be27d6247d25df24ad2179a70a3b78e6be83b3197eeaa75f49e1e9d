@@ -1,0 +1,12 @@
+Scenario: Accessing crisis resources without losing dignity
+    Given I need immediate assistance with food and housing
+    And I am worried about stigma and degradation
+    When I access support through the care economy network
+    Then resources are provided based on my care contributions, not means-testing
+    And I am treated as a community member deserving support
+    And there is no requirement to prove I'm "needy enough"
+    And I don't have to expose private trauma to gatekeepers
+    And assistance is framed as reciprocal care, not charity
+    And the system recognizes my parenting labor as valuable contribution
+    And my dignity is preserved throughout the support process
+    And I maintain my standing as a person, not a "case"

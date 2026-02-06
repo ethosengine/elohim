@@ -1,0 +1,12 @@
+Scenario: Professional networks include care economy perspective
+    Given Robert participates in professional networks and associations
+    And professional networks often ignore care economy
+    And his networks could advance care economy professionally
+    When workplace_elohim supports professional network engagement
+    Then it should help Robert bring care economy perspective to professional networks
+    And support him in advocating within professional associations
+    And help him connect with other care economy professionals
+    And build professional networks that normalize care economy principles
+    And advance care economy through professional channels
+    And demonstrate that all professions can adopt care economy lens
+    And spread care economy principles through professional influence

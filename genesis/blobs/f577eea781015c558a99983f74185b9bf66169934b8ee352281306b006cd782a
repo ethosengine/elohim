@@ -1,0 +1,12 @@
+Scenario: Privacy controls for managing sensitive cross-generational information
+    Given Robert manages his parents' sensitive health and financial data
+    And he coordinates care with his siblings
+    And he supports his adult children while respecting their privacy
+    When Robert configures privacy settings
+    Then he should have granular control over information flows
+    And his parents' health data should be protected
+    And his children's information should remain private
+    And family care coordination should share only relevant data
+    And his workplace should not access family health information
+    And community governance should see his care contributions without sensitive details
+    And privacy boundaries should protect all parties' dignity

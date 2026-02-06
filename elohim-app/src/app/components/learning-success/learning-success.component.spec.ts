@@ -8,9 +8,8 @@ describe('LearningSuccessComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [LearningSuccessComponent]
-    })
-    .compileComponents();
+      imports: [LearningSuccessComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(LearningSuccessComponent);
     component = fixture.componentInstance;
@@ -42,7 +41,7 @@ describe('LearningSuccessComponent', () => {
     const cardHeadings = compiled.querySelectorAll('.card h3');
     expect(cardHeadings.length).toBe(4);
 
-    const headingTexts = Array.from(cardHeadings).map((h: any) => h.textContent);
+    const headingTexts = Array.from(cardHeadings).map(h => (h as HTMLElement).textContent);
     expect(headingTexts).toContain('The Scandinavian Insight');
     expect(headingTexts).toContain('Indigenous Wisdom');
     expect(headingTexts).toContain('Intergenerational Thinking');

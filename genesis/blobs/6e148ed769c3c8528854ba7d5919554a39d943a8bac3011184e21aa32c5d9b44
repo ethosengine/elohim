@@ -1,0 +1,11 @@
+Scenario: Municipal Elohim provides cross-neighborhood insights
+    Given different neighborhoods have distinct challenges
+    And patterns aren't visible at single-neighborhood scale
+    When Municipal Elohim synthesizes cross-neighborhood data
+    Then I see: resource flows between neighborhoods
+    And I identify: opportunities for coordination
+    And I notice: problems emerging in multiple areas
+    And I recognize: how neighborhoods affect each other
+    And I use: this information for city council decisions
+    And I maintain: human judgment over agent information
+    And agent enhances: my understanding without replacing leadership

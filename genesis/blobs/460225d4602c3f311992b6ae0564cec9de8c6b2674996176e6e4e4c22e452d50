@@ -1,0 +1,11 @@
+Scenario: Right to disconnect maintained despite complex commitments
+    Given Robert has extensive care economy commitments
+    And many people depend on his coordination
+    And constitutional constraints protect his agency
+    When Robert chooses to disconnect from the system
+    Then the disconnection must be honored immediately
+    And no manipulative patterns to retain usage should be employed
+    And his care contributions should be exportable in standard format
+    And alternative coordination support should be surfaced for those who depend on him
+    And his right to not participate must be respected
+    And he should maintain full control over his participation

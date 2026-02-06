@@ -1,0 +1,10 @@
+Scenario: Parent expertise in child development informs school practices
+    Given Sarah has professional teaching expertise
+    And she knows her children's developmental needs intimately
+    When Sarah engages with children's schools
+    Then her expertise should be recognized and valued
+    And teachers should consult Sarah's knowledge of Tommy and Emma
+    And parent-teacher relationships should be expert collaboration
+    And Sarah's observations should inform educational planning
+    And the system should position parents as expert partners
+    And parent knowledge should shape school practices

@@ -169,7 +169,7 @@ export interface DomainKnowledgeMap extends KnowledgeMap {
 
   subject: {
     type: 'content-graph';
-    subjectId: string;  // ID of the root content node or graph
+    subjectId: string; // ID of the root content node or graph
     subjectName: string;
   };
 
@@ -185,8 +185,7 @@ export interface DomainKnowledgeMap extends KnowledgeMap {
 
 // MasteryLevel is imported from agent.model.ts to avoid duplication
 // Re-export for convenience within this file
-import type { MasteryLevel } from './agent.model';
-export type { MasteryLevel };
+import type { MasteryLevel } from '@app/elohim/models/agent.model';
 
 export interface DomainGoal {
   id: string;
@@ -224,7 +223,7 @@ export interface SelfKnowledgeMap extends KnowledgeMap {
 
   subject: {
     type: 'agent';
-    subjectId: string;  // Same as ownerId - maps self
+    subjectId: string; // Same as ownerId - maps self
     subjectName: string;
   };
 
@@ -274,7 +273,7 @@ export interface ImagoDeiDimension {
   title: string;
   description: string;
   insights: SelfInsight[];
-  affinity: number;  // How well do I know this dimension?
+  affinity: number; // How well do I know this dimension?
   lastExplored: string;
 }
 
@@ -287,14 +286,14 @@ export interface SelfInsight {
 }
 
 export type InsightSource =
-  | 'reflection'           // Direct self-examination
-  | 'learning-path'        // Emerged from domain learning
-  | 'relationship'         // Revealed in relationship with others
-  | 'trial'                // Discovered through difficulty
-  | 'celebration'          // Revealed in joy/success
-  | 'feedback'             // Others' perspective
-  | 'spiritual'            // Prayer, meditation, worship
-  | 'assessment';          // Psychometrically validated instrument
+  | 'reflection' // Direct self-examination
+  | 'learning-path' // Emerged from domain learning
+  | 'relationship' // Revealed in relationship with others
+  | 'trial' // Discovered through difficulty
+  | 'celebration' // Revealed in joy/success
+  | 'feedback' // Others' perspective
+  | 'spiritual' // Prayer, meditation, worship
+  | 'assessment'; // Psychometrically validated instrument
 
 /**
  * PersonalValue - Core values in priority order.
@@ -303,9 +302,9 @@ export interface PersonalValue {
   id: string;
   name: string;
   description: string;
-  rank: number;  // Priority order (1 = highest)
-  evidencedBy: string[];  // Life examples where this value appeared
-  inTensionWith?: string[];  // Other values that create tension
+  rank: number; // Priority order (1 = highest)
+  evidencedBy: string[]; // Life examples where this value appeared
+  inTensionWith?: string[]; // Other values that create tension
 }
 
 /**
@@ -315,15 +314,15 @@ export interface PersonalValue {
  */
 export interface LifeChapter {
   id: string;
-  title: string;  // "The Wilderness Years", "Finding My Voice"
+  title: string; // "The Wilderness Years", "Finding My Voice"
   timespan: {
     start: string;
-    end?: string;  // Undefined = current chapter
+    end?: string; // Undefined = current chapter
   };
   theme: string;
   keyEvents: LifeEvent[];
   lessonsLearned: string[];
-  characterDevelopment: string;  // How did I grow?
+  characterDevelopment: string; // How did I grow?
 }
 
 export interface LifeEvent {
@@ -332,7 +331,7 @@ export interface LifeEvent {
   date: string;
   type: 'formative' | 'transformative' | 'milestone' | 'ordinary';
   description: string;
-  impact: string;  // How this shaped me
+  impact: string; // How this shaped me
 }
 
 /**
@@ -343,18 +342,18 @@ export interface DiscoveredGift {
   name: string;
   category: GiftCategory;
   description: string;
-  evidencedBy: string[];  // Where this gift has manifested
+  evidencedBy: string[]; // Where this gift has manifested
   developmentLevel: 'latent' | 'emerging' | 'practiced' | 'mastered';
-  calledTo?: string;  // How this gift might be used
+  calledTo?: string; // How this gift might be used
 }
 
 export type GiftCategory =
-  | 'intellectual'     // Analytical, creative thinking
-  | 'relational'       // Connection, empathy, leadership
-  | 'practical'        // Skills, craftsmanship
-  | 'artistic'         // Creative expression
-  | 'spiritual'        // Faith, wisdom, discernment
-  | 'physical';        // Body, health, athleticism
+  | 'intellectual' // Analytical, creative thinking
+  | 'relational' // Connection, empathy, leadership
+  | 'practical' // Skills, craftsmanship
+  | 'artistic' // Creative expression
+  | 'spiritual' // Faith, wisdom, discernment
+  | 'physical'; // Body, health, athleticism
 
 /**
  * ShadowArea - Areas for growth, blind spots, struggles.
@@ -385,11 +384,11 @@ export interface VocationalClarity {
   peopleToServe: string[];
 
   /** How do my gifts align with needs? */
-  giftAlignment: Array<{
+  giftAlignment: {
     giftId: string;
     need: string;
-    fit: number;  // 0.0 - 1.0
-  }>;
+    fit: number; // 0.0 - 1.0
+  }[];
 
   /** Current clarity level */
   clarityLevel: 'searching' | 'glimpsing' | 'discerning' | 'walking';
@@ -405,8 +404,8 @@ export interface DomainReflection {
   domainMapId: string;
   domainTitle: string;
   selfDiscoveries: string[];
-  energizers: string[];  // Topics that light me up
-  resistances: string[];  // Topics I avoid (why?)
+  energizers: string[]; // Topics that light me up
+  resistances: string[]; // Topics I avoid (why?)
   connectionToVocation?: string;
 }
 
@@ -464,7 +463,7 @@ export interface DomainReflection {
 export interface AssessmentInstrument {
   id: string;
   name: string;
-  shortName: string;  // e.g., "BFI-2", "ECR-R", "VIA"
+  shortName: string; // e.g., "BFI-2", "ECR-R", "VIA"
   description: string;
 
   /** What this assessment measures */
@@ -477,13 +476,13 @@ export interface AssessmentInstrument {
   estimatedMinutes: number;
 
   /** How often it should be retaken for longitudinal data */
-  recommendedInterval?: string;  // ISO 8601 duration, e.g., "P6M" (6 months)
+  recommendedInterval?: string; // ISO 8601 duration, e.g., "P6M" (6 months)
 
   /** Content warnings (some assessments touch difficult topics) */
   contentWarnings?: string[];
 
   /** Which Imago Dei dimensions this informs */
-  informsDimensions: Array<'core' | 'experience' | 'gifts' | 'synthesis'>;
+  informsDimensions: ('core' | 'experience' | 'gifts' | 'synthesis')[];
 
   /** License/usage restrictions */
   license: InstrumentLicense;
@@ -545,14 +544,14 @@ export interface InstrumentContributor {
 }
 
 export type ContributorRole =
-  | 'original-author'      // Created the instrument
-  | 'validator'            // Conducted validation studies
-  | 'adapter'              // Adapted for new context/population
-  | 'translator'           // Translated to new language
-  | 'normer'               // Developed norms for population
-  | 'digitizer'            // Converted to digital format
-  | 'curator'              // Curated into Lamad with interpretation
-  | 'elohim-synthesizer';  // AI-assisted development
+  | 'original-author' // Created the instrument
+  | 'validator' // Conducted validation studies
+  | 'adapter' // Adapted for new context/population
+  | 'translator' // Translated to new language
+  | 'normer' // Developed norms for population
+  | 'digitizer' // Converted to digital format
+  | 'curator' // Curated into Lamad with interpretation
+  | 'elohim-synthesizer'; // AI-assisted development
 
 /**
  * InstrumentDerivation - When an assessment builds on prior work.
@@ -591,10 +590,10 @@ export interface InstrumentRecognitionModel {
   researchContributionBonus?: number;
 
   /** Recognition flows to these contributor presences */
-  recognitionRecipients: Array<{
+  recognitionRecipients: {
     contributorPresenceId: string;
-    share: number;  // 0.0 - 1.0
-  }>;
+    share: number; // 0.0 - 1.0
+  }[];
 
   /** Citation recognition when used in research */
   citationRecognition?: number;
@@ -687,14 +686,14 @@ export interface AssessmentQuestion {
 }
 
 export type QuestionType =
-  | 'likert-5'           // 5-point Likert scale
-  | 'likert-7'           // 7-point Likert scale
-  | 'multiple-choice'    // Single selection
-  | 'multiple-select'    // Multiple selections allowed
-  | 'ranking'            // Rank items in order
-  | 'slider'             // Continuous scale
-  | 'open-text'          // Free text response
-  | 'forced-choice';     // Choose between two options
+  | 'likert-5' // 5-point Likert scale
+  | 'likert-7' // 7-point Likert scale
+  | 'multiple-choice' // Single selection
+  | 'multiple-select' // Multiple selections allowed
+  | 'ranking' // Rank items in order
+  | 'slider' // Continuous scale
+  | 'open-text' // Free text response
+  | 'forced-choice'; // Choose between two options
 
 export interface QuestionOption {
   value: number | string;
@@ -728,15 +727,15 @@ export interface AssessmentAttestation {
   publiclyDisplayable: boolean;
 
   /** Enables access to content/paths? */
-  enablesAccess?: string[];  // Content or path IDs
+  enablesAccess?: string[]; // Content or path IDs
 }
 
 export type AssessmentAttestationType =
-  | 'self-knowledge'       // "I know my attachment style"
-  | 'domain-exploration'   // "I've explored my values"
-  | 'pattern-awareness'    // "I'm aware of my anxiety patterns"
-  | 'growth-commitment'    // "I've committed to growth in this area"
-  | 'longitudinal'         // "I've tracked this over time"
+  | 'self-knowledge' // "I know my attachment style"
+  | 'domain-exploration' // "I've explored my values"
+  | 'pattern-awareness' // "I'm aware of my anxiety patterns"
+  | 'growth-commitment' // "I've committed to growth in this area"
+  | 'longitudinal' // "I've tracked this over time"
   | 'research-contributor' // "I've contributed to research"
   | 'instrument-certified'; // "I'm certified to administer this instrument"
 
@@ -763,18 +762,18 @@ export interface AssessmentPrerequisite {
 }
 
 export type AssessmentDomain =
-  | 'personality'           // Big Five, temperament
-  | 'attachment'            // Attachment style in relationships
+  | 'personality' // Big Five, temperament
+  | 'attachment' // Attachment style in relationships
   | 'emotional-intelligence' // EQ, emotion regulation
-  | 'values'                // Personal values hierarchy
-  | 'strengths'             // Character strengths (VIA)
-  | 'relationship'          // Relationship satisfaction, patterns
-  | 'wellbeing'             // Mental health screening
-  | 'spiritual'             // Faith development, spiritual gifts
-  | 'vocational'            // Career interests, work values
-  | 'cognitive'             // Learning styles, cognitive patterns
-  | 'trauma'                // ACE, trauma screening (sensitive)
-  | 'family-systems';       // Family of origin patterns
+  | 'values' // Personal values hierarchy
+  | 'strengths' // Character strengths (VIA)
+  | 'relationship' // Relationship satisfaction, patterns
+  | 'wellbeing' // Mental health screening
+  | 'spiritual' // Faith development, spiritual gifts
+  | 'vocational' // Career interests, work values
+  | 'cognitive' // Learning styles, cognitive patterns
+  | 'trauma' // ACE, trauma screening (sensitive)
+  | 'family-systems'; // Family of origin patterns
 
 export interface InstrumentValidation {
   /** Published validation study reference */
@@ -797,11 +796,11 @@ export interface InstrumentValidation {
 }
 
 export type InstrumentLicense =
-  | 'public-domain'         // Free to use
-  | 'creative-commons'      // CC license
-  | 'research-only'         // Academic use only
-  | 'licensed'              // Requires license fee
-  | 'elohim-developed';     // Developed within Elohim Protocol
+  | 'public-domain' // Free to use
+  | 'creative-commons' // CC license
+  | 'research-only' // Academic use only
+  | 'licensed' // Requires license fee
+  | 'elohim-developed'; // Developed within Elohim Protocol
 
 /**
  * AssessmentResult - A completed assessment.
@@ -850,7 +849,7 @@ export interface AssessmentInterpretation {
 export interface SubscaleResult {
   name: string;
   score: number;
-  percentile?: number;  // If normed
+  percentile?: number; // If normed
   interpretation: string;
   relatedGifts?: string[];
   relatedShadows?: string[];
@@ -874,7 +873,7 @@ export interface SelfKnowledgeLink {
   insight: string;
 
   /** Confidence in this link */
-  confidence: number;  // 0.0 - 1.0
+  confidence: number; // 0.0 - 1.0
 }
 
 export interface ResponseQuality {
@@ -932,28 +931,28 @@ export interface PatternAlert {
 }
 
 export type PatternType =
-  | 'anxiety-elevation'          // Anxiety indicators increasing
-  | 'depression-indicators'      // Depression screening flags
-  | 'relationship-distress'      // Relationship satisfaction declining
-  | 'attachment-activation'      // Attachment patterns being triggered
-  | 'burnout-risk'               // Work-life balance concerns
-  | 'value-conflict'             // Living out of alignment with values
-  | 'growth-opportunity'         // Positive pattern - ready for next level
-  | 'blind-spot-revealed'        // Assessment revealed unknown pattern
-  | 'longitudinal-shift';        // Significant change over time
+  | 'anxiety-elevation' // Anxiety indicators increasing
+  | 'depression-indicators' // Depression screening flags
+  | 'relationship-distress' // Relationship satisfaction declining
+  | 'attachment-activation' // Attachment patterns being triggered
+  | 'burnout-risk' // Work-life balance concerns
+  | 'value-conflict' // Living out of alignment with values
+  | 'growth-opportunity' // Positive pattern - ready for next level
+  | 'blind-spot-revealed' // Assessment revealed unknown pattern
+  | 'longitudinal-shift'; // Significant change over time
 
 export interface PatternEvidence {
   assessmentResultId: string;
   subscale: string;
   observation: string;
-  weight: number;  // How much this contributes to pattern detection
+  weight: number; // How much this contributes to pattern detection
 }
 
 export interface SuggestedAction {
   type: 'learning-path' | 'assessment' | 'reflection' | 'professional-help' | 'community';
   title: string;
   description: string;
-  resourceId?: string;  // Path ID, assessment ID, etc.
+  resourceId?: string; // Path ID, assessment ID, etc.
   urgency: 'when-ready' | 'soon' | 'promptly';
 }
 
@@ -996,10 +995,10 @@ export interface ResearchConsent {
 }
 
 export type ResearchConsentScope =
-  | 'none'              // No contribution
-  | 'aggregate-only'    // Only aggregate statistics
-  | 'anonymized'        // Full anonymized individual data
-  | 'identifiable';     // Willing to be contacted for studies
+  | 'none' // No contribution
+  | 'aggregate-only' // Only aggregate statistics
+  | 'anonymized' // Full anonymized individual data
+  | 'identifiable'; // Willing to be contacted for studies
 
 export interface ContributionRecognition {
   /** Number of assessments contributed */
@@ -1012,7 +1011,7 @@ export interface ContributionRecognition {
   studiesContributed: string[];
 
   /** Recognition in REA terms */
-  recognitionEvents: string[];  // EconomicEvent IDs
+  recognitionEvents: string[]; // EconomicEvent IDs
 }
 
 /**
@@ -1038,7 +1037,7 @@ export interface CrisisProtocol {
   };
 
   /** Cooling-off period before allowing dismissal */
-  minimumAcknowledgmentTime: number;  // seconds
+  minimumAcknowledgmentTime: number; // seconds
 }
 
 export interface CrisisResource {
@@ -1046,7 +1045,7 @@ export interface CrisisResource {
   description: string;
   contactInfo: string;
   type: 'hotline' | 'text-line' | 'website' | 'local-service';
-  available: string;  // e.g., "24/7", "M-F 9am-5pm"
+  available: string; // e.g., "24/7", "M-F 9am-5pm"
 }
 
 // ============================================================================
@@ -1070,7 +1069,7 @@ export interface PersonKnowledgeMap extends KnowledgeMap {
 
   subject: {
     type: 'agent';
-    subjectId: string;  // The person being mapped
+    subjectId: string; // The person being mapped
     subjectName: string;
   };
 
@@ -1127,9 +1126,9 @@ export interface SubjectConsent {
 }
 
 export type ConsentScope =
-  | 'public-info'    // Only publicly shared information
-  | 'shared-only'    // Only what subject explicitly shares with mapper
-  | 'full-access';   // Deep knowledge mapping permitted
+  | 'public-info' // Only publicly shared information
+  | 'shared-only' // Only what subject explicitly shares with mapper
+  | 'full-access'; // Deep knowledge mapping permitted
 
 /**
  * PersonKnowledgeCategory - Gottman-inspired knowledge categories.
@@ -1144,18 +1143,18 @@ export interface PersonKnowledgeCategory {
 }
 
 export type PersonKnowledgeCategoryType =
-  | 'life-history'         // Past experiences, childhood, formative events
-  | 'current-stressors'    // Present challenges, worries, pressures
-  | 'dreams-aspirations'   // Future hopes, goals, ambitions
-  | 'values-beliefs'       // Core principles, worldview, ethics
+  | 'life-history' // Past experiences, childhood, formative events
+  | 'current-stressors' // Present challenges, worries, pressures
+  | 'dreams-aspirations' // Future hopes, goals, ambitions
+  | 'values-beliefs' // Core principles, worldview, ethics
   | 'preferences-dislikes' // Daily preferences, pet peeves, favorites
-  | 'friends-family'       // Social network, important relationships
-  | 'work-career'          // Professional life, skills, ambitions
-  | 'health-wellbeing'     // Physical/mental health, self-care
-  | 'communication-style'  // How they express, receive love/feedback
-  | 'conflict-patterns'    // How they handle disagreement
-  | 'love-language'        // Primary ways of giving/receiving love
-  | 'custom';              // User-defined categories
+  | 'friends-family' // Social network, important relationships
+  | 'work-career' // Professional life, skills, ambitions
+  | 'health-wellbeing' // Physical/mental health, self-care
+  | 'communication-style' // How they express, receive love/feedback
+  | 'conflict-patterns' // How they handle disagreement
+  | 'love-language' // Primary ways of giving/receiving love
+  | 'custom'; // User-defined categories
 
 /**
  * RelationshipMetrics - Health indicators for the relationship.
@@ -1192,7 +1191,7 @@ export interface CollectiveKnowledgeMap extends KnowledgeMap {
 
   subject: {
     type: 'organization';
-    subjectId: string;  // The collective being mapped
+    subjectId: string; // The collective being mapped
     subjectName: string;
   };
 
@@ -1231,9 +1230,9 @@ export interface CollectiveDomain {
   id: string;
   title: string;
   description: string;
-  stewards: string[];  // Agent IDs responsible for this domain
+  stewards: string[]; // Agent IDs responsible for this domain
   nodes: KnowledgeNode[];
-  affinity: number;  // Collective mastery level
+  affinity: number; // Collective mastery level
 }
 
 // ============================================================================
@@ -1287,6 +1286,8 @@ export interface KnowledgeMapUpdate {
 export interface MapMergeRequest {
   sourceMapId: string;
   targetMapId: string;
-  nodeIds: string[];  // Specific nodes to merge
+  nodeIds: string[]; // Specific nodes to merge
   conflictResolution: 'source-wins' | 'target-wins' | 'manual';
 }
+
+export { type MasteryLevel } from '@app/elohim/models/agent.model';

@@ -1,0 +1,10 @@
+Scenario: Balancing family obligations with personal sustainability
+    Given Aisha's family has ongoing needs
+    And she has limited time and energy
+    When family requests compete with Aisha's capacity
+    Then the personal_agent should help her set boundaries
+    And it should flag when family demands become unsustainable
+    And it should help her communicate limits lovingly
+    And the family_elohim should respect her capacity constraints
+    And she should maintain family connection without burning out
+    And sustainable care should be prioritized over martyrdom

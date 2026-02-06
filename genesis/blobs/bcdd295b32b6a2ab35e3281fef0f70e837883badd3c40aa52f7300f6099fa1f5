@@ -1,0 +1,11 @@
+Scenario: Sharing implementation wisdom with other community leaders
+    Given I have three years experience implementing protocol in Riverside
+    And other mayors considering adoption seek my advice
+    When I share honest assessment of benefits and challenges
+    Then I describe: what worked (community calibration, Constitutional Council)
+    And I acknowledge: what struggled (elderly accessibility, some controversy)
+    And I explain: factors predicting success (community buy-in, resources, patience)
+    And I provide: practical implementation guidance
+    And I offer: not utopia but better than what we had
+    And I emphasize: communities control adoption speed and approach
+    And peer network: enables learning across communities

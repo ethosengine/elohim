@@ -1,0 +1,10 @@
+Scenario: Transparent community resource allocation based on care contributions
+    Given community resources are limited
+    And allocation decisions must be made
+    When the community_elohim allocates resources
+    Then allocation should be based on transparent care economy principles
+    And care contributions should influence resource access
+    And Marcus's substantial household labor should be weighted appropriately
+    And the process should be visible and accountable
+    And community members should understand allocation rationale
+    And care economy should provide fair distribution framework

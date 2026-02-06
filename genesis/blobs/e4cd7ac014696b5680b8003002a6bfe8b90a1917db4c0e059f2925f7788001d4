@@ -1,0 +1,9 @@
+Scenario: Supporting Maria's boundaries against impossible external demands
+    Given everyone wants more from Maria—employers, schools, children, family, community
+    And she has finite capacity with no partner to share load
+    When external demands are placed on Maria
+    Then the personal_agent should monitor her total commitments
+    And it should help her evaluate what she can realistically handle
+    And it should support her in saying no when necessary
+    And it should remind her that she's already doing more than humanly sustainable
+    And Maria should have AI support for boundary-setting

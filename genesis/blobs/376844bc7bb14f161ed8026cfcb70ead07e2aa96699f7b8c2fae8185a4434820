@@ -1,0 +1,10 @@
+Scenario: Neighborhood as site for practicing civic participation
+    Given Kenji is learning how democratic participation works
+    And neighborhood is most accessible governance layer
+    When Kenji participates in neighborhood meetings or decisions
+    Then the neighborhood_elohim should recognize civic participation as care work
+    And it should accumulate care tokens for attending meetings, voting on issues
+    And it should teach him that democracy requires participation labor
+    And civic work should be valued as care economy contribution
+    And the system should build habits of democratic participation
+    And students should practice civic engagement at neighborhood scale

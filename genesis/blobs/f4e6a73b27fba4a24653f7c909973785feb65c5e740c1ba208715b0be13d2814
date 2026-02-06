@@ -1,0 +1,9 @@
+Scenario: Managing sibling conflicts with no co-parent to tag team
+    Given children will conflict with each other
+    And Maria handles all conflict resolution alone with no one to tag in
+    When sibling conflicts arise
+    Then the family_elohim should provide conflict resolution guidance
+    And it should help Maria address conflicts fairly and age-appropriately
+    And it should remind her to stay calm when she's the only adult managing chaos
+    And it should prevent her exhaustion from leading to ineffective responses
+    And Maria should successfully navigate sibling dynamics without co-parent backup

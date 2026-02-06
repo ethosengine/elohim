@@ -1,0 +1,288 @@
+<div class="appeal-wizard">
+  <!-- Header -->
+  <header class="wizard-header">
+    <h1>File an Appeal</h1>
+    <p class="subtitle">Appeals are your right. This process cannot be restricted.</p>
+  </header>
+
+  <!-- Error Banner -->
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span class="icon">&#9888;</span>
+      <span class="message">{{ error() }}</span>
+      <button type="button" class="dismiss-btn" (click)="clearError()">&times;</button>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+  }
+
+  @if (!isLoading() && grant()) {
+    <!-- Progress Steps -->
+    <nav class="step-progress">
+      @for (step of steps(); track step.id; let i = $index) {
+        <button
+          type="button"
+          class="step-indicator"
+          [class.active]="currentStep() === step.id"
+          [class.completed]="step.completed && currentStep() !== step.id"
+          [disabled]="i > currentStepIndex() && !steps()[i - 1].completed"
+          (click)="goToStep(step.id)"
+        >
+          <span class="step-number">{{ i + 1 }}</span>
+          <span class="step-label">{{ step.label }}</span>
+        </button>
+        @if (i < steps().length - 1) {
+          <div class="step-connector" [class.completed]="step.completed"></div>
+        }
+      }
+    </nav>
+
+    <!-- Grant Info -->
+    <section class="grant-info">
+      <h3>Appealing Grant</h3>
+      <div class="grant-details">
+        <div class="detail">
+          <span class="label">Authority:</span>
+          <span class="value">{{ getAuthorityBasisLabel(grant()!.authorityBasis) }}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Steward:</span>
+          <span class="value">{{ grant()!.stewardId.substring(0, 12) }}...</span>
+        </div>
+        <div class="detail">
+          <span class="label">Status:</span>
+          <span class="value status-badge">{{ grant()!.status }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step Content -->
+    <div class="step-content">
+      <!-- Step 1: Appeal Type -->
+      @if (currentStep() === 'type') {
+        <section class="step-panel">
+          <h2>What type of appeal are you filing?</h2>
+          <p class="step-description">Select the category that best describes your concern.</p>
+
+          <div class="type-options">
+            @for (option of appealTypeOptions; track option.value) {
+              <button
+                type="button"
+                class="type-option"
+                [class.selected]="appealType() === option.value"
+                (click)="selectAppealType(option.value)"
+              >
+                <div class="option-header">
+                  <span class="option-radio">
+                    @if (appealType() === option.value) {
+                      &#9679;
+                    } @else {
+                      &#9675;
+                    }
+                  </span>
+                  <span class="option-label">{{ option.label }}</span>
+                </div>
+                <p class="option-description">{{ option.description }}</p>
+              </button>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- Step 2: Grounds -->
+      @if (currentStep() === 'grounds') {
+        <section class="step-panel">
+          <h2>What are your grounds for this appeal?</h2>
+          <p class="step-description">Select all that apply, or write your own.</p>
+
+          <div class="grounds-list">
+            @for (ground of availableGrounds(); track ground) {
+              <label class="ground-item" [class.selected]="isGroundSelected(ground)">
+                <input
+                  type="checkbox"
+                  [checked]="isGroundSelected(ground)"
+                  (change)="toggleGround(ground)"
+                />
+                <span class="ground-text">{{ ground }}</span>
+              </label>
+            }
+          </div>
+
+          <div class="custom-grounds">
+            <label for="customGrounds">Additional explanation (optional):</label>
+            <textarea
+              id="customGrounds"
+              [ngModel]="customGrounds()"
+              (ngModelChange)="customGrounds.set($event)"
+              placeholder="Describe your specific situation..."
+              rows="4"
+            ></textarea>
+          </div>
+
+          <div class="evidence-section">
+            <label for="evidence">Supporting evidence (optional):</label>
+            <textarea
+              id="evidence"
+              [ngModel]="evidenceDescription()"
+              (ngModelChange)="evidenceDescription.set($event)"
+              placeholder="Describe any evidence that supports your appeal..."
+              rows="3"
+            ></textarea>
+          </div>
+        </section>
+      }
+
+      <!-- Step 3: Advocate -->
+      @if (currentStep() === 'advocate') {
+        <section class="step-panel">
+          <h2>Would you like an advocate?</h2>
+          <p class="step-description">An advocate can help present your case during arbitration.</p>
+
+          <div class="advocate-options">
+            <label class="advocate-option" [class.selected]="!wantsAdvocate()">
+              <input
+                type="radio"
+                name="advocate"
+                [checked]="!wantsAdvocate()"
+                (change)="wantsAdvocate.set(false)"
+              />
+              <div class="option-content">
+                <span class="option-title">No advocate needed</span>
+                <span class="option-desc">I will present my own case.</span>
+              </div>
+            </label>
+
+            <label class="advocate-option" [class.selected]="wantsAdvocate()">
+              <input
+                type="radio"
+                name="advocate"
+                [checked]="wantsAdvocate()"
+                (change)="wantsAdvocate.set(true)"
+              />
+              <div class="option-content">
+                <span class="option-title">Request Elohim advocate</span>
+                <span class="option-desc">
+                  Elohim will review your case and advocate on your behalf during arbitration.
+                </span>
+              </div>
+            </label>
+          </div>
+
+          @if (wantsAdvocate()) {
+            <div class="advocate-notes">
+              <label for="advocateNotes">Notes for your advocate (optional):</label>
+              <textarea
+                id="advocateNotes"
+                [ngModel]="advocateNotes()"
+                (ngModelChange)="advocateNotes.set($event)"
+                placeholder="Any additional context you'd like Elohim to consider..."
+                rows="3"
+              ></textarea>
+            </div>
+          }
+        </section>
+      }
+
+      <!-- Step 4: Review -->
+      @if (currentStep() === 'review') {
+        <section class="step-panel">
+          <h2>Review Your Appeal</h2>
+          <p class="step-description">Please review your appeal before submitting.</p>
+
+          <div class="review-section">
+            <h3>Appeal Type</h3>
+            <p class="review-value">{{ appealTypeLabel() }}</p>
+          </div>
+
+          <div class="review-section">
+            <h3>Grounds</h3>
+            <ul class="review-list">
+              @for (ground of selectedGrounds(); track ground) {
+                <li>{{ ground }}</li>
+              }
+              @if (customGrounds()) {
+                <li class="custom">
+                  <em>{{ customGrounds() }}</em>
+                </li>
+              }
+            </ul>
+          </div>
+
+          @if (evidenceDescription()) {
+            <div class="review-section">
+              <h3>Evidence</h3>
+              <p class="review-value">{{ evidenceDescription() }}</p>
+            </div>
+          }
+
+          <div class="review-section">
+            <h3>Advocate</h3>
+            <p class="review-value">
+              @if (wantsAdvocate()) {
+                Elohim will advocate on your behalf.
+              } @else {
+                No advocate requested.
+              }
+            </p>
+          </div>
+
+          <div class="review-notice">
+            <span class="icon">&#9432;</span>
+            <p>
+              After submission, your appeal will be reviewed by the arbitration layer. You will
+              receive notification of any decisions within 7 days. You can check the status of your
+              appeal at any time from your dashboard.
+            </p>
+          </div>
+        </section>
+      }
+    </div>
+
+    <!-- Navigation -->
+    <div class="wizard-nav">
+      @if (currentStepIndex() > 0) {
+        <button type="button" class="nav-btn secondary" (click)="previousStep()">
+          <span class="icon">&#8592;</span>
+          Back
+        </button>
+      } @else {
+        <a routerLink="../capabilities" class="nav-btn secondary">
+          <span class="icon">&#8592;</span>
+          Cancel
+        </a>
+      }
+
+      @if (currentStep() !== 'review') {
+        <button
+          type="button"
+          class="nav-btn primary"
+          [disabled]="!canProceed()"
+          (click)="nextStep()"
+        >
+          Continue
+          <span class="icon">&#8594;</span>
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="nav-btn primary submit"
+          [disabled]="isSubmitting()"
+          (click)="submitAppeal()"
+        >
+          @if (isSubmitting()) {
+            <span class="spinner-small"></span>
+            Submitting...
+          } @else {
+            Submit Appeal
+          }
+        </button>
+      }
+    </div>
+  }
+</div>

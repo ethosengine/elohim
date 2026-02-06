@@ -1,0 +1,9 @@
+Scenario: Advocacy for single-parent-friendly workplace policies
+    Given Maria and single parent colleagues face systemic workplace barriers
+    And employers may not understand scale of single parent challenges
+    When Maria advocates for policy improvements
+    Then the workplace_elohim should provide care economy data on single parents
+    And advocacy should be strengthened by quantified evidence of work-care conflicts
+    And Maria should be able to advocate collectively with other single parent workers
+    And care economy data should support policy changes like flexible scheduling and adequate leave
+    And workplace should adopt single-parent-friendly policies based on demonstrated needs

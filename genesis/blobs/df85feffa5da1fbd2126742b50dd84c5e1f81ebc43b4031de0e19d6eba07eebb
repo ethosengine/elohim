@@ -1,0 +1,11 @@
+Scenario: Transportation coordination enables neighborhood mobility
+    Given Helen no longer drives
+    And public transit is limited or inaccessible
+    When Helen needs to get to local appointments or events
+    Then the neighborhood_elohim should coordinate rides with neighbors
+    And volunteer drivers should be matched based on schedule compatibility
+    And Helen should maintain ability to participate in neighborhood life
+    And transportation barriers should not cause isolation
+    And driver care work should be recognized
+    And the protocol should solve last-mile transportation through care economy
+    And neighborhood networks should provide mobility infrastructure

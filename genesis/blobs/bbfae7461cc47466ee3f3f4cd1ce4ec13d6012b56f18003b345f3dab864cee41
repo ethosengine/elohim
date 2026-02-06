@@ -1,0 +1,10 @@
+Scenario: Cultural and artistic contributions to community life
+    Given Margaret has time for cultural and creative pursuits
+    And community cultural life requires participation
+    When Margaret engages in community cultural activities
+    Then her participation and leadership should be tracked
+    And cultural contributions should be recognized as care work
+    And community flourishing includes cultural richness
+    And Margaret's creative labor should be valued
+    And seniors should be visible in community cultural life
+    And arts and culture should be part of care economy

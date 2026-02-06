@@ -1,0 +1,8 @@
+Scenario: Participating in family celebrations despite work
+    Given family gatherings and celebrations matter for connection
+    And my work schedule may conflict with family events
+    When family plans celebrations or important gatherings
+    Then the protocol should help me advocate for work schedule changes
+    And coordinate around my employment constraints when necessary
+    And help me participate meaningfully even if time is limited
+    And recognize that family care includes celebration and joy

@@ -1,0 +1,9 @@
+Scenario: Neighbor coordination for carpooling and activity transportation
+    Given Maria struggles with impossible logistics of three children's different schedules
+    And she has no partner to split transportation duties
+    When children need transportation to school, activities, and appointments
+    Then the neighborhood_elohim should coordinate carpooling with other families
+    And it should match families with compatible schedules and destinations
+    And it should track reciprocal transportation contributions
+    And carpooling should reduce Maria's impossible logistics burden
+    And neighborhood coordination should make solo parenting more manageable

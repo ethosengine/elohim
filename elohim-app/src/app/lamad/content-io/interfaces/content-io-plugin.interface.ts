@@ -1,5 +1,5 @@
-import { ValidationResult } from './validation-result.interface';
 import { FormatMetadata } from './format-metadata.interface';
+import { ValidationResult } from './validation-result.interface';
 
 /**
  * Contract for content I/O plugins.

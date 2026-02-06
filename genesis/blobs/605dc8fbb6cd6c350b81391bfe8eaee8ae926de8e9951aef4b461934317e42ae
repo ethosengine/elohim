@@ -1,0 +1,11 @@
+Scenario: Alex's accessibility advocacy improves neighborhood for everyone
+    Given Alex documents accessibility barriers in the neighborhood
+    And improved accessibility benefits elderly residents, parents with strollers, delivery workers
+    When the neighborhood_elohim tracks Alex's advocacy contributions
+    Then Alex's work identifying barriers should accumulate care tokens
+    And advocacy for curb cuts, accessible entrances, better lighting benefits whole neighborhood
+    And Alex's contributions should be recognized as care work for community
+    And the protocol should make visible how disability advocacy serves everyone
+    And Alex should be seen as neighborhood improver, not complainer
+    And care economy should value Alex's expertise about accessibility
+    And neighborhood should understand Alex's work as gift to all residents

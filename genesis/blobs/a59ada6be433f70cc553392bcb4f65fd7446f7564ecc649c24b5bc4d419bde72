@@ -1,0 +1,10 @@
+Scenario: Workplace relationships and peer support
+    Given Kenji works with other employees, many also students
+    And workplace can be site of mutual support or competition
+    When the workplace_elohim tracks workplace relationships
+    Then it should recognize peer support among coworkers as care work
+    And it should value helping coworkers, sharing shifts, covering emergencies
+    And it should accumulate care tokens for workplace mutual aid
+    And worker solidarity should be understood as care economy
+    And the system should foster cooperative rather than competitive workplace culture
+    And Kenji should build care relationships with fellow workers

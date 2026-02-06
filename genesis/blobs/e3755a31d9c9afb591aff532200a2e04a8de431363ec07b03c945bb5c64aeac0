@@ -1,0 +1,9 @@
+Scenario: Family grief support as David's condition progresses
+    Given entire family grieves David's decline
+    And James's grief is compounded by providing daily care
+    When the family_elohim recognizes collective family grief
+    Then it should connect family to grief support resources
+    And it should acknowledge progressive loss affects everyone
+    And it should coordinate family emotional support for each other
+    And James should receive family support, not just provide care
+    And family should process grief together while supporting James

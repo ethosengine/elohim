@@ -1,0 +1,10 @@
+Scenario: Food bank volunteering with dignity for participants
+    Given Margaret volunteers at community food bank
+    And she also uses food bank resources on her limited budget
+    When the community_elohim coordinates food access
+    Then Margaret should both contribute and receive without stigma
+    And the framing should be community resource sharing, not charity
+    And her volunteer labor should give her standing as member, not supplicant
+    And she should experience dignity in both giving and receiving
+    And community food access should operate on mutual aid principles
+    And Margaret should be valued contributor regardless of income

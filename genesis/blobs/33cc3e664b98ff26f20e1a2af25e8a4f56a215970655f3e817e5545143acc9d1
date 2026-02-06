@@ -1,0 +1,10 @@
+Scenario: Teen builds peer networks for collective care economy
+    Given Jasmine has friends and peers in the neighborhood
+    And they are all learning care economy practices
+    When Jasmine coordinates with peers for mutual support
+    Then the neighborhood_elohim should facilitate peer-to-peer care
+    And teens should be able to exchange care tokens without adult mediation
+    And peer networks should operate horizontally as valid care economy
+    And collective buying, skill sharing, and mutual aid should be supported
+    And Jasmine should learn that care economy works at her generation's scale
+    And peer care networks should build social capital and community resilience

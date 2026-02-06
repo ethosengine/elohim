@@ -1,0 +1,11 @@
+Scenario: Grandchild care contributions made visible to family
+    Given Margaret provides 15 hours/week of grandchild care
+    And this care has market value of approximately $15k/year
+    When the family_elohim tracks Margaret's care contributions
+    Then the care labor should be quantified and visible
+    And her daughter should see specific care contributions
+    And the data should show "Margaret provided 60 hours of childcare this month"
+    And the economic value should be calculated and displayed
+    And Margaret's care work should be recognized, not taken for granted
+    And family care tokens should reflect her substantial contributions
+    And genuine appreciation should be enabled through visibility

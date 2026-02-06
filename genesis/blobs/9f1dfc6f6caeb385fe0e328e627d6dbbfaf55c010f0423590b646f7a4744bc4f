@@ -1,0 +1,11 @@
+Scenario: Creating neighborhood joy through personal presence
+    Given Jordan has an infectious smile and loves greeting people
+    And Jordan's positive energy affects everyone they encounter
+    When Jordan walks through the neighborhood
+    Then neighbors often smile back and feel uplifted
+    And Jordan's emotional contribution to neighborhood atmosphere is real
+    And the neighborhood_elohim recognizes Jordan's joy-spreading as care work
+    And Jordan accumulates care tokens for emotional care contribution
+    And neighbors tell stories about "Jordan who makes everyone smile"
+    And Jordan's unique contribution to community is celebrated
+    And Jordan experiences being valued for who they are

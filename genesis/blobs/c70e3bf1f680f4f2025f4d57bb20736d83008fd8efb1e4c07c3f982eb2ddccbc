@@ -1,0 +1,10 @@
+Scenario: Recognizing workplace emotional labor
+    Given Aisha performs emotional labor at work
+    And emotional labor is typically unrecognized
+    When the workplace_elohim tracks her contributions
+    Then emotional labor should be valued explicitly
+    And relationship maintenance, conflict resolution, and care for colleagues should count
+    And the full scope of her work should be visible
+    And invisible emotional work should be recognized
+    And workplace care economy should value all forms of labor
+    And she should understand emotional labor as legitimate work

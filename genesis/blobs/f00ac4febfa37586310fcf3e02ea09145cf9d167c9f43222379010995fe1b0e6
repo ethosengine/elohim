@@ -1,0 +1,9 @@
+Scenario: Investor consumption and investment align supporting same democratic businesses
+    Given Patricia's consumption and investment were previously disconnected activities
+    And roles as customer and investor didn't integrate
+    When she invests in and patronizes same democratic businesses
+    Then consumption supports investment supports values supports community
+    And economic activities align creating virtuous cycle
+    And integrated participation deepens commitment and impact
+    And community economic participation becomes holistic, not fragmented
+    And community_elohim helps investors see connections between consumption and investment

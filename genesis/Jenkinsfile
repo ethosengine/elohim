@@ -1,0 +1,518 @@
+/**
+ * Genesis Pipeline (elohim-genesis)
+ *
+ * Seeds content from genesis/data/lamad to Holochain via doorway.
+ * Triggered by orchestrator after successful holochain/edge/app builds.
+ *
+ * Pipeline: checkout → resolve hosts → verify health → seed
+ *
+ * Auto-detects target environment from branch:
+ *   - dev, feat-*, claude-* → alpha.elohim.host (doorway-alpha)
+ *   - staging*              → staging.elohim.host (doorway-staging)
+ *   - main                  → elohim.host (doorway)
+ *
+ * Parameters:
+ *   - TARGET_HOST: Override auto-detected host (optional)
+ *   - SEED_DATA: Enable/disable seeding (default: true)
+ *   - SEED_IDS: Comma-separated list of specific IDs to seed (optional)
+ */
+
+def resolveDoorwayHost(String targetHost, String explicitDoorway) {
+    if (explicitDoorway) {
+        return explicitDoorway
+    }
+    // Map target app URLs to environment-specific doorway URLs
+    if (targetHost.contains('alpha.elohim.host')) {
+        return 'https://doorway-alpha.elohim.host'
+    } else if (targetHost.contains('staging.elohim.host')) {
+        return 'https://doorway-staging.elohim.host'
+    } else if (targetHost.contains('elohim.host') && !targetHost.contains('doorway')) {
+        return 'https://doorway.elohim.host'
+    }
+    return targetHost.replaceFirst('://', '://doorway.')
+}
+
+def resolveInternalDoorwayUrl(String doorwayHost) {
+    // Map external DNS to internal Kubernetes service DNS
+    if (doorwayHost.contains('doorway-alpha.elohim.host')) {
+        return 'elohim-edgenode-alpha.elohim-alpha.svc.cluster.local:8080'
+    } else if (doorwayHost.contains('doorway-staging.elohim.host')) {
+        return 'elohim-edgenode-staging.elohim-staging.svc.cluster.local:8080'
+    } else if (doorwayHost.contains('doorway.elohim.host') && !doorwayHost.contains('doorway-')) {
+        return 'elohim-edgenode-prod.elohim-prod.svc.cluster.local:8080'
+    }
+    // Fallback for custom hosts
+    return doorwayHost.replace('https://', '').replace('http://', '')
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccount: jenkins-deployer
+  nodeSelector:
+    node-type: edge
+  containers:
+  - name: builder
+    image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+    command:
+    - cat
+    tty: true
+    resources:
+      requests:
+        ephemeral-storage: "2Gi"
+        memory: "2Gi"
+      limits:
+        ephemeral-storage: "5Gi"
+        memory: "4Gi"
+'''
+        }
+    }
+
+    parameters {
+        string(
+            name: 'TARGET_HOST',
+            defaultValue: '',
+            description: 'Target host URL (auto-detected from branch if empty)'
+        )
+        booleanParam(
+            name: 'SEED_DATA',
+            defaultValue: true,
+            description: 'Seed the database with content from genesis/data/lamad'
+        )
+        string(
+            name: 'SEED_IDS',
+            defaultValue: '',
+            description: 'Specific content IDs to seed (comma-separated). Empty = all content'
+        )
+    }
+
+    environment {
+        NO_COLOR = '1'
+    }
+
+    options {
+        skipDefaultCheckout(true)
+        timeout(time: 15, unit: 'MINUTES')  // SQLite seeding is fast (~5 seconds)
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
+    }
+
+    // No triggers - orchestrator handles triggering genesis after all builds complete
+    // triggers { }
+
+    stages {
+        stage('Check Trigger') {
+            steps {
+                script {
+                    def validTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UpstreamCause') || cause._class.contains('UserIdCause')
+                    }
+                    if (!validTrigger) {
+                        echo "⏭️ PIPELINE SKIPPED - Use orchestrator or manual trigger"
+                        currentBuild.result = 'NOT_BUILT'
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "✅ Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                    }
+                }
+            }
+        }
+
+        stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        sh 'git config --global --add safe.directory "*"'
+
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
+                            extensions: [
+                                [$class: 'CloneOption', shallow: true, noTags: true, depth: 1],
+                                [$class: 'CleanBeforeCheckout']
+                            ],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/ethosengine/elohim.git',
+                                credentialsId: 'ee-bot-pat'
+                            ]]
+                        ])
+
+                        echo """
+═══════════════════════════════════════════════════════════
+🌱 GENESIS PIPELINE
+═══════════════════════════════════════════════════════════
+Branch: ${env.BRANCH_NAME ?: 'dev'}
+Seed Data: ${params.SEED_DATA}
+Seed IDs: ${params.SEED_IDS ?: '(all)'}
+═══════════════════════════════════════════════════════════
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Resolve Hosts') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        // Auto-detect target host based on branch if not specified
+                        def targetHost = params.TARGET_HOST
+                        if (!targetHost) {
+                            if (env.BRANCH_NAME == 'main') {
+                                targetHost = 'https://elohim.host'
+                            } else if (env.BRANCH_NAME == 'staging' || env.BRANCH_NAME ==~ /staging-.+/) {
+                                targetHost = 'https://staging.elohim.host'
+                            } else {
+                                // dev, feat-*, claude/* branches → alpha
+                                targetHost = 'https://alpha.elohim.host'
+                            }
+                            echo "Auto-detected target host from branch '${env.BRANCH_NAME}': ${targetHost}"
+                        }
+
+                        env.TARGET_HOST = targetHost
+                        def doorwayHost = resolveDoorwayHost(targetHost, '')
+                        def internalDoorway = resolveInternalDoorwayUrl(doorwayHost)
+
+                        env.RESOLVED_DOORWAY_HOST = doorwayHost
+                        env.INTERNAL_DOORWAY_URL = internalDoorway
+
+                        echo "✅ Target host: ${targetHost}"
+                        echo "✅ Doorway API (external): ${doorwayHost}"
+                        echo "✅ Doorway API (internal): ${internalDoorway}"
+                    }
+                }
+            }
+        }
+
+        stage('Install Seeder') {
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            steps {
+                container('builder') {
+                    dir('genesis/seeder') {
+                        sh '''
+                            echo "Installing seeder dependencies..."
+                            npm ci --prefer-offline
+                            echo "✅ Seeder ready"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Generate Schema Types') {
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            steps {
+                container('builder') {
+                    dir('genesis/seeder') {
+                        sh '''#!/bin/bash
+                            set -euo pipefail
+
+                            echo "Generating TypeScript types from Rust healing.rs..."
+
+                            # Generate schema types from Rust source directly (no Rust toolchain needed)
+                            # This parses healing.rs and extracts validation constants
+                            npx tsx src/generate-schema-types.ts
+
+                            echo "✅ Schema types generated"
+                        '''
+                    }
+                }
+            }
+        }
+
+
+        stage('Verify Target Health') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        // Ensure jq is available for JSON parsing
+                        sh '''
+                            command -v jq >/dev/null 2>&1 || {
+                                echo "Installing jq..."
+                                apt-get update -qq && apt-get install -y -qq jq 2>/dev/null || apk add --no-cache jq
+                            }
+                        '''
+
+                        def targetHost = env.TARGET_HOST
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        def internalDoorway = env.INTERNAL_DOORWAY_URL
+
+                        echo "Verifying target site: ${targetHost}"
+                        sh """
+                            timeout 120s bash -c 'until curl -sf -o /dev/null "${targetHost}"; do
+                                echo "Waiting for target site..."
+                                sleep 5
+                            done'
+                            echo "✅ Target site responding: ${targetHost}"
+                        """
+
+                        // Use /status endpoint for comprehensive preflight checks
+                        // This includes: conductor connectivity, storage health, cell discovery
+                        echo "Verifying Doorway readiness (internal): ${internalDoorway}"
+                        sh """#!/bin/bash
+                            set -euo pipefail
+
+                            MAX_ATTEMPTS=30
+                            ATTEMPT=1
+                            DOORWAY_READY=false
+                            DOORWAY_BASE_URL=""
+
+                            # First, wait for doorway to be reachable
+                            while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
+                                # Try internal DNS first
+                                if curl -sf -o /dev/null "http://${internalDoorway}/health" 2>/dev/null; then
+                                    DOORWAY_BASE_URL="http://${internalDoorway}"
+                                    echo "✅ Doorway responding (via internal DNS)"
+                                    break
+                                fi
+                                # Fall back to external DNS
+                                if curl -sf -o /dev/null "${doorwayHost}/health" 2>/dev/null; then
+                                    DOORWAY_BASE_URL="${doorwayHost}"
+                                    echo "✅ Doorway responding (via external DNS)"
+                                    break
+                                fi
+                                echo "Waiting for Doorway... (attempt \$ATTEMPT/\$MAX_ATTEMPTS)"
+                                sleep 5
+                                ATTEMPT=\$((ATTEMPT + 1))
+                            done
+
+                            if [ -z "\$DOORWAY_BASE_URL" ]; then
+                                echo "❌ Doorway not responding after \$MAX_ATTEMPTS attempts"
+                                exit 1
+                            fi
+
+                            # Now use /status for comprehensive preflight checks
+                            echo ""
+                            echo "════════════════════════════════════════════════════════════"
+                            echo "🔍 PREFLIGHT CHECKS"
+                            echo "════════════════════════════════════════════════════════════"
+
+                            PREFLIGHT_ATTEMPTS=0
+                            PREFLIGHT_MAX=24  # 2 minutes with 5s intervals
+                            CONDUCTOR_READY=false
+
+                            while [ \$PREFLIGHT_ATTEMPTS -lt \$PREFLIGHT_MAX ]; do
+                                STATUS_JSON=\$(curl -sf "\$DOORWAY_BASE_URL/status" 2>/dev/null || echo '{}')
+
+                                # Parse status response
+                                CONDUCTOR_CONNECTED=\$(echo "\$STATUS_JSON" | jq -r '.conductor.connected // false')
+                                CONDUCTOR_WORKERS=\$(echo "\$STATUS_JSON" | jq -r '.conductor.connected_workers // 0')
+                                STORAGE_HEALTHY=\$(echo "\$STATUS_JSON" | jq -r '.storage.healthy // false')
+                                IMPORT_ENABLED=\$(echo "\$STATUS_JSON" | jq -r '.storage.import_enabled // false')
+                                CELL_DISCOVERED=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.cell_discovered // false')
+                                READY_FOR_SEEDING=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.ready_for_seeding // false')
+
+                                echo "  Conductor: connected=\$CONDUCTOR_CONNECTED workers=\$CONDUCTOR_WORKERS"
+                                echo "  Storage: healthy=\$STORAGE_HEALTHY import=\$IMPORT_ENABLED"
+                                echo "  Cell discovered: \$CELL_DISCOVERED"
+                                echo "  Ready for seeding: \$READY_FOR_SEEDING"
+
+                                # Check recommendations for any blockers
+                                RECOMMENDATIONS=\$(echo "\$STATUS_JSON" | jq -r '.diagnostics.recommendations // []')
+                                if [ "\$RECOMMENDATIONS" != "[]" ] && [ "\$RECOMMENDATIONS" != "null" ]; then
+                                    echo "  Recommendations:"
+                                    echo "\$RECOMMENDATIONS" | jq -r '.[] | "    ⚠️  " + .'
+                                fi
+
+                                # Check if ready
+                                if [ "\$CONDUCTOR_CONNECTED" = "true" ] && [ "\$STORAGE_HEALTHY" = "true" ]; then
+                                    # With lazy cell discovery, we don't need cell_discovered=true at preflight
+                                    # The seeder will trigger lazy discovery on first import
+                                    echo ""
+                                    echo "✅ Doorway ready for seeding"
+                                    echo "   Note: cell_id will be discovered lazily on first import if not already cached"
+                                    CONDUCTOR_READY=true
+                                    break
+                                fi
+
+                                PREFLIGHT_ATTEMPTS=\$((PREFLIGHT_ATTEMPTS + 1))
+                                if [ \$PREFLIGHT_ATTEMPTS -lt \$PREFLIGHT_MAX ]; then
+                                    echo "  ⏳ Waiting for conductor/storage... (\$PREFLIGHT_ATTEMPTS/\$PREFLIGHT_MAX)"
+                                    sleep 5
+                                fi
+                            done
+
+                            if [ "\$CONDUCTOR_READY" != "true" ]; then
+                                echo ""
+                                echo "❌ PREFLIGHT FAILED: Doorway not ready for seeding"
+                                echo "   Conductor connected: \$CONDUCTOR_CONNECTED"
+                                echo "   Storage healthy: \$STORAGE_HEALTHY"
+                                echo ""
+                                echo "Check doorway and elohim-storage logs for issues."
+                                exit 1
+                            fi
+
+                            # Verify SQLite database is available on storage port 8090
+                            echo ""
+                            echo "🔍 Checking SQLite database availability..."
+                            STORAGE_URL="\${DOORWAY_BASE_URL/8080/8090}"
+                            DB_STATS=\$(curl -sf "\$STORAGE_URL/db/stats" 2>/dev/null || echo '{}')
+                            DB_READY=\$(echo "\$DB_STATS" | jq -r 'has("content_count")' 2>/dev/null || echo 'false')
+
+                            if [ "\$DB_READY" = "true" ]; then
+                                echo "✅ SQLite database ready at \$STORAGE_URL"
+                                CURRENT_CONTENT=\$(echo "\$DB_STATS" | jq -r '.content_count // 0')
+                                CURRENT_PATHS=\$(echo "\$DB_STATS" | jq -r '.path_count // 0')
+                                echo "   Current state: \$CURRENT_CONTENT content, \$CURRENT_PATHS paths"
+                            else
+                                echo "❌ SQLite database not available at \$STORAGE_URL"
+                                echo "   Ensure ENABLE_CONTENT_DB=true is set on elohim-storage"
+                                exit 1
+                            fi
+
+                            echo "════════════════════════════════════════════════════════════"
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Seed Database') {
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            steps {
+                container('builder') {
+                    script {
+                        def internalDoorway = env.INTERNAL_DOORWAY_URL
+                        // Storage runs on port 8090 in the same pod
+                        def internalStorage = internalDoorway.replace(':8080', ':8090')
+                        def seedIds = params.SEED_IDS
+
+                        dir('genesis/seeder') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "🌱 SEEDING DATABASE (SQLite)"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "Storage: ${internalStorage}"
+                                echo "IDs: ${seedIds ?: '(all content)'}"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo ""
+
+                                # SQLite seeding - direct to elohim-storage, bypasses DHT
+                                # ~5 seconds vs 50+ minutes with DHT seeding
+                                STORAGE_URL="http://${internalStorage}" \
+                                    npx tsx src/seed-sqlite.ts
+
+                                echo ""
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "✅ DATABASE SEEDED SUCCESSFULLY"
+                                echo "═══════════════════════════════════════════════════════════"
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Verify Seeding') {
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; expression { params.SEED_DATA } } }
+            steps {
+                container('builder') {
+                    script {
+                        def internalDoorway = env.INTERNAL_DOORWAY_URL
+                        def internalStorage = internalDoorway.replace(':8080', ':8090')
+
+                        sh """#!/bin/bash
+                            set -euo pipefail
+
+                            echo "═══════════════════════════════════════════════════════════"
+                            echo "🔍 VERIFYING SEEDING"
+                            echo "═══════════════════════════════════════════════════════════"
+
+                            # Query SQLite database stats
+                            STATS=\$(curl -sf "http://${internalStorage}/db/stats")
+
+                            CONTENT_COUNT=\$(echo "\$STATS" | jq -r '.content_count')
+                            PATH_COUNT=\$(echo "\$STATS" | jq -r '.path_count')
+                            STEP_COUNT=\$(echo "\$STATS" | jq -r '.step_count')
+                            TAG_COUNT=\$(echo "\$STATS" | jq -r '.unique_tags')
+
+                            echo ""
+                            echo "📊 Database Statistics:"
+                            echo "   Content: \$CONTENT_COUNT items"
+                            echo "   Paths:   \$PATH_COUNT items"
+                            echo "   Steps:   \$STEP_COUNT items"
+                            echo "   Tags:    \$TAG_COUNT unique"
+                            echo ""
+
+                            # Verify minimum expected counts
+                            MIN_CONTENT=3400
+                            MIN_PATHS=5
+
+                            if [ "\$CONTENT_COUNT" -lt "\$MIN_CONTENT" ]; then
+                                echo "❌ Content count \$CONTENT_COUNT is below minimum \$MIN_CONTENT"
+                                exit 1
+                            fi
+
+                            if [ "\$PATH_COUNT" -lt "\$MIN_PATHS" ]; then
+                                echo "❌ Path count \$PATH_COUNT is below minimum \$MIN_PATHS"
+                                exit 1
+                            fi
+
+                            echo "✅ Content: \$CONTENT_COUNT items (min: \$MIN_CONTENT)"
+                            echo "✅ Paths: \$PATH_COUNT items (min: \$MIN_PATHS)"
+
+                            # Verify a sample content item exists
+                            SAMPLE_ID="manifesto"
+                            SAMPLE=\$(curl -sf "http://${internalStorage}/db/content/\$SAMPLE_ID" || echo '{}')
+                            SAMPLE_TITLE=\$(echo "\$SAMPLE" | jq -r '.title // empty')
+
+                            if [ -n "\$SAMPLE_TITLE" ]; then
+                                echo "✅ Sample content '\$SAMPLE_ID' verified: \$SAMPLE_TITLE"
+                            else
+                                echo "⚠️ Sample content '\$SAMPLE_ID' not found (may be expected)"
+                            fi
+
+                            echo ""
+                            echo "═══════════════════════════════════════════════════════════"
+                            echo "✅ SEEDING VERIFIED"
+                            echo "═══════════════════════════════════════════════════════════"
+                        """
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            script {
+                echo """
+═══════════════════════════════════════════════════════════
+✅ GENESIS PIPELINE COMPLETE
+═══════════════════════════════════════════════════════════
+Target: ${env.TARGET_HOST}
+Seeded: ${params.SEED_DATA}
+IDs: ${params.SEED_IDS ?: '(all)'}
+═══════════════════════════════════════════════════════════
+                """
+            }
+        }
+        failure {
+            script {
+                echo """
+═══════════════════════════════════════════════════════════
+❌ GENESIS PIPELINE FAILED
+═══════════════════════════════════════════════════════════
+Target: ${env.TARGET_HOST}
+Seeded: ${params.SEED_DATA}
+IDs: ${params.SEED_IDS ?: '(all)'}
+
+Check the logs for details.
+═══════════════════════════════════════════════════════════
+                """
+            }
+        }
+    }
+}

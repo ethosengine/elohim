@@ -1,0 +1,10 @@
+Scenario: Teaching household management as life skill
+    Given Kenji is learning to coordinate shared living
+    And household management is essential adult capability
+    When the personal_agent supports Kenji's household skill development
+    Then it should teach him to negotiate responsibilities fairly
+    And it should help him communicate needs and boundaries
+    And it should build his capability in conflict resolution
+    And it should recognize household coordination as professional-grade skill
+    And the agent should frame this as valuable life learning
+    And Kenji should develop skills that serve all future shared living

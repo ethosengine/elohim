@@ -1,0 +1,9 @@
+Scenario: Democratic food system challenges corporate distributor business model
+    Given corporate distributors depend on opacity and extraction for profit
+    And their value proposition (convenience, consistency) doesn't justify 400% markup
+    When democratic network demonstrates distribution without extraction
+    Then corporate distributors face competitive threat from transparent alternative
+    And necessary distribution functions (logistics, aggregation) are provided at cost-recovery pricing
+    And extractive markup is proven unnecessary for functioning supply chain
+    And food industry learns distribution can be democratic cooperative, not profit-maximizing corporation
+    And industry_sector_elohim documents cost comparison between extractive and democratic distribution

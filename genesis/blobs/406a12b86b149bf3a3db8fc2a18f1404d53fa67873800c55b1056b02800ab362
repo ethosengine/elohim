@@ -1,0 +1,11 @@
+Scenario: Family care token flows reflect Alex's substantial contributions
+    Given Alex contributes significantly to family care economy
+    And traditional family roles often render disabled people's contributions invisible
+    When family care tokens are calculated
+    Then Alex's emotional labor should accumulate tokens appropriately
+    And Alex's advocacy improving accessibility benefits whole family
+    And Alex's peer support to other disabled family members should be valued
+    And care tokens should flow to Alex for contributions, not just from Alex as recipient
+    And family economics should recognize Alex's care work explicitly
+    And the data should challenge family narratives of Alex as burden
+    And Alex's economic standing within family should reflect actual contributions

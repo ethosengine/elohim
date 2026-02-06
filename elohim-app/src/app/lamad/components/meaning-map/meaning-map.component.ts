@@ -1,12 +1,18 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
-import { Subject, combineLatest } from 'rxjs';
+
+// @coverage: 100.0% (2026-02-05)
+
 import { takeUntil, map } from 'rxjs/operators';
-import { DataLoaderService } from '../../services/data-loader.service';
-import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { ContentNode } from '../../models/content-node.model';
-import { CategoryAffinityStats } from '../../models/human-affinity.model';
+
+import { Subject, combineLatest } from 'rxjs';
+
+import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { CategoryAffinityStats } from '@app/qahal/models/human-affinity.model';
+
+import { ContentNode } from '../../models';
 
 interface CategorySection {
   name: string;
@@ -17,9 +23,11 @@ interface CategorySection {
   expanded: boolean;
 }
 
+type AffinityLevel = 'unseen' | 'low' | 'medium' | 'high';
+
 interface ContentNodeWithAffinity extends ContentNode {
   affinity: number;
-  affinityLevel: 'unseen' | 'low' | 'medium' | 'high';
+  affinityLevel: AffinityLevel;
 }
 
 @Component({
@@ -48,13 +56,13 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     combineLatest([
-      this.dataLoader.getContentIndex().pipe(
-        map(index => index.nodes ?? [])
-      ),
+      this.dataLoader
+        .getContentIndex()
+        .pipe(map(index => (index as { nodes?: ContentNode[] }).nodes ?? [])),
       this.affinityService.affinity$,
     ])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([nodes, affinity]) => {
+      .subscribe(([nodes, _affinity]) => {
         if (nodes.length > 0) {
           this.buildMeaningMap(nodes);
           this.isLoading = false;
@@ -81,7 +89,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
 
     // Group nodes by category
     const categoryMap = new Map<string, ContentNode[]>();
-    contentNodes.forEach((node) => {
+    contentNodes.forEach(node => {
       const category = node.metadata?.['category'] ?? 'uncategorized';
       if (!categoryMap.has(category)) {
         categoryMap.set(category, []);
@@ -90,25 +98,21 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     });
 
     // Build category sections
-    this.categories = Array.from(categoryMap.entries()).map(
-      ([categoryName, nodes]) => {
-        const nodesWithAffinity = nodes.map((node) =>
-          this.enrichNodeWithAffinity(node)
-        );
+    this.categories = Array.from(categoryMap.entries()).map(([categoryName, nodes]) => {
+      const nodesWithAffinity = nodes.map(node => this.enrichNodeWithAffinity(node));
 
-        // Sort by affinity (lower affinity first to encourage exploration)
-        nodesWithAffinity.sort((a, b) => a.affinity - b.affinity);
+      // Sort by affinity (lower affinity first to encourage exploration)
+      nodesWithAffinity.sort((a, b) => a.affinity - b.affinity);
 
-        return {
-          name: categoryName,
-          displayName: this.getCategoryDisplayName(categoryName),
-          icon: this.getCategoryIcon(categoryName),
-          nodes: nodesWithAffinity,
-          stats: stats.byCategory.get(categoryName) ?? null,
-          expanded: true, // Default to expanded
-        };
-      }
-    );
+      return {
+        name: categoryName,
+        displayName: this.getCategoryDisplayName(categoryName),
+        icon: this.getCategoryIcon(categoryName),
+        nodes: nodesWithAffinity,
+        stats: stats.byCategory.get(categoryName) ?? null,
+        expanded: true, // Default to expanded
+      };
+    });
 
     // Sort categories by average affinity (lowest first)
     this.categories.sort((a, b) => {
@@ -133,9 +137,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
   /**
    * Get affinity level category
    */
-  getAffinityLevel(
-    affinity: number
-  ): 'unseen' | 'low' | 'medium' | 'high' {
+  getAffinityLevel(affinity: number): 'unseen' | 'low' | 'medium' | 'high' {
     if (affinity === 0) return 'unseen';
     if (affinity <= 0.33) return 'low';
     if (affinity <= 0.66) return 'medium';
@@ -179,7 +181,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Navigate to content viewer
    */
   viewContent(node: ContentNodeWithAffinity): void {
-    this.router.navigate(['/lamad/content', node.id]);
+    void this.router.navigate(['/lamad/content', node.id]);
   }
 
   /**

@@ -1,0 +1,10 @@
+Scenario: Family boundary management as care recipient's family intrudes
+    Given David's parents have opinions about his care
+    And they may question James's decisions
+    When family boundaries are negotiated
+    Then the family_elohim should support James's care authority
+    And it should recognize him as primary caregiver and spouse
+    And it should help James maintain appropriate boundaries
+    And David's family should provide support, not interference
+    And family governance should respect caregiving relationship
+    And boundaries should be clear when family dynamics become difficult

@@ -1,0 +1,10 @@
+Scenario: Teen's labor contribution valued at appropriate care economy rates
+    Given Jasmine works 15 hours per week
+    And her labor has real economic value
+    When workplace_elohim calculates her care contributions
+    Then it should value her work at care economy rates, not just market wages
+    And recognize that her labor enables the business to function
+    And track the full value she creates, not just what she's paid
+    And help her understand the difference between value created and compensation received
+    And build her critical awareness of labor economics
+    And prepare her to advocate for fair value recognition

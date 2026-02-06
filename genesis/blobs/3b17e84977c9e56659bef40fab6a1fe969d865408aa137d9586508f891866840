@@ -1,0 +1,9 @@
+Scenario: Family privacy protected while coordinating across contexts
+    Given family care economy involves multiple family members
+    And privacy needs differ across individuals
+    When family data is managed
+    Then Sarah should control what's shared with extended family
+    And children's privacy should be protected by parental oversight
+    And partner's privacy should be respected
+    And extended family should only see what Sarah chooses to share
+    And family privacy should be complex, nuanced, and protected

@@ -1,0 +1,9 @@
+Scenario: Conflict resolution through democratic process, not managerial fiat
+    Given DeShawn and another worker have a scheduling disagreement
+    And corporate model would have manager impose solution
+    When the conflict is brought to worker council
+    Then workplace_elohim facilitates mediated discussion
+    And both workers express their perspectives and needs
+    And council members propose compromise solutions
+    And workers reach consensus on fair schedule accommodation
+    And conflict is resolved through transparency and democratic process

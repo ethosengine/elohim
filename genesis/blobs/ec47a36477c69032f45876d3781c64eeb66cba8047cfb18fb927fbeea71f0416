@@ -1,0 +1,10 @@
+Scenario: Bioregional food networks could serve families like Marcus's
+    Given Marcus's family struggles with food budget
+    And bioregional food networks could provide affordable access
+    When the community_elohim identifies bioregional opportunities
+    Then it should connect Marcus to local food networks
+    And it should help him access CSA programs, food cooperatives, gleaning
+    And bioregional connection should reduce his economic burden
+    And local food systems should serve food security goals
+    And care economy should operate at bioregional scale
+    And connection to land and farmers should benefit all parties

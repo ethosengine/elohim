@@ -8,9 +8,8 @@ describe('VisionComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [VisionComponent]
-    })
-    .compileComponents();
+      imports: [VisionComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(VisionComponent);
     component = fixture.componentInstance;
@@ -40,11 +39,13 @@ describe('VisionComponent', () => {
   it('should render key vision statements', () => {
     const compiled = fixture.nativeElement;
     const items = compiled.querySelectorAll('.vision-item');
-    const itemTexts = Array.from(items).map((item: any) => item.textContent);
+    const itemTexts = Array.from(items).map(item => (item as HTMLElement).textContent ?? '');
 
     expect(itemTexts.some((text: string) => text.includes('Technology serves love'))).toBe(true);
     expect(itemTexts.some((text: string) => text.includes('Communities self-govern'))).toBe(true);
-    expect(itemTexts.some((text: string) => text.includes('Dark patterns are impossible'))).toBe(true);
+    expect(itemTexts.some((text: string) => text.includes('Dark patterns are impossible'))).toBe(
+      true
+    );
   });
 
   it('should render introductory and closing paragraphs', () => {

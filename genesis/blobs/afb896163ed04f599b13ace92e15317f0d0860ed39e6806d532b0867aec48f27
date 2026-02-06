@@ -1,0 +1,9 @@
+Scenario: Low consumption as climate justice leadership
+    Given wealthy overconsumption drives climate crisis
+    And Maria's low-income household has minimal climate impact
+    When climate justice is assessed
+    Then the bioregional_elohim should recognize that Maria is not causing climate crisis
+    And it should acknowledge that low-income households bear crisis costs without causing it
+    And her low consumption should be honored, not stigmatized
+    And climate justice should recognize economic inequality in emissions
+    And Maria should be seen as climate leader, not climate burden

@@ -1,0 +1,10 @@
+Scenario: Child's care work saves family money with real impact
+    Given the family has tight budget constraints
+    And Emma chooses cost-effective options consistently
+    When Emma's choices accumulate over time
+    Then actual savings should be calculated and visible
+    And Emma should see concrete impact: "Your choices saved $47 this month"
+    And the family should be able to allocate savings to other needs
+    And Emma's stewardship should have measurable benefit
+    And economic contribution should be recognized as genuine help
+    And she should understand her agency affects family flourishing

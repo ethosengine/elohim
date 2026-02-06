@@ -1,0 +1,10 @@
+Scenario: Coordinating community resource sharing and mutual aid
+    Given Margaret has organizational skills and available time
+    And community needs coordination of sharing networks
+    When the community_elohim facilitates resource coordination
+    Then Margaret should be identified as potential coordinator
+    And her labor in coordinating should be recognized and valued
+    And community resource sharing should reduce individual scarcity
+    And Margaret's organizational contributions should strengthen community
+    And her time availability should serve collective benefit
+    And coordination labor should be visible and appreciated

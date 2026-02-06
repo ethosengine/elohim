@@ -1,0 +1,11 @@
+Scenario: Teen coordinates her schedule with family needs
+    Given Jasmine works part-time with variable hours
+    And the family has commitments that require coordination
+    And Jordan needs after-school supervision
+    When Jasmine's work schedule is set
+    Then her personal_agent should communicate with family_elohim
+    And flag potential conflicts: "Jordan needs supervision Tuesday 3-6pm"
+    And help Jasmine balance her work commitments with family responsibilities
+    And recognize her care contributions when she adjusts her schedule for family
+    And support the family in coordinating across multiple schedules
+    And demonstrate that family functioning requires mutual care and flexibility

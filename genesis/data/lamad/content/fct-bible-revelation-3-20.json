@@ -1,0 +1,52 @@
+{
+  "id": "fct-bible-revelation-3-20",
+  "contentType": "bible-verse",
+  "title": "Revelation 3:20",
+  "description": "Scripture reference used in FCT Module 5",
+  "content": "## Revelation 3:20\n\n> Revelation 3:20, \"Behold, I stand at the door and knock. If anyone hears my voice and opens the door, I will come in to him and eat with him, and he with me\"\n\n*ESV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "revelation",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-05-respecting-human-nature",
+    "thematicContext": "Respecting Human Nature"
+  },
+  "createdAt": "2025-11-28T21:10:19.197044",
+  "updatedAt": "2025-12-24T03:05:26.047Z",
+  "did": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Revelation 3:20",
+    "ogDescription": "Scripture reference used in FCT Module 5",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-revelation-3-20",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Revelation 3:20 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-revelation-3-20",
+    "identifier": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+    "name": "Revelation 3:20",
+    "description": "Scripture reference used in FCT Module 5",
+    "dateCreated": "2025-11-28T21:10:19.197044",
+    "dateModified": "2025-11-28T21:10:19.197045",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

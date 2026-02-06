@@ -1,0 +1,9 @@
+Scenario: Palliative care integration as disease progresses
+    Given Alzheimer's is progressive and eventually terminal
+    And palliative care improves quality of life before end stage
+    When the healthcare_elohim considers palliative care
+    Then it should introduce palliative care discussions early
+    And it should coordinate palliative services with disease management
+    And it should ensure David's comfort and dignity are prioritized
+    And James should have support for progressive care needs
+    And healthcare should include palliative approach throughout disease

@@ -1,0 +1,10 @@
+Scenario: Food waste reduction serves both budget and ecology
+    Given Marcus must maximize value from $75 budget
+    And food waste represents economic and ecological loss
+    When Marcus manages food inventory
+    Then the personal_agent should help him minimize waste
+    And it should track what gets used and what spoils
+    And it should suggest meal planning that uses ingredients completely
+    And waste reduction should serve both his budget and environment
+    And ecological stewardship should align with economic necessity
+    And care for resources should extend to caring for earth

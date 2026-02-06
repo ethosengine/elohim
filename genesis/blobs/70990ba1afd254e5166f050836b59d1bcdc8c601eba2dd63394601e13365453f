@@ -1,0 +1,10 @@
+Scenario: Learning household management skills not taught in formal education
+    Given Aisha's college education didn't include life skills
+    And she needs practical household management capabilities
+    When Aisha uses the Value Scanner educational features
+    Then the personal_agent should teach grocery shopping efficiency
+    And it should provide meal planning education
+    And it should teach nutrition basics within budget constraints
+    And it should explain waste reduction strategies
+    And practical life skills should be taught through direct application
+    And education should fill gaps from formal schooling

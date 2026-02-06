@@ -25,7 +25,7 @@
   color: white;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -47,11 +47,8 @@
 
 .toc-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
+  inset: 0;
+  background: rgb(0 0 0 / 30%);
   z-index: 1000;
   cursor: pointer;
 }
@@ -62,13 +59,13 @@
   right: -320px;
   width: 300px;
   height: 100vh;
-  background: var(--lamad-bg-primary, #ffffff);
+  background: var(--lamad-bg-primary, #fff);
   border-left: 1px solid var(--lamad-border, #d0d7de);
   padding: 1.5rem;
   overflow-y: auto;
   transition: right 0.3s ease;
   z-index: 1001;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+  box-shadow: -4px 0 16px rgb(0 0 0 / 10%);
 }
 
 .toc-sidebar.toc-visible {
@@ -133,15 +130,32 @@
 }
 
 /* TOC indentation by heading level */
-.toc-level-1 { padding-left: 0; }
-.toc-level-2 { padding-left: 0.75rem; }
-.toc-level-3 { padding-left: 1.5rem; }
-.toc-level-4 { padding-left: 2.25rem; }
-.toc-level-5 { padding-left: 3rem; }
-.toc-level-6 { padding-left: 3.75rem; }
+.toc-level-1 {
+  padding-left: 0;
+}
+
+.toc-level-2 {
+  padding-left: 0.75rem;
+}
+
+.toc-level-3 {
+  padding-left: 1.5rem;
+}
+
+.toc-level-4 {
+  padding-left: 2.25rem;
+}
+
+.toc-level-5 {
+  padding-left: 3rem;
+}
+
+.toc-level-6 {
+  padding-left: 3.75rem;
+}
 
 /* Desktop: show TOC as sidebar (Standard Mode Only) */
-@media (min-width: 1280px) {
+@media (width >= 1280px) {
   .markdown-wrapper:not(.embedded) .toc-toggle {
     display: none;
   }
@@ -177,14 +191,15 @@
   padding: 1rem;
   max-width: 75ch;
   margin: 0 auto;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
   font-size: 16px;
   line-height: 1.5;
   color: var(--lamad-text-primary, #1f2328);
-  
+
   /* Text Wrapping */
   overflow-wrap: break-word;
-  word-wrap: break-word;
   word-break: break-word;
 }
 
@@ -205,6 +220,7 @@
   max-width: 100%;
   padding: 0;
   margin: 0;
+
   /* Ensure text color is explicitly set for embedded mode */
   color: var(--lamad-text-primary, #1f2328);
 }
@@ -220,7 +236,7 @@
   right: -320px;
   height: 100vh;
   width: 300px;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+  box-shadow: -4px 0 16px rgb(0 0 0 / 10%);
   border-left: 1px solid var(--lamad-border, #d0d7de);
   border-right: none;
   order: unset;
@@ -312,7 +328,7 @@
 :host ::ng-deep .markdown-content .heading-anchor .anchor-link {
   position: absolute;
   left: -1.25em;
-  opacity: 0;
+  opacity: 0%;
   color: var(--lamad-text-tertiary, #656d76);
   font-weight: 400;
   text-decoration: none;
@@ -322,7 +338,7 @@
 }
 
 :host ::ng-deep .markdown-content .heading-anchor:hover .anchor-link {
-  opacity: 1;
+  opacity: 100%;
 }
 
 :host ::ng-deep .markdown-content .heading-anchor .anchor-link:hover {
@@ -343,7 +359,7 @@
 }
 
 :host ::ng-deep .markdown-content li {
-  word-wrap: break-word;
+  overflow-wrap: break-word;
   color: var(--lamad-text-primary, #1f2328);
 }
 
@@ -370,7 +386,7 @@
   padding: 0 1em;
   color: var(--lamad-text-secondary, #4b5563);
   border-left: 0.25em solid var(--lamad-border, #d0d7de);
-  margin: 0 0 16px 0;
+  margin: 0 0 16px;
 }
 
 :host ::ng-deep .markdown-content blockquote > :first-child {
@@ -389,7 +405,8 @@
 :host ::ng-deep .markdown-content code,
 :host ::ng-deep .markdown-content kbd,
 :host ::ng-deep .markdown-content samp {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 85%;
 }
 
@@ -398,7 +415,7 @@
   margin: 0;
   font-size: 85%;
   white-space: break-spaces;
-  background-color: var(--lamad-bg-tertiary, rgba(175, 184, 193, 0.2));
+  background-color: var(--lamad-bg-tertiary, rgb(175 184 193 / 20%));
   border-radius: 6px;
   color: var(--lamad-text-primary, #1f2328);
 }
@@ -422,7 +439,7 @@
   margin: 0;
   overflow: visible;
   line-height: inherit;
-  word-wrap: normal;
+  overflow-wrap: normal;
   background-color: transparent;
   border: 0;
   color: #e2e8f0;
@@ -431,8 +448,21 @@
 }
 
 /* =============================================================================
-   Tables
+   Tables - with responsive scroll wrapper
    ============================================================================= */
+
+/* Table scroll wrapper for responsive handling */
+:host ::ng-deep .markdown-content .table-wrapper {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 16px;
+}
+
+:host ::ng-deep .markdown-content .table-wrapper table {
+  margin-bottom: 0;
+}
 
 :host ::ng-deep .markdown-content table {
   border-spacing: 0;
@@ -441,6 +471,10 @@
   margin-bottom: 16px;
   width: 100%;
   overflow: auto;
+
+  /* Ensure tables don't break layout on mobile */
+  display: block;
+  max-width: 100%;
 }
 
 :host ::ng-deep .markdown-content th,
@@ -455,7 +489,7 @@
 }
 
 :host ::ng-deep .markdown-content tr {
-  background-color: var(--lamad-bg-primary, #ffffff);
+  background-color: var(--lamad-bg-primary, #fff);
   border-top: 1px solid var(--lamad-border, #d0d7de);
 }
 
@@ -482,7 +516,7 @@
 :host ::ng-deep .markdown-content img {
   max-width: 100%;
   box-sizing: content-box;
-  background-color: var(--lamad-bg-primary, #ffffff);
+  background-color: var(--lamad-bg-primary, #fff);
 }
 
 /* =============================================================================
@@ -501,7 +535,7 @@
   color: var(--lamad-text-primary, #1f2328);
   border: 1px solid var(--lamad-border, #d0d7de);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
   transition: all 0.2s ease;
   font-size: 1.25rem;
   display: flex;
@@ -511,7 +545,7 @@
 
 .back-to-top:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
   background: white;
 }
 
@@ -557,4 +591,128 @@
   }
 
   /* Note: Colors handled by CSS variables, only border/separator colors here */
+}
+
+/* =============================================================================
+   Responsive Breakpoints
+   =============================================================================
+   Using standardized breakpoints:
+   - 480px (--bp-sm): Small mobile
+   - 768px (--bp-md): Tablet / Large mobile
+   - 1024px (--bp-lg): Desktop
+   ============================================================================= */
+
+/* Tablet (768px - 1024px) */
+@media (width <= 1024px) {
+  .markdown-content {
+    padding: 0.75rem;
+  }
+
+  .toc-toggle {
+    /* Ensure touch-friendly size */
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .back-to-top {
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .toc-list a {
+    /* Touch-friendly tap target */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}
+
+/* Mobile (max-width: 768px) */
+@media (width <= 768px) {
+  .markdown-wrapper {
+    flex-direction: column;
+  }
+
+  .markdown-content {
+    padding: 0.5rem;
+    font-size: 15px;
+  }
+
+  .toc-sidebar {
+    width: 85vw;
+    max-width: 300px;
+  }
+
+  .toc-toggle {
+    bottom: 4rem;
+    right: 1rem;
+  }
+
+  .back-to-top {
+    bottom: 1rem;
+    right: 1rem;
+  }
+
+  /* Ensure code blocks scroll horizontally */
+  :host ::ng-deep .markdown-content pre {
+    padding: 12px;
+    font-size: 80%;
+  }
+
+  /* Adjust heading sizes for mobile */
+  :host ::ng-deep .markdown-content h1 {
+    font-size: 1.75em;
+  }
+
+  :host ::ng-deep .markdown-content h2 {
+    font-size: 1.375em;
+  }
+
+  :host ::ng-deep .markdown-content h3 {
+    font-size: 1.125em;
+  }
+
+  /* Hide anchor links on touch (tap to reveal is confusing) */
+  :host ::ng-deep .markdown-content .heading-anchor .anchor-link {
+    display: none;
+  }
+}
+
+/* Small mobile (max-width: 480px) */
+@media (width <= 480px) {
+  .markdown-content {
+    padding: 0.25rem;
+    font-size: 14px;
+  }
+
+  .toc-sidebar {
+    width: 100vw;
+    max-width: 100vw;
+    right: -100vw;
+  }
+
+  .toc-sidebar.toc-visible {
+    right: 0;
+  }
+
+  :host ::ng-deep .markdown-content h1 {
+    font-size: 1.5em;
+  }
+
+  :host ::ng-deep .markdown-content h2 {
+    font-size: 1.25em;
+  }
+
+  /* Tighter list padding on small screens */
+  :host ::ng-deep .markdown-content ul,
+  :host ::ng-deep .markdown-content ol {
+    padding-left: 1.5em;
+  }
+
+  /* Smaller table padding on mobile */
+  :host ::ng-deep .markdown-content th,
+  :host ::ng-deep .markdown-content td {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+  }
 }

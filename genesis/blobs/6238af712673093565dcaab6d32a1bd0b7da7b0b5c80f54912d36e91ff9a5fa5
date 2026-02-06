@@ -1,0 +1,11 @@
+Scenario: Maintaining capacity boundaries for sustainable care provision
+    Given Margaret is 68 and has her own health considerations
+    And excessive care burden could compromise her well-being
+    When the personal_agent monitors Margaret's care load
+    Then it should track whether care labor exceeds healthy capacity
+    And it should alert if Margaret is sacrificing her own health
+    And it should suggest when to renegotiate care arrangements
+    And it should help her maintain sustainable care levels
+    And Margaret should be able to provide care without burning out
+    And the system should protect her well-being while valuing her contributions
+    And capacity monitoring should enable long-term care sustainability

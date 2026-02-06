@@ -1,0 +1,7 @@
+Scenario: Participating in industry policy advocacy
+    Given policy changes can transform industry conditions
+    When legislation affecting food service workers is under consideration
+    Then the protocol should alert workers to policy opportunities
+    And facilitate participation in legislative advocacy
+    And coordinate worker testimony and organizing for policy change
+    And build political power for worker-supportive policy

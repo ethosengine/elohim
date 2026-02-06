@@ -1,0 +1,10 @@
+Scenario: Learning relationship and sexuality education with dignity
+    Given Jordan is an adult with the same needs and desires as any adult
+    And comprehensive sexuality education is a right
+    When Jordan participates in relationships and sexuality education
+    Then instruction is accessible, honest, and dignity-preserving
+    And topics include healthy relationships, consent, and body autonomy
+    And Jordan's questions are answered respectfully
+    And Jordan learns to navigate relationships safely and joyfully
+    And Jordan's adult sexuality is honored, not ignored or shamed
+    And education supports Jordan's full adult human experience

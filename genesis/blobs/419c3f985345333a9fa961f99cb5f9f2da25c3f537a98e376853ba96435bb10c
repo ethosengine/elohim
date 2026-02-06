@@ -1,0 +1,9 @@
+Scenario: Building sustainable household routines
+    Given Aisha wants to establish effective household practices
+    And sustainable routines reduce decision fatigue
+    When Aisha develops household routines
+    Then the personal_agent should help her establish patterns
+    And it should track what routines are working
+    And it should suggest optimizations based on her actual behavior
+    And routines should be sustainable for her lifestyle and energy
+    And the system should help her build household practices that last

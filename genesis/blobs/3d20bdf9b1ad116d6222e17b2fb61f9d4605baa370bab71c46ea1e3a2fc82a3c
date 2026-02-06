@@ -1,0 +1,10 @@
+Scenario: Organizer builds cross-neighborhood budget justice coalition
+    Given parents care about after-school programs being cut
+    And seniors need meal delivery services maintained
+    And workers depend on subsidized transit
+    When the organizer uses Observer to identify alignment
+    Then they see all three groups affected by same budget priorities
+    And facilitate coordination across five neighborhoods
+    And maintain shared information base on budget impacts
+    And coordinate 100 residents for budget hearing testimony
+    And diverse communities unite around shared municipal interests

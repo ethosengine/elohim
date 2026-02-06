@@ -1,0 +1,11 @@
+Scenario: Acknowledging limits of technical solutions to political problems
+    Given some delegates hope technology will solve governance challenges
+    And I must clarify what technology can and cannot do
+    When I testify about technical limits
+    Then I explain: technology enables but doesn't replace democratic choice
+    And I clarify: that AI cannot resolve fundamental values conflicts
+    And I acknowledge: many governance problems are political not technical
+    And I resist: techno-solutionism and engineering hubris
+    And I honor: that democracy is about human judgment not optimization
+    And I demonstrate: epistemic humility about technology's role
+    And I serve: realistic understanding of technical possibilities

@@ -1,0 +1,697 @@
+/* ============================================================================
+   Perseus Theme Overrides - Consolidated Dark/Light Mode Support
+   ============================================================================
+   This file provides theme-aware styling for Khan Academy's Perseus quiz
+   components. It consolidates all theme-related overrides into a single
+   location using CSS custom properties.
+
+   Architecture:
+   - Define theme-aware custom properties in a single place
+   - Perseus styles reference these properties (no duplication)
+   - Works with both system preference and manual theme toggle
+
+   Load order: This file should be loaded AFTER perseus.css
+   ============================================================================ */
+
+/* ============================================================================
+   Section 1: Dark Mode Detection Selector
+   ============================================================================
+   This selector activates dark mode styles when:
+   1. System prefers dark AND user hasn't manually selected light, OR
+   2. User has manually selected dark theme
+   ============================================================================ */
+
+/* Dark mode styles - consolidated single definition */
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme='light']) .framework-perseus {
+    /* Text colors */
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  body:not([data-theme='light']) .framework-perseus .paragraph,
+  body:not([data-theme='light']) .framework-perseus .paragraph .paragraph,
+  body:not([data-theme='light']) .framework-perseus div.paragraph,
+  body:not([data-theme='light']) .framework-perseus .perseus-renderer > .paragraph,
+  body:not([data-theme='light']) .framework-perseus .perseus-renderer > .paragraph .paragraph,
+  body:not([data-theme='light']) .framework-perseus .default-body-text {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  body:not([data-theme='light']) .framework-perseus h1,
+  body:not([data-theme='light']) .framework-perseus h2,
+  body:not([data-theme='light']) .framework-perseus h3,
+  body:not([data-theme='light']) .framework-perseus h4,
+  body:not([data-theme='light']) .framework-perseus h5,
+  body:not([data-theme='light']) .framework-perseus h6 {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  /* Radio option content */
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-radio-option-content
+    .perseus-renderer
+    > .paragraph,
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-radio-option-content
+    .perseus-renderer
+    > .paragraph
+    .paragraph,
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-radio-rationale-content
+    .perseus-renderer
+    > .paragraph,
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-radio-rationale-content
+    .perseus-renderer
+    > .paragraph
+    .paragraph {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  /* MathJax content */
+  body:not([data-theme='light']) .framework-perseus mjx-container,
+  body:not([data-theme='light']) .framework-perseus mjx-container:not(.mafs-graph *),
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-radio-rationale-content
+    .perseus-renderer
+    > .paragraph
+    .paragraph
+    mjx-container {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  /* Code blocks */
+  body:not([data-theme='light']) .framework-perseus pre,
+  body:not([data-theme='light']) .framework-perseus code {
+    background-color: var(--lamad-bg-tertiary, #334155);
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  /* Tables */
+  body:not([data-theme='light']) .framework-perseus table,
+  body:not([data-theme='light']) .framework-perseus table td,
+  body:not([data-theme='light']) .framework-perseus table th {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  body:not([data-theme='light']) .framework-perseus table td {
+    background-color: var(--lamad-bg-secondary, #1e293b);
+  }
+
+  body:not([data-theme='light']) .framework-perseus table tr:nth-child(odd) td {
+    background-color: var(--lamad-bg-tertiary, #334155);
+  }
+
+  body:not([data-theme='light']) .framework-perseus table th {
+    border-bottom-color: var(--lamad-border, rgba(148, 163, 184, 0.2));
+  }
+
+  body:not([data-theme='light']) .framework-perseus table tbody > tr {
+    border-color: var(--lamad-border, rgba(148, 163, 184, 0.2));
+  }
+
+  /* Blockquotes */
+  body:not([data-theme='light']) .framework-perseus blockquote {
+    color: var(--lamad-text-secondary, #cbd5e1);
+    border-left-color: var(--lamad-border, rgba(148, 163, 184, 0.4));
+  }
+
+  /* Highlights */
+  body:not([data-theme='light']) .framework-perseus .perseus-highlight {
+    background-color: rgba(99, 102, 241, 0.3);
+  }
+
+  body:not([data-theme='light']) .framework-perseus .perseus-review-highlight {
+    background-color: rgba(139, 92, 246, 0.25);
+  }
+
+  /* Image captions */
+  body:not([data-theme='light']) .framework-perseus .perseus-image-caption .paragraph .paragraph {
+    color: var(--lamad-text-tertiary, #94a3b8);
+  }
+
+  /* Input fields */
+  body:not([data-theme='light']) .framework-perseus input[type='text'],
+  body:not([data-theme='light']) .framework-perseus input[type='number'],
+  body:not([data-theme='light']) .framework-perseus .number-input,
+  body:not([data-theme='light']) .framework-perseus .range-input > input {
+    background-color: var(--lamad-bg-secondary, #1e293b);
+    color: var(--lamad-text-primary, #f1f5f9);
+    border-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+  }
+
+  body:not([data-theme='light']) .framework-perseus .number-input.invalid-input {
+    background-color: rgba(220, 38, 38, 0.2);
+  }
+
+  /* Matrix widget */
+  body:not([data-theme='light']) .framework-perseus .perseus-matrix .matrix-input {
+    background-color: var(--lamad-bg-tertiary, #334155);
+  }
+
+  body:not([data-theme='light']) .framework-perseus .perseus-matrix .matrix-bracket {
+    border-color: var(--lamad-text-tertiary, #94a3b8);
+  }
+
+  /* Orderer/draggy boxes */
+  body:not([data-theme='light']) .framework-perseus .draggy-boxy-thing .cards-area,
+  body:not([data-theme='light']) .framework-perseus .draggy-boxy-thing .draggable-box {
+    background-color: var(--lamad-bg-tertiary, #334155);
+    border-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+  }
+
+  body:not([data-theme='light']) .framework-perseus .draggy-boxy-thing .card {
+    background-color: var(--lamad-bg-secondary, #1e293b);
+    border-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  body:not([data-theme='light']) .framework-perseus .draggy-boxy-thing .card.placeholder {
+    background-color: var(--lamad-bg-tertiary, #334155);
+  }
+
+  body:not([data-theme='light']) .framework-perseus .draggy-boxy-thing .card.dragging {
+    background-color: rgba(99, 102, 241, 0.2);
+  }
+
+  /* Passage widget */
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-passage
+    .passage-title
+    div.paragraph {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-passage
+    > .passage-text
+    div.paragraph {
+    color: var(--lamad-text-secondary, #cbd5e1);
+  }
+
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-passage
+    .footnotes
+    div.paragraph {
+    color: var(--lamad-text-tertiary, #94a3b8);
+  }
+
+  body:not([data-theme='light']) .framework-perseus .perseus-widget-passage .line-numbers {
+    color: var(--lamad-text-muted, #64748b);
+  }
+
+  /* Tooltips */
+  body:not([data-theme='light']) .framework-perseus .input-with-examples-tooltip {
+    background-color: var(--lamad-bg-secondary, #1e293b);
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  /* Error states */
+  body:not([data-theme='light']) .framework-perseus .perseus-error {
+    background-color: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.5);
+    color: #fca5a5;
+  }
+
+  /* Hint renderer */
+  body:not([data-theme='light']) .framework-perseus .perseus-hint-renderer {
+    border-left-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+  }
+
+  /* Multiple choice styling overrides */
+  body:not([data-theme='light']) .framework-perseus .perseus_hm3uu-sq {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+
+  body:not([data-theme='light']) .framework-perseus .perseus_dUXUrBDI {
+    color: var(--lamad-text-muted, #64748b);
+  }
+
+  /* Graphie labels */
+  body:not([data-theme='light']) .framework-perseus .graphie-label {
+    color: var(--lamad-text-primary, #f1f5f9);
+  }
+}
+
+/* ============================================================================
+   Section 2: Manual Dark Theme Selection
+   ============================================================================
+   These rules apply when user explicitly selects dark theme via toggle.
+   Uses same styles as system dark mode above.
+   NOTE: Duplication is intentional - media queries and attribute selectors
+   cannot be combined. This ensures dark mode works for both:
+   1. System preference (prefers-color-scheme: dark)
+   2. Manual toggle (data-theme='dark')
+   ============================================================================ */
+
+/* stylelint-disable no-duplicate-selectors -- Intentional: separate media query and manual theme contexts */
+
+body[data-theme='dark'] .framework-perseus {
+  color: var(--lamad-text-primary, #f1f5f9);
+  --wb-semanticColor-core-foreground-neutral-default: var(--lamad-text-primary, #f1f5f9);
+  --wb-semanticColor-core-foreground-neutral-subtle: var(--lamad-text-secondary, #cbd5e1);
+  --wb-semanticColor-core-foreground-knockout-default: #ffffff;
+  --wb-semanticColor-core-border-neutral-strong: rgba(148, 163, 184, 0.5);
+  --wb-semanticColor-core-border-neutral-subtle: var(--lamad-border, rgba(148, 163, 184, 0.2));
+  --wb-semanticColor-core-border-neutral-default: var(--lamad-border, rgba(148, 163, 184, 0.3));
+  --wb-semanticColor-core-background-base-default: var(--lamad-bg-primary, #0f172a);
+  --wb-semanticColor-core-background-neutral-strong: var(--lamad-bg-tertiary, #334155);
+  --wb-semanticColor-core-background-instructive-default: var(--lamad-accent-primary, #6366f1);
+  --wb-semanticColor-core-foreground-instructive-default: var(--lamad-accent-primary, #6366f1);
+  --wb-semanticColor-core-foreground-instructive-strong: var(--lamad-accent-secondary, #8b5cf6);
+  --wb-semanticColor-core-foreground-success-strong: var(--lamad-success, #10b981);
+  --wb-semanticColor-core-border-success-default: var(--lamad-success, #10b981);
+  --wb-semanticColor-core-background-success-strong: var(--lamad-success, #10b981);
+  --wb-semanticColor-core-border-disabled-strong: var(--lamad-text-muted, #64748b);
+  --wb-semanticColor-core-transparent: transparent;
+  --perseus-widget-background-color: var(--lamad-bg-primary, #0f172a);
+}
+
+body[data-theme='dark'] .framework-perseus .paragraph,
+body[data-theme='dark'] .framework-perseus .paragraph .paragraph,
+body[data-theme='dark'] .framework-perseus div.paragraph,
+body[data-theme='dark'] .framework-perseus .perseus-renderer > .paragraph,
+body[data-theme='dark'] .framework-perseus .perseus-renderer > .paragraph .paragraph,
+body[data-theme='dark'] .framework-perseus .default-body-text {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus h1,
+body[data-theme='dark'] .framework-perseus h2,
+body[data-theme='dark'] .framework-perseus h3,
+body[data-theme='dark'] .framework-perseus h4,
+body[data-theme='dark'] .framework-perseus h5,
+body[data-theme='dark'] .framework-perseus h6 {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-radio-option-content
+  .perseus-renderer
+  > .paragraph,
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-radio-option-content
+  .perseus-renderer
+  > .paragraph
+  .paragraph,
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-radio-rationale-content
+  .perseus-renderer
+  > .paragraph,
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-radio-rationale-content
+  .perseus-renderer
+  > .paragraph
+  .paragraph {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus mjx-container,
+body[data-theme='dark'] .framework-perseus mjx-container:not(.mafs-graph *),
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-radio-rationale-content
+  .perseus-renderer
+  > .paragraph
+  .paragraph
+  mjx-container {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus pre,
+body[data-theme='dark'] .framework-perseus code {
+  background-color: var(--lamad-bg-tertiary, #334155);
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus table,
+body[data-theme='dark'] .framework-perseus table td,
+body[data-theme='dark'] .framework-perseus table th {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus table td {
+  background-color: var(--lamad-bg-secondary, #1e293b);
+}
+
+body[data-theme='dark'] .framework-perseus table tr:nth-child(odd) td {
+  background-color: var(--lamad-bg-tertiary, #334155);
+}
+
+body[data-theme='dark'] .framework-perseus table th {
+  border-bottom-color: var(--lamad-border, rgba(148, 163, 184, 0.2));
+}
+
+body[data-theme='dark'] .framework-perseus table tbody > tr {
+  border-color: var(--lamad-border, rgba(148, 163, 184, 0.2));
+}
+
+body[data-theme='dark'] .framework-perseus blockquote {
+  color: var(--lamad-text-secondary, #cbd5e1);
+  border-left-color: var(--lamad-border, rgba(148, 163, 184, 0.4));
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-highlight {
+  background-color: rgba(99, 102, 241, 0.3);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-review-highlight {
+  background-color: rgba(139, 92, 246, 0.25);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-image-caption .paragraph .paragraph {
+  color: var(--lamad-text-tertiary, #94a3b8);
+}
+
+body[data-theme='dark'] .framework-perseus input[type='text'],
+body[data-theme='dark'] .framework-perseus input[type='number'],
+body[data-theme='dark'] .framework-perseus .number-input,
+body[data-theme='dark'] .framework-perseus .range-input > input {
+  background-color: var(--lamad-bg-secondary, #1e293b);
+  color: var(--lamad-text-primary, #f1f5f9);
+  border-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+}
+
+body[data-theme='dark'] .framework-perseus .number-input.invalid-input {
+  background-color: rgba(220, 38, 38, 0.2);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-matrix .matrix-input {
+  background-color: var(--lamad-bg-tertiary, #334155);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-matrix .matrix-bracket {
+  border-color: var(--lamad-text-tertiary, #94a3b8);
+}
+
+body[data-theme='dark'] .framework-perseus .draggy-boxy-thing .cards-area,
+body[data-theme='dark'] .framework-perseus .draggy-boxy-thing .draggable-box {
+  background-color: var(--lamad-bg-tertiary, #334155);
+  border-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+}
+
+body[data-theme='dark'] .framework-perseus .draggy-boxy-thing .card {
+  background-color: var(--lamad-bg-secondary, #1e293b);
+  border-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus .draggy-boxy-thing .card.placeholder {
+  background-color: var(--lamad-bg-tertiary, #334155);
+}
+
+body[data-theme='dark'] .framework-perseus .draggy-boxy-thing .card.dragging {
+  background-color: rgba(99, 102, 241, 0.2);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-widget-passage .passage-title div.paragraph {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-widget-passage > .passage-text div.paragraph {
+  color: var(--lamad-text-secondary, #cbd5e1);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-widget-passage .footnotes div.paragraph {
+  color: var(--lamad-text-tertiary, #94a3b8);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-widget-passage .line-numbers {
+  color: var(--lamad-text-muted, #64748b);
+}
+
+body[data-theme='dark'] .framework-perseus .input-with-examples-tooltip {
+  background-color: var(--lamad-bg-secondary, #1e293b);
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-error {
+  background-color: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.5);
+  color: #fca5a5;
+}
+
+body[data-theme='dark'] .framework-perseus .perseus-hint-renderer {
+  border-left-color: var(--lamad-border, rgba(148, 163, 184, 0.3));
+}
+
+body[data-theme='dark'] .framework-perseus .perseus_hm3uu-sq {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+body[data-theme='dark'] .framework-perseus .perseus_dUXUrBDI {
+  color: var(--lamad-text-muted, #64748b);
+}
+
+body[data-theme='dark'] .framework-perseus .graphie-label {
+  color: var(--lamad-text-primary, #f1f5f9);
+}
+
+/* stylelint-enable no-duplicate-selectors */
+
+/* ============================================================================
+   Section 3: Wonder Blocks CSS Variable Mapping
+   ============================================================================
+   Maps Wonder Blocks semantic color tokens to Lamad design tokens.
+   The Lamad tokens handle light/dark theming, so Wonder Blocks vars
+   automatically adapt without duplication.
+   ============================================================================ */
+
+/* Light mode Wonder Blocks defaults */
+@media (prefers-color-scheme: light) {
+  body:not([data-theme='dark']) .framework-perseus {
+    --wb-semanticColor-core-foreground-neutral-default: #21242c;
+    --wb-semanticColor-core-foreground-neutral-subtle: #626569;
+    --wb-semanticColor-core-foreground-knockout-default: #ffffff;
+    --wb-semanticColor-core-border-neutral-strong: #909296;
+    --wb-semanticColor-core-border-neutral-subtle: #d8d8d8;
+    --wb-semanticColor-core-border-neutral-default: #babec2;
+    --wb-semanticColor-core-background-base-default: #ffffff;
+    --wb-semanticColor-core-background-neutral-strong: #f0f1f2;
+    --wb-semanticColor-core-background-instructive-default: #1865f2;
+    --wb-semanticColor-core-foreground-instructive-default: #1865f2;
+    --wb-semanticColor-core-foreground-instructive-strong: #0a4dcc;
+    --wb-semanticColor-core-foreground-success-strong: #00880d;
+    --wb-semanticColor-core-border-success-default: #00880d;
+    --wb-semanticColor-core-background-success-strong: #00880d;
+    --wb-semanticColor-core-border-disabled-strong: #babec2;
+    --wb-semanticColor-core-transparent: transparent;
+    --perseus-widget-background-color: #ffffff;
+  }
+}
+
+body[data-theme='light'] .framework-perseus {
+  --wb-semanticColor-core-foreground-neutral-default: #21242c;
+  --wb-semanticColor-core-foreground-neutral-subtle: #626569;
+  --wb-semanticColor-core-foreground-knockout-default: #ffffff;
+  --wb-semanticColor-core-border-neutral-strong: #909296;
+  --wb-semanticColor-core-border-neutral-subtle: #d8d8d8;
+  --wb-semanticColor-core-border-neutral-default: #babec2;
+  --wb-semanticColor-core-background-base-default: #ffffff;
+  --wb-semanticColor-core-background-neutral-strong: #f0f1f2;
+  --wb-semanticColor-core-background-instructive-default: #1865f2;
+  --wb-semanticColor-core-foreground-instructive-default: #1865f2;
+  --wb-semanticColor-core-foreground-instructive-strong: #0a4dcc;
+  --wb-semanticColor-core-foreground-success-strong: #00880d;
+  --wb-semanticColor-core-border-success-default: #00880d;
+  --wb-semanticColor-core-background-success-strong: #00880d;
+  --wb-semanticColor-core-border-disabled-strong: #babec2;
+  --wb-semanticColor-core-transparent: transparent;
+  --perseus-widget-background-color: #ffffff;
+}
+
+/* Dark mode Wonder Blocks - maps to Lamad design tokens */
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme='light']) .framework-perseus {
+    --wb-semanticColor-core-foreground-neutral-default: var(--lamad-text-primary, #f1f5f9);
+    --wb-semanticColor-core-foreground-neutral-subtle: var(--lamad-text-secondary, #cbd5e1);
+    --wb-semanticColor-core-foreground-knockout-default: #ffffff;
+    --wb-semanticColor-core-border-neutral-strong: var(
+      --lamad-border-hover,
+      rgba(148, 163, 184, 0.4)
+    );
+    --wb-semanticColor-core-border-neutral-subtle: var(--lamad-border, rgba(148, 163, 184, 0.2));
+    --wb-semanticColor-core-border-neutral-default: var(--lamad-border, rgba(148, 163, 184, 0.3));
+    --wb-semanticColor-core-background-base-default: var(--lamad-bg-primary, #0f172a);
+    --wb-semanticColor-core-background-neutral-strong: var(--lamad-bg-tertiary, #334155);
+    --wb-semanticColor-core-background-instructive-default: var(--lamad-accent-primary, #6366f1);
+    --wb-semanticColor-core-foreground-instructive-default: var(--lamad-accent-primary, #6366f1);
+    --wb-semanticColor-core-foreground-instructive-strong: var(--lamad-accent-secondary, #8b5cf6);
+    --wb-semanticColor-core-foreground-success-strong: var(--lamad-success, #10b981);
+    --wb-semanticColor-core-border-success-default: var(--lamad-success, #10b981);
+    --wb-semanticColor-core-background-success-strong: var(--lamad-success, #10b981);
+    --wb-semanticColor-core-border-disabled-strong: var(--lamad-text-muted, #64748b);
+    --wb-semanticColor-core-transparent: transparent;
+    --perseus-widget-background-color: var(--lamad-bg-primary, #0f172a);
+  }
+}
+
+/* ============================================================================
+   Section 4: Multiple Choice Button Dark Mode Fixes
+   ============================================================================
+   Direct overrides for choice indicator buttons (A, B, C circles)
+   and choice row containers to ensure visibility in dark mode.
+   ============================================================================ */
+
+/* System dark mode - Choice indicator buttons
+   Perseus uses Wonder Blocks CSS variables for button styling.
+   We set the WB variables in Section 3, so we only need to override
+   the border color for unselected state here. */
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme='light'])
+    .framework-perseus
+    [class*='perseus_C4cWo']:not([aria-pressed='true']) {
+    border-color: rgba(148, 163, 184, 0.6) !important;
+  }
+
+  body:not([data-theme='light']) .framework-perseus [class*='perseus_hm3uu'],
+  body:not([data-theme='light']) .framework-perseus [class*='perseus_kjDHi'] {
+    background-color: transparent !important;
+  }
+
+  body:not([data-theme='light']) .framework-perseus [class*='perseus_hm3uu']:before,
+  body:not([data-theme='light']) .framework-perseus [class*='perseus_hm3uu']:after {
+    background-color: rgba(148, 163, 184, 0.2) !important;
+  }
+
+  body:not([data-theme='light']) .framework-perseus [class*='perseus_HSvzO']:before {
+    background: linear-gradient(
+      var(--perseus-multiple-choice-fade-direction, 90deg),
+      var(--lamad-bg-primary, #0f172a)
+        calc(var(--perseus-multiple-choice-content-margin, 4rem) + 0.8rem),
+      transparent calc(var(--perseus-multiple-choice-content-margin, 4rem) + 1.6rem)
+        calc(100% - 2.4rem),
+      var(--lamad-bg-primary, #0f172a) calc(100% - 1.6rem)
+    ) !important;
+  }
+
+  /* Selected/checked option row - highlight the row containing selected button */
+  body:not([data-theme='light'])
+    .framework-perseus
+    [class*='perseus_hm3uu']:has([aria-pressed='true']),
+  body:not([data-theme='light']) .framework-perseus li[class*='_']:has([aria-pressed='true']) {
+    background-color: rgba(99, 102, 241, 0.15) !important;
+  }
+
+  /* Force Aphrodite row backgrounds transparent - EXCLUDE selected buttons */
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-radio
+    li[class^='_']:not(:has([aria-pressed='true'])),
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-radio
+    li[class*=' _']:not(:has([aria-pressed='true'])),
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-radio
+    div[class^='_']:not([aria-pressed='true']),
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-radio-option:not(:has([aria-pressed='true'])),
+  body:not([data-theme='light'])
+    .framework-perseus
+    [role='listitem']:not(:has([aria-pressed='true'])) {
+    background-color: transparent !important;
+  }
+}
+
+/* Manual dark theme - Choice indicator buttons
+   Perseus uses Wonder Blocks CSS variables for button styling.
+   We set the WB variables in Section 3, so we only need to override
+   the border color for unselected state here. */
+body[data-theme='dark'] .framework-perseus [class*='perseus_C4cWo']:not([aria-pressed='true']) {
+  border-color: rgba(148, 163, 184, 0.6) !important;
+}
+
+body[data-theme='dark'] .framework-perseus [class*='perseus_hm3uu'],
+body[data-theme='dark'] .framework-perseus [class*='perseus_kjDHi'] {
+  background-color: transparent !important;
+}
+
+/* Selected/checked option row - highlight the row containing selected button */
+body[data-theme='dark'] .framework-perseus [class*='perseus_hm3uu']:has([aria-pressed='true']),
+body[data-theme='dark'] .framework-perseus li[class*='_']:has([aria-pressed='true']) {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Force Aphrodite row backgrounds transparent - EXCLUDE selected buttons */
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-widget-radio
+  li[class^='_']:not(:has([aria-pressed='true'])),
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-widget-radio
+  li[class*=' _']:not(:has([aria-pressed='true'])),
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-widget-radio
+  div[class^='_']:not([aria-pressed='true']),
+body[data-theme='dark'] .framework-perseus .perseus-radio-option:not(:has([aria-pressed='true'])),
+body[data-theme='dark'] .framework-perseus [role='listitem']:not(:has([aria-pressed='true'])) {
+  background-color: transparent !important;
+}
+
+body[data-theme='dark'] .framework-perseus [class*='perseus_hm3uu']:before,
+body[data-theme='dark'] .framework-perseus [class*='perseus_hm3uu']:after {
+  background-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+body[data-theme='dark'] .framework-perseus [class*='perseus_HSvzO']:before {
+  background: linear-gradient(
+    var(--perseus-multiple-choice-fade-direction, 90deg),
+    var(--lamad-bg-primary, #0f172a)
+      calc(var(--perseus-multiple-choice-content-margin, 4rem) + 0.8rem),
+    transparent calc(var(--perseus-multiple-choice-content-margin, 4rem) + 1.6rem)
+      calc(100% - 2.4rem),
+    var(--lamad-bg-primary, #0f172a) calc(100% - 1.6rem)
+  ) !important;
+}
+
+/* ============================================================================
+   Section 5: Aphrodite Override - Dark Mode Text Colors
+   ============================================================================
+   Aphrodite generates classes with hardcoded text colors.
+   We only override text colors here - button backgrounds are handled by
+   Wonder Blocks CSS variables set in Section 3.
+   ============================================================================ */
+
+/* System dark mode - text color only */
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme='light']) .framework-perseus .perseus-widget-radio.perseus-rendered-radio,
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-radio.perseus-rendered-radio
+    span,
+  body:not([data-theme='light']) .framework-perseus .perseus-widget-radio.perseus-rendered-radio p,
+  body:not([data-theme='light'])
+    .framework-perseus
+    .perseus-widget-radio.perseus-rendered-radio
+    [class*='_']:not([aria-pressed='true']) {
+    color: #f1f5f9 !important;
+  }
+}
+
+/* Manual dark theme - text color only */
+body[data-theme='dark'] .framework-perseus .perseus-widget-radio.perseus-rendered-radio,
+body[data-theme='dark'] .framework-perseus .perseus-widget-radio.perseus-rendered-radio span,
+body[data-theme='dark'] .framework-perseus .perseus-widget-radio.perseus-rendered-radio p,
+body[data-theme='dark']
+  .framework-perseus
+  .perseus-widget-radio.perseus-rendered-radio
+  [class*='_']:not([aria-pressed='true']) {
+  color: #f1f5f9 !important;
+}

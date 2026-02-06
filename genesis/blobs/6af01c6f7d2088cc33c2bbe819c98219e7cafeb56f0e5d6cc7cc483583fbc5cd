@@ -1,0 +1,12 @@
+Scenario: Recognition of care economy contributions builds continued purpose
+    Given Frank's contributions are substantial but unpaid
+    And traditional economics labels him as "not working"
+    And he's navigating the cultural narrative of retirement as obsolescence
+    When Frank reviews his care contribution data
+    Then he should see quantified value of his volunteer and care labor
+    And he should understand his economic contribution is significant (~$20k/year)
+    And he should experience himself as productive member of society
+    And the narrative of retirement as withdrawal should be countered
+    And Frank should have data to assert his continued value
+    And his dignity, purpose, and self-worth should be affirmed
+    And retirement should feel like transition to different contribution, not exit

@@ -1,0 +1,9 @@
+Scenario: Personal care token accumulation reflects superhuman solo work
+    Given Maria performs the work of two parents plus household management plus breadwinning
+    And her care contributions are extraordinary
+    When Maria's care tokens are calculated
+    Then they should reflect that she's doing multiple full-time jobs
+    And solo parenting should be valued higher than partnered parenting
+    And her care tokens should accumulate at accelerated rate
+    And the protocol should make undeniable her superhuman care labor
+    And Maria should see quantified recognition of work society often dismisses

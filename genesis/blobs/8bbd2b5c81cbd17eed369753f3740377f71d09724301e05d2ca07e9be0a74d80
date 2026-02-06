@@ -1,0 +1,10 @@
+Scenario: Parental oversight protects young child while honoring agency
+    Given Tommy has genuine autonomy in the scanner
+    And he is only 5 years old
+    When Tommy makes selections
+    Then parental oversight should be supreme
+    And Sarah should have full visibility into Tommy's scanner usage
+    And Sarah should control what data is recorded
+    And Tommy's agency should be preserved within parental boundaries
+    And the balance should protect both safety and autonomy
+    And Sarah should not experience anxiety about granting Tommy freedom

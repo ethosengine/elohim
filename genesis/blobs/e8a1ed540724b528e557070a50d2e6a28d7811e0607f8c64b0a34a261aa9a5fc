@@ -1,0 +1,9 @@
+Scenario: Operator processes identity shift from franchise owner to liberated participant
+    Given James's identity was tied to franchise ownership despite its burden
+    And exit could trigger identity crisis and sense of failure
+    When EAE provides transition support for psychological and social adjustment
+    Then James accesses peer counseling with other converted franchise operators
+    And new identity emerges: operator who chose workers and community over corporate servitude
+    And he discovers purpose beyond ownership—contribution without extraction
+    And transition is honored as wisdom and courage, not failure
+    And emotional reality of major life change is validated and supported

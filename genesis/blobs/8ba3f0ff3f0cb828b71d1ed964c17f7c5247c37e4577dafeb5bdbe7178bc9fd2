@@ -1,0 +1,12 @@
+Scenario: Building professional network and references despite isolation and crisis
+    Given professional networking requires time, energy, and social capital I lack
+    And I need professional connections for employment opportunities
+    When I work to build professional network
+    Then the workplace_elohim helps me identify low-barrier networking opportunities
+    And suggests strategies for building professional connections despite constraints
+    And helps me leverage existing relationships for professional support
+    And validates that networking is harder during crisis and that's not my fault
+    And connects me to professional networks for people in similar situations
+    And my personal_agent identifies networking opportunities matching my capacity
+    And recognizes networking efforts as valuable professional development
+    And celebrates each professional connection built

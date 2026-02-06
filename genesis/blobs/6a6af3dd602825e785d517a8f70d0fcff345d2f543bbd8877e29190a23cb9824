@@ -1,0 +1,9 @@
+Scenario: Journalist exposes wage theft pattern across employers
+    Given workers report unpaid wages and overtime violations
+    And the journalist investigates wage theft
+    When the Observer analyzes wage violation enforcement data
+    Then the journalist sees systematic wage theft across multiple employers
+    And identifies industries with concentrated violations
+    And documents millions in stolen wages and minimal enforcement
+    And shows workers of color disproportionately affected
+    And publishes investigation exposing wage theft epidemic

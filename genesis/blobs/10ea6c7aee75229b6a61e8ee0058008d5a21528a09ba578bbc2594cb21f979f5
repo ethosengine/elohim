@@ -1,0 +1,9 @@
+Scenario: Journalist monitors labor board and regulatory hearings
+    Given the journalist covers labor and employment
+    And must track labor board, wage enforcement, OSHA, and related agencies
+    When the Observer monitors all labor regulatory agencies
+    Then the journalist reviews all violation cases and enforcement actions
+    And receives alerts for significant labor violations
+    And tracks patterns in enforcement and employer violations
+    And comprehensive labor accountability coverage becomes sustainable
+    And worker exploitation cannot hide in regulatory obscurity

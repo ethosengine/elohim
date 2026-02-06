@@ -1,0 +1,11 @@
+Scenario: Board member prepares for contentious development decision in special district
+    Given transit district board must decide on major service expansion
+    And developers advocate for routes serving new developments
+    And existing riders advocate for frequency improvements on current routes
+    And staff recommendation favors expansion over frequency
+    When the board member uses Observer decision support
+    Then they receive ridership data showing current overcrowding and reliability issues
+    And see community benefits analysis comparing expansion versus improvement
+    And access transportation equity analysis of who is served by each option
+    And get examples of how peer transit districts approached similar trade-offs
+    And accessible expertise enables informed judgment balancing competing interests

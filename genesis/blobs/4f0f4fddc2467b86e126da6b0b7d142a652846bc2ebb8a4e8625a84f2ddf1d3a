@@ -1,0 +1,10 @@
+Scenario: First-time budget planning for independent living
+    Given Aisha has a monthly grocery budget of $200
+    And she is learning to manage finances independently
+    When Aisha opens the Value Scanner budget planning feature
+    Then the personal_agent should display her monthly allocation
+    And the system should show remaining budget in real-time
+    And the interface should provide clear spending analytics
+    And budget recommendations should account for her income level
+    And the agent should help her balance immediate needs with future goals
+    And financial education should be integrated into the experience

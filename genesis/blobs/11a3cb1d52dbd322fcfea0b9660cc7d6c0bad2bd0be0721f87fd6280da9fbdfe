@@ -1,0 +1,10 @@
+Scenario: Child influences family values while family shapes child
+    Given Emma is forming her own values at age 8
+    And family values still primarily guide her
+    When Emma suggests trying new products or priorities
+    Then the family_elohim should track her value proposals
+    And Sarah should receive prompts to consider Emma's input
+    And Emma's voice should genuinely influence family decisions
+    And bidirectional value formation should occur
+    And Emma should experience being heard in family governance
+    And family culture should evolve with children's input

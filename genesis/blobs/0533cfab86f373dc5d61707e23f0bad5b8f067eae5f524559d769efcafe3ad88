@@ -1,0 +1,10 @@
+Scenario: Preventing workplace stress from undermining academic success
+    Given Kenji's work adds stress to already-intense academic load
+    And excessive work hours can threaten educational outcomes
+    When the workplace_elohim monitors Kenji's work-study balance
+    Then it should flag when work hours threaten academic performance
+    And it should help him identify when to reduce hours
+    And it should validate that education is his primary work right now
+    And it should support him prioritizing school over work when necessary
+    And the system should prevent work from derailing educational investment
+    And Kenji's long-term development should take precedence over immediate income

@@ -1,0 +1,10 @@
+Scenario: Personal burnout risk detection and intervention
+    Given Sarah has been operating at unsustainable intensity
+    And she wakes at 5:30am and works until 10pm daily
+    When the personal_agent detects burnout patterns
+    Then it should flag the unsustainability explicitly
+    And it should say "This pace will break you. You need support."
+    And it should connect her to respite resources
+    And it should help her identify what must give
+    And crisis intervention should be immediate and clear
+    And the system should prioritize her survival over perfection

@@ -1,0 +1,11 @@
+Scenario: Convening deliberative assembly for community conflict
+    Given watershed decision deadlocked agents (agricultural vs ecological)
+    And multi-community coordination is needed
+    When I convene deliberative assembly with affected communities
+    Then we bring together: upstream and downstream stakeholders
+    And we facilitate: structured deliberation about shared resources
+    And we explore: synthesis honoring multiple values
+    And we enable: democratic resolution of agent conflicts
+    And we reach: agreement on graduated resource sharing
+    And deliberative democracy: resolves what algorithms couldn't
+    And I demonstrate: leadership as facilitation not command

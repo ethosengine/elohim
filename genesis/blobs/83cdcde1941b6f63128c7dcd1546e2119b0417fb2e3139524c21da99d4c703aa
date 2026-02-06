@@ -1,0 +1,10 @@
+Scenario: Dissenting opinion preserved in regional precedent
+    Given Regional Constitutional Council deliberates my appeal
+    And the council reaches majority decision but some members disagree
+    When the precedent is documented
+    Then dissenting opinions are included with their reasoning
+    And The dissent explains alternative constitutional interpretation
+    And Future councils can reference both majority and dissent
+    And Constitutional evolution can draw on minority wisdom later
+    And My appeal generates rich constitutional dialogue not just single answer
+    And Disagreement is honored as part of democratic deliberation

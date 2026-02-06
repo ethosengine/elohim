@@ -1,0 +1,11 @@
+Scenario: National survey research on public trust and legitimacy
+    Given I need to understand population-wide attitudes toward protocol
+    And survey data provides breadth that case studies cannot
+    When I conduct nationally representative survey on protocol governance
+    Then I measure: trust in agents vs trust in traditional institutions
+    And I assess: perceived legitimacy of Constitutional Councils
+    And I explore: what predicts individual support or opposition
+    And I examine: demographic patterns in trust and participation
+    And I track: opinion changes over time as protocol matures
+    And I identify: sources of resistance and paths to broader acceptance
+    And My research informs: public engagement and communication strategies

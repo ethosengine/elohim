@@ -1,0 +1,10 @@
+Scenario: Managing personal care routine with autonomy
+    Given Jordan has a morning self-care routine
+    And Jordan can complete most tasks independently with reminders
+    When Jordan uses the morning routine feature
+    Then the interface shows each task as a picture checklist
+    And Jordan can mark tasks complete as they finish them
+    And the system provides gentle audio reminders if Jordan forgets
+    And the personal_agent celebrates Jordan's independence
+    And support workers only assist when Jordan requests help
+    And Jordan's autonomy is maximized within their capabilities

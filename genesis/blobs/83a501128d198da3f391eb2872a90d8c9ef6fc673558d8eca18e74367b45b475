@@ -1,0 +1,11 @@
+Scenario: Observing Constitutional Council deliberation in real-time
+    Given Community Constitutional Council is reviewing Marcus's mental health appeal
+    And I have permission to observe their deliberation
+    When I document how the council works through the case
+    Then I capture: argument patterns, member interactions, uncertainty navigation
+    And I analyze: how expertise influences judgment, how dissent gets resolved
+    And I examine: quality of deliberation, constitutional reasoning depth
+    And I observe: what enables effective citizen governance
+    And I document: dynamics that retrospective analysis would miss
+    And My research reveals how sortition democracy actually works
+    And Findings feed back to improve council support and training

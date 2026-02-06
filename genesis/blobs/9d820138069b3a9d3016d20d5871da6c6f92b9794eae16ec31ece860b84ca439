@@ -1,0 +1,89 @@
+---
+epic: value_scanner
+user_type: adult
+archetype_name: "Adult in Prime Working/Parenting Years"
+epic_domain: "Care Economy - Value recognition and exchange"
+governance_scope: [individual, household, family, neighborhood, community, municipality, workplace_organizational]
+related_users: [young_adult, middle_aged, parent, worker, caregiver]
+---
+
+# Adult - Value Scanner
+
+## Archetype
+
+Sarah is 34 years old, mother of Tommy (5) and Emma (8), working full-time as a teacher while managing household economics on a combined family income of $65k/year. She uses the Value Scanner to coordinate family shopping across four different contexts: her own grocery runs (efficiency-focused), shopping with Tommy (wonder-preserving and educational), shopping with Emma (guided autonomy building), and coordinating with her partner on major household purchases. Her personal_agent helps her balance competing demands: children's developmental needs, household budget, nutritional requirements, her own well-being, professional obligations, and community participation. Her care contributions are massive and mostly invisible in traditional economics—the Value Scanner makes them visible and valuable.
+
+Sarah represents the Prime Working/Parenting Years phase (ages 26-45) of the Value Scanner epic—the demographic shouldering the heaviest care economy burden in current society. She's simultaneously providing care upward (aging parents starting to need support), downward (young children requiring intensive parenting), inward (maintaining her own health and capability), and outward (professional work, community participation). The protocol serves her by making her care labor visible, providing tools to manage overwhelming complexity, and connecting her to community resources and support networks.
+
+What distinguishes Sarah from both younger and older adults is this specific life stage's intensity: maximum responsibility with finite resources. She needs sophisticated care economy tools not just for learning or future planning, but for immediate survival and flourishing under real constraint. The Value Scanner isn't optional for Sarah—it's infrastructure that makes her life manageable. Her successful navigation of these prime years will shape her children's development, her professional trajectory, her relationship health, her own well-being, and her community's resilience.
+
+## Core Needs
+
+- **Managing Overwhelming Complexity**: Sarah needs tools that help her coordinate across multiple domains simultaneously. On a Tuesday evening, she's planning meals that meet different children's developmental needs, staying within budget, accommodating food allergies, aligning with her teaching schedule, and contributing to neighborhood food cooperative coordination. Her personal_agent functions as a genuine cognitive partner—tracking all these factors, surfacing conflicts before they become crises, and suggesting solutions that balance competing needs. Without this support, something breaks—usually her own well-being.
+
+- **Making Invisible Care Labor Visible**: Sarah performs enormous amounts of care work that traditional economics don't recognize or value: meal planning, shopping, cooking, nutrition management, household coordination, child development support, schedule management, emotional labor, kin-keeping, community building. The Value Scanner makes all this visible through care token accumulation. When Sarah's family discusses resource allocation, her care contributions are quantified and valued. When she applies for community leadership positions, her demonstrated care work is evidence of her capability. Visibility transforms both Sarah's self-understanding and society's recognition of her contributions.
+
+- **Coordinating Family Care Economy**: Sarah needs tools that help her whole family participate in care economy—children at appropriate developmental stages, her partner in equitable labor distribution, extended family in reciprocal support. The family_elohim coordinates permissions (Tommy's wonder-preservation vs. Emma's guided autonomy), tracks contributions across family members, identifies imbalances before they cause conflict, and prompts recognition opportunities. Sarah is building a family culture of visible, valued, reciprocal care.
+
+- **Maintaining Personal Flourishing Under Constraint**: Sarah needs support in preserving her own well-being while caring for others. Her personal_agent watches for signs that she's sacrificing herself unsustainably: nutrition suffering, exercise disappearing, social connection eroding, professional development stalling. It might prompt: "You've prioritized everyone else's needs for two weeks—what would support your flourishing?" The protocol recognizes that care for self is care work that enables care for others—not selfishness but essential stewardship.
+
+- **Community Connection and Mutual Support**: Sarah needs care economy participation beyond her household—neighborhood resource sharing, community mutual aid, professional networks, parent support groups. The Value Scanner connects her to these contexts based on her care contributions and needs. She might coordinate bulk buying with neighbors, exchange childcare with other parents, contribute to community food security initiatives, or access support during crises. She's learning that care economy scales beyond household to create community resilience.
+
+## Key Relationships
+
+**To Children**: Sarah's relationship with Tommy and Emma is mediated by the Value Scanner at different developmental stages. She sets Tommy's boundaries (wonder-preservation, safety, family values), guides Emma's growing autonomy, and coordinates their care contributions within family context. The family_elohim helps her calibrate each child's permissions appropriately, recognize their care work specifically, and teach value literacy through practice. She's raising the next generation of care economy participants.
+
+**To Partner**: Sarah's partnership involves substantial care economy coordination—distributing household labor, managing shared resources, making joint decisions, maintaining relationship health. The Value Scanner makes both partners' care contributions visible, preventing the invisible labor imbalances that damage relationships. They can see who's doing what, identify unfair distributions, and negotiate adjustments based on data rather than resentment. They're building equitable partnership through care economy literacy.
+
+**To Parents/Extended Family**: Sarah is beginning to provide care upward—her parents are in their 60s and starting to need support. She coordinates care across distance, contributes to their household needs, manages complex family dynamics, and balances care for children with care for parents. The family_elohim helps coordinate across generations, track reciprocal care flows, and prevent Sarah from being overwhelmed by competing family demands.
+
+**To Workplace**: Sarah's teaching work is itself care labor—educating children is one of society's most important care functions. The workplace_elohim could help her see her professional work as care contribution, advocate for fair compensation and conditions, and maintain boundaries that protect her capacity for household and personal care. She's learning to apply care economy principles to employment.
+
+**To Community**: Sarah participates actively in community care economy—neighborhood coordination, school involvement, food cooperative participation, local governance engagement. Her care contributions qualify her for community leadership and resource access. The community_elohim coordinates her participation, preventing overcommitment while enabling meaningful contribution. She's building community resilience through care economy practices.
+
+**To Personal Agent**: Sarah's personal_agent is her most important tool for managing life complexity. It tracks her care contributions across contexts, monitors her well-being, coordinates schedules, manages household economics, provides decision support, and connects her to resources. Their relationship is deep partnership—Sarah trusts the agent to hold complexity she can't, while maintaining full decision-making authority over her life.
+
+## Relevant Governance Layers
+
+### Geographic/Political
+
+**Individual Layer**
+Sarah exercises full autonomy over her own choices, values, and life direction. Her personal_agent serves her individual flourishing while helping her balance individual needs with care responsibilities. She's maintaining identity and agency amid overwhelming demands.
+
+**Household Layer**
+Sarah's household governance involves coordinating with her partner on resource management, decision-making, labor distribution, and household culture. The household_elohim helps them maintain equity and effectiveness.
+
+**Family Layer**
+Sarah participates in family governance across her household, children, partner, and extended family. She's simultaneously teaching children, partnering with spouse, and coordinating with parents. The family_elohim coordinates across these contexts.
+
+**Neighborhood Layer**
+Sarah actively participates in neighborhood care economy—resource sharing, mutual aid, collective action, local improvement. Her care contributions strengthen neighborhood resilience. She's learning that neighborhoods are governance units that coordinate care across households.
+
+**Community Layer**
+Sarah engages community-level governance through school involvement, food cooperative participation, local organization membership, and civic engagement. Her care contributions give her standing in community decisions. She's helping shape community care economy practices.
+
+**Municipality Layer**
+Sarah's care economy participation connects to municipal systems—school policy, food access programs, working parent supports, community resource allocation. Her accumulated care contributions could give her voice in municipal governance. She's learning how individual care work connects to public policy.
+
+### Functional
+
+**Educational Layer**
+Sarah operates as both educator (professionally) and parent (household). Educational governance shapes her work life and her children's development. She sees connections between classroom teaching and household value literacy education.
+
+**Workplace/Organizational Layer**
+Sarah's workplace governance affects her time, energy, and capacity for household care. She's learning to advocate for workplace policies that recognize workers' care responsibilities—flexible scheduling, family leave, fair compensation that enables household flourishing.
+
+**Ecological/Bioregional Layer**
+Sarah's consumption choices affect ecological systems. She's teaching her children care economy principles that include environmental stewardship. Her personal_agent helps her balance cost, nutrition, and ecological impact within budget constraints.
+
+## Implementation Notes
+
+- **Technical**: Interface must handle extreme complexity—multiple family members with different permissions, sophisticated budgeting and planning tools, nutrition tracking across family, schedule coordination, multi-context care contribution tracking, community resource connection, crisis management. Personal_agent needs sophisticated AI to genuinely serve as cognitive partner. Integration with calendars, banking, school systems, workplace tools. Mobile-first for accessibility in chaotic daily life.
+
+- **Privacy**: Complex privacy management—Sarah controls what data is shared with whom. Partner sees household-relevant information, children see age-appropriate content, extended family sees care contributions Sarah chooses to share, workplace doesn't access personal data, community sees aggregated patterns not individual details. Sarah manages family members' privacy settings while maintaining appropriate oversight of children.
+
+- **Interface**: Design for competent adult under time pressure. Information must be scannable, decisions must be quick, tools must be powerful yet simple. Recognition of care contributions should be meaningful without requiring additional labor to receive it. Interface should reduce cognitive load, not add to it. Aesthetic should feel supportive and calming, not overwhelming.
+
+- **Constraints**: Crisis support essential—if Sarah encounters job loss, health emergency, family crisis, relationship breakdown, or burnout, protocol must connect her to appropriate resources quickly. Support should be immediate, dignified, and effective. System should watch for signs of unsustainable burden and proactively surface help options.
+
+- **Opportunities**: Adults in prime working/parenting years are simultaneously the most burdened by current economic systems and the most capable of transforming those systems. If millions of adults like Sarah adopt care economy practices, they'll teach the next generation (their children) while demonstrating to the current generation (their peers) that alternatives to extraction economics are viable. Sarah's visible care contributions could shift cultural understanding of parenting from "not working" to "performing essential care labor." Her workplace advocacy could transform employment norms around care responsibilities. Her community participation could build care economy infrastructure that serves everyone. This demographic is the leverage point for care economy transformation—if the protocol serves them well, they'll spread it virally while raising children who assume care economy principles are normal.

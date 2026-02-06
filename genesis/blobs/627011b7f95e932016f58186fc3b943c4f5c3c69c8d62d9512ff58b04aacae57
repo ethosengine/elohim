@@ -1,0 +1,11 @@
+Scenario: Learning through Socratic questioning not direct instruction
+    Given Emma is comparing two products
+    And her personal_agent serves as teacher-guide
+    When Emma seeks guidance on which to choose
+    Then the agent should ask "What do you notice about these two options?"
+    And the agent should follow up based on Emma's observations
+    And the agent should ask "Which one do you think would work better for your family?"
+    And direct instruction should be avoided
+    And Emma should develop her own reasoning through inquiry
+    And critical thinking should be built through question-based pedagogy
+    And teaching should treat Emma as thinker, not rule-follower

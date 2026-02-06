@@ -1,0 +1,10 @@
+Scenario: Building social capital for future care needs
+    Given Margaret is relatively healthy and capable now
+    And she will need more support as she ages
+    When Margaret makes neighborhood care contributions
+    Then she should be building relationships for her future
+    And social capital should accumulate through current contributions
+    And neighbors should develop sense of connection and reciprocity
+    And Margaret's future care needs will be met by strong relationships
+    And she's investing in the community that will care for her
+    And strategic relationship-building for aging should be supported

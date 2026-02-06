@@ -1,0 +1,9 @@
+Scenario: Farm employment provides community economic opportunity with dignity
+    Given local employment often means low-wage service jobs without advancement
+    And agricultural work is typically exploited and underpaid
+    When democratic farm offers dignified employment with ownership pathway
+    Then community members gain living-wage agricultural employment ($18/hour minimum)
+    And employment includes training, ownership potential, and democratic voice
+    And youth employment programs connect young people to agriculture
+    And farm becomes community economic development asset
+    And community_elohim tracks employment outcomes and community economic impact

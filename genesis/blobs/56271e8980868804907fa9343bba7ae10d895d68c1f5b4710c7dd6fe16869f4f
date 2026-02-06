@@ -1,0 +1,10 @@
+Scenario: Transparent boundaries that Emma can understand and learn from
+    Given Emma operates within parental boundaries
+    And she is old enough to understand limits
+    When Emma encounters a boundary (allergen, budget, nutrition)
+    Then the boundary should be explained transparently
+    And the agent should say "This exceeds the family budget we're working within"
+    And Emma should see and understand the limits
+    And boundaries should be teaching tools, not just restrictions
+    And she should learn that all autonomy operates within contexts
+    And transparency should build understanding of constraint reasoning

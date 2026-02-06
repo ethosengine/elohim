@@ -1,0 +1,11 @@
+Scenario: Care for sibling recognized without enabling parentification
+    Given Marcus cares for Keisha age 7
+    And he manages her meals and nutritional needs
+    When Marcus makes care decisions for Keisha
+    Then his care work should be tracked by family_elohim
+    And the system should recognize legitimate care contributions
+    And it should also watch for parentification damage
+    And Keisha should be prompted to appreciate Marcus's work
+    And the protocol should prevent Keisha from taking Marcus for granted
+    And family_elohim should help maintain sibling dynamics alongside care reality
+    And Marcus should be supported, not exploited

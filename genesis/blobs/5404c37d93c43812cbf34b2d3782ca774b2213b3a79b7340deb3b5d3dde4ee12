@@ -1,0 +1,9 @@
+Scenario: Workers collectively negotiate with suppliers for better terms
+    Given individual EAE entities have limited purchasing power
+    And workers want fair prices and quality ingredients
+    When sector workers coordinate procurement
+    Then industry_sector_elohim aggregates demand across food entities
+    And workers collectively negotiate with Johnson Farm for volume pricing
+    And sector workers secure better prices than individual entities could
+    And all participating entities benefit from collective bargaining
+    And sector purchasing power rivals corporate chains without exploitation

@@ -1,0 +1,11 @@
+Scenario: Cultural representation challenges ableist narratives
+    Given media representation of disability is often harmful
+    And Alex works to improve disability representation
+    When Alex engages in cultural advocacy (media, arts, education)
+    Then representation work should be recognized as care labor
+    And the community_elohim should value cultural transformation efforts
+    And challenging ableist narratives benefits entire disabled community
+    And Alex's cultural work should accumulate care tokens
+    And the protocol should recognize that culture shapes material conditions
+    And representation advocacy is sophisticated intellectual labor
+    And Alex's contributions shift what community believes about disability

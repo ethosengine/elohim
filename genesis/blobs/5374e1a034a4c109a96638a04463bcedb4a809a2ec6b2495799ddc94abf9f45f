@@ -1,0 +1,9 @@
+Scenario: Neighborhood respite network for caregiver breaks
+    Given James needs regular breaks or he will burn out
+    And formal respite care is expensive and hard to access
+    When the neighborhood_elohim organizes respite network
+    Then it should coordinate neighbors willing to provide respite
+    And it should schedule regular respite periods for James
+    And neighbors should be trained for basic Alzheimer's care
+    And respite should be reliable and consistent
+    And neighborhood should provide systematic respite support

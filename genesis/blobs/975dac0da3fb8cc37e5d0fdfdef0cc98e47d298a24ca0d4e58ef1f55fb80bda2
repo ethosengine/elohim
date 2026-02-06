@@ -1,0 +1,9 @@
+Scenario: Protection from retaliation after filing appeal
+    Given I filed an appeal that challenged an agent's authority
+    And I was concerned about potential retaliation in future decisions
+    When I continue interacting with Elohim agents after my appeal
+    Then the appeal cannot be used against me in future decisions
+    And Agents do not punish me for exercising my right to appeal
+    And The system monitors for retaliatory patterns
+    And I have recourse if I detect bias based on my appeal history
+    And My right to dissent is protected as fundamental to the protocol

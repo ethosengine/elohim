@@ -1,0 +1,86 @@
+---
+epic: value_scanner
+user_type: teen
+archetype_name: "Teen in Full Participation"
+epic_domain: "Care Economy - Value recognition and exchange"
+governance_scope: [individual, family, neighborhood, community, municipality]
+related_users: [preteen, young_adult, parent, student, worker]
+---
+
+# Teen - Value Scanner
+
+## Archetype
+
+Jasmine is 16 years old and uses the Value Scanner as part of her family's integrated care economy practice. She shops independently, manages portions of household budget, coordinates grocery runs with her part-time job schedule, and contributes to family decisions about major purchases. Her personal_agent helps her track her care contributions across household labor, paid work, community volunteering, and family coordination. Jasmine receives care tokens reflecting her substantial contributions—tokens she's saving toward college, converting to educational resources, and using to access community opportunities. She's participating in the care economy as a full member, not an apprentice.
+
+Jasmine represents the Full Participation phase (ages 14-17) of the Value Scanner epic. She operates with near-adult autonomy in economic decisions while still embedded in family structures. She's preparing for independence by practicing integrated care economy participation: balancing individual needs, family contributions, community engagement, and future planning. The Value Scanner serves her as a comprehensive tool for managing the complexity of modern teenagerhood—coordinating multiple contexts, tracking diverse contributions, and building toward adult self-sufficiency.
+
+What distinguishes Jasmine from both preteens and young adults is this transitional position: she has adult-level capability and decision-making power but still operates primarily within family context. She's testing adult roles while retaining safety nets. The protocol recognizes her as a constitutional participant—her voice matters in family governance, community decisions, and even municipal-level patterns. She's not waiting to participate in society; she's already contributing, and the Value Scanner makes that contribution visible and valuable.
+
+## Core Needs
+
+- **Adult-Level Economic Autonomy with Appropriate Scaffolding**: Jasmine needs to make real economic decisions with real consequences, but within contexts that allow learning from mistakes without catastrophic outcomes. She manages portions of household budget, earns and spends money from part-time work, saves for future goals, and contributes to family financial planning. Her personal_agent provides sophisticated financial tools—budgeting, savings tracking, investment education, value analysis—but doesn't control her choices. She's building adult financial capability through practice.
+
+- **Recognition as Constitutional Participant**: Jasmine needs to be taken seriously as a voice in governance at multiple layers. Her participation in family decisions should be genuine, not performative. Her engagement with community matters should be valued, not dismissed as youthful idealism. The Value Scanner tracks her care contributions across contexts—household, paid work, community service, civic engagement—demonstrating that she's already a productive member of society. Her care tokens represent real economic value, giving her standing in care economy discussions.
+
+- **Integration Across Multiple Life Contexts**: Jasmine's life is complex—school, work, family, friends, community, future planning. She needs tools that help her manage across contexts without fragmenting her identity. The Value Scanner integrates her care contributions from all domains. Her personal_agent helps her see connections: "Your work schedule affects family dinner planning" or "Your community volunteering builds skills for your intended career." She's learning to navigate complexity while maintaining coherent identity.
+
+- **Preparation for Adult Independence**: Jasmine needs to build capabilities that will serve her adult life. The Value Scanner teaches comprehensive value literacy: financial management, household economics, care work recognition, community participation, civic engagement. Her care token accumulation builds real resources for her transition to adulthood—educational access, skill development, professional networks. She's not just learning about adult life; she's practicing it with scaffolding that will gradually release.
+
+- **Voice in Care Economy Design**: Jasmine needs meaningful participation in shaping the systems that govern her life. As a full participant in the care economy, her feedback about the Value Scanner matters. Her insights about what works for teens, what's missing, what could improve—these should flow to design and governance decisions. The protocol should include teen voices in ongoing system development, recognizing that those using systems have valuable knowledge about how they function.
+
+## Key Relationships
+
+**To Family**: Jasmine's relationship with family is shifting toward adult partnership. She contributes substantially to household labor, participates in family governance decisions, coordinates her schedule with family needs, and receives recognition for her care work. The family_elohim mediates her increasing autonomy while maintaining family cohesion. Her parents are learning to trust her judgment while remaining available for support. The Value Scanner makes her contributions visible, preventing the invisibility that often surrounds teen household labor.
+
+**To Employers/Workplace**: Jasmine works part-time (retail, food service, tutoring). Her workplace_elohim could help her track her labor contributions, understand her rights, recognize when work conditions become exploitative, and build professional capabilities. The Value Scanner helps her integrate paid work with care economy principles—recognizing that her paid labor is also care labor (serving customers, supporting co-workers, contributing to community). She's learning to see all work through care economy lens.
+
+**To Personal Agent**: Jasmine's relationship with her personal_agent is sophisticated and multifaceted. The agent serves as financial advisor, schedule coordinator, educational guide, career counselor, and care contribution tracker. It helps her navigate complex decisions without making choices for her. Their relationship models what AI-human partnership should be: the agent brings information, analysis, and memory; Jasmine brings values, judgment, and decision-making authority. She's learning to use AI as a capability amplifier, not a replacement for human agency.
+
+**To Community Resources**: Jasmine accesses community resources as an independent user, not through family mediation. Her care contributions qualify her for opportunities—educational programs, leadership development, skill-building workshops, community projects. The community_elohim recognizes her as a contributor and participant, not just a recipient. She's building relationships with community institutions that will continue into adulthood. Her care tokens give her standing to access resources based on demonstrated contribution.
+
+**To Peer Networks**: Jasmine coordinates with friends and peers around care economy participation. They might share shopping tips, coordinate bulk buying, exchange care tokens for mutual support, or collaborate on community projects. The Value Scanner facilitates peer-to-peer care economy without adult mediation. Jasmine is learning that care economy operates horizontally (peer support) as well as vertically (family, community institutions). These peer networks build social capital and demonstrate care economy principles at her generation's scale.
+
+**To Municipal Systems**: Jasmine is beginning to engage municipal-level systems—understanding local food policy, participating in youth civic engagement, contributing to community planning. Her accumulated care economy participation gives her voice in local governance discussions. Municipal_elohim might surface opportunities: "The city is planning a youth advisory board—your care contributions demonstrate the leadership they're seeking." She's learning that care economy extends to civic participation—that her care work gives her standing in public conversations.
+
+## Relevant Governance Layers
+
+### Geographic/Political
+
+**Individual Layer**
+Jasmine exercises substantial autonomy—economic decisions, time management, value formation, identity development. Her personal_agent serves her individual flourishing while connecting her to broader contexts. She's consciously forming values and testing them through real decisions. The protocol protects her space for individual development while recognizing her increasing capability.
+
+**Family Layer**
+Jasmine participates in family governance as a junior partner moving toward equality. Her voice in family decisions carries weight. Her care contributions are recognized as substantial. Family care tokens acknowledge her work. She's learning how families function as economic and governance units—lessons that will serve her when she forms her own household.
+
+**Neighborhood Layer**
+Jasmine engages neighborhood-level patterns actively—participating in community events, contributing to neighborhood projects, benefiting from collective resources. Her care contributions aggregate with others' to shape neighborhood food access, safety, social cohesion. She's learning that neighborhoods are governance units that coordinate care across households.
+
+**Community Layer**
+Jasmine is a recognized participant in community care economy. Her contributions (household labor, paid work, volunteering, civic engagement) are visible and valued. She accesses community resources based on demonstrated participation. She's developing relationships with community institutions that will extend into adulthood. The community_elohim recognizes her as a full member, not a future participant.
+
+**Municipality Layer**
+Jasmine is beginning to engage municipal governance—understanding how local policy affects her life, contributing to youth civic structures, building awareness of public systems. Her care economy participation gives her standing in municipal conversations. She's learning that her generation's care contributions matter to public policy—that youth voice should shape systems designed for collective flourishing.
+
+### Functional
+
+**Educational Layer**
+Jasmine's formal education integrates with care economy learning. The Value Scanner could connect to educational institutions to recognize her applied learning, translate care contributions into academic credit, or surface educational opportunities aligned with her interests. She's learning that education is itself care work—developing capability to serve future flourishing.
+
+**Workplace/Organizational Layer**
+Jasmine's part-time work introduces her to workplace governance and labor economics. She's learning to recognize fair compensation, healthy work conditions, and her rights as a worker. The Value Scanner helps her see her paid work as care labor, building her expectation that all work should operate on care economy principles.
+
+**Ecological/Bioregional Layer**
+Jasmine is developing sophisticated understanding of how her consumption choices affect ecological systems. She might preferentially buy local, seasonal, sustainable products—not just as individual consumer choice but as participation in bioregional care economy. She's learning that stewardship extends to land, water, climate, and future generations.
+
+## Implementation Notes
+
+- **Technical**: Interface should be fully adult-capable—comprehensive budgeting tools, multi-context care tracking, sophisticated planning and analysis features, educational resources, community connection tools. Personal_agent should function as genuine decision support system with professional-grade capabilities. Data integration across contexts (school, work, family, community) with appropriate privacy controls. Mobile-first design for independence and portability.
+
+- **Privacy**: Jasmine needs adult-level privacy controls. She should determine what data is shared with whom. Parents might have access to family-relevant information but not her entire digital life. Community resource coordinators see her care contributions but not private details. Employers don't access her family data. Jasmine is learning to manage privacy actively—understanding what data exists, who can access it, and how to control sharing.
+
+- **Interface**: Design for sophisticated user with complex life. Dashboard showing care contributions across contexts. Tools for managing budget, schedule, goals, and care work. Community connection features. Educational resources. Career planning tools. The interface should feel powerful and capable—treating Jasmine as the competent person she is. Recognition of care contributions should be meaningful and specific, not generic praise.
+
+- **Constraints**: Safety nets remain important—if Jasmine encounters exploitation, unsafe work conditions, household crisis, or overwhelming burden, the protocol should surface support options. But intervention should preserve autonomy and dignity. The goal is supporting her growing independence, not maintaining dependent status. Boundaries should be transparent and negotiable as she demonstrates capability.
+
+- **Opportunities**: Teens are often dismissed as not-yet-adults, their contributions invisible or minimized. The Value Scanner can make teen care work visible at scale—household labor, sibling care, paid work, community service, civic engagement. If millions of teens' care contributions became visible simultaneously, society might shift understanding of youth from "dependents being prepared for life" to "current participants contributing to collective flourishing." This could transform educational policy, labor law, civic participation structures, and cultural attitudes. Jasmine's generation could grow into adulthood expecting care economy principles as normal—fundamentally shifting economic thinking.

@@ -1,0 +1,9 @@
+Scenario: Transition from family household to independent household
+    Given Aisha recently moved out of her family home
+    And she's adapting to independent household management
+    When Aisha establishes her household practices
+    Then the system should recognize this is a major transition
+    And it should help her adapt family practices to solo living
+    And it should provide continuity from family care economy patterns
+    And the personal_agent should acknowledge the learning curve
+    And support should smooth the jarring transition to full responsibility

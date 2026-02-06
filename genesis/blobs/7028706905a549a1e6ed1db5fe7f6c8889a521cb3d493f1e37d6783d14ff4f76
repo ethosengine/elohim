@@ -1,0 +1,10 @@
+Scenario: Spousal care recognized as professional-grade family contribution
+    Given James provides skilled nursing-level care for David
+    And this care is rendered invisible because they're married
+    When the family_elohim evaluates James's spousal care
+    Then it should be valued at professional care rates
+    And care tokens should reflect $50k+/year equivalent value
+    And "caring for spouse out of love" should not erase economic value
+    And family should recognize James is doing professional work
+    And spousal caregiving should be visible as enormous contribution
+    And marriage should not make care work economically invisible

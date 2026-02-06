@@ -1,0 +1,9 @@
+Scenario: Journalist fact-checks superintendent claims on achievement
+    Given the superintendent presents glowing achievement data
+    And the journalist provides accountability coverage
+    When the Observer analyzes district outcome data
+    Then the journalist verifies overall test score increase (true)
+    And finds achievement gap between white and Black students widened
+    And shows gains concentrated in already-high-performing schools
+    And identifies selective data presentation masking inequity
+    And publishes fact-check revealing hidden disparities

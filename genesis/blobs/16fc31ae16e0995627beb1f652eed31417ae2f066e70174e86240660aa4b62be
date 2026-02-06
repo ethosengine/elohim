@@ -1,0 +1,12 @@
+Scenario: Rebuilding self-concept after trauma and loss
+    Given my sense of self has been damaged by abuse and crisis
+    And I struggle with self-blame and internalized stigma
+    When I engage with the Value Scanner over time
+    Then the system consistently reflects my worth and capability
+    And makes visible my substantial care contributions
+    And celebrates my strengths and achievements
+    And reframes "survival" as sophisticated, valuable work
+    And counters stigmatizing narratives about people in crisis
+    And my personal_agent provides affirming, non-judgmental support
+    And the care economy recognizes me as valuable community member
+    And I see evidence of my competence and contributions

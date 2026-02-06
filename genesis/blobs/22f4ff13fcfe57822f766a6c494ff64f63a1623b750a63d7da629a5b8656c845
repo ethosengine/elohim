@@ -1,0 +1,10 @@
+Scenario: Meal planning for changing nutritional needs and budget
+    Given Margaret has dietary requirements for diabetes management
+    And she needs to optimize nutrition within $150/week budget
+    When the household_elohim helps plan meals
+    Then it should balance health needs with budget constraints
+    And it should suggest affordable high-protein, high-calcium options
+    And it should plan for one or two people to minimize waste
+    And it should use Margaret's cooking knowledge and preferences
+    And meals should be nutritious, affordable, and satisfying
+    And food should support health without breaking budget

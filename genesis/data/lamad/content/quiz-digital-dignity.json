@@ -1,0 +1,142 @@
+{
+  "id": "quiz-digital-dignity",
+  "contentType": "assessment",
+  "title": "Digital Dignity Check",
+  "description": "Assess understanding of dignity-preserving platform design",
+  "content": [
+    {
+      "id": "dd-q1",
+      "purpose": "mastery",
+      "content": {
+        "content": "What does 'virality as privilege' mean?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                { "content": "Only privileged people can go viral", "correct": false, "id": "dd-q1-choice-0" },
+                { "content": "Wide reach must be earned through trust, not just engagement", "correct": true, "id": "dd-q1-choice-1" },
+                { "content": "Viruses are privileged", "correct": false, "id": "dd-q1-choice-2" },
+                { "content": "Viral content gets special treatment", "correct": false, "id": "dd-q1-choice-3" }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Virality as privilege means reach is earned through demonstrated trustworthiness.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-digital-dignity",
+        "assessesContentId": "social-medium-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["social-medium", "virality", "trust"]
+      }
+    },
+    {
+      "id": "dd-q2",
+      "purpose": "mastery",
+      "content": {
+        "content": "The Social Medium epic supports 'like' buttons as primary engagement.\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                { "content": "True", "correct": false, "id": "dd-q2-true" },
+                { "content": "False", "correct": true, "id": "dd-q2-false" }
+              ],
+              "randomize": false,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "The protocol explicitly avoids low-friction 'likes' in favor of more meaningful engagement.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-digital-dignity",
+        "assessesContentId": "social-medium-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "easy",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["social-medium", "true-false"]
+      }
+    },
+    {
+      "id": "dd-q3",
+      "purpose": "mastery",
+      "content": {
+        "content": "What is 'mediated reaction'?\n\n[[☃ radio 1]]",
+        "images": {},
+        "widgets": {
+          "radio 1": {
+            "type": "radio",
+            "options": {
+              "choices": [
+                { "content": "Reactions by mediators", "correct": false, "id": "dd-q3-choice-0" },
+                { "content": "Elohim intercepting potentially harmful reactions with teaching", "correct": true, "id": "dd-q3-choice-1" },
+                { "content": "Delayed reactions", "correct": false, "id": "dd-q3-choice-2" },
+                { "content": "Reactions on media", "correct": false, "id": "dd-q3-choice-3" }
+              ],
+              "randomize": true,
+              "multipleSelect": false
+            },
+            "graded": true,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "hints": [
+        {
+          "content": "Mediated reactions teach rather than block, preserving agency while protecting dignity.",
+          "images": {},
+          "widgets": {}
+        }
+      ],
+      "metadata": {
+        "sourceContentId": "quiz-digital-dignity",
+        "assessesContentId": "social-medium-epic",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["social-medium", "mediation"]
+      }
+    }
+  ],
+  "contentFormat": "sophia",
+  "tags": ["assessment", "social-medium", "dignity", "design"],
+  "relatedNodeIds": ["social-medium-epic"],
+  "metadata": {
+    "assessmentType": "mastery",
+    "category": "social-medium",
+    "attestationId": "dignity-advocate",
+    "difficulty": "medium",
+    "questionCount": 3,
+    "migratedAt": "2026-01-24T00:00:00.000Z"
+  },
+  "createdAt": "2025-11-28T00:09:03.479370",
+  "updatedAt": "2026-01-24T00:00:00.000Z"
+}

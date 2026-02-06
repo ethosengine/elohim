@@ -1,0 +1,8 @@
+Scenario: Accessing neighborhood time-banking system
+    Given neighborhood operates time-banking for service exchange
+    And I accumulate time credits through my work and contributions
+    When I need services I cannot afford to purchase
+    Then the protocol should connect me to time-banking opportunities
+    And help me exchange my labor/skills for needed services
+    And facilitate reciprocal care economy without money exchange
+    And recognize that care economy can operate beyond cash

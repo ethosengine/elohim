@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-hugo-mercier",
+  "contentType": "contributor",
+  "title": "Hugo Mercier",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Hugo Mercier\n\n**Role:** author\n\n**Works:** The Enigma of Reason\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-media-00-book-the-enigma-of-reason"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-01-church-dilemma"
+  },
+  "createdAt": "2025-11-28T21:10:19.190371",
+  "updatedAt": "2025-12-24T03:05:26.063Z",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Hugo Mercier",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-hugo-mercier",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Hugo Mercier - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-hugo-mercier",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Hugo Mercier",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.190371",
+    "dateModified": "2025-11-28T21:10:19.190372",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

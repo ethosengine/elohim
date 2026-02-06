@@ -1,0 +1,11 @@
+Scenario: Elderly person maintains choice authority despite assistance needs
+    Given Helen's daughter assists with weekly shopping
+    And Helen requires help but retains decision-making capacity
+    When Helen uses the Value Scanner with assistance
+    Then she should still choose which foods she prefers
+    And her daughter should facilitate, not decide for her
+    And the personal_agent should say "Helen, which apples do you want?"
+    And Helen's preferences should be respected and recorded
+    And assistance should enhance her autonomy, not diminish it
+    And her dignity as decision-maker should be preserved
+    And the system should distinguish between needing help and losing authority

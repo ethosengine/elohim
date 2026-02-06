@@ -1,0 +1,9 @@
+Scenario: Organizer creates accessible education materials for community meeting
+    Given the organizer is holding meeting about proposed zoning changes
+    And community members have limited policy literacy and speak multiple languages
+    When the organizer requests education materials from Observer
+    Then they receive one-page summary in plain language
+    And get versions in Spanish, Mandarin, and Vietnamese
+    And see visual infographics showing community impact
+    And access deeper detail for residents who want more information
+    And 47-page staff report becomes accessible to whole community

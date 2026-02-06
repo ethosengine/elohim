@@ -1,0 +1,9 @@
+Scenario: Track how Riverside community evolves over 10 years
+    Given Riverside adopted protocol in Year 1 of study
+    When James returns annually to measure changes
+    Then he tracks wellbeing indicators over full decade
+    And he documents how trust builds incrementally not instantaneously
+    And he observes how civic participation increases over time
+    And he identifies challenges that emerge only after years of operation
+    And he captures transformation that short-term studies miss
+    And longitudinal design reveals cumulative effects

@@ -1,0 +1,10 @@
+Scenario: Coordinating household schedule around grandparenting commitments
+    Given Margaret provides childcare three days per week
+    And this affects household availability and flexibility
+    When the household plans activities and commitments
+    Then the household_elohim should coordinate around care schedule
+    And it should recognize grandparenting as household commitment
+    And it should help both partners plan around care days
+    And household decisions should account for care obligations
+    And Margaret's care work should be treated as serious commitment
+    And the household should operate as team around grandparenting

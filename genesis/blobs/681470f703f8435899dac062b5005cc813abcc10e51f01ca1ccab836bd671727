@@ -1,0 +1,12 @@
+Scenario: Personal agent serves Frank's autonomy without infantilizing
+    Given Frank is a capable adult with 70 years of life experience
+    And he has decades of construction expertise
+    And the interface uses AI assistance
+    When the personal_agent interacts with Frank
+    Then it must preserve his full autonomy and dignity
+    And it must never be patronizing or infantilizing
+    And it must respect his expertise and judgment
+    And it must provide information and options, not directives
+    And it must acknowledge his skills and competence
+    And the relationship should be respectful partnership
+    And Frank should feel empowered and respected, never managed

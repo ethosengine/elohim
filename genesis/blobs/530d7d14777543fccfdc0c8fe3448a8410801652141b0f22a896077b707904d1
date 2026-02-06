@@ -1,0 +1,10 @@
+Scenario: Parks board member tracks implementation of playground improvement promises
+    Given board approved contract with playground vendor three years ago
+    And vendor promised high-quality equipment meeting accessibility standards
+    And community members complain about equipment safety and accessibility
+    When the board member uses Observer implementation tracking
+    Then they discover equipment doesn't meet accessibility standards promised
+    And see maintenance issues documented across multiple park sites
+    And find vendor's performance worse than contract specifications
+    And access data showing peer municipalities use better vendors
+    And impact tracking reveals vendor failed to deliver promised outcomes

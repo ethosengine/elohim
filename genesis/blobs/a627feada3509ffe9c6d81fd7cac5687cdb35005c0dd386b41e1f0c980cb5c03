@@ -1,0 +1,11 @@
+Scenario: Household care tokens reflect both partners' contributions
+    Given Robert and Jennifer both contribute substantial household labor
+    And they coordinate care for parents and support for children
+    When household_elohim calculates care tokens
+    Then both partners' contributions should be valued appropriately
+    And household labor should be recognized economically
+    And care coordination should be valued alongside direct care
+    And emotional labor should be made visible and valued
+    And both partners should see their care work recognized
+    And household care economy should operate on equity principles
+    And token allocation should support rather than strain partnership

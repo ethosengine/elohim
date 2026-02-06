@@ -1,0 +1,27 @@
+{
+  "id": "unit-core-principles",
+  "title": "Core Principles: The Foundation of Elohim",
+  "content": "# Core Principles: The Foundation of Elohim\n\n## Beyond Left and Right\n\nTraditional political frameworks offer a choice: market efficiency or state protection. The Elohim Protocol rejects this false dichotomy by returning to first principles.\n\nWhat do humans actually need to flourish?\n\n## The Five Foundational Principles\n\n### 1. Dignity is Non-Negotiable\n\nEvery person has intrinsic worth that no system should compromise. This isn't sentimentality—it's the foundation of stable coordination. Systems that degrade dignity eventually collapse under their own contradictions.\n\n**For policy makers**: Rights aren't obstacles to efficiency; they're prerequisites for legitimacy.\n\n**For developers**: Design for the most vulnerable user, and you'll build better systems for everyone.\n\n### 2. Value Flows, Not Just Money\n\nThe care economy—parenting, eldercare, mentorship, community building—creates enormous value that GDP ignores. When we only count what markets price, we systematically underinvest in what matters most.\n\n**For influencers**: Your reach has value beyond ad revenue. Recognition systems should reflect that.\n\n**For content creators**: Educational content that changes lives deserves recognition, not just content that maximizes watch time.\n\n### 3. Distributed Intelligence\n\nNo single entity—human, AI, or institution—should have unilateral power. Intelligence and judgment should be distributed across networks with appropriate checks and balances.\n\n**For developers**: This is the microservices architecture applied to governance.\n\n**For policy makers**: This is federalism taken seriously, with modern tools to make it work.\n\n### 4. Constitutional AI\n\nAI systems must operate under explicit constraints that humans can understand, verify, and modify. \"Trust us, our AI is aligned\" isn't good enough.\n\n**For everyone**: You should be able to understand what your AI assistant can and cannot do, and why.\n\n### 5. Regenerative by Design\n\nSystems should leave things better than they found them. Extraction is a bug, not a feature. This applies to ecological systems, social systems, and economic systems.\n\n**For creators**: The attention economy extracts; the Elohim economy regenerates.\n\n## How These Principles Connect\n\nThese aren't five separate ideas—they're facets of a single insight:\n\n> **Sustainable coordination requires recognizing the full spectrum of human value within constitutional constraints.**\n\nEach principle reinforces the others:\n- Dignity requires recognizing all value (not just market value)\n- Distributed intelligence requires constitutional constraints\n- Regeneration requires dignity for future generations\n\n## The Implementation Challenge\n\nPrinciples are easy to state, hard to implement. The following sections show how the Elohim Protocol operationalizes these principles through:\n\n- **AI Governance** (constitutional oversight)\n- **Value Scanner** (making invisible value visible)\n- **Public Observer** (civic participation)\n- **Autonomous Entity** (workplace transformation)\n- **Social Medium** (healthy digital spaces)",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/manifesto.md",
+  "tags": [
+    "vision",
+    "principles",
+    "foundations",
+    "unit",
+    "dignity",
+    "value"
+  ],
+  "relationships": [
+    {
+      "target": "manifesto",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-why-elohim",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:30:43.253Z",
+  "updatedAt": "2025-12-17T01:30:54.682Z"
+}

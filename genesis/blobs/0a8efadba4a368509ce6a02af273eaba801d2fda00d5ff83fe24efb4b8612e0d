@@ -1,0 +1,11 @@
+Scenario: Workplace accommodations legally required and systematically tracked
+    Given Alex requires specific workplace accommodations
+    And accommodations are legally mandated under ADA
+    When Alex requests workplace accommodations
+    Then the workplace_elohim should help Alex document accommodation requests
+    And it should track whether employer provides required accommodations
+    And it should maintain records of all accommodation-related communications
+    And Alex should have documentation to support legal action if necessary
+    And the protocol should recognize that accommodation is right, not favor
+    And Alex should be supported in asserting legal rights
+    And workplace obligations should be clearly documented

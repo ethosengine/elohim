@@ -1,0 +1,12 @@
+Scenario: Tracking nutritional needs as dietary requirements change with age
+    Given Frank's dietary needs are changing as he ages
+    And he needs more protein and fiber, less sodium
+    And he's managing early indicators of health conditions
+    When Frank shops for groceries on fixed budget
+    Then his personal_agent should track nutrition across time
+    And it should suggest foods appropriate for aging nutritional needs
+    And it should flag items high in sodium or added sugars
+    And it should highlight protein and fiber-rich options
+    And it should balance health needs with budget constraints
+    And nutritional guidance should feel supportive, not controlling
+    And Frank should maintain full agency over food choices

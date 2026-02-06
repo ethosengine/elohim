@@ -1,0 +1,13 @@
+Scenario: Neighborhood children and elders connected across generations
+    Given Robert's grandchild occasionally visits
+    And neighborhood has elderly residents and young families
+    And intergenerational connection benefits everyone
+    When neighborhood_elohim facilitates intergenerational connection
+    Then it should coordinate intergenerational activities
+    And connect Robert's visiting grandchild with neighborhood children
+    And facilitate connections between neighborhood elders and families
+    And build multigenerational neighborhood care networks
+    And reduce isolation for elderly residents
+    And provide care and enrichment for children
+    And demonstrate that neighborhoods thrive through age diversity
+    And strengthen community through intergenerational care

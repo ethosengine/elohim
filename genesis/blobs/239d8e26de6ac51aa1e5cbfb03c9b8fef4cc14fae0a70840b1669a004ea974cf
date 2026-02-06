@@ -1,0 +1,10 @@
+Scenario: Community coordination reduces individual family burden
+    Given Marcus carries heavy household responsibility
+    And community coordination could reduce this burden
+    When the community_elohim identifies systemic solutions
+    Then it should propose community-level responses to individual struggles
+    And collective action should be suggested: cooperatives, sharing networks, bulk buying
+    And Marcus's individual burden should decrease through community organization
+    And the protocol should demonstrate that care economy reduces isolation
+    And community should exist to coordinate care across families
+    And systemic support should replace individual heroics where possible

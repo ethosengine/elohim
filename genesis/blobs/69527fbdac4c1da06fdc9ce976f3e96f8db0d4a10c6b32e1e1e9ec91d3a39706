@@ -1,0 +1,10 @@
+Scenario: Coordinating with school for grandchildren's educational needs
+    Given Margaret is involved in grandchildren's education
+    And she sometimes attends school events or communicates with teachers
+    When the educational_elohim coordinates school involvement
+    Then it should recognize Margaret's educational engagement
+    And it should facilitate communication between grandparent and school
+    And it should value her participation in children's formal education
+    And school involvement should accumulate care tokens
+    And Margaret should be recognized as part of children's educational support network
+    And grandparent participation should be welcomed and valued

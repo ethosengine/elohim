@@ -1,0 +1,10 @@
+Scenario: Municipal transit and urban planning responsive to teen needs
+    Given Jasmine relies on public transit and walkable neighborhoods
+    And urban planning decisions affect her daily mobility
+    When the municipality makes transit and planning decisions
+    Then youth input should be actively solicited through municipal_elohim
+    And Jasmine's lived experience should inform planning
+    And teen mobility needs should shape transit routing and scheduling
+    And safe walking and biking infrastructure should reflect youth usage patterns
+    And municipal planning should recognize teens as legitimate urban space users
+    And age-friendly cities should include teen-friendly design

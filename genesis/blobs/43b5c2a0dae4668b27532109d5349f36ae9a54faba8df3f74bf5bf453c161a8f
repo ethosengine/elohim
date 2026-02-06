@@ -1,0 +1,9 @@
+Scenario: Journalist develops whistleblower source on environmental violations
+    Given an employee witnesses company illegally dumping waste
+    And fears job loss for reporting violations
+    When the Observer provides secure anonymous channel
+    Then the whistleblower shares evidence of illegal dumping
+    And journalist investigates without exposing source
+    And verifies claims through regulatory records and site investigation
+    And publishes investigation leading to enforcement action
+    And source protection enables environmental accountability

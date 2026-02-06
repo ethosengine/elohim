@@ -1,0 +1,11 @@
+Scenario: Walking assistance from neighborhood volunteers
+    Given Helen's mobility makes walking difficult
+    And she needs assistance to remain active in neighborhood
+    When neighborhood volunteers offer walking support
+    Then the neighborhood_elohim should coordinate volunteer schedules
+    And volunteers should be matched based on availability and compatibility
+    And Helen's preferences should guide volunteer matching
+    And volunteer care work should be recognized with care tokens
+    And Helen should experience companionship, not charity
+    And the protocol should build reciprocal neighbor relationships
+    And neighborhood support should enable continued engagement

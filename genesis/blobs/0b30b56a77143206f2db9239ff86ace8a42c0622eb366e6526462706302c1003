@@ -1,0 +1,10 @@
+Scenario: Shopping locally contributes to neighborhood economy
+    Given Kenji buys groceries at neighborhood corner store and farmer's market
+    And local shopping supports neighborhood businesses
+    When the neighborhood_elohim tracks local economic participation
+    Then it should recognize Kenji's local purchases as neighborhood contribution
+    And it should show him "You've spent $X at local businesses this month"
+    And it should help him understand his economic impact on neighborhood
+    And local shopping should accumulate care tokens
+    And the system should make visible how spending choices support community
+    And students should see themselves as neighborhood economic participants

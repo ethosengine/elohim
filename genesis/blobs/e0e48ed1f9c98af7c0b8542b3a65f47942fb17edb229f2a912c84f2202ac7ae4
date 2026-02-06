@@ -1,0 +1,9 @@
+Scenario: Farmer cooperation replaces competition through democratic coordination
+    Given farmers traditionally compete for corporate contracts driving prices down
+    And competition prevented coordination benefiting all farmers
+    When democratic network enables farmer cooperation
+    Then Tom and neighboring farms coordinate complementary production
+    And crop specialization (one farm tomatoes, another greens, another roots) provides diversity
+    And revenue is shared fairly based on contribution
+    And farmers share equipment, labor, and expertise
+    And industry_sector_elohim facilitates farmer network coordination and fair value distribution

@@ -1,0 +1,12 @@
+Scenario: Skilled volunteer labor valued at market rates for community contribution
+    Given Frank volunteers 20 hours/week with Habitat for Humanity
+    And he provides skilled construction labor
+    And this work has clear market value (~$40/hour for skilled trades)
+    When the community_elohim tracks volunteer contributions
+    Then Frank's volunteer labor should be quantified specifically
+    And market value should be calculated (~$20k/year contribution)
+    And his skilled labor should be recognized as substantial community asset
+    And community care tokens should accumulate from volunteer work
+    And Frank should see quantified value of his contribution
+    And the narrative of retired as "not contributing" should be countered
+    And community should recognize his volunteer work as real economic value

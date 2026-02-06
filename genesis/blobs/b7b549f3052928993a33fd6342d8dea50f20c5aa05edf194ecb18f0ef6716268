@@ -1,0 +1,10 @@
+Scenario: Recognition prompts build mother-son relationship
+    Given Sarah has limited time with Marcus
+    And their relationship could be strained by her absence and his burden
+    When the family_elohim generates recognition prompts
+    Then prompts should facilitate positive connection moments
+    And Sarah should be given specific appreciations to express
+    And Marcus should receive recognition from Sarah, not just system
+    And their relationship should be strengthened by care visibility
+    And prompts should create opportunities for bonding
+    And love should be communicated despite difficult circumstances

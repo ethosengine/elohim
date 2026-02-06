@@ -1,0 +1,11 @@
+Scenario: Emergency response configured to Helen's advance directives
+    Given emergency situations may occur in Helen's household
+    And Helen has specific wishes about medical intervention
+    When emergency protocols are configured
+    Then her advance directives should guide emergency response
+    And emergency contacts should understand her wishes
+    And the household_elohim should communicate her preferences to responders
+    And her values should be respected even in crisis
+    And emergency systems should serve her autonomy, not override it
+    And her voice should remain authoritative about her own care
+    And the protocol should ensure her wishes guide all household emergency response

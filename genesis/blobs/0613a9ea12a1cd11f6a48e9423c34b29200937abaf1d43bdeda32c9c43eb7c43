@@ -1,0 +1,12 @@
+Scenario: Protecting children's relationship with abusive parent when legally required
+    Given my children have court-ordered visitation with their abusive parent
+    And I need to support children's wellbeing within legal constraints
+    When children navigate relationship with abusive parent
+    Then the family_elohim helps me prepare children appropriately
+    And tracks children's responses to visitation
+    And helps me support children's processing of complex feelings
+    And documents concerning behaviors for legal purposes if needed
+    And connects me to resources on supporting children through this
+    And my personal_agent reminds me of safety protocols around visitation
+    And recognizes my emotional labor supporting children through this trauma
+    And validates that my protective responses are appropriate

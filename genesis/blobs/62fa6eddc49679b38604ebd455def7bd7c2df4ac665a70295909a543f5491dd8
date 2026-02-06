@@ -1,0 +1,10 @@
+Scenario: Student privacy rights within family context
+    Given Kenji is legal adult with full privacy rights
+    And family relationships involve some appropriate information sharing
+    When the family_elohim manages family information
+    Then Kenji must have complete control over what family sees
+    And parents should not have access to his personal data without consent
+    And the system should respect his adult autonomy absolutely
+    And family connection should not compromise privacy
+    And Kenji should decide what to share with family
+    And adult student privacy should be default, non-negotiable

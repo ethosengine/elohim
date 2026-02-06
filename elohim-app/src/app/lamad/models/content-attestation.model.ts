@@ -21,7 +21,10 @@
  * - Revocation: creates new entry with revoked status, doesn't delete
  */
 
-import { REACH_LEVEL_VALUES } from './protocol-core.model';
+import { REACH_LEVEL_VALUES } from '@app/elohim/models/protocol-core.model';
+
+// @coverage: 100.0% (2026-02-05)
+
 import type { ContentReach } from './content-node.model';
 
 // Re-export ContentReach for backward compatibility
@@ -50,16 +53,16 @@ export const CONTENT_REACH_LEVELS: Record<ContentReach, number> = REACH_LEVEL_VA
  * Multiple attestations can stack to increase reach.
  */
 export type ContentAttestationType =
-  | 'author-verified'       // Author identity confirmed (baseline)
-  | 'steward-approved'      // Domain steward reviewed and approved
-  | 'community-endorsed'    // Received N endorsements from community
-  | 'peer-reviewed'         // Formal review by qualified peers
-  | 'governance-ratified'   // Approved through governance process
-  | 'curriculum-canonical'  // Official learning content for a path
-  | 'safety-reviewed'       // Checked for harmful content
-  | 'accuracy-verified'     // Factual accuracy validated
+  | 'author-verified' // Author identity confirmed (baseline)
+  | 'steward-approved' // Domain steward reviewed and approved
+  | 'community-endorsed' // Received N endorsements from community
+  | 'peer-reviewed' // Formal review by qualified peers
+  | 'governance-ratified' // Approved through governance process
+  | 'curriculum-canonical' // Official learning content for a path
+  | 'safety-reviewed' // Checked for harmful content
+  | 'accuracy-verified' // Factual accuracy validated
   | 'accessibility-checked' // Meets accessibility standards
-  | 'license-cleared';      // IP/licensing verified
+  | 'license-cleared'; // IP/licensing verified
 
 /**
  * AttestationReachGrant - What reach level each attestation type can grant.
@@ -76,7 +79,7 @@ export const DEFAULT_ATTESTATION_REACH_GRANTS: Record<ContentAttestationType, Co
   'safety-reviewed': 'regional',
   'accuracy-verified': 'regional',
   'accessibility-checked': 'municipal',
-  'license-cleared': 'commons'
+  'license-cleared': 'commons',
 };
 
 // ============================================================================
@@ -171,15 +174,15 @@ export interface AttestationRevocation {
 }
 
 export type RevocationReason =
-  | 'harmful-content'       // Content causes harm
-  | 'misinformation'        // Factually incorrect
-  | 'copyright-violation'   // IP issues
-  | 'author-request'        // Author requested removal
-  | 'policy-violation'      // Violates community policies
-  | 'superseded'            // Replaced by newer attestation
-  | 'expired-not-renewed'   // Time-based expiration
-  | 'grantor-revoked'       // Grantor lost their authority
-  | 'governance-decision';  // Formal governance process
+  | 'harmful-content' // Content causes harm
+  | 'misinformation' // Factually incorrect
+  | 'copyright-violation' // IP issues
+  | 'author-request' // Author requested removal
+  | 'policy-violation' // Violates community policies
+  | 'superseded' // Replaced by newer attestation
+  | 'expired-not-renewed' // Time-based expiration
+  | 'grantor-revoked' // Grantor lost their authority
+  | 'governance-decision'; // Formal governance process
 
 /**
  * AttestationEvidence - Proof/justification for attestation.
@@ -304,52 +307,75 @@ export interface ContentReachRequirement {
   customRequirements?: Record<string, unknown>;
 }
 
+// Attestation type constants to avoid magic strings
+const ATTESTATION_AUTHOR_VERIFIED: ContentAttestationType = 'author-verified';
+const ATTESTATION_STEWARD_APPROVED: ContentAttestationType = 'steward-approved';
+const ATTESTATION_SAFETY_REVIEWED: ContentAttestationType = 'safety-reviewed';
+const ATTESTATION_COMMUNITY_ENDORSED: ContentAttestationType = 'community-endorsed';
+const ATTESTATION_PEER_REVIEWED: ContentAttestationType = 'peer-reviewed';
+const ATTESTATION_GOVERNANCE_RATIFIED: ContentAttestationType = 'governance-ratified';
+const ATTESTATION_CURRICULUM_CANONICAL: ContentAttestationType = 'curriculum-canonical';
+const ATTESTATION_LICENSE_CLEARED: ContentAttestationType = 'license-cleared';
+
+// Flag type constants
+const FLAG_DISPUTED: ContentFlag['type'] = 'disputed';
+const FLAG_UNDER_REVIEW: ContentFlag['type'] = 'under-review';
+const FLAG_APPEAL_PENDING: ContentFlag['type'] = 'appeal-pending';
+
 /**
  * Default reach requirements - what attestations are needed for each reach level.
  */
 export const DEFAULT_REACH_REQUIREMENTS: Record<ContentReach, ContentReachRequirement> = {
-  'private': {
+  private: {
     reach: 'private',
     // No requirements - author always has private access
   },
-  'invited': {
+  invited: {
     reach: 'invited',
-    requiredAttestations: ['author-verified'],
+    requiredAttestations: [ATTESTATION_AUTHOR_VERIFIED],
   },
-  'local': {
+  local: {
     reach: 'local',
-    requiredAttestations: ['author-verified'],
+    requiredAttestations: [ATTESTATION_AUTHOR_VERIFIED],
     minimumTrustScore: 0.2,
   },
-  'neighborhood': {
+  neighborhood: {
     reach: 'neighborhood',
-    requiredAttestations: ['author-verified', 'community-endorsed'],
+    requiredAttestations: [ATTESTATION_AUTHOR_VERIFIED, ATTESTATION_COMMUNITY_ENDORSED],
     minimumTrustScore: 0.3,
   },
-  'municipal': {
+  municipal: {
     reach: 'municipal',
-    requiredAttestations: ['steward-approved', 'community-endorsed', 'safety-reviewed'],
+    requiredAttestations: [
+      ATTESTATION_STEWARD_APPROVED,
+      ATTESTATION_COMMUNITY_ENDORSED,
+      ATTESTATION_SAFETY_REVIEWED,
+    ],
     minimumTrustScore: 0.4,
   },
-  'bioregional': {
+  bioregional: {
     reach: 'bioregional',
-    requiredAttestations: ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
+    requiredAttestations: [
+      ATTESTATION_STEWARD_APPROVED,
+      ATTESTATION_PEER_REVIEWED,
+      ATTESTATION_SAFETY_REVIEWED,
+    ],
     minimumTrustScore: 0.5,
-    noFlags: ['disputed'],
+    noFlags: [FLAG_DISPUTED],
   },
-  'regional': {
+  regional: {
     reach: 'regional',
-    requiredAttestations: ['peer-reviewed', 'governance-ratified'],
+    requiredAttestations: [ATTESTATION_PEER_REVIEWED, ATTESTATION_GOVERNANCE_RATIFIED],
     minimumTrustScore: 0.6,
-    noFlags: ['disputed', 'under-review'],
+    noFlags: [FLAG_DISPUTED, FLAG_UNDER_REVIEW],
   },
-  'commons': {
+  commons: {
     reach: 'commons',
-    requiredAllAttestations: ['safety-reviewed', 'license-cleared'],
-    requiredAttestations: ['governance-ratified', 'curriculum-canonical'],
+    requiredAllAttestations: [ATTESTATION_SAFETY_REVIEWED, ATTESTATION_LICENSE_CLEARED],
+    requiredAttestations: [ATTESTATION_GOVERNANCE_RATIFIED, ATTESTATION_CURRICULUM_CANONICAL],
     minimumTrustScore: 0.8,
-    noFlags: ['disputed', 'under-review', 'appeal-pending'],
-  }
+    noFlags: [FLAG_DISPUTED, FLAG_UNDER_REVIEW, FLAG_APPEAL_PENDING],
+  },
 };
 
 // ============================================================================
@@ -379,7 +405,7 @@ export interface AttestationDecision {
   decidedAt: string;
   reason?: string;
   attestationId?: string; // If approved, the created attestation
-  conditions?: string[];  // Conditions for approval
+  conditions?: string[]; // Conditions for approval
   deferredUntil?: string; // If deferred
 }
 

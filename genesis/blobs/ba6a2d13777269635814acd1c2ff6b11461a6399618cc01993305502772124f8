@@ -1,0 +1,9 @@
+Scenario: Part-time employment with full benefits for caregivers
+    Given James can only work part-time due to caregiving
+    And loss of benefits creates devastating vulnerability
+    When the workplace_elohim advocates for benefits policy
+    Then part-time caregiver employees should access benefits
+    And healthcare coverage should not require full-time employment
+    And benefits should recognize caregiving as legitimate constraint
+    And workplace should not force caregivers to choose between care and benefits
+    And employment protection should include part-time caregivers

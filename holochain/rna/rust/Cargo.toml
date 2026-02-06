@@ -1,0 +1,43 @@
+[package]
+name = "hc-rna"
+version = "0.1.0"
+edition = "2021"
+description = "RNA - Holochain migration toolkit for transcribing data between DNA versions"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["holochain", "migration", "dna", "upgrade"]
+categories = ["development-tools"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "hc-rna-generate"
+path = "src/bin/generate_enhanced.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "generate"
+path = "src/bin/generate.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "hc-rna-schema"
+path = "src/bin/schema.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "hc-rna-fixtures"
+path = "src/bin/fixtures.rs"
+required-features = ["cli"]
+
+[dependencies]
+hdk = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.10"
+clap = { version = "4.4", features = ["derive"], optional = true }
+
+[features]
+default = []
+cli = ["clap"]

@@ -1,0 +1,66 @@
+# Processes and Recipes: How Value Gets Created
+
+## What is a Process?
+
+In hREA, a Process is an activity that transforms resources:
+- Takes **inputs** (consumed, used, or cited resources)
+- Produces **outputs** (new or modified resources)
+- Involves **agents** who do the work
+
+```
+Process: Community Health Checkup
+├── inputs:
+│   ├── consume: medical supplies
+│   ├── use: examination equipment
+│   └── work: nurse labor (2 hours)
+├── outputs:
+│   ├── produce: health assessment report
+│   └── produce: patient care notes
+└── involvedAgents: [nurse_adaeze, patient]
+```
+
+## Recipes: Reusable Process Templates
+
+A Recipe (via ProcessSpecification and RecipeFlow) defines **how** to do something:
+
+```
+Recipe: Emergency Stabilization Protocol
+├── inputs required:
+│   ├── IV supplies
+│   ├── Monitoring equipment
+│   └── Trained nurse (skill: emergency-triage)
+├── outputs expected:
+│   ├── Stabilized patient
+│   └── Care documentation
+└── estimatedDuration: 30-60 minutes
+```
+
+Recipes enable:
+- **Knowledge sharing**: Documented best practices
+- **Training**: New agents learn from recipes
+- **Coordination**: Teams know what to expect
+- **Quality**: Consistent processes
+
+## Processes in Care Networks
+
+Care work follows patterns:
+
+| Process Type | Inputs | Outputs |
+|--------------|--------|---------|
+| Patient Care | Time, supplies, skill | Health, comfort, documentation |
+| Device Repair | Parts, labor, expertise | Working device, knowledge |
+| Teaching | Time, knowledge, attention | Learning, questions, insights |
+| Meal Prep | Ingredients, labor, love | Food, nutrition, togetherness |
+
+## Chaining Processes
+
+Processes connect:
+- `previousProcesses`: What came before
+- `nextProcesses`: What comes after
+
+This creates **value chains** visible across the network:
+```
+Farm → Market → Kitchen → Family Meal → Compost → Farm
+```
+
+The circular economy becomes traceable.

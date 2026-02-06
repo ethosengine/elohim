@@ -1,0 +1,11 @@
+Scenario: Retired residents as civic engagement resource for municipal governance
+    Given Frank has time freedom enabling substantial civic participation
+    And many retired residents can attend daytime meetings and hearings
+    When the municipal_elohim coordinates civic engagement
+    Then it should recognize retired residents as civic participation resource
+    And facilitate their attendance at municipal meetings and hearings
+    And coordinate testimony and advocacy utilizing their availability
+    And recognize civic engagement as care contribution
+    And retired residents should be understood as democracy infrastructure
+    And Frank should participate meaningfully in municipal governance
+    And elder voice should shape municipal policy

@@ -1,0 +1,17 @@
+# Imago Dei DNA - Identity, Relationships & Attestations
+---
+manifest_version: "0"
+name: imagodei
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: imagodei_integrity
+      path: "target/wasm32-unknown-unknown/release/imagodei_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: imagodei
+      path: "target/wasm32-unknown-unknown/release/imagodei.wasm"
+      dependencies:
+        - name: imagodei_integrity

@@ -1,0 +1,9 @@
+Scenario: Journalist tracks regional displacement and gentrification
+    Given housing costs rise across metropolitan region
+    And the journalist investigates who benefits and who is harmed
+    When the Observer tracks displacement patterns regionally
+    Then the journalist sees working-class communities of color losing residents
+    And maps evictions, rent increases, and demographic changes
+    And identifies corporate landlords buying properties across region
+    And documents regional coordination of displacement
+    And publishes investigation connecting local experiences to regional pattern

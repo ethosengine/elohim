@@ -1,0 +1,10 @@
+Scenario: Supporting homework and school learning
+    Given Emma has homework and school projects
+    And Margaret helps with reading, math, and assignments
+    When Margaret provides academic support
+    Then the educational_elohim should recognize homework help as teaching
+    And it should coordinate with Emma's school learning goals
+    And it should value Margaret's educational support labor
+    And academic assistance should accumulate care tokens
+    And Margaret should be recognized as part of Emma's educational team
+    And grandparent learning support should complement formal schooling

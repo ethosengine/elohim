@@ -1,0 +1,10 @@
+Scenario: Mentoring younger volunteers in construction and community work
+    Given Frank has both construction expertise and volunteering experience
+    And younger volunteers need skill development and guidance
+    When the community_elohim coordinates mentoring
+    Then it should connect Frank to volunteers seeking construction skills
+    And facilitate teaching and skill transmission
+    And recognize mentoring as multiplying Frank's contribution
+    And value teaching labor as care contribution
+    And build community capacity through intergenerational skill sharing
+    And Frank should experience meaningful role as mentor and teacher

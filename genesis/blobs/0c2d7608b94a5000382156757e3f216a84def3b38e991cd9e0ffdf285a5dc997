@@ -1,0 +1,9 @@
+Scenario: Customer experiences transparency about where money goes
+    Given corporate spending is opaque—customers don't know how their payment distributes
+    And Ms. Johnson cares about supporting fair wages but had no information
+    When democratic business provides complete value distribution transparency
+    Then she sees exactly: 60% to worker wages and benefits, 30% to community programs, 10% to sustainability
+    And workers earn $18/hour minimum vs. previous corporate $11/hour
+    And her $8.99 meal supports specific visible outcomes
+    And transparency enables ethical consumption through informed choice
+    And community_elohim provides accessible transparency dashboard for interested customers

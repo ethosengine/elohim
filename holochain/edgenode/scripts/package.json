@@ -1,0 +1,16 @@
+{
+  "name": "happ-installer",
+  "version": "1.0.0",
+  "description": "Installs hApp on Holochain conductor startup",
+  "main": "install-happ.cjs",
+  "scripts": {
+    "install-happ": "node install-happ.cjs"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.20.0"
+  },
+  "overrides": {
+    "libsodium": "0.7.15",
+    "libsodium-wrappers": "0.7.15"
+  }
+}

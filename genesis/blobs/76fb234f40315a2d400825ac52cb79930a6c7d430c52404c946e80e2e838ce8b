@@ -1,0 +1,10 @@
+Scenario: Household contribution recognition for care reciprocity
+    Given Helen has lived in this home for 40 years
+    And she raised family and contributed to community from this household
+    When household care economy is tracked
+    Then her lifetime of household labor should be visible
+    And her decades of contribution should create legitimate claims
+    And current care receipt should be framed as reciprocity
+    And she should not feel like a burden in her own home
+    And the household_elohim should surface her contribution history
+    And care flowing to her should be recognized as earned through lifetime of giving

@@ -1,0 +1,11 @@
+Scenario: Memory preservation as educational contribution
+    Given Helen holds family and community history
+    And dementia threatens loss of collective memory
+    When Helen participates in memory preservation projects
+    Then her storytelling should be captured for educational archives
+    And oral history should be treated as legitimate historical knowledge
+    And her participation should be recognized as educational contribution
+    And the protocol should prioritize preservation while Helen can still share
+    And cultural heritage should be maintained through elder participation
+    And Helen's memory keeping should be valued as community education
+    And historical knowledge should be preserved before it's lost

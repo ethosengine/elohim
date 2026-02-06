@@ -1,0 +1,9 @@
+Scenario: Workplace boundaries protect capacity for household care
+    Given Sarah's care responsibilities require substantial time and energy
+    And work can expand to consume all available capacity
+    When workplace demands are placed on Sarah
+    Then the workplace_elohim should monitor total demands
+    And it should alert Sarah when work threatens care capacity
+    And it should help her maintain boundaries
+    And workplace should respect that Sarah has legitimate care obligations
+    And boundaries should protect Sarah's sustainability

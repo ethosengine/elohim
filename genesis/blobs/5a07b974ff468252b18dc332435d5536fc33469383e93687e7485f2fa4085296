@@ -1,0 +1,9 @@
+Scenario: Municipal working parent policies informed by care economy data
+    Given Sarah balances full-time work with parenting
+    And municipal policy affects working parents' capacity to care
+    When municipal employment policies are considered
+    Then care economy data should show working parents' time constraints
+    And policy should recognize workers' care responsibilities
+    And municipal employers should adopt family-friendly policies
+    And Sarah's advocacy should be strengthened by care economy evidence
+    And municipal policy should support work-life integration

@@ -1,0 +1,11 @@
+Scenario: Distributing grandparenting labor equitably between partners
+    Given both Margaret and Robert are retired and available
+    And Margaret currently does most of the grandchild care
+    When the household_elohim tracks care contributions
+    Then it should show Margaret's 25 hours/week of grandchild care
+    And it should show Robert's care contributions (if any)
+    And it should identify if care labor is unequally distributed
+    And it should facilitate discussion about equitable distribution
+    And both partners should contribute to grandparenting
+    And Margaret should not bear sole burden of care work
+    And household care economy should be equitable

@@ -1,0 +1,9 @@
+Scenario: Personal crisis support provides immediate dignified assistance
+    Given Sarah encounters a crisis—job loss, health emergency, family breakdown
+    And she needs immediate support
+    When the personal_agent detects crisis indicators
+    Then it should connect her to appropriate resources immediately
+    And support should be dignified, not stigmatizing
+    And she should access community mutual aid networks
+    And crisis response should be effective under extreme stress
+    And the protocol should function as safety net during vulnerability

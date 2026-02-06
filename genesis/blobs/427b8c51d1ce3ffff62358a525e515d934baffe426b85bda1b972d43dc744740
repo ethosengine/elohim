@@ -1,0 +1,12 @@
+Scenario: Identifying employment opportunities that are genuine versus exploitative
+    Given some employers specifically target vulnerable people for exploitation
+    And I am vulnerable to accepting exploitative work due to desperation
+    When I evaluate employment opportunities
+    Then the workplace_elohim helps me assess whether opportunities are exploitative
+    And identifies red flags (unpaid "training", illegal pay practices, unsafe conditions, unrealistic expectations)
+    And validates that I deserve fair employment, not exploitation
+    And helps me decline opportunities that would harm my recovery
+    And surfaces genuinely fair employment options
+    And my personal_agent alerts me to concerning employer patterns
+    And recognizes that protecting myself from exploitation is essential
+    And supports me waiting for appropriate opportunity rather than accepting harm

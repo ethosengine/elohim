@@ -1,0 +1,46 @@
+version: '3.8'
+
+# Development infrastructure for Doorway
+# Run: docker-compose -f docker-compose.dev.yml up -d
+
+services:
+  # NATS Server with JetStream enabled
+  nats:
+    image: nats:2.10-alpine
+    container_name: doorway-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    restart: unless-stopped
+
+  # MongoDB for persistent storage
+  mongodb:
+    image: mongo:7
+    container_name: doorway-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: doorway
+    volumes:
+      - doorway_mongo_data:/data/db
+    restart: unless-stopped
+
+  # MongoDB Express UI (optional, for debugging)
+  mongo-express:
+    image: mongo-express
+    container_name: doorway-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017/
+      ME_CONFIG_BASICAUTH: "false"
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+    profiles:
+      - debug
+
+volumes:
+  doorway_mongo_data:
+    name: doorway_mongo_data

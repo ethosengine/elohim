@@ -14,10 +14,7 @@ describe('LamadNotFoundComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [LamadNotFoundComponent],
-      providers: [
-        provideRouter([]),
-        { provide: SeoService, useValue: seoServiceSpy }
-      ]
+      providers: [provideRouter([]), { provide: SeoService, useValue: seoServiceSpy }],
     }).compileComponents();
 
     router = TestBed.inject(Router);
@@ -41,10 +38,12 @@ describe('LamadNotFoundComponent', () => {
   it('should update SEO with noIndex on init', () => {
     fixture.detectChanges();
 
-    expect(seoServiceSpy.updateSeo).toHaveBeenCalledWith(jasmine.objectContaining({
-      title: 'Content Not Found - Lamad',
-      noIndex: true
-    }));
+    expect(seoServiceSpy.updateSeo).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        title: 'Content Not Found - Lamad',
+        noIndex: true,
+      })
+    );
   });
 
   it('should detect path resource type', () => {

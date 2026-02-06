@@ -27,15 +27,110 @@
  * - Uses Attestation patterns from protocol-core
  */
 
-import {
-  type ReachLevel,
-  type GeographicContext,
-} from './protocol-core.model';
-import type { Place } from './place.model';
-import { JsonLdMetadata } from './json-ld.model';
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { type ReachLevel, type GeographicContext } from '@app/elohim/models/protocol-core.model';
+
+// @coverage: 91.7% (2026-02-05)
+
+import type { Place } from '@app/qahal/models/place.model';
 
 // Re-export GeographicContext for backward compatibility
-export type { GeographicContext } from './protocol-core.model';
+export type { GeographicContext } from '@app/elohim/models/protocol-core.model';
+
+/**
+ * ContentBlob - Reference to large binary media for P2P distribution.
+ *
+ * Blobs are NOT stored in DHT (too large). Instead, ContentBlob stores:
+ * - Cryptographic hash for integrity verification
+ * - Size for cache planning
+ * - Fallback URLs for resilience
+ * - Bitrate variants for adaptive streaming
+ *
+ * Blobs are distributed via:
+ * - HTTP Range requests (resume)
+ * - HLS/DASH streaming (adaptive)
+ * - Custodian network replication (P2P)
+ */
+export interface ContentBlob {
+  /** Cryptographic hash of blob (SHA256 hex string) */
+  hash: string;
+
+  /** Size in bytes - used for cache allocation and streaming decisions */
+  sizeBytes: number;
+
+  /** MIME type (e.g., "video/mp4", "audio/mpeg", "application/pdf") */
+  mimeType: string;
+
+  /** Primary + fallback URLs for resilience (try in order) */
+  fallbackUrls: string[];
+
+  /** Bitrate in Mbps (useful for codec/quality tracking) */
+  bitrateMbps?: number;
+
+  /** Duration in seconds (for audio/video) */
+  durationSeconds?: number;
+
+  /** Codec information (H.264, H.265, VP9, AV1, AAC, OPUS, etc.) */
+  codec?: string;
+
+  /** Resolutions/bitrate variants for adaptive streaming */
+  variants?: ContentBlobVariant[];
+
+  /** Subtitle/caption tracks */
+  captions?: ContentBlobCaption[];
+
+  /** When this blob was created */
+  createdAt?: string;
+
+  /** When this blob was last verified/updated */
+  verifiedAt?: string;
+}
+
+/**
+ * Variant of a blob for adaptive streaming (e.g., 480p, 720p, 1080p, 4K).
+ */
+export interface ContentBlobVariant {
+  /** Resolution (e.g., "1080p", "720p", "480p") or bitrate (e.g., "5000k") */
+  label: string;
+
+  /** Bitrate in Mbps */
+  bitrateMbps: number;
+
+  /** Width in pixels (for video) */
+  width?: number;
+
+  /** Height in pixels (for video) */
+  height?: number;
+
+  /** Fallback URLs for this variant (same structure as parent) */
+  fallbackUrls: string[];
+
+  /** Hash of this variant for verification */
+  hash: string;
+
+  /** Size in bytes */
+  sizeBytes: number;
+}
+
+/**
+ * Subtitle or caption track for media.
+ */
+export interface ContentBlobCaption {
+  /** Language code (ISO 639-1: "en", "es", "fr", etc.) */
+  language: string;
+
+  /** Human-readable label ("English", "Spanish", "French with SDH") */
+  label: string;
+
+  /** Format (webvtt, srt, vtt, etc.) */
+  format: 'webvtt' | 'srt' | 'vtt' | 'ass' | 'ssa';
+
+  /** URL to caption file */
+  url: string;
+
+  /** Whether captions include hearing impaired info */
+  isHardOfHearing?: boolean;
+}
 
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
@@ -73,6 +168,9 @@ export interface ContentNode {
 
   /** Flexible metadata for domain-specific data */
   metadata: ContentMetadata;
+
+  /** Large binary media (videos, podcasts, etc.) - Phase 1 blob pointer system */
+  blobs?: ContentBlob[];
 
   // =========================================================================
   // Trust & Reach (Bidirectional Attestation Model)
@@ -309,10 +407,13 @@ export type ContentType =
   | 'simulation'
   | 'video'
   | 'assessment'
+  | 'discovery-assessment' // Self-discovery quizzes (Enneagram, learning style, etc.) - visible path steps
   | 'organization'
   | 'book-chapter'
   | 'tool'
-  | 'role'; // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
+  | 'role' // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
+  | 'path' // Learning path - curated journey through content nodes
+  | 'placeholder'; // Missing/errored content - shown when content can't be loaded
 
 /**
  * RoleMetadata - Extended metadata for role-type ContentNodes.
@@ -356,7 +457,7 @@ export interface RoleMetadata {
    * Minimum mastery level required across the attestation path.
    * Default is 'apply' (attestation gate) - demonstrates practical application.
    */
-  requiredMasteryLevel: import('./agent.model').MasteryLevel;
+  requiredMasteryLevel: import('@app/elohim/models/agent.model').MasteryLevel;
 
   /**
    * Skills/competencies this role encompasses.
@@ -391,19 +492,43 @@ export interface RoleMetadata {
 /**
  * ContentFormat - How the content payload should be interpreted and rendered.
  * Maps to specific renderer components via RendererRegistryService.
+ *
+ * Multimedia formats:
+ * - 'markdown': Rich text with embedded media (default for most content)
+ * - 'html': Raw HTML content
+ * - 'plaintext': Unformatted text
+ * - 'gherkin': Behavior-driven development scenarios
+ *
+ * Interactive formats:
+ * - 'html5-app': Interactive web applications (e.g., https://github.com/ncase/trust)
+ *   Rendered via iframe with sandbox. Ideal for simulations, games, explorable explanations.
+ *   Can have attestation quizzes built to verify understanding.
+ * - 'perseus-quiz-json': Legacy Khan Academy Perseus quiz format
+ * - 'sophia-quiz-json': Sophia Moment format with purpose-based assessment (mastery/discovery/reflection)
+ *   Uses psyche-core for psychometric aggregation and interpretation
+ *
+ * Media formats:
+ * - 'video-embed': Embedded video (YouTube, Vimeo, etc.)
+ * - 'video-file': Direct video file (blob-based streaming)
+ * - 'audio-file': Direct audio file (podcasts, lectures, music)
+ * - 'epub': E-book format
+ *
+ * Navigation:
+ * - 'external-link': Link to external resource
  */
 export type ContentFormat =
   | 'markdown'
   | 'html5-app'
   | 'video-embed'
   | 'video-file'
-  | 'quiz-json'
+  | 'audio-file'
+  | 'perseus-quiz-json' // Khan Academy Perseus quiz format (legacy)
+  | 'sophia-quiz-json' // Sophia Moment format with purpose-based assessment
   | 'external-link'
   | 'epub'
   | 'gherkin'
   | 'html'
-  | 'plaintext'
-  | 'assessment-json';
+  | 'plaintext';
 
 /**
  * ContentPreview - Lightweight preview data for listing/composing content.
@@ -500,7 +625,7 @@ export interface ContentMetadata {
   estimatedTime?: string;
 
   /** Embedding strategy for interactive content */
-  embedStrategy?: 'iframe' | 'native' | 'web-component';
+  embedStrategy?: 'iframe' | 'steward' | 'web-component';
 
   /** Required browser/runtime capabilities */
   requiredCapabilities?: string[];
@@ -540,7 +665,7 @@ export interface ContentMetadata {
   keywords?: string[];
 
   /** Custom domain-specific fields */
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -551,7 +676,7 @@ export interface ContentRelationship {
   sourceNodeId: string;
   targetNodeId: string;
   relationshipType: ContentRelationshipType;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export enum ContentRelationshipType {
@@ -632,3 +757,179 @@ export interface ContentGraphMetadata {
 }
 
 export type { ContentGraphMetadata as GraphMetadata };
+
+// =============================================================================
+// Content Relationship Detail (Diesel Backend)
+// =============================================================================
+// Full relationship model with metadata for graph sensemaking.
+// Maps to the relationships table in elohim-storage.
+
+/**
+ * ContentRelationshipDetail - Full relationship record from backend.
+ *
+ * Extends the basic ContentRelationship with:
+ * - Confidence scoring for inferred relationships
+ * - Inference source tracking (how was this relationship discovered?)
+ * - Bidirectionality and inverse relationship linking
+ * - Provenance chain for trust/audit
+ * - Reach/governance layers from protocol-core
+ */
+export interface ContentRelationshipDetail {
+  /** Unique relationship ID */
+  id: string;
+
+  /** App ID for multi-tenant scoping */
+  appId: string;
+
+  /** Source content node ID */
+  sourceNodeId: string;
+
+  /** Target content node ID */
+  targetNodeId: string;
+
+  /** Relationship type (from ContentRelationshipType enum) */
+  relationshipType: ContentRelationshipType | string;
+
+  /**
+   * Confidence score (0.0 - 1.0) for this relationship.
+   * - 1.0: Explicitly defined by author
+   * - 0.8-0.99: High confidence inference (structural analysis)
+   * - 0.5-0.79: Medium confidence (semantic similarity)
+   * - <0.5: Low confidence (speculative)
+   */
+  confidence: number;
+
+  /**
+   * How this relationship was discovered/created.
+   * - 'author': Explicitly defined by content author
+   * - 'structural': Inferred from path/chapter structure
+   * - 'semantic': Inferred from content similarity
+   * - 'usage': Inferred from user navigation patterns
+   * - 'citation': Extracted from references/links
+   * - 'system': System-generated (e.g., inverse relationships)
+   */
+  inferenceSource: RelationshipInferenceSource;
+
+  /** Is this relationship bidirectional? */
+  isBidirectional: boolean;
+
+  /**
+   * ID of the inverse relationship (for bidirectional pairs).
+   * If A→B is CONTAINS, B→A is BELONGS_TO with linked IDs.
+   */
+  inverseRelationshipId?: string;
+
+  /**
+   * Provenance chain - IDs of sources that contributed to this relationship.
+   * For citations: the source documents
+   * For inferences: the algorithm/model versions
+   */
+  provenanceChain?: string[];
+
+  /**
+   * Governance layer this relationship belongs to.
+   * Affects who can modify/delete it.
+   */
+  governanceLayer?: string;
+
+  /**
+   * Reach level for this relationship (who can see it).
+   * Inherits from the more restrictive of source/target nodes.
+   */
+  reach: ContentReach;
+
+  /** Additional metadata (JSON object) */
+  metadata?: Record<string, unknown>;
+
+  /** Creation timestamp */
+  createdAt: string;
+
+  /** Last updated timestamp */
+  updatedAt: string;
+}
+
+/**
+ * RelationshipInferenceSource - How a relationship was discovered.
+ */
+export type RelationshipInferenceSource =
+  | 'author' // Explicitly defined by content author
+  | 'structural' // Inferred from path/chapter structure
+  | 'semantic' // Inferred from content similarity
+  | 'usage' // Inferred from user navigation patterns
+  | 'citation' // Extracted from references/links
+  | 'system'; // System-generated (e.g., inverse relationships)
+
+/**
+ * Wire format for ContentRelationshipDetail (camelCase from backend).
+ */
+export interface ContentRelationshipDetailWire {
+  id: string;
+  appId: string;
+  sourceId: string;
+  targetId: string;
+  relationshipType: string;
+  confidence: number;
+  inferenceSource: string;
+  isBidirectional: number; // SQLite stores boolean as 0/1
+  inverseRelationshipId: string | null;
+  provenanceChain: string[] | null;
+  governanceLayer: string | null;
+  reach: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Transform wire format to ContentRelationshipDetail.
+ */
+export function transformRelationshipDetailFromWire(
+  wire: ContentRelationshipDetailWire
+): ContentRelationshipDetail {
+  return {
+    id: wire.id,
+    appId: wire.appId,
+    sourceNodeId: wire.sourceId,
+    targetNodeId: wire.targetId,
+    relationshipType: wire.relationshipType as ContentRelationshipType,
+    confidence: wire.confidence,
+    inferenceSource: wire.inferenceSource as RelationshipInferenceSource,
+    isBidirectional: wire.isBidirectional === 1,
+    inverseRelationshipId: wire.inverseRelationshipId ?? undefined,
+    provenanceChain: (wire.provenanceChain as string[]) ?? undefined,
+    governanceLayer: wire.governanceLayer ?? undefined,
+    reach: wire.reach as ContentReach,
+    metadata: (wire.metadata as Record<string, unknown>) ?? undefined,
+    createdAt: wire.createdAt,
+    updatedAt: wire.updatedAt,
+  };
+}
+
+/**
+ * Query parameters for listing relationships.
+ */
+export interface RelationshipQuery {
+  sourceId?: string;
+  targetId?: string;
+  relationshipType?: string;
+  minConfidence?: number;
+  inferenceSource?: RelationshipInferenceSource;
+  bidirectionalOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Input for creating a relationship.
+ */
+export interface CreateRelationshipInput {
+  sourceId: string;
+  targetId: string;
+  relationshipType: string;
+  confidence?: number;
+  inferenceSource?: RelationshipInferenceSource;
+  createInverse?: boolean;
+  inverseType?: string;
+  provenanceChain?: string[];
+  metadataJson?: string;
+}

@@ -1,0 +1,11 @@
+Scenario: Advance care planning supported by community resources
+    Given Helen is planning for end of life
+    And advance care planning is complex
+    When Helen accesses community advance planning support
+    Then the community_elohim should connect her to counseling resources
+    And her advance directives should be documented in accessible format
+    And her wishes should be communicated across care networks
+    And community should support death with dignity
+    And the protocol should enable agency over end of life
+    And Helen's values should guide her death as they guided her life
+    And community care economy should extend through end of life

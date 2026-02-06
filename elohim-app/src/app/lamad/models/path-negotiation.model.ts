@@ -17,7 +17,9 @@
  * This is the technical foundation for relationships built on shared learning.
  */
 
-import type { IntimacyLevel } from './human-consent.model';
+import type { IntimacyLevel } from '@app/elohim/models/human-consent.model';
+
+// @coverage: 75.0% (2026-02-05)
 
 // =========================================================================
 // Negotiation Status
@@ -399,9 +401,7 @@ export interface AffinityNode {
  * Check if a negotiation is still active (can receive updates).
  */
 export function isNegotiationActive(status: NegotiationStatus): boolean {
-  return (
-    status === 'proposed' || status === 'analyzing' || status === 'negotiating'
-  );
+  return status === 'proposed' || status === 'analyzing' || status === 'negotiating';
 }
 
 /**
@@ -409,10 +409,7 @@ export function isNegotiationActive(status: NegotiationStatus): boolean {
  */
 export function isNegotiationResolved(status: NegotiationStatus): boolean {
   return (
-    status === 'accepted' ||
-    status === 'declined' ||
-    status === 'failed' ||
-    status === 'expired'
+    status === 'accepted' || status === 'declined' || status === 'failed' || status === 'expired'
   );
 }
 

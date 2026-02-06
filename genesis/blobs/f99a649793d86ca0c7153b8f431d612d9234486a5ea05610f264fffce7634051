@@ -1,0 +1,10 @@
+Scenario: Neighborhood governance participation as new resident
+    Given the neighborhood makes collective decisions
+    And Aisha is a new resident
+    When neighborhood governance processes occur
+    Then the neighborhood_elohim should facilitate her participation
+    And newcomers should have voice proportional to care contributions
+    And she should learn how neighborhood decision-making works
+    And participation should be accessible to new residents
+    And the system should help her become active neighborhood citizen
+    And care economy should give her legitimate standing in governance

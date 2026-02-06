@@ -1,0 +1,10 @@
+Scenario: Individual autonomy maintained within caregiving constraints
+    Given caregiving severely limits James's choices
+    And he cannot leave David for extended periods
+    And his schedule revolves entirely around care needs
+    When James makes personal decisions
+    Then the personal_agent should protect his autonomy
+    And it should identify opportunities for individual agency
+    And it should help James maintain some life beyond caregiving
+    And constraints should be acknowledged but not completely controlling
+    And James should retain some sphere of personal freedom

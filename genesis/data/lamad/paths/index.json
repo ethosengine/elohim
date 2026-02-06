@@ -1,0 +1,78 @@
+{
+  "id": "paths-index",
+  "title": "Learning Paths Index",
+  "contentType": "index",
+  "description": "Manifest of all available learning paths in the Lamad system",
+  "lastUpdated": "2025-12-05T18:50:00.000Z",
+  "totalCount": 4,
+  "paths": [
+    {
+      "id": "elohim-protocol",
+      "title": "Elohim Protocol: Living Documentation",
+      "description": "Discover the vision and find your place in the Protocol",
+      "difficulty": "beginner",
+      "estimatedDuration": "1-2 hours",
+      "stepCount": 8,
+      "tags": [
+        "foundation",
+        "protocol",
+        "onboarding"
+      ],
+      "thumbnailUrl": "/images/elohim_protocol_logo_light.png",
+      "thumbnailAlt": "Elohim Protocol logo"
+    },
+    {
+      "id": "foundations-christian-technology",
+      "title": "Foundations for Christian Technology",
+      "description": "A course equipping Christians to navigate and shape the digital age with wisdom, integrating Center for Humane Technology principles with biblical foundations.",
+      "difficulty": "intermediate",
+      "estimatedDuration": "10-15 hours",
+      "stepCount": 15,
+      "chapterCount": 6,
+      "pathType": "expedition",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "ethics",
+        "discipleship",
+        "church"
+      ],
+      "category": "fct",
+      "thumbnailUrl": "/images/fct_cover.webp",
+      "thumbnailAlt": "Foundations for Christian Technology course cover"
+    },
+    {
+      "id": "social-medium-intro",
+      "title": "Building Relationship-Centered Digital Communication",
+      "description": "Learn how to design social systems that prioritize human connection over engagement metrics",
+      "difficulty": "intermediate",
+      "estimatedDuration": "2 hours",
+      "stepCount": 12,
+      "chapterCount": 2,
+      "pathType": "journey",
+      "tags": [
+        "social_medium",
+        "relationships",
+        "digital-communication"
+      ],
+      "category": "elohim-protocol"
+    },
+    {
+      "id": "governance-policy-maker",
+      "title": "AI Governance for Policy Makers",
+      "description": "A structured journey through AI constitutional oversight from the policy maker's perspective",
+      "difficulty": "advanced",
+      "estimatedDuration": "2.5 hours",
+      "stepCount": 15,
+      "chapterCount": 2,
+      "pathType": "journey",
+      "tags": [
+        "governance",
+        "policy",
+        "ai-oversight"
+      ],
+      "category": "elohim-protocol"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+Scenario: Learning value literacy through concrete experiences
+    Given Tommy is at the concrete operational stage of development
+    And abstract economic thinking has not yet developed
+    When Tommy uses the Value Scanner to make care decisions
+    Then learning should occur through direct, concrete experiences
+    And the personal_agent should present choices in tangible terms
+    And abstract concepts like "opportunity cost" should not be introduced
+    And Tommy should learn by doing: "Strawberries for Emma"
+    And value literacy should be built through action, not explanation
+    And neural pathways around care-based decision making should form

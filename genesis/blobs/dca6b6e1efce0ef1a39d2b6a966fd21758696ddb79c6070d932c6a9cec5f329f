@@ -1,0 +1,10 @@
+Scenario: Community mental health support for young adult
+    Given young adulthood is stressful
+    And Aisha sometimes struggles with anxiety
+    When Aisha accesses community mental health resources
+    Then the community_elohim should connect her to support
+    And mental health care should be part of community care economy
+    And accessing help should be destigmatized
+    And community care should include emotional and psychological support
+    And the system should recognize mental health as community concern
+    And mutual care should extend to psychological flourishing

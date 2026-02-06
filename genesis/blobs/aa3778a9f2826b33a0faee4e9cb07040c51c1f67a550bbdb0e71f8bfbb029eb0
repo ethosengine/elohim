@@ -1,0 +1,9 @@
+Scenario: Teacher evaluates budget priorities with evidence
+    Given the district approved $2M for new administration positions
+    But rejected $800K for reducing class sizes
+    When the Observer makes budget trade-offs transparent
+    Then teachers see value priorities (administration vs instruction)
+    And calculate that rejected proposal would fund 16 teaching positions
+    And document that administrative overhead increased 40% in five years
+    And organize parents and community around budget priorities
+    And fiscal policy becomes professional accountability issue

@@ -1,11 +1,11 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ContentMasteryService } from './content-mastery.service';
-import { LocalSourceChainService } from './local-source-chain.service';
-import { SessionHumanService } from './session-human.service';
-import { MasteryLevel } from '../models/agent.model';
-import { FRESHNESS_THRESHOLDS } from '../models/content-mastery.model';
+import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { MasteryLevel, FRESHNESS_THRESHOLDS } from '../models';
+import { SessionHuman } from '@app/imagodei/models/session-human.model';
 import { BehaviorSubject } from 'rxjs';
-import { SessionHuman } from '../models/session-human.model';
 
 describe('ContentMasteryService', () => {
   let service: ContentMasteryService;
@@ -23,6 +23,7 @@ describe('ContentMasteryService', () => {
     displayName: 'Test User',
     isAnonymous: true,
     accessLevel: 'visitor',
+    sessionState: 'active',
     createdAt: '2025-01-01T00:00:00.000Z',
     lastActiveAt: '2025-01-01T00:00:00.000Z',
     stats: {
@@ -42,11 +43,19 @@ describe('ContentMasteryService', () => {
     localStorageMock = {};
     mockStorage = {
       getItem: (key: string) => localStorageMock[key] || null,
-      setItem: (key: string, value: string) => { localStorageMock[key] = value; },
-      removeItem: (key: string) => { delete localStorageMock[key]; },
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key];
+      },
       key: (index: number) => Object.keys(localStorageMock)[index] || null,
-      get length() { return Object.keys(localStorageMock).length; },
-      clear: () => { localStorageMock = {}; }
+      get length() {
+        return Object.keys(localStorageMock).length;
+      },
+      clear: () => {
+        localStorageMock = {};
+      },
     };
     spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
 
@@ -54,22 +63,23 @@ describe('ContentMasteryService', () => {
     sessionSubject = new BehaviorSubject<SessionHuman | null>(createMockSession());
 
     // Create mock SessionHumanService
-    sessionHumanService = jasmine.createSpyObj('SessionHumanService', [
-      'getSession',
-      'getSessionId',
-      'recordContentView',
-    ], {
-      session$: sessionSubject.asObservable(),
-    });
+    sessionHumanService = jasmine.createSpyObj(
+      'SessionHumanService',
+      ['getSession', 'getSessionId', 'recordContentView'],
+      {
+        session$: sessionSubject.asObservable(),
+      }
+    );
     sessionHumanService.getSession.and.returnValue(createMockSession());
     sessionHumanService.getSessionId.and.returnValue(TEST_SESSION_ID);
 
     TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
       providers: [
         ContentMasteryService,
         LocalSourceChainService,
         { provide: SessionHumanService, useValue: sessionHumanService },
-      ]
+      ],
     });
 
     sourceChainService = TestBed.inject(LocalSourceChainService);
@@ -160,7 +170,7 @@ describe('ContentMasteryService', () => {
       expect(service.getMasteryLevelSync(TEST_CONTENT_ID)).toBe('apply');
     });
 
-    it('should track level history', (done) => {
+    it('should track level history', done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'seen');
       service.setMasteryLevel(TEST_CONTENT_ID, 'understand');
       service.setMasteryLevel(TEST_CONTENT_ID, 'apply');
@@ -190,7 +200,7 @@ describe('ContentMasteryService', () => {
       service.setMasteryLevel('content-4', 'analyze');
     });
 
-    it('should get mastery for content', (done) => {
+    it('should get mastery for content', done => {
       service.getMastery('content-2').subscribe(mastery => {
         expect(mastery).toBeTruthy();
         expect(mastery?.level).toBe('understand');
@@ -198,28 +208,28 @@ describe('ContentMasteryService', () => {
       });
     });
 
-    it('should return null for unknown content', (done) => {
+    it('should return null for unknown content', done => {
       service.getMastery('unknown-content').subscribe(mastery => {
         expect(mastery).toBeNull();
         done();
       });
     });
 
-    it('should get mastery level', (done) => {
+    it('should get mastery level', done => {
       service.getMasteryLevel('content-3').subscribe(level => {
         expect(level).toBe('apply');
         done();
       });
     });
 
-    it('should return not_started for unknown content level', (done) => {
+    it('should return not_started for unknown content level', done => {
       service.getMasteryLevel('unknown-content').subscribe(level => {
         expect(level).toBe('not_started');
         done();
       });
     });
 
-    it('should get all mastery records', (done) => {
+    it('should get all mastery records', done => {
       service.getAllMastery().subscribe(all => {
         expect(all.length).toBe(4);
         done();
@@ -228,21 +238,21 @@ describe('ContentMasteryService', () => {
   });
 
   describe('Privileges', () => {
-    it('should have view and practice privileges without mastery', (done) => {
+    it('should have view and practice privileges without mastery', done => {
       service.hasPrivilege('new-content', 'view').subscribe(has => {
         expect(has).toBe(true);
         done();
       });
     });
 
-    it('should have practice privilege without mastery', (done) => {
+    it('should have practice privilege without mastery', done => {
       service.hasPrivilege('new-content', 'practice').subscribe(has => {
         expect(has).toBe(true);
         done();
       });
     });
 
-    it('should not have comment privilege at seen level', (done) => {
+    it('should not have comment privilege at seen level', done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'seen');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'comment').subscribe(has => {
@@ -251,7 +261,7 @@ describe('ContentMasteryService', () => {
       });
     });
 
-    it('should have comment privilege at analyze level', (done) => {
+    it('should have comment privilege at analyze level', done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'analyze');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'comment').subscribe(has => {
@@ -260,7 +270,7 @@ describe('ContentMasteryService', () => {
       });
     });
 
-    it('should have peer_review privilege at evaluate level', (done) => {
+    it('should have peer_review privilege at evaluate level', done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'evaluate');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'peer_review').subscribe(has => {
@@ -269,7 +279,7 @@ describe('ContentMasteryService', () => {
       });
     });
 
-    it('should have govern privilege at create level', (done) => {
+    it('should have govern privilege at create level', done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'create');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'govern').subscribe(has => {
@@ -285,7 +295,7 @@ describe('ContentMasteryService', () => {
       expect(service.hasPrivilegeSync(TEST_CONTENT_ID, 'peer_review')).toBe(false);
     });
 
-    it('should get all privileges for content', (done) => {
+    it('should get all privileges for content', done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'apply');
 
       service.getPrivileges(TEST_CONTENT_ID).subscribe(privileges => {
@@ -336,7 +346,7 @@ describe('ContentMasteryService', () => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'understand');
 
       const mastery = service.getMasterySync(TEST_CONTENT_ID);
-      expect(mastery?.freshness).toBe(1.0);
+      expect(mastery?.freshness).toBe(1);
       expect(mastery?.needsRefresh).toBe(false);
     });
 
@@ -348,21 +358,21 @@ describe('ContentMasteryService', () => {
         level: 'understand' as MasteryLevel,
         levelAchievedAt: '2025-01-01T00:00:00.000Z',
         levelHistory: [],
-        lastEngagementAt: '2024-01-01T00:00:00.000Z',  // 1 year ago
+        lastEngagementAt: '2024-01-01T00:00:00.000Z', // 1 year ago
         lastEngagementType: 'view' as const,
         contentVersionAtMastery: '',
-        freshness: 1.0,
+        freshness: 1,
         needsRefresh: false,
         assessmentEvidence: [],
         privileges: [],
       };
 
       const freshness = service.computeFreshness(oldMastery);
-      expect(freshness).toBeLessThan(1.0);
+      expect(freshness).toBeLessThan(1);
       expect(freshness).toBeGreaterThan(0);
     });
 
-    it('should identify content needing refresh', (done) => {
+    it('should identify content needing refresh', done => {
       service.setMasteryLevel('content-1', 'seen');
       service.setMasteryLevel('content-2', 'understand');
 
@@ -383,14 +393,14 @@ describe('ContentMasteryService', () => {
       service.setMasteryLevel('content-5', 'analyze');
     });
 
-    it('should compute total mastered nodes', (done) => {
+    it('should compute total mastered nodes', done => {
       service.getMasteryStats().subscribe(stats => {
         expect(stats.totalMasteredNodes).toBe(5);
         done();
       });
     });
 
-    it('should compute level distribution', (done) => {
+    it('should compute level distribution', done => {
       service.getMasteryStats().subscribe(stats => {
         expect(stats.levelDistribution.seen).toBe(1);
         expect(stats.levelDistribution.remember).toBe(1);
@@ -401,16 +411,16 @@ describe('ContentMasteryService', () => {
       });
     });
 
-    it('should compute nodes above gate', (done) => {
+    it('should compute nodes above gate', done => {
       service.getMasteryStats().subscribe(stats => {
-        expect(stats.nodesAboveGate).toBe(2);  // apply and analyze
+        expect(stats.nodesAboveGate).toBe(2); // apply and analyze
         done();
       });
     });
 
-    it('should compute fresh percentage', (done) => {
+    it('should compute fresh percentage', done => {
       service.getMasteryStats().subscribe(stats => {
-        expect(stats.freshPercentage).toBe(100);  // All fresh
+        expect(stats.freshPercentage).toBe(100); // All fresh
         done();
       });
     });
@@ -423,8 +433,8 @@ describe('ContentMasteryService', () => {
       const entries = sourceChainService.getEntriesByType('mastery-record');
       expect(entries.length).toBeGreaterThan(0);
 
-      const entry = entries.find(e =>
-        (e.content as { contentId: string }).contentId === TEST_CONTENT_ID
+      const entry = entries.find(
+        e => (e.content as { contentId: string }).contentId === TEST_CONTENT_ID
       );
       expect(entry).toBeTruthy();
       expect((entry?.content as { level: string }).level).toBe('understand');
@@ -436,8 +446,8 @@ describe('ContentMasteryService', () => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'apply');
 
       const entries = sourceChainService.getEntriesByType('mastery-record');
-      const contentEntries = entries.filter(e =>
-        (e.content as { contentId: string }).contentId === TEST_CONTENT_ID
+      const contentEntries = entries.filter(
+        e => (e.content as { contentId: string }).contentId === TEST_CONTENT_ID
       );
 
       // Should have 3 entries (append-only)

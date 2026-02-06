@@ -1,0 +1,9 @@
+Scenario: Managing household budget on entry-level income
+    Given Aisha's income is $38,000 annually
+    And rent consumes a large portion of her budget
+    When Aisha allocates household resources
+    Then the personal_agent should help optimize spending
+    And it should identify where to invest versus economize
+    And it should suggest cost-saving strategies appropriate to her situation
+    And budget tools should account for her income constraints
+    And the system should help her achieve sustainability within limits

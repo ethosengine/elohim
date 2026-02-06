@@ -1,0 +1,10 @@
+Scenario: Family care economy coordinates reciprocity across generations
+    Given Sarah receives childcare support from grandparents
+    And Sarah provides elder care to her aging parents
+    When the family_elohim analyzes care flows
+    Then it should show reciprocal care patterns
+    And it should ensure care is not unidirectionally extractive
+    And it should coordinate so care flows equitably
+    And family relationships should be based on mutual support
+    And the system should enable sustainable multigenerational care
+    And care economy should prevent family exploitation

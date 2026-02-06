@@ -1,0 +1,10 @@
+Scenario: Food preservation skills as bioregional care contribution
+    Given Margaret knows how to preserve food through canning, freezing, drying
+    And food preservation reduces waste and builds food security
+    When the bioregional_elohim tracks food preservation
+    Then Margaret's preservation labor should be quantified
+    And skills should be recognized as ecological care contribution
+    And preserved food reduces reliance on industrial food systems
+    And Margaret's knowledge should be shared with community
+    And traditional preservation techniques should be valued
+    And bioregional food resilience should be strengthened by senior knowledge

@@ -1,0 +1,10 @@
+Scenario: Teaching healthy boundary-setting and self-advocacy
+    Given Aisha needs to learn professional and personal boundaries
+    And boundary-setting is rarely taught explicitly
+    When the personal_agent provides guidance
+    Then it should teach how to set healthy boundaries
+    And it should model self-advocacy language and approaches
+    And it should help her recognize when boundaries are needed
+    And the system should educate about sustainable capacity management
+    And she should learn that boundaries enable sustainable care
+    And self-advocacy should be taught as essential life skill

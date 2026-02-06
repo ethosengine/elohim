@@ -1,0 +1,10 @@
+Scenario: Young child's care work made visible to family
+    Given Tommy has chosen strawberries for his sister Emma
+    And the care contribution has been recorded by personal_agent
+    When the family_elohim processes the contribution
+    Then Tommy's care work should be visible on the family dashboard
+    And parent Sarah should receive specific prompts
+    And the prompt should say "Tommy chose strawberries for Emma"
+    And the care contribution should be attributed to Tommy by name
+    And family care tokens should reflect his contribution
+    And the visibility should enable parental recognition

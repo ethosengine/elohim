@@ -1,0 +1,10 @@
+Scenario: Community governance includes retired residents as active participants
+    Given Frank and other retired residents have time for civic engagement
+    And they have accumulated community knowledge and experience
+    When the community_elohim facilitates governance
+    Then it should actively include retired residents in decision-making
+    And their time availability should enable substantial governance participation
+    And their experience should inform community policy and planning
+    And community decisions should benefit from elder wisdom
+    And retired residents should be understood as governance resources, not dependents
+    And Frank should participate in shaping community direction

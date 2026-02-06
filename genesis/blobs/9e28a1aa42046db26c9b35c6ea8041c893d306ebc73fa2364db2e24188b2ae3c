@@ -1,0 +1,9 @@
+Scenario: Manager's expertise is valued without requiring worker subordination
+    Given Marcus has genuine operational expertise from years of experience
+    And corporate role required worker subordination to exercise that expertise
+    When Marcus transitions to democratic coordinator
+    Then his scheduling knowledge becomes proposals, not commands
+    And his operations expertise is valued through consultation, not authority
+    And workers request his input because it's helpful, not because it's mandated
+    And his compensation ($72K) reflects expertise without extraction premium
+    And his purpose comes from service, not domination

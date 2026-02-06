@@ -1,0 +1,9 @@
+Scenario: Fair compensation reflects that care work requires time and energy
+    Given Sarah's care responsibilities are substantial
+    And she needs sufficient income to support household
+    When Sarah's compensation is determined
+    Then the workplace_elohim should advocate for living wages
+    And compensation should enable household flourishing, not just survival
+    And Sarah should earn enough to afford care work time
+    And wages should reflect that workers have care responsibilities
+    And fair compensation should support care economy participation

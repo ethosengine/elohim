@@ -1,0 +1,8 @@
+Scenario: Owner experiences relief from impossible competitive pressures
+    Given Rosa cannot compete with corporate chains on price alone
+    And she faces slow death by competition or worker exploitation
+    When business converts to EAE network
+    Then competitive pressure eases through distributed ownership eliminating extraction
+    And network provides volume purchasing power Rosa never had
+    And democratic governance enables innovation chains cannot match
+    And Rosa experiences relief from impossible economic trap

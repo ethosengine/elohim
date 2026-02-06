@@ -1,0 +1,8 @@
+Scenario: Recognizing my own labor as care contribution
+    Given I work 50+ hours per week as a line cook
+    And I prepare food for hundreds of people daily
+    When I view my work through the care economy lens
+    Then the protocol should recognize my labor as care work
+    And accumulate care tokens reflecting my contribution to community nourishment
+    And show me that my work has dignity and social value
+    And reframe my relationship to labor from pure exploitation to meaningful contribution

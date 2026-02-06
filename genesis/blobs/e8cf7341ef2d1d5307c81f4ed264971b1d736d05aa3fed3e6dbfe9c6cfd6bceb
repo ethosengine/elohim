@@ -1,0 +1,10 @@
+Scenario: Climate change impacts on food systems understood concretely
+    Given climate change affects food production and prices
+    And Marcus experiences food cost volatility
+    When Marcus encounters price fluctuations
+    Then the personal_agent should explain climate impacts on agriculture
+    And it should connect extreme weather to food availability
+    And climate education should be grounded in lived experience
+    And he should understand climate as care economy issue
+    And ecological crisis should be framed as requiring care-based response
+    And his generation should be prepared to steward through climate chaos

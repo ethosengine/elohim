@@ -2,27 +2,33 @@
   <!-- Header -->
   <header class="profile-header">
     <div class="profile-avatar">
-      @if (session?.avatarUrl) {
-        <img [src]="session!.avatarUrl" [alt]="session!.displayName" class="avatar-image" />
+      @if (session?.avatarUrl && !isNetworkAuthenticated()) {
+        <img [src]="session!.avatarUrl" [alt]="displayName()" class="avatar-image" />
       } @else {
-        <div class="avatar-placeholder">
-          {{ session?.displayName?.charAt(0) ?? 'T' }}
+        <div class="avatar-placeholder" [class.authenticated]="isNetworkAuthenticated()">
+          {{ displayName().charAt(0) }}
         </div>
       }
     </div>
 
     <div class="profile-info">
-      <h1 class="profile-name">{{ session?.displayName ?? 'Traveler' }}</h1>
-      <div class="profile-badge">
-        <span class="badge-icon">local_activity</span>
-        <span class="badge-text">Session Visitor</span>
+      <h1 class="profile-name">{{ displayName() }}</h1>
+      <div class="profile-badge" [ngClass]="'badge-' + identityMode()">
+        <span class="badge-icon">{{ modeBadgeIcon() }}</span>
+        <span class="badge-text">{{ modeBadgeText() }}</span>
       </div>
-      @if (session?.bio) {
-        <p class="profile-bio">{{ session!.bio }}</p>
+      @if (bio()) {
+        <p class="profile-bio">{{ bio() }}</p>
       }
-      @if (session?.interests && session!.interests!.length > 0) {
+      @if (location()) {
+        <p class="profile-location">
+          <span class="location-icon">location_on</span>
+          {{ location() }}
+        </p>
+      }
+      @if (interests().length > 0) {
         <div class="profile-interests">
-          @for (interest of session!.interests!; track interest) {
+          @for (interest of interests(); track interest) {
             <span class="interest-tag">{{ interest }}</span>
           }
         </div>
@@ -30,28 +36,31 @@
     </div>
 
     <div class="profile-actions">
-      <button class="btn-secondary" (click)="setActiveTab('settings')">
+      <button type="button" class="btn-secondary" (click)="setActiveTab('settings')">
         <span class="btn-icon">settings</span>
         Edit Profile
       </button>
     </div>
   </header>
 
-  <!-- Upgrade Banner -->
-  <div class="upgrade-banner">
-    <div class="upgrade-content">
-      <span class="upgrade-icon">cloud_sync</span>
-      <div class="upgrade-text">
-        <strong>Your progress is stored locally</strong>
-        <p>Install the Elohim app to save your progress permanently and sync across devices.</p>
+  <!-- Upgrade Banner - Only show for session visitors -->
+  @if (!isNetworkAuthenticated()) {
+    <div class="upgrade-banner">
+      <div class="upgrade-content">
+        <span class="upgrade-icon">cloud_sync</span>
+        <div class="upgrade-text">
+          <strong>Your progress is stored locally</strong>
+          <p>Install the Elohim app to save your progress permanently and sync across devices.</p>
+        </div>
+        <button type="button" class="btn-primary">Join Network</button>
       </div>
-      <button class="btn-primary">Join Network</button>
     </div>
-  </div>
+  }
 
   <!-- Tab Navigation -->
   <nav class="tab-nav">
     <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'overview'"
       (click)="setActiveTab('overview')"
@@ -59,6 +68,7 @@
       Overview
     </button>
     <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'paths'"
       (click)="setActiveTab('paths')"
@@ -66,6 +76,7 @@
       Paths
     </button>
     <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'timeline'"
       (click)="setActiveTab('timeline')"
@@ -73,6 +84,15 @@
       Timeline
     </button>
     <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab === 'network'"
+      (click)="setActiveTab('network')"
+    >
+      Network
+    </button>
+    <button
+      type="button"
       class="tab-btn"
       [class.active]="activeTab === 'settings'"
       (click)="setActiveTab('settings')"
@@ -86,6 +106,46 @@
     <!-- Overview Tab -->
     @if (activeTab === 'overview') {
       <div class="tab-panel overview-panel">
+        <!-- Resume Point Card -->
+        @if (resumePoint) {
+          <section class="resume-section">
+            @if (resumePoint.type === 'continue_path') {
+              <div class="resume-card resume-card--continue">
+                <div class="resume-icon-wrapper">
+                  <span class="material-icons resume-icon">play_circle</span>
+                </div>
+                <div class="resume-content">
+                  <span class="resume-label">Continue Your Journey</span>
+                  <h3 class="resume-title">{{ resumePoint.title }}</h3>
+                  <p class="resume-reason">{{ resumePoint.reason }}</p>
+                </div>
+                <a
+                  [routerLink]="['/lamad/path', resumePoint.pathId, 'step', resumePoint.stepIndex]"
+                  class="resume-action"
+                >
+                  <span>Continue</span>
+                  <span class="material-icons">arrow_forward</span>
+                </a>
+              </div>
+            } @else {
+              <div class="resume-card resume-card--explore">
+                <div class="resume-icon-wrapper resume-icon-wrapper--explore">
+                  <span class="material-icons resume-icon">explore</span>
+                </div>
+                <div class="resume-content">
+                  <span class="resume-label">Start Exploring</span>
+                  <h3 class="resume-title">{{ resumePoint.title }}</h3>
+                  <p class="resume-reason">{{ resumePoint.reason }}</p>
+                </div>
+                <a routerLink="/lamad" class="resume-action resume-action--explore">
+                  <span>Browse Paths</span>
+                  <span class="material-icons">arrow_forward</span>
+                </a>
+              </div>
+            }
+          </section>
+        }
+
         <!-- Quick Stats -->
         <section class="stats-section">
           <h2 class="section-title">Journey Stats</h2>
@@ -162,13 +222,19 @@
             <div class="activity-list">
               @for (activity of activityHistory.slice(-5).reverse(); track activity.timestamp) {
                 <div class="activity-item">
-                  <span class="activity-icon material-icons">{{ getActivityIcon(activity.type) }}</span>
-                  <span class="activity-text">{{ getActivityLabel(activity.type) }}: {{ activity.resourceId }}</span>
+                  <span class="activity-icon material-icons">
+                    {{ getActivityIcon(activity.type) }}
+                  </span>
+                  <span class="activity-text">
+                    {{ getActivityLabel(activity.type) }}: {{ activity.resourceId }}
+                  </span>
                   <span class="activity-time">{{ formatTimestamp(activity.timestamp) }}</span>
                 </div>
               }
             </div>
-            <button class="btn-link" (click)="setActiveTab('timeline')">View Full Timeline</button>
+            <button type="button" class="btn-link" (click)="setActiveTab('timeline')">
+              View Full Timeline
+            </button>
           </section>
         }
       </div>
@@ -177,7 +243,12 @@
     <!-- Paths Tab -->
     @if (activeTab === 'paths') {
       <div class="tab-panel paths-panel">
-        @if (pathProgressList.length === 0) {
+        @if (
+          !pathsOverview ||
+          (pathsOverview.inProgress.length === 0 &&
+            pathsOverview.completed.length === 0 &&
+            pathsOverview.suggested.length === 0)
+        ) {
           <div class="empty-state">
             <span class="empty-icon material-icons">route</span>
             <h3>No paths started yet</h3>
@@ -185,35 +256,136 @@
             <a routerLink="/lamad" class="btn-primary">Browse Paths</a>
           </div>
         } @else {
-          <div class="path-list">
-            @for (progress of pathProgressList; track progress.pathId) {
-              <div class="path-card">
-                <div class="path-info">
-                  <h3 class="path-title">{{ progress.pathId }}</h3>
-                  <div class="path-meta">
-                    <span>Step {{ progress.currentStepIndex + 1 }}</span>
-                    <span>{{ progress.completedStepIndices.length }} completed</span>
-                  </div>
-                </div>
-                <div class="path-progress">
-                  <div class="progress-bar">
-                    <div
-                      class="progress-fill"
-                      [style.width.%]="getPathProgressPercentage(progress)"
-                    ></div>
-                  </div>
-                </div>
-                <div class="path-actions">
-                  <a
-                    [routerLink]="['/lamad/path', progress.pathId, 'step', progress.currentStepIndex]"
-                    class="btn-secondary"
-                  >
-                    Continue
-                  </a>
-                </div>
+          <!-- In Progress Section -->
+          @if (pathsOverview.inProgress.length > 0) {
+            <section class="paths-section">
+              <div class="paths-section-header">
+                <span class="material-icons paths-section-icon paths-section-icon--progress">
+                  schedule
+                </span>
+                <h3 class="paths-section-title">In Progress</h3>
+                <span class="paths-section-count">{{ pathsOverview.inProgress.length }}</span>
               </div>
-            }
-          </div>
+              <div class="paths-grid">
+                @for (path of pathsOverview.inProgress; track path.pathId) {
+                  <div class="path-card path-card--in-progress">
+                    <div class="path-card-header">
+                      <span class="path-difficulty path-difficulty--{{ path.difficulty }}">
+                        {{ path.difficulty }}
+                      </span>
+                    </div>
+                    <h4 class="path-card-title">{{ path.title }}</h4>
+                    <p class="path-card-description">{{ path.description }}</p>
+                    <div class="path-card-progress">
+                      <div class="progress-bar-enhanced">
+                        <div
+                          class="progress-fill-enhanced"
+                          [style.width.%]="path.progressPercent"
+                        ></div>
+                      </div>
+                      <span class="progress-text">
+                        {{ path.completedSteps }}/{{ path.totalSteps }} steps ·
+                        {{ path.progressPercent }}%
+                      </span>
+                    </div>
+                    <a
+                      [routerLink]="['/lamad/path', path.pathId, 'step', path.currentStepIndex]"
+                      class="path-card-action"
+                    >
+                      Continue
+                      <span class="material-icons">arrow_forward</span>
+                    </a>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+
+          <!-- Completed Section -->
+          @if (pathsOverview.completed.length > 0) {
+            <section class="paths-section">
+              <div class="paths-section-header">
+                <span class="material-icons paths-section-icon paths-section-icon--completed">
+                  emoji_events
+                </span>
+                <h3 class="paths-section-title">Completed</h3>
+                <span class="paths-section-count">{{ pathsOverview.completed.length }}</span>
+              </div>
+              <div class="paths-grid">
+                @for (path of pathsOverview.completed; track path.pathId) {
+                  <div class="path-card path-card--completed">
+                    <div class="path-card-header">
+                      <span class="completion-badge">
+                        <span class="material-icons">verified</span>
+                        Completed
+                      </span>
+                    </div>
+                    <h4 class="path-card-title">{{ path.title }}</h4>
+                    <p class="path-card-description">{{ path.description }}</p>
+                    <div class="path-card-meta">
+                      <span class="meta-item">
+                        <span class="material-icons">check_circle</span>
+                        {{ path.totalSteps }} steps
+                      </span>
+                      @if (path.attestationsGranted?.length) {
+                        <span class="meta-item attestation">
+                          <span class="material-icons">workspace_premium</span>
+                          {{ path.attestationsGranted?.length }} attestation{{
+                            path.attestationsGranted?.length !== 1 ? 's' : ''
+                          }}
+                        </span>
+                      }
+                    </div>
+                    <a
+                      [routerLink]="['/lamad/path', path.pathId]"
+                      class="path-card-action path-card-action--review"
+                    >
+                      Review
+                      <span class="material-icons">visibility</span>
+                    </a>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+
+          <!-- Suggested Section -->
+          @if (pathsOverview.suggested.length > 0) {
+            <section class="paths-section">
+              <div class="paths-section-header">
+                <span class="material-icons paths-section-icon paths-section-icon--suggested">
+                  auto_awesome
+                </span>
+                <h3 class="paths-section-title">Suggested for You</h3>
+              </div>
+              <div class="paths-grid">
+                @for (path of pathsOverview.suggested; track path.pathId) {
+                  <div class="path-card path-card--suggested">
+                    <div class="path-card-header">
+                      <span class="path-difficulty path-difficulty--{{ path.difficulty }}">
+                        {{ path.difficulty }}
+                      </span>
+                    </div>
+                    <h4 class="path-card-title">{{ path.title }}</h4>
+                    <p class="path-card-description">{{ path.description }}</p>
+                    <div class="path-card-meta">
+                      <span class="meta-item">
+                        <span class="material-icons">format_list_numbered</span>
+                        {{ path.totalSteps }} steps
+                      </span>
+                    </div>
+                    <a
+                      [routerLink]="['/lamad/path', path.pathId]"
+                      class="path-card-action path-card-action--start"
+                    >
+                      Start Path
+                      <span class="material-icons">arrow_forward</span>
+                    </a>
+                  </div>
+                }
+              </div>
+            </section>
+          }
         }
       </div>
     }
@@ -221,59 +393,370 @@
     <!-- Timeline Tab -->
     @if (activeTab === 'timeline') {
       <div class="tab-panel timeline-panel">
-        <!-- Filter -->
-        <div class="timeline-filter">
-          <button
-            class="filter-btn"
-            [class.active]="activityFilter === 'all'"
-            (click)="setActivityFilter('all')"
-          >All</button>
-          <button
-            class="filter-btn"
-            [class.active]="activityFilter === 'view'"
-            (click)="setActivityFilter('view')"
-          >Views</button>
-          <button
-            class="filter-btn"
-            [class.active]="activityFilter === 'affinity'"
-            (click)="setActivityFilter('affinity')"
-          >Affinity</button>
-          <button
-            class="filter-btn"
-            [class.active]="activityFilter === 'path-start'"
-            (click)="setActivityFilter('path-start')"
-          >Path Starts</button>
-          <button
-            class="filter-btn"
-            [class.active]="activityFilter === 'step-complete'"
-            (click)="setActivityFilter('step-complete')"
-          >Steps</button>
+        <!-- Timeline Header -->
+        <div class="timeline-header">
+          <h3 class="timeline-title">
+            <span class="material-icons">auto_stories</span>
+            Your Learning Journey
+          </h3>
+          <p class="timeline-subtitle">Milestones and progress on your path to mastery</p>
         </div>
 
-        @if (filteredActivities.length === 0) {
+        @if (timelineEvents.length === 0) {
           <div class="empty-state">
-            <span class="empty-icon material-icons">history</span>
-            <h3>No activity yet</h3>
-            <p>Your learning activity will appear here.</p>
+            <span class="empty-icon material-icons">timeline</span>
+            <h3>Your journey begins here</h3>
+            <p>Start exploring content to see your learning timeline.</p>
+            <a routerLink="/lamad" class="btn-primary">Start Exploring</a>
           </div>
         } @else {
-          <div class="timeline-list">
-            @for (activity of filteredActivities; track activity.timestamp) {
-              <div class="timeline-item">
-                <div class="timeline-marker">
-                  <span class="material-icons">{{ getActivityIcon(activity.type) }}</span>
+          <div class="timeline-enhanced">
+            <div class="timeline-line"></div>
+            @for (event of timelineEvents; track event.id; let i = $index) {
+              <div
+                class="timeline-event"
+                [class.timeline-event--milestone]="event.significance === 'milestone'"
+              >
+                <div
+                  class="timeline-event-marker"
+                  [style.background]="getTimelineEventColor(event.significance)"
+                >
+                  <span class="material-icons">{{ getTimelineEventIcon(event.type) }}</span>
                 </div>
-                <div class="timeline-content">
-                  <span class="timeline-action">{{ getActivityLabel(activity.type) }}</span>
-                  <span class="timeline-resource">{{ activity.resourceId }}</span>
-                  @if (activity.metadata) {
-                    <span class="timeline-meta">{{ activity.metadata | json }}</span>
+                <div class="timeline-event-content">
+                  <div class="timeline-event-header">
+                    <span class="timeline-event-title">{{ event.title }}</span>
+                    <span class="timeline-event-date">
+                      {{ formatTimelineDate(event.timestamp) }}
+                    </span>
+                  </div>
+                  @if (event.description) {
+                    <p class="timeline-event-description">{{ event.description }}</p>
+                  }
+                  @if (event.resourceId) {
+                    <a
+                      [routerLink]="
+                        event.resourceType === 'path'
+                          ? ['/lamad/path', event.resourceId]
+                          : ['/lamad/content', event.resourceId]
+                      "
+                      class="timeline-event-link"
+                    >
+                      View {{ event.resourceType }}
+                      <span class="material-icons">open_in_new</span>
+                    </a>
                   }
                 </div>
-                <div class="timeline-time">{{ formatTimestamp(activity.timestamp) }}</div>
               </div>
             }
           </div>
+        }
+
+        <!-- Legacy filter (if user prefers activity-level detail) -->
+        <details class="timeline-legacy-toggle">
+          <summary>View detailed activity log</summary>
+          <div class="timeline-filter">
+            <button
+              type="button"
+              class="filter-btn"
+              [class.active]="activityFilter === 'all'"
+              (click)="setActivityFilter('all')"
+            >
+              All
+            </button>
+            <button
+              type="button"
+              class="filter-btn"
+              [class.active]="activityFilter === 'view'"
+              (click)="setActivityFilter('view')"
+            >
+              Views
+            </button>
+            <button
+              type="button"
+              class="filter-btn"
+              [class.active]="activityFilter === 'affinity'"
+              (click)="setActivityFilter('affinity')"
+            >
+              Affinity
+            </button>
+            <button
+              type="button"
+              class="filter-btn"
+              [class.active]="activityFilter === 'path-start'"
+              (click)="setActivityFilter('path-start')"
+            >
+              Path Starts
+            </button>
+            <button
+              type="button"
+              class="filter-btn"
+              [class.active]="activityFilter === 'step-complete'"
+              (click)="setActivityFilter('step-complete')"
+            >
+              Steps
+            </button>
+          </div>
+          @if (filteredActivities.length > 0) {
+            <div class="timeline-list">
+              @for (activity of filteredActivities; track activity.timestamp) {
+                <div class="timeline-item">
+                  <div class="timeline-marker">
+                    <span class="material-icons">{{ getActivityIcon(activity.type) }}</span>
+                  </div>
+                  <div class="timeline-content">
+                    <span class="timeline-action">{{ getActivityLabel(activity.type) }}</span>
+                    <span class="timeline-resource">{{ activity.resourceId }}</span>
+                  </div>
+                  <div class="timeline-time">{{ formatTimestamp(activity.timestamp) }}</div>
+                </div>
+              }
+            </div>
+          }
+        </details>
+      </div>
+    }
+
+    <!-- Network Tab -->
+    @if (activeTab === 'network') {
+      <div class="tab-panel network-panel">
+        <!-- Agency Stage Card -->
+        <section class="agency-stage-card">
+          <div class="stage-header">
+            <span class="material-icons stage-icon">{{ stageInfo().icon }}</span>
+            <div class="stage-info">
+              <span class="stage-badge" [ngClass]="getStageBadgeClass()">
+                {{ stageInfo().label }}
+              </span>
+              <span class="stage-tagline">{{ stageInfo().tagline }}</span>
+            </div>
+            <div class="connection-status">
+              <span class="status-dot" [ngClass]="getStatusDotClass()"></span>
+              <span class="status-label">{{ connectionStatus().label }}</span>
+            </div>
+          </div>
+          <p class="stage-description">{{ stageInfo().description }}</p>
+
+          <!-- Stage Benefits & Limitations -->
+          <div class="stage-details">
+            <div class="benefits">
+              <h4>Benefits</h4>
+              <ul>
+                @for (benefit of stageInfo().benefits; track benefit) {
+                  <li>
+                    <span class="material-icons benefit-icon">check_circle</span>
+                    {{ benefit }}
+                  </li>
+                }
+              </ul>
+            </div>
+            <div class="limitations">
+              <h4>Current Limitations</h4>
+              <ul>
+                @for (limitation of stageInfo().limitations; track limitation) {
+                  <li>
+                    <span class="material-icons limitation-icon">info</span>
+                    {{ limitation }}
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+
+          <!-- Upgrade CTA -->
+          @if (canUpgrade()) {
+            <div class="upgrade-cta">
+              <span class="material-icons">arrow_upward</span>
+              <span>
+                Ready to upgrade? Move to
+                <strong>{{ agencyState().migrationTarget }}</strong>
+                for more control.
+              </span>
+              <button type="button" class="btn-primary">Learn About Upgrading</button>
+            </div>
+          }
+        </section>
+
+        <!-- Data Residency Section -->
+        <section class="data-residency-section">
+          <h2 class="section-title">
+            <span class="material-icons">storage</span>
+            Where Your Data Lives
+          </h2>
+          <p class="section-description">
+            Understanding where your data is stored helps you make informed decisions about your
+            digital sovereignty.
+          </p>
+
+          <div class="residency-grid">
+            @for (item of agencyState().dataResidency; track item.category) {
+              <div class="residency-card">
+                <div class="residency-header">
+                  <span class="material-icons residency-icon">{{ item.icon }}</span>
+                  <div class="residency-info">
+                    <span class="residency-label">{{ item.label }}</span>
+                    <span class="residency-location">{{ item.locationLabel }}</span>
+                  </div>
+                  <span class="material-icons location-icon">
+                    {{ getLocationIcon(item.location) }}
+                  </span>
+                </div>
+                <p class="residency-description">{{ item.description }}</p>
+                <div class="residency-meta">
+                  <span class="meta-item" [class.exportable]="item.exportable">
+                    <span class="material-icons">{{ item.exportable ? 'download' : 'block' }}</span>
+                    {{ item.exportable ? 'Exportable' : 'Not Exportable' }}
+                  </span>
+                  <span class="meta-item" [class.deletable]="item.deletable">
+                    <span class="material-icons">{{ item.deletable ? 'delete' : 'lock' }}</span>
+                    {{ item.deletable ? 'Deletable' : 'Permanent' }}
+                  </span>
+                  <span class="meta-item controller">Controlled by: {{ item.controlledBy }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- Connection Details Section (when connected) -->
+        @if (isConnected()) {
+          <section class="connection-section">
+            <h2 class="section-title">
+              <span class="material-icons">lan</span>
+              Connection Details
+            </h2>
+
+            <div class="connection-grid">
+              <div class="connection-row">
+                <span class="connection-label">Admin URL</span>
+                <span class="connection-value monospace">{{ edgeNodeInfo().adminUrl }}</span>
+              </div>
+
+              @if (edgeNodeInfo().agentPubKey) {
+                <div class="connection-row">
+                  <span class="connection-label">Agent Public Key</span>
+                  <div class="connection-value-with-copy">
+                    <code class="truncated" [title]="edgeNodeInfo().agentPubKey">
+                      {{ truncateHash(edgeNodeInfo().agentPubKey) }}
+                    </code>
+                    <button
+                      type="button"
+                      class="copy-btn"
+                      (click)="copyToClipboard(edgeNodeInfo().agentPubKey!)"
+                      title="Copy full key"
+                    >
+                      <span class="material-icons">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              @if (edgeNodeInfo().dnaHash) {
+                <div class="connection-row">
+                  <span class="connection-label">DNA Hash</span>
+                  <div class="connection-value-with-copy">
+                    <code class="truncated" [title]="edgeNodeInfo().dnaHash">
+                      {{ truncateHash(edgeNodeInfo().dnaHash) }}
+                    </code>
+                    <button
+                      type="button"
+                      class="copy-btn"
+                      (click)="copyToClipboard(edgeNodeInfo().dnaHash!)"
+                      title="Copy full hash"
+                    >
+                      <span class="material-icons">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+              }
+
+              @if (edgeNodeInfo().connectedAt) {
+                <div class="connection-row">
+                  <span class="connection-label">Connected Since</span>
+                  <span class="connection-value">
+                    {{ edgeNodeInfo().connectedAt?.toLocaleString() }}
+                  </span>
+                </div>
+              }
+
+              <div class="connection-row">
+                <span class="connection-label">Credentials</span>
+                <span class="connection-value" [class.stored]="edgeNodeInfo().hasStoredCredentials">
+                  {{ edgeNodeInfo().hasStoredCredentials ? 'Stored in browser' : 'Not stored' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="connection-actions">
+              <button type="button" class="btn-secondary" (click)="reconnect()">
+                <span class="material-icons">refresh</span>
+                Reconnect
+              </button>
+            </div>
+          </section>
+        }
+
+        <!-- Keys Section -->
+        @if (agencyState().keys.length > 0) {
+          <section class="keys-section">
+            <h2 class="section-title">
+              <span class="material-icons">vpn_key</span>
+              Your Keys
+            </h2>
+
+            <div class="keys-grid">
+              @for (key of agencyState().keys; track key.type) {
+                <div class="key-card">
+                  <div class="key-header">
+                    <span class="key-label">{{ key.label }}</span>
+                    <span class="key-type">{{ key.type }}</span>
+                  </div>
+                  <div class="key-value">
+                    <code [title]="key.value">{{ key.truncated }}</code>
+                    @if (key.canExport) {
+                      <button
+                        type="button"
+                        class="copy-btn"
+                        (click)="copyToClipboard(key.value)"
+                        title="Copy"
+                      >
+                        <span class="material-icons">content_copy</span>
+                      </button>
+                    }
+                  </div>
+                  <div class="key-actions">
+                    @if (key.canExport) {
+                      <span class="key-action exportable">
+                        <span class="material-icons">download</span>
+                        Exportable
+                      </span>
+                    }
+                    @if (key.canRevoke) {
+                      <span class="key-action revokable">
+                        <span class="material-icons">cancel</span>
+                        Revokable
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- Not Connected State -->
+        @if (!isConnected() && connectionStatus().state !== 'connecting') {
+          <section class="not-connected-section">
+            <div class="not-connected-card">
+              <span class="material-icons not-connected-icon">cloud_off</span>
+              <h3>Not Connected to Network</h3>
+              <p>{{ connectionStatus().description }}</p>
+              <button type="button" class="btn-primary" (click)="reconnect()">
+                <span class="material-icons">wifi</span>
+                Connect to Network
+              </button>
+            </div>
+          </section>
         }
       </div>
     }
@@ -289,25 +772,42 @@
             <div class="profile-display">
               <div class="field-row">
                 <span class="field-label">Display Name</span>
-                <span class="field-value">{{ session?.displayName ?? 'Traveler' }}</span>
+                <span class="field-value">{{ displayName() }}</span>
               </div>
-              <div class="field-row">
-                <span class="field-label">Avatar URL</span>
-                <span class="field-value">{{ session?.avatarUrl || '(not set)' }}</span>
-              </div>
+              @if (!isNetworkAuthenticated()) {
+                <div class="field-row">
+                  <span class="field-label">Avatar URL</span>
+                  <span class="field-value">{{ session?.avatarUrl || '(not set)' }}</span>
+                </div>
+              }
               <div class="field-row">
                 <span class="field-label">Bio</span>
-                <span class="field-value">{{ session?.bio || '(not set)' }}</span>
+                <span class="field-value">{{ bio() || '(not set)' }}</span>
               </div>
+              @if (isNetworkAuthenticated()) {
+                <div class="field-row">
+                  <span class="field-label">Location</span>
+                  <span class="field-value">{{ location() || '(not set)' }}</span>
+                </div>
+                <div class="field-row">
+                  <span class="field-label">Profile Visibility</span>
+                  <span class="field-value">{{ profileReach() || 'community' }}</span>
+                </div>
+              } @else {
+                <div class="field-row">
+                  <span class="field-label">Locale</span>
+                  <span class="field-value">{{ session?.locale || '(not set)' }}</span>
+                </div>
+              }
               <div class="field-row">
-                <span class="field-label">Locale</span>
-                <span class="field-value">{{ session?.locale || '(not set)' }}</span>
+                <span class="field-label">
+                  {{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }}
+                </span>
+                <span class="field-value">{{ interests().join(', ') || '(not set)' }}</span>
               </div>
-              <div class="field-row">
-                <span class="field-label">Interests</span>
-                <span class="field-value">{{ session?.interests?.join(', ') || '(not set)' }}</span>
-              </div>
-              <button class="btn-primary" (click)="startEditing()">Edit Profile</button>
+              <button type="button" class="btn-primary" (click)="startEditing()">
+                Edit Profile
+              </button>
             </div>
           } @else {
             <form class="profile-form" (submit)="saveProfile(); $event.preventDefault()">
@@ -321,16 +821,18 @@
                   placeholder="Your name"
                 />
               </div>
-              <div class="form-group">
-                <label for="avatarUrl">Avatar URL</label>
-                <input
-                  id="avatarUrl"
-                  type="url"
-                  [(ngModel)]="editForm.avatarUrl"
-                  name="avatarUrl"
-                  placeholder="https://example.com/avatar.jpg"
-                />
-              </div>
+              @if (!isNetworkAuthenticated()) {
+                <div class="form-group">
+                  <label for="avatarUrl">Avatar URL</label>
+                  <input
+                    id="avatarUrl"
+                    type="url"
+                    [(ngModel)]="editForm.avatarUrl"
+                    name="avatarUrl"
+                    placeholder="https://example.com/avatar.jpg"
+                  />
+                </div>
+              }
               <div class="form-group">
                 <label for="bio">Bio</label>
                 <textarea
@@ -341,18 +843,22 @@
                   placeholder="Tell us about yourself..."
                 ></textarea>
               </div>
+              @if (!isNetworkAuthenticated()) {
+                <div class="form-group">
+                  <label for="locale">Locale</label>
+                  <input
+                    id="locale"
+                    type="text"
+                    [(ngModel)]="editForm.locale"
+                    name="locale"
+                    placeholder="en_US"
+                  />
+                </div>
+              }
               <div class="form-group">
-                <label for="locale">Locale</label>
-                <input
-                  id="locale"
-                  type="text"
-                  [(ngModel)]="editForm.locale"
-                  name="locale"
-                  placeholder="en_US"
-                />
-              </div>
-              <div class="form-group">
-                <label for="interests">Interests (comma-separated)</label>
+                <label for="interests">
+                  {{ isNetworkAuthenticated() ? 'Affinities' : 'Interests' }} (comma-separated)
+                </label>
                 <input
                   id="interests"
                   type="text"
@@ -363,7 +869,9 @@
               </div>
               <div class="form-actions">
                 <button type="submit" class="btn-primary">Save Changes</button>
-                <button type="button" class="btn-secondary" (click)="cancelEditing()">Cancel</button>
+                <button type="button" class="btn-secondary" (click)="cancelEditing()">
+                  Cancel
+                </button>
               </div>
             </form>
           }
@@ -372,41 +880,76 @@
         <!-- Data Management -->
         <section class="settings-section">
           <h2 class="section-title">Data Management</h2>
-          <p class="section-description">
-            Your session data is stored locally in your browser. Export it to save a backup or transfer to another device.
-          </p>
+          @if (isNetworkAuthenticated()) {
+            <p class="section-description">
+              Your data is stored on the Elohim network. You have full control over your identity
+              and can export your data at any time.
+            </p>
+          } @else {
+            <p class="section-description">
+              Your session data is stored locally in your browser. Export it to save a backup or
+              transfer to another device.
+            </p>
+          }
           <div class="settings-actions">
-            <button class="btn-secondary" (click)="exportData()">
+            <button type="button" class="btn-secondary" (click)="exportData()">
               <span class="btn-icon">download</span>
               Export Data
             </button>
-            <button class="btn-danger" (click)="resetSession()">
-              <span class="btn-icon">delete</span>
-              Reset Session
-            </button>
+            @if (!isNetworkAuthenticated()) {
+              <button type="button" class="btn-danger" (click)="resetSession()">
+                <span class="btn-icon">delete</span>
+                Reset Session
+              </button>
+            }
           </div>
         </section>
 
-        <!-- Session Info -->
+        <!-- Identity Info -->
         <section class="settings-section">
-          <h2 class="section-title">Session Information</h2>
+          <h2 class="section-title">
+            {{ isNetworkAuthenticated() ? 'Identity Information' : 'Session Information' }}
+          </h2>
           <div class="info-grid">
-            <div class="info-row">
-              <span class="info-label">Session ID</span>
-              <code class="info-value">{{ session?.sessionId ?? 'N/A' }}</code>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Created</span>
-              <span class="info-value">{{ session?.createdAt ? formatTimestamp(session!.createdAt) : 'N/A' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Last Active</span>
-              <span class="info-value">{{ session?.lastActiveAt ? formatTimestamp(session!.lastActiveAt) : 'N/A' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Access Level</span>
-              <span class="info-value">{{ session?.accessLevel ?? 'visitor' }}</span>
-            </div>
+            @if (isNetworkAuthenticated()) {
+              <div class="info-row">
+                <span class="info-label">Human ID</span>
+                <code class="info-value">{{ identityService.humanId() ?? 'N/A' }}</code>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Identity Mode</span>
+                <span [ngClass]="['info-value', 'identity-mode', 'mode-' + identityMode()]">
+                  {{ modeBadgeText() }}
+                </span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Member Since</span>
+                <span class="info-value">
+                  {{ memberSince() ? formatTimestamp(memberSince()!) : 'N/A' }}
+                </span>
+              </div>
+            } @else {
+              <div class="info-row">
+                <span class="info-label">Session ID</span>
+                <code class="info-value">{{ session?.sessionId ?? 'N/A' }}</code>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Created</span>
+                <span class="info-value">
+                  {{ session?.createdAt ? formatTimestamp(session!.createdAt) : 'N/A' }}
+                </span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Last Active</span>
+                <span class="info-value">
+                  {{ session?.lastActiveAt ? formatTimestamp(session!.lastActiveAt) : 'N/A' }}
+                </span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Access Level</span>
+                <span class="info-value">{{ session?.accessLevel ?? 'visitor' }}</span>
+              </div>
+            }
           </div>
         </section>
       </div>

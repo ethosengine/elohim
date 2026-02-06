@@ -1,0 +1,10 @@
+Scenario: Avoiding conflict of interest through transparency
+    Given I have relationship with AI company
+    And I'm testifying on case involving similar technology
+    When I disclose potential conflict before testimony
+    Then I reveal: corporate funding, investment, or prior work
+    And I explain: how relationship might bias my perspective
+    And I offer: to recuse if council finds conflict problematic
+    And I maintain: credibility through honesty
+    And undisclosed conflicts: would permanently discredit me
+    And transparency: keeps expertise trustworthy

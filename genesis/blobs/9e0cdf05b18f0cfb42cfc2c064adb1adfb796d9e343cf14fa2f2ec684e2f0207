@@ -1,0 +1,10 @@
+Scenario: Ecological impact of household coordination
+    Given Kenji lives with three roommates
+    And household coordination can reduce ecological impact
+    When the bioregional_elohim tracks household ecological practices
+    Then it should recognize shared living as ecologically efficient
+    And it should show how cooking for four is more efficient than four cooking separately
+    And it should value household bulk buying as reducing packaging waste
+    And it should accumulate care tokens for ecological household practices
+    And the system should recognize household coordination as ecological care
+    And shared living should be valued as sustainability practice

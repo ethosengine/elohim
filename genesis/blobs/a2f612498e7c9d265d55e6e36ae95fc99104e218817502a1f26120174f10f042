@@ -1,0 +1,10 @@
+Scenario: Access appeal interface during high emotional distress
+    Given Marcus is experiencing mental health crisis
+    And Marcus wants to appeal the agent's intervention
+    When Marcus accesses the appeal interface
+    Then the interface uses simple language requiring no legal expertise
+    And the interface requires only: complaint description and desired outcome
+    And the interface supports voice input for those unable to type
+    And the interface provides language translation automatically
+    And the interface works on any device Marcus has available
+    And the interface saves progress if Marcus needs to step away

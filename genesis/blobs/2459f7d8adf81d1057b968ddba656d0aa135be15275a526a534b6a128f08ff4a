@@ -1,0 +1,11 @@
+Scenario: Household safety modifications balance autonomy and protection
+    Given Helen has mobility limitations and fall risk
+    And safety modifications would reduce risk
+    When household safety needs are assessed
+    Then modifications should be proposed, not imposed
+    And Helen should decide what changes occur in her home
+    And options should be presented with dignity: "Would grab bars help you feel safer?"
+    And her preferences about aesthetics and comfort should matter
+    And safety should support her autonomy, not restrict it
+    And the goal should be enabling continued home living
+    And Helen's agency over her space should be preserved

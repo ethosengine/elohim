@@ -1,0 +1,9 @@
+Scenario: Insurance navigation support reduces administrative burden
+    Given medical insurance is byzantine and frustrating
+    And James must manage claims, authorizations, coverage
+    When the healthcare_elohim assists with insurance
+    Then it should help James navigate insurance processes
+    And it should track claims and identify problems
+    And it should assist with authorization requirements
+    And it should escalate coverage denials for appeal
+    And insurance complexity should not prevent needed care

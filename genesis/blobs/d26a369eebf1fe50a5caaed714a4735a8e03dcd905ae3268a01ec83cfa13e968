@@ -1,0 +1,10 @@
+Scenario: Customizable interaction modes support diverse capabilities
+    Given Alex's capabilities vary day to day
+    And fatigue, pain, or other factors affect what's accessible
+    When Alex uses the Value Scanner on different days
+    Then Alex should be able to switch between interaction modes easily
+    And voice, touch, keyboard, and switch access should all be available
+    And the system should remember Alex's preferences per context
+    And Alex should not have to repeatedly explain needs
+    And flexible modes should accommodate fluctuating capabilities
+    And the interface should adapt to Alex, not force Alex to adapt

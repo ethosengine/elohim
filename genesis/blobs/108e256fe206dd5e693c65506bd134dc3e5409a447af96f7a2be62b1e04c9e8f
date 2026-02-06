@@ -1,0 +1,10 @@
+Scenario: Transportation choices and ecological impact
+    Given Kenji walks most places due to lack of car
+    And walking has minimal ecological impact
+    When the bioregional_elohim tracks transportation
+    Then it should recognize walking as ecological care contribution
+    And it should accumulate care tokens for low-impact transportation
+    And it should show "Walking instead of driving prevented X carbon emissions"
+    And it should validate that poverty can align with ecological values
+    And the system should recognize low-impact mobility as care work
+    And Kenji should see his car-free life as ecological stewardship

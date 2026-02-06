@@ -1,0 +1,10 @@
+Scenario: Concrete operations stage supports numerical comparison
+    Given Emma can handle basic math at age 8
+    And she is developing numerical reasoning
+    When Emma compares prices or quantities
+    Then the personal_agent should support mathematical thinking
+    And the agent should ask "How much money would we save?"
+    And simple calculations should be scaffolded
+    And Emma should practice applying math to real decisions
+    And numerical literacy should be built through authentic use
+    And abstract concepts should be grounded in concrete comparisons

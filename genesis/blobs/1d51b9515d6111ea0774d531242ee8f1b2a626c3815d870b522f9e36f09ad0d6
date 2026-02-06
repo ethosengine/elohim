@@ -1,0 +1,12 @@
+Scenario: Community leadership positions recognize accumulated care experience
+    Given Robert has decades of care economy participation
+    And he has demonstrated capability through managing complex responsibilities
+    And community needs experienced leadership
+    When community_elohim identifies leadership opportunities
+    Then it should recognize Robert's accumulated care contributions as leadership qualification
+    And surface opportunities: community boards, policy advisory roles, initiative leadership
+    And connect his care experience to governance credibility
+    And help him understand that his lived experience is valuable wisdom
+    And match leadership opportunities to his capacity and interests
+    And prevent exploitation of middle-aged adults' sense of responsibility
+    And support meaningful community contribution without burnout

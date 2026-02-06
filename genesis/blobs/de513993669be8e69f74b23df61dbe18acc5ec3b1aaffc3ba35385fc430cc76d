@@ -1,0 +1,11 @@
+Scenario: Flexible scheduling accommodates medical appointments and fatigue
+    Given Alex has medical appointments and disability-related health needs
+    And fatigue is a real factor in Alex's work capacity
+    When Alex manages work schedule
+    Then the workplace_elohim should help negotiate flexible scheduling
+    And it should track accommodation requests for schedule flexibility
+    And Alex should be able to adjust hours around medical needs
+    And part-time status should be respected as appropriate for Alex's capacity
+    And the protocol should support Alex in managing work-life balance
+    And flexible scheduling should be framed as reasonable accommodation
+    And Alex's productivity should be measured appropriately for part-time work

@@ -1,0 +1,10 @@
+Scenario: Research findings immediately improve local governance
+    Given my research identified that Constitutional Council deliberations improve with certain information tools
+    And I shared findings with Mayor Jamal and council members
+    When community decides to implement recommended improvements
+    Then research serves practical improvement not just academic knowledge
+    And Rapid feedback loop connects insight to implementation
+    And Community sees research benefiting them directly
+    And Researcher-community trust strengthens through mutual value
+    And Knowledge serves flourishing not just publication
+    And Research demonstrates: scholarship in service of democracy

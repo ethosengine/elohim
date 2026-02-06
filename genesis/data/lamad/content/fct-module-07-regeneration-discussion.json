@@ -1,0 +1,51 @@
+{
+  "id": "fct-module-07-regeneration-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Regeneration and Reconciliation",
+  "description": "Group discussion and reflection activity",
+  "content": "**Instructions:** How can churches embody Christ's vision of regeneration and reconciliation in their use and development of technology, while avoiding the pitfalls of extractive systems and harmful externalities?\"\n\nThis question encourages students to:\n\nReflect on Jesus' teachings about regeneration and reconciliation in light of modern technological challenges.  \nConsider how churches can model humane technology practices that align with Kingdom values.  \nCritically examine current church practices that may unintentionally contribute to extractive or harmful systems.  \nBrainstorm practical ways churches can shift towards more regenerative and reconciliatory approaches to technology use and development.  \nExplore the tension between growth/expansion and sustainability/stewardship in both technological and spiritual contexts.  \nApply concepts from the CHT course like externalities, regenerative systems, and \"binding scale to responsibility\" to a church context.  \nDiscuss how churches can be prophetic voices advocating for more humane technology in broader society.\n\nThis question invites rich discussion that bridges theological reflection, practical application, and critical analysis of current practices \\- key goals for this Christian companion course to the CHT material.\n\n**Activity Type:** discussion\n\n**Group Size:** small-group\n\n**Estimated Time:** 15-20 minutes\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 7 - Regeneration and Reconciliation - Changing the paradim of church success..md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-07-regeneration"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-07-regeneration",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T21:10:19.208023",
+  "updatedAt": "2025-12-24T03:05:26.195Z",
+  "did": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: Regeneration and Reconciliation",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-07-regeneration-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: Regeneration and Reconciliation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-07-regeneration-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+    "name": "Discussion: Regeneration and Reconciliation",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.208023",
+    "dateModified": "2025-11-28T21:10:19.208024",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

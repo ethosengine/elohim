@@ -1,0 +1,11 @@
+Scenario: Snow removal and seasonal support coordinated through neighbors
+    Given Helen cannot safely shovel snow or do seasonal maintenance
+    And neighbors have varying capabilities and availability
+    When seasonal support needs arise
+    Then the neighborhood_elohim should coordinate volunteer schedules
+    And neighbors should be matched to tasks based on capability
+    And Helen should experience this as neighborly care, not charity
+    And volunteer work should be recognized with care tokens
+    And reciprocal support should be tracked across seasons
+    And the protocol should coordinate practical mutual aid
+    And neighborhood care economy should handle seasonal challenges

@@ -1,0 +1,9 @@
+Scenario: Farmworker expertise in cultivation becomes valued in democratic governance
+    Given farmworkers have deep knowledge of soil, crops, and seasonal patterns
+    And hierarchical structure meant their expertise was undervalued or ignored
+    When democratic governance gives farmworkers decision-making voice
+    Then cultivation decisions incorporate workers' hands-on expertise
+    And crop selection reflects workers' knowledge of land and climate
+    And planting and harvesting schedules balance productivity with worker wellbeing
+    And farmworker wisdom shapes farm operations through democratic participation
+    And workplace_elohim documents farmworker knowledge and decision contributions

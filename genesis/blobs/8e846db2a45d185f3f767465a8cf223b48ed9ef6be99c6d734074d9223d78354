@@ -1,0 +1,10 @@
+Scenario: Participating in family decisions from distance
+    Given Aisha is geographically distant from family
+    And important family decisions need her input
+    When the family makes significant decisions
+    Then the family_elohim should facilitate remote participation
+    And Aisha's input should be solicited appropriately
+    And her adult perspective should be valued
+    And technology should enable genuine participation
+    And distance shouldn't exclude her from family governance
+    And her independent status should give her legitimate voice

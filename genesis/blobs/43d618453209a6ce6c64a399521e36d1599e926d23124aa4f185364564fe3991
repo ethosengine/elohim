@@ -1,0 +1,9 @@
+Scenario: Investor advocates for municipal community investment tax incentives
+    Given municipality offers tax breaks for corporate investment
+    And community investment lacks equivalent policy support
+    When Patricia and other investors organize for policy change
+    Then they advocate to city council for community investment tax credits
+    And propose municipal matching funds for community investment pools
+    And credible advocacy comes from investors who've proven model viability
+    And municipal policy evolves to support community investment and democratic ownership
+    And municipality_elohim coordinates investor advocacy and policy development

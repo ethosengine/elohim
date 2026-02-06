@@ -1,0 +1,7 @@
+Scenario: Documenting personal needs for advocacy
+    Given I experience specific challenges due to work conditions
+    When I want to advocate for changes
+    Then the protocol should help me document my needs
+    And provide evidence of how current conditions affect my well-being
+    And support me in articulating what I need to thrive
+    And empower me to advocate for care-economy-aligned workplace policies

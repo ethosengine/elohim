@@ -1,0 +1,10 @@
+Scenario: Integration with school curriculum where beneficial
+    Given Marcus's real-world learning is substantial
+    And school integration could recognize his capabilities
+    When Marcus grants permission for school integration
+    Then the Value Scanner could share relevant learning data
+    And schools could award credit for applied learning
+    And his care contributions could supplement traditional coursework
+    And integration should benefit Marcus academically
+    And his consent and privacy should be absolute requirements
+    And school recognition should honor his real-world competence

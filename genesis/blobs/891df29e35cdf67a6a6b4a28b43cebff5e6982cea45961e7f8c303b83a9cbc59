@@ -1,0 +1,12 @@
+Scenario: Grandparent role supported as new generation emerges
+    Given Robert occasionally provides care for his grandchild
+    And he's learning the grandparent role
+    And his care enables his adult child to work
+    When family_elohim tracks grandparent care contributions
+    Then it should recognize grandparent care as valuable family contribution
+    And help Robert understand his role in the four-generation family
+    And support him in providing care without overstepping parenting boundaries
+    And recognize that his grandparent care enables the middle generation
+    And value his care appropriately in family care economy
+    And help him see himself as part of ongoing care reciprocity
+    And model care patterns for when he'll need care

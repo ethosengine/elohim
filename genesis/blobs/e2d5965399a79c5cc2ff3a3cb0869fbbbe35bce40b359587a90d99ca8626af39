@@ -1,0 +1,10 @@
+Scenario: Community food systems and nutrition access for seniors
+    Given Margaret manages nutrition on limited budget
+    And community food systems affect senior health
+    When the community_elohim coordinates food access
+    Then Margaret should help shape senior-appropriate food programs
+    And her needs and knowledge should inform program design
+    And community should ensure affordable nutritious food for seniors
+    And Margaret should influence resource allocation
+    And senior nutritional needs should be community priority
+    And her participation should improve services for all seniors

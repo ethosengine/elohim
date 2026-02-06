@@ -1,0 +1,9 @@
+Given the activist wants to address local housing affordability
+When they create a housing justice organizing space
+And they invite community members through trusted connections
+And they establish space charter emphasizing transparency and consensus
+Then the organizing space is created at community layer
+And invitations travel through web of trust
+And the space has tools for decision-making and coordination
+And community members can contribute safely within the space
+And the moderation agent helps maintain healthy dialogue

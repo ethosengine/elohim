@@ -1,0 +1,10 @@
+Scenario: Personal values forming through conscious choice-making
+    Given Emma is making repeated value-based decisions
+    And she is old enough to articulate reasons for choices
+    When Emma reflects on why she makes certain choices
+    Then her personal_agent should help her identify her values
+    And the agent should ask "What matters to you about this choice?"
+    And Emma should begin to consciously understand her value framework
+    And her values should be forming through reflection, not imposition
+    And she should develop moral reasoning capacity
+    And individual value formation should be supported

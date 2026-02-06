@@ -1,0 +1,9 @@
+Scenario: Organizer documents environmental justice disparities for campaign
+    Given industrial pollution concentrates in low-income neighborhoods of color
+    While parks and trees concentrate in wealthy white areas
+    When the Observer provides environmental equity data
+    Then the organizer sees pollution sources mapped by neighborhood demographics
+    And views park access and tree canopy distribution
+    And calculates health impact disparities from environmental conditions
+    And identifies affected communities for organizing base
+    And environmental racism becomes documented and actionable

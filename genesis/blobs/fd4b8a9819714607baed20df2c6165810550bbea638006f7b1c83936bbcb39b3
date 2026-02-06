@@ -1,0 +1,11 @@
+Scenario: Documenting accessibility barriers for collective action
+    Given the neighborhood has many accessibility barriers
+    And individual complaints often go unaddressed
+    When Alex uses the system to document barriers
+    Then the neighborhood_elohim should collect systematic barrier data
+    And it should identify patterns across multiple residents' reports
+    And documentation should support collective advocacy
+    And data should enable organized demands for improvements
+    And Alex's expertise should strengthen neighborhood organizing
+    And the protocol should facilitate collective power-building
+    And systematic change should become possible through organized documentation

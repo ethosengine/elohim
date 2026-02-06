@@ -1,0 +1,12 @@
+Scenario: Industry education and training includes care economy content
+    Given professional development shapes industry practices
+    And care economy should be included in professional education
+    And Robert's experience qualifies him to contribute to education
+    When industry_elohim connects education and care economy
+    Then it should help Robert contribute to industry education development
+    And support inclusion of care economy in professional training
+    And help him develop case studies from lived experience
+    And build industry curriculum that includes care economy principles
+    And educate next generation of professionals in care economy thinking
+    And advance care economy through professional education
+    And demonstrate that industry knowledge should include care economy

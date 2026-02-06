@@ -1,0 +1,9 @@
+Scenario: Household safety modifications as care needs increase
+    Given David requires increasing safety monitoring
+    And household needs modifications for safe caregiving
+    When household safety is assessed
+    Then the household_elohim should identify needed modifications
+    And it should connect James to resources for safety equipment
+    And it should help finance modifications through care economy
+    And household should be adaptable to progressive care needs
+    And safety should be maintained as capability declines

@@ -1,0 +1,10 @@
+Scenario: Elder care for Margaret's mother made visible and valued
+    Given Margaret provides 8 hours/week care coordination for her mother
+    And Margaret's nursing background makes her care highly skilled
+    When Margaret's elder care contributions are tracked
+    Then the sophisticated care labor should be recognized
+    And the time, skill, and emotional labor should be quantified
+    And Margaret's siblings should see her care contributions
+    And family resource allocation should reflect her caregiving
+    And elder care should be valued as the skilled work it is
+    And Margaret's contributions should give her voice in mother's care decisions

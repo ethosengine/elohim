@@ -1,0 +1,9 @@
+Scenario: Wonder-preserving interface for making care choices
+    Given Tommy is using the Value Scanner for the first time
+    And the interface is optimized for ages 5-7
+    When Tommy opens the scanner application
+    Then the interface should display large, colorful icons
+    And the personal_agent should use warm, encouraging voice guidance
+    And no text requiring reading ability should be mandatory
+    And the interface should preserve the magic of choice-making
+    And no gamification or point systems should be present

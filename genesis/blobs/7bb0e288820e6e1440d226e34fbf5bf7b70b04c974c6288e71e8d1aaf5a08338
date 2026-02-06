@@ -1,0 +1,13 @@
+Scenario: Recognition of substantial disability advocacy contributions
+    Given Alex performs significant disability advocacy work
+    And Alex mentors other disabled people in their community
+    And Alex does accessibility consulting for local organizations
+    And this sophisticated care labor benefits entire communities
+    When the Value Scanner tracks Alex's care contributions
+    Then advocacy work should accumulate care tokens appropriately
+    And peer mentoring should be recognized as skilled care labor
+    And accessibility consulting should be valued explicitly
+    And community organizing should count toward care economy standing
+    And Alex's substantial contributions should be made visible
+    And society should see Alex as contributor, not burden
+    And Alex's care work should shape their economic standing

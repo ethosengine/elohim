@@ -1,0 +1,9 @@
+Scenario: Citizen participates in park and green space decisions
+    Given the city is planning park improvements or closures
+    And the citizen values local park access
+    When the Observer provides park decision information
+    Then the citizen learns about planned changes early enough to respond
+    And sees park access and quality distribution across city
+    And understands community needs and usage patterns
+    And can advocate for equitable green space investment
+    And park decisions reflect actual community priorities

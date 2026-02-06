@@ -1,0 +1,11 @@
+Scenario: Municipal level participates in county-state coordination
+    Given Riverside is part of larger county and state systems
+    And protocol must integrate with these layers
+    When I coordinate upward with county and state governance
+    Then I share: Riverside's experience with protocol adoption
+    And I advocate: for policies supporting municipal sovereignty
+    And I provide: evidence about outcomes for policy makers
+    And I resist: regulatory overreach from higher layers
+    And I seek: resources and support from county and state
+    And I maintain: that community adopted protocol voluntarily
+    And I protect: subsidiarity principle in multi-layer governance

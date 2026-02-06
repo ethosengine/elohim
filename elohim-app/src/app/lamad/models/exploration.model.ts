@@ -16,6 +16,8 @@
 
 import { ContentNode, ContentRelationshipType } from './content-node.model';
 
+// @coverage: 100.0% (2026-02-05)
+
 // ============================================================================
 // Exploration Query Types
 // ============================================================================
@@ -40,6 +42,12 @@ export interface GraphExplorationQuery {
   /** Optional: Filter by relationship type */
   relationshipFilter?: ContentRelationshipType | ContentRelationshipType[];
 
+  /** Optional: Filter by content type (e.g., only show 'path' nodes) */
+  contentTypeFilter?: string | string[];
+
+  /** Optional: Exclude certain content types from results */
+  excludeContentTypes?: string[];
+
   /** How to display results (used by UI, service returns data for all views) */
   view?: 'graph' | 'list' | 'tree';
 
@@ -48,6 +56,13 @@ export interface GraphExplorationQuery {
 
   /** Optional: Include content body or just metadata */
   includeContent?: boolean;
+
+  /**
+   * Optional: When exploring FROM a path node, expand to show contained content.
+   * If true, path nodes' relatedNodeIds are included in traversal.
+   * Default: true (paths are transparent containers)
+   */
+  expandPaths?: boolean;
 }
 
 /**
@@ -214,7 +229,11 @@ export interface QueryCost {
   canExecute: boolean;
 
   /** If cannot execute, why not */
-  blockedReason?: 'rate-limit-exceeded' | 'insufficient-attestation' | 'query-too-expensive' | 'invalid-query';
+  blockedReason?:
+    | 'rate-limit-exceeded'
+    | 'insufficient-attestation'
+    | 'query-too-expensive'
+    | 'invalid-query';
 }
 
 // ============================================================================
@@ -253,41 +272,41 @@ export interface RateLimitConfig {
  * Default rate limit configurations per tier.
  */
 export const RATE_LIMIT_CONFIGS: Record<RateLimitTier, RateLimitConfig> = {
-  'unauthenticated': {
+  unauthenticated: {
     tier: 'unauthenticated',
     maxDepth: 0,
     queriesPerHour: 0,
     pathfindingPerHour: 0,
-    resetIntervalMs: 3600000 // 1 hour
+    resetIntervalMs: 3600000, // 1 hour
   },
-  'authenticated': {
+  authenticated: {
     tier: 'authenticated',
     maxDepth: 1,
     queriesPerHour: 10,
     pathfindingPerHour: 0,
-    resetIntervalMs: 3600000
+    resetIntervalMs: 3600000,
   },
   'graph-researcher': {
     tier: 'graph-researcher',
     maxDepth: 2,
     queriesPerHour: 25,
     pathfindingPerHour: 0,
-    resetIntervalMs: 3600000
+    resetIntervalMs: 3600000,
   },
   'advanced-researcher': {
     tier: 'advanced-researcher',
     maxDepth: 3,
     queriesPerHour: 50,
     pathfindingPerHour: 0,
-    resetIntervalMs: 3600000
+    resetIntervalMs: 3600000,
   },
   'path-creator': {
     tier: 'path-creator',
     maxDepth: 3,
     queriesPerHour: 50,
     pathfindingPerHour: 5,
-    resetIntervalMs: 3600000
-  }
+    resetIntervalMs: 3600000,
+  },
 };
 
 /**
@@ -342,11 +361,23 @@ export interface ExplorationError {
   code: ExplorationErrorCode;
   message: string;
   details?: {
+    // Depth-related errors
     requestedDepth?: number;
     allowedDepth?: number;
+    // Attestation check results (when passed as details)
+    allowed?: boolean;
+    maxAllowedDepth?: number;
+    tier?: RateLimitTier;
     requiredAttestation?: string;
+    // Rate limiting
     rateLimitStatus?: RateLimitStatus;
+    // Query cost
     queryCost?: QueryCost;
+    // Resource identification
+    resourceId?: string;
+    // Pathfinding context
+    from?: string;
+    to?: string;
   };
 }
 
@@ -361,7 +392,7 @@ export const DEPTH_ATTESTATION_REQUIREMENTS: Record<number, string | null> = {
   0: null, // No attestation needed for depth 0
   1: null, // Authenticated users can do depth 1
   2: 'graph-researcher',
-  3: 'advanced-researcher'
+  3: 'advanced-researcher',
 };
 
 /**

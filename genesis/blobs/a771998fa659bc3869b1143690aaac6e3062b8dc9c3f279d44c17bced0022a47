@@ -1,0 +1,11 @@
+Scenario: Senior center programs maintain social connection and engagement
+    Given Helen participates in senior center activities
+    And social connection prevents isolation and decline
+    When Helen engages with senior center programs
+    Then the community_elohim should coordinate transportation
+    And accessibility should be ensured for all programs
+    And her participation should be recognized as community contribution
+    And programs should preserve dignity and agency
+    And senior centers should be spaces of continued growth, not warehousing
+    And the protocol should support elder engagement in community life
+    And Helen should experience valued participation, not make-work

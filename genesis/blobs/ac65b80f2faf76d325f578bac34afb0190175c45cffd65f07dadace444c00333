@@ -1,0 +1,11 @@
+Scenario: Participating in global constitutional convention as observer
+    Given Global Constitutional Convention convenes with 10,000 delegates
+    And I attend as policy maker observer not delegate
+    When I observe global deliberative democracy
+    Then I learn: from how diverse humanity deliberates together
+    And I see: what enables agreement despite profound disagreement
+    And I witness: ordinary citizens governing existential questions
+    And I prepare: to implement constitutional amendments in my nation
+    And I translate: global constitutional evolution into national law
+    And I am humbled: by wisdom of randomly-selected citizens
+    And I understand: my role as servant of democratic will

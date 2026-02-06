@@ -1,0 +1,9 @@
+Scenario: Owner processes identity shift from sole owner to transition supporter
+    Given Rosa's identity was tied to business ownership for 15 years
+    And letting go triggers real grief and identity crisis
+    When EAE provides transition support including peer counseling
+    Then Rosa accesses support groups with other converted owners
+    And she processes ownership loss with validation and care
+    And new identity emerges: founder who chose community over extraction
+    And her purpose shifts from ownership burden to legacy stewardship
+    And emotional reality is honored throughout transition

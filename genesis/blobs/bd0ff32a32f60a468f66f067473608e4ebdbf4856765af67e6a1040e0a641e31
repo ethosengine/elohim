@@ -1,0 +1,10 @@
+Scenario: Privacy boundaries in shared living space
+    Given Kenji shares space but deserves privacy
+    And household coordination requires some information sharing
+    When the household_elohim manages household data
+    Then it should share only household-relevant information with roommates
+    And Kenji's personal data should remain private
+    And roommates should see his cooking contributions, not his financial struggles
+    And privacy boundaries should be clear and respected
+    And the system should balance coordination needs with personal privacy
+    And Kenji should control what household information is shared

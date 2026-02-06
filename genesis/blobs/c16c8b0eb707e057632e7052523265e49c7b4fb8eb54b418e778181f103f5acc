@@ -1,0 +1,10 @@
+Scenario: Neighborhood care tokens reflect accumulated contributions
+    Given Frank contributes through council service, repairs, and relationship-building
+    And he's invested decades in neighborhood relationships
+    When the neighborhood_elohim calculates care tokens
+    Then tokens should accumulate from all Frank's neighborhood contributions
+    And governance participation, skilled labor, and social cohesion work should be valued
+    And accumulated tokens should represent neighborhood standing and resources
+    And Frank's contributions should create claims on neighborhood support
+    And the care economy should recognize long-term neighborhood investment
+    And his participation should be visible and celebrated

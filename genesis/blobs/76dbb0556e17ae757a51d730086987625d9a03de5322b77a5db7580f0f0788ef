@@ -1,0 +1,12 @@
+Scenario: Coordinating family participation in children's lives during instability
+    Given my children's lives are disrupted by housing changes and crisis
+    And extended family wants to support children's stability
+    When I organize family involvement in children's education, activities, care
+    Then the family_elohim coordinates family practical support
+    And helps family members contribute according to their capacity
+    And maintains my oversight of all family involvement with children
+    And ensures family help is consistent with my parenting values
+    And tracks family contributions with care token recognition
+    And my personal_agent facilitates communication without overwhelming me
+    And recognizes coordination of family help as substantial organizational labor
+    And validates that family participation strengthens children's support network

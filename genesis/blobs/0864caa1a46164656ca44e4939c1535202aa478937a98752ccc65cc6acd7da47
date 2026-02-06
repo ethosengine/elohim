@@ -1,0 +1,9 @@
+Scenario: Community investment enables conversion while building local ownership stake
+    Given conversion requires $750K acquisition capital for three locations
+    And community members want to support democratic ownership but lacked pathway
+    When community investment pools fund significant portion of acquisition
+    Then neighbors invest modest amounts ($2K-$20K each) in conversion
+    And investors receive fair return (5% annually) plus social benefit
+    And community gains financial stake in democratically-operated local institutions
+    And investment connects neighbors to democratic economy building in their community
+    And community_elohim manages community investment relationships transparently

@@ -1,0 +1,12 @@
+Scenario: Industry standards influenced toward care-friendly practices
+    Given Robert has professional standing in his industry
+    And industry standards affect millions of workers
+    And care-friendly standards would benefit workers across the sector
+    When industry_elohim connects Robert to standards development
+    Then it should identify opportunities to influence industry standards
+    And help him advocate for care leave, flexible work, and family support standards
+    And connect him to industry associations and standards bodies
+    And surface how care-friendly standards improve productivity and retention
+    And support him in leveraging professional position for sector transformation
+    And build industry practices that normalize care responsibilities
+    And demonstrate that industry standards can advance care economy

@@ -1,0 +1,9 @@
+Scenario: Crisis detection when Maria approaches physical or emotional breakdown
+    Given Maria operates at unsustainable intensity with no backup
+    And she cannot afford to collapse because there's no one else
+    When the personal_agent monitors Maria's health and stress levels
+    Then it should detect warning signs of approaching breakdown
+    And it should alert Maria before crisis becomes emergency
+    And it should proactively surface support options
+    And it should connect her to emergency resources if needed
+    And it should treat Maria's well-being as critical infrastructure for family survival

@@ -1,0 +1,11 @@
+Scenario: Crafting legislation enabling global constitutional amendments
+    Given Global Convention passed ecological standing amendment
+    And national law must operationalize this
+    When I translate constitutional evolution into legislation
+    Then I grant: legal personhood to ecosystems as constitution requires
+    And I update: property law to reflect ecological rights
+    And I modify: administrative procedure for ecosystem representation
+    And I ensure: national law aligns with global constitutional principle
+    And I demonstrate: how global and national governance coordinate
+    And I serve: democratic constitutional evolution
+    And I show: policy making as implementing citizen wisdom

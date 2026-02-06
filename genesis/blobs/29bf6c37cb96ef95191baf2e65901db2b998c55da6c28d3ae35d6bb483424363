@@ -1,0 +1,11 @@
+Scenario: Community care coordination across multiple service providers
+    Given Helen receives support from multiple sources
+    And coordination prevents gaps and duplication
+    When the community_elohim tracks Helen's care network
+    Then it should coordinate home health aides, medical providers, and volunteers
+    And it should identify gaps before they become crises
+    And it should prevent duplication of services
+    And it should ensure Helen's preferences are communicated across providers
+    And care should happen around Helen, not to her
+    And the protocol should provide infrastructure for complex care coordination
+    And Helen should be center of coordinated care web

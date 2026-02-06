@@ -1,0 +1,10 @@
+Scenario: Coordinating informal grandchild care sharing with neighbors
+    Given Margaret cares for her grandchildren regularly
+    And other neighborhood grandparents also provide childcare
+    When Margaret coordinates with other grandparents
+    Then the neighborhood_elohim should facilitate care coordination
+    And it should help grandparents share resources and support
+    And it should enable mutual aid among neighborhood grandparents
+    And grandparents should form care networks for collective benefit
+    And neighborhood care economy should strengthen through elder collaboration
+    And Margaret should connect with other grandparents in similar roles

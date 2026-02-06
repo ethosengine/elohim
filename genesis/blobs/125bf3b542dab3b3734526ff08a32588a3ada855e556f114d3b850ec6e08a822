@@ -1,0 +1,9 @@
+Scenario: Politician evaluates charter school expansion with comprehensive analysis
+    Given charter advocates push for expansion with achievement promises
+    And traditional public school advocates warn of harmful impacts
+    When the Observer analyzes charter performance and impacts
+    Then they see charter outcomes controlling for selective enrollment
+    And understand fiscal impacts on district school budgets
+    And identify which students benefit from charters versus harmed
+    And review discipline and expulsion patterns for vulnerable students
+    And make informed decision balancing innovation with equity

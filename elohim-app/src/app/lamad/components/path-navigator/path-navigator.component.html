@@ -1,114 +1,83 @@
-<div class="path-player-container" [class.sidebar-collapsed]="!sidebarOpen">
-
+<div
+  class="path-player-container focused-view-container"
+  [class.sidebar-collapsed]="!sidebarOpen"
+  [class.focused-view-active]="isFocusedView"
+>
   <!-- PATH TOOLING: Mobile Toggle -->
-  <button class="sidebar-toggle" (click)="toggleSidebar()" aria-label="Toggle Navigation">
+  <button
+    type="button"
+    class="sidebar-toggle"
+    (click)="toggleSidebar()"
+    aria-label="Toggle Navigation"
+    [hidden]="isFocusedView"
+  >
     <span class="icon">{{ sidebarOpen ? '✕' : '☰' }}</span>
   </button>
 
   <!-- Mobile Sidebar Backdrop - click to dismiss -->
   @if (sidebarOpen) {
-    <div class="sidebar-backdrop" (click)="toggleSidebar()" (keydown.escape)="toggleSidebar()" tabindex="-1"></div>
+    <div
+      class="sidebar-backdrop"
+      (click)="toggleSidebar()"
+      (keydown.escape)="toggleSidebar()"
+      tabindex="-1"
+    ></div>
   }
 
-  <!-- PATH TOOLING: Sidebar -->
+  <!-- PATH TOOLING: Sidebar (Lesson-focused) -->
   <aside class="path-sidebar">
     <div class="sidebar-header">
       <a [routerLink]="['/lamad/path', pathId]" class="back-link">
-        <span class="icon">←</span> Back to Overview
+        <span class="icon">←</span>
+        Back to Overview
       </a>
-      <div class="path-title-wrapper">
-        <h2 class="path-title">{{ path?.title }}</h2>
-        <span class="path-progress-text" [attr.aria-label]="getProgressPercentage() + '% Complete'">{{ getProgressPercentage() }}%</span>
-      </div>
 
-      <!-- Mobile Breadcrumbs (moved from main) -->
-      @if (stepView) {
-        <nav class="breadcrumbs sidebar-breadcrumbs" aria-label="Breadcrumb navigation">
-          <a routerLink="/lamad">Territory</a>
-          <span class="separator">/</span>
-          <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
-          @if (getCurrentChapterTitle()) {
-            <span class="separator">/</span>
-            <span class="crumb">{{ getCurrentChapterTitle() }}</span>
-          }
-          <span class="separator">/</span>
-          <span class="crumb current">{{ stepView.step.stepTitle }}</span>
-        </nav>
+      <!-- Lesson/Module Title -->
+      @if (lessonContext) {
+        <div class="lesson-title-wrapper">
+          <span class="lesson-context">{{ getCurrentChapterTitle() }}</span>
+          <h2 class="lesson-title">{{ getCurrentModuleTitle() }}</h2>
+          <span class="lesson-section">{{ getCurrentSectionTitle() }}</span>
+        </div>
+        <div class="lesson-progress">
+          <div class="lesson-progress-bar">
+            <div class="lesson-progress-fill" [style.width.%]="getLessonProgressPercentage()"></div>
+          </div>
+          <span class="lesson-progress-text">
+            {{ lessonContext.currentConceptIndex + 1 }} / {{ lessonContext.concepts.length }}
+          </span>
+        </div>
+      } @else {
+        <div class="path-title-wrapper">
+          <h2 class="path-title">{{ path?.title }}</h2>
+          <span class="path-progress-text">{{ getProgressPercentage() }}%</span>
+        </div>
       }
     </div>
 
-    <nav class="sidebar-nav" aria-label="Path navigation">
-      <!-- Chapter-based Navigation -->
-      @if (sidebarChapters.length > 0) {
-        <div class="chapter-list">
-          @for (chapter of sidebarChapters; track chapter.id) {
-            <div class="chapter-item" [class.expanded]="chapter.isExpanded">
-              <button class="chapter-header" (click)="toggleChapter(chapter.id)">
-                <span class="expand-icon">{{ chapter.isExpanded ? '▼' : '▶' }}</span>
-                <span class="chapter-title">{{ chapter.title }}</span>
-              </button>
-              
-              @if (chapter.isExpanded) {
-                <ul class="step-list">
-                  @for (step of chapter.steps; track step.index) {
-                    <li class="step-item"
-                        [class.current]="step.isCurrent"
-                        [class.completed]="step.isCompleted"
-                        [class.global-complete]="step.isGlobalCompletion"
-                        [class.locked]="step.isLocked">
-                      <a (click)="!step.isLocked ? goToStep(step.index) : null"
-                         (keydown.enter)="!step.isLocked ? goToStep(step.index) : null"
-                         [attr.role]="step.isLocked ? null : 'link'"
-                         [attr.tabindex]="step.isLocked ? -1 : 0">
-                        <span class="status-icon">
-                          @if (step.isCompleted) {
-                            <span class="checkmark">✓</span>
-                          } @else if (step.isGlobalCompletion) {
-                            <span class="checkmark global" title="Mastered in another journey">✓</span>
-                          } @else if (step.isLocked) {
-                            <span class="lock">🔒</span>
-                          } @else {
-                            <span class="circle">○</span>
-                          }
-                        </span>
-                        <span class="content-icon">{{ step.icon }}</span>
-                        <span class="step-label">{{ step.title }}</span>
-                      </a>
-                    </li>
-                  }
-                </ul>
-              }
-            </div>
-          }
-        </div>
-      } 
-      <!-- Flat Navigation -->
-      @else {
-        <ul class="step-list flat">
-          @for (step of flatSidebarSteps; track step.index) {
-            <li class="step-item"
-                [class.current]="step.isCurrent"
-                [class.completed]="step.isCompleted"
-                [class.global-complete]="step.isGlobalCompletion"
-                [class.locked]="step.isLocked">
-              <a (click)="!step.isLocked ? goToStep(step.index) : null"
-                 (keydown.enter)="!step.isLocked ? goToStep(step.index) : null"
-                 [attr.role]="step.isLocked ? null : 'link'"
-                 [attr.tabindex]="step.isLocked ? -1 : 0">
+    <nav class="sidebar-nav" aria-label="Lesson navigation">
+      <!-- Lesson Concepts (focused view) -->
+      @if (lessonContext && lessonContext.concepts.length > 0) {
+        <ul class="concept-list">
+          @for (concept of lessonContext.concepts; track concept.conceptId) {
+            <li
+              class="concept-item"
+              [class.current]="concept.isCurrent"
+              [class.completed]="concept.isCompleted"
+            >
+              <button type="button" (click)="goToConcept(concept.index)" class="concept-link">
                 <span class="status-icon">
-                  @if (step.isCompleted) {
+                  @if (concept.isCompleted) {
                     <span class="checkmark">✓</span>
-                  } @else if (step.isGlobalCompletion) {
-                    <span class="checkmark global" title="Mastered in another journey">✓</span>
-                  } @else if (step.isLocked) {
-                    <span class="lock">🔒</span>
+                  } @else if (concept.isCurrent) {
+                    <span class="current-indicator">▶</span>
                   } @else {
                     <span class="circle">○</span>
                   }
                 </span>
-                <span class="content-icon">{{ step.icon }}</span>
-                <span class="step-label">{{ step.title }}</span>
-              </a>
+                <span class="concept-icon">{{ concept.icon }}</span>
+                <span class="concept-label">{{ concept.title }}</span>
+              </button>
             </li>
           }
         </ul>
@@ -116,23 +85,29 @@
     </nav>
 
     <!-- Desktop collapse toggle -->
-    <button class="sidebar-collapse-btn" (click)="toggleSidebar()" aria-label="Collapse sidebar">
+    <button
+      type="button"
+      class="sidebar-collapse-btn"
+      (click)="toggleSidebar()"
+      aria-label="Collapse sidebar"
+    >
       <span class="collapse-icon">«</span>
     </button>
   </aside>
 
   <!-- Desktop expand toggle (shown when collapsed) -->
   <button
+    type="button"
     class="sidebar-expand-btn"
     *ngIf="!sidebarOpen"
     (click)="toggleSidebar()"
-    aria-label="Expand sidebar">
+    aria-label="Expand sidebar"
+  >
     <span class="expand-icon">»</span>
   </button>
 
   <!-- MAIN CONTENT AREA -->
-  <main class="main-content">
-    
+  <main class="main-content" id="main-content">
     <!-- Loading State -->
     @if (isLoading) {
       <div class="loading-state">
@@ -146,7 +121,7 @@
       <div class="error-state">
         <h2>Unable to load step</h2>
         <p>{{ error }}</p>
-        <button class="btn btn-primary" (click)="goToPathOverview()">
+        <button type="button" class="btn btn-primary" (click)="goToPathOverview()">
           Back to Path Overview
         </button>
       </div>
@@ -154,29 +129,38 @@
 
     <!-- Content -->
     @if (!isLoading && !error && stepView) {
-
-      <!-- PATH TOOLING: Breadcrumbs -->
+      <!-- PATH TOOLING: Breadcrumbs (Chapter > Module > Section > Concept) -->
       <nav class="breadcrumbs main-breadcrumbs" aria-label="Breadcrumb navigation">
-        <a routerLink="/lamad">Territory</a>
-        <span class="separator">/</span>
-        <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
-        @if (getCurrentChapterTitle()) {
+        <div class="breadcrumb-trail">
+          <a routerLink="/lamad">Territory</a>
           <span class="separator">/</span>
-          <span class="crumb">{{ getCurrentChapterTitle() }}</span>
-        }
-        <span class="separator">/</span>
-        <span class="crumb current">{{ stepView.step.stepTitle }}</span>
+          <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
+          @if (lessonContext) {
+            <span class="separator">/</span>
+            <span class="crumb">{{ lessonContext.chapter.title }}</span>
+            <span class="separator">/</span>
+            <span class="crumb">{{ lessonContext.module.title }}</span>
+            <span class="separator">/</span>
+            <span class="crumb">{{ lessonContext.section.title }}</span>
+          }
+          <span class="separator">/</span>
+          <span class="crumb current">{{ stepView.step.stepTitle }}</span>
+        </div>
+        <app-focused-view-toggle
+          [isActive]="isFocusedView"
+          (toggled)="onFocusedViewToggle($event)"
+        ></app-focused-view-toggle>
       </nav>
 
       <div class="content-scroll-container">
-
         <!-- PATH TOOLING: Step context from the Journey -->
         <header class="path-content-header">
           <div class="path-content-header-inner">
             <div class="content-meta">
               <span class="content-type-badge">{{ stepView.content.contentType }}</span>
               <a [routerLink]="['/lamad/resource', stepView.content.id]" class="view-resource-link">
-                View Resource Details <span class="icon">&#8599;</span>
+                View Resource Details
+                <span class="icon">&#8599;</span>
               </a>
             </div>
             <h1 class="content-title">{{ stepView.step.stepTitle }}</h1>
@@ -186,7 +170,7 @@
           </div>
         </header>
 
-        <!-- CONTENT: Rendered via RendererRegistryService -->
+        <!-- CONTENT: Rendered via LessonViewComponent with exploration panel -->
         <article class="content">
           <div class="content-inner">
             @if (stepView.nestedPath) {
@@ -197,20 +181,25 @@
                   <span class="badge">{{ stepView.nestedPath.steps.length }} Steps</span>
                   <span class="badge">{{ stepView.nestedPath.estimatedDuration }}</span>
                 </div>
-                <button class="btn btn-primary" [routerLink]="['/lamad/path', stepView.nestedPath.id]">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [routerLink]="['/lamad/path', stepView.nestedPath.id]"
+                >
                   Start Sub-Journey
                 </button>
               </div>
-            } @else {
-              <!-- Dynamic renderer host - always in DOM so ViewChild can find it -->
-              <ng-container #rendererHost></ng-container>
-
-              <!-- Fallback for unregistered content formats -->
-              @if (!hasRegisteredRenderer) {
-                <div class="generic-content">
-                  <pre>{{ getContentString() }}</pre>
-                </div>
-              }
+            } @else if (stepView.content) {
+              <!-- Lesson View with exploration affordances -->
+              <app-lesson-view
+                [content]="stepView.content"
+                [pathContext]="buildPathContext()"
+                [refreshKey]="contentRefreshKey"
+                explorationMode="path"
+                (exploreContent)="onExploreContent($event)"
+                (exploreInGraph)="onExploreInGraph()"
+                (complete)="onLessonComplete($event)"
+              ></app-lesson-view>
             }
 
             <!-- Learning Objectives -->
@@ -244,30 +233,41 @@
           <div class="path-content-footer-inner">
             <!-- Completion Action -->
             <div class="step-actions">
-              <button class="btn btn-bloom"
-                      [ngClass]="'bloom-' + currentBloomLevel"
-                      (click)="markComplete()">
+              <button
+                type="button"
+                class="btn btn-bloom"
+                [ngClass]="'bloom-' + currentBloomLevel"
+                (click)="markComplete()"
+              >
                 <span class="bloom-content">
                   <span class="bloom-icon">
-                    @if (currentBloomLevel === 'not_started') { ⭕ }
-                    @else if (currentBloomLevel === 'create') { 🌟 }
-                    @else { 🌱 }
+                    @if (currentBloomLevel === 'not_started') {
+                      ⭕
+                    } @else if (currentBloomLevel === 'create') {
+                      🌟
+                    } @else {
+                      🌱
+                    }
                   </span>
                   <span class="bloom-text">
                     @if (currentBloomLevel === 'not_started') {
                       Mark as Started
                     } @else {
-                      Mastery Level: <strong>{{ getBloomDisplay() }}</strong>
+                      Mastery Level:
+                      <strong>{{ getBloomDisplay() }}</strong>
                     }
                   </span>
                 </span>
-                <span class="bloom-hint" *ngIf="currentBloomLevel !== 'create'">Tap to advance</span>
+                <span class="bloom-hint" *ngIf="currentBloomLevel !== 'create'">
+                  Tap to advance
+                </span>
               </button>
             </div>
 
             <!-- Navigation -->
             <nav class="step-navigation" aria-label="Step navigation">
               <button
+                type="button"
                 class="btn btn-nav btn-prev"
                 [disabled]="!stepView.hasPrevious"
                 (click)="goToPrevious()"
@@ -277,6 +277,7 @@
               </button>
 
               <button
+                type="button"
                 class="btn btn-nav btn-next"
                 [disabled]="!stepView.hasNext"
                 (click)="goToNext()"

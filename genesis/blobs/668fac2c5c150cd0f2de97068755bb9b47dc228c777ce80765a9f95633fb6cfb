@@ -1,0 +1,10 @@
+Scenario: Neighborhood emergency response and resilience
+    Given Margaret is often home during the day
+    And she has nursing background and crisis response experience
+    When neighborhood emergencies occur
+    Then Margaret should be part of emergency response network
+    And her skills and availability should be known to neighbors
+    And the neighborhood should be more resilient due to her presence
+    And her contributions to collective safety should be tracked
+    And emergency preparedness should be enhanced by retiree participation
+    And Margaret's professional background should serve neighborhood

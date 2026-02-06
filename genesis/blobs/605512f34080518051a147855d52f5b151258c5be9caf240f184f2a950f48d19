@@ -1,0 +1,11 @@
+Scenario: Managing municipal-level crisis affecting whole city
+    Given city-wide emergency (flood, economic shock, public health crisis)
+    And coordination across neighborhoods is critical
+    When I coordinate municipal crisis response
+    Then Municipal Elohim: helps identify needs and match resources rapidly
+    And we enable: mutual aid flows across neighborhoods
+    And we coordinate: with county and state for additional support
+    And I maintain: human judgment on crisis priorities
+    And Municipal Constitutional Council: provides oversight even in emergency
+    And we preserve: democratic accountability under pressure
+    And protocol enhances: crisis response without sacrificing governance

@@ -1,0 +1,9 @@
+Scenario: Politician evaluates living wage proposal with comprehensive impact analysis
+    Given business lobby claims living wage ordinance will destroy jobs
+    And worker advocates demand wage increase
+    When the Observer provides evidence-based wage policy analysis
+    Then they see living wage outcomes in comparable jurisdictions
+    And understand actual employment impacts versus predicted job losses
+    And identify public cost savings from reduced need for assistance programs
+    And review worker quality of life improvements from wage increases
+    And make informed decision beyond ideological claims

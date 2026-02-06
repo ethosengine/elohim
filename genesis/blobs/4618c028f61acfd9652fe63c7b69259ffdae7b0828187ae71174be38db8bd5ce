@@ -1,0 +1,10 @@
+Scenario: Teaching and mentoring grandchildren as valued care work
+    Given Margaret provides not just childcare but teaching and mentoring
+    And she's passing on knowledge, values, and skills
+    When the family_elohim tracks educational care contributions
+    Then it should recognize teaching as distinct care category
+    And it should track skill-building and mentoring activities
+    And the long-term value of grandparent teaching should be recognized
+    And Margaret's role in grandchildren's development should be visible
+    And intergenerational knowledge transmission should be valued
+    And cultural/family traditions taught by Margaret should be tracked

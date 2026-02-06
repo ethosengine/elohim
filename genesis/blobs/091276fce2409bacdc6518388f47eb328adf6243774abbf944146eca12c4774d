@@ -1,0 +1,9 @@
+Scenario: Teaching reciprocity and mutual care through experience
+    Given Tommy is learning social and moral concepts
+    And reciprocity is foundational to care economy
+    When Tommy both gives and receives care through the scanner
+    Then he should learn that care flows in multiple directions
+    And he should experience receiving recognition for his care
+    And he should practice recognizing others' care for him
+    And reciprocal care patterns should be modeled
+    And mutual flourishing should be taught through practice

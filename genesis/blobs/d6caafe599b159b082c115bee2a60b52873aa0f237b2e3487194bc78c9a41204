@@ -1,0 +1,10 @@
+Scenario: Teen participates in neighborhood safety and social cohesion
+    Given Jasmine is present in the neighborhood frequently
+    And neighborhood safety depends on collective awareness
+    When Jasmine contributes to neighborhood social cohesion
+    Then her participation in neighborhood events should be tracked
+    And her relationships with neighbors across age groups should be valued
+    And her presence and engagement should contribute to perceived safety
+    And the neighborhood_elohim should recognize social capital building as care work
+    And Jasmine should understand that community safety is collective care labor
+    And her generation should be seen as contributors to neighborhood wellbeing, not problems to manage

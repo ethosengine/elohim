@@ -1,0 +1,10 @@
+Scenario: Privacy controls honor teen's developing autonomy
+    Given Jasmine's care contributions are tracked across multiple contexts
+    And she has legitimate need for privacy from parents
+    When Jasmine configures her privacy settings
+    Then she should have granular control over what data is shared with whom
+    And parents should have access to family-relevant information only
+    And her personal data (friendships, personal purchases, private reflections) should be protected
+    And community resource coordinators should see care contributions but not private details
+    And employers should not access her family or school data
+    And Jasmine should actively learn to manage privacy boundaries

@@ -1,0 +1,10 @@
+Scenario: Gardening and local food production with grandchildren
+    Given Margaret gardens and teaches grandchildren about growing food
+    And they learn where food comes from and how to nurture plants
+    When the bioregional_elohim tracks food production activities
+    Then it should recognize gardening as ecological care work
+    And it should value teaching food production as essential education
+    And it should track local food growing and knowledge transmission
+    And gardening should accumulate care tokens
+    And Margaret's teaching should support food sovereignty
+    And intergenerational food knowledge should be preserved

@@ -1,0 +1,11 @@
+Scenario: Participating in IDD self-advocacy group
+    Given there's a local IDD self-advocacy organization
+    And Jordan wants to participate in advocacy work
+    When Jordan attends a self-advocacy meeting
+    Then the personal_agent provides accessible meeting information
+    And the meeting uses IDD-accessible facilitation practices
+    And Jordan can share experiences and voice concerns
+    And Jordan's advocacy contribution is valued by peers
+    And the group works on issues Jordan cares about
+    And Jordan accumulates care tokens for community advocacy work
+    And Jordan experiences political agency and community power

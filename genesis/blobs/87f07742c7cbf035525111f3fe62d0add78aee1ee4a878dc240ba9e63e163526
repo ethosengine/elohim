@@ -1,0 +1,11 @@
+Scenario: Policy advocacy improves accessibility for entire community
+    Given Alex advocates for accessibility improvements in public spaces
+    And better accessibility benefits everyone, not just disabled people
+    When community accessibility improves due to Alex's advocacy
+    Then these improvements should be attributed to Alex's care work
+    And the community_elohim should track policy changes Alex influences
+    And curb cuts, accessible transit, universal design benefit whole community
+    And Alex should be recognized as community improver at scale
+    And care tokens should reflect population-level impact
+    And the protocol should make undeniable Alex's gift to community
+    And cultural narrative should shift from burden to contributor

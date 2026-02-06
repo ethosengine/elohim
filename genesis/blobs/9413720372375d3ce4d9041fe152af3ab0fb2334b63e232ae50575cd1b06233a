@@ -1,0 +1,7 @@
+Scenario: Advocating for worker ownership and cooperative models
+    Given current ownership structures extract from workers
+    When workers want to explore alternative ownership models
+    Then the protocol should provide information about worker cooperatives
+    And connect workers interested in cooperative organizing
+    And support transition toward worker ownership in food service
+    And build examples of care-economy-aligned food business models

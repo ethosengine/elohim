@@ -25,11 +25,87 @@
    ============================================================================= */
 
 .path-player-container {
-  display: flex;
-  height: calc(100vh - 64px); /* Adjust based on global header height */
-  background-color: var(--lamad-bg-primary, #ffffff);
+  display: flex; /* Adjust based on global header height */
+  height: calc(100dvh - 64px); /* Dynamic viewport height for mobile browsers */
+  background-color: var(--lamad-bg-primary, #fff);
   overflow: hidden;
   position: relative;
+}
+
+/* =============================================================================
+   Focused View Toggle & Mode
+   ============================================================================= */
+
+/* Toggle button is now inside breadcrumbs - no absolute positioning needed */
+
+/* Focused view mode overrides */
+.path-player-container.focused-view-active {
+  height: 100dvh;
+}
+
+/* Hide sidebar and tooling in focused view */
+.path-player-container.focused-view-active .path-sidebar,
+.path-player-container.focused-view-active .sidebar-toggle,
+.path-player-container.focused-view-active .sidebar-expand-btn,
+.path-player-container.focused-view-active .sidebar-backdrop {
+  display: none !important;
+}
+
+/* Hide path tooling elements in focused view */
+.path-player-container.focused-view-active .path-content-header,
+.path-player-container.focused-view-active .path-content-footer,
+.path-player-container.focused-view-active .learning-objectives,
+.path-player-container.focused-view-active .reflection-prompts {
+  display: none !important;
+}
+
+/* Hide breadcrumb trail text but keep toolbar visible in focused view */
+.path-player-container.focused-view-active .breadcrumb-trail {
+  display: none;
+}
+
+/* Main content takes full width in focused view */
+.path-player-container.focused-view-active .main-content {
+  padding: 0 !important;
+}
+
+/* Content fills viewport in focused view */
+.path-player-container.focused-view-active .content-scroll-container {
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.path-player-container.focused-view-active .content {
+  padding: 0;
+  margin: 0;
+}
+
+.path-player-container.focused-view-active .content-inner {
+  max-width: 100%;
+  width: 100%;
+  height: calc(100vh - 3rem); /* Account for breadcrumbs toolbar */
+  min-height: calc(100vh - 3rem);
+  padding: 0;
+  margin: 0;
+}
+
+/* LessonView fills available space in focused mode */
+.path-player-container.focused-view-active app-lesson-view {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.path-player-container.focused-view-active .lesson-view {
+  height: 100% !important;
+}
+
+.path-player-container.focused-view-active .lesson-main {
+  height: 100% !important;
+  padding: 1rem !important;
 }
 
 /* =============================================================================
@@ -44,7 +120,9 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: width 0.3s ease, transform 0.3s ease;
+  transition:
+    width 0.3s ease,
+    transform 0.3s ease;
   z-index: 20;
 }
 
@@ -150,7 +228,7 @@
 }
 
 .step-item.current a {
-  background-color: rgba(99, 102, 241, 0.08);
+  background-color: rgb(99 102 241 / 8%);
   color: var(--lamad-accent-primary, #4f46e5);
   font-weight: 600;
   border-left-color: var(--lamad-accent-primary, #4f46e5);
@@ -158,7 +236,7 @@
 
 .step-item.locked a {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 60%;
 }
 
 /* Status Icons */
@@ -185,7 +263,133 @@
 
 .checkmark.global {
   color: var(--lamad-success, #10b981);
-  opacity: 0.7; /* Distinguish mastered-elsewhere */
+  opacity: 70%; /* Distinguish mastered-elsewhere */
+}
+
+/* =============================================================================
+   Lesson-Focused Sidebar Styles
+   Shows current lesson context and concepts within the section
+   ============================================================================= */
+
+.lesson-title-wrapper {
+  margin-bottom: 1rem;
+}
+
+.lesson-context {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lamad-text-tertiary, #9ca3af);
+  margin-bottom: 0.25rem;
+}
+
+.lesson-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--lamad-text-primary, #111827);
+  margin: 0 0 0.25rem;
+  line-height: 1.3;
+}
+
+.lesson-section {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--lamad-text-secondary, #6b7280);
+}
+
+/* Lesson Progress Bar */
+.lesson-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lesson-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--lamad-bg-tertiary, #e5e7eb);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.lesson-progress-fill {
+  height: 100%;
+  background: var(--lamad-accent-primary, #6366f1);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.lesson-progress-text {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--lamad-text-secondary, #6b7280);
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+/* Concept List in Sidebar */
+.concept-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.concept-item .concept-link {
+  border: none;
+  font: inherit;
+  background: none;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  color: var(--lamad-text-secondary, #4b5563);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.concept-item:hover .concept-link {
+  background-color: var(--lamad-bg-secondary, #f3f4f6);
+  color: var(--lamad-text-primary, #111827);
+}
+
+.concept-item.current .concept-link {
+  background-color: rgb(99 102 241 / 8%);
+  color: var(--lamad-accent-primary, #4f46e5);
+  font-weight: 600;
+  border-left-color: var(--lamad-accent-primary, #4f46e5);
+}
+
+.concept-item.completed .concept-link {
+  color: var(--lamad-success, #10b981);
+}
+
+.concept-item.completed.current .concept-link {
+  color: var(--lamad-accent-primary, #4f46e5);
+}
+
+.concept-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  display: flex;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.concept-label {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.current-indicator {
+  color: var(--lamad-accent-primary, #6366f1);
+  font-size: 0.8rem;
 }
 
 .lock {
@@ -210,14 +414,23 @@
 
 /* Breadcrumbs */
 .breadcrumbs {
-  padding: 1rem 2rem;
-  background-color: var(--lamad-surface, #ffffff);
+  padding: 0.75rem 2rem;
+  background-color: var(--lamad-surface, #fff);
   border-bottom: 1px solid var(--lamad-border, #f3f4f6);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 1rem;
   font-size: 0.875rem;
   color: var(--lamad-text-secondary, #6b7280);
+}
+
+.breadcrumb-trail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0; /* Allow truncation */
 }
 
 /* Breadcrumb Visibility logic */
@@ -225,7 +438,7 @@
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .main-breadcrumbs {
     display: none;
   }
@@ -308,7 +521,7 @@
 .content-title {
   font-size: 1.75rem;
   font-weight: 600;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.5rem;
   color: var(--lamad-text-primary, #111827);
 }
 
@@ -332,7 +545,7 @@
 }
 
 .view-resource-link:hover {
-  background-color: rgba(99, 102, 241, 0.1);
+  background-color: rgb(99 102 241 / 10%);
   text-decoration: underline;
 }
 
@@ -349,7 +562,7 @@
 .content {
   flex: 1;
   padding: 2rem;
-  background: var(--lamad-bg-primary, #ffffff);
+  background: var(--lamad-bg-primary, #fff);
 }
 
 .content-inner {
@@ -450,7 +663,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background-color: var(--lamad-surface, #ffffff);
+  background-color: var(--lamad-surface, #fff);
   border: 1px solid var(--lamad-border, #d1d5db);
   border-radius: 0.375rem;
   color: var(--lamad-text-primary, #374151);
@@ -465,7 +678,7 @@
 }
 
 .btn-nav:disabled {
-  opacity: 0.5;
+  opacity: 50%;
   cursor: not-allowed;
 }
 
@@ -475,7 +688,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: rgb(16 185 129 / 10%);
   color: var(--lamad-success, #059669);
   border-radius: 99px;
   font-weight: 600;
@@ -483,7 +696,8 @@
 }
 
 /* Loading & Error States */
-.loading-state, .error-state {
+.loading-state,
+.error-state {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -502,7 +716,11 @@
   margin-bottom: 1rem;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* Bloom Toggle Button */
 .btn-bloom {
@@ -538,7 +756,7 @@
 
 .bloom-hint {
   font-size: 0.75rem;
-  opacity: 0.8;
+  opacity: 80%;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -550,20 +768,23 @@
   border-color: var(--lamad-border, #d1d5db);
 }
 
-.bloom-seen, .bloom-remember {
-  background: rgba(59, 130, 246, 0.1);
+.bloom-seen,
+.bloom-remember {
+  background: rgb(59 130 246 / 10%);
   color: #2563eb;
   border-color: #3b82f6;
 }
 
-.bloom-understand, .bloom-apply {
-  background: rgba(16, 185, 129, 0.1);
+.bloom-understand,
+.bloom-apply {
+  background: rgb(16 185 129 / 10%);
   color: #059669;
   border-color: #10b981;
 }
 
-.bloom-analyze, .bloom-evaluate {
-  background: rgba(124, 58, 237, 0.1);
+.bloom-analyze,
+.bloom-evaluate {
+  background: rgb(124 58 237 / 10%);
   color: #7c3aed;
   border-color: #8b5cf6;
 }
@@ -572,7 +793,7 @@
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: white;
   border-color: #fbbf24;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 12px rgb(245 158 11 / 30%);
 }
 
 .btn-bloom:hover {
@@ -596,7 +817,7 @@
   left: 1rem;
   z-index: 50;
   padding: 0.5rem;
-  background: var(--lamad-surface, #ffffff);
+  background: var(--lamad-surface, #fff);
   border: 1px solid var(--lamad-border, #e5e7eb);
   border-radius: 0.375rem;
   cursor: pointer;
@@ -607,11 +828,8 @@
 .sidebar-backdrop {
   display: none;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
+  inset: 0;
+  background: rgb(0 0 0 / 30%);
   z-index: 15;
   cursor: pointer;
 }
@@ -628,7 +846,9 @@
   border-top: 1px solid var(--lamad-border, #e5e7eb);
   cursor: pointer;
   color: var(--lamad-text-secondary, #6b7280);
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .sidebar-collapse-btn:hover {
@@ -656,11 +876,13 @@
   border-radius: 0 0.375rem 0.375rem 0;
   cursor: pointer;
   color: var(--lamad-text-secondary, #6b7280);
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .sidebar-expand-btn:hover {
-  background-color: var(--lamad-surface, #ffffff);
+  background-color: var(--lamad-surface, #fff);
   color: var(--lamad-text-primary, #374151);
 }
 
@@ -691,7 +913,7 @@
    Responsive - Tablet & Mobile
    ============================================================================= */
 
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
   /* Hide desktop collapse button on tablet/mobile */
   .sidebar-collapse-btn {
     display: none;
@@ -726,8 +948,7 @@
   }
 }
 
-
-@media (max-width: 768px) {
+@media (width <= 768px) {
   /* Allow normal document flow on mobile so footer appears at bottom of content */
   .path-player-container {
     height: auto;

@@ -1,0 +1,11 @@
+Scenario: Commissioning independent research on protocol effectiveness
+    Given I need evidence for policy evaluation
+    And research must be independent to be credible
+    When I establish national research program
+    Then I fund: rigorous evaluation by independent researchers
+    And I require: open access publication
+    And I support: longitudinal studies tracking long-term outcomes
+    And I enable: replication and peer review
+    And I demand: honest reporting including null results
+    And evidence base: supports informed democratic choice
+    And public funding: serves public knowledge

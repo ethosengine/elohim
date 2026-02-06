@@ -1,0 +1,12 @@
+Scenario: Navigating school bureaucracy and institutional requirements
+    Given schools require forms, meetings, documentation, and coordination
+    And school bureaucracy can be overwhelming during crisis
+    When I manage school institutional requirements
+    Then the Value Scanner tracks all school deadlines and requirements
+    And helps me gather necessary documentation efficiently
+    And prepares me for required school meetings (IEP, parent-teacher conferences)
+    And ensures nothing falls through cracks despite my overwhelm
+    And my personal_agent reminds me of upcoming school obligations
+    And recognizes school bureaucracy navigation as cognitive labor
+    And validates that school demands are significant amid crisis
+    And prevents school requirements from overwhelming me

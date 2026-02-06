@@ -1,0 +1,8 @@
+Scenario: Accessing community healthcare and support services
+    Given my low wages make healthcare and services unaffordable
+    And community provides sliding-scale or care-economy-based services
+    When I need healthcare, mental health support, or other services
+    Then the protocol should connect me to accessible community resources
+    And facilitate payment based on my care economy participation
+    And recognize that workers deserve healthcare regardless of income
+    And support building community care infrastructure

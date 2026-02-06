@@ -1,0 +1,10 @@
+Scenario: Adult-capable interface for sophisticated decision-making
+    Given Jasmine is using the Value Scanner independently
+    And she has complex financial goals and multiple contexts to manage
+    When Jasmine opens the scanner application
+    Then the interface should provide comprehensive budgeting tools
+    And the personal_agent should offer professional-grade financial analysis
+    And multi-context care tracking should be available (school, work, family, community)
+    And sophisticated planning and analysis features should be accessible
+    And privacy controls should be granular and user-controlled
+    And the interface should treat Jasmine as the competent person she is

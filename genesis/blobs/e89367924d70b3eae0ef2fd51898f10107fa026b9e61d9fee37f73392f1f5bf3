@@ -1,0 +1,9 @@
+Scenario: Displaced person's abuser attempts to locate her
+    Given Maria's abuser is trying to find her new location
+    When he attempts to contact her through the Elohim network
+    And he tries to contact her friends to get information
+    Then all his messages are blocked before reaching Maria
+    And her friends' connections don't leak location information
+    And the protection agent alerts relevant support networks
+    And Maria's sanctuary protocol remains secure
+    And she is protected without constant fear and vigilance

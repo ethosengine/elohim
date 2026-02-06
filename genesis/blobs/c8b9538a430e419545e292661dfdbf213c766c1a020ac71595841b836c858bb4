@@ -1,0 +1,11 @@
+Scenario: Coordinating care during family member illness
+    Given Jordan's mother becomes seriously ill
+    And the family is coordinating care support
+    When the family discusses how to help
+    Then Jordan is included in family care planning
+    And the personal_agent helps Jordan understand the situation
+    And Jordan can offer contributions at their capability (visits, calls)
+    And Jordan's care offerings are recognized and valued
+    And the family doesn't automatically exclude Jordan from caregiving
+    And Jordan experiences being a contributing family member in crisis
+    And Jordan's capacity to give care is honored

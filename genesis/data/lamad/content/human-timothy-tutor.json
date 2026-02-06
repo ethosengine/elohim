@@ -1,0 +1,71 @@
+{
+  "id": "human-timothy-tutor",
+  "did": "did:web:elohim.host:human:timothy-tutor",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Timothy",
+  "description": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
+  "content": "# Timothy\n\nEducator and learning facilitator. Helping kids and adults discover the joy of learning.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"community\",\n  \"displayName\": \"Valley Community\",\n  \"reach\": \"community\"\n}\n\n**Organizations:** [object Object]\n\n**Communities:** community-homeschool-coop, community-local-church\n\n**Public Affinities:** education, learning-science, youth-development, faith-formation, mastery-learning\n\n**Public Attestations:** attestation-teaching-certification\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/timothy-tutor/profile.json",
+  "tags": [
+    "youth-development",
+    "faith-formation",
+    "role-facilitator",
+    "layer-community",
+    "human-graph",
+    "education",
+    "mastery-learning",
+    "learning-science",
+    "affinity",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "affinity",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community"
+    ],
+    "organizationCount": 1,
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Timothy",
+    "ogDescription": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-timothy-tutor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-timothy-tutor.jpg",
+    "ogImageAlt": "Timothy's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-timothy-tutor",
+    "identifier": "did:web:elohim.host:human:timothy-tutor",
+    "name": "Timothy",
+    "description": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Valley Community",
+      "description": "community"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Valley Learning Collective",
+        "@id": "org-learning-collective"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328457",
+  "updatedAt": "2025-12-24T03:05:26.354Z"
+}

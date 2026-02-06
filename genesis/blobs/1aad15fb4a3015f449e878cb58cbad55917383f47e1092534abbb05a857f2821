@@ -1,0 +1,8 @@
+Scenario: Understanding ecological impact of food systems work
+    Given food systems have significant ecological footprint
+    And my work is embedded in these systems
+    When I want to understand ecological implications
+    Then the protocol should provide information about food systems ecology
+    And help me see connections between my work and environmental impact
+    And support me in making choices that reduce ecological harm
+    And recognize that ecological care is part of my care economy participation

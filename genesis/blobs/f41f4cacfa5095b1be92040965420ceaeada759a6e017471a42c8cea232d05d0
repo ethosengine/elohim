@@ -1,0 +1,10 @@
+Scenario: Neighborhood food cooperative participation on fixed income
+    Given Margaret's $150/week budget could benefit from bulk buying
+    And neighbors face similar budget constraints
+    When the neighborhood_elohim identifies food cooperative opportunities
+    Then Margaret should be connected to bulk buying networks
+    And her participation should reduce her grocery costs
+    And she should contribute her time and organizational skills
+    And the cooperative should reduce individual household scarcity
+    And neighborhood coordination should make fixed incomes stretch further
+    And collective action should create better outcomes than individual effort

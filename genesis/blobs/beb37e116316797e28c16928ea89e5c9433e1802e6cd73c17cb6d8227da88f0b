@@ -1,0 +1,10 @@
+Scenario: Lifelong learning continues in retirement for enrichment
+    Given Margaret has intellectual curiosity and time for learning
+    And education should continue throughout life
+    When the educational_elohim connects Margaret to learning opportunities
+    Then continuing education programs should be accessible
+    And learning for enrichment should be distinguished from job training
+    And Margaret should pursue subjects of personal interest
+    And senior learning programs should be available and affordable
+    And education should be framed as lifelong right and pleasure
+    And intellectual engagement should support cognitive health

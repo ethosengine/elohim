@@ -1,0 +1,147 @@
+@epic:value_scanner
+@user_type:caregiver
+@governance_layer:household
+@related_users:adult,middle_aged,person_with_disabilities,elderly
+@related_layers:individual,family,community
+@elohim_agents:personal_agent,household_elohim
+
+Feature: Household Layer Value Recognition for Caregiver
+  As a caregiver managing household for dependent adults
+  Operating at the household governance layer
+  I want household governance that recognizes care complexity and reduced capacity
+  So that household functions sustainably despite intensive care demands
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the caregiver user "James" is registered in the system
+    And James shares household with David who has early-onset Alzheimer's
+    And David's capability is progressively declining
+    And James manages household governance for both of them
+    And household income is severely reduced (~$40k/year from part-time work)
+    And the household governance context is active
+    And the household_elohim coordinates household care economy
+    And James is simultaneously caregiver and household manager
+
+  Scenario: Household governance transitions as care recipient loses capacity
+    Given David participated in household decisions before diagnosis
+    And his decision-making capability is now declining
+    When the household_elohim tracks governance participation
+    Then it should recognize David's changing capacity sensitively
+    And it should adjust his governance role appropriately
+    And it should preserve David's dignity despite declining capability
+    And it should support James in taking on decisions David once made
+    And governance transition should be respectful and gradual
+    And David should maintain maximum autonomy possible
+
+  Scenario: Household budget management on severely reduced income
+    Given household income dropped from $80k to ~$40k/year
+    And medical expenses have increased significantly
+    And caregiving prevents James from full-time employment
+    When James manages household finances
+    Then the household_elohim should track constrained budget carefully
+    And it should help prioritize essential expenses
+    And it should identify financial assistance resources
+    And it should recognize economic strain as care-related
+    And household should access care economy support based on need
+    And financial precarity should be addressed systematically
+
+  Scenario: Household care labor made visible despite reduced monetary income
+    Given James's care work is worth $50k+/year professionally
+    And household monetary income is only $40k/year
+    When household economics are evaluated
+    Then the household_elohim should show total household value
+    And James's care labor should be valued alongside income
+    And household should be recognized as generating $90k+ total value
+    And care work should count as household economic contribution
+    And reduced monetary income should not mean reduced household value
+
+  Scenario: Household food planning for specialized care needs
+    Given David requires special nutrition for Alzheimer's care
+    And James must manage David's changing appetite and needs
+    And household food budget is constrained
+    When James plans household meals
+    Then the household_elohim should support specialized meal planning
+    And it should track David's nutritional requirements
+    And it should help James meet care needs within budget
+    And it should ensure James's own nutrition isn't neglected
+    And household food planning should serve both members
+
+  Scenario: Household safety modifications as care needs increase
+    Given David requires increasing safety monitoring
+    And household needs modifications for safe caregiving
+    When household safety is assessed
+    Then the household_elohim should identify needed modifications
+    And it should connect James to resources for safety equipment
+    And it should help finance modifications through care economy
+    And household should be adaptable to progressive care needs
+    And safety should be maintained as capability declines
+
+  Scenario: Household schedule coordination around intensive care demands
+    Given David requires constant supervision and care
+    And James must balance caregiving with part-time work
+    When household schedules are coordinated
+    Then the household_elohim should integrate care demands with work
+    And it should identify conflicts between care and employment
+    And it should help James negotiate sustainable scheduling
+    And household operations should be possible despite constraints
+    And schedule coordination should prevent impossible demands
+
+  Scenario: Household resource allocation prioritizes care sustainability
+    Given household resources are severely limited
+    And care needs are high and increasing
+    When household resources are allocated
+    Then the household_elohim should prioritize care sustainability
+    And it should ensure James has resources for respite
+    And it should allocate funds for both David's and James's needs
+    And resource decisions should prevent caregiver burnout
+    And household economics should serve sustainable caregiving
+
+  Scenario: Household privacy protected amid care intimacy
+    Given James provides intimate personal care for David
+    And household care generates extremely private data
+    When household care is documented
+    Then privacy must be absolutely protected
+    And David's dignity must be preserved in all data
+    And intimate care details should never be exposed
+    And household data should remain under James's control
+    And privacy protection should be comprehensive and inviolable
+
+  Scenario: Household emergency preparedness for care crisis
+    Given David's condition could deteriorate suddenly
+    And James could become ill and unable to provide care
+    When the household_elohim plans for emergencies
+    Then it should maintain emergency care plans
+    And it should identify backup caregivers
+    And it should ensure emergency contacts are current
+    And it should prepare for crisis scenarios
+    And household should have resilience planning for care emergencies
+
+  Scenario: Household technology adapted for caregiving support
+    Given James uses technology for care coordination
+    And household needs assistive technology for David
+    When household technology is configured
+    Then the household_elohim should support care technology integration
+    And it should help James use monitoring and safety technology
+    And it should ensure technology serves caregiving needs
+    And assistive devices should be coordinated through household system
+    And technology should reduce burden, not increase complexity
+
+  Scenario: Household care economy supplements for financial strain
+    Given household income is severely reduced by caregiving
+    And care expenses are high and increasing
+    When household economic status is assessed
+    Then care token supplements should be available
+    And household should receive care economy financial support
+    And access should be dignified and non-stigmatizing
+    And care economy should function as household safety net
+    And financial support should recognize caregiving economic impact
+
+  Scenario: Household maintenance sustained despite overwhelming care demands
+    Given James is overwhelmed with caregiving responsibilities
+    And routine household maintenance is difficult to maintain
+    When household maintenance needs arise
+    Then the household_elohim should connect to community support
+    And neighbors should be able to assist with household tasks
+    And care economy should enable mutual aid for household maintenance
+    And James should access help without depleting limited finances
+    And household should remain functional despite care intensity

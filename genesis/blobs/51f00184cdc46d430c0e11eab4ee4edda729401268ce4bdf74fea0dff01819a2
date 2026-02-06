@@ -1,0 +1,64 @@
+@epic:social_medium
+@user_type:activist
+@governance_layer:affinity_network
+@related_users:activist,content_creator,refugee,displaced_person
+@related_layers:community,nation_state,global,cultural_linguistic
+@elohim_agents:coordination_agent,translation_agent,pattern_recognition_agent
+
+Feature: Movement Building Through Affinity Networks for Activist
+  As an activist in the social_medium system
+  Operating at the affinity_network governance layer
+  I want to build solidarity and coordinate action across geographies
+  So that movements can grow while respecting local autonomy and context
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the activist user is registered in the system
+    And the affinity_network governance context is active
+    And multiple communities are organizing around related issues
+
+  Scenario: Activist creates cross-geographic climate justice network
+    Given activists in 40 cities are working on climate action
+    And they share commitment to Indigenous leadership and just transition
+    When a founding group creates a climate justice affinity network
+    And they establish network charter emphasizing subsidiarity and equity
+    And they invite activists from participating communities
+    Then the affinity network space is created
+    And participants maintain connection to their local communities
+    And the network provides coordination without centralized control
+    And local autonomy is preserved while enabling collective action
+    And shared resources, tactics, and patterns flow through the network
+
+  Scenario: Activist shares successful tactic that spreads through trust
+    Given a community successfully pressured a bank to divest from fossil fuels
+    And the activist documents the strategy with evidence of impact
+    When they contribute the tactic to the climate justice network
+    And other activists review and validate the approach
+    Then the tactic enters the network's pattern library
+    And it surfaces for communities facing similar challenges
+    And 23 communities adapt the tactic to their local context
+    And improvements flow back into the pattern library
+    And the network tracks collective impact across implementations
+
+  Scenario: Activist coordinates rapid response across network
+    Given Indigenous land defenders face immediate threat of eviction
+    And the situation requires urgent solidarity action
+    When the land defenders' community issues call for support
+    And the call is verified through network trust relationships
+    Then rapid response protocol activates across affinity network
+    And each community determines its capacity to respond
+    And coordination happens in real-time across time zones
+    And actions are culturally appropriate and locally determined
+    And the network mobilizes pressure while preventing burnout
+    And the land defenders receive coordinated solidarity support
+
+  Scenario: Activist prevents movement co-optation by bad actors
+    Given a corporate-funded organization tries to join the network
+    And they claim to support climate action but oppose systemic change
+    When they attempt to participate in network coordination
+    Then their limited community trust becomes visible
+    And their ties to fossil fuel funding are surfaced through documentation
+    And the network collectively evaluates the participation request
+    And communities share experiences with similar co-optation attempts
+    And the network maintains boundaries while remaining open to good-faith participation
+    And the movement's integrity is protected through transparent evaluation

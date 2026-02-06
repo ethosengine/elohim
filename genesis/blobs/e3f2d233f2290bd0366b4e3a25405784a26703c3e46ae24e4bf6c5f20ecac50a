@@ -1,0 +1,12 @@
+Scenario: Accessing workplace benefits and resources for family stability
+    Given employment may provide benefits (health insurance, paid leave, retirement) critical for stability
+    And I need to maximize workplace benefits for family wellbeing
+    When I evaluate or access workplace benefits
+    Then the workplace_elohim helps me understand and maximize available benefits
+    And guides enrollment in health insurance, retirement, other benefits
+    And identifies workplace resources (EAP, childcare support, emergency assistance)
+    And validates that benefits are part of compensation, not "extras"
+    And helps me advocate for benefits if employer is unclear about offerings
+    And my personal_agent tracks benefit enrollment deadlines and requirements
+    And recognizes that benefits navigation is complex invisible labor
+    And ensures I access all benefits supporting family stability

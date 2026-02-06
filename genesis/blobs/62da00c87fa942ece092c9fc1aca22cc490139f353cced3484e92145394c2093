@@ -1,0 +1,9 @@
+Scenario: Manager chooses to exit gracefully with dignity and support
+    Given Marcus decides democratic coordination isn't the right fit for him
+    And corporate would have fired him or demanded resignation
+    When he communicates his intention to exit
+    Then workers appreciate his honest self-assessment
+    And he receives six months severance with glowing reference
+    And workplace_elohim facilitates transition support and knowledge transfer
+    And he leaves with dignity and community gratitude for attempting transition
+    And exit support demonstrates democratic values in practice

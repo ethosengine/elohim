@@ -1,0 +1,12 @@
+Scenario: Deliberating fundamental constitutional tension
+    Given an appeal reveals tension between care and privacy at constitutional level
+    And regional councils have reached conflicting interpretations
+    When we deliberate on national constitutional question
+    Then we ask: "Does mental health intervention ever justify privacy breach constitutionally?"
+    And we examine: not just case application but principle itself
+    And we consider: implications for millions of future cases
+    And we consult: technical experts, researchers, community leaders
+    And we deliberate: over multiple sessions spanning weeks
+    And we craft: comprehensive opinion with deep reasoning
+    And we create: national precedent guiding all lower councils
+    And we shape: constitutional understanding for generation

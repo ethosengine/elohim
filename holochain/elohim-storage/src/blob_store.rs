@@ -1,0 +1,649 @@
+//! Content-addressed blob storage
+//!
+//! Stores blobs in a local directory structure using content addressing.
+//! Supports both CID (IPFS-compatible) and legacy SHA256 hash formats.
+//! Supports chunked storage for large files.
+//!
+//! ## Content Addressing
+//!
+//! This module supports two content addressing formats:
+//! - **CID (Content Identifier)**: IPFS-compatible, self-describing format
+//!   - Format: `bafkrei...` (base32-encoded CIDv1 with raw codec)
+//!   - Future-proof: includes hash algorithm, version, codec
+//! - **Legacy SHA256**: For backward compatibility
+//!   - Format: `sha256-{64 hex chars}` or raw 64 hex chars
+//!
+//! Internally, blobs are stored using SHA256 hex for filesystem paths regardless
+//! of input format. This allows both formats to resolve to the same blob.
+//!
+//! ## P2P Announcement
+//!
+//! When the `p2p` feature is enabled, blobs can be announced to the Holochain
+//! infrastructure DNA for discovery by other nodes using `store_and_announce()`.
+
+use crate::error::StorageError;
+use crate::content_server::{ContentServerBridge, StorageEndpointInput};
+use cid::Cid;
+use multihash_codetable::{Code, MultihashDigest};
+use sha2::{Sha256, Digest};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use tokio::fs;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{debug, info, warn};
+
+/// Raw codec for CID (raw bytes, no structure)
+const RAW_CODEC: u64 = 0x55;
+
+/// Chunk size for large blobs (1MB)
+pub const CHUNK_SIZE: usize = 1024 * 1024;
+
+/// Maximum blob size before chunking (16MB - matches Holochain entry limit)
+pub const MAX_INLINE_SIZE: usize = 16 * 1024 * 1024;
+
+/// Result of storing a blob
+#[derive(Debug, Clone)]
+pub struct StoreResult {
+    /// CID (Content Identifier) of the blob - IPFS-compatible
+    pub cid: String,
+    /// SHA256 hash of the blob (for backward compatibility)
+    pub hash: String,
+    /// Total size in bytes
+    pub size_bytes: u64,
+    /// Number of chunks (1 for small blobs)
+    pub chunk_count: u32,
+    /// Whether blob was chunked
+    pub chunked: bool,
+    /// Whether blob already existed
+    pub already_existed: bool,
+}
+
+/// Result of storing and announcing a blob
+#[derive(Debug, Clone)]
+pub struct StoreAndAnnounceResult {
+    /// Store result with hash, size, etc.
+    pub store_result: StoreResult,
+    /// Action hash of the ContentServer registration
+    pub action_hash: Vec<u8>,
+}
+
+/// Blob storage manager
+pub struct BlobStore {
+    /// Root directory for blob storage
+    root_dir: PathBuf,
+}
+
+impl BlobStore {
+    /// Create a new blob store at the given directory
+    pub async fn new<P: AsRef<Path>>(root_dir: P) -> Result<Self, StorageError> {
+        let root_dir = root_dir.as_ref().to_path_buf();
+
+        // Ensure directory exists
+        fs::create_dir_all(&root_dir).await?;
+
+        info!(path = %root_dir.display(), "Initialized blob store");
+
+        Ok(Self { root_dir })
+    }
+
+    /// Create an in-memory blob store (for tests)
+    ///
+    /// Uses a temporary directory that will be cleaned up when dropped.
+    /// Note: This creates a real temp directory, not truly in-memory,
+    /// but is suitable for unit tests.
+    pub fn new_memory() -> Self {
+        let temp_dir = std::env::temp_dir().join(format!("elohim-blobs-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&temp_dir).ok();
+        Self { root_dir: temp_dir }
+    }
+
+    /// Compute SHA256 hash of data (legacy format)
+    pub fn compute_hash(data: &[u8]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        let result = hasher.finalize();
+        format!("sha256-{}", hex::encode(result))
+    }
+
+    /// Compute CID (Content Identifier) for data
+    ///
+    /// Creates a CIDv1 with raw codec and SHA256 multihash.
+    /// Format: `bafkrei...` (base32-encoded)
+    pub fn compute_cid(data: &[u8]) -> Cid {
+        let hash = Code::Sha2_256.digest(data);
+        Cid::new_v1(RAW_CODEC, hash)
+    }
+
+    /// Compute both CID and legacy hash for data
+    pub fn compute_addresses(data: &[u8]) -> (Cid, String) {
+        let cid = Self::compute_cid(data);
+        let hash = Self::compute_hash(data);
+        (cid, hash)
+    }
+
+    /// Parse a content address (CID or legacy hash) and return the SHA256 hex
+    ///
+    /// Accepts:
+    /// - CID string (e.g., `bafkreig...`)
+    /// - SHA256 with prefix (e.g., `sha256-a7ffc6f8...`)
+    /// - Raw SHA256 hex (64 chars)
+    ///
+    /// Returns the SHA256 hex string (without prefix) for filesystem lookup.
+    pub fn parse_content_address(addr: &str) -> Result<String, StorageError> {
+        // Try parsing as CID first
+        if let Ok(cid) = Cid::from_str(addr) {
+            // Extract the multihash digest (SHA256 bytes)
+            let digest = cid.hash().digest();
+            return Ok(hex::encode(digest));
+        }
+
+        // Try SHA256 with prefix
+        if let Some(hex_part) = addr.strip_prefix("sha256-") {
+            if hex_part.len() == 64 && hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Ok(hex_part.to_string());
+            }
+        }
+
+        // Try raw SHA256 hex
+        if addr.len() == 64 && addr.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Ok(addr.to_string());
+        }
+
+        Err(StorageError::InvalidContentAddress(addr.to_string()))
+    }
+
+    /// Convert SHA256 hex to CID
+    pub fn hash_to_cid(sha256_hex: &str) -> Result<Cid, StorageError> {
+        let hex_part = sha256_hex.strip_prefix("sha256-").unwrap_or(sha256_hex);
+        let bytes = hex::decode(hex_part)
+            .map_err(|_| StorageError::InvalidContentAddress(sha256_hex.to_string()))?;
+
+        // Create multihash from raw SHA256 bytes
+        // Code::Sha2_256 expects to hash data, but we have the hash already
+        // Use multihash directly
+        let mh = multihash_codetable::Multihash::wrap(0x12, &bytes) // 0x12 = SHA256 code
+            .map_err(|_| StorageError::InvalidContentAddress(sha256_hex.to_string()))?;
+
+        Ok(Cid::new_v1(RAW_CODEC, mh))
+    }
+
+    /// Get path for a blob by hash
+    fn blob_path(&self, hash: &str) -> PathBuf {
+        // Use first 4 chars of hash (after "sha256-") as subdirectory for better filesystem distribution
+        let hash_part = hash.strip_prefix("sha256-").unwrap_or(hash);
+        let subdir = &hash_part[..4.min(hash_part.len())];
+        self.root_dir.join("blobs").join(subdir).join(hash)
+    }
+
+    /// Get path for chunk index file
+    fn chunk_index_path(&self, hash: &str) -> PathBuf {
+        self.blob_path(hash).with_extension("chunks")
+    }
+
+    /// Store a blob, returning its CID and hash
+    ///
+    /// For large blobs (>16MB), automatically chunks and stores pieces.
+    pub async fn store(&self, data: &[u8]) -> Result<StoreResult, StorageError> {
+        let (cid, hash) = Self::compute_addresses(data);
+        let cid_str = cid.to_string();
+        let blob_path = self.blob_path(&hash);
+
+        // Check if already exists
+        if fs::metadata(&blob_path).await.is_ok() {
+            debug!(cid = %cid_str, hash = %hash, "Blob already exists");
+            return Ok(StoreResult {
+                cid: cid_str,
+                hash,
+                size_bytes: data.len() as u64,
+                chunk_count: 1, // TODO: read from chunk index if exists
+                chunked: data.len() > MAX_INLINE_SIZE,
+                already_existed: true,
+            });
+        }
+
+        // Ensure parent directory exists
+        if let Some(parent) = blob_path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        if data.len() <= MAX_INLINE_SIZE {
+            // Store as single file
+            fs::write(&blob_path, data).await?;
+
+            info!(cid = %cid_str, hash = %hash, size = data.len(), "Stored blob");
+
+            Ok(StoreResult {
+                cid: cid_str,
+                hash,
+                size_bytes: data.len() as u64,
+                chunk_count: 1,
+                chunked: false,
+                already_existed: false,
+            })
+        } else {
+            // Store as chunks
+            self.store_chunked(&hash, &cid_str, data).await
+        }
+    }
+
+    /// Store a blob and announce it to the P2P network
+    ///
+    /// This method:
+    /// 1. Stores the blob locally
+    /// 2. Registers with the ContentServer in the infrastructure DNA
+    /// 3. Returns the store result and action hash from registration
+    ///
+    /// Use this when you want other nodes to discover and fetch this content.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The blob data to store
+    /// * `content_server` - Bridge to the infrastructure DNA
+    /// * `capability` - Content capability: "blob", "html5_app", "media_stream", etc.
+    /// * `endpoints` - Optional HTTP endpoints where this content can be fetched.
+    ///   If None, uses the default serve_url from ContentServerConfig.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let endpoints = vec![StorageEndpointInput {
+    ///     url: "http://192.168.1.100:8080/store".to_string(),
+    ///     protocol: "http".to_string(),
+    ///     priority: Some(100),
+    /// }];
+    /// let result = blob_store
+    ///     .store_and_announce(data, &mut content_server, "blob", Some(endpoints))
+    ///     .await?;
+    /// ```
+    pub async fn store_and_announce(
+        &self,
+        data: &[u8],
+        content_server: &mut ContentServerBridge,
+        capability: &str,
+        endpoints: Option<Vec<StorageEndpointInput>>,
+    ) -> Result<StoreAndAnnounceResult, StorageError> {
+        // First, store locally
+        let store_result = self.store(data).await?;
+
+        // If already existed, we might already be registered, but register anyway
+        // (idempotent on the zome side)
+        let action_hash = content_server
+            .register_content_with_endpoints(&store_result.hash, capability, endpoints)
+            .await?;
+
+        info!(
+            hash = %store_result.hash,
+            capability = %capability,
+            "Stored and announced blob"
+        );
+
+        Ok(StoreAndAnnounceResult {
+            store_result,
+            action_hash,
+        })
+    }
+
+    /// Store a large blob as chunks
+    async fn store_chunked(&self, hash: &str, cid: &str, data: &[u8]) -> Result<StoreResult, StorageError> {
+        let blob_path = self.blob_path(hash);
+        let chunk_dir = blob_path.with_extension("d");
+
+        fs::create_dir_all(&chunk_dir).await?;
+
+        let chunk_count = (data.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        let mut chunk_hashes = Vec::with_capacity(chunk_count);
+
+        for (i, chunk) in data.chunks(CHUNK_SIZE).enumerate() {
+            let chunk_hash = Self::compute_hash(chunk);
+            let chunk_path = chunk_dir.join(format!("{:08}", i));
+
+            fs::write(&chunk_path, chunk).await?;
+            chunk_hashes.push(chunk_hash);
+        }
+
+        // Write chunk index file
+        let index_path = self.chunk_index_path(hash);
+        let index_json = serde_json::json!({
+            "cid": cid,
+            "hash": hash,
+            "size_bytes": data.len(),
+            "chunk_count": chunk_count,
+            "chunk_size": CHUNK_SIZE,
+            "chunk_hashes": chunk_hashes,
+        });
+        fs::write(&index_path, index_json.to_string()).await?;
+
+        // Write a marker file at the blob path
+        fs::write(&blob_path, b"CHUNKED").await?;
+
+        info!(
+            cid = %cid,
+            hash = %hash,
+            size = data.len(),
+            chunks = chunk_count,
+            "Stored chunked blob"
+        );
+
+        Ok(StoreResult {
+            cid: cid.to_string(),
+            hash: hash.to_string(),
+            size_bytes: data.len() as u64,
+            chunk_count: chunk_count as u32,
+            chunked: true,
+            already_existed: false,
+        })
+    }
+
+    /// Check if a blob exists by legacy hash
+    pub async fn exists(&self, hash: &str) -> bool {
+        fs::metadata(self.blob_path(hash)).await.is_ok()
+    }
+
+    /// Check if a blob exists by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn exists_by_address(&self, addr: &str) -> Result<bool, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        Ok(self.exists(&hash).await)
+    }
+
+    /// Retrieve a blob by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn get_by_address(&self, addr: &str) -> Result<Vec<u8>, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        self.get(&hash).await
+    }
+
+    /// Get blob size by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn size_by_address(&self, addr: &str) -> Result<u64, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        self.size(&hash).await
+    }
+
+    /// Get a range of bytes by CID or hash
+    ///
+    /// Accepts CID, sha256-prefixed hash, or raw hex hash.
+    pub async fn get_range_by_address(&self, addr: &str, start: u64, end: u64) -> Result<Vec<u8>, StorageError> {
+        let hex = Self::parse_content_address(addr)?;
+        let hash = format!("sha256-{}", hex);
+        self.get_range(&hash, start, end).await
+    }
+
+    /// Get blob size (without loading data)
+    pub async fn size(&self, hash: &str) -> Result<u64, StorageError> {
+        let blob_path = self.blob_path(hash);
+        let metadata = fs::metadata(&blob_path).await?;
+
+        // Check if chunked
+        if metadata.len() == 7 {
+            let content = fs::read_to_string(&blob_path).await?;
+            if content == "CHUNKED" {
+                // Read from chunk index
+                let index_path = self.chunk_index_path(hash);
+                let index_str = fs::read_to_string(&index_path).await?;
+                let index: serde_json::Value = serde_json::from_str(&index_str)?;
+                return Ok(index["size_bytes"].as_u64().unwrap_or(0));
+            }
+        }
+
+        Ok(metadata.len())
+    }
+
+    /// Retrieve a blob by hash
+    pub async fn get(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
+        let blob_path = self.blob_path(hash);
+
+        // Check if file exists
+        if !fs::metadata(&blob_path).await.is_ok() {
+            return Err(StorageError::NotFound(hash.to_string()));
+        }
+
+        // Check if chunked
+        let content = fs::read(&blob_path).await?;
+        if content == b"CHUNKED" {
+            return self.get_chunked(hash).await;
+        }
+
+        Ok(content)
+    }
+
+    /// Retrieve a chunked blob
+    async fn get_chunked(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
+        let index_path = self.chunk_index_path(hash);
+        let index_str = fs::read_to_string(&index_path).await?;
+        let index: serde_json::Value = serde_json::from_str(&index_str)?;
+
+        let chunk_count = index["chunk_count"].as_u64().unwrap_or(0) as usize;
+        let size_bytes = index["size_bytes"].as_u64().unwrap_or(0) as usize;
+
+        let chunk_dir = self.blob_path(hash).with_extension("d");
+        let mut data = Vec::with_capacity(size_bytes);
+
+        for i in 0..chunk_count {
+            let chunk_path = chunk_dir.join(format!("{:08}", i));
+            let chunk = fs::read(&chunk_path).await?;
+            data.extend_from_slice(&chunk);
+        }
+
+        // Verify reassembled hash
+        let computed_hash = Self::compute_hash(&data);
+        if computed_hash != hash {
+            return Err(StorageError::HashMismatch {
+                expected: hash.to_string(),
+                actual: computed_hash,
+            });
+        }
+
+        Ok(data)
+    }
+
+    /// Get a range of bytes from a blob (for HTTP Range requests)
+    pub async fn get_range(&self, hash: &str, start: u64, end: u64) -> Result<Vec<u8>, StorageError> {
+        let blob_path = self.blob_path(hash);
+
+        // Check if chunked - for now, load full blob and slice
+        // TODO: optimize for chunked blobs by only loading needed chunks
+        let content = fs::read(&blob_path).await?;
+        if content == b"CHUNKED" {
+            let full = self.get_chunked(hash).await?;
+            return Ok(full[start as usize..end.min(full.len() as u64) as usize].to_vec());
+        }
+
+        Ok(content[start as usize..end.min(content.len() as u64) as usize].to_vec())
+    }
+
+    /// Delete a blob
+    pub async fn delete(&self, hash: &str) -> Result<(), StorageError> {
+        let blob_path = self.blob_path(hash);
+
+        // Check if chunked
+        if let Ok(content) = fs::read(&blob_path).await {
+            if content == b"CHUNKED" {
+                // Delete chunk directory
+                let chunk_dir = blob_path.with_extension("d");
+                fs::remove_dir_all(&chunk_dir).await.ok();
+
+                // Delete chunk index
+                let index_path = self.chunk_index_path(hash);
+                fs::remove_file(&index_path).await.ok();
+            }
+        }
+
+        // Delete main file
+        fs::remove_file(&blob_path).await.ok();
+
+        info!(hash = %hash, "Deleted blob");
+        Ok(())
+    }
+
+    /// Get storage statistics
+    pub async fn stats(&self) -> Result<StorageStats, StorageError> {
+        let blobs_dir = self.root_dir.join("blobs");
+        let mut total_blobs = 0u64;
+        let mut total_bytes = 0u64;
+        let mut chunked_blobs = 0u64;
+
+        if let Ok(mut entries) = fs::read_dir(&blobs_dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if entry.path().is_dir() {
+                    if let Ok(mut subentries) = fs::read_dir(entry.path()).await {
+                        while let Ok(Some(subentry)) = subentries.next_entry().await {
+                            let path = subentry.path();
+                            if !path.to_string_lossy().contains(".chunks") && !path.to_string_lossy().ends_with(".d") {
+                                total_blobs += 1;
+                                if let Ok(metadata) = fs::metadata(&path).await {
+                                    if metadata.len() == 7 {
+                                        // Might be a chunked marker
+                                        if let Ok(content) = fs::read(&path).await {
+                                            if content == b"CHUNKED" {
+                                                chunked_blobs += 1;
+                                                // Get actual size from chunk index
+                                                if let Some(hash) = path.file_name().map(|f| f.to_string_lossy().to_string()) {
+                                                    if let Ok(size) = self.size(&hash).await {
+                                                        total_bytes += size;
+                                                        continue;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    total_bytes += metadata.len();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(StorageStats {
+            total_blobs,
+            total_bytes,
+            chunked_blobs,
+        })
+    }
+}
+
+/// Storage statistics
+#[derive(Debug, Clone)]
+pub struct StorageStats {
+    pub total_blobs: u64,
+    pub total_bytes: u64,
+    pub chunked_blobs: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_store_and_retrieve() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = BlobStore::new(temp_dir.path()).await.unwrap();
+
+        let data = b"Hello, Elohim!";
+        let result = store.store(data).await.unwrap();
+
+        // Should return both CID and hash
+        assert!(result.cid.starts_with("bafkrei")); // CIDv1 with raw codec
+        assert!(result.hash.starts_with("sha256-"));
+        assert_eq!(result.size_bytes, data.len() as u64);
+        assert!(!result.chunked);
+        assert!(!result.already_existed);
+
+        // Retrieve by hash (legacy)
+        let retrieved = store.get(&result.hash).await.unwrap();
+        assert_eq!(retrieved, data);
+
+        // Retrieve by CID
+        let retrieved_by_cid = store.get_by_address(&result.cid).await.unwrap();
+        assert_eq!(retrieved_by_cid, data);
+    }
+
+    #[tokio::test]
+    async fn test_idempotent_store() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = BlobStore::new(temp_dir.path()).await.unwrap();
+
+        let data = b"Duplicate test";
+        let result1 = store.store(data).await.unwrap();
+        let result2 = store.store(data).await.unwrap();
+
+        assert_eq!(result1.hash, result2.hash);
+        assert_eq!(result1.cid, result2.cid);
+        assert!(!result1.already_existed);
+        assert!(result2.already_existed);
+    }
+
+    #[tokio::test]
+    async fn test_compute_hash() {
+        let hash = BlobStore::compute_hash(b"test");
+        assert!(hash.starts_with("sha256-"));
+        assert_eq!(hash.len(), 7 + 64); // "sha256-" + 64 hex chars
+    }
+
+    #[tokio::test]
+    async fn test_compute_cid() {
+        let cid = BlobStore::compute_cid(b"test");
+        let cid_str = cid.to_string();
+        assert!(cid_str.starts_with("bafkrei")); // CIDv1 raw codec
+    }
+
+    #[tokio::test]
+    async fn test_parse_content_address() {
+        // Test CID parsing
+        let cid = BlobStore::compute_cid(b"test");
+        let cid_str = cid.to_string();
+        let hex = BlobStore::parse_content_address(&cid_str).unwrap();
+        assert_eq!(hex.len(), 64); // SHA256 = 32 bytes = 64 hex chars
+
+        // Test sha256-prefixed hash parsing
+        let hash = BlobStore::compute_hash(b"test");
+        let hex2 = BlobStore::parse_content_address(&hash).unwrap();
+        assert_eq!(hex, hex2); // Same data should produce same hex
+
+        // Test raw hex parsing
+        let raw_hex = hash.strip_prefix("sha256-").unwrap();
+        let hex3 = BlobStore::parse_content_address(raw_hex).unwrap();
+        assert_eq!(hex, hex3);
+
+        // Test invalid input
+        assert!(BlobStore::parse_content_address("invalid").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hash_to_cid_roundtrip() {
+        let data = b"roundtrip test";
+        let (original_cid, hash) = BlobStore::compute_addresses(data);
+
+        // Convert hash back to CID
+        let reconstructed_cid = BlobStore::hash_to_cid(&hash).unwrap();
+
+        assert_eq!(original_cid.to_string(), reconstructed_cid.to_string());
+    }
+
+    #[tokio::test]
+    async fn test_exists_by_address() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = BlobStore::new(temp_dir.path()).await.unwrap();
+
+        let data = b"Existence test";
+        let result = store.store(data).await.unwrap();
+
+        // Check existence by CID
+        assert!(store.exists_by_address(&result.cid).await.unwrap());
+
+        // Check existence by hash
+        assert!(store.exists_by_address(&result.hash).await.unwrap());
+
+        // Check non-existent
+        assert!(!store.exists_by_address("bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").await.unwrap_or(false));
+    }
+}

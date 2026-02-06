@@ -1,0 +1,10 @@
+Scenario: Cross-cultural family appeal about care norms
+    Given our family's cultural background has different care expectations
+    And Family Elohim applied default protocol assumptions
+    When I appeal that the decision didn't respect our cultural context
+    Then the Constitutional Council considers cultural specificity in family care
+    And They evaluate if the agent accommodated legitimate cultural variation
+    And They distinguish cultural respect from cultural relativism about harm
+    And They examine if our family could calibrate agent to our values
+    And The appeal supports cultural diversity within constitutional bounds
+    And Family Elohim learns to honor multiple models of family care

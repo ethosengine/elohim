@@ -1,0 +1,11 @@
+Scenario: Protecting Alex from neighborhood discrimination
+    Given Alex may face discrimination or harassment from neighbors
+    And ableism is pervasive in society
+    When discrimination occurs
+    Then the neighborhood_elohim should help Alex document incidents
+    And it should connect Alex to legal resources and advocacy support
+    And it should facilitate collective response from supportive neighbors
+    And Alex should have tools to protect themselves
+    And the protocol should recognize that neighborhoods can be hostile
+    And safety resources should be readily available
+    And Alex's right to live without discrimination should be defended

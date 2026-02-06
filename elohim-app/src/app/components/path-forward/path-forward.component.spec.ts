@@ -8,9 +8,8 @@ describe('PathForwardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PathForwardComponent]
-    })
-    .compileComponents();
+      imports: [PathForwardComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(PathForwardComponent);
     component = fixture.componentInstance;
@@ -42,7 +41,7 @@ describe('PathForwardComponent', () => {
     const cardHeadings = compiled.querySelectorAll('.card h3');
     expect(cardHeadings.length).toBe(3);
 
-    const headingTexts = Array.from(cardHeadings).map((h: any) => h.textContent);
+    const headingTexts = Array.from(cardHeadings).map(h => (h as HTMLElement).textContent);
     expect(headingTexts).toContain('For Policymakers');
     expect(headingTexts).toContain('For Developers');
     expect(headingTexts).toContain('For Communities');

@@ -1,0 +1,10 @@
+Scenario: Personal agent helps prevent expensive mistakes
+    Given Aisha bought too much fresh produce last week
+    And the produce spoiled before she could use it
+    When the personal_agent analyzes her shopping patterns
+    Then it should identify the waste pattern
+    And it should suggest buying smaller quantities
+    And it should recommend frozen alternatives when appropriate
+    And the feedback should be constructive, not judgmental
+    And Aisha should learn from the mistake without shame
+    And the system should help her optimize future purchases

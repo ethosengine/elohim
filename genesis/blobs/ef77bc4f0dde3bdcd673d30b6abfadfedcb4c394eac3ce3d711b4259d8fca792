@@ -1,0 +1,9 @@
+Scenario: Journalist tracks state promises on infrastructure investment
+    Given state announced major infrastructure funding 2 years ago
+    And the journalist covered initial announcement
+    When the Observer alerts on promise implementation timeline
+    Then the journalist investigates actual spending and project completion
+    And finds only 18% of promised funding has been allocated
+    And sees projects concentrated in politically connected districts
+    And documents communities still waiting for promised improvements
+    And publishes accountability story on broken infrastructure commitments

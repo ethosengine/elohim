@@ -1,0 +1,10 @@
+Scenario: Privacy protection for young child's data
+    Given Tommy's care contributions are being tracked
+    And Tommy cannot consent to data sharing
+    When Tommy's care data is recorded
+    Then all data must stay encrypted on family devices
+    And no behavioral profiling for commercial purposes should occur
+    And no third-party access should be permitted
+    And Tommy's wonder must never be monetized
+    And parental controls must govern all data visibility
+    And anonymization must occur before any community aggregation

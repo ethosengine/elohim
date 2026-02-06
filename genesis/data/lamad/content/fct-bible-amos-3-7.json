@@ -1,0 +1,52 @@
+{
+  "id": "fct-bible-amos-3-7",
+  "contentType": "bible-verse",
+  "title": "Amos 3:7",
+  "description": "Scripture reference used in FCT Module 6",
+  "content": "## Amos 3:7\n\n> Amos 3:7 - \"Surely the Sovereign Lord does nothing without revealing his plan to his servants the prophets.\"\nResponsible growth and collaborative community:\n\n*ESV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "amos",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "thematicContext": "Minimizing Harmful Consequences"
+  },
+  "createdAt": "2025-11-28T21:10:19.201366",
+  "updatedAt": "2025-12-24T03:05:25.930Z",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Amos 3:7",
+    "ogDescription": "Scripture reference used in FCT Module 6",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-amos-3-7",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Amos 3:7 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-amos-3-7",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "Amos 3:7",
+    "description": "Scripture reference used in FCT Module 6",
+    "dateCreated": "2025-11-28T21:10:19.201366",
+    "dateModified": "2025-11-28T21:10:19.201367",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

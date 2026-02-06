@@ -1,0 +1,11 @@
+Scenario: Preventing workplace retaliation for accommodation requests
+    Given employers sometimes retaliate against workers who request accommodations
+    And retaliation can be subtle (worse assignments, social exclusion, negative evaluations)
+    When Alex requests accommodations or asserts rights
+    Then the workplace_elohim should monitor for retaliation patterns
+    And it should document timeline of accommodation requests and subsequent treatment changes
+    And it should help Alex identify legally actionable retaliation
+    And Alex should be connected to legal resources if retaliation occurs
+    And the protocol should protect Alex from employer retaliation systematically
+    And documentation should support legal claims if necessary
+    And Alex should feel supported in asserting rights without fear

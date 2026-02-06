@@ -1,0 +1,11 @@
+Scenario: Household budget management with severe resource constraint
+    Given Helen's $24k/year income barely covers necessities
+    And household expenses are challenging on fixed income
+    When the household_elohim manages budget tracking
+    Then it should help Helen navigate financial limitations
+    And priority should be given to keeping her housed
+    And community resources for home maintenance should be surfaced
+    And no shame should attach to needing financial assistance
+    And the system should connect her to care economy support
+    And assistance should flow as reciprocity, not charity
+    And Helen's ability to remain in her home should be prioritized

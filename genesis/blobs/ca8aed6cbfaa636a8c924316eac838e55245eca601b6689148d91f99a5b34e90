@@ -1,0 +1,10 @@
+Scenario: Request explainable agent reasoning during appeal
+    Given Marcus has filed an appeal against his Family Elohim
+    And the agent made a mental health intervention decision
+    When Marcus requests detailed explanation of the decision
+    Then the agent provides layered explanation starting with plain language summary
+    And the agent explains which constitutional principles were applied
+    And the agent shows what data patterns triggered the decision
+    And the agent presents counterfactual scenarios showing what would change outcome
+    And technical audit trail is available for expert review
+    And Marcus can adjust detail level based on his understanding needs

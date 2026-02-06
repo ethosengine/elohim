@@ -1,0 +1,9 @@
+Scenario: Journalist detects gentrification pattern across neighborhoods
+    Given individual rent increases in scattered buildings
+    And the journalist suspects coordinated displacement
+    When the Observer tracks evictions and rent increases across community
+    Then the journalist sees systematic pattern of displacement
+    And identifies corporate landlord acquiring properties neighborhood-wide
+    And documents residents being priced out block by block
+    And connects individual stories to structural pattern
+    And publishes investigation exposing organized gentrification

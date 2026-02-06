@@ -1,0 +1,12 @@
+Scenario: Appeal mental health intervention that violated privacy
+    Given Marcus is experiencing behavioral changes
+    And his Family Elohim detects patterns indicating suicide risk
+    And the agent alerts his partner following graduated intervention protocol
+    When Marcus feels his privacy was violated despite life-saving intent
+    And Marcus triggers an appeal through his interface
+    Then the appeal is immediately logged with timestamp
+    And the Family Elohim provides full constitutional reasoning
+    And the reasoning includes pattern detection details with 85% confidence
+    And the reasoning explains care vs. privacy weighting
+    And Marcus receives plain language explanation within minutes
+    And the appeal is routed to Community Elohim for first-layer review

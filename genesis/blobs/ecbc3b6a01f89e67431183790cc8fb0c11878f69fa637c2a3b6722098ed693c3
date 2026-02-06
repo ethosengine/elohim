@@ -1,0 +1,10 @@
+Scenario: Mentoring younger community members and leaders
+    Given Margaret has professional experience and life wisdom
+    And younger adults benefit from mentoring
+    When the community_elohim facilitates mentoring connections
+    Then Margaret should be connected to mentees
+    And her knowledge should be passed to next generation
+    And the mentoring labor should be tracked as care contribution
+    And intergenerational knowledge transmission should be valued
+    And Margaret's experience should serve community capacity-building
+    And younger leaders should benefit from senior guidance

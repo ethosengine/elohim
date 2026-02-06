@@ -1,0 +1,12 @@
+Scenario: Neighborhood collective action on shared concerns
+    Given neighborhood faces shared challenges
+    And individual action is less effective than collective action
+    And Robert has leadership capacity from professional experience
+    When neighborhood_elohim coordinates collective action
+    Then it should facilitate neighborhood organizing around shared concerns
+    And recognize Robert's leadership capabilities
+    And help coordinate neighborhood improvement projects
+    And surface opportunities for collective action
+    And build neighborhood governance capacity
+    And demonstrate that care for place is part of care economy
+    And strengthen neighborhood through collaborative problem-solving

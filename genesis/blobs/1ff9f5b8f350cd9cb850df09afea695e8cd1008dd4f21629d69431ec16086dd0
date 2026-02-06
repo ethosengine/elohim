@@ -1,0 +1,10 @@
+Scenario: Family provides recognition that builds young child's care identity
+    Given Tommy has made care contributions over weeks
+    And the family_elohim has tracked patterns
+    When family recognition moments occur
+    Then Sarah should receive prompts for specific acknowledgment
+    And recognition should highlight Tommy's care work
+    And acknowledgment should feel genuine, not mechanical
+    And Tommy should internalize identity as caring family member
+    And positive reinforcement should build care-centered self-concept
+    And the family should collectively value invisible care labor

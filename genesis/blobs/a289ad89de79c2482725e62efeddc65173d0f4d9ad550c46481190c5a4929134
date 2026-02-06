@@ -1,0 +1,11 @@
+Scenario: Intensive training prepares me for constitutional interpretation
+    Given I have accepted my Constitutional Council appointment
+    And I need to understand constitutional principles to judge agent decisions
+    When I complete 3-week training program
+    Then I learn: constitutional principles and their application
+    And I study: how agents reason and make decisions
+    And I practice: deliberation protocols and consensus building
+    And I review: historical precedents and case studies
+    And I am educated: without being indoctrinated about "correct" answers
+    And I develop: judgment capacity not just knowledge
+    And I feel: prepared to serve despite lack of formal expertise

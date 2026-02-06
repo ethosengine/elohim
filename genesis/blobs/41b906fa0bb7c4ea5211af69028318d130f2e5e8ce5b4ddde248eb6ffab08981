@@ -1,0 +1,7 @@
+Scenario: Contributing to community education about care work
+    Given many people don't recognize labor as care contribution
+    When I want to help community understand care economy
+    Then the protocol should help me share my perspective as a worker
+    And support education about care work embedded in all labor
+    And facilitate community consciousness-raising
+    And build movement toward care-economy-aligned economics

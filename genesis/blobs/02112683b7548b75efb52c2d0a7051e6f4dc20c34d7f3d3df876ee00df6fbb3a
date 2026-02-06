@@ -1,0 +1,9 @@
+Scenario: Parent participates in 15 minutes not 3 hours
+    Given the school board meets Tuesday at 7 PM for 3+ hours
+    And the parent has work shift, dinner, and bedtime routines
+    When the parent cannot attend the meeting in person
+    Then they receive 3-minute morning summary of decisions
+    And can submit questions and positions via mobile app
+    And get alert if their child's school is specifically affected
+    And review post-meeting summary with action items
+    And democracy fits into parent's actual available time

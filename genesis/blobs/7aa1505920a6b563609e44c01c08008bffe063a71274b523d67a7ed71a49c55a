@@ -1,0 +1,142 @@
+Feature: Household Participation and Group Home Governance
+  As an IDD community member living in a group home
+  I want to contribute to household life and participate in governance
+  So that I live in a community of mutual care, not as a managed client
+
+  Background:
+    Given Jordan lives in a supported group home with three housemates
+    And all housemates are IDD community members
+    And the household operates on care economy principles
+    And everyone contributes at their capability level
+
+  Scenario: Contributing to household chores with dignity
+    Given Jordan is responsible for helping with dinner dishes
+    When Jordan completes their dishwashing task
+    Then the Value Scanner records Jordan's household contribution
+    And Jordan accumulates care tokens for their household labor
+    And the interface celebrates Jordan's contribution with positive feedback
+    And Jordan's work is valued equally to housemates' contributions
+    And the household labor distribution is visible to all housemates
+    And Jordan experiences being a valued household member, not a client
+
+  Scenario: Participating in meal planning decisions
+    Given the household plans weekly meals together
+    And each housemate has food preferences and dietary needs
+    When the household holds their weekly meal planning meeting
+    Then Jordan's personal_agent presents meal options visually
+    And Jordan can express preferences using simple voting (thumbs up/down)
+    And the support worker facilitates but doesn't override Jordan's choices
+    And Jordan's food preferences are honored in the meal plan
+    And Jordan participates as an equal household member
+    And the household_elohim coordinates fair preference balancing
+
+  Scenario: Coordinating shared household spaces
+    Given Jordan shares the living room with three housemates
+    And conflicts sometimes arise about TV use or noise
+    When Jordan wants to watch their favorite show
+    Then the household schedule shows shared space availability
+    And Jordan can book TV time using the visual scheduling interface
+    And the system helps housemates negotiate conflicts fairly
+    And Jordan's preferences matter as much as other housemates
+    And the household_elohim facilitates respectful conflict resolution
+    And Jordan learns about shared space cooperation
+
+  Scenario: Managing household budget participation
+    Given the group home has a shared household budget
+    And housemates collectively decide on discretionary spending
+    When the household discusses buying a new game system
+    Then Jordan participates in the budget discussion with support
+    And the interface shows budget information with visual aids
+    And Jordan can express their opinion on the purchase
+    And Jordan's vote counts equally with other housemates
+    And supported decision-making helps Jordan understand options
+    And Jordan experiences democratic household governance
+
+  Scenario: Hosting guests and social events at home
+    Given Jordan wants to invite friends to the group home
+    And the household has policies about guests
+    When Jordan plans a small gathering
+    Then the personal_agent helps Jordan coordinate with housemates
+    And the interface shows the guest policy in simple language
+    And Jordan can request guest approval using the household system
+    And housemates discuss and approve Jordan's gathering
+    And Jordan experiences autonomy in their home social life
+    And the household supports Jordan's social connections
+
+  Scenario: Responding to household maintenance needs
+    Given Jordan notices the bathroom sink is leaking
+    And household members should report maintenance issues
+    When Jordan uses the maintenance request feature
+    Then the interface allows simple issue reporting with pictures
+    And Jordan can photograph the problem or select from issue pictures
+    And the household_elohim routes the request appropriately
+    And Jordan receives confirmation and updates in accessible format
+    And Jordan's observant contribution is celebrated
+    And Jordan learns responsibility for shared home care
+
+  Scenario: Participating in household conflict resolution
+    Given Jordan had a disagreement with a housemate about noise
+    And the household uses restorative practices for conflicts
+    When the household facilitates a conflict resolution meeting
+    Then Jordan's personal_agent helps Jordan express their perspective
+    And the interface provides communication support (feeling words, pictures)
+    And the facilitator ensures Jordan's voice is fully heard
+    And Jordan participates in finding a solution
+    And the resolution honors Jordan's needs and boundaries
+    And Jordan learns healthy conflict resolution skills
+    And Jordan's dignity is preserved throughout the process
+
+  Scenario: Celebrating household milestones together
+    Given the household has lived together for one year
+    And housemates want to celebrate their community
+    When Jordan helps plan the anniversary celebration
+    Then Jordan contributes ideas using the visual planning interface
+    And Jordan's suggestions are valued equally with others
+    And Jordan helps with celebration preparations at their capability
+    And the Value Scanner records Jordan's party planning contributions
+    And Jordan experiences being part of a caring community
+    And the celebration honors everyone's contributions to household life
+
+  Scenario: Managing personal space within shared home
+    Given Jordan has their own bedroom in the group home
+    And personal space is important for privacy and autonomy
+    When Jordan wants to decorate their room
+    Then Jordan can choose decorations within household guidelines
+    And the personal_agent helps Jordan shop for items in budget
+    And support workers respect Jordan's room as their private space
+    And Jordan's choices about their space are honored
+    And Jordan experiences having a home, not just a placement
+    And privacy boundaries around Jordan's room are maintained
+
+  Scenario: Contributing to household culture and traditions
+    Given the household is building shared traditions
+    And Jordan loves music and dancing
+    When Jordan suggests Friday night dance parties
+    Then the household considers Jordan's idea democratically
+    And Jordan's cultural contribution is valued
+    And the household adopts Friday dance as a tradition
+    And Jordan accumulates care tokens for culture-building contribution
+    And Jordan experiences shaping their household community
+    And Jordan's joy and creativity enrich household life
+
+  Scenario: Coordinating support schedules respectfully
+    Given the group home has support workers on rotating shifts
+    And each housemate has different support needs and preferences
+    When the household reviews the support schedule
+    Then Jordan can express preferences for support worker assignments
+    And the scheduling system honors Jordan's preferences when possible
+    And Jordan's input is weighted equally with other housemates
+    And the household_elohim coordinates fair schedule distribution
+    And Jordan experiences having voice in who supports them
+    And Jordan's preferences shape their daily life experience
+
+  Scenario: Participating in household emergency preparedness
+    Given the household practices emergency procedures
+    And everyone needs to know safety protocols
+    When the household conducts a fire drill
+    Then Jordan receives emergency instructions in accessible format
+    And the interface shows evacuation steps with pictures and arrows
+    And Jordan can practice the procedures with support
+    And Jordan's understanding is verified in accessible ways
+    And Jordan's safety capability is enhanced through practice
+    And Jordan experiences being an active participant in household safety

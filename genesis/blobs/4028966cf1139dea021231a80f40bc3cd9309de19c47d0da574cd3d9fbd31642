@@ -1,0 +1,7 @@
+Scenario: Examine cohort effects comparing early vs late adopters
+    Given communities adopted protocol at different times across decade
+    When James compares adoption cohorts
+    Then he finds early adopters benefit from learning community support
+    And he discovers later adopters benefit from improved protocol versions
+    And he identifies that community context matters more than timing
+    And cohort analysis illuminates adoption dynamics

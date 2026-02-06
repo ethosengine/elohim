@@ -1,0 +1,9 @@
+Scenario: Journalist exposes environmental racism through pattern recognition
+    Given pollution facilities cluster in certain communities
+    And the journalist investigates environmental justice
+    When the Observer analyzes environmental permit patterns
+    Then the journalist sees industrial permits concentrate in communities of color
+    And maps proximity of pollution sources to schools and residences
+    And documents health outcome disparities by neighborhood demographics
+    And shows pattern persists across decades of permitting decisions
+    And publishes investigation exposing systematic environmental racism

@@ -1,0 +1,9 @@
+Scenario: Customer relationships institutionalize beyond individual owner
+    Given Rosa built customer loyalty through personal trust over 15 years
+    And these relationships are valuable but currently dependent on her
+    When customer relationship transition process begins
+    Then Rosa introduces workers to customers as new business leaders
+    And customer histories are documented (with privacy protection)
+    And workers learn customer preferences and build direct relationships
+    And customers discover democratic ownership often deepens their loyalty
+    And relationships survive and strengthen beyond Rosa's involvement

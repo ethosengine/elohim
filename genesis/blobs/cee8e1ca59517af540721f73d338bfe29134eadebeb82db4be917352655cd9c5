@@ -1,0 +1,10 @@
+Scenario: Recognizing when workplace demands become unsustainable
+    Given Aisha faces intense workplace expectations
+    And she often works long hours
+    When the personal_agent monitors her workplace patterns
+    Then it should flag when demands are unsustainable
+    And it should recognize that she's worked through lunch repeatedly
+    And it should identify when work-life balance is failing
+    And the system should help her see overwork clearly
+    And she should be supported in setting boundaries
+    And workplace care economy should prevent exploitation

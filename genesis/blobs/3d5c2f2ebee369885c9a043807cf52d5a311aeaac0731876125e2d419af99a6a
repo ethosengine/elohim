@@ -1,0 +1,9 @@
+Scenario: Displaced person maintains safe connection with home community
+    Given Maria left her hometown to escape an abusive partner
+    And she wants to stay connected with friends and family back home
+    When Maria configures her privacy settings for selective visibility
+    And she marks her abuser and his associates as blocked
+    Then she can communicate with trusted home community members
+    And her new location is never revealed to blocked individuals
+    And her abuser cannot find or contact her through the system
+    And she maintains important relationships while staying safe

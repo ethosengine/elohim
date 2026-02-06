@@ -1,0 +1,9 @@
+Scenario: School board member evaluates charter school proposal with evidence
+    Given charter organization proposes new school in district
+    And presents compelling student achievement promises
+    When the Observer analyzes charter track record
+    Then they see organization's student outcomes in other cities
+    And learn whether achievement gains account for selective enrollment
+    And understand fiscal impact on district schools
+    And review discipline and expulsion rates for vulnerable students
+    And make informed decision on charter authorization

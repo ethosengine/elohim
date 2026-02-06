@@ -1,0 +1,9 @@
+Scenario: Family financial support recognition as care contribution
+    Given James's household income has plummeted due to caregiving
+    And family members may provide financial assistance
+    When family financial support is tracked
+    Then the family_elohim should recognize financial help as care contribution
+    And it should value financial support alongside direct care labor
+    And family members unable to provide direct care can contribute financially
+    And care economy should include multiple forms of contribution
+    And financial support should be recognized, not taken for granted

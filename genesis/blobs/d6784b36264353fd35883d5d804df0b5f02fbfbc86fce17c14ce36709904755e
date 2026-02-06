@@ -1,0 +1,9 @@
+Scenario: Ecological care tokens recognize environmental contribution despite poverty
+    Given Maria's household practices are environmentally exemplary
+    And she achieves low impact through necessity, not affluent environmentalism
+    When ecological care tokens are calculated
+    Then her resource efficiency should be valued as environmental contribution
+    And she should accumulate ecological care tokens for sustainable practices
+    And low-impact living should be recognized regardless of economic motivation
+    And environmental stewardship should be valued whether chosen or necessary
+    And Maria should receive ecological recognition for her sustainable household

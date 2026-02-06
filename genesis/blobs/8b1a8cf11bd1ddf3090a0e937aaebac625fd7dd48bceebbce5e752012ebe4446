@@ -1,0 +1,9 @@
+Scenario: Workers exercise governance voice weighted by documented contribution
+    Given REA accounting documents each worker's contributions over time
+    And democratic governance weights votes by contribution and seniority
+    When workers vote on major strategic decisions
+    Then Maria's 8 years of documented expertise weights her vote higher
+    And newer workers have proportional but meaningful voice
+    And weighting is transparent and democratically adjustable
+    And workplace_elohim ensures weighting doesn't become oligarchic
+    And all workers maintain baseline voice protecting their dignity

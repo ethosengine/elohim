@@ -1,0 +1,10 @@
+Scenario: Identifying food waste reduction opportunities at neighborhood scale
+    Given Marcus must maximize value from limited budget
+    And food waste represents lost resources
+    When the neighborhood_elohim identifies waste patterns
+    Then it should connect Marcus to gleaning opportunities
+    And it should facilitate food rescue programs
+    And it should help him access surplus food from stores
+    And neighborhood coordination should reduce waste while addressing need
+    And Marcus's family should benefit from systematic waste reduction
+    And ecological and economic goals should align

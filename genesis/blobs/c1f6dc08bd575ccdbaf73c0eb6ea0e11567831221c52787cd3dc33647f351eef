@@ -1,0 +1,10 @@
+Scenario: Developing social skills through structured learning
+    Given Jordan wants to improve conversation skills
+    And social skills education can support relationship building
+    When Jordan participates in social skills group
+    Then the group uses accessible teaching methods (role-play, video modeling)
+    And Jordan practices skills with peer learners
+    And successes are celebrated and challenges are normalized
+    And Jordan's social confidence grows through practice
+    And improved skills enhance Jordan's community participation
+    And Jordan experiences personal growth and capability development

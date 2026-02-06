@@ -1,0 +1,10 @@
+Scenario: Learning community history and values through participation
+    Given Aisha is new to the community
+    And understanding community values takes time
+    When Aisha participates in community care economy
+    Then she should learn community history through engagement
+    And long-term residents should transmit community values
+    And the community_elohim should facilitate cultural transmission
+    And Aisha should understand community context through practice
+    And care economy should teach community membership
+    And participation should integrate newcomers into community culture

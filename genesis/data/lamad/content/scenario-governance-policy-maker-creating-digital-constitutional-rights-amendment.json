@@ -1,0 +1,44 @@
+{
+  "id": "scenario-governance-policy-maker-creating-digital-constitutional-rights-amendment",
+  "contentType": "scenario",
+  "title": "Creating Digital Constitutional Rights Amendment",
+  "description": "protocol creates new forms of governance and rights; constitutional recognition would strengthen legitimacy; I propose national constitutional amendment... (10 steps total)",
+  "content": "Given protocol creates new forms of governance and rights\nAnd constitutional recognition would strengthen legitimacy\nWhen I propose national constitutional amendment\nThen I recognize: sortition governance as legitimate democratic form\nAnd I establish: right to appeal agent decisions\nAnd I protect: community sovereignty over protocol adoption\nAnd I enshrine: privacy protections and dignity guarantees\nAnd amendment goes through: lengthy deliberative process\nAnd if passed: transforms national constitutional framework\nAnd protocol gains: highest legal recognition",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic",
+    "governance",
+    "user_type",
+    "policy_maker",
+    "governance_layer",
+    "nation_state",
+    "related_users",
+    "constitutional_council_member",
+    "related_layers",
+    "provincial_state",
+    "elohim_agents",
+    "national_elohim",
+    "policy-maker",
+    "scenario"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-nation-state",
+    "source-governance-policy-maker-nation-state"
+  ],
+  "metadata": {
+    "category": "scenario",
+    "scenarioType": "scenario",
+    "epic": "governance",
+    "userType": "policy_maker",
+    "featureId": "feature-governance-policy-maker-nation-state",
+    "stepCount": 10,
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-governance-policy-maker-nation-state",
+    "extractionMethod": "gherkin-parse"
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.232Z",
+  "updatedAt": "2025-12-05T18:41:24.232Z"
+}

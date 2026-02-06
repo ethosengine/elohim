@@ -1,0 +1,10 @@
+Scenario: Applied learning through care economy translates to academic credit
+    Given Jasmine manages household budget and coordinates care work
+    And these activities involve mathematical reasoning, planning, and analysis
+    When educational_elohim analyzes her care economy participation
+    Then it should identify applicable learning in her care work
+    And surface opportunities for academic recognition
+    And connect to teachers: "Jasmine's budget management demonstrates applied math skills"
+    And support translation of care contributions into academic credit where appropriate
+    And recognize that learning happens across contexts, not just in classrooms
+    And validate that care work develops genuine capabilities

@@ -1,0 +1,10 @@
+Scenario: Personal agent serves as thinking partner for overwhelming decisions
+    Given Maria faces countless decisions daily with no co-parent to consult
+    And she manages children's needs, household economics, work schedule, and logistics alone
+    When Maria needs to make a complex decision
+    Then her personal_agent should function as cognitive co-parent
+    And it should help her think through decisions systematically
+    And it should surface important factors she might miss in exhaustion
+    And it should track patterns and provide analysis
+    And it should support her sovereignty without imposing its own agenda
+    And Maria should have the thinking partnership that coupled parents get from each other

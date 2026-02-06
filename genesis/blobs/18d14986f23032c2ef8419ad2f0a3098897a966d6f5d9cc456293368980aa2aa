@@ -1,0 +1,10 @@
+Scenario: Municipal food policy informed by teen participation patterns
+    Given Jasmine uses Value Scanner for food purchasing across the municipality
+    And aggregate data shows youth food access patterns
+    When municipal_elohim analyzes food security and access
+    Then it should surface insights about how teens access food
+    And identify food deserts affecting youth
+    And show impact of local food policy on teen nutrition
+    And inform municipal food policy with data about youth participation
+    And support evidence-based policy for food security
+    And recognize that teen food access matters to public health

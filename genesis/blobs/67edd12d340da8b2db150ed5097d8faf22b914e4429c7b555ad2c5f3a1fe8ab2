@@ -1,0 +1,59 @@
+@epic:social_medium
+@user_type:elder
+@governance_layer:family
+@related_users:child,content_creator
+@related_layers:individual,neighborhood
+@elohim_agents:guardian_agent,connection_agent
+
+Feature: Intergenerational Family Connection for Elder
+  As an elder in the social_medium system
+  Operating at the family governance layer
+  I want to maintain meaningful relationships with my family across distances
+  So that I remain connected with children and grandchildren despite geographic separation
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the elder user is registered in the system
+    And the family governance context is active
+    And the elder is Rose, age 73, with family across three states
+
+  Scenario: Elder shares family wisdom with grandchildren
+    Given Rose's granddaughter Emma asks about Rose's childhood during WWII
+    When Rose creates a contribution sharing her memories
+    And she includes photos from her family album
+    And she describes what life was like during wartime
+    Then the contribution reaches all family members immediately
+    And Emma learns family history and develops deeper connection
+    And other grandchildren engage with questions and appreciation
+    And Rose experiences meaningful intergenerational exchange
+    And the family history is preserved in the network
+
+  Scenario: Elder protected from romance scam while maintaining real connections
+    Given Rose has been widowed for two years
+    When a scammer creates a fake profile and tries to contact her
+    And the scammer sends romantic messages requesting financial help
+    Then the guardian agent detects the fraudulent pattern
+    And the messages never reach Rose
+    And she is protected without knowing she was targeted
+    And all her genuine family and friend connections work normally
+    And her dignity and autonomy are fully preserved
+
+  Scenario: Elder stays connected to grandchild's daily life
+    Given Emma shares her school activities and achievements
+    When Emma posts about her science fair project
+    And she shares photos of her display
+    Then Rose sees Emma's contribution in family stream
+    And Rose can respond with encouragement and pride
+    And Emma feels her grandmother's support despite distance
+    And the family bond strengthens through regular positive interaction
+    And Rose remains engaged with grandchildren's lives
+
+  Scenario: Elder reaches out during health concern
+    Given Rose is feeling unwell and wants family support
+    When she creates a contribution mentioning she's not feeling well
+    And the guardian agent detects health concern indicators
+    Then her children are notified appropriately
+    And family members can coordinate support and check-ins
+    And if needed, healthcare resources are surfaced
+    And Rose experiences family care without having to explicitly ask for help
+    And the system respects her privacy while enabling family support

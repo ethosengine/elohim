@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-michiko-kakutani",
+  "contentType": "contributor",
+  "title": "Michiko Kakutani",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Michiko Kakutani\n\n**Role:** author\n\n**Works:** The Death of Truth\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-media-00-book-the-death-of-truth"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-01-church-dilemma"
+  },
+  "createdAt": "2025-11-28T21:10:19.190261",
+  "updatedAt": "2025-12-24T03:05:26.065Z",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Michiko Kakutani",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-michiko-kakutani",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Michiko Kakutani - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-michiko-kakutani",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Michiko Kakutani",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.190261",
+    "dateModified": "2025-11-28T21:10:19.190262",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

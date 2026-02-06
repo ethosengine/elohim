@@ -1,0 +1,10 @@
+Scenario: Seasonal and weather-related neighborhood mutual aid
+    Given Margaret is often available during daytime
+    And neighborhood needs vary with seasons and weather
+    When the neighborhood coordinates seasonal care
+    Then the neighborhood_elohim should facilitate seasonal mutual aid
+    And Margaret might help with snow observation, mail collection, or storm preparation
+    And she should receive help with physical tasks she cannot do
+    And seasonal care should be reciprocal and community-building
+    And neighborhood resilience should increase through elder participation
+    And Margaret should contribute according to her capacity

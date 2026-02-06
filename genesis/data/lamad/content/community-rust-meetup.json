@@ -1,0 +1,24 @@
+{
+  "id": "community-rust-meetup",
+  "did": "did:web:elohim.host:community:rust-meetup",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Rust Meetup",
+  "description": "Community with 1 members",
+  "content": "# Rust Meetup\n\n**Members:** 1\n\n## Member List\n\n- human-dan-developer",
+  "contentFormat": "markdown",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-dan-developer"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-26T21:04:01.764Z"
+}

@@ -1,0 +1,9 @@
+Scenario: Biodiversity preservation is integrated into agricultural practice
+    Given industrial agriculture destroys biodiversity through monoculture and chemicals
+    And biodiversity loss threatens ecosystem resilience and pollination
+    When democratic farms prioritize biodiversity as ecological value
+    Then pollinator habitat is planted and protected across farms
+    And hedgerows and field margins support wildlife and beneficial insects
+    And native plant species are incorporated into farm landscapes
+    And biodiversity increases measurably through democratic agricultural stewardship
+    And bioregional_elohim tracks biodiversity indicators across farm network

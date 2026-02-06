@@ -1,0 +1,9 @@
+Scenario: Solo parenting decisions without partner consultation or validation
+    Given Maria makes every parenting decision alone
+    And she has no co-parent to discuss, debate, or validate choices
+    When Maria faces difficult parenting decisions
+    Then the family_elohim should provide decision support and perspective
+    And it should help her think through consequences and options
+    And it should partially fill the gap of missing partner consultation
+    And it should validate her decision-making authority
+    And Maria should have AI thinking partner for parenting choices

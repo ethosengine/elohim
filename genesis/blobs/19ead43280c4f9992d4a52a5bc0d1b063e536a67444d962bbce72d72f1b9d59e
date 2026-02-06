@@ -1,0 +1,10 @@
+Scenario: Workplace relationships build professional networks
+    Given Jasmine works with manager Sarah and co-workers across age ranges
+    And workplace relationships can support her future career
+    When workplace_elohim tracks her professional relationship development
+    Then it should recognize relationship building as valuable outcome of work
+    And help her understand how to develop professional references
+    And surface when relationships could support her career goals
+    And teach her to navigate workplace relationships appropriately
+    And build her professional social capital
+    And demonstrate that work creates networks, not just income

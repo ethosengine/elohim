@@ -1,0 +1,11 @@
+Scenario: Traditional knowledge of food preservation and storage
+    Given Margaret knows how to preserve food, reduce waste, maximize resources
+    And these skills were essential in her generation
+    When the bioregional_elohim tracks traditional ecological knowledge
+    Then it should recognize Margaret's food preservation skills as valuable
+    And it should value her knowledge of canning, freezing, storing food
+    And it should facilitate teaching these skills to grandchildren
+    And traditional knowledge should be documented and transmitted
+    And Margaret's expertise should contribute to food security
+    And ecological wisdom should accumulate care tokens
+    And sustainable food practices should be valued and preserved

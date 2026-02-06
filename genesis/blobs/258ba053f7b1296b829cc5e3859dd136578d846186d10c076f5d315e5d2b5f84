@@ -1,0 +1,11 @@
+Scenario: Global meta-analysis synthesizing all protocol research
+    Given hundreds of researchers have studied protocol worldwide
+    And I want to synthesize cumulative knowledge
+    When I conduct systematic review and meta-analysis
+    Then I identify: all rigorous studies meeting quality criteria
+    And I synthesize: findings across diverse contexts and methods
+    And I assess: overall evidence about effectiveness and limitations
+    And I examine: publication bias and selective reporting
+    And I identify: gaps in knowledge requiring further research
+    And I provide: comprehensive evidence base for global policy
+    And My meta-analysis serves: evidence-based democratic deliberation at planetary scale

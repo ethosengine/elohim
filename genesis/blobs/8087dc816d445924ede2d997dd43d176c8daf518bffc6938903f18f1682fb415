@@ -1,0 +1,10 @@
+Scenario: Building care economy infrastructure at community scale
+    Given Margaret has time and motivation to build new systems
+    And care economy requires infrastructure development
+    When the community_elohim coordinates care economy building
+    Then Margaret should be identified as potential infrastructure builder
+    And her generation could establish care economy as normal practice
+    And seniors could be powerful advocates and practitioners
+    And community care economy infrastructure should be senior-led
+    And Margaret's cohort could transform how community operates
+    And systemic change should be enabled through senior participation

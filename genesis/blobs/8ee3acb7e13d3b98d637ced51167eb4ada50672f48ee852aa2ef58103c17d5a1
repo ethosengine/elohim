@@ -1,0 +1,8 @@
+Scenario: Documenting workplace violations
+    Given my workplace may violate labor laws or regulations
+    Including wage theft, unsafe conditions, or scheduling violations
+    When I experience potential violations
+    Then the workplace_elohim should help me document incidents
+    And track patterns of violations over time
+    And provide guidance on reporting mechanisms
+    And preserve evidence for potential enforcement or advocacy

@@ -1,0 +1,10 @@
+Scenario: Waste reduction as household care contribution
+    Given Sarah manages household waste and recycling
+    And reducing waste requires planning and effort
+    When the ecological_elohim tracks waste reduction work
+    Then it should recognize waste management as care labor
+    And it should value Sarah's composting, recycling, waste minimization
+    And it should quantify environmental benefit of her work
+    And waste reduction should accumulate care tokens
+    And the system should make invisible ecological labor visible
+    And Sarah's environmental care work should be recognized

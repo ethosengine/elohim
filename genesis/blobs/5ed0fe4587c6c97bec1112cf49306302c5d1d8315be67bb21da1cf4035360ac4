@@ -1,0 +1,72 @@
+# Economic Visibility: The Care Economy's Foundation
+
+## The Problem: Invisible Value
+
+Traditional economies make much labor invisible:
+
+| Type of Work | Traditional Value | Actual Value |
+|--------------|-------------------|--------------|
+| Nursing care | Hourly wage | Lives saved, comfort given, learning shared |
+| Parenting | $0 | Human development, social stability |
+| Eldercare | Minimal | Dignity preserved, wisdom transmitted |
+| Mentoring | Often unpaid | Careers launched, skills developed |
+| Community organizing | Volunteer | Social cohesion, collective action |
+
+The gap between recognition and contribution is **extraction**.
+
+## The Okonkwo Family's Value Gap
+
+From the Economic Coordination epic:
+
+```
+Traditional Economy (What you receive):
+└── Adaeze (Nursing): ₦180,000/month
+
+Elohim Network (What you create):
+└── Adaeze (Care + Training): ₦2,300,000/month
+
+Value Gap: ₦2,120,000/month extracted
+```
+
+## REA Makes Value Visible
+
+With REA accounting, every contribution is recorded:
+
+```json
+{
+  "event": "Emergency_Stabilization",
+  "resources_created": {
+    "patient_stability": "critical → stable",
+    "family_peace": "anxiety → hope",
+    "junior_nurse_learning": "witnessed and documented",
+    "hospital_cost_avoided": "ICU transfer prevented"
+  },
+  "value_flows": {
+    "care_tokens_to_adaeze": 23,
+    "skill_attestation": "emergency_stabilization_witnessed",
+    "monetary_equivalent": "₦78,000"
+  }
+}
+```
+
+## From Visibility to Recognition
+
+The path:
+1. **Document**: Record economic events as they happen
+2. **Witness**: Others observe and validate contributions
+3. **Aggregate**: Value accumulates over time
+4. **Recognize**: Tokens, attestations, reputation flow to contributors
+5. **Circulate**: Recognition becomes economic power
+
+## The Network That Sees You
+
+> "The old economy is blind. It sees transactions, not transformation. It counts money, not meaning."
+
+The care economy sees:
+- The nurse's 3 AM compassion
+- The repair tech's environmental stewardship
+- The student's peer tutoring
+- The parent's invisible labor
+- The elder's accumulated wisdom
+
+**And having seen, it recognizes.**

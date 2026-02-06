@@ -1,0 +1,9 @@
+Scenario: State legislator surfaces constituent priorities across diverse district
+    Given the politician represents 200,000 residents across urban and rural areas
+    And hears disproportionately from organized lobbying campaigns
+    When the Observer aggregates constituent intelligence
+    Then they see healthcare affordability is top concern across demographics
+    And identify rural transportation barriers affecting economic opportunity
+    And learn working families struggle with childcare costs statewide
+    And understand constituent priorities beyond lobbying group demands
+    And align legislative agenda with actual community needs

@@ -1,0 +1,10 @@
+Scenario: Manager facilitates community stakeholder meetings transparently
+    Given community investors and customers want to provide input
+    And workers want community perspective while maintaining autonomy
+    When annual stakeholder meeting occurs
+    Then Marcus facilitates meeting ensuring all voices are heard
+    And Marcus presents operational updates transparently
+    And Marcus helps translate community input into actionable worker proposals
+    But Marcus doesn't filter or control community input
+    And workers make final decisions on community suggestions
+    And community_elohim ensures facilitation doesn't manipulate outcomes

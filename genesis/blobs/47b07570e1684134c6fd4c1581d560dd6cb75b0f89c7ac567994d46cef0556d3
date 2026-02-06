@@ -1,0 +1,11 @@
+Scenario: Collective organizing with other disabled workers
+    Given disabled workers face common workplace barriers
+    And collective action is more powerful than individual advocacy
+    When Alex connects with other disabled workers
+    Then the workplace_elohim should facilitate disabled worker organizing
+    And it should help Alex build solidarity with other disabled employees
+    And collective accommodation requests should be coordinated
+    And workplace accessibility improvements should benefit all disabled workers
+    And the protocol should support disability labor organizing
+    And collective power should be built for systemic workplace change
+    And Alex should be connected to broader disability labor rights movements

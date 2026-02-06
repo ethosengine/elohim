@@ -1,0 +1,10 @@
+Scenario: Sustainable consumption choices tracked as environmental care work
+    Given Jasmine preferentially chooses sustainable products
+    And she has bought local/seasonal/sustainable products in 12 of 15 purchases
+    When bioregional_elohim analyzes her consumption patterns
+    Then it should recognize her environmental care contributions
+    And track her choices as care work for ecosystem health
+    And calculate environmental impact reduction from her choices
+    And value bioregional stewardship in care token allocation
+    And demonstrate that ecological care creates economic value
+    And recognize environmental activism as legitimate care labor

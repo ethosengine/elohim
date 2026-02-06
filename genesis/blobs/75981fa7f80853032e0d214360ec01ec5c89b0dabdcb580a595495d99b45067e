@@ -1,0 +1,7 @@
+Scenario: Accessing household support during crisis periods
+    Given work demands sometimes become overwhelming
+    When I am working double shifts or experiencing crisis
+    Then the protocol should facilitate household mutual aid
+    And help roommates understand my temporary extra needs
+    And suggest how others can support me during difficult periods
+    And enable reciprocity when my situation improves

@@ -1,0 +1,9 @@
+Scenario: Franchise surveillance systems convert to worker-controlled witness infrastructure
+    Given corporate-mandated cameras monitored workers for compliance and speedup
+    And surveillance served corporate extraction, not worker protection
+    When conversion disconnects corporate surveillance feed
+    Then cameras network to local Elohim node under worker control
+    And footage protects workers from customer harassment and safety violations
+    And surveillance data cannot be used for discipline or productivity pressure
+    And workers democratically govern when and how footage is accessed
+    And workplace_elohim ensures corporate has no backdoor access to surveillance

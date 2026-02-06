@@ -1,0 +1,10 @@
+Scenario: Professional expertise shared as valuable teaching contribution
+    Given Margaret has 40+ years of nursing knowledge
+    And her expertise could benefit nursing students and community
+    When the educational_elohim identifies teaching opportunities
+    Then Margaret should be connected to mentoring and teaching roles
+    And her professional knowledge should be valued as educational resource
+    And teaching labor should be recognized and possibly compensated
+    And expertise should continue to serve community after retirement
+    And Margaret's knowledge should be transmitted to next generation
+    And professional skills should be treated as community asset

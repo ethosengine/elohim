@@ -1,0 +1,9 @@
+Scenario: Parent decodes district resource allocation decisions
+    Given the school board discusses "optimizing resource distribution"
+    And the parent cannot attend the 3-hour Tuesday evening meeting
+    When the parent reviews Observer's translated summary
+    Then they learn this means cutting 12 teaching positions
+    And see this increases their child's class size from 24 to 32 students
+    And understand real impact on their child's learning
+    And can submit informed opposition via app in 10 minutes
+    And bureaucratic language doesn't hide impacts from working parents

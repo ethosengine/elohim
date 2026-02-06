@@ -1,0 +1,9 @@
+Scenario: Caregiver's own identity preserved amid intensive care work
+    Given James's life is consumed by caregiving responsibilities
+    And he risks losing his identity as caregiving intensifies
+    When the personal_agent monitors James's individual well-being
+    Then it should protect tiny spaces for his own identity
+    And it should remind him that his flourishing matters too
+    And it should recognize when caregiving threatens his sense of self
+    And it should prompt activities that sustain his individual identity
+    And caregiving should not erase who James is as a person

@@ -1,0 +1,9 @@
+Scenario: Teacher connects resource allocation to learning outcomes
+    Given district allocates resources based on administrative priorities
+    And claims all schools receive equitable support
+    When teachers document resource-outcome patterns through Observer
+    Then teachers show schools with counselors have better student wellbeing
+    And smaller class sizes correlate with better learning outcomes
+    And arts programs predict higher engagement and graduation rates
+    And teacher professional judgment is validated by student outcome data
+    And resource allocation becomes student-centered not administratively convenient

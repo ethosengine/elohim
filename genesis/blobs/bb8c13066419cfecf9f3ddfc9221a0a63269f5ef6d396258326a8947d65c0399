@@ -1,0 +1,11 @@
+Scenario: Elder abuse prevention through community monitoring
+    Given elderly people are vulnerable to abuse and exploitation
+    And community networks can identify concerning patterns
+    When the community_elohim detects potential abuse indicators
+    Then it should alert appropriate authorities
+    And Helen's safety should be prioritized
+    And intervention should preserve her autonomy where possible
+    And community should protect vulnerable members
+    And the protocol should provide infrastructure for elder protection
+    And abuse prevention should be community responsibility
+    And Helen should be safe in her community

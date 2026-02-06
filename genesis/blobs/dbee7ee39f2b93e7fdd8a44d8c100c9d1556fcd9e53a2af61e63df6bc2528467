@@ -1,0 +1,10 @@
+Scenario: Caregiver burnout detection and prevention
+    Given caregiver burnout is real and dangerous
+    And James is at risk of physical and emotional collapse
+    When the personal_agent monitors for burnout warning signs
+    Then it should detect declining nutrition in James
+    And it should recognize sleep deprivation patterns
+    And it should notice increasing social isolation
+    And it should identify health problems emerging
+    And it should alert James before burnout becomes crisis
+    And it should proactively connect him to respite resources

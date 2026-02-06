@@ -1,0 +1,462 @@
+{
+  "id": "governance-policy-maker",
+  "version": "1.0.0",
+  "title": "AI Governance for Policy Makers",
+  "description": "A structured journey through AI constitutional oversight from the policy maker's perspective",
+  "purpose": "To equip policy makers with understanding of how to participate in AI governance appeals and constitutional processes",
+  "createdBy": "cli-generator",
+  "contributors": [],
+  "createdAt": "2025-12-05T18:47:00.371Z",
+  "updatedAt": "2025-12-05T18:47:00.371Z",
+  "steps": [
+    {
+      "order": 1,
+      "stepType": "content",
+      "resourceId": "role-governance-policy-maker",
+      "stepTitle": "Policy Maker",
+      "stepNarrative": "AI Governance - Constitutional oversight and appeals",
+      "learningObjectives": [
+        "Understand Policy Maker"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 1,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-addressing-existential-ai-risk-through-democratic",
+      "stepTitle": "Addressing existential AI risk through democratic governance",
+      "stepNarrative": "superintelligent AI poses existential threat; democratic oversight might mitigate this risk; I participate in global existential risk discussions... (10 steps total)",
+      "learningObjectives": [
+        "Understand Addressing existential AI risk through democratic governance"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 2,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-addressing-global-inequality-in-protocol-access",
+      "stepTitle": "Addressing global inequality in protocol access",
+      "stepNarrative": "research shows protocol adoption correlates with national wealth; poor nations lack infrastructure for implementation; I advocate for global equity in access... (10 steps total)",
+      "learningObjectives": [
+        "Understand Addressing global inequality in protocol access"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 3,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-addressing-protocol-implications-for-labor-and-emp",
+      "stepTitle": "Addressing protocol implications for labor and employment law",
+      "stepNarrative": "protocol affects work and value recognition; care work generates care tokens; I update labor law for protocol economy... (9 steps total)",
+      "learningObjectives": [
+        "Understand Addressing protocol implications for labor and employment law"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 4,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-addressing-protocoltax-law-integration-questions",
+      "stepTitle": "Addressing protocol-tax law integration questions",
+      "stepNarrative": "protocol creates novel economic relationships; tax implications are unclear; I work with revenue department on clarification... (10 steps total)",
+      "learningObjectives": [
+        "Understand Addressing protocol-tax law integration questions"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 5,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-advocating-for-protocol-sovereignty-in-internation",
+      "stepTitle": "Advocating for protocol sovereignty in international forums",
+      "stepNarrative": "international organizations discuss AI regulation; some proposals would mandate centralization; I advocate for democratic governance principles... (10 steps total)",
+      "learningObjectives": [
+        "Understand Advocating for protocol sovereignty in international forums"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 6,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-building-international-coalition-resisting-corpora",
+      "stepTitle": "Building international coalition resisting corporate capture",
+      "stepNarrative": "corporations lobby internationally for favorable regulation; they use different nations to triangulate pressure; I coordinate with international policy maker allies... (10 steps total)",
+      "learningObjectives": [
+        "Understand Building international coalition resisting corporate capture"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 7,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-commissioning-independent-research-on-protocol-eff",
+      "stepTitle": "Commissioning independent research on protocol effectiveness",
+      "stepNarrative": "I need evidence for policy evaluation; research must be independent to be credible; I establish national research program... (10 steps total)",
+      "learningObjectives": [
+        "Understand Commissioning independent research on protocol effectiveness"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 8,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-coordinating-interstate-recognition-of-protocol-de",
+      "stepTitle": "Coordinating interstate recognition of protocol decisions",
+      "stepNarrative": "protocol operates across state boundaries; consistency is needed for coordination; I work on interstate compact for protocol recognition... (9 steps total)",
+      "learningObjectives": [
+        "Understand Coordinating interstate recognition of protocol decisions"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 9,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-coordinating-response-to-authoritarian-threats-to",
+      "stepTitle": "Coordinating response to authoritarian threats to protocol",
+      "stepNarrative": "authoritarian regimes may attack protocol infrastructure; democratic nations must respond collectively; I participate in democratic coalition... (10 steps total)",
+      "learningObjectives": [
+        "Understand Coordinating response to authoritarian threats to protocol"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 10,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-coordinating-with-international-counterparts-on-ai",
+      "stepTitle": "Coordinating with international counterparts on AI governance",
+      "stepNarrative": "AI governance is global challenge; national policies affect each other; I work with international policy makers... (9 steps total)",
+      "learningObjectives": [
+        "Understand Coordinating with international counterparts on AI governance"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 11,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-crafting-enabling-legislation-protecting-protocol",
+      "stepTitle": "Crafting enabling legislation protecting protocol sovereignty",
+      "stepNarrative": "I want to support democratic AI governance; I must integrate protocol with existing state law; I draft AI governance legislation... (10 steps total)",
+      "learningObjectives": [
+        "Understand Crafting enabling legislation protecting protocol sovereignty"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 12,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-crafting-legislation-enabling-global-constitutiona",
+      "stepTitle": "Crafting legislation enabling global constitutional amendments",
+      "stepNarrative": "Global Convention passed ecological standing amendment; national law must operationalize this; I translate constitutional evolution into legislation... (10 steps total)",
+      "learningObjectives": [
+        "Understand Crafting legislation enabling global constitutional amendments"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 13,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-creating-digital-constitutional-rights-amendment",
+      "stepTitle": "Creating Digital Constitutional Rights Amendment",
+      "stepNarrative": "protocol creates new forms of governance and rights; constitutional recognition would strengthen legitimacy; I propose national constitutional amendment... (10 steps total)",
+      "learningObjectives": [
+        "Understand Creating Digital Constitutional Rights Amendment"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    },
+    {
+      "order": 14,
+      "stepType": "content",
+      "resourceId": "scenario-governance-policy-maker-creating-national-crisis-reserve-funds-for-protoco",
+      "stepTitle": "Creating national crisis reserve funds for protocol resilience",
+      "stepNarrative": "crises may threaten protocol infrastructure; rapid response funding is needed; I establish emergency reserves... (9 steps total)",
+      "learningObjectives": [
+        "Understand Creating national crisis reserve funds for protocol resilience"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Review content"
+      ]
+    }
+  ],
+  "chapters": [
+    {
+      "id": "governance-policy-maker-chapter-1",
+      "title": "Roles",
+      "description": "Explore role content",
+      "order": 1,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "role-governance-policy-maker",
+          "stepTitle": "Policy Maker",
+          "stepNarrative": "AI Governance - Constitutional oversight and appeals",
+          "learningObjectives": [
+            "Understand Policy Maker"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        }
+      ],
+      "estimatedDuration": "10 minutes"
+    },
+    {
+      "id": "governance-policy-maker-chapter-2",
+      "title": "Scenarios",
+      "description": "Explore scenario content",
+      "order": 2,
+      "steps": [
+        {
+          "order": 1,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-addressing-existential-ai-risk-through-democratic",
+          "stepTitle": "Addressing existential AI risk through democratic governance",
+          "stepNarrative": "superintelligent AI poses existential threat; democratic oversight might mitigate this risk; I participate in global existential risk discussions... (10 steps total)",
+          "learningObjectives": [
+            "Understand Addressing existential AI risk through democratic governance"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 2,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-addressing-global-inequality-in-protocol-access",
+          "stepTitle": "Addressing global inequality in protocol access",
+          "stepNarrative": "research shows protocol adoption correlates with national wealth; poor nations lack infrastructure for implementation; I advocate for global equity in access... (10 steps total)",
+          "learningObjectives": [
+            "Understand Addressing global inequality in protocol access"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 3,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-addressing-protocol-implications-for-labor-and-emp",
+          "stepTitle": "Addressing protocol implications for labor and employment law",
+          "stepNarrative": "protocol affects work and value recognition; care work generates care tokens; I update labor law for protocol economy... (9 steps total)",
+          "learningObjectives": [
+            "Understand Addressing protocol implications for labor and employment law"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 4,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-addressing-protocoltax-law-integration-questions",
+          "stepTitle": "Addressing protocol-tax law integration questions",
+          "stepNarrative": "protocol creates novel economic relationships; tax implications are unclear; I work with revenue department on clarification... (10 steps total)",
+          "learningObjectives": [
+            "Understand Addressing protocol-tax law integration questions"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 5,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-advocating-for-protocol-sovereignty-in-internation",
+          "stepTitle": "Advocating for protocol sovereignty in international forums",
+          "stepNarrative": "international organizations discuss AI regulation; some proposals would mandate centralization; I advocate for democratic governance principles... (10 steps total)",
+          "learningObjectives": [
+            "Understand Advocating for protocol sovereignty in international forums"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 6,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-building-international-coalition-resisting-corpora",
+          "stepTitle": "Building international coalition resisting corporate capture",
+          "stepNarrative": "corporations lobby internationally for favorable regulation; they use different nations to triangulate pressure; I coordinate with international policy maker allies... (10 steps total)",
+          "learningObjectives": [
+            "Understand Building international coalition resisting corporate capture"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 7,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-commissioning-independent-research-on-protocol-eff",
+          "stepTitle": "Commissioning independent research on protocol effectiveness",
+          "stepNarrative": "I need evidence for policy evaluation; research must be independent to be credible; I establish national research program... (10 steps total)",
+          "learningObjectives": [
+            "Understand Commissioning independent research on protocol effectiveness"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 8,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-coordinating-interstate-recognition-of-protocol-de",
+          "stepTitle": "Coordinating interstate recognition of protocol decisions",
+          "stepNarrative": "protocol operates across state boundaries; consistency is needed for coordination; I work on interstate compact for protocol recognition... (9 steps total)",
+          "learningObjectives": [
+            "Understand Coordinating interstate recognition of protocol decisions"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 9,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-coordinating-response-to-authoritarian-threats-to",
+          "stepTitle": "Coordinating response to authoritarian threats to protocol",
+          "stepNarrative": "authoritarian regimes may attack protocol infrastructure; democratic nations must respond collectively; I participate in democratic coalition... (10 steps total)",
+          "learningObjectives": [
+            "Understand Coordinating response to authoritarian threats to protocol"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 10,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-coordinating-with-international-counterparts-on-ai",
+          "stepTitle": "Coordinating with international counterparts on AI governance",
+          "stepNarrative": "AI governance is global challenge; national policies affect each other; I work with international policy makers... (9 steps total)",
+          "learningObjectives": [
+            "Understand Coordinating with international counterparts on AI governance"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 11,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-crafting-enabling-legislation-protecting-protocol",
+          "stepTitle": "Crafting enabling legislation protecting protocol sovereignty",
+          "stepNarrative": "I want to support democratic AI governance; I must integrate protocol with existing state law; I draft AI governance legislation... (10 steps total)",
+          "learningObjectives": [
+            "Understand Crafting enabling legislation protecting protocol sovereignty"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 12,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-crafting-legislation-enabling-global-constitutiona",
+          "stepTitle": "Crafting legislation enabling global constitutional amendments",
+          "stepNarrative": "Global Convention passed ecological standing amendment; national law must operationalize this; I translate constitutional evolution into legislation... (10 steps total)",
+          "learningObjectives": [
+            "Understand Crafting legislation enabling global constitutional amendments"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 13,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-creating-digital-constitutional-rights-amendment",
+          "stepTitle": "Creating Digital Constitutional Rights Amendment",
+          "stepNarrative": "protocol creates new forms of governance and rights; constitutional recognition would strengthen legitimacy; I propose national constitutional amendment... (10 steps total)",
+          "learningObjectives": [
+            "Understand Creating Digital Constitutional Rights Amendment"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        },
+        {
+          "order": 14,
+          "stepType": "content",
+          "resourceId": "scenario-governance-policy-maker-creating-national-crisis-reserve-funds-for-protoco",
+          "stepTitle": "Creating national crisis reserve funds for protocol resilience",
+          "stepNarrative": "crises may threaten protocol infrastructure; rapid response funding is needed; I establish emergency reserves... (9 steps total)",
+          "learningObjectives": [
+            "Understand Creating national crisis reserve funds for protocol resilience"
+          ],
+          "optional": false,
+          "completionCriteria": [
+            "Review content"
+          ]
+        }
+      ],
+      "estimatedDuration": "140 minutes"
+    }
+  ],
+  "tags": [
+    "governance",
+    "policy_maker",
+    "generated"
+  ],
+  "difficulty": "advanced",
+  "estimatedDuration": "150 minutes",
+  "visibility": "public",
+  "pathType": "journey"
+}

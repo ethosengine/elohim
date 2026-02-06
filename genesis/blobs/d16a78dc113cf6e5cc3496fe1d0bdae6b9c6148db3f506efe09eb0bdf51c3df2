@@ -1,0 +1,9 @@
+Scenario: Teacher challenges administrator retaliation safely
+    Given a principal retaliates against teachers who question decisions
+    And individual teachers fear speaking up
+    When teachers report concerns anonymously through Observer
+    Then patterns of retaliation become visible (negative evaluations after dissent)
+    And aggregated evidence protects individual teachers
+    And union files grievance based on documented pattern
+    And district addresses hostile administrator behavior
+    And anonymous reporting enables accountability without individual risk

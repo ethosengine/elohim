@@ -1,0 +1,9 @@
+Scenario: Integrating care economy principles into classroom teaching
+    Given Sarah teaches in a traditional school system
+    And she wants to bring care economy into curriculum
+    When Sarah designs lessons for her students
+    Then the educational_elohim should provide age-appropriate resources
+    And she should teach that care work creates value
+    And students should learn through concrete experiences
+    And classroom should become care economy learning environment
+    And Sarah should spread care economy principles to hundreds of children

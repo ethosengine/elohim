@@ -14,7 +14,7 @@ metadata:
     - Angular
     - Node.js
     - Java
-    - ubi9
+    - ubi10
     - Claude
   projectType: holochain
   language: Polyglot
@@ -30,10 +30,10 @@ components:
   - name: tools
     container:
       image: harbor.ethosengine.com/devspaces/rust-nix-dev:latest
-      memoryLimit: 8Gi
-      memoryRequest: 2Gi
-      cpuLimit: '2'
-      cpuRequest: '500m'
+      memoryLimit: 16Gi
+      memoryRequest: 4Gi
+      cpuLimit: '4'
+      cpuRequest: '1'
       mountSources: true
       sourceMapping: /projects
       env:
@@ -44,6 +44,9 @@ components:
           value: user
         - name: RUST_BACKTRACE
           value: '1'
+        # Nix experimental features (required for flakes and nix develop)
+        - name: NIX_CONFIG
+          value: 'experimental-features = nix-command flakes'
         # XDG directories - use /nix-xdg subdirs (persists in nix PVC)
         - name: XDG_CACHE_HOME
           value: /nix-xdg/cache
@@ -60,11 +63,34 @@ components:
         # Jenkins integration
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
+        # SonarQube MCP configuration (SONARQUBE_TOKEN comes from K8s secret)
+        - name: STORAGE_PATH
+          value: /projects/.sonarqube-mcp
+        - name: SONARQUBE_URL
+          value: "https://sonarqube.ethosengine.com"
+        # GitHub CLI integration (GITHUB_TOKEN comes from K8s secret)
+        - name: GH_TOKEN
+          value: "${GITHUB_TOKEN}"
         # Chrome for Angular testing
         - name: CHROME_BIN
           value: /usr/local/bin/chrome
         - name: CHROME_PATH
           value: /opt/chrome-linux64/chrome
+        # Rust toolchain (installed to /opt/rust in Dockerfile)
+        - name: RUSTUP_HOME
+          value: /opt/rust/rustup
+        - name: CARGO_HOME
+          value: /opt/rust/cargo
+        # RUSTFLAGS for Holochain WASM builds (getrandom backend for wasm32)
+        - name: RUSTFLAGS
+          value: '--cfg getrandom_backend="custom"'
+        # CC for native compilation (some crates need explicit gcc)
+        - name: CC
+          value: gcc
+        # PATH: Ensure holochain binaries, rust toolchain, and helper scripts are available
+        # (not just interactive shells that source .bashrc)
+        - name: PATH
+          value: '/opt/rust/cargo/bin:/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
       endpoints:
         - name: angular-dev
           targetPort: 4200
@@ -74,39 +100,43 @@ components:
           targetPort: 4201
           exposure: public
           protocol: http
-        - name: hc-app
-          targetPort: 8080
-          exposure: public
-          protocol: https
-        - name: hc-admin
+        # Holochain Dev Proxy - unified path-based routing for all conductor access
+        # Routes: /admin → :4444, /app/:port → :port, /health, /status
+        - name: hc-dev
           targetPort: 8888
-          exposure: internal
+          exposure: public
+          protocol: http
+          #secure:true needed for che http -> ws upgrade, which uses traefik proxy
+          secure: true
+        # elohim-storage - blob storage and import processing
+        - name: hc-storage
+          targetPort: 8090
+          exposure: public
+          protocol: http
+        # Storybook - sophia component documentation
+        # Note: secure: false allows unauthenticated access to static assets
+        # The endpoint is still HTTPS via Che's ingress controller
+        - name: storybook
+          targetPort: 6006
+          exposure: public
+          protocol: http
       volumeMounts:
         - name: nix-store
           path: /nix
         - name: nix-xdg
           path: /nix-xdg
-        - name: cargo-cache
-          path: /home/user/.cargo
-        - name: rustup-cache
-          path: /home/user/.rustup
+        # Note: Rust toolchain is in /opt/rust (baked into image), not ~/.cargo or ~/.rustup
+        # The /home/user/.cargo and /home/user/.rustup paths are NOT mounted as volumes
+        # because the toolchain lives in /opt/rust and CARGO_HOME/RUSTUP_HOME point there
 
   # Nix store volume - required for Nix/Holochain tooling
   - name: nix-store
     volume:
-      size: 25Gi
-  # XDG directories for Nix cache/config
+      size: 40Gi
+  # XDG directories for Nix cache/config (npm, cypress, typescript caches)
   - name: nix-xdg
     volume:
-      size: 2Gi
-  # Cargo cache - dependency artifacts and incremental builds
-  - name: cargo-cache
-    volume:
-      size: 3Gi
-  # Rustup toolchain cache
-  - name: rustup-cache
-    volume:
-      size: 2Gi
+      size: 5Gi
 commands:
   - id: setup-npm-env
     exec:
@@ -120,40 +150,76 @@ commands:
       component: tools
       commandLine: |
         # Create VS Code CLI symlink (code-oss -> code)
-        # ⚠️ REVIEW REQUIRED: If base UBI image changes, verify /checode path exists
-        # See containers/udi-plus/Dockerfile for details
+        # checode only ships ubi8/ubi9 binaries, use ubi9 (forward compatible with ubi10)
         mkdir -p /home/user/.local/bin
-        ln -sf /checode/checode-linux-libc/ubi9/bin/remote-cli/code-oss /home/user/.local/bin/code
+        if [ -f /checode/checode-linux-libc/ubi9/bin/remote-cli/code-oss ]; then
+          ln -sf /checode/checode-linux-libc/ubi9/bin/remote-cli/code-oss /home/user/.local/bin/code
+        fi
+
+        # Link ~/.claude to persistent config dir for VS Code extension IDE detection
+        # The extension uses ~/.claude/ide for IPC sockets, must match CLAUDE_CONFIG_DIR
+        rm -rf /home/user/.claude 2>/dev/null || true
+        ln -sf "$CLAUDE_CONFIG_DIR" /home/user/.claude
+        mkdir -p /home/user/.claude/ide
 
   - id: setup-claude-mcp
     exec:
       component: tools
       workingDir: /projects/elohim
       commandLine: |
-        export STORAGE_PATH=/tmp/sonarqube-mcp-storage
+        # Create persistent storage directory for SonarQube MCP
         mkdir -p "$STORAGE_PATH"
+
+        # Configure SonarQube MCP (env vars from devfile, SONARQUBE_TOKEN from K8s secret)
         claude mcp remove sonarqube 2>/dev/null || true
         claude mcp add sonarqube \
           --env STORAGE_PATH="$STORAGE_PATH" \
           --env SONARQUBE_TOKEN="$SONARQUBE_TOKEN" \
           --env SONARQUBE_URL="$SONARQUBE_URL" \
           -- java -jar /opt/mcp/sonarqube-mcp.jar
-        
+        # Configure Jenkins MCP (requires mcp-server plugin and allowTokenAccessWithoutOicSession)
         claude mcp remove jenkins 2>/dev/null || true
-        
-        export JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
-        
-        # Add Jenkins MCP server using HTTP transport,
-        # connection might fail if the jenkins user (token owner) does not have an active oidc session
-        claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
-          --transport http \
-          --header "Authorization: Basic $JENKINS_AUTH" \
-          --env JENKINS_URL="$JENKINS_URL" \
-          --env JENKINS_USERNAME="$JENKINS_USERNAME" \
-          --env JENKINS_TOKEN="$JENKINS_TOKEN"     
-           
+        if [ -n "$JENKINS_USERNAME" ] && [ -n "$JENKINS_TOKEN" ]; then
+          JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
+          claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
+            --transport http \
+            --header "Authorization: Basic $JENKINS_AUTH"
+        fi
+
+        # Configure GitHub CLI authentication
+        if [ -n "$GH_TOKEN" ]; then
+          echo "$GH_TOKEN" | gh auth login --with-token
+          gh auth status
+        fi
+  - id: start-doorway
+    exec:
+      component: tools
+      workingDir: /projects/elohim/holochain/doorway
+      commandLine: |
+        RUSTFLAGS="" cargo build --release && STORAGE_URL=http://localhost:8090 ./target/release/doorway --dev-mode --listen 0.0.0.0:8888 --conductor-url ws://localhost:4444
+
+  - id: build-happ
+    exec:
+      component: tools
+      workingDir: /projects/elohim/holochain/dna/elohim
+      commandLine: |
+        echo "Building Holochain WASM zomes..."
+        cargo build --release --target wasm32-unknown-unknown
+        echo "Packing DNA..."
+        hc dna pack . -o workdir/lamad.dna
+        echo "Packing hApp..."
+        hc app pack workdir -o workdir/elohim.happ
+        echo "Done! hApp at: workdir/elohim.happ"
+
+  - id: seed-holochain
+    exec:
+      component: tools
+      workingDir: /projects/elohim/genesis/seeder
+      commandLine: |
+        npm install && npm run seed
+
 #events:
 #  postStart:
 #    - setup-vscode-cli
 #    - setup-npm-env
-#   - setup-claude-mcp
+#    - setup-claude-mcp

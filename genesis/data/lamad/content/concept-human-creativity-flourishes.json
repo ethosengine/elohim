@@ -1,0 +1,29 @@
+{
+  "id": "concept-human-creativity-flourishes",
+  "contentType": "concept",
+  "title": "Human creativity flourishes",
+  "description": "without algorithmic manipulation or artificial scarcity",
+  "content": "without algorithmic manipulation or artificial scarcity",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/vision/concept-human-creativity-flourishes.json",
+  "tags": [
+    "vision",
+    "creativity",
+    "flourishing",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "social-medium-epic",
+    "economic-coordination-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "vision",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001474",
+  "updatedAt": "2025-12-24T03:05:25.878Z"
+}

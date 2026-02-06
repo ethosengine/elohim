@@ -1,0 +1,11 @@
+Scenario: Food assistance programs accessed without stigma
+    Given Helen's $24k/year barely covers basic needs
+    And she needs food assistance to survive
+    When Helen accesses food programs through care economy
+    Then assistance should be presented as legitimate reciprocity
+    And no stigma should attach to receiving support
+    And her lifetime of contributions should frame current assistance
+    And food access should be coordinated through community_elohim
+    And dignity should be preserved throughout assistance
+    And the protocol should demonstrate that care economy eliminates charity model
+    And Helen should receive support as right based on contributions, not as failure

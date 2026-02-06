@@ -1,0 +1,9 @@
+Scenario: Former owner's community standing shifts from business owner to honored elder
+    Given Rosa was known as "business owner" for 15 years
+    And her community identity was tied to entrepreneurial success
+    When ownership transitions to workers
+    Then Rosa's community standing becomes "founder of democratic institution"
+    And neighbors honor her choice to prioritize community over maximum profit
+    And her wisdom is sought as elder who facilitated transformation
+    And community respects her continued participation as resident, not owner
+    And community_elohim documents her transition as model for other small business owners

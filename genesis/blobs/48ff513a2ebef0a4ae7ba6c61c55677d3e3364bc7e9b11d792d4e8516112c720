@@ -1,0 +1,9 @@
+Scenario: In-law family dynamics around David's care
+    Given David's parents struggle with their son's diagnosis
+    And they may have complicated feelings about James's caregiving
+    When the family_elohim navigates in-law relationships
+    Then it should recognize complex family dynamics
+    And it should support James's relationship with David's family
+    And it should help manage their grief without undermining James
+    And in-law relationships should be supportive of James's caregiving
+    And family care economy should include chosen family bonds

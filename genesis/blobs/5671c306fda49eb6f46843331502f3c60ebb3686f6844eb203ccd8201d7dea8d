@@ -1,0 +1,10 @@
+Scenario: Using neighborhood public spaces independently
+    Given Jordan loves visiting the nearby park
+    And the park is within safe walking distance
+    When Jordan wants to spend time at the park
+    Then the personal_agent helps Jordan coordinate timing and safety
+    And Jordan can walk to the park with appropriate support level
+    And Jordan uses park facilities like any other community member
+    And park neighbors see Jordan as a regular park user
+    And Jordan's public space usage is a right, not a privilege
+    And Jordan experiences freedom and community belonging

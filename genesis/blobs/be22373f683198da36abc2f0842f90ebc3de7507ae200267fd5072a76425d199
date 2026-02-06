@@ -1,0 +1,10 @@
+Scenario: Senior employment and income supplementation programs
+    Given Margaret's fixed income is limited
+    And some seniors want/need supplemental income
+    When the municipality_elohim provides employment information
+    Then senior-appropriate employment opportunities should be available
+    And part-time work that doesn't jeopardize benefits should be possible
+    And income supplementation programs should be accessible
+    And Margaret should have options to increase resources if she chooses
+    And employment should be optional, not mandatory for survival
+    And municipal programs should support senior economic security

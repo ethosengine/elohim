@@ -1,0 +1,10 @@
+Scenario: Building financial literacy through practice with support
+    Given Aisha received minimal financial education
+    And she's learning money management with real stakes
+    When Aisha makes financial decisions in the scanner
+    Then the personal_agent should provide contextual financial education
+    And it should teach budgeting through actual practice
+    And it should explain concepts like opportunity cost
+    And it should help her understand efficiency frontiers
+    And financial literacy should build through supported real-world decisions
+    And mistakes should be learning opportunities, not catastrophes

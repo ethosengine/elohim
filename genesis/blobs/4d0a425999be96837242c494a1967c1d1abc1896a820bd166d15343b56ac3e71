@@ -1,0 +1,10 @@
+Scenario: Sarah's support for aging parents made visible
+    Given Sarah's parents are aging and need increasing support
+    And Sarah helps with medical appointments, financial planning, household tasks
+    When the family_elohim tracks Sarah's elder care
+    Then it should recognize this as substantial care labor
+    And it should show Sarah is simultaneously caring up and down generations
+    And elder care should accumulate care tokens
+    And the family should see Sarah's sandwich generation burden
+    And her care for aging parents should be valued alongside childcare
+    And multigenerational care should be comprehensive and visible

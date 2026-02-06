@@ -1,0 +1,11 @@
+Scenario: Refusing treatments that prioritize normalization over flourishing
+    Given medical establishment often prioritizes making disabled people "normal"
+    And some treatments harm quality of life in pursuit of normalcy
+    When providers recommend treatments focused on normalization
+    Then the personal_agent should help Alex evaluate treatments critically
+    And it should distinguish between treatments that improve Alex's life and those that pursue normalcy
+    And it should support Alex in refusing treatments that don't serve Alex's goals
+    And Alex's definition of quality of life should be respected
+    And the protocol should recognize that disabled lives are valuable as they are
+    And medical goals should align with Alex's flourishing, not societal comfort
+    And Alex should be supported in rejecting medical model thinking

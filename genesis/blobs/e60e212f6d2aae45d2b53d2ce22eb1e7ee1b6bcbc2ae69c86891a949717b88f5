@@ -1,0 +1,137 @@
+# Platform Design: From Extraction to Flourishing
+
+## The Extraction Economy
+
+Current social platforms are designed to extract:
+- **Attention**: Keep you scrolling as long as possible
+- **Data**: Harvest everything you do for advertisers
+- **Content**: Your creativity is their inventory
+- **Connections**: Your relationships are their network effects
+
+The business model is simple: you are the product.
+
+## What Extraction Looks Like
+
+### The Engagement Trap
+Platforms optimize for time-on-site, not value-to-user:
+- Infinite scroll eliminates natural stopping points
+- Notifications interrupt real life
+- Variable reward schedules (like slot machines)
+- Outrage drives more engagement than insight
+
+### The Algorithmic Feed
+You don't choose what you see; algorithms do:
+- Optimized for engagement, not relevance
+- Creates filter bubbles and echo chambers
+- Amplifies extreme content
+- Changes without notice or consent
+
+### The Data Harvest
+Everything you do is captured and sold:
+- Location, contacts, browsing history
+- Typing patterns, attention duration
+- Emotional states inferred from behavior
+- Shared with thousands of "partners"
+
+### The Creator Squeeze
+Content creators face:
+- Algorithmic changes that destroy businesses overnight
+- Demonetization without explanation
+- Platform takes growing cut of revenue
+- Terms that grant perpetual content rights
+
+## Alternative Design Principles
+
+### Relationship-Centered
+Design around relationships, not content:
+- Who matters to you, not what's trending
+- Quality of connection, not quantity of followers
+- Conversations, not broadcasts
+- Trust circles, not public squares
+
+### User-Sovereign
+You own your data, connections, and experience:
+- Export everything anytime
+- Choose what's shared with whom
+- Control your own algorithm (or turn it off)
+- Leave without losing your network
+
+### Attention-Respecting
+Protect users' time and focus:
+- No infinite scroll; natural endpoints
+- Notification batching, not interruption
+- "Time well spent" metrics
+- Features that help you disengage
+
+### Value-Aligned
+Business model aligned with user benefit:
+- Subscription over advertising
+- No incentive to addict or manipulate
+- Success measured by user flourishing
+- Transparent about trade-offs
+
+## The Elohim Approach
+
+The Social Medium epic designs platforms that embody these principles:
+
+### Personal AI Mediation
+Your Elohim helps you navigate:
+- Filters content according to your values
+- Protects you from manipulation
+- Maintains relationships proactively
+- Represents you when you're not present
+
+### Distributed Infrastructure
+No single company controls the network:
+- Holochain: each community hosts its own
+- Interoperability between communities
+- Data stays with users, not platforms
+- Governance by communities, not shareholders
+
+### Trust-Based Curation
+Content visibility based on trust networks:
+- See content from people you trust
+- Trust propagates through networks
+- Manipulation is visible and addressable
+- Communities set their own norms
+
+## For Policy Makers: Regulating Platforms
+
+Current regulation struggles with platforms:
+- Section 230 debates miss the design question
+- Privacy laws don't address attention extraction
+- Antitrust focuses on competition, not harm
+- Content moderation is symptom, not cause
+
+Better approaches:
+- Mandate data portability and interoperability
+- Require algorithmic transparency
+- Tax attention extraction (not just data collection)
+- Support alternative ownership models
+
+## For Developers: Building Different
+
+Technical choices embed values:
+- Centralized vs. distributed architecture
+- Advertising vs. subscription business models
+- Engagement vs. wellbeing metrics
+- Proprietary vs. interoperable protocols
+
+You can build differently. The Elohim Protocol shows how.
+
+## For Influencers: Your Complicity and Power
+
+You benefit from and suffer under current platforms:
+- Reach depends on algorithmic favor
+- Success requires playing engagement games
+- Your audience is not really yours
+
+But you also have power:
+- Your audience follows you, not just platforms
+- You can demand better terms
+- You can support alternative platforms
+- You can model different relationships with audiences
+
+## Connection to Digital Dignity
+
+Design shapes experience. The next unit explores what it means to have dignity in digital spaces—to be treated as a person, not a user.

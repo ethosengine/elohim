@@ -1,0 +1,9 @@
+Scenario: Politician navigates development pressure with environmental accountability
+    Given developer proposes project with environmental impacts
+    And campaign contributions create perception of conflict
+    When the Observer documents environmental impacts and relationships
+    Then they see project's environmental footprint objectively analyzed
+    And identify developer's environmental track record
+    And understand campaign finance relationships made publicly visible
+    And review community environmental concerns systematically
+    And make transparent decision accountable to environmental and community interests

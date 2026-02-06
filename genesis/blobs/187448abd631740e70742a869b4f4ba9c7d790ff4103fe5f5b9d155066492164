@@ -1,0 +1,9 @@
+Scenario: Organizer coordinates parent-teacher coalition for class size reduction
+    Given teachers union supports smaller class sizes
+    And parents see crowded classrooms affecting their children
+    When the organizer builds coalition using Observer coordination tools
+    Then teachers and parents access shared data on class size impacts
+    And coordinate testimony combining professional and family perspectives
+    And track which board members support class size reduction
+    And organize joint mobilization for board meeting
+    And teacher expertise combines with parent power for policy change

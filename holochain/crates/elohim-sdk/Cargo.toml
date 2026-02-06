@@ -1,0 +1,48 @@
+[package]
+name = "elohim-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "SDK for building P2P applications on the Elohim Protocol"
+authors = ["Elohim Protocol"]
+license = "AGPL-3.0"
+readme = "README.md"
+
+[features]
+default = ["client"]
+# Core client functionality (HTTP to elohim-storage)
+client = ["dep:elohim-storage-client", "dep:reqwest"]
+# Native mode with local SQLite
+native = ["client", "dep:rusqlite"]
+# WASM target for browser
+wasm = ["client"]
+# Full sync support with Automerge
+sync = ["client", "dep:automerge"]
+# All features
+full = ["native", "sync"]
+
+[dependencies]
+# Core dependencies
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+async-trait = "0.1"
+
+# HTTP client (for projection warming, doorway API)
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"], optional = true }
+
+# Async runtime
+tokio = { version = "1", features = ["sync", "time"] }
+
+# Re-exported crates
+elohim-storage-client = { path = "../elohim-storage-client", optional = true }
+doorway-client = { path = "../doorway-client" }
+
+# Sync support
+automerge = { version = "0.5", optional = true }
+
+# Native-only
+rusqlite = { version = "0.31", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "macros"] }

@@ -1,0 +1,10 @@
+Scenario: Household care tokens reflect combined retirement contributions
+    Given household participates in care token economy
+    And both partners contribute substantial volunteer and family care
+    When household care tokens are calculated
+    Then tokens should accumulate from both partners' contributions
+    And Frank's Habitat work should be valued appropriately
+    And his wife's care contributions should be recognized
+    And household should receive care token supplements for low fixed income
+    And the scanner should be accessible regardless of economic status
+    And combined contributions should create household care economy resources

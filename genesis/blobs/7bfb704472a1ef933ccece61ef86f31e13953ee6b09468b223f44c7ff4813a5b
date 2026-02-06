@@ -1,0 +1,11 @@
+Scenario: Planning for aging together with dignity and agency
+    Given Frank and his wife are both aging
+    And their capabilities and care needs will change over time
+    And they're committed to supporting each other
+    When the household_elohim supports aging planning
+    Then it should help them plan for increasing care needs together
+    And it should facilitate conversations about future care scenarios
+    And it should coordinate with family about eventual support needs
+    And it should help them maintain autonomy as long as possible
+    And planning should preserve both partners' dignity and agency
+    And they should experience aging as partners, not burdens to each other

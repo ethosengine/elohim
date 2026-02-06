@@ -1,0 +1,11 @@
+Scenario: Studying marginalized community access and outcomes
+    Given I hypothesize protocol might help or harm marginalized communities
+    And I need to rigorously test distributional effects
+    When I analyze outcomes by race, class, disability, immigration status
+    Then I examine: whether marginalized communities adopt at equal rates
+    And I assess: whether they face barriers to effective participation
+    And I measure: whether Constitutional Council service includes them proportionally
+    And I analyze: whether appeal outcomes differ by demographic group
+    And I investigate: whether protocol reduces or exacerbates inequality
+    And I provide: evidence about who benefits and who suffers from protocol
+    And My research serves: justice by making invisible inequities visible

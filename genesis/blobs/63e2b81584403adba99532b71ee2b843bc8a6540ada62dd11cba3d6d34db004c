@@ -1,0 +1,9 @@
+Scenario: Building identity around care rather than consumption
+    Given Tommy has made multiple care contributions over time
+    And the system has recognized his caring actions
+    When Tommy reflects on his scanner usage
+    Then he should experience himself as a valued contributor
+    And his identity should be forming around care for others
+    And he should understand that invisible work is actually valuable
+    And he should not be conditioned toward consumer identity
+    And care economy principles should be internalized through experience

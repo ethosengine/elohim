@@ -1,0 +1,9 @@
+Scenario: Right to disconnect maintained with full data portability
+    Given Sarah has been using the Value Scanner
+    And constitutional constraints apply at all layers
+    When Sarah chooses to disconnect from the system
+    Then the system must honor disconnection immediately
+    And she should receive complete data export of all her information
+    And no manipulative retention patterns should be employed
+    And her right to not participate must be absolute
+    And data portability should enable switching to alternative systems

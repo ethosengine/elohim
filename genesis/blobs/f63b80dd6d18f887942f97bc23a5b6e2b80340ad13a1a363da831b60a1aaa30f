@@ -1,0 +1,11 @@
+Scenario: Crisis detection preserves autonomy while ensuring safety
+    Given Helen lives alone with family and community support
+    And she is at risk for falls and medication errors
+    When the system detects potential crisis indicators
+    Then safety monitoring should occur without surveillance feeling
+    And alerts should go to Helen first when appropriate
+    And emergency contacts should be notified only when necessary
+    And intervention should preserve her agency: "Helen, you haven't moved in a while. Are you okay?"
+    And she should be consulted before family is contacted when possible
+    And safety should enhance autonomy, not replace it
+    And the system should balance protection with dignity

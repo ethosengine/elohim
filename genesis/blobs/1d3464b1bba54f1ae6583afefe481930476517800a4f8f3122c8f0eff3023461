@@ -1,0 +1,10 @@
+Scenario: Learning disabilities and accommodations as care economy
+    Given some students need educational accommodations
+    And accommodations require advocacy and coordination
+    When students access disability services
+    Then the educational_elohim should support accommodation advocacy
+    And it should recognize student labor of managing accommodations
+    And it should value disability services as institutional care work
+    And accommodation should be understood as educational care economy
+    And the system should support equitable access to education
+    And disability justice should be core to educational care economy

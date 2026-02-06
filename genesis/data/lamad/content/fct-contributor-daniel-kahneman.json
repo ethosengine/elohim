@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-daniel-kahneman",
+  "contentType": "contributor",
+  "title": "Daniel Kahneman",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Daniel Kahneman\n\n**Role:** author\n\n**Works:** Thinking, Fast and Slow\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-media-00-book-thinking-fast-and-sl"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-01-church-dilemma"
+  },
+  "createdAt": "2025-11-28T21:10:19.190566",
+  "updatedAt": "2025-12-24T03:05:26.051Z",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Daniel Kahneman",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-daniel-kahneman",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Daniel Kahneman - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-daniel-kahneman",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Daniel Kahneman",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.190566",
+    "dateModified": "2025-11-28T21:10:19.190567",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

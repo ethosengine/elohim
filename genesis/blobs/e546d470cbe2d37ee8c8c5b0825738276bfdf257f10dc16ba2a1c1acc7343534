@@ -1,0 +1,10 @@
+Scenario: Water conservation in construction and household practices
+    Given water is critical bioregional resource
+    And Frank's construction knowledge includes plumbing systems
+    When the bioregional_elohim coordinates water stewardship
+    Then it should facilitate water-efficient plumbing in Habitat work
+    And help Frank repair leaks and improve water systems in community
+    And track water conservation as ecological care contribution
+    And teach water conservation practices to community
+    And Frank's skills should serve bioregional water security
+    And his expertise should build water-wise infrastructure

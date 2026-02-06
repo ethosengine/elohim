@@ -1,23 +1,27 @@
 import { Injectable } from '@angular/core';
-import { ContentIORegistryService } from './content-io-registry.service';
+
+// @coverage: 73.5% (2026-02-05)
+
 import {
   ContentIOImportResult,
-  ContentIOExportInput
+  ContentIOExportInput,
 } from '../interfaces/content-io-plugin.interface';
-import { ValidationResult } from '../interfaces/validation-result.interface';
 import { FormatMetadata } from '../interfaces/format-metadata.interface';
+import { ValidationResult } from '../interfaces/validation-result.interface';
+
+import { ContentFormatRegistryService } from './content-format-registry.service';
 
 /**
  * High-level service for content import/export operations.
  *
- * Orchestrates operations across plugins registered in the ContentIORegistry.
+ * Orchestrates operations across plugins registered in the ContentFormatRegistry.
  * Provides convenience methods for common operations like download and clipboard.
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ContentIOService {
-  constructor(private readonly registry: ContentIORegistryService) {}
+  constructor(private readonly registry: ContentFormatRegistryService) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Import Operations
@@ -153,8 +157,10 @@ export class ContentIOService {
     if (!formatId) {
       return {
         valid: false,
-        errors: [{ code: 'UNKNOWN_FORMAT', message: `Cannot detect format for file: ${file.name}` }],
-        warnings: []
+        errors: [
+          { code: 'UNKNOWN_FORMAT', message: `Cannot detect format for file: ${file.name}` },
+        ],
+        warnings: [],
       };
     }
 
@@ -171,7 +177,7 @@ export class ContentIOService {
       return {
         valid: false,
         errors: [{ code: 'NO_PLUGIN', message: `No plugin found for format: ${formatId}` }],
-        warnings: []
+        warnings: [],
       };
     }
 
@@ -179,7 +185,9 @@ export class ContentIOService {
       return {
         valid: true,
         errors: [],
-        warnings: [{ code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` }]
+        warnings: [
+          { code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` },
+        ],
       };
     }
 
@@ -196,7 +204,7 @@ export class ContentIOService {
       return {
         valid: false,
         errors: [{ code: 'NO_PLUGIN', message: `No plugin found for format: ${formatId}` }],
-        warnings: []
+        warnings: [],
       };
     }
 
@@ -204,7 +212,9 @@ export class ContentIOService {
       return {
         valid: true,
         errors: [],
-        warnings: [{ code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` }]
+        warnings: [
+          { code: 'NO_VALIDATION', message: `Plugin '${formatId}' does not support validation` },
+        ],
       };
     }
 
@@ -227,8 +237,8 @@ export class ContentIOService {
     const plugin = this.registry.getPlugin(formatId);
     const extension = plugin?.fileExtensions[0] ?? '';
 
-    const downloadFilename = filename ??
-      this.sanitizeFilename(node.title ?? node.id ?? 'content') + extension;
+    const downloadFilename =
+      filename ?? this.sanitizeFilename(node.title ?? node.id ?? 'content') + extension;
 
     this.downloadBlob(blob, downloadFilename);
   }
@@ -295,10 +305,7 @@ export class ContentIOService {
    * Note: For now, this downloads files sequentially.
    * Future: Could create a ZIP archive.
    */
-  async downloadMultiple(
-    nodes: ContentIOExportInput[],
-    formatId?: string
-  ): Promise<void> {
+  async downloadMultiple(nodes: ContentIOExportInput[], formatId?: string): Promise<void> {
     for (const node of nodes) {
       const targetFormat = formatId ?? node.contentFormat;
       if (this.registry.getPlugin(targetFormat)?.canExport) {
@@ -341,11 +348,11 @@ export class ContentIOService {
     link.download = filename;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
   }
 
-  private blobToString(blob: Blob): Promise<string> {
+  private async blobToString(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
@@ -356,8 +363,8 @@ export class ContentIOService {
 
   private sanitizeFilename(name: string): string {
     return name
-      .replace(/[^a-z0-9\s-]/gi, '')
-      .replace(/\s+/g, '-')
+      .replaceAll(/[^a-z0-9\s-]/gi, '')
+      .replaceAll(/\s+/g, '-')
       .toLowerCase()
       .substring(0, 100);
   }

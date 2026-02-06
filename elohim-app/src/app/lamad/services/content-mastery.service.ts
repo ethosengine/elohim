@@ -1,7 +1,16 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, map } from 'rxjs';
-import { LocalSourceChainService } from './local-source-chain.service';
-import { SessionHumanService } from './session-human.service';
+
+// @coverage: 58.2% (2026-02-05)
+
+import { BehaviorSubject, Observable, catchError, map, from, of } from 'rxjs';
+
+import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
+import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+
 import {
   ContentMastery,
   EngagementType,
@@ -13,44 +22,51 @@ import {
   DECAY_RATES,
   AssessmentEvidence,
   LevelProgressionEvent,
-} from '../models/content-mastery.model';
-import {
   MasteryLevel,
-  isAboveGate,
-  compareMasteryLevels,
-} from '../models/agent.model';
-import {
-  MasteryRecordContent,
-  SourceChainEntry,
-} from '../models/source-chain.model';
+  PathMasteryOverview,
+} from '../models';
+
+/** Result of migration from local to backend */
+export interface MigrationResult {
+  migrated: number;
+  failed: number;
+  success: boolean;
+  errors: string[];
+}
 
 /**
  * ContentMasteryService - Manages Bloom's Taxonomy mastery tracking.
  *
+ * Dual Backend Architecture:
+ * - Visitor mode: localStorage via LocalSourceChainService (no account needed)
+ * - Hosted account: Migrate localStorage → backend (adoption funnel)
+ * - Native mode: Full backend experience
+ *
  * Philosophy:
- * - All mastery data is stored on the agent's local source chain
+ * - All mastery data is stored on the agent's source chain
  * - Mastery entries are immutable (new entries for level changes)
  * - Freshness decays over time based on level-specific rates
  * - Privileges unlock at specific Bloom's levels
  *
  * Source Chain Entries:
- * - 'mastery-record': Each mastery level achievement
+ * - ENTRY_TYPE_MASTERY_RECORD: Each mastery level achievement
  * - Links from content → mastery records via 'mastery-for-content'
- *
- * Holochain migration:
- * - Mastery records migrate directly to agent's private source chain
- * - No structural changes needed
  */
+const ENTRY_TYPE_MASTERY_RECORD = 'mastery-record';
+
 @Injectable({ providedIn: 'root' })
 export class ContentMasteryService {
   private readonly masteryCache = new Map<string, ContentMastery>();
   private readonly masterySubject = new BehaviorSubject<Map<string, ContentMastery>>(new Map());
 
-  public readonly mastery$: Observable<Map<string, ContentMastery>> = this.masterySubject.asObservable();
+  public readonly mastery$: Observable<Map<string, ContentMastery>> =
+    this.masterySubject.asObservable();
 
   constructor(
     private readonly sourceChain: LocalSourceChainService,
-    private readonly sessionHuman: SessionHumanService
+    private readonly sessionHuman: SessionHumanService,
+    private readonly backend: LearnerBackendService,
+    private readonly holochainClient: HolochainClientService
   ) {
     // Initialize when session is available
     this.sessionHuman.session$.subscribe(session => {
@@ -58,6 +74,24 @@ export class ContentMasteryService {
         this.initializeForSession(session.sessionId);
       }
     });
+  }
+
+  // =========================================================================
+  // BACKEND SELECTION
+  // =========================================================================
+
+  /**
+   * Check if backend is available for mastery operations.
+   */
+  isBackendAvailable(): boolean {
+    return this.holochainClient.isConnected();
+  }
+
+  /**
+   * Get the active storage backend.
+   */
+  private get storageBackend(): 'local' | 'backend' {
+    return this.isBackendAvailable() ? 'backend' : 'local';
   }
 
   // =========================================================================
@@ -81,7 +115,8 @@ export class ContentMasteryService {
    * Load all mastery records from source chain into cache.
    */
   private loadMasteryCache(): void {
-    const entries = this.sourceChain.getEntriesByType<MasteryRecordContent>('mastery-record');
+    const entries =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
 
     // Group by contentId, keeping latest entry for each
     const masteryMap = new Map<string, ContentMastery>();
@@ -117,10 +152,10 @@ export class ContentMasteryService {
       humanId: entry.authorAgent,
       level: content.level as MasteryLevel,
       levelAchievedAt: content.levelAchievedAt,
-      levelHistory: [],  // Would need to query all entries for full history
+      levelHistory: [], // Would need to query all entries for full history
       lastEngagementAt: content.lastEngagementAt,
       lastEngagementType: content.lastEngagementType as EngagementType,
-      contentVersionAtMastery: '',  // Not tracked in MVP
+      contentVersionAtMastery: '', // Not tracked in MVP
       freshness: content.freshness,
       needsRefresh: false,
       assessmentEvidence: [],
@@ -136,9 +171,7 @@ export class ContentMasteryService {
    * Get mastery for a specific content node.
    */
   getMastery(contentId: string): Observable<ContentMastery | null> {
-    return this.mastery$.pipe(
-      map(cache => cache.get(contentId) ?? null)
-    );
+    return this.mastery$.pipe(map(cache => cache.get(contentId) ?? null));
   }
 
   /**
@@ -152,9 +185,7 @@ export class ContentMasteryService {
    * Get mastery level for content.
    */
   getMasteryLevel(contentId: string): Observable<MasteryLevel> {
-    return this.mastery$.pipe(
-      map(cache => cache.get(contentId)?.level ?? 'not_started')
-    );
+    return this.mastery$.pipe(map(cache => cache.get(contentId)?.level ?? 'not_started'));
   }
 
   /**
@@ -168,27 +199,21 @@ export class ContentMasteryService {
    * Get all mastery records.
    */
   getAllMastery(): Observable<ContentMastery[]> {
-    return this.mastery$.pipe(
-      map(cache => Array.from(cache.values()))
-    );
+    return this.mastery$.pipe(map(cache => Array.from(cache.values())));
   }
 
   /**
    * Get mastery statistics.
    */
   getMasteryStats(): Observable<MasteryStats> {
-    return this.mastery$.pipe(
-      map(cache => this.computeStats(cache))
-    );
+    return this.mastery$.pipe(map(cache => this.computeStats(cache)));
   }
 
   /**
    * Get content needing refresh.
    */
   getContentNeedingRefresh(): Observable<ContentMastery[]> {
-    return this.mastery$.pipe(
-      map(cache => Array.from(cache.values()).filter(m => m.needsRefresh))
-    );
+    return this.mastery$.pipe(map(cache => Array.from(cache.values()).filter(m => m.needsRefresh)));
   }
 
   // =========================================================================
@@ -223,7 +248,8 @@ export class ContentMasteryService {
     let newLevel = current;
 
     // Determine level based on assessment type and passing score
-    if (score >= 0.7) {  // 70% passing threshold
+    if (score >= 0.7) {
+      // 70% passing threshold
       switch (assessmentType) {
         case 'recall':
           newLevel = this.maxLevel(current, 'remember');
@@ -265,12 +291,15 @@ export class ContentMasteryService {
       contentId,
       level,
       levelAchievedAt: now,
-      freshness: 1.0,  // Fresh when just achieved
+      freshness: 1, // Fresh when just achieved
       lastEngagementAt: now,
       lastEngagementType: engagementType,
     };
 
-    const entry = this.sourceChain.createEntry<MasteryRecordContent>('mastery-record', masteryContent);
+    const entry = this.sourceChain.createEntry<MasteryRecordContent>(
+      ENTRY_TYPE_MASTERY_RECORD,
+      masteryContent
+    );
 
     // Update cache
     const mastery: ContentMastery = {
@@ -279,17 +308,20 @@ export class ContentMasteryService {
       level,
       levelAchievedAt: now,
       levelHistory: current
-        ? [...(current.levelHistory || []), {
-            fromLevel: current.level,
-            toLevel: level,
-            timestamp: now,
-            trigger: engagementType === 'quiz' ? 'assessment' : 'engagement',
-          } as LevelProgressionEvent]
+        ? [
+            ...(current.levelHistory || []),
+            {
+              fromLevel: current.level,
+              toLevel: level,
+              timestamp: now,
+              trigger: engagementType === 'quiz' ? 'assessment' : 'engagement',
+            } as LevelProgressionEvent,
+          ]
         : [],
       lastEngagementAt: now,
       lastEngagementType: engagementType,
       contentVersionAtMastery: '',
-      freshness: 1.0,
+      freshness: 1,
       needsRefresh: false,
       assessmentEvidence: current?.assessmentEvidence ?? [],
       privileges: this.computePrivileges(level),
@@ -373,13 +405,12 @@ export class ContentMasteryService {
    */
   private computePrivileges(level: MasteryLevel): ContentPrivilege[] {
     const privileges: ContentPrivilege[] = [];
-    const now = new Date().toISOString();
 
     for (const [privilegeType, requiredLevel] of Object.entries(PRIVILEGE_REQUIREMENTS)) {
       const granted = compareMasteryLevels(level, requiredLevel) >= 0;
       privileges.push({
         privilege: privilegeType as PrivilegeType,
-        grantedAt: granted ? now : '',
+        grantedAt: granted ? new Date().toISOString() : '',
         grantedByLevel: level,
         active: granted,
       });
@@ -479,9 +510,8 @@ export class ContentMasteryService {
       }
     }
 
-    stats.freshPercentage = stats.totalMasteredNodes > 0
-      ? (totalFreshness / stats.totalMasteredNodes) * 100
-      : 100;
+    stats.freshPercentage =
+      stats.totalMasteredNodes > 0 ? (totalFreshness / stats.totalMasteredNodes) * 100 : 100;
 
     return stats;
   }
@@ -503,5 +533,183 @@ export class ContentMasteryService {
   isAboveGate(contentId: string): boolean {
     const mastery = this.masteryCache.get(contentId);
     return mastery ? isAboveGate(mastery.level) : false;
+  }
+
+  // =========================================================================
+  // BACKEND INTEGRATION
+  // =========================================================================
+
+  /**
+   * Get path mastery overview (Khan Academy-style grid).
+   * Only available when backend is connected.
+   */
+  getPathMasteryOverview(pathId: string): Observable<PathMasteryOverview | null> {
+    if (!this.isBackendAvailable()) {
+      return of(null);
+    }
+
+    return from(this.backend.getPathMasteryOverview(pathId)).pipe(
+      catchError(_err => {
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Sync a mastery record to backend.
+   * Called automatically when backend becomes available.
+   */
+  private async syncMasteryToBackend(mastery: ContentMastery): Promise<boolean> {
+    if (!this.isBackendAvailable()) return false;
+
+    try {
+      // Initialize mastery on backend
+      await this.backend.initializeMastery(mastery.contentId);
+
+      // Record engagement to set the level
+      if (mastery.level !== 'not_started') {
+        await this.backend.recordEngagement({
+          content_id: mastery.contentId,
+          engagement_type: mastery.lastEngagementType,
+        });
+      }
+
+      return true;
+    } catch {
+      // Mastery attestation save failed - backend unavailable, return false
+      return false;
+    }
+  }
+
+  // =========================================================================
+  // MIGRATION: Visitor → Hosted Account
+  // =========================================================================
+
+  /**
+   * Migrate visitor's localStorage progress to their new backend account.
+   * Called when visitor creates a Hosted-level account.
+   *
+   * @returns Migration result with counts and errors
+   */
+  async migrateToBackend(): Promise<MigrationResult> {
+    const result = this.createEmptyMigrationResult();
+
+    if (!this.isBackendAvailable()) {
+      result.errors.push('Backend not available');
+      return result;
+    }
+
+    const localRecords =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
+    if (localRecords.length === 0) {
+      result.success = true;
+      return result;
+    }
+
+    const latestByContent = this.groupRecordsByContentId(localRecords);
+    await this.migrateRecords(latestByContent, result);
+
+    result.success = result.failed === 0;
+    return result;
+  }
+
+  /**
+   * Create an empty migration result object.
+   */
+  private createEmptyMigrationResult(): MigrationResult {
+    return {
+      migrated: 0,
+      failed: 0,
+      success: false,
+      errors: [],
+    };
+  }
+
+  /**
+   * Group mastery records by content ID, keeping only the latest per content.
+   */
+  private groupRecordsByContentId(
+    localRecords: SourceChainEntry<MasteryRecordContent>[]
+  ): Map<string, SourceChainEntry<MasteryRecordContent>> {
+    const latestByContent = new Map<string, SourceChainEntry<MasteryRecordContent>>();
+
+    for (const entry of localRecords) {
+      const contentId = entry.content.contentId;
+      const existing = latestByContent.get(contentId);
+
+      if (!existing || new Date(entry.timestamp) > new Date(existing.timestamp)) {
+        latestByContent.set(contentId, entry);
+      }
+    }
+
+    return latestByContent;
+  }
+
+  /**
+   * Migrate a batch of mastery records to the backend.
+   */
+  private async migrateRecords(
+    latestByContent: Map<string, SourceChainEntry<MasteryRecordContent>>,
+    result: MigrationResult
+  ): Promise<void> {
+    for (const [contentId, entry] of latestByContent) {
+      try {
+        await this.migrateSingleRecord(contentId, entry);
+        result.migrated++;
+      } catch (err) {
+        result.failed++;
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        result.errors.push(`${contentId}: ${errorMsg}`);
+      }
+    }
+  }
+
+  /**
+   * Migrate a single mastery record to the backend.
+   */
+  private async migrateSingleRecord(
+    contentId: string,
+    entry: SourceChainEntry<MasteryRecordContent>
+  ): Promise<void> {
+    const initialized = await this.backend.initializeMastery(contentId);
+    if (!initialized) {
+      throw new Error(`Failed to initialize mastery for ${contentId}`);
+    }
+
+    // If level is beyond 'seen', record the engagement type
+    if (this.shouldRecordEngagement(entry.content.level)) {
+      await this.backend.recordEngagement({
+        content_id: contentId,
+        engagement_type: entry.content.lastEngagementType,
+      });
+    }
+  }
+
+  /**
+   * Determine if engagement should be recorded based on mastery level.
+   */
+  private shouldRecordEngagement(level: string): boolean {
+    return level !== 'not_started' && level !== 'seen';
+  }
+
+  /**
+   * Check if there are local records that need migration.
+   */
+  hasPendingMigration(): boolean {
+    if (!this.isBackendAvailable()) return false;
+    const localRecords =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
+    return localRecords.length > 0;
+  }
+
+  /**
+   * Get count of records pending migration.
+   */
+  getPendingMigrationCount(): number {
+    const localRecords =
+      this.sourceChain.getEntriesByType<MasteryRecordContent>(ENTRY_TYPE_MASTERY_RECORD);
+    // Group by contentId to get unique count
+    const uniqueContentIds = new Set(localRecords.map(r => r.content.contentId));
+    return uniqueContentIds.size;
   }
 }

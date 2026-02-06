@@ -1,0 +1,10 @@
+Scenario: Participating in community ecological restoration and care
+    Given Margaret has time and commitment for environmental stewardship
+    And community needs participants in ecological restoration
+    When Margaret participates in community environmental work
+    Then the bioregional_elohim should recognize ecological care contributions
+    And it should value restoration work, cleanup, and stewardship
+    And it should track community environmental participation
+    And ecological care should accumulate care tokens
+    And Margaret's environmental service should be recognized
+    And community ecological health should benefit from elder participation

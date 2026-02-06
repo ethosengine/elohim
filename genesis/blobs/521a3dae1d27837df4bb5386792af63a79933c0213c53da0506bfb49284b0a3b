@@ -1,0 +1,10 @@
+Scenario: Traditional weather knowledge and climate adaptation
+    Given Margaret has observed local weather patterns for decades
+    And traditional weather knowledge supports climate adaptation
+    When the bioregional_elohim tracks traditional climate knowledge
+    Then it should recognize Margaret's weather wisdom
+    And it should value traditional ecological forecasting
+    And it should document climate observation across decades
+    And Margaret's knowledge should inform community climate adaptation
+    And traditional knowledge should complement scientific understanding
+    And elder wisdom should support bioregional resilience

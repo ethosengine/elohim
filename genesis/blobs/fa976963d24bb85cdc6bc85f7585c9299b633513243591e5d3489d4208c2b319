@@ -1,0 +1,10 @@
+Scenario: Coordinating care across limited parental availability
+    Given Sarah's work schedule limits her availability
+    And Marcus manages daily household operations
+    When coordination is needed between them
+    Then the family_elohim should facilitate asynchronous communication
+    And Sarah should be able to provide guidance during her available hours
+    And Marcus should be able to request help when needed
+    And the system should ensure Sarah stays informed despite time constraints
+    And coordination should happen efficiently without constant interruption
+    And their partnership should function despite scheduling challenges

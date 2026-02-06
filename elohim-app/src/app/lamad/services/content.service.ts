@@ -1,13 +1,27 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, forkJoin } from 'rxjs';
+
+// @coverage: 85.2% (2026-02-05)
+
 import { map, switchMap, catchError } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
-import { ContentNode, ContentType, ContentReach, ContentPreview } from '../models/content-node.model';
+
+import { Observable, of, forkJoin } from 'rxjs';
+
+import { AgentService } from '@app/elohim/services/agent.service';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+
+import {
+  ContentNode,
+  ContentType,
+  ContentReach,
+  ContentPreview,
+} from '../models/content-node.model';
 import { LearningPath } from '../models/learning-path.model';
-import { AgentService } from './agent.service';
 
 /**
  * Content index entry (metadata only).
+ *
+ * Core fields are always present. Optional fields are populated
+ * by DataLoaderService.getContentIndex() from ContentNode data.
  */
 export interface ContentIndexEntry {
   id: string;
@@ -15,6 +29,29 @@ export interface ContentIndexEntry {
   description: string;
   contentType: ContentType;
   tags: string[];
+
+  // Extended fields from DataLoaderService.getContentIndex()
+  reach?: ContentReach;
+  trustScore?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  flags?: string[];
+  attestationTypes?: string[];
+
+  // Rich media fields (from Keen/import data)
+  url?: string;
+  name?: string;
+  publisher?: string;
+  category?: string;
+  contributorPresenceId?: string;
+}
+
+/** Shape returned by DataLoaderService.getContentIndex(). */
+interface ContentIndex {
+  nodes: ContentIndexEntry[];
+  totalCount: number;
+  byType: Record<string, ContentIndexEntry[]>;
+  lastUpdated: string;
 }
 
 /**
@@ -59,7 +96,7 @@ const REACH_HIERARCHY: ContentReach[] = [
   'municipal',
   'bioregional',
   'regional',
-  'commons'
+  'commons',
 ];
 
 /**
@@ -100,9 +137,7 @@ export class ContentService {
    * The caller should load specific related resources as needed.
    */
   getRelatedResourceIds(resourceId: string): Observable<string[]> {
-    return this.dataLoader.getContent(resourceId).pipe(
-      map(node => node.relatedNodeIds ?? [])
-    );
+    return this.dataLoader.getContent(resourceId).pipe(map(node => node.relatedNodeIds ?? []));
   }
 
   /**
@@ -115,9 +150,9 @@ export class ContentService {
         if (relatedIndex < 0 || relatedIndex >= relatedIds.length) {
           return of(null);
         }
-        return this.dataLoader.getContent(relatedIds[relatedIndex]).pipe(
-          catchError(() => of(null))
-        );
+        return this.dataLoader
+          .getContent(relatedIds[relatedIndex])
+          .pipe(catchError(() => of(null)));
       })
     );
   }
@@ -128,16 +163,18 @@ export class ContentService {
    */
   searchContent(query: string): Observable<ContentIndexEntry[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         if (!query || query.trim().length === 0) {
           return index.nodes ?? [];
         }
 
         const lowerQuery = query.toLowerCase().trim();
-        return (index.nodes ?? []).filter((node: ContentIndexEntry) =>
-          node.title.toLowerCase().includes(lowerQuery) ||
-          node.description?.toLowerCase().includes(lowerQuery) ||
-          node.tags?.some((tag: string) => tag.toLowerCase().includes(lowerQuery))
+        return (index.nodes ?? []).filter(
+          (node: ContentIndexEntry) =>
+            node.title.toLowerCase().includes(lowerQuery) ||
+            node.description?.toLowerCase().includes(lowerQuery) ||
+            node.tags?.some((tag: string) => tag.toLowerCase().includes(lowerQuery))
         );
       })
     );
@@ -148,7 +185,8 @@ export class ContentService {
    */
   getContentByType(contentType: ContentType): Observable<ContentIndexEntry[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         return (index.nodes ?? []).filter(
           (node: ContentIndexEntry) => node.contentType === contentType
         );
@@ -161,7 +199,8 @@ export class ContentService {
    */
   getContentByTag(tag: string): Observable<ContentIndexEntry[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         const lowerTag = tag.toLowerCase();
         return (index.nodes ?? []).filter((node: ContentIndexEntry) =>
           node.tags?.some((t: string) => t.toLowerCase() === lowerTag)
@@ -175,7 +214,8 @@ export class ContentService {
    */
   getAllTags(): Observable<string[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         const tagSet = new Set<string>();
         (index.nodes ?? []).forEach((node: ContentIndexEntry) => {
           node.tags?.forEach((tag: string) => tagSet.add(tag));
@@ -190,7 +230,8 @@ export class ContentService {
    */
   getAllContentTypes(): Observable<ContentType[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
         const typeSet = new Set<ContentType>();
         (index.nodes ?? []).forEach((node: ContentIndexEntry) => {
           if (node.contentType) {
@@ -231,7 +272,7 @@ export class ContentService {
           return {
             canAccess: true,
             content,
-            agentReach
+            agentReach,
           } as ContentAccessResult;
         } else {
           const reason: 'unauthenticated' | 'insufficient-reach' =
@@ -240,14 +281,16 @@ export class ContentService {
             canAccess: false,
             reason,
             requiredReach: contentReach,
-            agentReach
+            agentReach,
           } as ContentAccessResult;
         }
       }),
-      catchError(() => of({
-        canAccess: false,
-        reason: 'not-found' as const
-      }))
+      catchError(() =>
+        of({
+          canAccess: false,
+          reason: 'not-found' as const,
+        })
+      )
     );
   }
 
@@ -275,6 +318,11 @@ export class ContentService {
       return true;
     }
 
+    // Private content is only accessible to the author (already checked above)
+    if (contentReach === 'private') {
+      return false;
+    }
+
     // Compare reach hierarchy
     const contentReachIndex = REACH_HIERARCHY.indexOf(contentReach);
     const agentReachIndex = REACH_HIERARCHY.indexOf(agentReach);
@@ -289,7 +337,10 @@ export class ContentService {
     const attestations = this.agentService.getAttestations();
 
     // Check attestations to determine reach level (geographic scope)
-    if (attestations.includes('commons-contributor') || attestations.includes('governance-ratifier')) {
+    if (
+      attestations.includes('commons-contributor') ||
+      attestations.includes('governance-ratifier')
+    ) {
       return 'commons';
     }
     if (attestations.includes('regional-member') || attestations.includes('peer-reviewer')) {
@@ -298,7 +349,10 @@ export class ContentService {
     if (attestations.includes('bioregional-member')) {
       return 'bioregional';
     }
-    if (attestations.includes('municipal-member') || attestations.includes('path-completion:elohim-protocol')) {
+    if (
+      attestations.includes('municipal-member') ||
+      attestations.includes('path-completion:elohim-protocol')
+    ) {
       return 'municipal';
     }
     if (attestations.includes('neighborhood-member')) {
@@ -363,7 +417,7 @@ export class ContentService {
     return {
       path,
       stepIndex,
-      stepNarrative: path.steps[stepIndex].stepNarrative
+      stepNarrative: path.steps[stepIndex].stepNarrative,
     };
   }
 
@@ -371,17 +425,21 @@ export class ContentService {
    * Get a summary of paths containing this resource (lightweight).
    * Returns just path metadata without loading full paths.
    */
-  getContainingPathsSummary(resourceId: string): Observable<Array<{
-    pathId: string;
-    pathTitle: string;
-    stepIndex: number;
-  }>> {
+  getContainingPathsSummary(resourceId: string): Observable<
+    {
+      pathId: string;
+      pathTitle: string;
+      stepIndex: number;
+    }[]
+  > {
     return this.getContainingPaths(resourceId).pipe(
-      map(refs => refs.map(ref => ({
-        pathId: ref.path.id,
-        pathTitle: ref.path.title,
-        stepIndex: ref.stepIndex
-      })))
+      map(refs =>
+        refs.map(ref => ({
+          pathId: ref.path.id,
+          pathTitle: ref.path.title,
+          stepIndex: ref.stepIndex,
+        }))
+      )
     );
   }
 
@@ -397,7 +455,10 @@ export class ContentService {
    */
   getContentPreviewsForCategory(category: string): Observable<ContentPreview[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => this.filterAndMapToPreview(index.nodes ?? [], category))
+      map((raw: unknown) => {
+        const index = raw as ContentIndex;
+        return this.filterAndMapToPreview(index.nodes ?? [], category);
+      })
     );
   }
 
@@ -429,7 +490,7 @@ export class ContentService {
         videos: previews.filter(p => p.contentType === 'video'),
         organizations: previews.filter(p => p.contentType === 'organization'),
         books: previews.filter(p => p.contentType === 'book-chapter'),
-        tools: previews.filter(p => p.contentType === 'tool')
+        tools: previews.filter(p => p.contentType === 'tool'),
       }))
     );
   }
@@ -447,11 +508,12 @@ export class ContentService {
         }
 
         return this.dataLoader.getContentIndex().pipe(
-          map(index => {
+          map((raw: unknown) => {
+            const index = raw as ContentIndex;
             const nodes = index.nodes ?? [];
             return nodes
-              .filter((n: any) => relatedIds.includes(n.id))
-              .map((n: any) => this.mapIndexEntryToPreview(n));
+              .filter((n: ContentIndexEntry) => relatedIds.includes(n.id))
+              .map((n: ContentIndexEntry) => this.mapIndexEntryToPreview(n));
           })
         );
       }),
@@ -485,7 +547,7 @@ export class ContentService {
   /**
    * Filter content index entries by category and map to ContentPreview.
    */
-  private filterAndMapToPreview(nodes: any[], categoryId: string): ContentPreview[] {
+  private filterAndMapToPreview(nodes: ContentIndexEntry[], categoryId: string): ContentPreview[] {
     // Normalize categoryId (handle both "governance" and "governance-epic" formats)
     const normalizedCategoryId = categoryId.replace('-epic', '').replace('_', '-');
 
@@ -508,7 +570,7 @@ export class ContentService {
   /**
    * Map a content index entry to ContentPreview.
    */
-  private mapIndexEntryToPreview(entry: any): ContentPreview {
+  private mapIndexEntryToPreview(entry: ContentIndexEntry): ContentPreview {
     const preview: ContentPreview = {
       id: entry.id,
       title: entry.name ?? entry.title, // Prefer 'name' for display if available
@@ -521,7 +583,7 @@ export class ContentService {
       category: entry.category,
       isPlayable: ['video', 'audio'].includes(entry.contentType),
       // contributorPresenceId will be populated when ContributorPresence data is generated
-      contributorPresenceId: entry.contributorPresenceId
+      contributorPresenceId: entry.contributorPresenceId,
     };
 
     // Generate YouTube thumbnail if URL is a YouTube link
@@ -546,7 +608,7 @@ export class ContentService {
     const patterns = [
       /youtube\.com\/watch\?v=([^&]+)/,
       /youtu\.be\/([^?]+)/,
-      /youtube\.com\/embed\/([^?]+)/
+      /youtube\.com\/embed\/([^?]+)/,
     ];
 
     for (const pattern of patterns) {
@@ -613,7 +675,7 @@ export class ContentService {
         }
 
         // Build ActivityPub object
-        const apObject: any = {
+        const apObject: Record<string, unknown> = {
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: content.activityPubType,
           id: content.did ?? `https://elohim-protocol.org/content/${content.id}`,
@@ -621,19 +683,19 @@ export class ContentService {
           content: content.description,
           published: content.createdAt,
           updated: content.updatedAt,
-          url: content.url ?? `https://elohim-protocol.org/content/${content.id}`
+          url: content.url ?? `https://elohim-protocol.org/content/${content.id}`,
         };
 
         // Add author if available
         if (content.authorId) {
-          apObject.attributedTo = content.authorId;
+          apObject['attributedTo'] = content.authorId;
         }
 
         // Add tags
         if (content.tags && content.tags.length > 0) {
-          apObject.tag = content.tags.map(tag => ({
+          apObject['tag'] = content.tags.map(tag => ({
             type: 'Hashtag',
-            name: `#${tag}`
+            name: `#${tag}`,
           }));
         }
 
@@ -713,15 +775,17 @@ export class ContentService {
         activityPubType: content.activityPubType ?? null,
         activityPubObject: content.activityPubType ? this.buildActivityPubObject(content) : null,
         openGraph: content.openGraphMetadata ?? null,
-        jsonLd: content.linkedData ?? null
+        jsonLd: content.linkedData ?? null,
       })),
-      catchError(() => of({
-        did: null,
-        activityPubType: null,
-        activityPubObject: null,
-        openGraph: null,
-        jsonLd: null
-      }))
+      catchError(() =>
+        of({
+          did: null,
+          activityPubType: null,
+          activityPubObject: null,
+          openGraph: null,
+          jsonLd: null,
+        })
+      )
     );
   }
 
@@ -729,8 +793,8 @@ export class ContentService {
    * Helper to build ActivityPub object from content.
    * Extracted for reuse between methods.
    */
-  private buildActivityPubObject(content: ContentNode): any {
-    const apObject: any = {
+  private buildActivityPubObject(content: ContentNode): Record<string, unknown> {
+    const apObject: Record<string, unknown> = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       type: content.activityPubType,
       id: content.did ?? `https://elohim-protocol.org/content/${content.id}`,
@@ -738,17 +802,17 @@ export class ContentService {
       content: content.description,
       published: content.createdAt,
       updated: content.updatedAt,
-      url: content.url ?? `https://elohim-protocol.org/content/${content.id}`
+      url: content.url ?? `https://elohim-protocol.org/content/${content.id}`,
     };
 
     if (content.authorId) {
-      apObject.attributedTo = content.authorId;
+      apObject['attributedTo'] = content.authorId;
     }
 
     if (content.tags && content.tags.length > 0) {
-      apObject.tag = content.tags.map(tag => ({
+      apObject['tag'] = content.tags.map(tag => ({
         type: 'Hashtag',
-        name: `#${tag}`
+        name: `#${tag}`,
       }));
     }
 

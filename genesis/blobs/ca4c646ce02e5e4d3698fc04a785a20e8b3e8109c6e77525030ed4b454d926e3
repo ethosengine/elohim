@@ -1,0 +1,10 @@
+Scenario: Building peer networks through community care economy
+    Given Aisha's friendships increasingly involve care dimensions
+    And peer support is crucial for young adults
+    When Aisha connects with peers through care economy
+    Then the community_elohim should facilitate peer networks
+    And it should coordinate resource sharing among young adults
+    And it should enable care token exchanges between peers
+    And peer mutual aid should be systematized
+    And friendships should be strengthened through practical care
+    And community should support young adult peer networks

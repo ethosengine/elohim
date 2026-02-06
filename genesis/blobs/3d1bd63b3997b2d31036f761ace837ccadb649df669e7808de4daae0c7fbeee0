@@ -1,0 +1,9 @@
+Scenario: Politician evaluates climate adaptation investments with equity focus
+    Given climate change requires infrastructure resilience investments
+    And limited resources force priority-setting across neighborhoods
+    When the Observer analyzes climate vulnerability and adaptation patterns
+    Then they see flood risk concentrated in low-income neighborhoods
+    And identify heat island effects in communities lacking tree canopy
+    And understand which populations most vulnerable to climate impacts
+    And ensure resilience investments prioritize environmental justice
+    And allocate climate adaptation funding equitably

@@ -1,0 +1,12 @@
+Scenario: Municipal resource allocation reflects care economy priorities
+    Given Robert participates in municipal budget processes
+    And care economy principles should inform resource allocation
+    And municipal budgets often underfund care infrastructure
+    When municipal_elohim supports budget advocacy
+    Then it should help him understand municipal budget priorities
+    And surface opportunities to advocate for care infrastructure funding
+    And connect him to budget hearings and participatory budgeting
+    And help him articulate how care infrastructure serves community wellbeing
+    And support advocacy for elder care, childcare, and caregiver support funding
+    And build municipal budgets that prioritize care economy
+    And demonstrate that care should be public infrastructure priority

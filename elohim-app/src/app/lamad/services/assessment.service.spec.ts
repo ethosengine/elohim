@@ -1,8 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { AssessmentService, AssessmentSession, AssessmentResult } from './assessment.service';
-import { DataLoaderService, AssessmentIndex, AssessmentIndexEntry } from './data-loader.service';
-import { SessionHumanService } from './session-human.service';
+import {
+  DataLoaderService,
+  AssessmentIndex,
+  AssessmentIndexEntry,
+} from '@app/elohim/services/data-loader.service';
+import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { ContentNode } from '../models/content-node.model';
 
 describe('AssessmentService', () => {
@@ -21,16 +25,16 @@ describe('AssessmentService', () => {
         title: 'Values Assessment',
         domain: 'values',
         instrumentType: 'questionnaire',
-        estimatedTime: '15 minutes'
+        estimatedTime: '15 minutes',
       },
       {
         id: 'assessment-2',
         title: 'Attachment Style',
         domain: 'attachment',
         instrumentType: 'questionnaire',
-        estimatedTime: '20 minutes'
-      }
-    ]
+        estimatedTime: '20 minutes',
+      },
+    ],
   };
 
   const mockAssessmentNode: ContentNode = {
@@ -38,18 +42,18 @@ describe('AssessmentService', () => {
     title: 'Values Assessment',
     description: 'Discover your core values',
     contentType: 'assessment',
-    contentFormat: 'quiz-json',
+    contentFormat: 'perseus-quiz-json',
     content: {
       questions: [
         { id: 'q1', text: 'Question 1', subscales: ['value-a'] },
-        { id: 'q2', text: 'Question 2', subscales: ['value-b'], reverseScored: true }
+        { id: 'q2', text: 'Question 2', subscales: ['value-b'], reverseScored: true },
       ],
       sections: [],
-      interpretation: { method: 'ranking' }
+      interpretation: { method: 'ranking' },
     },
     tags: ['values', 'self-knowledge'],
     relatedNodeIds: [],
-    metadata: { attestationId: 'values-self-knowledge' }
+    metadata: { attestationId: 'values-self-knowledge' },
   };
 
   const mockGatedAssessment: ContentNode = {
@@ -57,33 +61,41 @@ describe('AssessmentService', () => {
     title: 'Advanced Assessment',
     description: 'Requires prerequisite',
     contentType: 'assessment',
-    contentFormat: 'quiz-json',
+    contentFormat: 'perseus-quiz-json',
     content: { questions: [], sections: [] },
     tags: [],
     relatedNodeIds: [],
-    metadata: { prerequisiteAttestation: 'basic-attestation' }
+    metadata: { prerequisiteAttestation: 'basic-attestation' },
   };
 
   beforeEach(() => {
     const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
       'getAssessmentIndex',
       'getAssessmentsByDomain',
-      'getAssessment'
+      'getAssessment',
     ]);
     const sessionUserSpyObj = jasmine.createSpyObj('SessionHumanService', [
       'getSessionId',
-      'getSession'
+      'getSession',
     ]);
 
     // Mock localStorage
     localStorageMock = {};
     mockStorage = {
       getItem: (key: string) => localStorageMock[key] || null,
-      setItem: (key: string, value: string) => { localStorageMock[key] = value; },
-      removeItem: (key: string) => { delete localStorageMock[key]; },
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key];
+      },
       key: (index: number) => Object.keys(localStorageMock)[index] || null,
-      get length() { return Object.keys(localStorageMock).length; },
-      clear: () => { localStorageMock = {}; }
+      get length() {
+        return Object.keys(localStorageMock).length;
+      },
+      clear: () => {
+        localStorageMock = {};
+      },
     };
     spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
 
@@ -91,8 +103,8 @@ describe('AssessmentService', () => {
       providers: [
         AssessmentService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: SessionHumanService, useValue: sessionUserSpyObj }
-      ]
+        { provide: SessionHumanService, useValue: sessionUserSpyObj },
+      ],
     });
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
@@ -121,7 +133,7 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('getAssessmentIndex', () => {
-    it('should return assessment index from data loader', (done) => {
+    it('should return assessment index from data loader', done => {
       service.getAssessmentIndex().subscribe(index => {
         expect(index).toEqual(mockAssessmentIndex);
         expect(dataLoaderSpy.getAssessmentIndex).toHaveBeenCalled();
@@ -131,7 +143,7 @@ describe('AssessmentService', () => {
   });
 
   describe('getAssessmentsByDomain', () => {
-    it('should filter assessments by domain', (done) => {
+    it('should filter assessments by domain', done => {
       service.getAssessmentsByDomain('values').subscribe(assessments => {
         expect(dataLoaderSpy.getAssessmentsByDomain).toHaveBeenCalledWith('values');
         done();
@@ -140,7 +152,7 @@ describe('AssessmentService', () => {
   });
 
   describe('getAssessment', () => {
-    it('should load assessment by ID', (done) => {
+    it('should load assessment by ID', done => {
       service.getAssessment('assessment-1').subscribe(assessment => {
         expect(assessment).toEqual(mockAssessmentNode);
         expect(dataLoaderSpy.getAssessment).toHaveBeenCalledWith('assessment-1');
@@ -148,7 +160,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should return null for missing assessment', (done) => {
+    it('should return null for missing assessment', done => {
       dataLoaderSpy.getAssessment.and.returnValue(of(null));
 
       service.getAssessment('missing').subscribe(assessment => {
@@ -159,14 +171,14 @@ describe('AssessmentService', () => {
   });
 
   describe('canAccessAssessment', () => {
-    it('should allow access when no prerequisite', (done) => {
+    it('should allow access when no prerequisite', done => {
       service.canAccessAssessment('assessment-1').subscribe(canAccess => {
         expect(canAccess).toBe(true);
         done();
       });
     });
 
-    it('should deny access when prerequisite attestation is missing', (done) => {
+    it('should deny access when prerequisite attestation is missing', done => {
       dataLoaderSpy.getAssessment.and.returnValue(of(mockGatedAssessment));
 
       service.canAccessAssessment('gated-assessment').subscribe(canAccess => {
@@ -175,10 +187,12 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should allow access when prerequisite attestation is present', (done) => {
+    it('should allow access when prerequisite attestation is present', done => {
       dataLoaderSpy.getAssessment.and.returnValue(of(mockGatedAssessment));
       // Store the attestation in localStorage
-      localStorageMock['lamad-assessment-attestations-session-123'] = JSON.stringify(['basic-attestation']);
+      localStorageMock['lamad-assessment-attestations-session-123'] = JSON.stringify([
+        'basic-attestation',
+      ]);
 
       service.canAccessAssessment('gated-assessment').subscribe(canAccess => {
         expect(canAccess).toBe(true);
@@ -186,7 +200,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should return false for non-existent assessment', (done) => {
+    it('should return false for non-existent assessment', done => {
       dataLoaderSpy.getAssessment.and.returnValue(of(null));
 
       service.canAccessAssessment('missing').subscribe(canAccess => {
@@ -201,7 +215,7 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('startAssessment', () => {
-    it('should create a new session', (done) => {
+    it('should create a new session', done => {
       service.startAssessment('assessment-1').subscribe(session => {
         expect(session.assessmentId).toBe('assessment-1');
         expect(session.agentId).toBe('session-123');
@@ -212,7 +226,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should save session to localStorage', (done) => {
+    it('should save session to localStorage', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         const key = 'lamad-assessment-session-session-123-assessment-1';
         expect(localStorageMock[key]).toBeDefined();
@@ -220,7 +234,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should use anonymous for missing session ID', (done) => {
+    it('should use anonymous for missing session ID', done => {
       sessionUserSpy.getSessionId.and.returnValue(undefined as unknown as string);
 
       service.startAssessment('assessment-1').subscribe(session => {
@@ -231,14 +245,14 @@ describe('AssessmentService', () => {
   });
 
   describe('getActiveSession', () => {
-    it('should return null when no active session', (done) => {
+    it('should return null when no active session', done => {
       service.getActiveSession().subscribe(session => {
         expect(session).toBeNull();
         done();
       });
     });
 
-    it('should return active session after starting assessment', (done) => {
+    it('should return active session after starting assessment', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.getActiveSession().subscribe(session => {
           expect(session).not.toBeNull();
@@ -250,16 +264,24 @@ describe('AssessmentService', () => {
   });
 
   describe('resumeAssessment', () => {
-    it('should resume session from localStorage', (done) => {
+    it('should resume session from localStorage', done => {
       const savedSession: AssessmentSession = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
         startedAt: '2025-01-01T00:00:00.000Z',
         currentQuestionIndex: 2,
-        responses: { 'q1': { questionId: 'q1', questionType: 'likert', value: 5, answeredAt: '2025-01-01T00:00:00.000Z' } },
-        timeSpentMs: 60000
+        responses: {
+          q1: {
+            questionId: 'q1',
+            questionType: 'likert',
+            value: 5,
+            answeredAt: '2025-01-01T00:00:00.000Z',
+          },
+        },
+        timeSpentMs: 60000,
       };
-      localStorageMock['lamad-assessment-session-session-123-assessment-1'] = JSON.stringify(savedSession);
+      localStorageMock['lamad-assessment-session-session-123-assessment-1'] =
+        JSON.stringify(savedSession);
 
       service.resumeAssessment('assessment-1').subscribe(session => {
         expect(session).not.toBeNull();
@@ -269,7 +291,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should return null when no saved session', (done) => {
+    it('should return null when no saved session', done => {
       service.resumeAssessment('missing').subscribe(session => {
         expect(session).toBeNull();
         done();
@@ -278,7 +300,7 @@ describe('AssessmentService', () => {
   });
 
   describe('recordResponse', () => {
-    it('should record response and increment question index', (done) => {
+    it('should record response and increment question index', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'likert', 5);
 
@@ -291,7 +313,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should handle string responses', (done) => {
+    it('should handle string responses', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'text', 'My answer');
 
@@ -302,7 +324,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should handle array responses', (done) => {
+    it('should handle array responses', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'multi-select', ['a', 'b']);
 
@@ -321,7 +343,7 @@ describe('AssessmentService', () => {
   });
 
   describe('updateTimeSpent', () => {
-    it('should accumulate time spent', (done) => {
+    it('should accumulate time spent', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.updateTimeSpent(5000);
         service.updateTimeSpent(3000);
@@ -340,7 +362,7 @@ describe('AssessmentService', () => {
   });
 
   describe('abandonAssessment', () => {
-    it('should clear active session', (done) => {
+    it('should clear active session', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.abandonAssessment();
 
@@ -351,7 +373,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should remove session from localStorage', (done) => {
+    it('should remove session from localStorage', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         const key = 'lamad-assessment-session-session-123-assessment-1';
         expect(localStorageMock[key]).toBeDefined();
@@ -368,14 +390,14 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('completeAssessment', () => {
-    it('should return null when no active session', (done) => {
+    it('should return null when no active session', done => {
       service.completeAssessment().subscribe(result => {
         expect(result).toBeNull();
         done();
       });
     });
 
-    it('should compute scores and return result', (done) => {
+    it('should compute scores and return result', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'likert', 7);
         service.recordResponse('q2', 'likert', 3);
@@ -391,7 +413,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should clear session after completion', (done) => {
+    it('should clear session after completion', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.completeAssessment().subscribe(() => {
           service.getActiveSession().subscribe(session => {
@@ -402,7 +424,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should save result to localStorage', (done) => {
+    it('should save result to localStorage', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.completeAssessment().subscribe(() => {
           const key = 'lamad-assessment-result-session-123-assessment-1';
@@ -412,7 +434,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should return null when assessment not found', (done) => {
+    it('should return null when assessment not found', done => {
       dataLoaderSpy.getAssessment.and.returnValue(of(null));
 
       service.startAssessment('missing').subscribe(() => {
@@ -423,13 +445,13 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should handle quadrant interpretation', (done) => {
+    it('should handle quadrant interpretation', done => {
       const quadrantAssessment: ContentNode = {
         ...mockAssessmentNode,
         content: {
           questions: [
             { id: 'q1', subscales: ['anxiety'] },
-            { id: 'q2', subscales: ['avoidance'] }
+            { id: 'q2', subscales: ['avoidance'] },
           ],
           sections: [],
           interpretation: {
@@ -439,10 +461,10 @@ describe('AssessmentService', () => {
               { name: 'Secure', anxiety: 'low', avoidance: 'low' },
               { name: 'Anxious', anxiety: 'high', avoidance: 'low' },
               { name: 'Avoidant', anxiety: 'low', avoidance: 'high' },
-              { name: 'Disorganized', anxiety: 'high', avoidance: 'high' }
-            ]
-          }
-        }
+              { name: 'Disorganized', anxiety: 'high', avoidance: 'high' },
+            ],
+          },
+        },
       };
       dataLoaderSpy.getAssessment.and.returnValue(of(quadrantAssessment));
 
@@ -457,7 +479,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should handle ranking interpretation', (done) => {
+    it('should handle ranking interpretation', done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'likert', 7);
         service.recordResponse('q2', 'likert', 5);
@@ -476,21 +498,21 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('getMyResults', () => {
-    it('should return empty array when no results', (done) => {
+    it('should return empty array when no results', done => {
       service.getMyResults().subscribe(results => {
         expect(results).toEqual([]);
         done();
       });
     });
 
-    it('should return sorted results from localStorage', (done) => {
+    it('should return sorted results from localStorage', done => {
       const result1: AssessmentResult = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
         completedAt: '2025-01-01T00:00:00.000Z',
         timeSpentMs: 60000,
         responses: {},
-        scores: { 'value-a': 10 }
+        scores: { 'value-a': 10 },
       };
       const result2: AssessmentResult = {
         assessmentId: 'assessment-2',
@@ -498,10 +520,12 @@ describe('AssessmentService', () => {
         completedAt: '2025-01-02T00:00:00.000Z',
         timeSpentMs: 90000,
         responses: {},
-        scores: { 'attachment': 15 }
+        scores: { attachment: 15 },
       };
-      localStorageMock['lamad-assessment-result-session-123-assessment-1'] = JSON.stringify(result1);
-      localStorageMock['lamad-assessment-result-session-123-assessment-2'] = JSON.stringify(result2);
+      localStorageMock['lamad-assessment-result-session-123-assessment-1'] =
+        JSON.stringify(result1);
+      localStorageMock['lamad-assessment-result-session-123-assessment-2'] =
+        JSON.stringify(result2);
 
       service.getMyResults().subscribe(results => {
         expect(results.length).toBe(2);
@@ -511,7 +535,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should skip malformed entries', (done) => {
+    it('should skip malformed entries', done => {
       localStorageMock['lamad-assessment-result-session-123-bad'] = 'invalid json';
 
       service.getMyResults().subscribe(results => {
@@ -522,14 +546,14 @@ describe('AssessmentService', () => {
   });
 
   describe('getResultForAssessment', () => {
-    it('should return specific result', (done) => {
+    it('should return specific result', done => {
       const result: AssessmentResult = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
         completedAt: '2025-01-01T00:00:00.000Z',
         timeSpentMs: 60000,
         responses: {},
-        scores: {}
+        scores: {},
       };
       localStorageMock['lamad-assessment-result-session-123-assessment-1'] = JSON.stringify(result);
 
@@ -540,7 +564,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should return null for missing result', (done) => {
+    it('should return null for missing result', done => {
       service.getResultForAssessment('missing').subscribe(result => {
         expect(result).toBeNull();
         done();
@@ -549,14 +573,14 @@ describe('AssessmentService', () => {
   });
 
   describe('hasCompleted', () => {
-    it('should return true when result exists', (done) => {
+    it('should return true when result exists', done => {
       const result: AssessmentResult = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
         completedAt: '2025-01-01T00:00:00.000Z',
         timeSpentMs: 60000,
         responses: {},
-        scores: {}
+        scores: {},
       };
       localStorageMock['lamad-assessment-result-session-123-assessment-1'] = JSON.stringify(result);
 
@@ -566,7 +590,7 @@ describe('AssessmentService', () => {
       });
     });
 
-    it('should return false when no result', (done) => {
+    it('should return false when no result', done => {
       service.hasCompleted('missing').subscribe(hasCompleted => {
         expect(hasCompleted).toBe(false);
         done();

@@ -1,0 +1,10 @@
+Scenario: Appeal unsuccessful but feeling heard through the process
+    Given I filed an appeal about a life-saving intervention I felt was invasive
+    And the Constitutional Council has deliberated on my case
+    When the council affirms the agent's decision as constitutionally aligned
+    But also recommends protocol enhancements for pre-specified preferences
+    Then I receive detailed explanation of why the decision was upheld
+    And I can see how my appeal influenced protocol improvements
+    And I am offered support to update my future preferences
+    And My dissent is honored and recorded even though I didn't win
+    And I understand my voice mattered in making the system better

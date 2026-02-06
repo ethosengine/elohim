@@ -1,0 +1,10 @@
+Scenario: Understanding workplace labor as care economy contribution
+    Given Kenji serves food to community members
+    And service work directly contributes to people's daily needs
+    When the workplace_elohim frames his work through care economy
+    Then it should recognize that feeding people is care work
+    And it should value service labor as community care contribution
+    And it should accumulate care tokens for workplace care labor
+    And it should help Kenji see his work as meaningful contribution
+    And the system should dignify service work as care economy participation
+    And Kenji should understand his labor as serving community flourishing

@@ -1,0 +1,10 @@
+Scenario: Care token accumulation reflects totality of invisible labor
+    Given Sarah performs mental labor and physical labor continuously
+    And traditional economics renders her household work invisible
+    When the Value Scanner tracks Sarah's care contributions
+    Then care tokens should accumulate for meal planning, not just cooking
+    And tokens should reflect coordinating schedules, managing inventory, teaching values
+    And emotional labor should be valued alongside physical tasks
+    And the full complexity of parenting work should be quantified
+    And Sarah's care token balance should reflect her enormous contributions
+    And invisible care labor should become economically visible

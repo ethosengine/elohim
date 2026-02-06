@@ -1,0 +1,10 @@
+Scenario: Board member detects potential conflict of interest in vendor contract
+    Given district staff recommends contract with technology vendor
+    And recommendation emphasizes vendor qualifications and competitive pricing
+    And board will vote on $2M multi-year contract next meeting
+    When the board member uses Observer to review the recommendation
+    Then they discover vendor donated to superintendent's previous campaigns
+    And see vendor's track record in other districts shows implementation problems
+    And find contract terms more favorable to vendor than peer district contracts
+    And access data showing alternative vendors with better performance
+    And capture protection makes conflict of interest and manipulation visible

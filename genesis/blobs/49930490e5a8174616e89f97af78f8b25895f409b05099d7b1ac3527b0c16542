@@ -1,0 +1,11 @@
+Scenario: Building international coalition resisting corporate capture
+    Given corporations lobby internationally for favorable regulation
+    And they use different nations to triangulate pressure
+    When I coordinate with international policy maker allies
+    Then we share: intelligence about lobbying tactics
+    And we coordinate: resistance to capture attempts
+    And we establish: transparency requirements for global lobbying
+    And we support: each other under corporate pressure
+    And we create: race-to-top rather than race-to-bottom
+    And we demonstrate: democratic solidarity across nations
+    And we protect: protocol sovereignty through collective action

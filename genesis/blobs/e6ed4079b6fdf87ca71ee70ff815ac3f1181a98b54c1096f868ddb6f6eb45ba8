@@ -1,0 +1,10 @@
+Scenario: Parental oversight balances with expanding child autonomy
+    Given Emma has more freedom than Tommy
+    And she still needs parental guidance at age 8
+    When Emma makes independent scanner decisions
+    Then Sarah should have full visibility into Emma's choices
+    And Sarah should maintain ultimate authority
+    And Emma's autonomy should be genuine within parental bounds
+    And the balance should protect both safety and capability development
+    And Sarah should be supported in letting go appropriately
+    And trust should grow as Emma demonstrates judgment

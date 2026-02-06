@@ -1,0 +1,9 @@
+Scenario: Politician evaluates curriculum controversy with evidence beyond ideology
+    Given vocal activists demand curriculum changes on ideological grounds
+    And both sides present culture war framing
+    When the Observer provides evidence-based curriculum analysis
+    Then they see what's actually taught in classrooms versus political claims
+    And review curriculum outcomes in student learning and engagement
+    And identify teacher and parent perspectives beyond activist voices
+    And compare curriculum to best practices in high-performing districts
+    And make decision based on educational merit not political pressure

@@ -1,0 +1,11 @@
+Scenario: Healthcare costs managed through community care economy
+    Given Helen faces overwhelming healthcare expenses
+    And medical debt threatens her housing stability
+    When healthcare costs are tracked
+    Then the community_elohim should help navigate cost assistance
+    And community care economy should supplement inadequate insurance
+    And medical care should not require choosing between health and housing
+    And Helen's contributions should create claims on community health resources
+    And the protocol should address the healthcare affordability crisis for elderly
+    And community networks should provide economic buffer against medical costs
+    And care economy should demonstrate healthcare as community responsibility

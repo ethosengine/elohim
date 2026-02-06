@@ -1,0 +1,9 @@
+Scenario: Remote work essential for caregiver employment viability
+    Given James cannot leave David alone for commuting and full workdays
+    And remote work makes part-time employment possible
+    When employment arrangements are structured
+    Then the workplace_elohim should advocate for remote work access
+    And remote work should be recognized as caregiving accommodation
+    And employers should understand caregivers depend on remote options
+    And workplace should support remote work for caregiving employees
+    And location flexibility should be caregiving accessibility issue

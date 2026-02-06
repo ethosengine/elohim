@@ -1,0 +1,67 @@
+@epic:public_observer
+@user_type:activist
+@governance_layer:workplace_organizational
+@related_users:worker,community_organizer,politician
+@related_layers:municipality,industry_sector,provincial_state
+@elohim_agents:public_observer,workplace_elohim,economic_elohim
+
+Feature: Labor Justice Advocacy for Activist
+  As an activist in the public_observer system
+  Operating at the workplace_organizational governance layer
+  I want to fight for worker protections and living wages
+  So that economic justice becomes civic policy priority
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the activist user is registered in the system
+    And the workplace_organizational governance context is active
+
+  Scenario: Activist campaigns for municipal living wage ordinance
+    Given workers in the city struggle with poverty wages
+    And the activist advocates for living wage policy
+    When the Observer documents local wage patterns
+    Then the activist shows median wage is $14/hour in city with $22/hour living wage
+    And sees public subsidies go to employers paying poverty wages
+    And calculates economic impact of low wages on families and communities
+    And mobilizes workers and community supporters for policy campaign
+    And labor advocacy gains economic evidence foundation
+
+  Scenario: Activist exposes wage theft and labor violations
+    Given workers report widespread wage theft
+    And enforcement seems inadequate
+    When the Observer tracks labor violations and enforcement
+    Then the activist documents thousands of violations annually
+    And shows penalties are minimal and rarely collected
+    And identifies which employers are repeat offenders
+    And exposes regulatory capture of labor enforcement
+    And worker protection becomes political accountability issue
+
+  Scenario: Activist demands community benefits agreement for development
+    Given a developer seeks public subsidies for project
+    And claims it will "create jobs"
+    When the Observer analyzes developer's labor track record
+    Then the activist shows previous projects created mostly temp low-wage work
+    And demonstrates few jobs went to local community members
+    And reveals history of labor violations and union-busting
+    And organizes coalition demanding binding labor standards
+    And economic development serves workers not just capital
+
+  Scenario: Activist fights for paid sick leave policy
+    Given workers lack basic workplace protections
+    And the activist campaigns for paid sick leave ordinance
+    When the Observer shows public health and economic impacts
+    Then the activist demonstrates workers go to work sick
+    And spread illness because they can't afford to stay home
+    And public health costs of no sick leave
+    And presents evidence from cities with successful sick leave policies
+    And worker protection becomes public health imperative
+
+  Scenario: Activist connects workplace justice to municipal budget
+    Given city approved $5M tax break for developer
+    But refused to fund $500K worker center
+    When the Observer makes budget trade-offs visible
+    Then the activist exposes value priorities (corporate welfare vs worker support)
+    And shows developer already profitable without subsidy
+    And demonstrates worker center's community economic impact
+    And organizes campaign to redirect public resources
+    And municipal priorities become labor justice battleground

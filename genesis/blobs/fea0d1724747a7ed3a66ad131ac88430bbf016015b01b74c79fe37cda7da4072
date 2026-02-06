@@ -1,0 +1,11 @@
+Scenario: Building care economy capital for future aging needs
+    Given Margaret is watching her mother navigate advanced aging
+    And Margaret recognizes she will need care in 10-20 years
+    When Margaret makes care contributions now
+    Then care tokens should accumulate to her individual account
+    And these tokens should represent future care economy resources
+    And the system should help her build reciprocal relationships
+    And she should be preparing for her own increasing care needs
+    And current contributions should create future security
+    And Margaret should experience agency in planning her own aging
+    And care economy capital should provide retirement resilience

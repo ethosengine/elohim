@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elohim Node Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">E</span>
+            <span class="brand-text">Elohim Node</span>
+        </div>
+        <div class="nav-center">
+            <div class="node-selector">
+                <button id="node-selector-btn" class="node-selector-btn">
+                    <span id="current-node-name">This Node</span>
+                    <span class="dropdown-arrow">&#x25BC;</span>
+                </button>
+                <div id="node-dropdown" class="node-dropdown">
+                    <div class="node-dropdown-header">Switch Node</div>
+                    <div id="node-list" class="node-list">
+                        <!-- Nodes populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="nav-status">
+            <span id="viewing-remote" class="viewing-remote" style="display: none;">
+                Viewing: <span id="remote-node-name">-</span>
+                <button id="return-local-btn" class="btn btn-small">Return to Local</button>
+            </span>
+            <span id="cluster-status" class="status-badge status-unknown">Unknown</span>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Node Info -->
+        <section class="card">
+            <h2>Node Information</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Node ID</label>
+                    <span id="node-id">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Hostname</label>
+                    <span id="hostname">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Cluster</label>
+                    <span id="cluster-name">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Role</label>
+                    <span id="cluster-role">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Uptime</label>
+                    <span id="uptime">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Version</label>
+                    <span id="version">-</span>
+                </div>
+            </div>
+
+            <!-- System Info -->
+            <div class="subsection">
+                <h3>System</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>OS</label>
+                        <span id="sys-os">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Kernel</label>
+                        <span id="sys-kernel">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Architecture</label>
+                        <span id="sys-arch">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Boot Time</label>
+                        <span id="sys-boot">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Machine ID</label>
+                        <span id="sys-machine-id" class="monospace">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Primary IP</label>
+                        <span id="sys-primary-ip">-</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Node Health Conditions -->
+        <section class="card">
+            <h2>Health Conditions</h2>
+            <div class="conditions-grid">
+                <div class="condition-item" id="cond-ready">
+                    <span class="condition-icon">&#x2714;</span>
+                    <div class="condition-info">
+                        <span class="condition-name">Ready</span>
+                        <span class="condition-message" id="cond-ready-msg">-</span>
+                    </div>
+                </div>
+                <div class="condition-item" id="cond-memory">
+                    <span class="condition-icon">&#x2714;</span>
+                    <div class="condition-info">
+                        <span class="condition-name">MemoryPressure</span>
+                        <span class="condition-message" id="cond-memory-msg">-</span>
+                    </div>
+                </div>
+                <div class="condition-item" id="cond-disk">
+                    <span class="condition-icon">&#x2714;</span>
+                    <div class="condition-info">
+                        <span class="condition-name">DiskPressure</span>
+                        <span class="condition-message" id="cond-disk-msg">-</span>
+                    </div>
+                </div>
+                <div class="condition-item" id="cond-pid">
+                    <span class="condition-icon">&#x2714;</span>
+                    <div class="condition-info">
+                        <span class="condition-name">PIDPressure</span>
+                        <span class="condition-message" id="cond-pid-msg">-</span>
+                    </div>
+                </div>
+                <div class="condition-item" id="cond-network">
+                    <span class="condition-icon">&#x2714;</span>
+                    <div class="condition-info">
+                        <span class="condition-name">NetworkReady</span>
+                        <span class="condition-message" id="cond-network-msg">-</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Service Health -->
+        <section class="card">
+            <h2>Services</h2>
+            <div class="services-grid" id="services-list">
+                <!-- Services will be rendered by JS -->
+            </div>
+        </section>
+
+        <!-- Network Membership -->
+        <section class="card" id="network-section">
+            <h2>Network Membership</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Status</label>
+                    <span id="network-status" class="status-badge">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Operator</label>
+                    <span id="operator-name">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Registered</label>
+                    <span id="registered-at">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Last Heartbeat</label>
+                    <span id="last-heartbeat">-</span>
+                </div>
+            </div>
+
+            <!-- Doorways -->
+            <div class="subsection">
+                <h3>Doorways</h3>
+                <div id="doorways-list" class="doorways-list">
+                    <p class="empty-state">Not connected to any doorways</p>
+                </div>
+            </div>
+
+            <!-- Sync Progress -->
+            <div class="subsection">
+                <h3>Sync Progress</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>State</label>
+                        <span id="sync-state">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Position</label>
+                        <span id="sync-position">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Documents</label>
+                        <span id="docs-synced">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Blobs</label>
+                        <span id="blobs-synced">-</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Connected Apps -->
+        <section class="card">
+            <h2>Connected Apps</h2>
+            <div class="info-grid" id="apps-summary">
+                <div class="info-item">
+                    <label>Total Connected</label>
+                    <span id="apps-total">0</span>
+                </div>
+                <div class="info-item">
+                    <label>Currently Syncing</label>
+                    <span id="apps-syncing">0</span>
+                </div>
+            </div>
+            <div id="apps-list" class="apps-list">
+                <p class="empty-state">No apps connected</p>
+            </div>
+        </section>
+
+        <!-- Resource Metrics -->
+        <section class="card">
+            <h2>Resource Metrics</h2>
+            <div class="metrics-grid">
+                <!-- CPU -->
+                <div class="metric-card">
+                    <h3>CPU</h3>
+                    <div class="metric-value">
+                        <span id="cpu-usage">0</span>%
+                    </div>
+                    <div class="progress-bar">
+                        <div id="cpu-bar" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-details">
+                        <span id="cpu-cores">0 cores</span>
+                        <span id="cpu-model">-</span>
+                    </div>
+                    <div class="metric-details">
+                        <span>Load: <span id="load-avg">0.00, 0.00, 0.00</span></span>
+                    </div>
+                </div>
+
+                <!-- Memory -->
+                <div class="metric-card">
+                    <h3>Memory</h3>
+                    <div class="metric-value">
+                        <span id="mem-usage">0</span>%
+                    </div>
+                    <div class="progress-bar">
+                        <div id="mem-bar" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-details">
+                        <span id="mem-used">0 GB</span> / <span id="mem-total">0 GB</span>
+                    </div>
+                    <div class="metric-details">
+                        <span>Swap: <span id="swap-used">0 GB</span> / <span id="swap-total">0 GB</span></span>
+                    </div>
+                </div>
+
+                <!-- Disk -->
+                <div class="metric-card">
+                    <h3>Disk</h3>
+                    <div class="metric-value">
+                        <span id="disk-usage">0</span>%
+                    </div>
+                    <div class="progress-bar">
+                        <div id="disk-bar" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="metric-details">
+                        <span id="disk-used">0 GB</span> / <span id="disk-total">0 GB</span>
+                    </div>
+                    <div class="metric-details">
+                        <span id="disk-mount">/var/lib/elohim</span>
+                    </div>
+                </div>
+
+                <!-- Network -->
+                <div class="metric-card">
+                    <h3>Network</h3>
+                    <div class="metric-value">
+                        <span id="net-connections">0</span> conn
+                    </div>
+                    <div class="metric-details">
+                        <span>RX: <span id="net-rx">0 MB</span></span>
+                        <span>TX: <span id="net-tx">0 MB</span></span>
+                    </div>
+                    <div class="metric-details">
+                        <span id="net-interfaces">0 interfaces</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Temperature Sensors -->
+        <section class="card" id="temps-section">
+            <h2>Temperature Sensors</h2>
+            <div class="temps-grid" id="temps-list">
+                <p class="empty-state">No temperature sensors detected</p>
+            </div>
+        </section>
+
+        <!-- Storage Volumes -->
+        <section class="card">
+            <h2>Storage Volumes</h2>
+            <div class="volumes-list" id="volumes-list">
+                <p class="empty-state">No volumes detected</p>
+            </div>
+        </section>
+
+        <!-- Elohim Status -->
+        <section class="card">
+            <h2>Elohim Status</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Synced Documents</label>
+                    <span id="synced-docs">0</span>
+                </div>
+                <div class="info-item">
+                    <label>Stored Blobs</label>
+                    <span id="stored-blobs">0</span>
+                </div>
+                <div class="info-item">
+                    <label>Storage Used</label>
+                    <span id="storage-used">0 MB</span>
+                </div>
+                <div class="info-item">
+                    <label>Connected Peers</label>
+                    <span id="connected-peers">0</span>
+                </div>
+                <div class="info-item">
+                    <label>Discovered Peers</label>
+                    <span id="discovered-peers">0</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Updates -->
+        <section class="card">
+            <h2>
+                Software Updates
+                <button id="check-updates-btn" class="btn btn-small">Check for Updates</button>
+            </h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Current Version</label>
+                    <span id="current-version">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Update Status</label>
+                    <span id="update-status" class="status-badge">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Auto-Update</label>
+                    <span id="auto-update">-</span>
+                </div>
+            </div>
+            <div id="update-actions" class="update-actions" style="display: none;">
+                <div id="update-info" class="update-info"></div>
+                <div class="btn-group">
+                    <button id="apply-update-btn" class="btn btn-primary">Apply Update</button>
+                    <button id="rollback-btn" class="btn btn-secondary">Rollback</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Discovered Peers -->
+        <section class="card">
+            <h2>
+                Local Network Peers
+                <button id="scan-btn" class="btn btn-small">Scan Network</button>
+            </h2>
+            <div id="peers-list" class="peers-list">
+                <p class="empty-state">No peers discovered on local network</p>
+            </div>
+        </section>
+
+        <!-- Pairing Requests -->
+        <section class="card" id="pairing-section" style="display: none;">
+            <h2>Pairing Requests</h2>
+            <div id="pairing-list" class="pairing-list">
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

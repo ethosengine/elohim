@@ -1,0 +1,10 @@
+Scenario: Right to disconnect maintained despite vulnerability
+    Given Helen is elderly and vulnerable
+    And constitutional constraints apply at all layers
+    When Helen or her designated advocate chooses to disconnect
+    Then the system must honor disconnection immediately
+    And no manipulative retention patterns should be employed
+    And her right to refuse participation must be absolute
+    And vulnerability does not diminish constitutional rights
+    And data deletion must occur per her instructions
+    And autonomy includes the right to reject the protocol entirely

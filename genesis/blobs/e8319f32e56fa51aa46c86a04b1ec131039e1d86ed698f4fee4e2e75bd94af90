@@ -1,0 +1,11 @@
+Scenario: Building adult financial capability through practice
+    Given Jasmine manages portions of her household budget
+    And she has responsibility for weekly grocery shopping
+    And her family has allocated $100/week for her to manage
+    When Jasmine makes purchasing decisions
+    Then her personal_agent should track spending against budget
+    And provide analysis of value optimization
+    And highlight patterns: "You've stayed within budget 7 of 8 weeks"
+    And surface learning opportunities: "Buying bulk rice saved $12 this month"
+    And build sophisticated financial literacy through real practice
+    And scaffold her capability without removing decision-making authority

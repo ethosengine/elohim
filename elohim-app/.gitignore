@@ -7,7 +7,7 @@
 /bazel-out
 
 # Node
-/node_modules
+node_modules/
 npm-debug.log
 yarn-error.log
 
@@ -37,6 +37,17 @@ yarn-error.log
 testem.log
 /typings
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
 # System files
 .DS_Store
 Thumbs.db
+
+# Build artifacts (generated during CI)
+/src/assets/sophia-plugin/
+/src/assets/react/

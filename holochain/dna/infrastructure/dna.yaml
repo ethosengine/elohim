@@ -1,0 +1,17 @@
+# Infrastructure DNA - Doorway Federation & Network Operations
+---
+manifest_version: "0"
+name: infrastructure
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: infrastructure_integrity
+      path: "target/wasm32-unknown-unknown/release/infrastructure_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: infrastructure
+      path: "target/wasm32-unknown-unknown/release/infrastructure.wasm"
+      dependencies:
+        - name: infrastructure_integrity

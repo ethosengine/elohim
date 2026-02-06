@@ -1,0 +1,10 @@
+Scenario: Making purchasing decisions within budget
+    Given Jordan receives a weekly personal allowance
+    And Jordan wants to buy something they enjoy
+    When Jordan uses the shopping feature at the store
+    Then the personal_agent shows Jordan's available money visually
+    And the interface helps Jordan compare item prices to their budget
+    And Jordan can choose what to buy within their means
+    And the system celebrates Jordan's smart money choices
+    And Jordan experiences genuine financial autonomy
+    And Jordan learns from their purchasing decisions

@@ -1,0 +1,9 @@
+Scenario: Former owner role evolves from command to facilitation
+    Given Rosa was sole decision-maker carrying full responsibility
+    And transition steward role requires fundamentally different skills
+    When Rosa begins facilitating rather than commanding
+    Then her proposals become suggestions workers can accept or modify
+    And her expertise is valued through consultation, not authority
+    And conflicts are resolved through democratic process, not owner decree
+    And workers request her input because it's helpful, not because it's mandated
+    And workplace_elohim ensures boundaries prevent hierarchical creep

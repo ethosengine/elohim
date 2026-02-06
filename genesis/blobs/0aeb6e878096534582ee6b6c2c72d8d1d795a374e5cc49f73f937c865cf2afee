@@ -1,0 +1,11 @@
+Scenario: Ecological wisdom from lifetime of experience
+    Given Helen has observed environmental changes over 82 years
+    And her generation has knowledge of pre-industrial practices
+    When Helen shares ecological knowledge
+    Then her observations should inform environmental education
+    And traditional sustainable practices should be preserved
+    And her lifetime of data should be valued in climate education
+    And care tokens should reflect her contribution to ecological stewardship
+    And the protocol should recognize elders as environmental historians
+    And ecological education should include elder perspectives
+    And Helen's knowledge should contribute to community sustainability

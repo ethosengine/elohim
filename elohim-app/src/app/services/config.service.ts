@@ -1,6 +1,10 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
+// @coverage: 100.0% (2026-02-05)
+
 import { Observable, of, shareReplay, map, catchError } from 'rxjs';
+
 import { environment } from '../../environments/environment';
 
 export interface AppConfig {
@@ -10,15 +14,15 @@ export interface AppConfig {
 
 const DEFAULT_PROD_CONFIG: AppConfig = {
   logLevel: 'error',
-  environment: 'production'
+  environment: 'production',
 } as const;
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ConfigService {
   private readonly http = inject(HttpClient);
-  
+
   readonly config$: Observable<AppConfig> = this.createConfigStream();
 
   private createConfigStream(): Observable<AppConfig> {
@@ -36,7 +40,7 @@ export class ConfigService {
   private getDevConfig(): AppConfig {
     return {
       logLevel: environment.logLevel || 'debug',
-      environment: environment.environment || 'development'
+      environment: environment.environment || 'development',
     };
   }
 

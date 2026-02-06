@@ -1,0 +1,9 @@
+Scenario: Family culture of visible, valued, reciprocal care
+    Given Sarah is building family culture around care economy
+    And she wants care to be visible and valued by all members
+    When family care patterns develop over time
+    Then the family_elohim should make all contributions visible
+    And recognition should flow in all directions
+    And family culture should value care labor explicitly
+    And reciprocity should be practiced, not just preached
+    And family should become care economy demonstration site

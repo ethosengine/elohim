@@ -1,0 +1,10 @@
+Scenario: Child's substantive care contributions visible to family
+    Given Emma has made budget-conscious cereal choice
+    And she selected store brand to save $2
+    When the family_elohim processes the contribution
+    Then Emma's stewardship should be visible on family dashboard
+    And parent Sarah should receive specific recognition prompts
+    And the prompt should highlight Emma's economic reasoning
+    And the contribution should be attributed with concrete impact
+    And family care tokens should reflect genuine value created
+    And visibility should enable meaningful parental acknowledgment

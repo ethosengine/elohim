@@ -1,0 +1,10 @@
+Scenario: Successfully overturning an agent decision through appeal
+    Given I appealed a personal autonomy decision
+    And the Constitutional Council has reviewed my case
+    When the council rules that the agent overstepped constitutional bounds
+    Then the agent's decision is immediately overturned
+    And my preferences are updated automatically in the system
+    And the incident is documented as an error in the agent's record
+    And Similar future interventions require higher thresholds
+    And I receive notification of the outcome with full reasoning
+    And Protocol improvements are proposed based on my case

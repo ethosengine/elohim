@@ -1,0 +1,10 @@
+Scenario: Coordinate resource allocation across diverse neighborhoods
+    Given downtown needs economic development support
+    And residential areas prioritize environmental protection
+    And outskirts need infrastructure investment
+    When Municipal Elohim analyzes resource allocation
+    Then agent shows resource flows and gaps across neighborhoods
+    And agent identifies conflicts and synergies
+    And Jamal facilitates city council deliberation with agent data
+    And city council makes democratic allocation decisions
+    And protocol enables informed democratic choice

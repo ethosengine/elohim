@@ -1,0 +1,10 @@
+Scenario: Municipal public transit serves retired residents without car access
+    Given Frank may not be able to afford car ownership
+    And he relies on public transit and walking
+    When the municipal_elohim coordinates transportation
+    Then public transit should serve Frank's mobility needs effectively
+    And routes and schedules should accommodate non-employment patterns
+    And transit should enable access to medical, social, and civic destinations
+    And affordable transit should support continued community participation
+    And Frank should maintain mobility and independence through public infrastructure
+    And municipal transportation should serve residents across lifespan

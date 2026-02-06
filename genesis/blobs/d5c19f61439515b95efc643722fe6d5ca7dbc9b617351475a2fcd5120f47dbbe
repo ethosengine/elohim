@@ -1,0 +1,10 @@
+Scenario: Climate adaptation knowledge from lived experience
+    Given Margaret has observed environmental changes over decades
+    And adaptation requires long-term observation
+    When the bioregional_elohim coordinates climate adaptation
+    Then Margaret's observations should inform adaptation strategies
+    And her knowledge of changing patterns should be valued
+    And long-term perspective should shape bioregional planning
+    And senior experience should guide community resilience
+    And climate adaptation should benefit from elder wisdom
+    And Margaret's lifetime of observation should serve collective response

@@ -1,0 +1,9 @@
+Scenario: Medical record integration for comprehensive care coordination
+    Given David's medical information is scattered across providers
+    And comprehensive view is essential for good care
+    When the healthcare_elohim accesses medical records
+    Then it should integrate information across healthcare systems
+    And James should have complete medical picture
+    And providers should receive comprehensive information
+    And medical record fragmentation should be addressed
+    And care coordination should be supported by integrated data

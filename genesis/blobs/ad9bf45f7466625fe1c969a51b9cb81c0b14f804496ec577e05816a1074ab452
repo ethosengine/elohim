@@ -1,0 +1,9 @@
+Scenario: Responsible developer demonstrates genuine sustainability commitment
+    Given a developer builds with high environmental standards
+    And wants sustainability track record to be visible and valued
+    When the Observer documents environmental performance
+    Then the developer shows: LEED Platinum certification on 8 of 10 projects
+    And stormwater management exceeds regulatory requirements by 40%
+    And green infrastructure investment totals $4M beyond minimum requirements
+    And environmental commitments were kept not just promised
+    And genuine sustainability creates market differentiation

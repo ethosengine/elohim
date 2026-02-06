@@ -1,0 +1,10 @@
+Scenario: Learning meal planning without formal training
+    Given Aisha has minimal cooking experience
+    And she wants to eat nutritiously on a tight budget
+    When Aisha requests meal planning assistance
+    Then the personal_agent should suggest recipes based on her skill level
+    And recommendations should optimize nutrition per dollar
+    And the system should consider ingredients she already has
+    And the agent should teach cooking skills progressively
+    And meal plans should fit her time constraints
+    And the interface should feel like a patient teacher, not a critic

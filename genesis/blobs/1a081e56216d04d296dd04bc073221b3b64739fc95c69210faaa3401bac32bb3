@@ -1,0 +1,9 @@
+Scenario: Building nutrition awareness while managing costs
+    Given Aisha has been working through lunch frequently
+    And her energy levels are declining
+    When the personal_agent reviews her eating patterns
+    Then it should flag the concerning pattern
+    And it should say "You've worked through lunch four days this week"
+    And it should suggest quick, nutritious options within budget
+    And the agent should help her see self-care as essential, not optional
+    And recommendations should balance nutrition, cost, and time constraints

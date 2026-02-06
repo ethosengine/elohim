@@ -1,0 +1,10 @@
+Scenario: Teen participates in municipal sustainability initiatives
+    Given the municipality has climate action and sustainability goals
+    And Jasmine makes consumption choices reflecting environmental values
+    When she participates in municipal environmental programs
+    Then her ecological care work should be tracked and valued
+    And municipal_elohim should aggregate youth environmental contributions
+    And recognize that youth climate activism is care work for future generations
+    And connect individual choices to municipal sustainability metrics
+    And demonstrate that youth environmental leadership advances city goals
+    And support her generation's investment in climate action

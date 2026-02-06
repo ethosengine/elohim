@@ -1,0 +1,50 @@
+{
+  "name": "holochain-seeder",
+  "version": "1.0.0",
+  "description": "Seed structured JSON from /data/lamad into Holochain",
+  "type": "module",
+  "scripts": {
+    "validate": "npx tsx src/schema-validation.ts ../data/lamad/content",
+    "validate:verbose": "npx tsx src/schema-validation.ts ../data/lamad/content --verbose",
+    "bootstrap": "npx tsx src/bootstrap.ts",
+    "seed": "npx tsx src/seed.ts",
+    "genesis:pack": "npx tsx src/genesis-pack.ts",
+    "genesis:pack:dry": "npx tsx src/genesis-pack.ts --dry",
+    "seed:validate": "npx tsx src/seed.ts --validate-only",
+    "seed:dry-run": "npx tsx src/seed.ts --dry-run",
+    "seed:dev": "DOORWAY_URL='https://doorway-dev.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' npx tsx src/seed.ts",
+    "stats": "npx tsx src/stats.ts",
+    "stats:dev": "HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' npx tsx src/stats.ts",
+    "stats:prod": "HOLOCHAIN_ADMIN_URL='wss://doorway.elohim.host?apiKey=$ELOHIM_PROD_API_KEY' npx tsx src/stats.ts",
+    "snapshot": "npx tsx src/snapshot.ts",
+    "snapshot:save": "npx tsx src/snapshot.ts save",
+    "snapshot:create": "npx tsx src/snapshot.ts create",
+    "snapshot:restore": "npx tsx src/snapshot.ts restore",
+    "snapshot:clean": "npx tsx src/snapshot.ts clean",
+    "snapshot:status": "npx tsx src/snapshot.ts status",
+    "snapshot:list": "npx tsx src/snapshot.ts list",
+    "hc:start:snapshot": "hc sandbox run --root /projects/elohim/holochain/local-dev/conductor-data -p=4445",
+    "diagnose": "npx tsx src/diagnose.ts",
+    "diagnose:dev": "HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' DOORWAY_URL='https://doorway-dev.elohim.host' npx tsx src/diagnose.ts",
+    "diagnose:apps": "npx tsx src/diagnose.ts --apps --cells",
+    "diagnose:content": "npx tsx src/diagnose.ts --content",
+    "debug:stream": "npx tsx src/debug-stream.ts",
+    "debug:stream:dev": "DOORWAY_URL='https://doorway-dev.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' npx tsx src/debug-stream.ts",
+    "seed:test-admin": "npx tsx src/seed-test-admin.ts",
+    "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-dev.elohim.host' npx tsx src/seed-test-admin.ts"
+  },
+  "dependencies": {
+    "@elohim/storage-client": "file:../../holochain/sdk/storage-client-ts",
+    "@holochain/client": "^0.20.1",
+    "multiformats": "^13.4.1",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
+    "@vitest/coverage-v8": "^4.0.18",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
+  }
+}

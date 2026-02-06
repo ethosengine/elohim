@@ -1,0 +1,11 @@
+Scenario: Ethical data practices respecting community sovereignty
+    Given I am studying Riverside residents and their governance
+    And I have access to sensitive information about their lives
+    When I conduct research following ethical protocols
+    Then I obtain: informed consent from all research participants
+    And I ensure: anonymization and privacy protection in publications
+    And I provide: community review of findings before publication (for accuracy)
+    And I share: research benefits with Riverside (payments support community fund)
+    And I respect: community right to revoke access if research becomes harmful
+    And I practice: research ethics aligned with dignity principles protocol embodies
+    And My methodology demonstrates: how to study communities without extracting from them

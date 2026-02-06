@@ -1,0 +1,12 @@
+Scenario: Family history and care patterns made visible across generations
+    Given care patterns often repeat across generations
+    And Robert learned care from his parents' care for their parents
+    And he's modeling care for the next generation
+    When family_elohim surfaces family care history
+    Then it should help Robert see multigenerational care patterns
+    And recognize: "Your parents provided similar care for your grandparents"
+    And surface how his current care teaches his children
+    And connect past care received to present care given to future care needed
+    And help family understand care as lifecycle reciprocity
+    And validate that Robert's care continues family care traditions
+    And prepare next generation to provide care when Robert needs it

@@ -1,0 +1,11 @@
+Scenario: Grappling with my influence on decisions affecting millions
+    Given my testimony shapes National Council decisions
+    And those decisions affect millions of people
+    When I reflect on the weight of my responsibility
+    Then I feel: burden of expertise influencing democratic governance
+    And I worry: about errors in my analysis causing harm
+    And I accept: that I must act under uncertainty
+    And I commit: to honesty about my limitations
+    And I trust: democratic process to weigh my input appropriately
+    And I practice: epistemic humility while still providing expertise
+    And I demonstrate: expertise serving democracy despite uncertainty

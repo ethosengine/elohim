@@ -1,0 +1,10 @@
+Scenario: Teen learns how local policy affects daily life
+    Given Jasmine participates in municipal care economy
+    And local policies shape her lived experience
+    When she engages with municipal systems through the Value Scanner
+    Then the municipal_elohim should make policy connections visible
+    And explain how local food policy affects her grocery shopping
+    And show how zoning decisions impact neighborhood walkability
+    And connect transit policy to her ability to access work and school
+    And help her understand that municipal governance is not abstract
+    And build her civic literacy through connection to daily experience

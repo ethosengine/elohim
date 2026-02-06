@@ -1,0 +1,9 @@
+Scenario: State legislator builds coalition for statewide healthcare reform
+    Given the politician champions Medicaid expansion
+    And needs bipartisan support for passage
+    When the Observer identifies coalition building opportunities
+    Then they see rural hospitals support expansion for financial survival
+    And identify business groups concerned about employee healthcare costs
+    And connect with faith organizations serving uninsured populations
+    And map which legislators have constituent pressure for expansion
+    And build diverse coalition across partisan and geographic divides

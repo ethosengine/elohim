@@ -1,0 +1,9 @@
+Scenario: Schools challenge single-parent deficit narratives through care economy data
+    Given society often views single-parent families as inherently problematic
+    And this stigma affects how teachers and administrators view Maria's children
+    When schools engage with single-parent families
+    Then the educational_elohim should provide care economy data showing single parents' contributions
+    And schools should recognize single parents as providing extraordinary care
+    And deficit narratives about single-parent families should be challenged with evidence
+    And Maria and her children should be treated with respect, not pity
+    And educational systems should support single-parent family thriving, not assume deficiency

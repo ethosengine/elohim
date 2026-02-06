@@ -1,0 +1,9 @@
+Scenario: Successful conversion demonstrates viability to municipal economic development officials
+    Given city economic development typically subsidizes corporate expansion
+    And officials are skeptical of alternative ownership models
+    When Rosa's conversion proves successful with documented outcomes
+    Then municipality sees concrete evidence: workers earning living wages without subsidies
+    And job quality improves (higher wages, benefits, ownership) without tax breaks
+    And community institution is preserved, not destroyed by corporate acquisition
+    And municipal economic development data shows democratic ownership creates better outcomes
+    And municipality_elohim provides officials with impact documentation

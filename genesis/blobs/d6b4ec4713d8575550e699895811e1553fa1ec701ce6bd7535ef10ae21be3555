@@ -1,0 +1,9 @@
+Scenario: Teacher advocates for professional development that actually helps
+    Given district mandates professional development hours
+    But most PD is generic and doesn't improve teaching
+    When teachers evaluate professional development through Observer
+    Then teachers rate 75% of required PD as not useful for their teaching
+    And identify what actually helps (job-embedded coaching, subject-specific content)
+    And document time wasted on compliance PD vs productive professional learning
+    And negotiate for teacher voice in PD planning and evaluation
+    And professional development becomes professional not bureaucratic

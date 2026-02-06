@@ -1,0 +1,11 @@
+Scenario: Comparing protocol adoption outcomes across hundreds of communities
+    Given I am studying all communities in the state that adopted Elohim Protocol
+    And I have comparison group of similar communities without adoption
+    When I analyze outcomes data from 200+ communities over 5 years
+    Then I examine: which communities adopted and which didn't (selection patterns)
+    And I measure: wellbeing, trust, economic resilience, social cohesion differences
+    And I use: difference-in-differences analysis to estimate causal effects
+    And I control: for demographics, economics, political culture confounds
+    And I identify: what predicts adoption success vs struggle
+    And I provide: statistical evidence about protocol effectiveness at scale
+    And I distinguish: average effects from heterogeneous effects across community types

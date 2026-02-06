@@ -1,0 +1,10 @@
+Scenario: Accessibility features support diverse learning needs
+    Given Emma may have varied learning needs
+    And accessibility is required for equitable education
+    When Emma uses educational features of the scanner
+    Then multiple modalities should be available (visual, audio, text)
+    And reading support should be provided as needed
+    And math scaffolding should be accessible
+    And voice guidance should be option
+    And interface should serve children with diverse abilities
+    And educational access should be universal

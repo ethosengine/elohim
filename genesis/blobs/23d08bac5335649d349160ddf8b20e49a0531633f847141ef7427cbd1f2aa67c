@@ -1,0 +1,10 @@
+Scenario: Municipal care economy data informs state and federal policy
+    Given Riverside municipality has comprehensive care economy data
+    And thousands of teens participate in tracked care contributions
+    When state or federal policymakers study youth economics
+    Then municipal_elohim should provide anonymized aggregate data
+    And demonstrate economic value of teen care contributions at scale
+    And inform policy about youth employment, education, and wellbeing
+    And show that care economy framework reveals invisible youth labor
+    And support evidence-based policy at higher governance levels
+    And contribute to national conversation about youth participation in economy

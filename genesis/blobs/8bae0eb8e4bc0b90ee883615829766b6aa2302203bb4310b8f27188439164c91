@@ -1,0 +1,10 @@
+Scenario: Community cultural events and intergenerational connection
+    Given communities thrive on cultural connection and celebration
+    And Sarah wants children integrated into community life
+    When the community_elohim coordinates cultural events
+    Then it should facilitate family participation in community culture
+    And it should recognize Sarah's work bringing children to events
+    And cultural transmission should be valued as care labor
+    And intergenerational community events should be prioritized
+    And the system should build community bonds across generations
+    And family participation should strengthen community cohesion

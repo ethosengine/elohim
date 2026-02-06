@@ -1,0 +1,8 @@
+Scenario: Making visible that industry depends on worker care labor
+    Given the food service industry depends entirely on workers' care labor
+    And workers are serving essential human needs (nourishment and community)
+    When the industry narrative treats workers as disposable
+    Then the protocol should make visible workers' essential contributions
+    And reframe food service as care work serving community flourishing
+    And build consciousness that workers deserve dignity and fair compensation
+    And transform industry culture from extraction to care economy alignment

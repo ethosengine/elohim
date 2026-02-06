@@ -1,0 +1,8 @@
+Scenario: Accessing community resources based on care contributions
+    Given I contribute significantly to community through my labor
+    And community has food banks, meal programs, and mutual aid resources
+    When I need support due to low wages or difficult circumstances
+    Then the protocol should connect me to community resources
+    And help me access support with dignity (not charity but reciprocity)
+    And recognize that I have standing based on my care contributions
+    And facilitate care economy where workers are supported by the community they serve

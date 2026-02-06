@@ -1,0 +1,11 @@
+Scenario: Household budget management on fixed retirement income
+    Given household operates on $28k/year fixed income
+    And income cannot be increased through employment
+    And resources must cover housing, food, healthcare, and participation
+    When Frank and his wife make household financial decisions
+    Then the household_elohim should track spending against fixed budget
+    And it should identify optimization opportunities without stigma
+    And it should integrate financial constraints with care contribution goals
+    And it should help both partners make informed trade-offs
+    And budget should reflect care priorities and community participation
+    And financial management should maintain dignity and agency

@@ -1,0 +1,11 @@
+Scenario: Neighborhood beautification and common space maintenance
+    Given Frank has time and skills to contribute to neighborhood spaces
+    And common spaces require ongoing care and maintenance
+    When the neighborhood_elohim coordinates common space work
+    Then it should facilitate Frank's participation in beautification
+    And coordinate neighborhood workdays utilizing his skills
+    And recognize landscaping, repair, and maintenance as care labor
+    And value his contributions to neighborhood quality of life
+    And enable collective ownership of neighborhood commons
+    And Frank should experience meaningful contribution to place
+    And neighborhood should benefit from retired residents' time

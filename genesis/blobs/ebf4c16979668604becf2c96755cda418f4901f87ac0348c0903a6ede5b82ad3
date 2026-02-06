@@ -1,0 +1,11 @@
+Scenario: Family care coordination prevents burnout and exploitation
+    Given Frank provides substantial family care across contexts
+    And care work can become exploitative even within families
+    When family_elohim monitors Frank's care burden
+    Then it should flag when contributions exceed sustainable levels
+    And surface if family is taking advantage without reciprocation
+    And recognize if Frank is sacrificing his wellbeing for family
+    And prompt discussions about fair distribution
+    And protect Frank from exploitation through visibility
+    And ensure family care operates on reciprocity, not extraction
+    And support Frank in maintaining boundaries

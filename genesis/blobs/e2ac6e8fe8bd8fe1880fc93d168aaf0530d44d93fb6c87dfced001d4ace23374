@@ -1,0 +1,10 @@
+Scenario: Local environmental impact visible through neighborhood patterns
+    Given Emma is learning ecological care concepts
+    And neighborhood aggregate data shows environmental impact
+    When Emma makes choices with environmental dimensions
+    Then her personal_agent should share community environmental patterns
+    And the agent should say "Your neighborhood has reduced plastic waste by choosing reusable bags"
+    And she should see how individual choices aggregate to ecological impact
+    And environmental stewardship should be connected to care economy
+    And she should learn community can collectively care for local environment
+    And ecological literacy should develop at appropriate scale

@@ -1,0 +1,9 @@
+Scenario: Seasonal supply coordination enables year-round democratic food service
+    Given individual farms have limited seasonal production windows
+    And restaurants need year-round supply but faced corporate distribution dependence
+    When democratic farms coordinate across climate zones and seasons
+    Then network provides diverse year-round supply through farmer coordination
+    And restaurants adapt menus to seasonal availability reducing waste
+    And farmers specialize in crops suited to their land and climate
+    And seasonal coordination provides reliability without standardization
+    And industry_sector_elohim coordinates seasonal supply across bioregional network

@@ -1,0 +1,9 @@
+Scenario: Journalist fact-checks employer claims during union campaign
+    Given workers organize union at major retailer
+    And employer makes claims about wages and benefits
+    When the Observer provides instant fact-checking against labor data
+    Then the journalist verifies wage claim is misleading (includes management)
+    And finds actual frontline worker wages below poverty level
+    And shows benefits exclude most workers due to hour restrictions
+    And identifies employer's union-busting expenditures
+    And publishes real-time fact-check supporting informed worker vote

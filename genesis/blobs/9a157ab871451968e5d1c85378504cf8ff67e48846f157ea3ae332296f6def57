@@ -1,0 +1,9 @@
+Scenario: Organizer holds city council accountable for campaign promises
+    Given council member promised affordable housing support during campaign
+    And the organizer's coalition delivered volunteer support and votes
+    When the council member votes on housing policy
+    Then the Observer tracks their votes against commitments
+    And shows the organizer their complete voting record
+    And provides evidence for accountability conversations
+    And makes politician's record visible to organized constituents
+    And electoral support creates ongoing accountability relationship

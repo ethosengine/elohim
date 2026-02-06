@@ -1,0 +1,9 @@
+Scenario: Journalist investigates playground neglect in underserved neighborhood
+    Given residents complain about dangerous playground conditions
+    And the journalist needs context on maintenance patterns
+    When the Observer provides hyperlocal infrastructure data
+    Then the journalist sees playground hasn't been maintained in 5 years
+    And compares to monthly maintenance in affluent neighborhoods
+    And documents injury reports and resident complaints ignored
+    And tracks city budget showing maintenance disparities
+    And publishes accountability story on infrastructure racism

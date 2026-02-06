@@ -1,0 +1,11 @@
+Scenario: Managing complex medication regimens with cognitive support
+    Given Alex may have multiple medications with complex schedules
+    And medication management is cognitively demanding
+    When Alex manages medications
+    Then the personal_agent should provide medication reminders
+    And it should track medication schedules and adherence
+    And it should alert Alex to potential interactions
+    And it should help Alex communicate with prescribers
+    And cognitive support should reduce medication management burden
+    And the protocol should serve Alex's health goals
+    And Alex should maintain control over medication decisions

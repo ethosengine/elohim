@@ -1,0 +1,375 @@
+# Edge Node Production Deployment
+#
+# Production Holochain conductor for elohim.host users.
+# Accessible at: doorway.elohim.host
+#
+# Architecture:
+#   Browser -> Doorway Gateway (auth + whitelist + worker pool) -> Conductor (localhost)
+#
+# Ports:
+#   - 4444: Conductor Admin WebSocket (localhost only)
+#   - 8444: socat proxy (pod-internal, for legacy/direct access)
+#   - 8080: Doorway Gateway (public, authenticated)
+---
+# Secret for Doorway Gateway API keys
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elohim-doorway-prod-secrets
+  namespace: elohim-prod
+type: Opaque
+stringData:
+  # IMPORTANT: These MUST be changed before production deployment!
+  # Use strong, unique keys generated with: openssl rand -hex 32
+  api-key-authenticated: "CHANGE-ME-prod-elohim-auth-2024"
+  api-key-admin: "CHANGE-ME-prod-elohim-admin-2024"
+  jwt-secret: "CHANGE-ME-prod-jwt-secret-use-openssl-rand-hex-32"
+---
+# ConfigMap for conductor configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elohim-edgenode-prod-config
+  namespace: elohim-prod
+data:
+  # hApp version to fetch from Harbor (latest = main branch builds)
+  happ-version: "latest"
+  conductor-config.yaml: |
+    # Holochain Conductor Configuration for Elohim Protocol (Production)
+    admin_interfaces:
+      - driver:
+          type: websocket
+          port: 4444
+          # Allow any origin - conductor only binds to localhost anyway
+          # Doorway gateway handles external authentication
+          allowed_origins: "*"
+    network:
+      # Bootstrap served by Doorway gateway
+      bootstrap_url: "https://doorway.elohim.host/bootstrap"
+      # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
+      signal_url: "wss://signal.doorway.elohim.host"
+      enable_mdns: false
+      enable_relaying: true
+      webrtc_config:
+        ice_servers:
+          - urls: ["stun:stun.cloudflare.com:3478"]
+          - urls: ["stun:stun.l.google.com:19302"]
+    data_root_path: "/var/local/lib/holochain"
+    keystore:
+      type: lair_server_in_proc
+      lair_root: "/var/local/lib/holochain/ks"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: holochain-data-prod
+  namespace: elohim-prod
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: microk8s-hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-data-prod
+  namespace: elohim-prod
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: microk8s-hostpath
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-edgenode-prod
+  namespace: elohim-prod
+  labels:
+    app: elohim-edgenode
+    environment: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elohim-edgenode
+      environment: prod
+  template:
+    metadata:
+      labels:
+        app: elohim-edgenode
+        environment: prod
+    spec:
+      nodeSelector:
+        node-type: operations
+      # Init container fetches hApp from Harbor registry using oras
+      initContainers:
+        - name: happ-fetcher
+          image: ghcr.io/oras-project/oras:v1.1.0
+          command: ['sh', '-c']
+          args:
+            - |
+              set -e
+              echo "Fetching hApp from Harbor registry..."
+              echo "Version: ${HAPP_VERSION}"
+
+              # Login to Harbor and pull artifact
+              oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${HAPP_VERSION} -o /happ
+
+              if [ -f /happ/elohim.happ ]; then
+                echo "✅ hApp downloaded successfully from Harbor"
+                ls -lh /happ/elohim.happ
+              else
+                echo "❌ Failed to download hApp from Harbor"
+                exit 1
+              fi
+          env:
+            - name: HAPP_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: elohim-edgenode-prod-config
+                  key: happ-version
+          volumeMounts:
+            - name: happ-volume
+              mountPath: /happ
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+      containers:
+        # Main Holochain conductor
+        - name: edgenode
+          image: harbor.ethosengine.com/ethosengine/elohim-edgenode:BUILD_NUMBER_PLACEHOLDER
+          env:
+            - name: CONDUCTOR_MODE
+              value: "true"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          volumeMounts:
+            - name: holochain-data
+              mountPath: /data
+            # Mount to template path - entrypoint.sh copies this to /etc/holochain/
+            - name: conductor-config
+              mountPath: /usr/local/share/holochain/conductor-config.template.yaml
+              subPath: conductor-config.yaml
+            # hApp volume - conductor needs access to install hApp
+            - name: happ-volume
+              mountPath: /opt/holochain
+          # Use exec probe since conductor binds to localhost
+          # bash supports /dev/tcp, ash/sh does not
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - "echo > /dev/tcp/127.0.0.1/4444"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - "echo > /dev/tcp/127.0.0.1/4444"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+        # Socat proxy for direct pod-internal access (legacy, not publicly exposed)
+        - name: ws-proxy
+          image: alpine/socat:latest
+          args:
+            - "TCP-LISTEN:8444,fork,reuseaddr"
+            - "TCP:127.0.0.1:4444"
+          ports:
+            - name: admin-ws-int
+              containerPort: 8444
+              protocol: TCP
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          readinessProbe:
+            tcpSocket:
+              port: 8444
+            initialDelaySeconds: 5
+            periodSeconds: 5
+        # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
+        # Production uses versioned tags for stability
+        - name: doorway
+          image: harbor.ethosengine.com/ethosengine/elohim-doorway:BUILD_NUMBER_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--listen"
+            - "0.0.0.0:8080"
+            - "--conductor-url"
+            - "ws://localhost:4444"
+          ports:
+            - name: gateway-ws
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: "warn,doorway=info"
+            - name: API_KEY_AUTHENTICATED
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-prod-secrets
+                  key: api-key-authenticated
+            - name: API_KEY_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-prod-secrets
+                  key: api-key-admin
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-prod-secrets
+                  key: jwt-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+        # hApp Installer - installs the hApp on conductor startup
+        # Production uses versioned tags for stability
+        # hApp is fetched by init container, not baked into image
+        - name: happ-installer
+          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:BUILD_NUMBER_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONDUCTOR_URL
+              value: "ws://localhost:4444"
+            - name: APP_ID
+              value: "elohim"
+            - name: MAX_RETRIES
+              value: "60"
+            - name: RETRY_DELAY_MS
+              value: "2000"
+            - name: HAPP_PATH
+              value: "/opt/holochain/elohim.happ"
+          volumeMounts:
+            - name: happ-volume
+              mountPath: /opt/holochain
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      volumes:
+        # Shared volume for hApp (fetched by init container)
+        - name: happ-volume
+          emptyDir: {}
+        - name: holochain-data
+          persistentVolumeClaim:
+            claimName: holochain-data-prod
+        - name: storage-data
+          persistentVolumeClaim:
+            claimName: storage-data-prod
+        - name: conductor-config
+          configMap:
+            name: elohim-edgenode-prod-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-edgenode-prod
+  namespace: elohim-prod
+  labels:
+    app: elohim-edgenode
+    environment: prod
+spec:
+  type: ClusterIP
+  ports:
+    # Internal socat proxy (for kubectl port-forward or pod-to-pod)
+    - name: admin-ws-int
+      port: 4444
+      targetPort: 8444
+      protocol: TCP
+    # Doorway Gateway (for public authenticated access)
+    - name: gateway-ws
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: elohim-edgenode
+    environment: prod
+---
+# Public Ingress - routes all traffic through authenticated Doorway Gateway
+# Supports: /admin, /app/*, /bootstrap/*, /api/v1/*
+# Signal subdomain: signal.doorway.elohim.host (tx5/SBD protocol)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: elohim-edgenode-prod
+  namespace: elohim-prod
+  annotations:
+    # WebSocket support for /admin, /app/*, signal subdomain
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
+    nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-prod"
+    # Required for WebSocket upgrade headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: public
+  tls:
+    - hosts:
+        - doorway.elohim.host
+        - signal.doorway.elohim.host
+      secretName: doorway-prod-tls
+  rules:
+    - host: doorway.elohim.host
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-edgenode-prod
+                port:
+                  number: 8080
+    - host: signal.doorway.elohim.host
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-edgenode-prod
+                port:
+                  number: 8080

@@ -1,32 +1,44 @@
-<div *ngIf="quiz" class="quiz-container p-4 max-w-2xl mx-auto">
-  <div *ngFor="let q of quiz.questions; let i = index" class="question mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+<div *ngIf="quiz && quiz.questions?.length" class="quiz-container p-4 max-w-2xl mx-auto">
+  <div
+    *ngFor="let q of quiz.questions; let i = index"
+    class="question mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg shadow"
+  >
     <h3 class="font-bold text-lg mb-3">{{ i + 1 }}. {{ q.question }}</h3>
 
     <div *ngIf="q.type === 'multiple-choice' || q.type === 'true-false'" class="options space-y-2">
-      <div *ngFor="let opt of q.options" class="option flex items-center">
-        <label class="flex items-center space-x-2 cursor-pointer">
-          <input
-            type="radio"
-            [name]="'q-' + q.id"
-            [value]="opt"
-            [checked]="answers.get(q.id) === opt"
-            (change)="selectAnswer(q.id, opt)"
-            [disabled]="submitted"
-            class="form-radio text-blue-600"
-          >
+      <div *ngFor="let opt of q.options; let optIdx = index" class="option flex items-center">
+        <input
+          type="radio"
+          [id]="'q-' + q.id + '-opt-' + optIdx"
+          [name]="'q-' + q.id"
+          [value]="opt"
+          [checked]="answers.get(q.id) === opt"
+          (change)="selectAnswer(q.id, opt)"
+          [disabled]="submitted"
+          class="form-radio text-blue-600"
+        />
+        <label
+          [for]="'q-' + q.id + '-opt-' + optIdx"
+          class="flex items-center space-x-2 cursor-pointer"
+        >
           <span>{{ opt }}</span>
         </label>
       </div>
     </div>
     <!-- Add other types if needed -->
 
-    <div *ngIf="submitted && quiz.showCorrectAnswers && q.explanation" class="explanation mt-3 p-3 bg-blue-50 dark:bg-blue-900 rounded text-sm">
-      <strong>Explanation:</strong> {{ q.explanation }}
+    <div
+      *ngIf="submitted && quiz.showCorrectAnswers && q.explanation"
+      class="explanation mt-3 p-3 bg-blue-50 dark:bg-blue-900 rounded text-sm"
+    >
+      <strong>Explanation:</strong>
+      {{ q.explanation }}
     </div>
   </div>
 
   <div class="actions mt-6 flex flex-col items-center">
     <button
+      type="button"
       *ngIf="!submitted"
       (click)="submitQuiz()"
       class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
@@ -40,8 +52,9 @@
         {{ passed ? 'Passed!' : 'Try Again' }}
       </h2>
       <p class="text-xl mb-4">Score: {{ score }}% (Required: {{ quiz.passingScore }}%)</p>
-      
+
       <button
+        type="button"
         *ngIf="quiz.allowRetake"
         (click)="retake()"
         class="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
@@ -51,6 +64,9 @@
     </div>
   </div>
 </div>
-<div *ngIf="!quiz" class="text-center text-gray-500">
-  Loading quiz...
+<div *ngIf="!quiz || !quiz.questions?.length" class="text-center p-8">
+  <div class="text-gray-500 dark:text-gray-400">
+    <p class="text-lg mb-2">Quiz not available</p>
+    <p class="text-sm">This assessment content is not yet configured with quiz questions.</p>
+  </div>
 </div>

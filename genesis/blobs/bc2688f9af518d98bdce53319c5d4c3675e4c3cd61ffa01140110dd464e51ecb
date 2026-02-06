@@ -1,0 +1,9 @@
+Scenario: Manager derives legitimacy from consent rather than hierarchical appointment
+    Given Marcus was previously appointed by corporate, not chosen by workers
+    And workers resented his authority as imposed
+    When democratic governance structures are established
+    Then Marcus's coordinator role requires ongoing worker consent
+    And workers evaluate his facilitation effectiveness quarterly
+    And workers can democratically recall him if he fails to serve collective interests
+    And his legitimacy is earned through effective service, not imposed through hierarchy
+    And workplace_elohim ensures fair evaluation process

@@ -1,0 +1,7 @@
+Scenario: Advocating for sustainable food practices at work
+    Given my workplace makes decisions about sourcing and operations
+    When I want to advocate for more sustainable and care-aligned practices
+    Then the protocol should help me propose sustainable improvements
+    Such as local sourcing, waste reduction, composting, sustainable packaging
+    And provide evidence for ecological and economic benefits
+    And support me in advocating for care-economy-aligned food operations

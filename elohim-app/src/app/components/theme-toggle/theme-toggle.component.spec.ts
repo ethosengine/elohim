@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ThemeToggleComponent } from './theme-toggle.component';
-import { ThemeService } from '../../services/theme.service';
+
 import { of } from 'rxjs';
+
+import { ThemeService } from '../../services/theme.service';
+
+import { ThemeToggleComponent } from './theme-toggle.component';
 
 describe('ThemeToggleComponent', () => {
   let component: ThemeToggleComponent;
@@ -14,9 +17,7 @@ describe('ThemeToggleComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ThemeToggleComponent],
-      providers: [
-        { provide: ThemeService, useValue: mockThemeService }
-      ]
+      providers: [{ provide: ThemeService, useValue: mockThemeService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ThemeToggleComponent);

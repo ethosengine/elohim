@@ -1,0 +1,10 @@
+Scenario: Household space and logistics for grandchild care
+    Given Margaret cares for grandchildren in their household
+    And this requires child-friendly space and supplies
+    When the household_elohim tracks space usage
+    Then it should recognize household space devoted to grandchild care
+    And it should help maintain appropriate supplies (toys, books, safety items)
+    And it should coordinate space needs with household preferences
+    And both partners should agree on household modifications for care
+    And home should serve both grandparenting and household needs
+    And space allocation should be mutually agreed

@@ -1,0 +1,11 @@
+Scenario: Teen's paid work recognized as care labor
+    Given Jasmine works in retail serving customers
+    And traditional economics treats this as market transaction only
+    When workplace_elohim processes her work
+    Then it should recognize that her labor is care work
+    And helping customers find what they need is care
+    And supporting co-workers is care
+    And contributing to community through her work is care
+    And she should learn to see all work through care economy lens
+    And understand that service work is valuable care labor
+    And expect her work to be valued as contribution to collective flourishing

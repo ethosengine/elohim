@@ -1,0 +1,10 @@
+Scenario: Supporting younger siblings while building own life
+    Given Aisha has younger teenage siblings
+    And she wants to support their development
+    When Aisha provides mentoring and help
+    Then the family_elohim should recognize sibling care
+    And her contributions should be valued appropriately
+    And siblings should learn from her young adult experience
+    And the system should coordinate cross-generational sibling support
+    And family bonds should be strengthened through visible care
+    And Aisha should model care economy participation for siblings

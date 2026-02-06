@@ -1,0 +1,9 @@
+Scenario: Developer track record follows across jurisdictions
+    Given a developer broke promises in one municipality
+    And now seeks approval in neighboring jurisdiction
+    When the Observer provides cross-jurisdictional track record
+    Then planning commission sees: developer promised 150 jobs, delivered 18
+    And community benefits agreement was not honored
+    And pattern shows developer moves to new jurisdiction after burning bridges
+    And regional transparency prevents serial extraction
+    And developers can't escape accountability through relocation

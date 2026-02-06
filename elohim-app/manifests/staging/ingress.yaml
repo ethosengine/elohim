@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: elohim-site-staging-ingress
+  namespace: elohim-staging
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: public
+  rules:
+  - host: staging.elohim.host
+    http:
+      paths:
+      - backend:
+          service:
+            name: elohim-site-staging-service
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - staging.elohim.host
+    secretName: staging-elohim-site-tls-cert

@@ -1,0 +1,9 @@
+Scenario: Worker council makes strategic decisions about business direction
+    Given corporate previously mandated menu, pricing, and suppliers
+    And workers now govern these strategic decisions democratically
+    When Emma proposes direct relationships with local farmers
+    Then worker council deliberates on supply chain transition
+    And workers analyze cost/benefit of local vs. corporate sourcing
+    And workers vote on adopting Johnson Farm as primary vegetable supplier
+    And the decision is implemented immediately
+    And menu adapts to seasonal availability from democratic supplier relationships

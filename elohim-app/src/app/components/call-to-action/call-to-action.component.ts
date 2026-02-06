@@ -1,11 +1,11 @@
 import { Component } from '@angular/core';
 
+// @coverage: 100.0% (2026-02-05)
+
 @Component({
   selector: 'app-call-to-action',
   imports: [],
   templateUrl: './call-to-action.component.html',
-  styleUrl: './call-to-action.component.css'
+  styleUrl: './call-to-action.component.css',
 })
-export class CallToActionComponent {
-
-}
+export class CallToActionComponent {}

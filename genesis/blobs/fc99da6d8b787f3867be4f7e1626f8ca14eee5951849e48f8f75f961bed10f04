@@ -1,0 +1,11 @@
+Scenario: Adult children caring for aging parents receive support
+    Given Sarah navigates complex dynamics of caring for her mother
+    And role reversal creates emotional challenges
+    When Sarah provides care for Helen
+    Then the family_elohim should provide guidance on healthy boundaries
+    And Sarah should receive recognition for care labor
+    And emotional complexity should be acknowledged
+    And Sarah should be connected to caregiver support resources
+    And Helen's dignity should be preserved through care relationship changes
+    And the protocol should support both caregiver and care recipient
+    And family care should be sustainable and healthy for all

@@ -1,0 +1,10 @@
+Scenario: Community care tokens accumulate from sustained volunteer participation
+    Given Frank has volunteered consistently over years
+    And his contributions are substantial and ongoing
+    When the community_elohim calculates care tokens
+    Then tokens should accumulate from Frank's volunteer hours
+    And skill level should affect token value (skilled trades valued highly)
+    And sustained participation should be recognized over time
+    And accumulated tokens should represent Frank's community standing
+    And tokens should create claims on community resources and support
+    And his years of contribution should be visible and valued

@@ -1,0 +1,9 @@
+Scenario: Activist establishes protected digital identity
+    Given the activist is setting up their personal node
+    When they configure their activist identity with privacy controls
+    And they designate trusted sanctuary institutions for backup
+    And they enable multi-factor authentication with biometric verification
+    Then their identity is cryptographically secured on their personal node
+    And their data is encrypted end-to-end
+    And sanctuary protocols are established with designated institutions
+    And the system confirms digital sovereignty is established

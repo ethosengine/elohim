@@ -1,0 +1,11 @@
+Scenario: Explaining attack vectors and security risks
+    Given appellant claims agent could be manipulated
+    And council needs to understand vulnerability
+    When I explain potential attack vectors
+    Then I describe: how agents could be corrupted or gamed
+    And I assess: likelihood and impact of different attacks
+    And I explain: defense mechanisms in place
+    And I acknowledge: residual risks that remain
+    And I avoid: either dismissing concerns or creating panic
+    And I provide: realistic risk assessment
+    And council can: judge if security is adequate for constitutional governance

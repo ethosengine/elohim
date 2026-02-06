@@ -1,0 +1,11 @@
+Scenario: Creating precedent that will guide future cases
+    Given our council rules on Marcus's mental health intervention appeal
+    And we affirm the agent's decision as constitutionally aligned
+    When we document our reasoning and recommendations
+    Then we explain: why privacy was balanced against care in this case
+    And we recommend: protocol enhancements for pre-specified preferences
+    And we create: precedent that future councils can reference
+    And we document: our deliberation process (anonymized)
+    And we contribute: to evolving constitutional interpretation
+    And our judgment: becomes part of public constitutional record
+    And Marcus's case: makes the protocol better for everyone

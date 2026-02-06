@@ -14,36 +14,36 @@ describe('AnalyticsService', () => {
 
   beforeEach(() => {
     const configServiceSpy = jasmine.createSpyObj('ConfigService', ['getConfig']);
-    
+
     mockScript = {
       async: false,
       src: '',
     };
-    
+
     mockMeta = {
       name: '',
-      content: ''
+      content: '',
     };
-    
+
     mockWindow = {};
-    
+
     mockDocument = {
       createElement: jasmine.createSpy('createElement').and.callFake((tagName: string) => {
         return tagName === 'script' ? mockScript : mockMeta;
       }),
       head: {
-        appendChild: jasmine.createSpy('appendChild')
+        appendChild: jasmine.createSpy('appendChild'),
       },
-      defaultView: mockWindow
+      defaultView: mockWindow,
     };
-    
+
     TestBed.configureTestingModule({
       providers: [
         { provide: ConfigService, useValue: configServiceSpy },
-        { provide: DOCUMENT, useValue: mockDocument }
-      ]
+        { provide: DOCUMENT, useValue: mockDocument },
+      ],
     });
-    
+
     configService = TestBed.inject(ConfigService) as jasmine.SpyObj<ConfigService>;
   });
 
@@ -61,7 +61,7 @@ describe('AnalyticsService', () => {
     expect(mockScript.src).toBe('https://www.googletagmanager.com/gtag/js?id=G-NSL7PVP55B');
     expect(mockScript.async).toBe(true);
     expect(mockDocument.head.appendChild).toHaveBeenCalledWith(mockScript);
-    
+
     // Test gtag function initialization
     expect(mockWindow.dataLayer).toEqual([]);
     expect(typeof mockWindow.gtag).toBe('function');
@@ -109,7 +109,7 @@ describe('AnalyticsService', () => {
     const createElementCalls = mockDocument.createElement.calls.all();
     const metaCall = createElementCalls.find((call: any) => call.args[0] === 'meta');
     expect(metaCall).toBeUndefined();
-    
+
     const appendChildCalls = mockDocument.head.appendChild.calls.all();
     const metaAppendCall = appendChildCalls.find((call: any) => call.args[0] === mockMeta);
     expect(metaAppendCall).toBeUndefined();
@@ -118,14 +118,14 @@ describe('AnalyticsService', () => {
   it('should execute script onload callback and test gtag function', () => {
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     service = TestBed.inject(AnalyticsService);
-    
+
     // Verify dataLayer was initialized
     expect(mockWindow.dataLayer).toEqual([]);
     expect(typeof mockWindow.gtag).toBe('function');
-    
+
     // Execute the onload callback
     mockScript.onload();
-    
+
     // Test that gtag function was created and works
     mockWindow.gtag('test');
     expect(mockWindow.dataLayer.length).toBeGreaterThan(2);
@@ -135,7 +135,7 @@ describe('AnalyticsService', () => {
     mockWindow.dataLayer = ['existing'];
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     service = TestBed.inject(AnalyticsService);
-    
+
     // Verify existing dataLayer was preserved
     expect(mockWindow.dataLayer).toEqual(['existing']);
   });
@@ -143,13 +143,13 @@ describe('AnalyticsService', () => {
   it('should not reinitialize if already initialized', () => {
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     service = TestBed.inject(AnalyticsService);
-    
+
     const createElementCallCount = mockDocument.createElement.calls.count();
-    
+
     // Trigger config again - should not reinitialize
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     (service as any).initializeIfProduction();
-    
+
     // Should not create additional script elements
     expect(mockDocument.createElement.calls.count()).toBe(createElementCallCount);
   });

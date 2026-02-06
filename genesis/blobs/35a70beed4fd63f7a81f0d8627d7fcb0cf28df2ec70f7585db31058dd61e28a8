@@ -1,0 +1,12 @@
+Scenario: Building toward employment while not currently ready to work
+    Given I am still in acute crisis or early trauma recovery
+    And employment right now would overwhelm my capacity
+    When I plan for future employment while not currently seeking work
+    Then the workplace_elohim helps me identify skill-building opportunities
+    And surfaces training, education, or credential programs I could pursue
+    And validates that not being employment-ready yet is appropriate
+    And helps me build toward future employment at my pace
+    And tracks my skill development and preparation
+    And my personal_agent identifies low-pressure ways to build employment readiness
+    And recognizes that recovery before employment is often necessary
+    And supports my timeline for employment readiness

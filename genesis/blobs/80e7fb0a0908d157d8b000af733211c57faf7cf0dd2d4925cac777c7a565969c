@@ -1,0 +1,8 @@
+Scenario: Coordinating shared meals around work schedules
+    Given my roommates and I want to share meal costs and preparation
+    And my work schedule is unpredictable and changes weekly
+    When we plan shared meals
+    Then the protocol should coordinate across different schedules
+    And identify opportunities when I can participate
+    And help distribute cooking responsibilities fairly
+    And allow flexible contribution when my schedule permits

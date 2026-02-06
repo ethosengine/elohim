@@ -1,0 +1,8 @@
+Scenario: Advocating for care-economy-aligned workplace policies
+    Given my workplace treats me as labor unit without care needs
+    When I want to advocate for care-supportive policies
+    Then the protocol should help me propose specific policies
+    Such as paid sick leave, predictable scheduling, living wages, meal provisions
+    And provide evidence for why these policies support workers' flourishing
+    And help me communicate needs to management
+    And support pushing for workplace transformation

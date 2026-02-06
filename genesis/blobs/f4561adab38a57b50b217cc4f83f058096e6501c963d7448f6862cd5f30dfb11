@@ -1,0 +1,11 @@
+Scenario: Testifying to congressional committee on protocol security
+    Given Congress considers legislation affecting protocol
+    And technical security assessment is needed
+    When I testify to legislative committee
+    Then I explain: cryptographic foundations and their robustness
+    And I assess: attack vectors and defense mechanisms
+    And I clarify: what regulation would help vs harm security
+    And I present: evidence from adversarial testing
+    And I maintain: independence from political pressure
+    And I avoid: either advocacy or false neutrality
+    And I serve: informed democratic policy making

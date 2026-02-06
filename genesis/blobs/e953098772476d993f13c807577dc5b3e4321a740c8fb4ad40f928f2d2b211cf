@@ -1,0 +1,11 @@
+Scenario: Participating in global public education through convention
+    Given convention proceedings are globally broadcast and accessible
+    And billions of people watch our deliberations
+    When I participate in constitutional debate
+    Then public sees: ordinary citizens grappling with profound questions
+    And they witness: democratic deliberation across radical diversity
+    And they learn: about constitutional governance of AI
+    And they understand: sortition democracy in action
+    And they feel: connected to global democratic project
+    And my participation: educates humanity about self-governance
+    And I demonstrate: that democracy is not just for elites

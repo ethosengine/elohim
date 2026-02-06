@@ -1,0 +1,8 @@
+Scenario: Understanding and claiming wage rights
+    Given I am entitled to minimum wage, overtime pay, and tip protections
+    And wage theft is common in food service industry
+    When I track my hours and compensation
+    Then the workplace_elohim should help me verify I am paid correctly
+    And identify potential wage violations
+    And provide guidance on claiming unpaid wages
+    And support me in pursuing wage justice

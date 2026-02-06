@@ -1,0 +1,9 @@
+Scenario: Workers transition from implementing franchise extraction to democratic coordination
+    Given workers were required to enforce franchise policies regardless of harm
+    And implementation of extraction created moral injury and worker resentment
+    When democratic governance replaces franchise control
+    Then workers coordinate operations based on collective wisdom, not corporate mandates
+    And schedule flexibility serves workers' family needs, not corporate efficiency demands
+    And customer service becomes genuine care, not scripted performance
+    And workplace becomes site of flourishing, not extraction enforcement
+    And workplace_elohim supports workers' growing democratic governance capacity

@@ -1,0 +1,8 @@
+Scenario: Displaced person builds connection in new community
+    Given Maria has relocated to a new city where she knows no one
+    When she joins her new neighborhood community space
+    And she participates in local mutual aid and support networks
+    Then she can gradually build trust in her new community
+    And neighbors help her find resources and employment
+    And she establishes new relationships while processing loss
+    And the new community welcomes her without requiring full disclosure

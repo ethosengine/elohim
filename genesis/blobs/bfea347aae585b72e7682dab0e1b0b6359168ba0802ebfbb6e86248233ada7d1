@@ -1,0 +1,9 @@
+Scenario: Personal data privacy under adult's complete control
+    Given Sarah's care contributions generate detailed personal data
+    And this data reveals intimate patterns of her life
+    When Sarah's data is collected and stored
+    Then she must have complete control over all data sharing
+    And she should decide what partner sees, what children see, what community sees
+    And workplace should never access personal care economy data
+    And her privacy must be absolute unless she chooses to share
+    And she should manage family members' privacy while maintaining oversight of children

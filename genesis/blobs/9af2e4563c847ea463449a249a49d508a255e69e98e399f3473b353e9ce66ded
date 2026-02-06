@@ -1,0 +1,10 @@
+Scenario: Shopping patterns contribute to neighborhood food access insights
+    Given Marcus shops regularly at neighborhood stores
+    And he tracks prices and availability across locations
+    When Marcus's anonymized shopping data is aggregated
+    Then it should contribute to neighborhood food access mapping
+    And the neighborhood_elohim should identify food deserts
+    And pricing patterns should be visible at neighborhood scale
+    And Marcus's data should help others navigate local food systems
+    And collective knowledge should reduce individual burden
+    And his contributions should improve neighborhood food security

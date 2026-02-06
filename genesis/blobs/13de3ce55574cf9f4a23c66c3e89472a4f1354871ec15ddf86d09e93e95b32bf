@@ -1,0 +1,9 @@
+Scenario: Manager unlearns corporate extraction training through supported transition
+    Given Marcus was trained by corporate to minimize labor costs and maximize productivity
+    And these extraction skills are actively harmful in democratic context
+    When he begins democratic coordinator role
+    Then he receives training in facilitation, mediation, and collaborative coordination
+    And workplace_elohim provides resources on horizontal organization practices
+    And other democratic coordinators mentor him through transition
+    And he unlearns surveillance instincts and command reflexes
+    And his skill evolution is documented and supported, not demanded instantly

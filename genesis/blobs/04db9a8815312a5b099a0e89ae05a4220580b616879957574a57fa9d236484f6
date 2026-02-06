@@ -1,0 +1,11 @@
+Scenario: Advance directives maintained as authoritative voice
+    Given Helen is planning for potential loss of capacity
+    And she has specific values about end-of-life care
+    When Helen configures her advance directives in the system
+    Then her personal_agent should hold and communicate her wishes
+    And her values should remain authoritative even if she loses speech
+    And medical providers should receive clear advance directive information
+    And family should have access to Helen's documented preferences
+    And her agency over her own death should be preserved
+    And the protocol should ensure her voice guides care when she cannot speak
+    And dignity should be maintained throughout end-of-life process

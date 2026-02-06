@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-site-alpha-service
+  namespace: elohim-alpha
+spec:
+  selector:
+    app: elohim-site-alpha
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-ui-playground-alpha-service
+  namespace: elohim-alpha
+spec:
+  selector:
+    app: elohim-ui-playground-alpha
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: ClusterIP

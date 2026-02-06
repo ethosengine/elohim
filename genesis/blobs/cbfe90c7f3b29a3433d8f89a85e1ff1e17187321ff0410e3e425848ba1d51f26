@@ -1,0 +1,9 @@
+Scenario: Developer worker safety record affects reputation
+    Given a responsible developer maintains excellent safety practices
+    And invests in worker protection beyond minimum requirements
+    When the Observer tracks workplace safety performance
+    Then the developer shows: zero serious injuries over 8 projects
+    And safety training exceeds industry standards
+    And workers report positive working conditions
+    And safety commitment creates positive reputation with workers and community
+    And responsible practices support recruitment and retention

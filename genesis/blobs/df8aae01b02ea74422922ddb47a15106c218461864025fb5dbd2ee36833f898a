@@ -1,0 +1,9 @@
+Scenario: Teacher documents unpaid overtime and workload
+    Given teachers work far beyond contracted hours
+    And administration claims workload is reasonable
+    When teachers track actual working hours through Observer
+    Then aggregated data shows teachers average 52 hours weekly vs 40 contracted
+    And 12 hours weekly of unpaid overtime is documented
+    And workload breakdown reveals what consumes time (grading, paperwork, meetings)
+    And union uses evidence in contract negotiations for compensation or reduction
+    And working conditions transparency creates accountability pressure

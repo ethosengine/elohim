@@ -1,11 +1,17 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+
+// @coverage: 94.0% (2026-02-05)
+
 import { map, catchError } from 'rxjs/operators';
-import { DataLoaderService } from './data-loader.service';
-import { TrustBadgeService } from './trust-badge.service';
+
+import { Observable, of, forkJoin } from 'rxjs';
+
+import { TrustLevel, calculateTrustLevel } from '@app/elohim/models/trust-badge.model';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
+
 import { ContentType, ContentReach } from '../models/content-node.model';
-import { TrustLevel, calculateTrustLevel } from '../models/trust-badge.model';
-import { ContentIndexEntry } from './content.service';
+import { PathIndexEntry } from '../models/learning-path.model';
 import {
   SearchQuery,
   SearchResult,
@@ -20,8 +26,12 @@ import {
   SEARCH_MATCH_BONUSES,
   DEFAULT_SEARCH_CONFIG,
   createEmptyResults,
-  extractSnippet
+  extractSnippet,
 } from '../models/search.model';
+
+import { ContentIndexEntry } from './content.service';
+
+import type { ContentAttestationType } from '../models/content-attestation.model';
 
 /**
  * SearchService - Enhanced content search with relevance scoring and facets.
@@ -62,23 +72,42 @@ export class SearchService {
   ) {}
 
   /**
-   * Search content with relevance scoring, filtering, and facets.
+   * Search content AND paths with relevance scoring, filtering, and facets.
+   *
+   * Searches both:
+   * - Content nodes (documents, articles, videos, etc.)
+   * - Learning paths (curated journeys)
+   *
+   * Results are merged and sorted by relevance.
    */
   search(query: SearchQuery): Observable<SearchResults> {
     const startTime = Date.now();
 
-    return this.dataLoader.getContentIndex().pipe(
-      map(index => {
-        const nodes = index.nodes ?? [];
+    // Search both content and paths in parallel
+    return forkJoin({
+      contentIndex: this.dataLoader.getContentIndex().pipe(catchError(() => of({ nodes: [] }))),
+      pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] }))),
+    }).pipe(
+      map(({ contentIndex, pathIndex }) => {
+        const ci = contentIndex as { nodes?: ContentIndexEntry[] };
+        const pi = pathIndex as { paths?: PathIndexEntry[] };
+        const contentNodes = ci.nodes ?? [];
+        const paths = pi.paths ?? [];
 
-        // Score and filter all nodes
-        const scoredResults = this.scoreAndFilter(nodes, query);
+        // Score and filter content nodes
+        const scoredContentResults = this.scoreAndFilter(contentNodes, query);
+
+        // Score and filter paths (converted to search result format)
+        const scoredPathResults = this.scoreAndFilterPaths(paths, query);
+
+        // Merge results
+        const allResults = [...scoredContentResults, ...scoredPathResults];
 
         // Compute facets from ALL matching results (before pagination)
-        const facets = this.computeFacets(scoredResults, query);
+        const facets = this.computeFacets(allResults, query);
 
         // Sort results
-        const sortedResults = this.sortResults(scoredResults, query);
+        const sortedResults = this.sortResults(allResults, query);
 
         // Paginate
         const page = query.page ?? 1;
@@ -100,75 +129,115 @@ export class SearchService {
           totalPages,
           hasMore: page < totalPages,
           facets,
-          executionTimeMs: Date.now() - startTime
+          executionTimeMs: Date.now() - startTime,
         };
       }),
-      catchError(err => {
-        console.error('[SearchService] Search failed:', err);
+      catchError(_err => {
         return of({
           ...createEmptyResults(query),
-          executionTimeMs: Date.now() - startTime
+          executionTimeMs: Date.now() - startTime,
         });
       })
     );
   }
 
   /**
-   * Get autocomplete suggestions for partial query.
+   * Score and filter paths, converting them to SearchResult format.
    */
-  suggest(partialQuery: string, limit: number = 10): Observable<SearchSuggestions> {
+  private scoreAndFilterPaths(paths: PathIndexEntry[], query: SearchQuery): SearchResult[] {
+    const results: SearchResult[] = [];
+    const searchText = (query.text ?? '').toLowerCase().trim();
+    const searchWords = searchText.split(/\s+/).filter(w => w.length > 0);
+
+    // If filtering by content type and 'path' is not included, skip paths
+    if (
+      query.contentTypes &&
+      query.contentTypes.length > 0 &&
+      !query.contentTypes.includes('path')
+    ) {
+      return [];
+    }
+
+    for (const path of paths) {
+      // Runtime paths may carry createdAt/updatedAt even though PathIndexEntry doesn't declare them
+      const pathRecord = path as unknown as Record<string, unknown>;
+      // Convert path to a node-like format for filtering
+      const pathAsNode = {
+        id: path.id,
+        title: path.title,
+        description: path.description ?? '',
+        contentType: 'path' as ContentType,
+        tags: path.tags ?? [],
+        reach: 'commons' as ContentReach, // Paths are typically commons
+        trustScore: 1,
+        createdAt: pathRecord['createdAt'] as string | undefined,
+        updatedAt: pathRecord['updatedAt'] as string | undefined,
+      };
+
+      // Apply filters (reuse existing filter logic)
+      if (!this.passesFilters(pathAsNode, query)) {
+        continue;
+      }
+
+      // Score the path
+      const { score, matchedFields, highlights } = this.scoreNode(pathAsNode, searchWords);
+
+      // If there's search text, require a minimum score
+      if (searchText && score === 0) {
+        continue;
+      }
+
+      results.push({
+        id: path.id,
+        title: path.title,
+        description: path.description ?? '',
+        contentType: 'path',
+        tags: path.tags ?? [],
+        reach: 'commons',
+        trustScore: 1,
+        trustLevel: 'trusted' as TrustLevel,
+        hasFlags: false,
+        relevanceScore: score,
+        matchedFields,
+        highlights,
+        createdAt: pathRecord['createdAt'] as string | undefined,
+        updatedAt: pathRecord['updatedAt'] as string | undefined,
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Get autocomplete suggestions for partial query.
+   * Includes suggestions from both content nodes and learning paths.
+   */
+  suggest(partialQuery: string, limit = 10): Observable<SearchSuggestions> {
     if (!partialQuery || partialQuery.trim().length < 2) {
       return of({ query: partialQuery, suggestions: [] });
     }
 
-    return this.dataLoader.getContentIndex().pipe(
-      map(index => {
-        const nodes = index.nodes ?? [];
+    return forkJoin({
+      contentIndex: this.dataLoader.getContentIndex().pipe(catchError(() => of({ nodes: [] }))),
+      pathIndex: this.dataLoader.getPathIndex().pipe(catchError(() => of({ paths: [] }))),
+    }).pipe(
+      map(({ contentIndex, pathIndex }) => {
+        const ci = contentIndex as { nodes?: ContentIndexEntry[] };
+        const pi = pathIndex as { paths?: PathIndexEntry[] };
+        const nodes = ci.nodes ?? [];
+        const paths = pi.paths ?? [];
         const query = partialQuery.toLowerCase().trim();
         const suggestions: SearchSuggestion[] = [];
         const seen = new Set<string>();
 
-        // Suggest matching titles
-        for (const node of nodes) {
-          if (suggestions.length >= limit) break;
+        // Add content title suggestions
+        this.addContentTitleSuggestions(nodes, query, suggestions, seen, limit);
 
-          const titleLower = node.title.toLowerCase();
-          if (titleLower.includes(query) && !seen.has(titleLower)) {
-            seen.add(titleLower);
-            suggestions.push({
-              text: node.title,
-              type: 'title',
-              highlight: this.highlightMatch(node.title, query)
-            });
-          }
-        }
+        // Add path title suggestions
+        this.addPathTitleSuggestions(paths, query, suggestions, seen, limit);
 
-        // Suggest matching tags
-        const tagCounts = new Map<string, number>();
-        for (const node of nodes) {
-          for (const tag of node.tags ?? []) {
-            if (tag.toLowerCase().includes(query)) {
-              tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-            }
-          }
-        }
-
-        // Sort tags by count and add to suggestions
-        const sortedTags = Array.from(tagCounts.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, limit - suggestions.length);
-
-        for (const [tag, count] of sortedTags) {
-          if (!seen.has(tag.toLowerCase())) {
-            seen.add(tag.toLowerCase());
-            suggestions.push({
-              text: tag,
-              type: 'tag',
-              resultCount: count,
-              highlight: this.highlightMatch(tag, query)
-            });
-          }
-        }
+        // Add tag suggestions
+        this.addTagSuggestions(nodes, paths, query, suggestions, seen, limit);
 
         return { query: partialQuery, suggestions };
       }),
@@ -177,14 +246,126 @@ export class SearchService {
   }
 
   /**
+   * Add content title suggestions to the suggestions array.
+   */
+  private addContentTitleSuggestions(
+    nodes: ContentIndexEntry[],
+    query: string,
+    suggestions: SearchSuggestion[],
+    seen: Set<string>,
+    limit: number
+  ): void {
+    for (const node of nodes) {
+      if (suggestions.length >= limit) break;
+
+      const titleLower = node.title.toLowerCase();
+      if (titleLower.includes(query) && !seen.has(titleLower)) {
+        seen.add(titleLower);
+        suggestions.push({
+          text: node.title,
+          type: 'title',
+          highlight: this.highlightMatch(node.title, query),
+        });
+      }
+    }
+  }
+
+  /**
+   * Add path title suggestions to the suggestions array.
+   */
+  private addPathTitleSuggestions(
+    paths: PathIndexEntry[],
+    query: string,
+    suggestions: SearchSuggestion[],
+    seen: Set<string>,
+    limit: number
+  ): void {
+    for (const path of paths) {
+      if (suggestions.length >= limit) break;
+
+      const titleLower = path.title.toLowerCase();
+      if (titleLower.includes(query) && !seen.has(titleLower)) {
+        seen.add(titleLower);
+        suggestions.push({
+          text: path.title,
+          type: 'path',
+          highlight: this.highlightMatch(path.title, query),
+        });
+      }
+    }
+  }
+
+  /**
+   * Add tag suggestions to the suggestions array.
+   */
+  private addTagSuggestions(
+    nodes: ContentIndexEntry[],
+    paths: PathIndexEntry[],
+    query: string,
+    suggestions: SearchSuggestion[],
+    seen: Set<string>,
+    limit: number
+  ): void {
+    const tagCounts = this.collectMatchingTags(nodes, paths, query);
+    const sortedTags = Array.from(tagCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit - suggestions.length);
+
+    for (const [tag, count] of sortedTags) {
+      if (!seen.has(tag.toLowerCase())) {
+        seen.add(tag.toLowerCase());
+        suggestions.push({
+          text: tag,
+          type: 'tag',
+          resultCount: count,
+          highlight: this.highlightMatch(tag, query),
+        });
+      }
+    }
+  }
+
+  /**
+   * Collect matching tags from nodes and paths with their occurrence counts.
+   */
+  private collectMatchingTags(
+    nodes: ContentIndexEntry[],
+    paths: PathIndexEntry[],
+    query: string
+  ): Map<string, number> {
+    const tagCounts = new Map<string, number>();
+
+    for (const node of nodes) {
+      this.countMatchingTags(node.tags ?? [], query, tagCounts);
+    }
+
+    for (const path of paths) {
+      this.countMatchingTags(path.tags ?? [], query, tagCounts);
+    }
+
+    return tagCounts;
+  }
+
+  /**
+   * Count matching tags and add to the tagCounts map.
+   */
+  private countMatchingTags(tags: string[], query: string, tagCounts: Map<string, number>): void {
+    for (const tag of tags) {
+      if (tag.toLowerCase().includes(query)) {
+        tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+      }
+    }
+  }
+
+  /**
    * Get all unique tags with counts.
    */
-  getTagCloud(): Observable<Array<{ tag: string; count: number }>> {
+  getTagCloud(): Observable<{ tag: string; count: number }[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => {
+      map(rawIndex => {
+        const idx = rawIndex as { nodes?: ContentIndexEntry[] };
         const tagCounts = new Map<string, number>();
 
-        for (const node of index.nodes ?? []) {
+        for (const node of idx.nodes ?? []) {
           for (const tag of node.tags ?? []) {
             tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
           }
@@ -232,15 +413,15 @@ export class SearchService {
         description: node.description,
         contentType: node.contentType,
         tags: node.tags ?? [],
-        reach: (node as any).reach ?? 'commons',
-        trustScore: (node as any).trustScore ?? 1.0,
+        reach: node.reach ?? 'commons',
+        trustScore: node.trustScore ?? 1,
         trustLevel,
-        hasFlags: ((node as any).flags ?? []).length > 0,
+        hasFlags: (node.flags ?? []).length > 0,
         relevanceScore: score,
         matchedFields,
         highlights,
-        createdAt: (node as any).createdAt,
-        updatedAt: (node as any).updatedAt
+        createdAt: node.createdAt,
+        updatedAt: node.updatedAt,
       });
     }
 
@@ -251,12 +432,14 @@ export class SearchService {
    * Check if node passes all query filters.
    */
   private passesFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
-    return this.passesContentTypeFilter(node, query) &&
-           this.passesReachLevelFilter(node, query) &&
-           this.passesTrustLevelFilter(node, query) &&
-           this.passesTagFilters(node, query) &&
-           this.passesTrustScoreFilter(node, query) &&
-           this.passesFlaggedFilter(node, query);
+    return (
+      this.passesContentTypeFilter(node, query) &&
+      this.passesReachLevelFilter(node, query) &&
+      this.passesTrustLevelFilter(node, query) &&
+      this.passesTagFilters(node, query) &&
+      this.passesTrustScoreFilter(node, query) &&
+      this.passesFlaggedFilter(node, query)
+    );
   }
 
   private passesContentTypeFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
@@ -266,7 +449,7 @@ export class SearchService {
 
   private passesReachLevelFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
     if (!query.reachLevels || query.reachLevels.length === 0) return true;
-    const nodeReach = (node as any).reach ?? 'commons';
+    const nodeReach = node.reach ?? 'commons';
     return query.reachLevels.includes(nodeReach);
   }
 
@@ -276,14 +459,22 @@ export class SearchService {
   }
 
   private passesTagFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
-    const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
+    const nodeTags = new Set((node.tags ?? []).map(t => t.toLowerCase()));
 
-    if (query.tags && query.tags.length > 0) {
-      if (!query.tags.some(t => nodeTags.includes(t.toLowerCase()))) return false;
+    if (
+      query.tags &&
+      query.tags.length > 0 &&
+      !query.tags.some(t => nodeTags.has(t.toLowerCase()))
+    ) {
+      return false;
     }
 
-    if (query.requiredTags && query.requiredTags.length > 0) {
-      if (!query.requiredTags.every(t => nodeTags.includes(t.toLowerCase()))) return false;
+    if (
+      query.requiredTags &&
+      query.requiredTags.length > 0 &&
+      !query.requiredTags.every(t => nodeTags.has(t.toLowerCase()))
+    ) {
+      return false;
     }
 
     return true;
@@ -291,13 +482,13 @@ export class SearchService {
 
   private passesTrustScoreFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
     if (query.minTrustScore === undefined) return true;
-    const trustScore = (node as any).trustScore ?? 1.0;
+    const trustScore = node.trustScore ?? 1;
     return trustScore >= query.minTrustScore;
   }
 
   private passesFlaggedFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
     if (!query.excludeFlagged) return true;
-    const flags = (node as any).flags ?? [];
+    const flags = node.flags ?? [];
     return flags.length === 0;
   }
 
@@ -316,7 +507,7 @@ export class SearchService {
     const nodeText = {
       title: node.title.toLowerCase(),
       description: (node.description ?? '').toLowerCase(),
-      tags: (node.tags ?? []).map(t => t.toLowerCase())
+      tags: (node.tags ?? []).map(t => t.toLowerCase()),
     };
 
     const totalScore = this.calculateFieldScores(searchWords, nodeText, matchedFields);
@@ -342,7 +533,12 @@ export class SearchService {
     return totalScore;
   }
 
-  private scoreFieldMatch(field: 'title' | 'description', text: string, word: string, matchedFields: MatchedField[]): number {
+  private scoreFieldMatch(
+    field: 'title' | 'description',
+    text: string,
+    word: string,
+    matchedFields: MatchedField[]
+  ): number {
     const matchType = this.getMatchType(text, word);
     if (!matchType) return 0;
 
@@ -364,15 +560,19 @@ export class SearchService {
   }
 
   private normalizeScore(totalScore: number, wordCount: number): number {
-    const maxPossibleScore = wordCount * (
-      SEARCH_FIELD_WEIGHTS.title * SEARCH_MATCH_BONUSES.exactMatch +
-      SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES.exactMatch +
-      SEARCH_FIELD_WEIGHTS.description * SEARCH_MATCH_BONUSES.exactMatch
-    );
+    const maxPossibleScore =
+      wordCount *
+      (SEARCH_FIELD_WEIGHTS.title * SEARCH_MATCH_BONUSES.exactMatch +
+        SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES.exactMatch +
+        SEARCH_FIELD_WEIGHTS.description * SEARCH_MATCH_BONUSES.exactMatch);
     return Math.round((totalScore / maxPossibleScore) * 100);
   }
 
-  private generateHighlights(node: ContentIndexEntry, searchWords: string[], matchedFields: MatchedField[]): SearchHighlight[] {
+  private generateHighlights(
+    node: ContentIndexEntry,
+    searchWords: string[],
+    matchedFields: MatchedField[]
+  ): SearchHighlight[] {
     const highlights: SearchHighlight[] = [];
     const queryText = searchWords.join(' ');
 
@@ -401,13 +601,13 @@ export class SearchService {
    */
   private getMatchType(text: string, word: string): keyof typeof SEARCH_MATCH_BONUSES | null {
     // Check for exact word match (word boundaries)
-    const exactRegex = new RegExp(`\\b${this.escapeRegex(word)}\\b`, 'i');
+    const exactRegex = new RegExp(String.raw`\b${this.escapeRegex(word)}\b`, 'i');
     if (exactRegex.test(text)) {
       return 'exactMatch';
     }
 
     // Check for prefix match (word starts with search term)
-    const prefixRegex = new RegExp(`\\b${this.escapeRegex(word)}`, 'i');
+    const prefixRegex = new RegExp(String.raw`\b${this.escapeRegex(word)}`, 'i');
     if (prefixRegex.test(text)) {
       return 'prefixMatch';
     }
@@ -424,7 +624,7 @@ export class SearchService {
    * Escape special regex characters.
    */
   private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   }
 
   // ===========================================================================
@@ -471,7 +671,16 @@ export class SearchService {
    * Convert reach level to numeric for sorting.
    */
   private reachToNumber(reach: ContentReach): number {
-    const levels: ContentReach[] = ['private', 'invited', 'local', 'neighborhood', 'municipal', 'bioregional', 'regional', 'commons'];
+    const levels: ContentReach[] = [
+      'private',
+      'invited',
+      'local',
+      'neighborhood',
+      'municipal',
+      'bioregional',
+      'regional',
+      'commons',
+    ];
     return levels.indexOf(reach);
   }
 
@@ -492,19 +701,13 @@ export class SearchService {
 
     for (const result of results) {
       // Content type
-      byContentType.set(
-        result.contentType,
-        (byContentType.get(result.contentType) ?? 0) + 1
-      );
+      byContentType.set(result.contentType, (byContentType.get(result.contentType) ?? 0) + 1);
 
       // Reach
       byReach.set(result.reach, (byReach.get(result.reach) ?? 0) + 1);
 
       // Trust level
-      byTrustLevel.set(
-        result.trustLevel,
-        (byTrustLevel.get(result.trustLevel) ?? 0) + 1
-      );
+      byTrustLevel.set(result.trustLevel, (byTrustLevel.get(result.trustLevel) ?? 0) + 1);
 
       // Tags
       for (const tag of result.tags) {
@@ -520,15 +723,12 @@ export class SearchService {
     }
 
     // Convert maps to sorted arrays
-    const toFacetArray = <T>(
-      map: Map<T, number>,
-      selectedValues?: T[]
-    ): FacetCount<T>[] => {
+    const toFacetArray = <T>(map: Map<T, number>, selectedValues?: T[]): FacetCount<T>[] => {
       return Array.from(map.entries())
         .map(([value, count]) => ({
           value,
           count,
-          selected: selectedValues?.includes(value) ?? false
+          selected: selectedValues?.includes(value) ?? false,
         }))
         .sort((a, b) => b.count - a.count);
     };
@@ -538,7 +738,7 @@ export class SearchService {
       byReach: toFacetArray(byReach, query.reachLevels),
       byTrustLevel: toFacetArray(byTrustLevel, query.trustLevels),
       byTag: toFacetArray(byTag, query.tags).slice(0, DEFAULT_SEARCH_CONFIG.maxFacetTags),
-      byFlagStatus: { flagged, unflagged }
+      byFlagStatus: { flagged, unflagged },
     };
   }
 
@@ -550,13 +750,9 @@ export class SearchService {
    * Compute trust level for a node.
    */
   private computeTrustLevel(node: ContentIndexEntry): TrustLevel {
-    const attestationTypes = (node as any).attestationTypes ?? [];
-    const hasFlags = ((node as any).flags ?? []).length > 0;
-    return calculateTrustLevel(
-      (node as any).reach ?? 'commons',
-      attestationTypes,
-      hasFlags
-    );
+    const attestationTypes = (node.attestationTypes ?? []) as ContentAttestationType[];
+    const hasFlags = (node.flags ?? []).length > 0;
+    return calculateTrustLevel(node.reach ?? 'commons', attestationTypes, hasFlags);
   }
 
   /**

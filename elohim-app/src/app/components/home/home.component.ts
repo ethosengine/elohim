@@ -1,16 +1,20 @@
 import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
-import { HeroComponent } from '../hero/hero.component';
+
+// @coverage: 56.0% (2026-02-05)
+
+import { AnalyticsService } from '../../services/analytics.service';
+import { ConfigService } from '../../services/config.service';
+import { DomInteractionService } from '../../services/dom-interaction.service';
+import { CallToActionComponent } from '../call-to-action/call-to-action.component';
 import { CrisisComponent } from '../crisis/crisis.component';
-import { VisionComponent } from '../vision/vision.component';
-import { ElohimHostComponent } from '../elohim-host/elohim-host.component';
+import { DebugBarComponent } from '../debug-bar/debug-bar.component';
 import { DesignPrinciplesComponent } from '../design-principles/design-principles.component';
+import { ElohimHostComponent } from '../elohim-host/elohim-host.component';
+import { FooterComponent } from '../footer/footer.component';
+import { HeroComponent } from '../hero/hero.component';
 import { LearningSuccessComponent } from '../learning-success/learning-success.component';
 import { PathForwardComponent } from '../path-forward/path-forward.component';
-import { CallToActionComponent } from '../call-to-action/call-to-action.component';
-import { FooterComponent } from '../footer/footer.component';
-import { DebugBarComponent } from '../debug-bar/debug-bar.component';
-import { ConfigService } from '../../services/config.service';
-import { AnalyticsService } from '../../services/analytics.service';
+import { VisionComponent } from '../vision/vision.component';
 
 @Component({
   selector: 'app-home',
@@ -25,10 +29,10 @@ import { AnalyticsService } from '../../services/analytics.service';
     LearningSuccessComponent,
     PathForwardComponent,
     CallToActionComponent,
-    FooterComponent
+    FooterComponent,
   ],
   templateUrl: './home.component.html',
-  styleUrl: './home.component.css'
+  styleUrl: './home.component.css',
 })
 export class HomeComponent implements OnInit, OnDestroy {
   private scrollListener?: () => void;
@@ -40,15 +44,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     private readonly el: ElementRef,
     private readonly renderer: Renderer2,
     private readonly configService: ConfigService,
-    private readonly analyticsService: AnalyticsService
+    private readonly analyticsService: AnalyticsService,
+    private readonly domInteractionService: DomInteractionService
   ) {}
 
   ngOnInit() {
     this.configService.getConfig().subscribe(() => {
       this.setupParallaxScrolling();
       this.setupIntersectionObserver();
-      this.setupScrollIndicator();
-      this.setupHeroTitleInteraction();
+      this.domInteractionService.setupScrollIndicator(this.el);
+      this.domInteractionService.setupHeroTitleAnimation(this.el);
     });
   }
 
@@ -79,7 +84,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private updateParallaxElements() {
-    const scrolled = window.pageYOffset;
+    const scrolled = window.scrollY;
 
     // Update CSS custom property for parallax background
     this.renderer.setStyle(
@@ -90,7 +95,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     const parallaxLayers = this.el.nativeElement.querySelectorAll('.parallax-layer');
     parallaxLayers.forEach((layer: HTMLElement) => {
-      const speed = parseFloat(layer.dataset['speed'] ?? '0.5');
+      const speed = Number.parseFloat(layer.dataset['speed'] ?? '0.5');
       const yPos = -(scrolled * speed);
       this.renderer.setStyle(layer, 'transform', `translate3d(0, ${yPos}px, 0)`);
     });
@@ -106,10 +111,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   private setupIntersectionObserver() {
     const observerOptions = {
       threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
+      rootMargin: '0px 0px -50px 0px',
     };
 
-    this.intersectionObserver = new IntersectionObserver((entries) => {
+    this.intersectionObserver = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           this.renderer.addClass(entry.target, 'visible');
@@ -132,35 +137,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       sections.forEach((section: HTMLElement) => {
         this.intersectionObserver?.observe(section);
       });
-    }, 0);
-  }
-
-  private setupScrollIndicator() {
-    setTimeout(() => {
-      const scrollIndicator = this.el.nativeElement.querySelector('.scroll-indicator');
-      if (scrollIndicator) {
-        this.renderer.listen(scrollIndicator, 'click', () => {
-          window.scrollTo({
-            top: window.innerHeight,
-            behavior: 'smooth'
-          });
-        });
-      }
-    }, 0);
-  }
-
-  private setupHeroTitleInteraction() {
-    setTimeout(() => {
-      const heroTitle = this.el.nativeElement.querySelector('.hero h1');
-      if (heroTitle) {
-        this.renderer.setStyle(heroTitle, 'cursor', 'pointer');
-        this.renderer.listen(heroTitle, 'click', () => {
-          this.renderer.setStyle(heroTitle, 'animation', 'none');
-          setTimeout(() => {
-            this.renderer.setStyle(heroTitle, 'animation', 'float 6s ease-in-out infinite');
-          }, 10);
-        });
-      }
     }, 0);
   }
 }

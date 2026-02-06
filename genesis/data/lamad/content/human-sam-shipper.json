@@ -1,0 +1,58 @@
+{
+  "id": "human-sam-shipper",
+  "did": "did:web:elohim.host:human:sam-shipper",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Sam",
+  "description": "Entrepreneur. Building the future of commerce. DM me for opportunities!",
+  "content": "# Sam\n\nEntrepreneur. Building the future of commerce. DM me for opportunities!\n\n**Profile Reach:** public\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Public Affinities:** dropshipping, passive-income, hustle-culture, crypto\n\n**Flags:** [object Object], [object Object]\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/sam-shipper/profile.json",
+  "tags": [
+    "flagged",
+    "reach-public",
+    "dropshipping",
+    "red-team",
+    "passive-income",
+    "hustle-culture",
+    "crypto",
+    "human-graph",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "red-team",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [],
+    "hasFlags": true,
+    "flagTypes": [
+      "spam-warning",
+      "commercial-intent"
+    ],
+    "designNotes": "Spam/commercial abuse pattern. High-volume low-quality connections."
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sam",
+    "ogDescription": "Entrepreneur. Building the future of commerce. DM me for opportunities!",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-sam-shipper",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-sam-shipper.jpg",
+    "ogImageAlt": "Sam's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-sam-shipper",
+    "identifier": "did:web:elohim.host:human:sam-shipper",
+    "name": "Sam",
+    "description": "Entrepreneur. Building the future of commerce. DM me for opportunities!",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328595",
+  "updatedAt": "2025-12-24T03:05:26.353Z"
+}

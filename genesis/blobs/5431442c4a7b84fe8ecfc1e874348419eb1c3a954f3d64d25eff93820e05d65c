@@ -1,0 +1,10 @@
+Scenario: Privacy control remains with Margaret as autonomous adult
+    Given Margaret's care contribution data is being tracked
+    And health information is particularly sensitive
+    When Margaret determines data sharing preferences
+    Then she must have complete control over all her data
+    And she should choose what's shared with family, doctors, or community
+    And she can demonstrate care value to family if she wishes
+    And she can maintain complete privacy if she prefers
+    And health data sharing must be explicitly consented
+    And Margaret's autonomy over her information must be absolute

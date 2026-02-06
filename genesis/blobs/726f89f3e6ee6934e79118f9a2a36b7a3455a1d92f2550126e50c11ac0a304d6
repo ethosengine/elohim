@@ -1,0 +1,8 @@
+Scenario: Study long-term effects on mental health and social cohesion
+    Given protocol aims to reduce loneliness and improve wellbeing
+    When James analyzes decade of mental health and cohesion data
+    Then he finds sustained reduction in loneliness indicators
+    And he documents improved community social networks
+    And he examines whether benefits distribute equitably
+    And he identifies mental health improvements particularly strong for isolated individuals
+    And long-term health effects justify protocol as public health intervention

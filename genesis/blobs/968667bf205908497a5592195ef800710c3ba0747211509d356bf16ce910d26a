@@ -1,0 +1,12 @@
+Scenario: Preparing for role reversal as parent-child relationship evolves
+    Given Robert's parents increasingly need his care
+    And he remembers them caring for him as a child
+    And he recognizes his children will someday care for him
+    When Robert reflects on lifecycle care patterns
+    Then his personal_agent should help him navigate the emotional complexity
+    And surface the reciprocity: "Your parents cared for you, you care for them, your children will care for you"
+    And support him in maintaining his parents' dignity as he assumes care responsibilities
+    And help him model dignified care receiving for his children
+    And recognize that role reversal is natural lifecycle transition
+    And validate the grief and complexity of watching parents age
+    And prepare him for his own eventual care needs

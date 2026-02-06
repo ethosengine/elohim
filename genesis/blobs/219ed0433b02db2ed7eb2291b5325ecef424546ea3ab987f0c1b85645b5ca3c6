@@ -1,0 +1,10 @@
+Scenario: Teen learns comprehensive value literacy through integrated education
+    Given Jasmine is learning economics in school
+    And she practices care economy through Value Scanner daily
+    When her educational_elohim integrates these learning contexts
+    Then she should understand both market economics and care economics
+    And learn how care creates value beyond market exchange
+    And develop sophisticated analysis of invisible labor
+    And understand household economics, care work recognition, and community participation
+    And build foundation for adult economic capability
+    And recognize limitations of market-only economic thinking

@@ -1,0 +1,10 @@
+Scenario: Family emergency response across distance
+    Given family emergencies can occur while Kenji is at school
+    And he may need to return home or provide remote support
+    When family crisis occurs (illness, accident, death)
+    Then the family_elohim should coordinate crisis response
+    And it should help Kenji balance academic obligations with family needs
+    And it should facilitate his care contributions from distance if he can't travel
+    And it should connect him to campus support if family crisis affects his functioning
+    And the system should recognize family crisis impact on student
+    And emergency coordination should include geographically distant students

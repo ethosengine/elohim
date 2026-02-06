@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { ContentIOService } from './content-io.service';
-import { ContentIORegistryService } from './content-io-registry.service';
-import { ContentIOPlugin } from '../interfaces/content-io-plugin.interface';
+import { ContentFormatRegistryService } from './content-format-registry.service';
+import { ContentFormatPlugin } from '../interfaces/content-format-plugin.interface';
 import { FormatMetadata } from '../interfaces/format-metadata.interface';
 
 describe('ContentIOService', () => {
   let service: ContentIOService;
-  let registrySpy: jasmine.SpyObj<ContentIORegistryService>;
+  let registrySpy: jasmine.SpyObj<ContentFormatRegistryService>;
 
-  const mockPlugin: ContentIOPlugin = {
+  const mockPlugin: Partial<ContentFormatPlugin> = {
     formatId: 'markdown',
     displayName: 'Markdown',
     fileExtensions: ['.md'],
@@ -16,16 +16,20 @@ describe('ContentIOService', () => {
     canImport: true,
     canExport: true,
     canValidate: true,
-    import: jasmine.createSpy('import').and.returnValue(Promise.resolve({
-      nodes: [{ id: 'test', title: 'Test', content: '# Test' }],
-      warnings: []
-    })),
+    import: jasmine.createSpy('import').and.returnValue(
+      Promise.resolve({
+        nodes: [{ id: 'test', title: 'Test', content: '# Test' }],
+        warnings: [],
+      })
+    ),
     export: jasmine.createSpy('export').and.returnValue(Promise.resolve('# Exported')),
-    validate: jasmine.createSpy('validate').and.returnValue(Promise.resolve({
-      valid: true,
-      errors: [],
-      warnings: []
-    })),
+    validate: jasmine.createSpy('validate').and.returnValue(
+      Promise.resolve({
+        valid: true,
+        errors: [],
+        warnings: [],
+      })
+    ),
     getFormatMetadata: () => ({
       formatId: 'markdown',
       displayName: 'Markdown',
@@ -36,11 +40,11 @@ describe('ContentIOService', () => {
       canExport: true,
       canValidate: true,
       category: 'document',
-      supportsRoundTrip: true
-    })
+      supportsRoundTrip: true,
+    }),
   };
 
-  const mockPluginNoImport: ContentIOPlugin = {
+  const mockPluginNoImport: Partial<ContentFormatPlugin> = {
     formatId: 'readonly',
     displayName: 'Read Only',
     fileExtensions: ['.ro'],
@@ -48,9 +52,13 @@ describe('ContentIOService', () => {
     canImport: false,
     canExport: true,
     canValidate: false,
-    import: jasmine.createSpy('import').and.callFake(() => Promise.reject(new Error('Not supported'))),
+    import: jasmine
+      .createSpy('import')
+      .and.callFake(() => Promise.reject(new Error('Not supported'))),
     export: jasmine.createSpy('export').and.returnValue(Promise.resolve('exported')),
-    validate: jasmine.createSpy('validate').and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
+    validate: jasmine
+      .createSpy('validate')
+      .and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
     getFormatMetadata: () => ({
       formatId: 'readonly',
       displayName: 'Read Only',
@@ -61,32 +69,34 @@ describe('ContentIOService', () => {
       canExport: true,
       canValidate: false,
       category: 'document',
-      supportsRoundTrip: false
-    })
+      supportsRoundTrip: false,
+    }),
   };
 
   beforeEach(() => {
-    const registrySpyObj = jasmine.createSpyObj('ContentIORegistryService', [
+    const registrySpyObj = jasmine.createSpyObj('ContentFormatRegistryService', [
       'detectFormat',
       'detectFormatFromContent',
       'getPlugin',
       'getImportableFormats',
       'getExportableFormats',
-      'getExportableFormatsForContent'
+      'getExportableFormatsForContent',
     ]);
 
     TestBed.configureTestingModule({
       providers: [
         ContentIOService,
-        { provide: ContentIORegistryService, useValue: registrySpyObj }
-      ]
+        { provide: ContentFormatRegistryService, useValue: registrySpyObj },
+      ],
     });
 
     service = TestBed.inject(ContentIOService);
-    registrySpy = TestBed.inject(ContentIORegistryService) as jasmine.SpyObj<ContentIORegistryService>;
+    registrySpy = TestBed.inject(
+      ContentFormatRegistryService
+    ) as jasmine.SpyObj<ContentFormatRegistryService>;
 
     // Default spy returns
-    registrySpy.getPlugin.and.returnValue(mockPlugin);
+    registrySpy.getPlugin.and.returnValue(mockPlugin as ContentFormatPlugin);
     registrySpy.detectFormat.and.returnValue(Promise.resolve('markdown'));
     registrySpy.detectFormatFromContent.and.returnValue('markdown');
   });
@@ -109,7 +119,9 @@ describe('ContentIOService', () => {
       registrySpy.detectFormat.and.returnValue(Promise.resolve(null));
       const file = new File(['unknown'], 'test.xyz', { type: 'application/octet-stream' });
 
-      await expectAsync(service.importFile(file)).toBeRejectedWithError('Cannot detect format for file: test.xyz');
+      await expectAsync(service.importFile(file)).toBeRejectedWithError(
+        'Cannot detect format for file: test.xyz'
+      );
     });
   });
 
@@ -128,14 +140,18 @@ describe('ContentIOService', () => {
       registrySpy.getPlugin.and.returnValue(undefined);
       const file = new File(['content'], 'test.xyz');
 
-      await expectAsync(service.importFileAs(file, 'unknown')).toBeRejectedWithError('No plugin found for format: unknown');
+      await expectAsync(service.importFileAs(file, 'unknown')).toBeRejectedWithError(
+        'No plugin found for format: unknown'
+      );
     });
 
     it('should throw error if plugin does not support import', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
       const file = new File(['content'], 'test.ro');
 
-      await expectAsync(service.importFileAs(file, 'readonly')).toBeRejectedWithError("Plugin 'readonly' does not support import");
+      await expectAsync(service.importFileAs(file, 'readonly')).toBeRejectedWithError(
+        "Plugin 'readonly' does not support import"
+      );
     });
   });
 
@@ -150,13 +166,17 @@ describe('ContentIOService', () => {
     it('should throw error if plugin not found', async () => {
       registrySpy.getPlugin.and.returnValue(undefined);
 
-      await expectAsync(service.importString('content', 'unknown')).toBeRejectedWithError('No plugin found for format: unknown');
+      await expectAsync(service.importString('content', 'unknown')).toBeRejectedWithError(
+        'No plugin found for format: unknown'
+      );
     });
 
     it('should throw error if plugin does not support import', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
 
-      await expectAsync(service.importString('content', 'readonly')).toBeRejectedWithError("Plugin 'readonly' does not support import");
+      await expectAsync(service.importString('content', 'readonly')).toBeRejectedWithError(
+        "Plugin 'readonly' does not support import"
+      );
     });
   });
 
@@ -171,7 +191,9 @@ describe('ContentIOService', () => {
     it('should throw error if format cannot be detected', async () => {
       registrySpy.detectFormatFromContent.and.returnValue(null);
 
-      await expectAsync(service.importStringAutoDetect('unknown')).toBeRejectedWithError('Cannot detect format from content');
+      await expectAsync(service.importStringAutoDetect('unknown')).toBeRejectedWithError(
+        'Cannot detect format from content'
+      );
     });
   });
 
@@ -188,21 +210,28 @@ describe('ContentIOService', () => {
       registrySpy.getPlugin.and.returnValue(undefined);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'unknown' };
 
-      await expectAsync(service.exportToFormat(node, 'unknown')).toBeRejectedWithError('No plugin found for format: unknown');
+      await expectAsync(service.exportToFormat(node, 'unknown')).toBeRejectedWithError(
+        'No plugin found for format: unknown'
+      );
     });
 
     it('should throw error if plugin does not support export', async () => {
       const noExportPlugin = { ...mockPlugin, canExport: false };
-      registrySpy.getPlugin.and.returnValue(noExportPlugin);
+      registrySpy.getPlugin.and.returnValue(noExportPlugin as ContentFormatPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
-      await expectAsync(service.exportToFormat(node, 'markdown')).toBeRejectedWithError("Plugin 'markdown' does not support export");
+      await expectAsync(service.exportToFormat(node, 'markdown')).toBeRejectedWithError(
+        "Plugin 'markdown' does not support export"
+      );
     });
 
     it('should return Blob directly if export returns Blob', async () => {
       const blob = new Blob(['test'], { type: 'text/plain' });
-      const blobPlugin = { ...mockPlugin, export: jasmine.createSpy('export').and.returnValue(Promise.resolve(blob)) };
-      registrySpy.getPlugin.and.returnValue(blobPlugin);
+      const blobPlugin = {
+        ...mockPlugin,
+        export: jasmine.createSpy('export').and.returnValue(Promise.resolve(blob)),
+      };
+      registrySpy.getPlugin.and.returnValue(blobPlugin as ContentFormatPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
       const result = await service.exportToFormat(node, 'markdown');
@@ -224,7 +253,9 @@ describe('ContentIOService', () => {
       registrySpy.getPlugin.and.returnValue(undefined);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'unknown' };
 
-      await expectAsync(service.exportToString(node, 'unknown')).toBeRejectedWithError('No plugin found for format: unknown');
+      await expectAsync(service.exportToString(node, 'unknown')).toBeRejectedWithError(
+        'No plugin found for format: unknown'
+      );
     });
   });
 
@@ -268,7 +299,7 @@ describe('ContentIOService', () => {
     });
 
     it('should return warning if plugin does not support validation', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
       const file = new File(['content'], 'test.ro');
 
       const result = await service.validateFileAs(file, 'readonly');
@@ -295,7 +326,7 @@ describe('ContentIOService', () => {
     });
 
     it('should return warning if plugin does not support validation', async () => {
-      registrySpy.getPlugin.and.returnValue(mockPluginNoImport);
+      registrySpy.getPlugin.and.returnValue(mockPluginNoImport as ContentFormatPlugin);
 
       const result = await service.validateString('content', 'readonly');
 
@@ -361,7 +392,7 @@ describe('ContentIOService', () => {
 
     it('should return false if plugin does not support export', () => {
       const noExportPlugin = { ...mockPlugin, canExport: false };
-      registrySpy.getPlugin.and.returnValue(noExportPlugin);
+      registrySpy.getPlugin.and.returnValue(noExportPlugin as ContentFormatPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
       const result = service.canExport(node);
@@ -403,7 +434,7 @@ describe('ContentIOService', () => {
 
     it('should return null if plugin does not support export', async () => {
       const noExportPlugin = { ...mockPlugin, canExport: false };
-      registrySpy.getPlugin.and.returnValue(noExportPlugin);
+      registrySpy.getPlugin.and.returnValue(noExportPlugin as ContentFormatPlugin);
       const node = { id: 'test', title: 'Test', content: 'test', contentFormat: 'markdown' };
 
       const result = await service.getExportedContent(node);

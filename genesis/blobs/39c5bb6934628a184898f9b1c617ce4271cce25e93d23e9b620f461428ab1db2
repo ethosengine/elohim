@@ -1,0 +1,9 @@
+Scenario: Politician distinguishes education reform evidence from ideology
+    Given competing reform proposals claim research support
+    And ideological advocacy masks as evidence-based policy
+    When the Observer evaluates education research rigorously
+    Then they see which reforms have strong evidence base
+    And identify advocacy research versus peer-reviewed findings
+    And understand limitations and contexts of research claims
+    And compare reform outcomes across diverse implementation sites
+    And make evidence-based policy decisions beyond ideological fights

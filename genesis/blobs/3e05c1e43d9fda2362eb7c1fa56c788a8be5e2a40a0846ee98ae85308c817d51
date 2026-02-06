@@ -1,0 +1,10 @@
+Scenario: Student recognized as real neighborhood member despite temporary status
+    Given Kenji will likely move after graduation
+    And neighborhoods often treat students as temporary non-members
+    When the neighborhood_elohim tracks neighborhood participation
+    Then it should recognize students as current, real residents
+    And it should value Kenji's presence now, not discount it as temporary
+    And it should include him in neighborhood decision-making
+    And temporary residency should not exclude from community membership
+    And the system should counteract student marginalization
+    And Kenji should experience genuine neighborhood belonging

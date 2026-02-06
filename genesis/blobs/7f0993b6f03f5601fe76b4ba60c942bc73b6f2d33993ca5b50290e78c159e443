@@ -1,0 +1,11 @@
+Scenario: Family governance includes Frank's voice in his own care planning
+    Given family makes decisions that affect Frank's future
+    And decisions about his care must honor his autonomy
+    When family_elohim facilitates governance decisions
+    Then Frank must have primary voice in his own care planning
+    And adult children should participate but not dominate
+    And Frank's preferences and values must be centered
+    And family should plan with him, not for him
+    And his decades of life experience should be respected
+    And autonomy should be preserved even as needs increase
+    And family governance should empower, never infantilize

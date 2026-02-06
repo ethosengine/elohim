@@ -1,0 +1,10 @@
+Scenario: Supporting each other through health challenges
+    Given one or both partners may face health crises
+    And partners provide mutual care and support
+    When the household_elohim tracks caregiving between partners
+    Then it should recognize care provided by each partner
+    And it should surface when care burden becomes unsustainable
+    And it should suggest external support when needed
+    And care between partners should be valued and visible
+    And the system should protect relationship health under care stress
+    And mutual care should strengthen rather than strain partnership

@@ -1,0 +1,11 @@
+Scenario: Participating in household conflict resolution
+    Given Jordan had a disagreement with a housemate about noise
+    And the household uses restorative practices for conflicts
+    When the household facilitates a conflict resolution meeting
+    Then Jordan's personal_agent helps Jordan express their perspective
+    And the interface provides communication support (feeling words, pictures)
+    And the facilitator ensures Jordan's voice is fully heard
+    And Jordan participates in finding a solution
+    And the resolution honors Jordan's needs and boundaries
+    And Jordan learns healthy conflict resolution skills
+    And Jordan's dignity is preserved throughout the process

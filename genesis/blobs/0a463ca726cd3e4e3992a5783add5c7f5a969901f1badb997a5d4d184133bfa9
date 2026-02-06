@@ -1,0 +1,9 @@
+Scenario: Responsible developer gains regional competitive advantage
+    Given a responsible developer consistently delivers promised benefits
+    And has positive track record across multiple jurisdictions
+    When the Observer makes regional reputation visible
+    Then the developer shows: projects in four counties all met commitments
+    And community feedback is consistently positive
+    And environmental standards were exceeded not just met
+    And regional reputation creates access to better opportunities
+    And integrity pays dividends across jurisdictional boundaries

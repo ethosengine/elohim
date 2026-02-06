@@ -1,0 +1,9 @@
+Scenario: Equipment and facilities knowledge prevents operational failures
+    Given Rosa knows every quirk of equipment and building systems
+    And this tacit knowledge prevents costly breakdowns and delays
+    When facilities knowledge transfer is prioritized
+    Then Rosa documents equipment maintenance schedules and troubleshooting
+    And workers learn which compressor sounds indicate problems
+    And building system knowledge (electrical, plumbing, HVAC) is shared
+    And maintenance protocols are established preventing future failures
+    And institutional knowledge replaces individual expertise

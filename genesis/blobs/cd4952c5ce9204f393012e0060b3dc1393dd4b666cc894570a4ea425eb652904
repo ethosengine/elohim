@@ -1,0 +1,9 @@
+Scenario: Bioregional food system serves as climate resilience infrastructure
+    Given climate disruption threatens food security through crop failures and supply chain breakdown
+    And communities need resilient local food production capacity
+    When democratic bioregional farm network provides distributed food security
+    Then climate shocks are absorbed through network coordination
+    And crop failures at individual farms don't create community food insecurity
+    And bioregional food sovereignty provides climate resilience
+    And food security is protected as climate changes through democratic coordination
+    And bioregional_elohim coordinates climate resilience and food security planning

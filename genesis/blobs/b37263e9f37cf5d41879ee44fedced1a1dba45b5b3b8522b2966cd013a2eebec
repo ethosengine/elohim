@@ -1,0 +1,10 @@
+Scenario: Fair distribution of household labor among roommates
+    Given Kenji does most cooking but little cleaning
+    And roommates have different strengths and available time
+    When the household_elohim tracks all household labor
+    Then it should measure cooking, cleaning, shopping, maintenance, and organizing
+    And it should show each roommate's contribution: "Kenji: 18hrs, Maya: 6hrs, Sam: 8hrs, Jordan: 4hrs"
+    And it should surface imbalances explicitly
+    And it should facilitate conversation about fair redistribution
+    And the system should prevent exploitation through visibility
+    And household equity should be measurable and adjustable

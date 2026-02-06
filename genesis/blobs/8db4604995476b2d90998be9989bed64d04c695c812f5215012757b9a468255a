@@ -1,0 +1,9 @@
+Scenario: Organizer identifies budget justice organizing opportunity
+    Given city council will vote on annual budget in three weeks
+    And proposed cuts affect services in low-income neighborhoods
+    When the Observer surfaces the organizing opportunity
+    Then the organizer receives early alert with enough time to organize
+    And sees which communities are most affected by cuts
+    And gets analysis of budget trade-offs and alternatives
+    And identifies decision points where testimony will have impact
+    And three weeks allows for education, coalition building, and mobilization

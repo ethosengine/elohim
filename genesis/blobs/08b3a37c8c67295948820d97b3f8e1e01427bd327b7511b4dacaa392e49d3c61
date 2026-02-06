@@ -1,0 +1,10 @@
+Scenario: Multiple appellants challenge same community decision
+    Given several community members appeal the same Community Elohim decision
+    And we all believe a community resource decision was unjust
+    When Constitutional Council reviews the multiple related appeals
+    Then they treat this as collective concern requiring community deliberation
+    And They evaluate if the decision violated community consensus
+    And They examine if community participation in the decision was adequate
+    And They may convene community assembly to deliberate the issue
+    And The appeals trigger democratic engagement not just individual recourse
+    And Community governance evolves through collective voice

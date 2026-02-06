@@ -1,0 +1,7 @@
+Scenario: Coordinating financial support for family
+    Given my income is limited but family may need support
+    When family members need financial help
+    Then the protocol should help me assess what I can contribute
+    And coordinate financial support across family network
+    And recognize that my economic constraints are real
+    And facilitate fair distribution of financial responsibility

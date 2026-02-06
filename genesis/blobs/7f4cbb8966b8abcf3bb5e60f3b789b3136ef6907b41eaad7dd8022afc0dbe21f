@@ -1,0 +1,10 @@
+Scenario: First-layer appeal review within 24 hours
+    Given I appealed my Family Elohim's decision about mental health intervention
+    When Community Elohim conducts first-layer appeal review
+    Then the review happens within 24 hours of my appeal filing
+    And Community Elohim examines if Family Elohim decision was appropriate for local context
+    And They consider community resources available (mental health services, support networks)
+    And They evaluate if local cultural norms were respected
+    And They provide transparent reasoning for their review decision
+    And Most appeals are resolved at this layer through clarification or correction
+    And I receive immediate notification of the review outcome

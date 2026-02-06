@@ -1,0 +1,9 @@
+Scenario: Child receives help during distress
+    Given Emma is upset about something that happened at school
+    When she creates a contribution expressing her distress
+    And the guardian agent detects emotional crisis indicators
+    Then her parents are immediately notified with sensitivity
+    And age-appropriate support resources are surfaced
+    And family members can provide comfort and guidance
+    And if needed, connection to counseling resources is offered
+    And Emma experiences the system as safe space to express feelings

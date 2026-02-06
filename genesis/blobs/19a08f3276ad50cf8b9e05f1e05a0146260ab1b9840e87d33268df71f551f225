@@ -1,0 +1,9 @@
+Scenario: Appeal contributes to constitutional evolution
+    Given my appeal revealed a fundamental gap in the constitutional framework
+    And the Constitutional Council identified this as a recurring issue
+    When the council documents recommendations for protocol improvement
+    Then my case becomes input for the next 7-year Constitutional Convention
+    And My lived experience of feeling violated despite life-saving intervention
+    And This helps shape how care and autonomy are balanced at constitutional level
+    And I can see the long-term impact of my appeal beyond my individual case
+    And My suffering wasn't wasted—it made the system better for everyone

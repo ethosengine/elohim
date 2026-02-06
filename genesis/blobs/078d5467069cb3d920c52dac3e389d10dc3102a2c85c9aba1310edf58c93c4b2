@@ -1,0 +1,12 @@
+Scenario: Coordinating family information sharing to protect privacy and safety
+    Given different family members have different levels of trustworthiness
+    And information about my location or situation could compromise safety
+    When I decide what to share with which family members
+    Then the family_elohim helps me track what information each person has
+    And provides graduated privacy controls for different relationships
+    And alerts me if information sharing could create safety risks
+    And helps me maintain consistent boundaries about what I disclose
+    And supports me withholding information from untrustworthy family
+    And my personal_agent reminds me of safety protocols
+    And recognizes information management as constant cognitive labor
+    And validates that privacy protection is appropriate

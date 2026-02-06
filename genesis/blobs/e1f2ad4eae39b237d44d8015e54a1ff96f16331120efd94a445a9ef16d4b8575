@@ -1,0 +1,10 @@
+Scenario: Financial literacy development through care economy lens
+    Given Kenji must manage all his finances independently
+    And he receives financial aid, earns wages, and makes all spending decisions
+    When the personal_agent teaches financial management
+    Then it should frame finances through care economy principles
+    And it should teach him to value care contributions alongside paid work
+    And it should help him understand exploitation vs. fair exchange
+    And the agent should build financial literacy integrated with care values
+    And Kenji should learn to see economy as care exchange, not just money
+    And financial capability should be built on care economy foundation

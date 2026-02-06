@@ -1,0 +1,12 @@
+Scenario: Transitioning from provider to receiver in family care economy
+    Given Frank has been primary provider throughout his working life
+    And he's now transitioning to more mutual reciprocity
+    And he'll eventually need more care than he provides
+    When family_elohim tracks the transition
+    Then it should recognize Frank continues substantial provision
+    And it should help him accept receiving care without shame
+    And it should show adult children how to reciprocate care
+    And Frank's lifetime of provision should create legitimate claims
+    And the transition should preserve his dignity and agency
+    And family should prepare for his increasing future needs
+    And care reciprocity across lifecycle should be normalized

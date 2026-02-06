@@ -1,0 +1,9 @@
+Scenario: School board member understands resource distribution across schools
+    Given the politician governs district with 40 schools
+    And limited visibility into daily school operations
+    When the Observer analyzes district resource patterns
+    Then they see experienced teachers concentrated in affluent area schools
+    And identify disparities in per-student spending across buildings
+    And learn which schools lack arts programs and advanced courses
+    And understand facility maintenance varies by neighborhood
+    And advocate for equitable resource distribution with evidence

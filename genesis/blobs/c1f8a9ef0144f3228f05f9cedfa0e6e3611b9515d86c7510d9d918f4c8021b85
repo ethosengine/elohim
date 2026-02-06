@@ -1,0 +1,10 @@
+Scenario: Privacy protection in community care participation
+    Given Marcus participates in community care economy
+    And his family's specific circumstances are sensitive
+    When community resource coordination occurs
+    Then Marcus's privacy must be absolutely protected
+    And only anonymized data should be visible to community coordinators
+    And his specific situation should not be broadcast
+    And community support should flow without exposing private struggles
+    And dignity requires privacy even while participating in networks
+    And the protocol should enable solidarity without surveillance

@@ -1,0 +1,10 @@
+Scenario: Board member receives independent analysis of staff budget recommendation
+    Given district superintendent recommends budget with significant program cuts
+    And 200-page budget packet emphasizes efficiency and fiscal responsibility
+    And board meeting is in 3 days with vote expected
+    When the board member requests Observer independent analysis
+    Then they receive concise summary identifying key trade-offs staff minimized
+    And see comparison of per-student spending across district schools showing disparities
+    And access data on community impacts of proposed cuts by demographic group
+    And get examples of how similar districts managed budget challenges differently
+    And independent analysis reveals information asymmetry in staff presentation

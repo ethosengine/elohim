@@ -1,10 +1,14 @@
+import { DOCUMENT } from '@angular/common';
 import { Injectable, inject } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
-import { DOCUMENT } from '@angular/common';
+
+// @coverage: 92.4% (2026-02-05)
+
 import { filter, map, mergeMap } from 'rxjs/operators';
-import { OpenGraphMetadata } from '../lamad/models/open-graph.model';
-import { JsonLdMetadata } from '../lamad/models/json-ld.model';
+
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
 
 /**
  * SEO configuration for a page
@@ -27,6 +31,11 @@ export interface SeoConfig {
 }
 
 /**
+ * Schema.org context URL
+ */
+const SCHEMA_ORG_CONTEXT = 'https://schema.org';
+
+/**
  * Default SEO values for the site
  */
 const DEFAULTS = {
@@ -34,7 +43,7 @@ const DEFAULTS = {
   siteUrl: 'https://elohim.host',
   defaultDescription: 'Digital guardians for human flourishing. Technology organized around love.',
   defaultImage: 'https://elohim.host/images/elohim_logo_light.png',
-  defaultImageAlt: 'Elohim Protocol Logo'
+  defaultImageAlt: 'Elohim Protocol Logo',
 } as const;
 
 /**
@@ -62,7 +71,7 @@ const DEFAULTS = {
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class SeoService {
   private readonly titleService = inject(Title);
@@ -81,33 +90,36 @@ export class SeoService {
    * Listen for route changes and update title from route data
    */
   private initRouteListener(): void {
-    this.router.events.pipe(
-      filter(event => event instanceof NavigationEnd),
-      map(() => this.activatedRoute),
-      map(route => {
-        // Traverse to the deepest activated route
-        while (route.firstChild) {
-          route = route.firstChild;
+    this.router.events
+      .pipe(
+        filter(event => event instanceof NavigationEnd),
+        map(() => this.activatedRoute),
+        map(route => {
+          // Traverse to the deepest activated route
+          while (route.firstChild) {
+            route = route.firstChild;
+          }
+          return route;
+        }),
+        filter(route => route.outlet === 'primary'),
+        mergeMap(route => route.data)
+      )
+      .subscribe(data => {
+        // If route has seo data, apply it
+        if (data['seo']) {
+          this.updateSeo(data['seo'] as SeoConfig);
+        } else if (data['title']) {
+          // Simple title from route data
+          const title = data['title'] as string;
+          this.setTitle(title);
+          // Reset to defaults for other meta
+          this.updateMetaDescription(DEFAULTS.defaultDescription);
+          this.updateOpenGraphTags({
+            ogTitle: title,
+            ogDescription: DEFAULTS.defaultDescription,
+          });
         }
-        return route;
-      }),
-      filter(route => route.outlet === 'primary'),
-      mergeMap(route => route.data)
-    ).subscribe(data => {
-      // If route has seo data, apply it
-      if (data['seo']) {
-        this.updateSeo(data['seo']);
-      } else if (data['title']) {
-        // Simple title from route data
-        this.setTitle(data['title']);
-        // Reset to defaults for other meta
-        this.updateMetaDescription(DEFAULTS.defaultDescription);
-        this.updateOpenGraphTags({
-          ogTitle: data['title'],
-          ogDescription: DEFAULTS.defaultDescription
-        });
-      }
-    });
+      });
   }
 
   /**
@@ -136,7 +148,7 @@ export class SeoService {
       ogTitle: config.title,
       ogDescription: config.description,
       ogUrl: canonicalUrl,
-      ...config.openGraph
+      ...config.openGraph,
     });
 
     // Update JSON-LD if provided
@@ -326,7 +338,7 @@ export class SeoService {
       ogDescription: DEFAULTS.defaultDescription,
       ogImage: DEFAULTS.defaultImage,
       ogImageAlt: DEFAULTS.defaultImageAlt,
-      ogType: 'website'
+      ogType: 'website',
     });
     this.removeJsonLd();
   }
@@ -356,10 +368,10 @@ export class SeoService {
         ogType: 'article',
         ogImage: path.thumbnailUrl ?? DEFAULTS.defaultImage,
         ogImageAlt: `${path.title} - Learning Path`,
-        articleSection: 'Learning'
+        articleSection: 'Learning',
       },
       jsonLd: {
-        '@context': 'https://schema.org',
+        '@context': SCHEMA_ORG_CONTEXT,
         '@type': 'Course',
         '@id': canonicalUrl,
         name: path.title,
@@ -367,11 +379,11 @@ export class SeoService {
         provider: {
           '@type': 'Organization',
           name: DEFAULTS.siteName,
-          url: DEFAULTS.siteUrl
+          url: DEFAULTS.siteUrl,
         },
         ...(path.difficulty && { educationalLevel: path.difficulty }),
-        ...(path.estimatedDuration && { timeRequired: path.estimatedDuration })
-      }
+        ...(path.estimatedDuration && { timeRequired: path.estimatedDuration }),
+      },
     });
   }
 
@@ -401,20 +413,20 @@ export class SeoService {
         ogImageAlt: content.title,
         articleSection: content.contentType,
         articlePublishedTime: content.createdAt,
-        articleModifiedTime: content.updatedAt
+        articleModifiedTime: content.updatedAt,
       },
       jsonLd: {
-        '@context': 'https://schema.org',
+        '@context': SCHEMA_ORG_CONTEXT,
         '@type': this.mapContentTypeToSchemaType(content.contentType),
         '@id': canonicalUrl,
         name: content.title,
         description,
         ...(content.authors?.length && {
-          author: content.authors.map(name => ({ '@type': 'Person', name }))
+          author: content.authors.map(name => ({ '@type': 'Person', name })),
         }),
         ...(content.createdAt && { dateCreated: content.createdAt }),
-        ...(content.updatedAt && { dateModified: content.updatedAt })
-      }
+        ...(content.updatedAt && { dateModified: content.updatedAt }),
+      },
     });
   }
 
@@ -442,12 +454,12 @@ export class SeoService {
         profileUsername: profile.username,
       },
       jsonLd: {
-        '@context': 'https://schema.org',
+        '@context': SCHEMA_ORG_CONTEXT,
         '@type': 'Person',
         '@id': canonicalUrl,
         name: title,
-        ...(profile.bio && { description: profile.bio })
-      }
+        ...(profile.bio && { description: profile.bio }),
+      },
     });
   }
 
@@ -456,16 +468,16 @@ export class SeoService {
    */
   private mapContentTypeToSchemaType(contentType: string): string {
     const mapping: Record<string, string> = {
-      'epic': 'Article',
-      'feature': 'Article',
-      'scenario': 'HowTo',
-      'concept': 'DefinedTerm',
-      'video': 'VideoObject',
-      'assessment': 'Quiz',
-      'simulation': 'Game',
+      epic: 'Article',
+      feature: 'Article',
+      scenario: 'HowTo',
+      concept: 'DefinedTerm',
+      video: 'VideoObject',
+      assessment: 'Quiz',
+      simulation: 'Game',
       'book-chapter': 'Chapter',
-      'tool': 'SoftwareApplication',
-      'organization': 'Organization'
+      tool: 'SoftwareApplication',
+      organization: 'Organization',
     };
     return mapping[contentType] ?? 'Article';
   }

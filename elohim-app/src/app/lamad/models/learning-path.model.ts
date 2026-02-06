@@ -1,13 +1,36 @@
+import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
+import { OpenGraphMetadata } from '@app/elohim/models/open-graph.model';
+
+// @coverage: 33.3% (2026-02-05)
+
 import { ContentNode } from './content-node.model';
-import { OpenGraphMetadata } from './open-graph.model';
-import { JsonLdMetadata } from './json-ld.model';
+
+/**
+ * Difficulty level for learning paths and content.
+ */
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+
+/**
+ * Path type hint for UI rendering.
+ * - 'journey': Standard learning path (default)
+ * - 'quest': Achievement-oriented with milestones
+ * - 'expedition': Long-form deep dive
+ * - 'practice': Skill-building through repetition
+ */
+export type PathType = 'journey' | 'quest' | 'expedition' | 'practice';
 
 /**
  * LearningPath - A curated journey through Territory resources.
  *
  * Paths can be structured in two ways:
- * 1. Flat: Just `steps[]` - simple sequential journey
- * 2. Chapters: `chapters[]` containing steps - thematic groupings
+ * 1. Flat: Just `steps[]` - simple sequential journey (legacy)
+ * 2. Hierarchical: `chapters[]` → `modules[]` → `sections[]` → `conceptIds[]`
+ *
+ * The hierarchical structure enables:
+ * - Chapters: Top-level thematic groupings
+ * - Modules: Mid-level organization within chapters (the "lesson" unit)
+ * - Sections: Focused learning sessions within modules
+ * - Concepts: Individual content items referenced by ID
  *
  * Paths can also compose other paths:
  * - A step can reference another path (stepType: 'path')
@@ -32,7 +55,7 @@ export interface LearningPath {
   createdBy: string;
   contributors: string[];
   forkedFrom?: string;
-  createdAt: string;  // ISO 8601
+  createdAt: string; // ISO 8601
   updatedAt: string;
 
   /**
@@ -53,7 +76,7 @@ export interface LearningPath {
 
   // Classification
   tags: string[];
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: DifficultyLevel;
   estimatedDuration: string;
 
   // =========================================================================
@@ -126,14 +149,8 @@ export interface LearningPath {
   prerequisitePaths?: string[];
   attestationsGranted?: string[];
 
-  /**
-   * Path type hint for UI rendering:
-   * - 'journey': Standard learning path (default)
-   * - 'quest': Achievement-oriented with milestones
-   * - 'expedition': Long-form deep dive
-   * - 'practice': Skill-building through repetition
-   */
-  pathType?: 'journey' | 'quest' | 'expedition' | 'practice';
+  /** Path type hint for UI rendering */
+  pathType?: PathType;
 
   // =========================================================================
   // Social Graph Metadata (for sharing learning paths)
@@ -191,15 +208,16 @@ export interface LearningPath {
 }
 
 /**
- * PathChapter - A thematic grouping of steps within a path.
+ * PathChapter - A thematic grouping within a path.
  *
  * Chapters provide:
  * - Visual/conceptual organization for longer journeys
  * - Optional attestations at chapter completion (milestones)
  * - Clearer progress indication ("Chapter 2 of 5")
  *
- * Named "chapter" rather than "unit" or "module" to evoke
- * narrative journey rather than institutional curriculum.
+ * Structure: chapters[] → modules[] → sections[] → conceptIds[]
+ *
+ * Aligned with MCP schema for rich hierarchical organization.
  */
 export interface PathChapter {
   id: string;
@@ -213,8 +231,18 @@ export interface PathChapter {
   /** Order within path */
   order: number;
 
-  /** Steps in this chapter */
-  steps: PathStep[];
+  /**
+   * Modules in this chapter (4-level hierarchy: chapter → modules → sections → conceptIds)
+   * Use this for complex paths with multiple layers of organization.
+   */
+  modules?: PathModule[];
+
+  /**
+   * Direct steps in this chapter (2-level hierarchy: chapter → steps)
+   * Use this for simpler paths where chapters contain steps directly.
+   * If both `modules` and `steps` exist, `modules` takes precedence.
+   */
+  steps?: PathStep[];
 
   /** Estimated duration for this chapter */
   estimatedDuration?: string;
@@ -224,6 +252,117 @@ export interface PathChapter {
 
   /** Whether this chapter is optional */
   optional?: boolean;
+}
+
+/**
+ * PathModule - A thematic grouping of sections within a chapter.
+ *
+ * Modules provide mid-level organization:
+ * - Group related sections together
+ * - Enable "Module 2 of 4" progress indication
+ * - Support module-level learning objectives
+ *
+ * Aligned with MCP schema: Chapter → Module → Section → Concepts
+ */
+export interface PathModule {
+  id: string;
+
+  /** Module title */
+  title: string;
+
+  /** What this module covers */
+  description?: string;
+
+  /** Order within chapter */
+  order: number;
+
+  /** Sections in this module */
+  sections: PathSection[];
+
+  /** Estimated duration for this module */
+  estimatedDuration?: string;
+
+  /** Learning objectives for this module */
+  learningObjectives?: string[];
+
+  /** Whether this module is optional */
+  optional?: boolean;
+}
+
+/**
+ * PathSection - A focused grouping of concepts within a module.
+ *
+ * Sections are the leaf-level groupings that contain actual content:
+ * - Reference concepts by ID (conceptIds)
+ * - Typically represent a single focused learning session (a "lesson")
+ * - Limited to ~1 hour of learning (human capacity constraint)
+ * - Contains skill-based assessments derived from content
+ *
+ * Aligned with MCP schema: Chapter → Module → Section → conceptIds[]
+ */
+export interface PathSection {
+  id: string;
+
+  /** Section title */
+  title: string;
+
+  /** What this section covers */
+  description?: string;
+
+  /** Order within module */
+  order: number;
+
+  /**
+   * Concept IDs referenced by this section.
+   * These link to ContentNode entries in the content graph.
+   */
+  conceptIds: string[];
+
+  /**
+   * Skill-based assessments for this section.
+   * Following Khan Academy model: assessments are derived from content.
+   * Multiple assessments can approach the same concept from different angles.
+   */
+  assessments?: SectionAssessment[];
+
+  /** Estimated duration in minutes (max ~60 for a single lesson) */
+  estimatedMinutes?: number;
+
+  /** Estimated duration for this section (legacy string format) */
+  estimatedDuration?: string;
+
+  /** Whether this section is optional */
+  optional?: boolean;
+}
+
+/**
+ * SectionAssessment - A skill-based assessment within a section.
+ *
+ * Following the Khan Academy model:
+ * - Assessments are derived FROM the content within the section
+ * - Multiple assessments can cover the same concept from different angles
+ * - Types: core (direct), applied (scenarios), synthesis (integration)
+ */
+export interface SectionAssessment {
+  /** Unique assessment ID */
+  id: string;
+
+  /** Assessment title (e.g., "Adding Two Numbers" or "Adding Two Numbers - Word Problems") */
+  title: string;
+
+  /**
+   * Assessment type:
+   * - 'core': Direct application of concepts (knowledge recall, understanding)
+   * - 'applied': Scenarios, word problems, real-world application
+   * - 'synthesis': Combining multiple concepts, higher-order thinking
+   */
+  type: 'core' | 'applied' | 'synthesis';
+
+  /** What this assessment measures */
+  description?: string;
+
+  /** Reference to assessment content (if stored separately) */
+  assessmentId?: string;
 }
 
 /**
@@ -255,6 +394,15 @@ export interface PathStep {
    * - checkpoint: (not used)
    */
   resourceId: string;
+
+  /**
+   * Module association metadata for UI filtering.
+   * When viewing a module, the UI filters steps to show only those
+   * with matching moduleId, enabling "Step 2 of 5" within the current module.
+   */
+  chapterId?: string;
+  moduleId?: string;
+  sectionId?: string;
 
   /**
    * For stepType: 'path' - the nested path ID.
@@ -348,11 +496,11 @@ export interface PathOverviewView {
   nestedPathSummaries?: PathIndexEntry[];
 
   /** Prerequisites with completion status */
-  prerequisites?: Array<{
+  prerequisites?: {
     pathId: string;
     title: string;
     isCompleted: boolean;
-  }>;
+  }[];
 }
 
 /**
@@ -379,7 +527,7 @@ export interface PathIndexEntry {
   id: string;
   title: string;
   description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: DifficultyLevel;
   estimatedDuration: string;
   stepCount: number;
   tags: string[];
@@ -388,7 +536,7 @@ export interface PathIndexEntry {
   chapterCount?: number;
 
   /** Path type for UI hints */
-  pathType?: 'journey' | 'quest' | 'expedition' | 'practice';
+  pathType?: PathType;
 
   /** Attestations granted upon completion */
   attestationsGranted?: string[];
@@ -410,6 +558,116 @@ export interface PathIndex {
   lastUpdated: string;
   totalCount: number;
   paths: PathIndexEntry[];
+}
+
+// =========================================================================
+// Path as ContentNode (Graph Integration)
+// =========================================================================
+
+/**
+ * PathContentMetadata - Metadata for paths represented as ContentNodes on the graph.
+ *
+ * When a LearningPath is registered on the Content Graph, it becomes a ContentNode
+ * with contentType: 'path'. This interface defines the metadata structure stored
+ * in the ContentNode.metadata field.
+ *
+ * This enables:
+ * - Graph traversal to discover paths containing specific content
+ * - Paths can be found via "what paths cover topic X?" queries
+ * - Paths participate in the attestation/governance system
+ * - Unified search across content and paths
+ *
+ * The ContentNode with type 'path' links to the full LearningPath via pathId,
+ * which contains the complete step definitions. The ContentNode is a lightweight
+ * index entry for graph discoverability.
+ */
+export interface PathContentMetadata {
+  /** Reference to the full LearningPath definition */
+  pathId: string;
+
+  /** Difficulty level for filtering */
+  difficulty: DifficultyLevel;
+
+  /** Human-readable estimated duration (e.g., "2-3 hours") */
+  estimatedDuration: string;
+
+  /** Total number of steps in the path */
+  stepCount: number;
+
+  /** Number of chapters (if path uses chapter organization) */
+  chapterCount?: number;
+
+  /**
+   * Content node IDs referenced by this path's steps.
+   * Enables reverse lookup: "which paths contain this content?"
+   *
+   * This is a flattened list of all resourceIds from steps/chapters.
+   * Nested paths (stepType: 'path') are NOT expanded - only direct content.
+   */
+  contentNodeIds: string[];
+
+  /**
+   * Nested path IDs (for stepType: 'path' steps).
+   * Enables path composition graph: "which paths include this path?"
+   */
+  nestedPathIds?: string[];
+
+  /**
+   * Creator information for branded paths.
+   * Links to the ContributorPresence for economic attribution.
+   */
+  creatorInfo?: {
+    /** ContributorPresence ID for the creator */
+    presenceId: string;
+
+    /** Brand name for display (e.g., "Bare Marriage") */
+    brandName?: string;
+
+    /** Brand logo URL for path cards */
+    brandLogoUrl?: string;
+  };
+
+  /**
+   * If this path was forked from another, link to the original.
+   * Enables fork tree visualization and attribution.
+   */
+  forkedFromPathId?: string;
+
+  /**
+   * Fork generation (0 = original, 1 = direct fork, 2 = fork of fork, etc.)
+   */
+  forkGeneration?: number;
+
+  /**
+   * Canonical status for governance.
+   * - 'draft': Author working copy
+   * - 'community': Community-endorsed but not canonical
+   * - 'canonical': Officially ratified path
+   */
+  canonicalStatus?: 'draft' | 'community' | 'canonical';
+
+  /** Path type hint for UI rendering */
+  pathType?: PathType;
+
+  /** Attestations granted upon path completion */
+  attestationsGranted?: string[];
+}
+
+/**
+ * PathReference - Lightweight reference to a path, used in graph queries.
+ */
+export interface PathReference {
+  /** Path node ID (the ContentNode ID, not the LearningPath ID) */
+  nodeId: string;
+
+  /** The underlying LearningPath ID */
+  pathId: string;
+
+  /** Path title */
+  title: string;
+
+  /** Relationship type (how this path relates to the query) */
+  relationship: 'contains' | 'references' | 'requires';
 }
 
 // =========================================================================

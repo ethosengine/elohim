@@ -1,0 +1,9 @@
+Scenario: Family respite coordination to prevent James's burnout
+    Given James needs regular respite or he will collapse
+    And family members could provide some respite care
+    When the family_elohim coordinates respite
+    Then it should identify family members who could help
+    And it should schedule regular respite periods
+    And it should ensure James gets breaks from intensive care
+    And family should actively provide respite, not just sympathy
+    And respite coordination should be systematic, not ad hoc

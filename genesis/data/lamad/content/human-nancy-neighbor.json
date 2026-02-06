@@ -1,0 +1,61 @@
+{
+  "id": "human-nancy-neighbor",
+  "did": "did:web:elohim.host:human:nancy-neighbor",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Nancy",
+  "description": "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.",
+  "content": "# Nancy\n\nLong-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"neighborhood\",\n  \"displayName\": \"Tech Valley\",\n  \"reach\": \"community\"\n}\n\n**Communities:** community-neighborhood-association, community-local-church\n\n**Public Affinities:** community-organizing, local-government, neighborhood-safety, mutual-aid\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/nancy-neighbor/profile.json",
+  "tags": [
+    "mutual-aid",
+    "neighborhood-safety",
+    "community",
+    "community-organizing",
+    "local-government",
+    "layer-neighborhood",
+    "human-graph",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "community",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "neighborhood",
+      "community"
+    ],
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Nancy",
+    "ogDescription": "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-nancy-neighbor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-nancy-neighbor.jpg",
+    "ogImageAlt": "Nancy's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-nancy-neighbor",
+    "identifier": "did:web:elohim.host:human:nancy-neighbor",
+    "name": "Nancy",
+    "description": "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Tech Valley",
+      "description": "neighborhood"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328400",
+  "updatedAt": "2025-12-24T03:05:26.351Z"
+}

@@ -1,0 +1,11 @@
+Scenario: Presenting to 10,000 global citizens on superintelligence governance
+    Given Global Constitutional Convention deliberates superintelligent AI oversight
+    And I am invited to provide technical expert testimony
+    When I address delegates from every nation and culture
+    Then I explain: what "superintelligence" means technically
+    And I clarify: when agents might exceed human comprehension
+    And I present: technical mechanisms for constitutional alignment
+    And I explore: whether "explain-down" capability is possible
+    And I acknowledge: deep uncertainty about solvability
+    And I translate: across language and cultural barriers
+    And I demonstrate: how expertise serves global democracy

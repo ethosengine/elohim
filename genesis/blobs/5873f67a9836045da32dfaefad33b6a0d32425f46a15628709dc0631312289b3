@@ -1,0 +1,9 @@
+Scenario: Worker experiences liberation from constant surveillance anxiety
+    Given Maria previously worked under corporate cameras monitoring for "time theft"
+    And she developed stress from constant surveillance
+    When the workplace converts to democratic ownership
+    And cameras become worker-controlled witness infrastructure
+    Then Maria no longer fears being watched for compliance
+    And she experiences reduced workplace anxiety and stress
+    And her health indicators improve (lower blood pressure, better sleep)
+    And her sense of dignity and autonomy increases measurably

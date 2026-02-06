@@ -1,0 +1,9 @@
+Scenario: Child-related emergency leave without invasive documentation
+    Given children have emergencies requiring immediate parent presence
+    And Maria cannot ask co-parent to handle while she works
+    When Maria needs emergency leave for child crisis
+    Then she should access immediate leave without bureaucratic barriers
+    And she should not have to prove emergency legitimacy with invasive documentation
+    And emergency leave should be available quickly and with dignity
+    And workplace should trust that single parents take leave only when truly necessary
+    And Maria should handle emergencies without fear of job consequences

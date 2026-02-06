@@ -1,0 +1,11 @@
+Scenario: Advising on global crisis governance maintaining democracy
+    Given planetary emergencies require rapid coordination
+    And delegates establish crisis governance framework
+    When I explain technical requirements for emergency response
+    Then I clarify: what's technically possible under urgency
+    And I explore: how to maintain verification under time pressure
+    And I assess: risks of emergency powers being exploited
+    And I present: technical safeguards for crisis protocols
+    And I balance: speed with democratic accountability
+    And I enable: delegates to design crisis governance wisely
+    And I serve: resilient democracy through technical design

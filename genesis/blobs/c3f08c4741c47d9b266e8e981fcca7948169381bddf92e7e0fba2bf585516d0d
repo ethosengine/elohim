@@ -1,0 +1,9 @@
+Scenario: Validating Maria's superhuman efforts without toxic positivity
+    Given Maria performs extraordinary care labor daily
+    And society often dismisses or pities single parents
+    When the personal_agent provides feedback to Maria
+    Then it should genuinely recognize her superhuman work
+    And it should validate the weight of solo parenting
+    And it should avoid toxic positivity that dismisses her struggles
+    And it should acknowledge both her strength and her legitimate exhaustion
+    And Maria should feel truly seen, not patronized

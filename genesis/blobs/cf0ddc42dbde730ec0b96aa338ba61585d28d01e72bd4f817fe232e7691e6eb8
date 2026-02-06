@@ -1,0 +1,35 @@
+Feature: Lamad Learning Paths
+  As a learner using Lamad
+  I want to navigate through learning paths
+  So that I can follow a structured learning journey
+
+  @smoke @lamad @api
+  Scenario: Learning paths API returns data
+    Given the backend API is available
+    When I request the learning paths from the API
+    Then the response should be successful
+    And the response should contain paths
+
+  @lamad @navigation
+  Scenario: Learning paths are displayed
+    Given I am on the Lamad section
+    Then at least one learning path should be displayed
+
+  @lamad @navigation @workflow
+  Scenario: User can navigate to a learning path
+    Given I am on the Lamad section
+    When I click on the first learning path
+    Then the page should load successfully
+    And the content should finish loading
+
+  @lamad @data
+  Scenario: Learning path shows title and description
+    Given I am on the Lamad section
+    Then each path should show a title and description
+
+  @lamad @api @data
+  Scenario: API paths match displayed paths
+    Given the backend API is available
+    When I request the learning paths from the API
+    Then the response should contain paths
+    And the learning paths should match the API data

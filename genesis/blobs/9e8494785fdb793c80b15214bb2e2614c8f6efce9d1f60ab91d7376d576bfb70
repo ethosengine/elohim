@@ -1,0 +1,10 @@
+Scenario: Neighborhood bulk buying coordinated with teen participation
+    Given Jasmine's neighborhood organizes collective bulk food purchases
+    And she has transportation and time flexibility
+    When she participates in bulk buying coordination
+    Then the neighborhood_elohim should facilitate logistics
+    And track her contributions of labor (pickup, distribution, coordination)
+    And enable cost savings to be distributed equitably
+    And recognize that her participation makes bulk buying possible for others
+    And demonstrate that care economy creates real economic value
+    And show that youth participation strengthens neighborhood economic resilience

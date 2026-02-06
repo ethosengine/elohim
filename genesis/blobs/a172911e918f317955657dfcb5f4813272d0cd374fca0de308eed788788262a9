@@ -1,0 +1,9 @@
+Scenario: Navigating 9-year-old's growing autonomy and competence
+    Given her middle child is developing independence and self-direction
+    And this age needs balance of freedom and parental guidance
+    When Maria parents her 9-year-old
+    Then the family_elohim should help her calibrate appropriate autonomy
+    And it should remind her of developmental milestones to support
+    And it should help her stay connected while allowing necessary independence
+    And it should prevent middle child from being lost between younger and older siblings
+    And Maria should serve this complex developmental stage effectively

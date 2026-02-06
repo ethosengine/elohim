@@ -1,0 +1,9 @@
+Scenario: Developer community benefits agreement gains enforcement mechanism
+    Given a developer negotiated affordable housing units as approval condition
+    And promised childcare facility and public greenspace
+    When the Observer tracks commitment delivery
+    Then community members monitor construction and occupancy
+    And see whether affordable units are actually rented to qualifying residents
+    And track whether childcare facility opens as promised
+    And developer reputation depends on honoring commitments
+    And binding accountability replaces unenforceable promises

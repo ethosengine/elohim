@@ -1,0 +1,10 @@
+Scenario: Continuing education about rights and entitlements
+    Given Jordan has rights as a person with disabilities
+    And knowing rights supports self-advocacy
+    When Jordan participates in rights education
+    Then Jordan learns about ADA, employment rights, housing rights
+    And information is provided in highly accessible format
+    And Jordan understands what protections they have
+    And Jordan can advocate for their rights when violations occur
+    And rights education empowers Jordan's full citizenship
+    And Jordan experiences being a person with protected rights and dignity

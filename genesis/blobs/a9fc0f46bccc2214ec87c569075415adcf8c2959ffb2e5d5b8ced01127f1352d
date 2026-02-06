@@ -1,0 +1,11 @@
+Scenario: Visibility of aggregate retired resident contributions transforms perception
+    Given Frank is one of many retired residents contributing substantial volunteer labor
+    And aggregate impact is significant but invisible in traditional metrics
+    When the community_elohim surfaces aggregate data
+    Then it should quantify total volunteer labor from retired residents
+    And calculate combined market value (potentially millions annually)
+    And demonstrate that retired residents are massive community asset
+    And counter narrative of elders as economic burden
+    And transform community understanding of retirement contributions
+    And support policy that recognizes and values retired resident participation
+    And Frank should see himself as part of powerful community infrastructure

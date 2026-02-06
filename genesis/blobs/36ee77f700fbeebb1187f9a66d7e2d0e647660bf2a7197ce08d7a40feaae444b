@@ -1,0 +1,11 @@
+Scenario: Municipal budget allocation informed by protocol data
+    Given city council determines annual budget
+    And we need evidence about neighborhood needs and priorities
+    When Municipal Elohim provides resource flow analysis
+    Then we see: which neighborhoods are underserved
+    And we identify: where investments would have most impact
+    And we understand: how different spending choices ripple across city
+    And city council: deliberates and decides using this information
+    And we maintain: political accountability for budget choices
+    And protocol transparency: enables better democratic decision-making
+    And agent information: serves elected governance

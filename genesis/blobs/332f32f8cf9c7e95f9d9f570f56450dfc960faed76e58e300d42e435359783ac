@@ -1,0 +1,10 @@
+Scenario: Multi-store comparison for budget optimization
+    Given Aisha's limited budget requires strategic shopping
+    And different stores offer different value propositions
+    When Aisha compares shopping options
+    Then the personal_agent should analyze prices across stores
+    And it should consider transportation costs in calculations
+    And it should identify where spending more saves money long-term
+    And recommendations should optimize total value, not just price
+    And the system should help her find efficiency frontiers
+    And decision support should build financial literacy

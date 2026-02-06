@@ -1,0 +1,10 @@
+Scenario: Teen contributes to neighborhood ecological stewardship
+    Given Jasmine's neighborhood has collective garden spaces
+    And environmental stewardship is part of neighborhood care economy
+    When Jasmine contributes to neighborhood composting or garden maintenance
+    Then her ecological care work should be tracked and valued
+    And the neighborhood_elohim should recognize environmental labor
+    And she should learn that care extends to land and ecological systems
+    And neighborhood food production should be understood as collective care work
+    And her generation should develop expectation that communities steward their environment
+    And ecological care should be integrated with social and economic care

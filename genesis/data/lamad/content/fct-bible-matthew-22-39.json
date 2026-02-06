@@ -1,0 +1,52 @@
+{
+  "id": "fct-bible-matthew-22-39",
+  "contentType": "bible-verse",
+  "title": "Matthew 22:39",
+  "description": "Scripture reference used in FCT Module 6",
+  "content": "## Matthew 22:39\n\n> Matthew 22:39 - \"And the second is like it: 'Love your neighbor as yourself.'\"\nEthical frameworks and discernment:\n\n*ESV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "thematicContext": "Minimizing Harmful Consequences"
+  },
+  "createdAt": "2025-11-28T21:10:19.201339",
+  "updatedAt": "2025-12-24T03:05:25.997Z",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Matthew 22:39",
+    "ogDescription": "Scripture reference used in FCT Module 6",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-matthew-22-39",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Matthew 22:39 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-matthew-22-39",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "Matthew 22:39",
+    "description": "Scripture reference used in FCT Module 6",
+    "dateCreated": "2025-11-28T21:10:19.201339",
+    "dateModified": "2025-11-28T21:10:19.201341",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

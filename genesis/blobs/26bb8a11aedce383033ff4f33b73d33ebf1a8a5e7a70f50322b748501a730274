@@ -1,0 +1,8 @@
+Scenario: Participating in community food systems
+    Given I work in food preparation and understand food systems
+    And community has food co-ops, gardens, or alternative food access
+    When I participate in community food initiatives
+    Then the protocol should recognize my expertise and contribution
+    And help me access affordable, quality food through community systems
+    And accumulate care tokens for food systems participation
+    And support building community food sovereignty

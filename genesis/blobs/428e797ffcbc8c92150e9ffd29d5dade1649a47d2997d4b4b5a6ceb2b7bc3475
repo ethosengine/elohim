@@ -1,0 +1,10 @@
+Scenario: Recognizing educational institution care economy failures
+    Given Kenji's college charges high tuition while many students face food insecurity
+    And educational institutions can exploit student labor
+    When the educational_elohim helps Kenji analyze institutional practices
+    Then it should teach him to recognize extractive vs. care-based institutions
+    And it should help him see when colleges fail care economy principles
+    And it should validate his critique of exploitative educational models
+    And the system should build critical awareness of institutional care failures
+    And Kenji should learn to evaluate institutions through care economy lens
+    And educational institutions should be accountable to care economy standards

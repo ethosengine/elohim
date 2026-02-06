@@ -1,0 +1,25 @@
+{
+  "id": "fct-video-04-00",
+  "contentType": "video",
+  "title": "is Haugen - 60mins interview or Congressional Testimony",
+  "description": "Recommended video for Respecting Human Nature",
+  "content": "**Platform:** youtube",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "video",
+    "fct",
+    "youtube",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-05-respecting-human-nature",
+    "mediaType": "video"
+  },
+  "createdAt": "2025-11-28T02:47:31.018220",
+  "updatedAt": "2025-12-26T21:04:01.845Z"
+}

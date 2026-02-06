@@ -1,0 +1,30 @@
+{
+  "id": "concept-transparency-as-immune-system",
+  "contentType": "concept",
+  "title": "Transparency as Immune System",
+  "description": "Open governance makes manipulation visible. Behavioral pattern recognition identifies corruption while preserving privacy and dignity.",
+  "content": "Open governance makes manipulation visible. Behavioral pattern recognition identifies corruption while preserving privacy and dignity.",
+  "contentFormat": "plaintext",
+  "sourcePath": "generated/landing-page/design-principles/concept-transparency-as-immune-system.json",
+  "tags": [
+    "transparency",
+    "governance",
+    "accountability",
+    "design-principle",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "design-principles",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:56.999837",
+  "updatedAt": "2025-12-24T03:05:25.893Z"
+}

@@ -1,0 +1,10 @@
+Scenario: Reciprocal care between Margaret and Robert as they age
+    Given Margaret and Robert are both aging
+    And they will increasingly need to care for each other
+    When the household_elohim tracks household care patterns
+    Then it should recognize reciprocal care between partners
+    And it should show how they support each other's well-being
+    And it should value care they provide to each other
+    And household care economy should include partner care
+    And both should accumulate care tokens for caring for each other
+    And the system should support their aging together with dignity

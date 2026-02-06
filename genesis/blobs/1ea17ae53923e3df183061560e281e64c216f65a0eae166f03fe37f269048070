@@ -1,0 +1,9 @@
+Scenario: Developer lobbying relationships become transparent
+    Given a developer lobbies state legislature for favorable policy
+    And makes campaign donations to key committee members
+    When the Observer tracks lobbying and political relationships
+    Then constituents see: $250K in donations to housing committee members
+    And identify correlation between donations and votes on developer-friendly bills
+    And the developer faces accountability for political influence
+    And legislators face scrutiny about who they serve
+    And transparent relationships create pressure for merit-based policy

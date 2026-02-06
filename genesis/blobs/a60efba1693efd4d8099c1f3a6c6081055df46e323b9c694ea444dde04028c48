@@ -1,0 +1,9 @@
+Scenario: Municipal policy informed by aggregated care economy data
+    Given thousands of residents participate in care economy
+    And their care patterns generate valuable data
+    When municipal policy decisions are made
+    Then the municipal_elohim should provide aggregated care work data
+    And policy makers should see actual patterns of care labor
+    And invisible care work should be quantified at municipal scale
+    And policy should be informed by real care economy patterns
+    And data should reveal needs that traditional economics miss

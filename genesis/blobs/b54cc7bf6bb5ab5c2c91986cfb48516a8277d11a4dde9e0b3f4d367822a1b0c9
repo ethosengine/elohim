@@ -1,0 +1,10 @@
+Scenario: Coordinating children's different developmental needs in household
+    Given Tommy (5) needs wonder-preservation
+    And Emma (8) needs autonomy-building
+    When Sarah coordinates household routines
+    Then the household_elohim should help balance different needs
+    And it should suggest how to serve both children appropriately
+    And it should track whether each child's needs are being met
+    And developmental coordination should be recognized as complex work
+    And Sarah's skilled navigation of competing needs should be valued
+    And household care should serve all members' flourishing

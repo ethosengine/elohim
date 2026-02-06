@@ -1,0 +1,10 @@
+Scenario: Navigating student-resident tensions in shared neighborhood
+    Given long-term residents might resent student noise, parties, or turnover
+    And students might be unaware of neighborhood norms
+    When the neighborhood_elohim facilitates student-resident relationships
+    Then it should educate students about neighborhood expectations
+    And it should help residents recognize students as temporary but real members
+    And it should facilitate communication between students and long-term residents
+    And it should build understanding across different neighborhood groups
+    And the system should reduce student-resident conflict
+    And mixed neighborhoods should be navigable for all residents

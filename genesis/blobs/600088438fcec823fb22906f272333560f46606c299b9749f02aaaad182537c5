@@ -1,0 +1,10 @@
+Scenario: Bioregional care economy integrates human and ecosystem flourishing
+    Given Jasmine participates in care economy across multiple contexts
+    And all human care depends on functioning ecosystems
+    When her personal_agent provides comprehensive care economy view
+    Then it should integrate ecological care with social and economic care
+    And show that caring for ecosystems enables caring for people
+    And demonstrate that bioregional health is inseparable from community health
+    And help her understand care economy as integrated human-ecological system
+    And build expectation that economy must serve both human and ecosystem flourishing
+    And internalize that her generation must heal relationship between economy and ecology

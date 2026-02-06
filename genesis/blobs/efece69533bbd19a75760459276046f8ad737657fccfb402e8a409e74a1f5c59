@@ -1,0 +1,9 @@
+Scenario: Citywide democratic business network emerges from successful conversions
+    Given Rosa's conversion inspires other small business owners
+    And isolated democratic businesses are vulnerable
+    When multiple conversions create critical mass across municipality
+    Then democratic business network provides mutual support and coordination
+    And owners considering conversion can learn from Rosa and others
+    And network advocates collectively for supportive municipal policies
+    And citywide democratic economy infrastructure develops (shared services, coordination, advocacy)
+    And municipality_elohim facilitates network development and coordination

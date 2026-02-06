@@ -1,0 +1,9 @@
+Scenario: Family resource allocation reflects all members' contributions
+    Given family makes decisions about major resource allocation
+    And multiple members contribute in different ways
+    When family decisions are made
+    Then all members' care contributions should be considered
+    And Sarah's care work should give her legitimate standing
+    And children's contributions should be recognized appropriately
+    And resource decisions should reflect visible care patterns
+    And family economics should honor care creates value

@@ -1,0 +1,7 @@
+Scenario: Demanding workplace democracy and worker voice
+    Given decisions affecting my life are made without my input
+    When I want to advocate for worker participation in decisions
+    Then the protocol should support advocacy for workplace democracy
+    And help me articulate the case for worker voice in governance
+    And provide information about worker ownership and cooperative models
+    And build consciousness that workers deserve decision-making power

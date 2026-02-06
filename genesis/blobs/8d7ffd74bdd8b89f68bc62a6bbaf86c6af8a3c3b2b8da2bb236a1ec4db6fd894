@@ -1,0 +1,8 @@
+Scenario: School board member understands transportation impact on families
+    Given administration proposes transportation cuts for budget savings
+    When the Observer analyzes transportation usage and impacts
+    Then they see which families depend on bus routes for work schedules
+    And identify students who will lose access without transportation
+    And understand time burdens on working parents from route changes
+    And calculate actual family costs of proposed savings
+    And evaluate trade-offs with family wellbeing impact visible

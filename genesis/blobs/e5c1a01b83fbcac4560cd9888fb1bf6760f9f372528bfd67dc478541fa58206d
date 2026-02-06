@@ -1,0 +1,9 @@
+Scenario: Citizen connects municipal decisions to school impacts
+    Given a developer proposes 200-unit residential complex
+    And claims it will benefit the tax base
+    When the Observer calculates educational impacts
+    Then the citizen sees 180 new students projected
+    And understands infrastructure capacity constraints
+    And learns no new school facilities are planned
+    And connects municipal development to education quality
+    And cross-domain impacts become visible

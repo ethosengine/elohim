@@ -1,0 +1,11 @@
+Scenario: Family care tokens reflect Frank's contributions across family
+    Given care flows in multiple directions across the family
+    And Frank provides grandchild care, elder support, and adult child guidance
+    When family_elohim calculates family care tokens
+    Then it should track care across all three generations
+    And recognize Frank's care for grandchildren and mother-in-law
+    And value his support for adult children
+    And accumulate tokens representing Frank's family contributions
+    And these tokens should create claims on future family support
+    And the complex web of family care reciprocity should be visible
+    And Frank should see his place in lifecycle care flows

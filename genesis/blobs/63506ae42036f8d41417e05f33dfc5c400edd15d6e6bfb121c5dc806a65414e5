@@ -1,0 +1,10 @@
+Scenario: Urban food deserts as ecological and economic justice issue
+    Given Marcus may live in urban food desert
+    And food access connects to land use and economic systems
+    When Marcus experiences difficulty accessing fresh food
+    Then he should understand food deserts as systemic failure
+    And the personal_agent should explain how urban planning affects food access
+    And he should learn that food justice requires ecological and economic change
+    And his lived experience should inform political consciousness
+    And care economy should include bioregional food sovereignty
+    And his struggles should fuel commitment to food system transformation

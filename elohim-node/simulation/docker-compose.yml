@@ -1,0 +1,216 @@
+# elohim-node Cluster Simulation
+#
+# Simulates a multi-cluster topology:
+# - Cluster A: 2 nodes (family-a-node-1, family-a-node-2) on LAN
+# - Cluster B: 2 nodes (family-b-node-1, family-b-node-2) on LAN
+# - WAN connection between clusters (with latency)
+#
+# Usage:
+#   docker-compose up -d              # Start all nodes
+#   docker-compose logs -f            # Follow logs
+#   docker-compose down               # Stop all
+#   docker-compose down -v            # Stop and remove volumes
+#
+# Network topology:
+#   ┌─────────────────────────────────────────────────────────────┐
+#   │  cluster-a-lan (172.20.1.0/24)    cluster-b-lan (172.20.2.0/24)
+#   │  ┌─────────────────────┐          ┌─────────────────────┐  │
+#   │  │ family-a-node-1     │          │ family-b-node-1     │  │
+#   │  │ 172.20.1.11         │          │ 172.20.2.11         │  │
+#   │  │         │           │          │         │           │  │
+#   │  │ family-a-node-2     │          │ family-b-node-2     │  │
+#   │  │ 172.20.1.12         │          │ 172.20.2.12         │  │
+#   │  └─────────┬───────────┘          └─────────┬───────────┘  │
+#   │            │                                │              │
+#   │            └────────────┬───────────────────┘              │
+#   │                         │                                  │
+#   │                    wan-bridge                              │
+#   │                   (172.20.0.0/24)                          │
+#   │                   (50ms latency)                           │
+#   └─────────────────────────────────────────────────────────────┘
+
+services:
+  # ===========================================================================
+  # CLUSTER A - "Johnson Family"
+  # ===========================================================================
+
+  family-a-node-1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: family-a-node-1
+    hostname: family-a-node-1
+    environment:
+      - ELOHIM_NODE_ID=family-a-node-1
+      - ELOHIM_CLUSTER_NAME=johnson-family
+      - ELOHIM_CLUSTER_KEY=johnson-family-secret-key-2024
+      - ELOHIM_DATA_DIR=/var/lib/elohim
+      - RUST_LOG=info,elohim_node=debug
+    volumes:
+      - family-a-node-1-data:/var/lib/elohim
+      - ./configs/family-a-node-1.toml:/etc/elohim/elohim-node.toml:ro
+    networks:
+      cluster-a-lan:
+        ipv4_address: 172.20.1.11
+      wan-bridge:
+        ipv4_address: 172.20.0.11
+    ports:
+      - "8081:8080"   # HTTP API
+      - "9091:9090"   # gRPC API
+      - "4011:4001"   # libp2p
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  family-a-node-2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: family-a-node-2
+    hostname: family-a-node-2
+    environment:
+      - ELOHIM_NODE_ID=family-a-node-2
+      - ELOHIM_CLUSTER_NAME=johnson-family
+      - ELOHIM_CLUSTER_KEY=johnson-family-secret-key-2024
+      - ELOHIM_DATA_DIR=/var/lib/elohim
+      - RUST_LOG=info,elohim_node=debug
+    volumes:
+      - family-a-node-2-data:/var/lib/elohim
+      - ./configs/family-a-node-2.toml:/etc/elohim/elohim-node.toml:ro
+    networks:
+      cluster-a-lan:
+        ipv4_address: 172.20.1.12
+    depends_on:
+      - family-a-node-1
+    restart: unless-stopped
+
+  # ===========================================================================
+  # CLUSTER B - "Smith Family"
+  # ===========================================================================
+
+  family-b-node-1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: family-b-node-1
+    hostname: family-b-node-1
+    environment:
+      - ELOHIM_NODE_ID=family-b-node-1
+      - ELOHIM_CLUSTER_NAME=smith-family
+      - ELOHIM_CLUSTER_KEY=smith-family-secret-key-2024
+      - ELOHIM_DATA_DIR=/var/lib/elohim
+      - RUST_LOG=info,elohim_node=debug
+    volumes:
+      - family-b-node-1-data:/var/lib/elohim
+      - ./configs/family-b-node-1.toml:/etc/elohim/elohim-node.toml:ro
+    networks:
+      cluster-b-lan:
+        ipv4_address: 172.20.2.11
+      wan-bridge:
+        ipv4_address: 172.20.0.21
+    ports:
+      - "8082:8080"   # HTTP API
+      - "9092:9090"   # gRPC API
+      - "4021:4001"   # libp2p
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  family-b-node-2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: family-b-node-2
+    hostname: family-b-node-2
+    environment:
+      - ELOHIM_NODE_ID=family-b-node-2
+      - ELOHIM_CLUSTER_NAME=smith-family
+      - ELOHIM_CLUSTER_KEY=smith-family-secret-key-2024
+      - ELOHIM_DATA_DIR=/var/lib/elohim
+      - RUST_LOG=info,elohim_node=debug
+    volumes:
+      - family-b-node-2-data:/var/lib/elohim
+      - ./configs/family-b-node-2.toml:/etc/elohim/elohim-node.toml:ro
+    networks:
+      cluster-b-lan:
+        ipv4_address: 172.20.2.12
+    depends_on:
+      - family-b-node-1
+    restart: unless-stopped
+
+  # ===========================================================================
+  # WAN LATENCY SIMULATOR
+  # ===========================================================================
+
+  # Pumba or tc-based latency injection (optional)
+  # This container adds 50ms latency to WAN traffic
+  wan-latency:
+    image: gaiaadm/pumba:latest
+    container_name: wan-latency
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      netem
+      --duration 24h
+      --tc-image gaiadocker/iproute2
+      delay
+      --time 50
+      --jitter 10
+      family-a-node-1
+      family-b-node-1
+    profiles:
+      - latency
+    depends_on:
+      - family-a-node-1
+      - family-b-node-1
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+
+networks:
+  # Cluster A LAN - fast local network
+  cluster-a-lan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+          gateway: 172.20.1.1
+    driver_opts:
+      com.docker.network.bridge.name: br-cluster-a
+
+  # Cluster B LAN - fast local network
+  cluster-b-lan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+          gateway: 172.20.2.1
+    driver_opts:
+      com.docker.network.bridge.name: br-cluster-b
+
+  # WAN bridge - connects clusters (with latency simulation)
+  wan-bridge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-wan
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+
+volumes:
+  family-a-node-1-data:
+  family-a-node-2-data:
+  family-b-node-1-data:
+  family-b-node-2-data:

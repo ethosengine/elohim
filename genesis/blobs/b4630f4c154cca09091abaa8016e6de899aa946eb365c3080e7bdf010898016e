@@ -1,0 +1,10 @@
+Scenario: Exploring career interests through accessible career education
+    Given Jordan might want to explore other career options
+    And career exploration supports life planning
+    When Jordan uses career exploration resources
+    Then the personal_agent shows career options with pictures and simple descriptions
+    And Jordan can learn about different jobs through videos and stories
+    And Jordan can explore interests without pressure to commit
+    And the educational_elohim provides information about training pathways
+    And Jordan's career dreams are taken seriously, not dismissed
+    And Jordan experiences hope and possibility through education

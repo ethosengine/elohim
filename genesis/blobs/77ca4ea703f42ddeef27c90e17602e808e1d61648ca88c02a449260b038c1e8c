@@ -1,0 +1,11 @@
+Scenario: Family care economy includes elderly in reciprocal network
+    Given the family participates in care token economy
+    And Helen both receives and gives care
+    When family care tokens are calculated
+    Then Helen's contributions should be valued alongside her care receipt
+    And her lifetime of family care should be visible
+    And current care she receives should be framed as reciprocity
+    And family care economy should show mutual support, not one-way dependency
+    And Helen should have standing in family based on accumulated contributions
+    And the protocol should demonstrate that care flows throughout entire lifespan
+    And family economics should value elders as continuing participants

@@ -1,21 +1,27 @@
-import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+
+// @coverage: 19.0% (2026-02-05)
+
 import { ContentNode } from '../../models/content-node.model';
 import { InteractiveRenderer, RendererCompletionEvent } from '../renderer-registry.service';
 
+type QuizQuestionType = 'multiple-choice' | 'true-false' | 'short-answer' | 'connection';
+type QuizAnswer = number | string | boolean;
+
 interface QuizQuestion {
   id: string;
-  type: 'multiple-choice' | 'true-false' | 'short-answer' | 'connection';
+  type: QuizQuestionType;
   question: string;
-  options?: string[];         // For multiple-choice
-  correctAnswer?: number | string | boolean;
-  rubric?: string;            // For manually graded
-  explanation?: string;       // Shown after answer
+  options?: string[]; // For multiple-choice
+  correctAnswer?: QuizAnswer;
+  rubric?: string; // For manually graded
+  explanation?: string; // Shown after answer
 }
 
 interface QuizContent {
-  passingScore: number;       // 0-100
+  passingScore: number; // 0-100
   allowRetake: boolean;
   showCorrectAnswers: boolean;
   questions: QuizQuestion[];
@@ -26,7 +32,7 @@ interface QuizContent {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './quiz-renderer.component.html',
-  styleUrls: ['./quiz-renderer.component.css']
+  styleUrls: ['./quiz-renderer.component.css'],
 })
 export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
   @Input() node!: ContentNode;
@@ -38,20 +44,49 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
   @Output() quizComplete = new EventEmitter<{ passed: boolean; score: number }>();
 
   quiz: QuizContent | null = null;
-  answers: Map<string, any> = new Map();
+  answers = new Map<string, QuizAnswer>();
   submitted = false;
   score = 0;
   passed = false;
 
   ngOnChanges(): void {
-    if (this.node && this.node.contentFormat === 'quiz-json') {
-      this.quiz = this.node.content as QuizContent;
-      this.answers.clear();
-      this.submitted = false;
+    // Reset state when node changes
+    this.quiz = null;
+    this.answers.clear();
+    this.submitted = false;
+    this.score = 0;
+    this.passed = false;
+
+    if (!this.node) return;
+
+    // Handle quiz content - could be quiz-json format or assessment type
+    if (
+      this.node.contentFormat === ('quiz-json' as any) ||
+      this.node.contentType === 'assessment'
+    ) {
+      let content: unknown = this.node.content;
+
+      // Parse if it's a string
+      if (typeof content === 'string') {
+        try {
+          content = JSON.parse(content) as unknown;
+        } catch {
+          // JSON parse failed - invalid quiz content, skip rendering
+          return;
+        }
+      }
+
+      // Validate quiz structure
+      const quizData = content as QuizContent;
+      if (quizData && Array.isArray(quizData.questions)) {
+        this.quiz = quizData;
+      } else {
+        // Invalid quiz structure - will show error state
+      }
     }
   }
 
-  selectAnswer(questionId: string, answer: any): void {
+  selectAnswer(questionId: string, answer: QuizAnswer): void {
     if (this.submitted) return;
     this.answers.set(questionId, answer);
   }
@@ -83,8 +118,8 @@ export class QuizRendererComponent implements OnChanges, InteractiveRenderer {
       details: {
         correct,
         total: gradeable,
-        passingScore: this.quiz.passingScore
-      }
+        passingScore: this.quiz.passingScore,
+      },
     });
 
     // Also emit legacy event for backwards compatibility

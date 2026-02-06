@@ -1,0 +1,11 @@
+Scenario: Facing superintelligent agent reasoning complexity
+    Given an appeal involves agent reasoning approaching comprehension limits
+    And I struggle to understand what I'm judging
+    When we confront superintelligence governance question
+    Then we honestly acknowledge: limits of our understanding
+    And we hear: technical experts explain what can and cannot be grasped
+    And we evaluate: if cryptographic proof suffices when reasoning is opaque
+    And we grapple: with governing intelligence that exceeds ours
+    And we may establish: capability limits until explainability improves
+    And we preserve: democratic oversight even at AI capability frontiers
+    And we accept: uncertainty about whether this is truly possible

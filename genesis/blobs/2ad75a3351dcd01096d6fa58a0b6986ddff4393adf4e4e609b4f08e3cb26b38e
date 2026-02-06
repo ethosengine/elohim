@@ -1,0 +1,11 @@
+Scenario: Alex participates in family governance as full adult member
+    Given Alex is an adult family member
+    And some family might still treat Alex as dependent child
+    When family decisions are made
+    Then Alex should have equal voice to other adult family members
+    And Alex's autonomy should be respected by the family_elohim
+    And Alex's opinions should carry weight appropriate to an adult
+    And infantilization patterns should be identified and countered
+    And the system should structure Alex as competent adult
+    And family should be prompted to respect Alex's sovereignty
+    And Alex's full adulthood should be systematically affirmed

@@ -1,0 +1,9 @@
+Scenario: Teacher informs early literacy policy with classroom expertise
+    Given state mandates specific reading instruction approach
+    And approach contradicts teacher professional knowledge and research
+    When teachers document reading instruction reality through Observer
+    Then teachers show mandated approach doesn't work for all students
+    And provide evidence on effective literacy practices for diverse learners
+    And document student reading outcomes under different approaches
+    And coordinate with literacy researchers and reading specialists
+    And reading policy becomes informed by professional expertise not ideology

@@ -1,0 +1,52 @@
+{
+  "id": "fct-bible-matthew-6-33",
+  "contentType": "bible-verse",
+  "title": "Matthew 6:33",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": "## Matthew 6:33\n\n> Matthew 6:33 - \"But seek first the kingdom of God and his righteousness, and all these things will be added to you.\"\nConsidering Basic Needs and Capabilities for All:\n\n*ESV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T21:10:19.224135",
+  "updatedAt": "2025-12-24T03:05:25.998Z",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Matthew 6:33",
+    "ogDescription": "Scripture reference used in FCT Module 13",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-matthew-6-33",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Matthew 6:33 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-matthew-6-33",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "Matthew 6:33",
+    "description": "Scripture reference used in FCT Module 13",
+    "dateCreated": "2025-11-28T21:10:19.224135",
+    "dateModified": "2025-11-28T21:10:19.224136",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

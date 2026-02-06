@@ -1,0 +1,9 @@
+Scenario: Citizen evaluates development environmental claims
+    Given a developer claims their project is environmentally sustainable
+    And uses terms like "green building" and "eco-friendly"
+    When the Observer fact-checks environmental claims
+    Then the citizen sees actual environmental review data
+    And views the developer's environmental track record
+    And understands real impacts on habitat, pollution, resources
+    And can distinguish genuine sustainability from greenwashing
+    And environmental accountability becomes measurable

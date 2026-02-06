@@ -1,0 +1,10 @@
+Scenario: Neighborhood representation and voice for retirees
+    Given Margaret has time to attend neighborhood meetings
+    And retired residents have important perspective and needs
+    When neighborhood governance decisions are made
+    Then Margaret's participation and voice should be valued
+    And retired residents' interests should be represented
+    And her care contributions should give her standing in decisions
+    And neighborhood should benefit from elder wisdom and participation
+    And Margaret should help shape neighborhood policies and priorities
+    And all age groups should be represented in neighborhood governance

@@ -1,0 +1,9 @@
+Scenario: Teacher advocates for professional development reform
+    Given state mandates professional development hours annually
+    But current PD is generic and unhelpful for actual teaching
+    When teachers provide evidence on PD effectiveness through Observer
+    Then aggregated data shows teachers rate 80% of PD as not useful
+    And teachers propose evidence-based PD reform based on what actually helps
+    And document successful PD models from other states
+    And coordinate with education researchers and reform advocates
+    And state professional development policy respects teacher expertise

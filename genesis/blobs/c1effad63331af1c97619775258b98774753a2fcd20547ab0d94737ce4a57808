@@ -1,0 +1,10 @@
+Scenario: Elder finds peer support during life transition
+    Given Rose is adjusting to widowhood after 50 years of marriage
+    When she joins a grief support affinity network for widows/widowers
+    And she shares her experience and struggles
+    Then she connects with others navigating similar loss
+    And peer support helps her process grief
+    And she eventually mentors newly widowed community members
+    And the network provides genuine emotional support
+    And isolation during difficult transition is prevented
+    And Rose finds path forward through community support

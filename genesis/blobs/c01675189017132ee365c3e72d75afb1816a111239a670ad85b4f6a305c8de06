@@ -1,0 +1,9 @@
+Scenario: Child creates first contribution within family circle
+    Given Emma wants to share her art project with her family
+    When she creates a contribution with a photo of her drawing
+    And she writes "I made this at school today!"
+    Then the contribution is immediately visible to all family members
+    And it stays within the family circle by default
+    And family members can respond with encouragement
+    And the guardian agent tracks this as positive creative expression
+    And Emma learns that sharing creates connection

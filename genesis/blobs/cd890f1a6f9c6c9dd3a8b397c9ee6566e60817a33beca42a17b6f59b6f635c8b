@@ -1,0 +1,11 @@
+Scenario: Interviewing appellant about appeal experience and recourse
+    Given Marcus appealed his Family Elohim's mental health intervention
+    And he has consented to research interview
+    When I ask about his experience of the appeal process
+    Then he shares: emotional impact of feeling violated then heard
+    And he describes: accessibility of appeal interface, dignity of process
+    And he explains: how explanation changed his understanding
+    And he reflects: reconciliation with agent through meaningful recourse
+    And I learn: what made the process feel legitimate despite initial anger
+    And I understand: lived experience that statistics cannot capture
+    And His story humanizes governance mechanisms for research audience

@@ -1,0 +1,10 @@
+Scenario: Sick children and workplace accommodation
+    Given children get sick frequently
+    And Sarah needs to care for sick children
+    When Tommy or Emma is sick
+    Then the workplace_elohim should help Sarah navigate work accommodations
+    And it should recognize parent's obligation to care for sick child
+    And it should support requesting necessary time off
+    And the system should validate that child care is priority
+    And workplace should accommodate parent responsibilities
+    And Sarah should not face professional penalty for parenting obligations

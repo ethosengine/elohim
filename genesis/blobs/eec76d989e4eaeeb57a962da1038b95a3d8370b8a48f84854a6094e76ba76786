@@ -1,0 +1,9 @@
+Scenario: Politician distinguishes business lobbying from small business reality
+    Given corporate lobbying claims to represent small business
+    And uses small business owners in advocacy campaigns
+    When the Observer analyzes business community diversity
+    Then they see large corporations drive policy positions
+    And identify actual small business priorities differ from lobbying
+    And understand small businesses harmed by corporate subsidies
+    And distinguish authentic small business concerns from corporate manipulation
+    And align economic policy with diverse business community

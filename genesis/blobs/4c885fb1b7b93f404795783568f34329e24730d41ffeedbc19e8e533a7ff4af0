@@ -1,0 +1,11 @@
+Scenario: Recognition of emotional labor in grandparenting role
+    Given Margaret provides not just practical care but emotional support
+    And she navigates complex family dynamics with wisdom
+    When the personal_agent tracks Margaret's care contributions
+    Then it should recognize emotional labor as work
+    And it should value relationship maintenance and family harmony
+    And it should acknowledge the sophistication of intergenerational care
+    And it should quantify not just hours but quality of care
+    And emotional labor should be visible and valued
+    And Margaret's wisdom and relationship work should be recognized
+    And the full dimension of grandparenting care should be appreciated

@@ -1,0 +1,24 @@
+{
+  "id": "community-garden-club",
+  "did": "did:web:elohim.host:community:garden-club",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Garden Club",
+  "description": "Community with 1 members",
+  "content": "# Garden Club\n\n**Members:** 1\n\n## Member List\n\n- human-gertrude-grandma",
+  "contentFormat": "markdown",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-gertrude-grandma"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-26T21:04:01.744Z"
+}

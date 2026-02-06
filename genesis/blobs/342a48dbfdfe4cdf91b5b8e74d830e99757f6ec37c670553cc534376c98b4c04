@@ -1,0 +1,10 @@
+Scenario: Board member learns accessible expertise on special education compliance
+    Given district faces federal monitoring for special education compliance issues
+    And board must oversee corrective action plan with complex legal requirements
+    And board member has no special education or legal background
+    When the board member uses Observer to understand the situation
+    Then they receive plain-language explanation of IDEA requirements and violations
+    And see comparison of district's special education outcomes to state averages
+    And access key questions to ask superintendent about implementation capacity
+    And get examples of how other districts achieved compliance
+    And accessible expertise enables informed oversight without full-time study

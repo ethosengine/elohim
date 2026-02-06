@@ -1,0 +1,9 @@
+Scenario: Farm transitions from private land to community food security institution
+    Given Johnson Farm was Tom's private property serving his individual livelihood
+    And community depended on farm but had no governance participation
+    When farm converts to democratic ownership with community investment
+    Then community investors gain stake in local food production
+    And farm governance includes community voice alongside farmworker control
+    And food security becomes community priority, not just individual profit
+    And farmland is protected from development through community commitment
+    And community_elohim facilitates community participation in farm governance

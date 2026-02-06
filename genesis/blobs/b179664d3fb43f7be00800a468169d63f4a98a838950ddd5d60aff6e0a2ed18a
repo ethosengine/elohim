@@ -1,0 +1,9 @@
+Scenario: Parent evaluates development affecting school routes
+    Given a developer proposes construction near their child's school
+    And claims it will "benefit the community"
+    When the parent reviews Observer analysis
+    Then they see traffic impacts on school walking routes
+    And understand safety implications for children's commutes
+    And view how construction timing affects school access
+    And can challenge developer claims with child-safety data
+    And parent concerns are grounded in evidence not just fear

@@ -1,0 +1,9 @@
+Scenario: Workers collaborate with community organizations for mutual benefit
+    Given local youth program needs employment opportunities
+    And ChickenMax needs additional staff during busy periods
+    When workers discuss partnership with youth program
+    Then workers create paid internship program for neighborhood youth
+    And workers provide mentorship and skill development
+    And workers hire successful interns as permanent staff
+    And community_elohim tracks youth development outcomes
+    And community wealth circulates through youth employment

@@ -1,0 +1,11 @@
+Scenario: Appeal involving adolescent autonomy within family
+    Given I am a teenager whose Family Elohim restricted my social media use
+    And I believe this violates my developing autonomy
+    And my parents supported the agent's decision
+    When I file an appeal for my individual autonomy rights
+    Then the Constitutional Council considers "developing autonomy" as constitutional value
+    And They balance parental care responsibility with adolescent independence
+    And They evaluate if the restriction was proportionate to actual risk
+    And They consider age-appropriate autonomy recognition
+    And The appeal may establish family-specific boundaries for future interventions
+    And My voice is heard even within family authority structures

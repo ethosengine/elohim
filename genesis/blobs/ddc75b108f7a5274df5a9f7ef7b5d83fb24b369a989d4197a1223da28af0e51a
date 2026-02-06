@@ -1,0 +1,11 @@
+Scenario: Teen's substantial care work made visible to family
+    Given Jasmine manages weekly grocery shopping for the family
+    And she coordinates dinner preparation 3 nights per week
+    And she provides childcare for Jordan after school
+    When the family_elohim processes her contributions
+    Then Jasmine's care work should be visible on the family dashboard
+    And her contributions should be quantified and valued
+    And parent Maya should see specific recognition prompts
+    And family care tokens should reflect her substantial contributions
+    And the visibility should prevent the invisibility that often surrounds teen household labor
+    And Jasmine should experience being valued as a genuine contributor

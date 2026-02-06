@@ -1,0 +1,12 @@
+Scenario: Transportation choices balance care needs with ecological impact
+    Given Robert travels for work, parent care, and family support
+    And transportation has substantial ecological impact
+    And care responsibilities create transportation needs
+    When bioregional_elohim analyzes transportation
+    Then it should track transportation ecological impact
+    And help Robert optimize travel to reduce impact while meeting care needs
+    And surface alternatives: "Video call could replace 200-mile drive for parent check-in"
+    And recognize when care needs require travel despite ecological cost
+    And support sustainable transportation choices where possible
+    And prevent guilt about necessary care-related travel
+    And build transportation patterns that balance care and ecology

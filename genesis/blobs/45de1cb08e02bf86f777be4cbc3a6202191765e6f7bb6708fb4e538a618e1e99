@@ -1,0 +1,10 @@
+Scenario: Contributing to household culture and traditions
+    Given the household is building shared traditions
+    And Jordan loves music and dancing
+    When Jordan suggests Friday night dance parties
+    Then the household considers Jordan's idea democratically
+    And Jordan's cultural contribution is valued
+    And the household adopts Friday dance as a tradition
+    And Jordan accumulates care tokens for culture-building contribution
+    And Jordan experiences shaping their household community
+    And Jordan's joy and creativity enrich household life

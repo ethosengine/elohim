@@ -1,0 +1,12 @@
+Scenario: Reviewing case with significant technical complexity
+    Given appeal involves cryptographic verification questions
+    And I lack technical expertise to understand the details
+    When Dr. Okonkwo provides expert testimony
+    Then she explains: in language I can understand
+    And she shows: what can and cannot be technically verified
+    And she presents: competing expert interpretations
+    And she informs: without advocating for particular outcome
+    And I ask: questions until I understand enough to judge
+    And I weigh: technical information alongside human wisdom
+    And I decide: on constitutional alignment not technical optimization
+    And I honor: the boundary between expertise and judgment

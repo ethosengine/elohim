@@ -1,0 +1,7 @@
+Scenario: Building worker power through industry-wide organizing
+    Given individual workers and workplaces have limited power
+    When workers organize across the industry
+    Then the protocol should facilitate industry-wide organizing
+    And support union drives and worker organization formation
+    And coordinate collective action across workplaces
+    And build worker power sufficient to transform industry conditions

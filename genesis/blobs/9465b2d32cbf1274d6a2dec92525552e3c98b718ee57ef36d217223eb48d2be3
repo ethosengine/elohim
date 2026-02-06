@@ -1,0 +1,9 @@
+Scenario: Part-time and flexible work options support intensive care periods
+    Given Sarah may need reduced hours during intensive care periods
+    And full-time work may be unsustainable at some life stages
+    When Sarah's care responsibilities increase
+    Then workplace should offer part-time and flexible work options
+    And reduced hours should not mean career penalty
+    And the workplace_elohim should coordinate schedule adjustments
+    And Sarah should be able to modulate work commitment based on care needs
+    And career paths should accommodate care economy participation

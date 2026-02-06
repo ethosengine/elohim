@@ -1,0 +1,11 @@
+Scenario: Drafting Community AI Infrastructure Act for national funding
+    Given poor communities nationwide need infrastructure support
+    And I want equitable protocol access
+    When I draft national funding legislation
+    Then I provide: grants for community nodes and maintenance
+    And I fund: research evaluating protocol outcomes
+    And I support: technical assistance for poor communities
+    And I establish: sliding scale and cross-subsidization
+    And I treat: democratic AI governance as public infrastructure
+    And I defend: against claims of "picking winners"
+    And I argue: this enables democracy not market manipulation

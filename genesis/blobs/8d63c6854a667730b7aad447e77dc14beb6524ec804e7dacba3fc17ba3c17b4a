@@ -1,0 +1,9 @@
+Scenario: Developer school impact fees gain accountability
+    Given a developer paid $1.2M in school impact fees
+    And fees were supposed to address enrollment impacts
+    When the Observer tracks how district used impact fees
+    Then analysis shows: fees went to general operations not capacity expansion
+    And school still lacks capacity to serve development's students
+    And impact fee mechanism failed to actually mitigate impacts
+    And accountability creates pressure for effective mitigation requirements
+    And communities demand better school impact policy

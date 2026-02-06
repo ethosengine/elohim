@@ -1,0 +1,10 @@
+Scenario: Teaching children repair, reuse, and circular economy
+    Given children learn consumption patterns from parents
+    And Sarah wants to teach alternatives to disposable culture
+    When Sarah teaches Tommy and Emma to repair and reuse
+    Then the educational_elohim should recognize anti-consumerist education
+    And teaching circular economy practices should accumulate care tokens
+    And Sarah's work to counter disposable culture should be valued
+    And the system should recognize teaching sustainable practices
+    And next generation should learn to value durability and repair
+    And Sarah's cultural transmission work should be recognized

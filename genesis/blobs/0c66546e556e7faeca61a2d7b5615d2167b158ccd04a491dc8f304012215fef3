@@ -1,0 +1,10 @@
+Scenario: Teaching values, ethics, and character development
+    Given Margaret models and teaches values through her behavior
+    And grandchildren learn ethics through relationship with her
+    When the educational_elohim tracks character education
+    Then it should recognize values teaching as educational work
+    And it should value ethical guidance and moral development
+    And it should track Margaret's role in character formation
+    And values education should accumulate care tokens
+    And moral guidance should be recognized as sophisticated teaching
+    And character development should be valued educational outcome

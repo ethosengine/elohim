@@ -13,14 +13,14 @@ describe('ConfigService', () => {
     originalEnvironment = {
       production: environment.production,
       logLevel: (environment as any).logLevel,
-      environment: (environment as any).environment
+      environment: (environment as any).environment,
     };
-    
+
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [ConfigService]
+      providers: [ConfigService],
     });
-    
+
     httpMock = TestBed.inject(HttpTestingController);
   });
 
@@ -45,27 +45,27 @@ describe('ConfigService', () => {
       service = TestBed.inject(ConfigService);
     });
 
-    it('should return config from environment file', (done) => {
+    it('should return config from environment file', done => {
       service.getConfig().subscribe(config => {
         expect(config).toEqual({
           logLevel: 'debug',
-          environment: 'development'
+          environment: 'development',
         });
         done();
       });
-      
+
       // No HTTP request should be made
       httpMock.expectNone('/assets/config.json');
     });
 
-    it('should use shareReplay for caching', (done) => {
+    it('should use shareReplay for caching', done => {
       let emissionCount = 0;
-      
+
       service.getConfig().subscribe(config => {
         emissionCount++;
         expect(config).toEqual({
           logLevel: 'debug',
-          environment: 'development'
+          environment: 'development',
         });
       });
 
@@ -73,9 +73,9 @@ describe('ConfigService', () => {
         emissionCount++;
         expect(config).toEqual({
           logLevel: 'debug',
-          environment: 'development'
+          environment: 'development',
         });
-        
+
         // Should only emit once due to shareReplay
         expect(emissionCount).toBe(2);
         done();
@@ -89,10 +89,10 @@ describe('ConfigService', () => {
       service = TestBed.inject(ConfigService);
     });
 
-    it('should load config from HTTP request', (done) => {
+    it('should load config from HTTP request', done => {
       const mockConfig: AppConfig = {
         logLevel: 'error',
-        environment: 'production'
+        environment: 'production',
       };
 
       service.getConfig().subscribe(config => {
@@ -105,11 +105,11 @@ describe('ConfigService', () => {
       req.flush(mockConfig);
     });
 
-    it('should use default config when HTTP request returns null', (done) => {
+    it('should use default config when HTTP request returns null', done => {
       service.getConfig().subscribe(config => {
         expect(config).toEqual({
           logLevel: 'error',
-          environment: 'production'
+          environment: 'production',
         });
         done();
       });
@@ -118,11 +118,11 @@ describe('ConfigService', () => {
       req.flush(null);
     });
 
-    it('should use default config when HTTP request returns undefined', (done) => {
+    it('should use default config when HTTP request returns undefined', done => {
       service.getConfig().subscribe(config => {
         expect(config).toEqual({
           logLevel: 'error',
-          environment: 'production'
+          environment: 'production',
         });
         done();
       });
@@ -131,11 +131,11 @@ describe('ConfigService', () => {
       req.flush(null);
     });
 
-    it('should handle HTTP errors gracefully with default config', (done) => {
+    it('should handle HTTP errors gracefully with default config', done => {
       service.getConfig().subscribe(config => {
         expect(config).toEqual({
           logLevel: 'error',
-          environment: 'production'
+          environment: 'production',
         });
         done();
       });
@@ -144,14 +144,14 @@ describe('ConfigService', () => {
       req.error(new ErrorEvent('Network error'));
     });
 
-    it('should cache config after successful load using shareReplay', (done) => {
+    it('should cache config after successful load using shareReplay', done => {
       const mockConfig: AppConfig = {
         logLevel: 'info',
-        environment: 'production'
+        environment: 'production',
       };
 
       let subscriptionCount = 0;
-      
+
       service.getConfig().subscribe(config => {
         subscriptionCount++;
         expect(config).toEqual(mockConfig);
@@ -172,27 +172,27 @@ describe('ConfigService', () => {
   });
 
   describe('config interface and validation', () => {
-    it('should handle missing environment values with defaults', (done) => {
+    it('should handle missing environment values with defaults', done => {
       (environment as any).production = false;
       (environment as any).logLevel = undefined;
       (environment as any).environment = undefined;
       service = TestBed.inject(ConfigService);
-      
+
       service.getConfig().subscribe(config => {
         expect(config).toEqual({
           logLevel: 'debug',
-          environment: 'development'
+          environment: 'development',
         });
         done();
       });
     });
 
-    it('should accept valid log levels', (done) => {
+    it('should accept valid log levels', done => {
       (environment as any).production = false;
       (environment as any).logLevel = 'info';
       (environment as any).environment = 'staging';
       service = TestBed.inject(ConfigService);
-      
+
       service.getConfig().subscribe(config => {
         expect(config.logLevel).toBe('info');
         expect(config.environment).toBe('staging');
@@ -200,22 +200,22 @@ describe('ConfigService', () => {
       });
     });
 
-    it('should maintain readonly properties', (done) => {
+    it('should maintain readonly properties', done => {
       (environment as any).production = false;
       (environment as any).logLevel = 'debug';
       (environment as any).environment = 'development';
       service = TestBed.inject(ConfigService);
-      
+
       service.getConfig().subscribe(config => {
         const originalLogLevel = config.logLevel;
-        
+
         // Try to modify the property (this will work in JS but shouldn't affect future calls)
         (config as any).logLevel = 'error';
-        
+
         // The current object is modified (JS limitation), but the interface is readonly by design
         expect(config.logLevel).toBe('error'); // Modified object shows change
         expect(originalLogLevel).toBe('debug'); // Original value captured before modification
-        
+
         done();
       });
     });

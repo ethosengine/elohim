@@ -1,0 +1,10 @@
+Scenario: Interface designed for developing literacy and numeracy
+    Given Emma is building reading and math skills
+    And she can handle more complexity than younger children
+    When Emma uses the Value Scanner interface
+    Then text should be at appropriate reading level for ages 8-10
+    And comparison tools should support decision-making
+    And basic math support should help with calculating savings
+    And visual aids should supplement text
+    And the interface should feel helpful, not game-like
+    And design should support skill development without frustration

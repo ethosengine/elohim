@@ -1,0 +1,12 @@
+Scenario: Multigenerational teaching about ecological care responsibility
+    Given Robert teaches values to children and grandchildren through practice
+    And ecological sustainability requires intergenerational commitment
+    And his generation must prepare next generation for ecological challenges
+    When bioregional_elohim supports ecological education
+    Then it should help Robert model ecological care practices for younger generations
+    And surface teaching opportunities through everyday choices
+    And recognize: "Your composting practice teaches grandchildren about waste reduction"
+    And support him in explaining ecological choices to family
+    And build intergenerational ecological literacy through practice
+    And demonstrate that ecological care is care economy responsibility
+    And prepare next generation for ecological stewardship

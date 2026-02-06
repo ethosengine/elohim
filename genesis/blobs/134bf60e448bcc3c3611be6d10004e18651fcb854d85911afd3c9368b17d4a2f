@@ -1,0 +1,11 @@
+Scenario: Personal agent serves as cognitive partner for overwhelming complexity
+    Given Sarah is managing multiple care contexts simultaneously
+    And Sarah is planning Tuesday evening meals
+    And she must coordinate children's developmental needs, budget, allergies, schedule, and community obligations
+    When Sarah opens the Value Scanner
+    Then her personal_agent should present integrated complexity overview
+    And the agent should surface conflicts before they become crises
+    And it should suggest solutions balancing competing needs
+    And it should track factors Sarah can't hold simultaneously
+    And Sarah should experience genuine cognitive partnership
+    And the agent should reduce mental load, not add to it

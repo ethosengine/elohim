@@ -1,0 +1,9 @@
+Scenario: Sarah's care contributions give her voice in municipal decisions
+    Given Sarah has accumulated substantial care tokens through community work
+    And municipal governance affects her family's well-being
+    When municipal decisions are being made
+    Then Sarah's care contributions should give her legitimate standing
+    And her voice should carry weight based on demonstrated care
+    And municipal democracy should recognize care work as civic participation
+    And those who contribute to community should influence community governance
+    And care economy should create accountable municipal leadership

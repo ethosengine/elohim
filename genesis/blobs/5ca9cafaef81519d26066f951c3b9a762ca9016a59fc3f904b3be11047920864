@@ -1,0 +1,9 @@
+Scenario: Contributing to family care economy while managing own resources
+    Given Aisha has limited financial resources
+    And she wants to support her family
+    When Aisha decides what care to contribute
+    Then the system should help her balance competing obligations
+    And it should recognize that her care capacity is limited
+    And it should validate both family support and self-care
+    And the family_elohim should not create unsustainable demands
+    And Aisha should maintain boundaries while remaining connected

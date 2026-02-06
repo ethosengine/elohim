@@ -1,0 +1,9 @@
+Scenario: Mayor evaluates development proposal with comprehensive impact analysis
+    Given a developer proposes mixed-use project with rosy projections
+    And activists present worst-case scenarios in opposition
+    When the politician requests Observer impact analysis
+    Then they see developer's track record on past projects in other cities
+    And review infrastructure capacity data (traffic, water, schools)
+    And understand economic benefits distribution (jobs for whom, tax revenue timing)
+    And identify community costs and trade-offs objectively
+    And make informed decision beyond political calculations

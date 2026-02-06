@@ -1,0 +1,10 @@
+Scenario: Building diverse friendships across community
+    Given Jordan's social circle includes both IDD and non-IDD people
+    And diverse friendships enrich Jordan's life
+    When Jordan participates in mixed-ability social activities
+    Then the personal_agent supports social coordination
+    And friends engage with Jordan as a peer, not a project
+    And Jordan contributes to friendships through presence, joy, and care
+    And relationships are genuine and reciprocal
+    And Jordan experiences belonging in diverse community
+    And Jordan's social connections are honored and supported

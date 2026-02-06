@@ -1,0 +1,9 @@
+Scenario: Educational pace adapts to individual developmental readiness
+    Given Tommy's development may differ from age averages
+    And learning readiness varies widely at ages 5-7
+    When the personal_agent teaches value concepts
+    Then instruction should adapt to Tommy's actual capabilities
+    And the system should observe Tommy's comprehension
+    And pacing should match Tommy's readiness, not chronological age
+    And no child should be pushed beyond developmental capacity
+    And no child should be held back from what they're ready to learn

@@ -1,0 +1,10 @@
+Scenario: Walking and public transit use reduces carbon footprint
+    Given Margaret can no longer afford car ownership
+    And walking/transit use serves ecological goals
+    When the bioregional_elohim tracks transportation patterns
+    Then Margaret's low-carbon mobility should be recognized
+    And walking should be valued as ecological choice
+    And public transit use should be supported and facilitated
+    And her mobility patterns should serve bioregional sustainability
+    And car-free living should be honored as ecological stewardship
+    And economic constraint should be reframed as ecological virtue

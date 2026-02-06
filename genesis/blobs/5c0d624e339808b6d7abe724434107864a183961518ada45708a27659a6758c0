@@ -1,0 +1,9 @@
+Scenario: Politician builds coalition for green infrastructure investment
+    Given the politician champions urban tree canopy expansion
+    And needs support across diverse constituencies
+    When the Observer identifies coalition building opportunities
+    Then they see environmental groups support ecological benefits
+    And identify public health advocates concerned about heat and air quality
+    And connect with neighborhood groups seeking park improvements
+    And facilitate coalition across environmental and equity interests
+    And build broad-based support for green infrastructure

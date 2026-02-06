@@ -1,0 +1,9 @@
+Scenario: State development policy outcomes versus promises
+    Given state legislature passed developer-backed "affordable housing" law
+    And promised it would increase affordable housing supply
+    When the Observer tracks actual outcomes three years later
+    Then analysis shows: luxury housing increased 40%
+    And affordable housing decreased 8%
+    And displacement accelerated in gentrifying neighborhoods
+    And policy delivered opposite of promised outcomes
+    And evidence supports policy reform not developer rhetoric

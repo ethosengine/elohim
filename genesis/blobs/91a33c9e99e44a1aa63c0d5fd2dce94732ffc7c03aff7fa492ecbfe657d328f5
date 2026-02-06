@@ -1,0 +1,10 @@
+Scenario: Packaging waste reduction and recycling
+    Given packaging creates environmental waste
+    And Aisha wants to reduce packaging impact
+    When Aisha makes purchasing decisions
+    Then the bioregional_elohim should highlight packaging differences
+    And it should suggest lower-packaging alternatives
+    And it should provide local recycling and composting information
+    And waste management should connect to bioregional systems
+    And she should learn to minimize packaging waste
+    And circular economy principles should be taught

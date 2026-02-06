@@ -1,10 +1,13 @@
 import { Injectable, Renderer2, RendererFactory2 } from '@angular/core';
+
+// @coverage: 96.3% (2026-02-05)
+
 import { BehaviorSubject, Observable } from 'rxjs';
 
 export type Theme = 'light' | 'dark' | 'device';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ThemeService {
   private readonly renderer: Renderer2;
@@ -79,8 +82,8 @@ export class ThemeService {
   private saveTheme(theme: Theme): void {
     try {
       localStorage.setItem('elohim-theme', theme);
-    } catch (e) {
-      console.warn('Failed to save theme preference:', e);
+    } catch {
+      // localStorage write failure is non-critical
     }
   }
 
@@ -101,8 +104,8 @@ export class ThemeService {
       } else {
         this.setTheme('device');
       }
-    } catch (e) {
-      console.warn('Failed to load theme preference:', e);
+    } catch {
+      // localStorage read failure - fallback to default theme
       this.setTheme('device');
     }
   }

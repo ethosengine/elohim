@@ -1,0 +1,9 @@
+Scenario: Teacher grounds curriculum debate in professional knowledge
+    Given the school board debates curriculum approaches
+    And discussion is dominated by political ideology not educational evidence
+    When teachers contribute professional expertise through Observer
+    Then board receives aggregated teacher insights on effective curriculum
+    And teachers provide research evidence on curriculum approaches
+    And share classroom examples of what actually works for students
+    And connect curriculum to actual student learning outcomes
+    And education policy discussion becomes evidence-based and professional

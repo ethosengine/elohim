@@ -1,0 +1,10 @@
+Scenario: Relationship-based learning preserves wonder
+    Given Tommy needs wonder preservation during learning
+    And relationship is primary for ages 5-7
+    When the personal_agent teaches Tommy about care economy
+    Then teaching should happen through story and relationship
+    And the agent should feel like a caring guide, not a system
+    And learning should be framed as adventures: "What will make Emma smile?"
+    And transactional language should never be used
+    And wonder at the world should be preserved, not diminished
+    And the magic of caring should remain intact

@@ -1,0 +1,10 @@
+Scenario: Advocating for family-friendly workplace policies
+    Given Sarah needs flexible scheduling to manage children's needs
+    And current workplace policies assume workers have no care responsibilities
+    When Sarah advocates for policy change
+    Then the workplace_elohim should provide supporting data
+    And it should show that working parents need flexibility
+    And it should help Sarah make evidence-based case for change
+    And advocacy labor should accumulate care tokens
+    And the system should amplify parent voices in workplace governance
+    And workplace should adopt policies that enable sustainable parenting

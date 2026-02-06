@@ -1,0 +1,9 @@
+Scenario: Study systematic bias correction over time
+    Given Year 2 research identified bias affecting marginalized communities
+    And protocol modifications were implemented in Year 3
+    When James tracks bias indicators through Year 10
+    Then he measures whether modifications successfully reduced bias
+    And he documents improved outcomes for marginalized communities
+    And he identifies remaining persistent inequalities
+    And he evaluates effectiveness of bias correction mechanisms
+    And longitudinal accountability serves justice

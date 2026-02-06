@@ -1,0 +1,9 @@
+Scenario: Investor redirects capital from extractive corporations to democratic community businesses
+    Given Patricia has $60K in index funds funding corporate extraction
+    And she morally opposes enterprises her capital funds but lacked alternatives
+    When community investment pool offers values-aligned local alternative
+    Then she moves $10K from stock market to community investment in Maria's Kitchen conversion
+    And capital directly funds worker ownership, not corporate extraction
+    And investment aligns with values: worker dignity, community wealth, environmental stewardship
+    And financial returns are fair (5% annually) while social returns are massive
+    And community_elohim facilitates investment pool management and transparent reporting

@@ -1,0 +1,11 @@
+Scenario: Accessible technology is workplace obligation not special treatment
+    Given Alex requires accessible technology to perform job functions
+    And technology access is fundamental workplace accommodation
+    When Alex uses workplace technology
+    Then employer must provide accessible technology as legal requirement
+    And the workplace_elohim should document technology accessibility
+    And it should track when technology barriers prevent Alex from working
+    And Alex should not have to use inaccessible systems
+    And employer should be held accountable for accessibility failures
+    And the protocol should recognize accessible tech as baseline, not luxury
+    And Alex's right to accessible tools should be systematically defended

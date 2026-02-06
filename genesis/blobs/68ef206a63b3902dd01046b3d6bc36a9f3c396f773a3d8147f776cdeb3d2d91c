@@ -1,0 +1,10 @@
+Scenario: Safety through neighborhood awareness and care
+    Given Marcus is a 12-year-old shopping independently
+    And neighborhood safety is important for his autonomy
+    When Marcus moves through his neighborhood
+    Then the neighborhood_elohim should facilitate informal care networks
+    And local adults should be aware of children shopping independently
+    And community care should provide informal oversight
+    And Marcus should be safer through neighborhood relationships
+    And his independence should be supported by community awareness
+    And the protocol should build village-scale child protection

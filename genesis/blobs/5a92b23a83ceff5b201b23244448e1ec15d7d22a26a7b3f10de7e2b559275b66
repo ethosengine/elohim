@@ -1,0 +1,9 @@
+Scenario: Workers share facility space for community organizing after hours
+    Given ChickenMax dining space sits empty evenings and weekends
+    And community groups need meeting space
+    When community requests use of space for organizing meetings
+    Then workers democratically decide to share space with community groups
+    And workers establish guidelines for community space use
+    And workers charge minimal fee to cover utilities
+    And community groups organize tenants' rights, immigrant support, etc.
+    And business becomes community hub beyond meal service

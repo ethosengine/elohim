@@ -1,0 +1,89 @@
+# elohim-node configuration
+#
+# This is the default configuration. Override via:
+# - Environment variables (ELOHIM_*)
+# - Command line arguments
+# - Custom config file (--config /path/to/config.toml)
+
+[node]
+# Unique node identifier (auto-generated if not set)
+# id = "node-1"
+
+# Data directory for persistent storage
+data_dir = "/var/lib/elohim"
+
+# Cluster name this node belongs to
+cluster_name = "default"
+
+[sync]
+# Maximum document size in bytes (10MB default)
+max_document_size = 10485760
+
+# Sync interval in milliseconds
+sync_interval_ms = 1000
+
+# Maximum events to keep in memory for quick replay
+max_recent_events = 1000
+
+[cluster]
+# Enable mDNS discovery for local cluster members
+mdns_enabled = true
+
+# Shared secret for cluster membership authentication
+# Generate with: openssl rand -base64 32
+# cluster_key = "your-secret-key-here"
+
+# Cluster join timeout in seconds
+join_timeout_secs = 30
+
+[p2p]
+# Listen addresses for libp2p
+listen_addrs = [
+    "/ip4/0.0.0.0/tcp/4001",
+    "/ip4/0.0.0.0/udp/4001/quic-v1"
+]
+
+# Bootstrap nodes for initial peer discovery
+# These are doorway signal servers or known stable nodes
+bootstrap_nodes = [
+    "https://doorway.elohim.host/signal/p2p"
+]
+
+# Enable relay for NAT traversal
+relay_enabled = true
+
+# Maximum concurrent connections
+max_connections = 100
+
+[storage]
+# Maximum storage capacity (e.g., "500GB", "1TB")
+max_capacity = "500GB"
+
+# Reed-Solomon shard redundancy (data shards + parity shards)
+# Default 4+3 means 4 data shards, 3 parity shards
+data_shards = 4
+parity_shards = 3
+
+# Cache size for frequently accessed content
+cache_size = "1GB"
+
+[api]
+# HTTP management API
+http_enabled = true
+http_port = 8080
+http_bind = "0.0.0.0"
+
+# gRPC API for device clients
+grpc_enabled = true
+grpc_port = 9090
+grpc_bind = "0.0.0.0"
+
+# Enable metrics endpoint at /metrics
+metrics_enabled = true
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+
+# Log format: json, pretty
+format = "pretty"

@@ -1,0 +1,11 @@
+Scenario: Household budget management on combined disability benefits and part-time income
+    Given Alex's household operates on $35k/year
+    And income comes from part-time employment and disability benefits
+    When Alex manages household budget
+    Then the household_elohim should track spending against limited resources
+    And it should help Alex prioritize essential expenses
+    And disability-related costs (equipment, support services, medical) should be factored in
+    And Alex should be able to make informed financial decisions
+    And budget tools should respect Alex's competence in managing money
+    And the system should support Alex's financial autonomy
+    And resource constraints should be managed with dignity

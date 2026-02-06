@@ -1,0 +1,9 @@
+Scenario: Parent-teacher conferences scheduled for working single parent availability
+    Given Maria must attend conferences for three children across different schools
+    And she has no co-parent to split attendance or attend in her place
+    When schools schedule parent-teacher conferences
+    Then the educational_elohim should coordinate scheduling across multiple schools
+    And schools should offer evening or flexible timing for working single parents
+    And Maria should not have to take multiple work days for conferences
+    And scheduling should recognize single parents cannot "send the other parent"
+    And educational engagement should be accessible to working solo parents

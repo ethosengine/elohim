@@ -1,0 +1,10 @@
+Scenario: Reading and literacy development through grandparent care
+    Given Margaret reads to Tommy and Emma regularly
+    And reading together builds literacy and love of learning
+    When the educational_elohim tracks reading activities
+    Then it should recognize reading as essential educational care
+    And it should track reading time and book engagement
+    And it should value Margaret's role in literacy development
+    And reading should accumulate care tokens
+    And grandparent reading should be recognized as educational contribution
+    And literacy support should be valued and encouraged

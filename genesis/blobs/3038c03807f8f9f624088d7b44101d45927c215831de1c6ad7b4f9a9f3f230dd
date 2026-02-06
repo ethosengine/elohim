@@ -1,0 +1,12 @@
+Scenario: Managing household during crisis transitions (shelter to housing, housing to housing)
+    Given I am moving from transitional housing to permanent housing
+    And household operations must continue during major disruption
+    When I coordinate the moving transition
+    Then the Value Scanner helps me manage transition logistics
+    And maintains children's routines as much as possible during chaos
+    And tracks what needs to happen when (utilities, school transfers, address changes)
+    And helps me coordinate assistance with moving
+    And ensures essential household functions continue uninterrupted
+    And my personal_agent prevents critical tasks from being forgotten
+    And recognizes transition management as substantial invisible labor
+    And celebrates successful navigation of major household disruption

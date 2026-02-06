@@ -1,0 +1,9 @@
+Scenario: Citizen tracks environmental commitment implementation
+    Given the city adopted a climate action plan two years ago
+    And promised specific sustainability measures
+    When the citizen reviews Observer tracking
+    Then they see which commitments have been implemented
+    And which remain unfulfilled promises
+    And view progress on measurable sustainability goals
+    And can hold officials accountable for climate action
+    And long-term environmental policy gets institutional memory

@@ -1,0 +1,9 @@
+Scenario: Teaching includes ecological care appropriate to age
+    Given care economy extends beyond human relationships
+    And environmental stewardship is part of value literacy
+    When Tommy learns about care through the scanner
+    Then ecological care should be introduced at concrete level
+    And Tommy should learn "Taking care of our food" (not abstract sustainability)
+    And connections between care for people and care for environment should begin
+    And age-appropriate environmental consciousness should develop
+    And foundations for ecological stewardship should be laid

@@ -1,0 +1,10 @@
+Scenario: Modeling low-consumption lifestyle for next generation
+    Given Margaret lives simply on retirement income
+    And her low-consumption lifestyle has low environmental impact
+    When the bioregional_elohim tracks consumption patterns
+    Then it should recognize Margaret's low-impact lifestyle as ecological contribution
+    And it should value simple living as environmental stewardship
+    And it should show grandchildren that fulfillment doesn't require high consumption
+    And low-impact living should be recognized as climate action
+    And Margaret's lifestyle should model sustainable living
+    And intergenerational value transmission should support sustainability

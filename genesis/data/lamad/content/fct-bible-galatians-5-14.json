@@ -1,0 +1,52 @@
+{
+  "id": "fct-bible-galatians-5-14",
+  "contentType": "bible-verse",
+  "title": "Galatians 5:14",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": "## Galatians 5:14\n\n> Galatians 5:14\nThe entire law is fulfilled in a single decree: \"Love your neighbor as yourself.\"\n\n*ESV Translation*\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "galatians",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T21:10:19.208456",
+  "updatedAt": "2025-12-24T03:05:25.951Z",
+  "did": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Galatians 5:14",
+    "ogDescription": "Scripture reference used in FCT Module 8",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-galatians-5-14",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Galatians 5:14 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-galatians-5-14",
+    "identifier": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+    "name": "Galatians 5:14",
+    "description": "Scripture reference used in FCT Module 8",
+    "dateCreated": "2025-11-28T21:10:19.208456",
+    "dateModified": "2025-11-28T21:10:19.208457",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

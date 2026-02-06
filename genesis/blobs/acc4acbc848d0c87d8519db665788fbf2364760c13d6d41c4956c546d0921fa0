@@ -1,0 +1,9 @@
+Scenario: Organizer creates accessible materials on community benefits agreement
+    Given developer seeks public subsidy for major project
+    And promises to "create jobs" but history shows otherwise
+    When the organizer requests education materials from Observer
+    Then they receive plain-language explanation of community benefits agreements
+    And see developer's labor track record from past projects
+    And get template for CBA with binding labor standards
+    And access wage and hiring data to counter developer claims
+    And complex economic development becomes community organizing opportunity

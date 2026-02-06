@@ -1,0 +1,10 @@
+Scenario: Garden and food production as ecological care and education
+    Given Sarah wants children to understand food systems
+    And growing food teaches ecological relationships
+    When Sarah gardens with Tommy and Emma
+    Then the ecological_elohim should recognize gardening as multi-dimensional care
+    And it should value food production, education, and ecological benefit
+    And teaching children to grow food should accumulate care tokens
+    And the system should recognize food sovereignty work
+    And Sarah's effort to build children's food system understanding should be valued
+    And gardening should be recognized as ecological care labor

@@ -1,4 +1,7 @@
 import { Injectable, Type, EventEmitter } from '@angular/core';
+
+// @coverage: 42.9% (2026-02-05)
+
 import { ContentNode } from '../models/content-node.model';
 
 /**
@@ -44,8 +47,8 @@ export interface RendererCompletionEvent {
  */
 interface RendererEntry {
   formats: string[];
-  component: Type<any>;
-  priority: number;  // Higher priority = checked first
+  component: Type<ContentRenderer>;
+  priority: number; // Higher priority = checked first
 }
 
 /**
@@ -58,7 +61,8 @@ interface RendererEntry {
  */
 @Injectable({ providedIn: 'root' })
 export class RendererRegistryService {
-  private readonly renderers: RendererEntry[] = [];
+  // eslint-disable-next-line @typescript-eslint/prefer-readonly
+  private renderers: RendererEntry[] = [];
 
   /**
    * Register a renderer component for specific formats.
@@ -67,7 +71,7 @@ export class RendererRegistryService {
    * @param component The Angular component class
    * @param priority Higher = checked first (default 0)
    */
-  register(formats: string[], component: Type<any>, priority = 0): void {
+  register(formats: string[], component: Type<ContentRenderer>, priority = 0): void {
     this.renderers.push({ formats, component, priority });
     // Sort by priority descending
     this.renderers.sort((a, b) => b.priority - a.priority);
@@ -79,13 +83,13 @@ export class RendererRegistryService {
    * @param node The ContentNode to render
    * @returns Component class or null if no match
    */
-  getRenderer(node: ContentNode): Type<any> | null {
+  getRenderer(node: ContentNode): Type<ContentRenderer> | null {
     for (const entry of this.renderers) {
       if (entry.formats.includes(node.contentFormat)) {
         return entry.component;
       }
     }
-    return null;  // Caller should use fallback
+    return null; // Caller should use fallback
   }
 
   /**

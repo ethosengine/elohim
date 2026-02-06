@@ -1,0 +1,9 @@
+Scenario: Workers coordinate sector-wide minimum standards
+    Given different EAE food entities have varying wage and benefit levels
+    And workers want to prevent race-to-bottom competition
+    When food service sector workers hold coordination meeting
+    Then workers from multiple entities propose sector minimum wage ($18/hour)
+    And workers deliberate on benefits standards (paid sick leave, health insurance)
+    And sector workers vote to adopt coordinated minimums
+    And industry_sector_elohim helps enforce standards across network
+    And local entities can exceed minimums but not undercut them

@@ -1,0 +1,10 @@
+Scenario: Family care token allocation includes young child contributions
+    Given the family participates in care token economy
+    And Tommy has made multiple care contributions
+    When family care tokens are calculated
+    Then Tommy's contributions should be valued appropriately
+    And his care work should not be dismissed as "just helping"
+    And tokens should accumulate to the family account
+    And Tommy should have age-appropriate awareness of his contributions
+    And the family should receive care token supplements for low income
+    And the scanner should be accessible regardless of economic status

@@ -1,0 +1,10 @@
+Scenario: Responsible developer navigates approval process transparently
+    Given a developer is proposing affordable housing project
+    And wants to understand complete approval pathway
+    When the Observer provides civic process navigation
+    Then the developer sees required steps: zoning review, planning commission, city council
+    And receives timeline estimates and submission requirements
+    And identifies relevant regulations and precedents
+    And connects to appropriate civic contacts
+    And navigates process efficiently without buying insider access
+    And transparent process reduces corruption opportunities

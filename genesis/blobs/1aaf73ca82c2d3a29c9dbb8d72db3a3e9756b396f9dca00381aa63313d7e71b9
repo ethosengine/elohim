@@ -1,0 +1,9 @@
+Scenario: Neighborhood youth gain employment pathways with dignity and ownership potential
+    Given franchise locations offered poverty-wage jobs with no advancement or ownership
+    And youth employment was exploitative, not developmental
+    When democratic governance creates dignified youth employment programs
+    Then neighborhood youth earn living wages ($18/hour) with training and support
+    And employment includes path to worker ownership for committed participants
+    And youth experience democratic governance, not hierarchical exploitation
+    And community youth economic opportunity improves dramatically through local democratic businesses
+    And community_elohim documents youth employment outcomes and advancement pathways

@@ -1,0 +1,10 @@
+Scenario: Democratic value distribution replaces hierarchical extraction
+    Given ChickenMax generates $100K monthly revenue
+    And elimination of franchise fees freed $48K annually
+    When workers hold their quarterly value distribution governance meeting
+    Then transparent REA accounting shows complete revenue and cost breakdown
+    And workers democratically decide wage allocation ($60K to wages)
+    And workers vote on community program funding ($10K to senior meals)
+    And workers approve environmental sustainability investment ($8K to regenerative sourcing)
+    And every worker sees exactly how value flows and why
+    And workers can modify distribution algorithms democratically

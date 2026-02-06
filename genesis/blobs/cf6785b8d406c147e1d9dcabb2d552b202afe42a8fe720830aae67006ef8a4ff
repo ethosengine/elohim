@@ -1,0 +1,10 @@
+Scenario: Parental leave recognized as essential workplace benefit
+    Given parents need time for infant care, adoption, family crisis
+    And parental leave is essential for child well-being
+    When the workplace_elohim assesses workplace policies
+    Then it should flag inadequate parental leave as care economy violation
+    And it should help Sarah advocate for better leave policies
+    And the system should recognize parental leave as basic necessity
+    And workplace should provide substantial paid parental leave
+    And care economy principles should require workplace support for new parents
+    And Sarah should have support for advocating for family leave

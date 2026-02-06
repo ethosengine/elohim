@@ -1,0 +1,11 @@
+Scenario: Protecting Alex from quality of life assumptions
+    Given medical providers often make negative assumptions about disabled people's quality of life
+    And these assumptions can lead to withheld or substandard care
+    When providers discuss treatment options
+    Then the personal_agent should help Alex challenge quality of life assumptions
+    And it should assert that Alex's life is valuable and worth full treatment
+    And it should document when providers suggest limiting care based on disability
+    And Alex should receive same standard of care as non-disabled patients
+    And the protocol should recognize that quality of life bias is discrimination
+    And Alex's right to full medical care should be defended
+    And assumptions about disability should never limit treatment options

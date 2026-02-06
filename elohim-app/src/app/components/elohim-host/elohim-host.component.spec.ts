@@ -8,9 +8,8 @@ describe('ElohimHostComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ElohimHostComponent]
-    })
-    .compileComponents();
+      imports: [ElohimHostComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(ElohimHostComponent);
     component = fixture.componentInstance;
@@ -55,7 +54,7 @@ describe('ElohimHostComponent', () => {
     expect(cards.length).toBe(3);
 
     const cardHeadings = compiled.querySelectorAll('.card-grid .card h3');
-    const headingTexts = Array.from(cardHeadings).map((h: any) => h.textContent);
+    const headingTexts = Array.from(cardHeadings).map(h => (h as HTMLElement).textContent);
     expect(headingTexts).toContain('Redemptive Security Model');
     expect(headingTexts).toContain('Value-Generative Economics');
   });

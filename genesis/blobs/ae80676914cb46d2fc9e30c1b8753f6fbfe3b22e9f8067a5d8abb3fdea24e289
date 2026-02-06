@@ -1,0 +1,9 @@
+Given multiple neighborhoods face similar housing challenges
+And the activist has credibility in their own neighborhood
+When they reach out to activists in adjacent neighborhoods
+And they propose forming a district-level coalition
+Then cross-neighborhood connections are negotiated through mutual trust
+And a district-layer organizing space is created
+And patterns from successful housing campaigns surface as resources
+And the coalition coordinates action while respecting local autonomy
+And each neighborhood maintains its own decision-making process

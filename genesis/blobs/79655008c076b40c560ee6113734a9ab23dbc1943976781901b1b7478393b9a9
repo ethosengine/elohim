@@ -1,0 +1,10 @@
+Scenario: Connecting academic learning to care economy values
+    Given Kenji studies environmental science
+    And his field directly relates to planetary care economy
+    When the educational_elohim connects learning to care principles
+    Then it should help Kenji see environmental science as care work
+    And it should link his academic study to ecological stewardship
+    And it should show how his education prepares him for care contributions
+    And learning should be framed as developing capacity to serve flourishing
+    And the system should integrate academic work with care economy purpose
+    And Kenji should understand his education as care economy investment

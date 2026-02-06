@@ -1,0 +1,9 @@
+Scenario: Organizer mobilizes community against polluting facility permit
+    Given a company seeks permit for facility in Black neighborhood
+    And already has history of violations
+    When the organizer uses Observer to support community opposition
+    Then they access company's complete violation and enforcement record
+    And see health impacts from similar facilities elsewhere
+    And calculate cumulative pollution burden on neighborhood
+    And organize residents for powerful testimony at permit hearing
+    And environmental organizing prevents new pollution in overburdened community

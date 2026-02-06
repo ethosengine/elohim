@@ -1,0 +1,10 @@
+Scenario: Understanding environmental impact of food choices
+    Given Marcus is developing capacity for abstract thinking
+    And environmental sustainability connects to care economy
+    When Marcus makes food choices
+    Then the personal_agent should provide age-appropriate environmental information
+    And it should explain ecological impact in concrete terms
+    And it should not overwhelm him with climate anxiety
+    And it should frame environmental care as extension of household care
+    And ecological literacy should develop alongside care economy principles
+    And stewardship should extend from family to bioregion

@@ -1,0 +1,12 @@
+Scenario: Community leadership balanced with existing care demands
+    Given Robert has capacity for community contribution
+    And community leadership opportunities are abundant
+    And he also carries substantial family and work responsibilities
+    When community_elohim coordinates his community participation
+    Then it should help him balance community leadership with other demands
+    And prevent over-commitment that would overwhelm him
+    And surface when community demands exceed healthy boundaries
+    And support him in choosing leadership roles that match his capacity
+    And recognize that sustainable participation requires limits
+    And prevent community from exploiting his sense of responsibility
+    And support meaningful contribution without burnout

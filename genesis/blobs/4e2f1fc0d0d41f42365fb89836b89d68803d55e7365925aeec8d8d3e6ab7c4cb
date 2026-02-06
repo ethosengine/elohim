@@ -1,0 +1,10 @@
+Scenario: Developmentally appropriate autonomy with emergency assistance
+    Given Marcus has substantial independence
+    And he is still only 12 years old
+    When Marcus uses the Value Scanner
+    Then he should have freedom to make real decisions
+    And emergency assistance options should be clearly visible
+    And the personal_agent should watch for stress exceeding healthy bounds
+    And crisis situations should trigger connection to adult support
+    And intervention should preserve his dignity and autonomy
+    And the goal should be supporting capability, not taking over

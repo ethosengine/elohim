@@ -1,0 +1,10 @@
+Scenario: Civic education and community organizing skills
+    Given Margaret participates in civic life and advocacy
+    And organizing skills enhance civic effectiveness
+    When the educational_elohim provides civic education
+    Then Margaret should access community organizing training
+    And education should empower political participation
+    And skills for advocacy and policy influence should be taught
+    And civic literacy should strengthen senior voice in governance
+    And education should support senior political power
+    And organizing should be understood as learnable skill

@@ -1,0 +1,8 @@
+Scenario: Creator collaborates with activists on community campaign
+    Given Riverside is organizing for better public transportation
+    When Sam creates content documenting the transit challenges
+    And activists provide data and community testimonials
+    Then evidence-based storytelling supports the campaign
+    And content earns reach through verified community impact
+    And the campaign builds support through quality documentation
+    And Sam's work serves community organizing without manipulation

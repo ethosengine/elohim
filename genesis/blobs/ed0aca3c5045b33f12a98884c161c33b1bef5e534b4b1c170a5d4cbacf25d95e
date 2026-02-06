@@ -1,0 +1,9 @@
+Scenario: Child protected from cyberbullying attempt
+    Given Emma participates in school reading club space
+    When another student tries to post mean comments about Emma
+    Then the guardian agent detects harmful intent before posting
+    And the comment is prevented from reaching Emma
+    And the space moderator is alerted to address the behavior
+    And the student who posted receives appropriate intervention
+    And Emma continues participating without being harmed
+    And restorative process helps both students learn and grow

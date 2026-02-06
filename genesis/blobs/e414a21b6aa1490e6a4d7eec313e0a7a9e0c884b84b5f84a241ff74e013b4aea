@@ -1,0 +1,12 @@
+Scenario: Coordinating with teachers about children's circumstances
+    Given teachers need some information to support my children appropriately
+    And I need to protect privacy while ensuring teachers understand context
+    When I communicate with children's teachers
+    Then the Value Scanner helps me determine what to disclose
+    And provides language for explaining relevant context without oversharing
+    And helps me advocate for appropriate accommodations
+    And tracks teacher communications and commitments
+    And validates that teachers should know enough to support children
+    And my personal_agent drafts communications that balance privacy and advocacy
+    And recognizes school communication as ongoing parenting labor
+    And supports appropriate teacher partnership in children's support

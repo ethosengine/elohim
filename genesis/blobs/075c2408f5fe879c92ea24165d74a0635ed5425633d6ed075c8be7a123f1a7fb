@@ -1,0 +1,9 @@
+Scenario: Workers democratically decide on operational schedules
+    Given scheduling was previously dictated by management
+    And workers had no input on shift assignments
+    When the democratic workplace holds a scheduling governance session
+    Then Maria proposes a schedule balancing operational needs with worker life needs
+    And DeShawn suggests modifications for his college class schedule
+    And workers vote on the proposed schedule with governance weight based on seniority and contribution
+    And the approved schedule is implemented immediately
+    And no manager can override the democratic decision

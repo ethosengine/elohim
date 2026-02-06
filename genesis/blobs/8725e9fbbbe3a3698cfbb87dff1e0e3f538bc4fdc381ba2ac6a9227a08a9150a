@@ -1,0 +1,10 @@
+Scenario: Knowing and watching out for neighborhood children
+    Given Margaret is present when children are coming home from school
+    And she has time to notice and care about local kids
+    When the neighborhood_elohim facilitates informal child watching
+    Then Margaret's presence should contribute to neighborhood safety
+    And parents should understand seniors provide informal oversight
+    And Margaret's care about local children should be recognized
+    And village-scale child protection should be facilitated
+    And intergenerational neighborhood care should be normalized
+    And working parents should benefit from retiree presence

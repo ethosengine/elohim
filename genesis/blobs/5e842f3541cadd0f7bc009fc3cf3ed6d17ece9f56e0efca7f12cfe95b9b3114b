@@ -1,0 +1,11 @@
+Scenario: Studying global inequality in protocol access and benefits
+    Given I hypothesize protocol might exacerbate global inequality
+    And wealthy nations can afford infrastructure poor nations cannot
+    When I analyze distributional effects at global scale
+    Then I examine: adoption rates by national income and infrastructure
+    And I assess: whether benefits flow primarily to Global North
+    And I measure: whether protocol reduces or increases global inequality
+    And I explore: mechanisms of digital colonialism or democratic leveling
+    And I identify: barriers preventing equitable global adoption
+    And I advocate: for international funding and technology transfer
+    And My research serves: global justice by revealing inequities

@@ -1,0 +1,8 @@
+Scenario: Witnessing food waste and understanding ecological cost
+    Given I see significant food waste in restaurant operations
+    And food waste represents wasted care labor and ecological resources
+    When I observe food system inefficiencies
+    Then the protocol should help me understand ecological and care economy costs
+    And support me in advocating for waste reduction
+    And connect me to food rescue or composting initiatives
+    And recognize that reducing waste is care work for ecology

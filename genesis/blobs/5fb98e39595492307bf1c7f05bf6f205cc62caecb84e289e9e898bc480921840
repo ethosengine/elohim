@@ -1,0 +1,11 @@
+Scenario: Random selection to Global Constitutional Convention
+    Given the 7-year Global Constitutional Convention is convening
+    And 10,000 citizens will be randomly selected from all humanity
+    When I receive notification of my global selection
+    Then I am chosen: via stratified global sortition
+    And I will serve: 6-month term with citizens from every nation
+    And I will deliberate: on constitutional amendments and existential questions
+    And I will help: shape governance for superintelligent AI
+    And I am supported: with full resources, translation, travel
+    And I feel: overwhelming responsibility and honor
+    And I understand: I am representing all humanity in democratic choice

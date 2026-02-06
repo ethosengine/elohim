@@ -1,0 +1,12 @@
+Scenario: Industry knowledge networks spread care economy best practices
+    Given some organizations have developed care-friendly practices
+    And best practices should spread across the industry
+    And Robert's networks can facilitate knowledge sharing
+    When industry_elohim supports knowledge networks
+    Then it should connect Robert with industry care economy practitioners
+    And facilitate sharing of successful care economy practices
+    And help build industry knowledge about what works
+    And accelerate adoption through peer networks
+    And build industry capacity for care economy implementation
+    And demonstrate that practitioners can drive industry transformation
+    And advance care economy through knowledge sharing

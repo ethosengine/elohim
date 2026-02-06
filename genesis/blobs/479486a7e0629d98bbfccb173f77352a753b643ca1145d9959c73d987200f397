@@ -1,0 +1,12 @@
+Scenario: My healthcare amendment proposal passes convention
+    Given my nursing experience revealed healthcare as dignity issue
+    And I proposed amendment recognizing healthcare as constitutional right
+    When convention deliberates my proposal
+    Then delegates hear: my testimony about dignity in healthcare
+    And they discuss: healthcare across diverse economic contexts
+    And they debate: what healthcare dignity requires constitutionally
+    And they refine: language to work across cultures and nations
+    And they vote: and my amendment passes
+    And I have: shaped constitution for human-AI partnership
+    And I know: ordinary nurse from small town helped write law for humanity
+    And I embody: democratic possibility that anyone can govern

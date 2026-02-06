@@ -1,0 +1,9 @@
+Scenario: School board member distinguishes authentic parent concern from coordinated campaign
+    Given the politician receives mass emails opposing curriculum
+    And messages claim widespread parent outrage
+    When the Observer analyzes campaign origins
+    Then they see template messages from national advocacy organization
+    And identify 15 local parents among 300 emails
+    And distinguish coordinated political campaign from genuine community concern
+    And understand actual parent sentiment in district
+    And resist manipulation by outside political organizations

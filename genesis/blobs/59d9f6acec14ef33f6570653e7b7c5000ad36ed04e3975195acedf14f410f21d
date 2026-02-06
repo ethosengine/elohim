@@ -1,0 +1,11 @@
+Scenario: Savings and investment education through real practice
+    Given Jasmine is saving for college and future goals
+    And she has accumulated $2,400 in savings from work
+    When she explores investment options through her personal_agent
+    Then the agent should provide age-appropriate investment education
+    And explain concepts like compound interest, risk, diversification
+    And connect to her specific goals and timeline
+    And help her understand long-term financial planning
+    And provide resources for learning about different investment vehicles
+    And support her building adult financial capability
+    And never pressure her toward specific investment products

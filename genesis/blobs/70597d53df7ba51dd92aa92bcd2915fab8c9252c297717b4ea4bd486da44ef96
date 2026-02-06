@@ -1,0 +1,9 @@
+Scenario: Teacher decodes school board agenda in morning brief
+    Given tonight's board meeting will vote on "instructional efficiency optimization"
+    And teachers have limited time to track board activities
+    When the teacher receives Observer morning brief
+    Then they learn this means increasing class sizes from 24 to 28
+    And see projected impact on teaching and individual attention
+    And get concrete advocacy pathway (testimony, email, coordination)
+    And can coordinate response with colleagues and parents during workday
+    And board jargon becomes actionable intelligence

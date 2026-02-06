@@ -1,0 +1,12 @@
+Scenario: Contributing to community care economy even while in crisis
+    Given I am receiving support and have limited capacity
+    And I still have skills, knowledge, and care to offer
+    When opportunities arise to contribute to community
+    Then the Value Scanner surfaces contribution opportunities matching my capacity
+    And recognizes even small contributions as valuable
+    And facilitates contributions that don't overwhelm my limited resources
+    And tracks my care economy participation comprehensively
+    And validates that I am contributor as well as recipient
+    And my personal_agent suggests contributions I can manage
+    And ensures my contributions are recognized with care tokens
+    And supports reciprocity without exploiting vulnerable people

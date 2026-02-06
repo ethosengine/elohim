@@ -1,0 +1,11 @@
+Scenario: Analyzing national media discourse about AI governance
+    Given public understanding is shaped by media coverage
+    And I want to understand how protocol is portrayed and discussed
+    When I analyze national media coverage over time
+    Then I examine: framing (opportunity vs threat, freedom vs control)
+    And I identify: key narratives and their evolution
+    And I assess: accuracy of coverage vs actual protocol function
+    And I explore: elite discourse vs grassroots perspectives
+    And I analyze: how coverage affects public opinion and adoption
+    And I track: whether critical discourse improves protocol or undermines it
+    And My research reveals: democratic deliberation about democratic AI

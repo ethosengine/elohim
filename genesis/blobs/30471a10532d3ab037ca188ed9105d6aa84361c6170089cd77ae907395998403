@@ -1,0 +1,10 @@
+Scenario: Household downsizing and simplification support
+    Given Margaret is transitioning to retirement household patterns
+    And she may need to simplify or downsize
+    When Margaret considers household changes
+    Then the household_elohim should provide decision support
+    And it should help evaluate different living arrangements
+    And it should calculate cost implications of changes
+    And it should preserve Margaret's autonomy in decisions
+    And practical information should support her choices
+    And the system should help her age in place if she wishes

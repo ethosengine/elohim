@@ -1,0 +1,34 @@
+{
+  "id": "product-test-lamad-content",
+  "did": "did:elohim:product-test-lamad-content",
+  "contentType": "feature",
+  "contentFormat": "gherkin",
+  "title": "Lamad Content Display Product Tests",
+  "description": "BDD product tests validating content loading and display in the Lamad learning system",
+  "content": "Feature: Lamad Content Display\n  As a learner using Lamad\n  I want to view educational content\n  So that I can learn and grow\n\n  @smoke @lamad @api\n  Scenario: Content API returns data\n    Given the backend API is available\n    When I request the content list from the API\n    Then the response should be successful\n    And the response should contain content items\n    And each item should have required fields\n\n  @smoke @lamad @navigation\n  Scenario: Lamad section loads\n    Given I am on the home page\n    When I navigate to the Lamad section\n    Then the page should load successfully\n    And the Lamad content should load\n\n  @lamad @data\n  Scenario: Content list displays items\n    Given I am on the Lamad section\n    Then at least one learning path should be displayed\n    And each path should show a title and description\n\n  @lamad @api @data\n  Scenario: Assessments are available in content\n    Given the backend API is available\n    When I request the content list from the API\n    Then the response should contain content items\n    And at least one assessment should be present\n\n  @lamad @api @data\n  Scenario: Features are available in content\n    Given the backend API is available\n    When I request the content list from the API\n    Then the response should contain content items\n    And at least one feature should be present\n\n  @lamad @api @data\n  Scenario: Concepts are available in content\n    Given the backend API is available\n    When I request the content list from the API\n    Then the response should contain content items\n    And at least one concept should be present",
+  "tags": [
+    "product-test",
+    "lamad",
+    "smoke",
+    "content",
+    "api",
+    "category:lamad"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "lamad",
+    "testType": "product",
+    "scenarioCount": 6,
+    "priority": "critical"
+  },
+  "openGraph": {
+    "title": "Lamad Content Display Product Tests",
+    "description": "BDD product tests for content loading and display"
+  },
+  "linkedData": {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "programmingLanguage": "Gherkin",
+    "codeRepository": "https://github.com/EthosEngine/elohim"
+  }
+}

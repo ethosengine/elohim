@@ -1,0 +1,12 @@
+Scenario: Accessing neighborhood food assistance with dignity
+    Given I need supplemental food support beyond my grocery budget
+    And neighborhood has food pantries, community meals, or assistance programs
+    When I seek food assistance in my neighborhood
+    Then the Value Scanner helps me locate and access food resources
+    And provides information about pantry hours, requirements, and culture
+    And prepares me for what to expect to reduce anxiety
+    And frames food assistance as community care economy, not charity
+    And tracks my care contributions that create standing for support
+    And my personal_agent helps me navigate first visits
+    And recognizes accessing help as strength, not failure
+    And connects me to most dignity-preserving food resources

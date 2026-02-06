@@ -1,0 +1,10 @@
+Scenario: Family decision making includes preteen's substantial input
+    Given Marcus has real knowledge of household needs and constraints
+    And he manages daily household operations
+    When family decisions about resources are made
+    Then Marcus's input should carry genuine weight
+    And his knowledge should inform family planning
+    And the family_elohim should surface his insights to Sarah
+    And his voice should be respected as informed perspective
+    And family governance should reflect that he has legitimate standing
+    And his participation should be meaningful, not token

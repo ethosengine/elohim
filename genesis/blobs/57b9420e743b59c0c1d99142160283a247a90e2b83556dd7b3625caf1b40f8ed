@@ -1,0 +1,9 @@
+Scenario: Community transportation support for medical appointments
+    Given James must coordinate multiple medical appointments
+    And transportation logistics are overwhelming
+    When the community_elohim organizes transportation support
+    Then volunteer drivers should be available for medical appointments
+    And transportation should accommodate David's cognitive needs
+    And scheduling should be reliable for multiple appointments
+    And community should reduce transportation burden
+    And medical access should not require James to manage everything alone

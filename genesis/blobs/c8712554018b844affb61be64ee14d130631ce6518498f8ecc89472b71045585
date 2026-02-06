@@ -1,0 +1,9 @@
+Scenario: Protecting tiny spaces for Maria's personal identity and flourishing
+    Given Maria's life is consumed by parenting and work demands
+    And she has almost no time or energy for herself
+    When the personal_agent monitors Maria's well-being
+    Then it should identify and protect small moments for personal care
+    And it should remind Maria that she exists beyond her parenting role
+    And it should help her maintain individual identity despite overwhelming demands
+    And it should advocate for her personal needs, not just children's needs
+    And Maria should be supported in being a person, not just a parent

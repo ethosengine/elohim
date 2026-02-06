@@ -1,0 +1,11 @@
+Scenario: Ruling against agent decision when constitutional bounds exceeded
+    Given I am reviewing an appeal where agent clearly overstepped
+    And the facts show the decision violated constitutional principles
+    When our council rules the agent decision unconstitutional
+    Then the decision is: immediately overturned
+    And appellant's preferences are: automatically restored
+    And the incident is: documented as error in agent's record
+    And similar interventions: require higher thresholds going forward
+    And protocol improvements are: proposed and implemented
+    And agent learns: from legitimate critique without being punished
+    And accountability works: without compromising agent autonomy

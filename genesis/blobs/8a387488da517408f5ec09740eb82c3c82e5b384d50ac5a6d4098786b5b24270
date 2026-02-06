@@ -1,0 +1,10 @@
+Scenario: Personal capacity limits respected and enforced
+    Given Sarah has finite energy, time, and emotional capacity
+    And demands regularly exceed her available resources
+    When Sarah approaches capacity limits
+    Then the personal_agent should help her identify what to drop
+    And it should validate saying no to non-essential demands
+    And it should recognize that she cannot do everything
+    And capacity constraints should be treated as real boundaries
+    And the system should support sustainable pacing
+    And Sarah should learn that limitations are human, not failure

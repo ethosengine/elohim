@@ -1,0 +1,10 @@
+Scenario: Municipal services accessibility for aging residents
+    Given Frank is aging and may have mobility or transportation limitations
+    And municipal services should remain accessible to all residents
+    When the municipal_elohim coordinates service accessibility
+    Then it should ensure public buildings are physically accessible
+    And public transit should serve aging residents' mobility needs
+    And municipal services should be available in formats accessible to aging users
+    And digital services should accommodate aging-related changes
+    And Frank should access municipal services with dignity
+    And universal design should serve residents across lifespan

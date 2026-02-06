@@ -1,0 +1,9 @@
+Scenario: Board member verifies administrator claims about state mandates
+    Given district administration claims state mandates prevent local changes
+    And politicians suspect bureaucratic resistance masked as legal constraint
+    When the Observer researches actual state requirements
+    Then they see what's legally required versus administrative preference
+    And identify how other districts handle same mandates differently
+    And distinguish genuine constraints from bureaucratic inertia
+    And push for changes within actual legal bounds
+    And hold administration accountable for implementation choices

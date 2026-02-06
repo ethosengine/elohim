@@ -1,0 +1,10 @@
+Scenario: Teen learns to value ecosystem services
+    Given Jasmine benefits from clean water, air, and functional ecosystems
+    And ecosystem services are typically invisible in market economy
+    When bioregional_elohim explains ecosystem dependencies
+    Then it should teach her about ecosystem services she depends on
+    And show how wetlands filter water, forests stabilize climate, and pollinators enable food production
+    And help her understand that ecosystems provide care that sustains human life
+    And recognize that ecosystem health is prerequisite for all other care
+    And value ecological stewardship as foundational care work
+    And build understanding that economy depends on ecology, not the other way around

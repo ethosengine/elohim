@@ -1,0 +1,9 @@
+Scenario: Board member builds coalition for increased education funding
+    Given the politician seeks voter approval for tax levy
+    And needs broad community support
+    When the Observer identifies coalition potential
+    Then they see parents care about class sizes and programs
+    And identify business leaders concerned about workforce preparation
+    And connect with community organizations serving families
+    And facilitate coalition across diverse stakeholder groups
+    And build campaign for education investment with broad base

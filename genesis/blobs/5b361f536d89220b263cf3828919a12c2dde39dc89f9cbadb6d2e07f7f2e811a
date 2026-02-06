@@ -1,0 +1,9 @@
+Scenario: Operator experiences relief from dual extraction trap
+    Given corporate extracts from above (fees, mandatory purchasing, controlled pricing)
+    And profitability required worker extraction from below (low wages, speedup, surveillance)
+    When EAE conversion eliminates corporate extraction entirely
+    Then $100K+ annually per location is freed from franchise fees and markups
+    And workers receive substantial wage increases without threatening sustainability
+    And James escapes impossible position of implementing exploitation he knows is harmful
+    And dual extraction trap that made ethical operation impossible is broken
+    And workplace_elohim documents liberation from extraction on both levels

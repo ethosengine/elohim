@@ -1,0 +1,10 @@
+Scenario: Household governance decisions made as equal partners
+    Given Frank and his wife are equal partners in household
+    And both contribute care labor and have voice in decisions
+    When household decisions are made
+    Then the household_elohim should support collaborative decision-making
+    And neither partner should dominate household governance
+    And both partners' preferences and needs should have equal weight
+    And retirement should enable true partnership, not hierarchy
+    And household decisions should serve both partners' flourishing
+    And equitable partnership should be structurally supported

@@ -1,0 +1,9 @@
+Scenario: Investor discovers community connection through investment network
+    Given stock market investing is isolating
+    And Patricia managed portfolio individually without community
+    When community investment creates investor network
+    Then she knows other neighborhood residents who invested in democratic conversions
+    And investors share motivations, coordinate for larger projects, build community wealth strategy
+    And investment becomes collective political project, not individual portfolio management
+    And community connections deepen through shared values and collaboration
+    And community_elohim facilitates investor network development and coordination

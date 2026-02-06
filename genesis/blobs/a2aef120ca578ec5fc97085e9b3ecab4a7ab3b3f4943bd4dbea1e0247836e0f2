@@ -1,0 +1,9 @@
+Scenario: Professional care work valued in care economy framework
+    Given Sarah's teaching is professional care work
+    And care economy should recognize professional caregiving
+    When Sarah's care contributions are tracked
+    Then her professional teaching should count as care labor
+    And it should be valued alongside household care
+    And Sarah should see her career as care economy participation
+    And professional care workers should be recognized explicitly
+    And care economy should include paid care work, not just unpaid

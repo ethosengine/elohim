@@ -1,0 +1,11 @@
+Scenario: Planning for crisis response maintaining democratic oversight
+    Given emergencies require rapid coordination
+    And I must balance speed with democratic legitimacy
+    When I establish crisis response protocols
+    Then Community Elohim: helps coordinate response rapidly
+    And I maintain: human judgment for crisis decisions
+    And Constitutional Council: provides oversight even under urgency
+    And emergency powers: have clear limits and sunset provisions
+    And we preserve: democratic accountability during crisis
+    And we plan: for resilience without sacrificing governance principles
+    And we demonstrate: democracy can be both deliberative and responsive

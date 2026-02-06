@@ -1,0 +1,9 @@
+Scenario: Neighborhood resource sharing reduces individual household costs
+    Given Sarah's household operates on limited budget
+    And neighbors have complementary resources and needs
+    When Sarah participates in neighborhood resource sharing
+    Then the neighborhood_elohim should coordinate bulk buying
+    And it should facilitate tool lending among neighbors
+    And it should enable childcare exchanges
+    And it should reduce costs through collective purchasing
+    And neighborhood cooperation should improve household economics

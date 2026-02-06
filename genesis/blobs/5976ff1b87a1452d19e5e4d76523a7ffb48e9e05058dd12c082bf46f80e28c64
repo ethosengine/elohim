@@ -1,0 +1,9 @@
+Scenario: Community privacy protects members while enabling coordination
+    Given community care economy involves data about many people
+    And privacy must be protected rigorously
+    When community care patterns are tracked
+    Then the community_elohim should only share aggregated data
+    And individual household details should remain private
+    And Sarah should control what community sees about her family
+    And community coordination should not require privacy sacrifice
+    And data should serve community well-being, not surveillance

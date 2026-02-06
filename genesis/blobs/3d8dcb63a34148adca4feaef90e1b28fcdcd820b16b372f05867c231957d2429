@@ -1,0 +1,11 @@
+Scenario: Providing evidence to Senator Ruiz for policy development
+    Given Senator Ruiz is drafting AI governance legislation
+    And she needs evidence about what regulatory approaches help vs harm
+    When I brief her committee on my regional research findings
+    Then I present: rigorous evaluation of protocol outcomes
+    And I explain: what factors predict successful adoption
+    And I provide: evidence about marginalized community access
+    And I offer: comparative findings about governance models
+    And I testify: honestly about limitations and uncertainties
+    And I maintain: independence by reporting truth not advocacy
+    And My research becomes: evidence base for democratic policy making

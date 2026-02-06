@@ -1,0 +1,7 @@
+Scenario: Accessing workplace accommodations for care needs
+    Given I may need accommodations for health, family, or care responsibilities
+    When I need to request workplace accommodations
+    Then the workplace_elohim should help me understand my rights
+    And support me in making formal accommodation requests
+    And provide guidance on documentation and process
+    And advocate for my right to work conditions that don't destroy my capacity for care

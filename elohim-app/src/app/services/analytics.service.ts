@@ -1,11 +1,20 @@
-import { Injectable, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
+import { Injectable, inject } from '@angular/core';
+
+// @coverage: 100.0% (2026-02-05)
+
 import { ConfigService } from './config.service';
 
 const GA_TRACKING_ID = 'G-NSL7PVP55B' as const;
 
+/** Window augmented with Google Analytics globals */
+interface GAWindow extends Window {
+  dataLayer: unknown[][];
+  gtag: (...args: unknown[]) => void;
+}
+
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AnalyticsService {
   private readonly configService = inject(ConfigService);
@@ -39,25 +48,23 @@ export class AnalyticsService {
     if (!window) return;
 
     // Initialize dataLayer and gtag
-    (window as any).dataLayer = (window as any).dataLayer ?? [];
-    (window as any).gtag = function() {
-      (window as any).dataLayer.push(arguments);
+    const gaWindow = window as unknown as GAWindow;
+    gaWindow.dataLayer = gaWindow.dataLayer ?? [];
+    gaWindow.gtag = (...args: unknown[]) => {
+      gaWindow.dataLayer.push(args);
     };
-
 
     // Load script
     const script = this.document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`;
-    
+
     // Configure GA
     script.onload = () => {
-      (window as any).gtag('js', new Date());
-      (window as any).gtag('config', GA_TRACKING_ID);
+      gaWindow.gtag('js', new Date());
+      gaWindow.gtag('config', GA_TRACKING_ID);
     };
-    
+
     this.document.head.appendChild(script);
-
-
   }
 }

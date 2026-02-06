@@ -1,0 +1,12 @@
+Scenario: Accessing community resources without invasive means-testing
+    Given traditional social services require proving I'm "needy enough"
+    And care economy provides support based on different principles
+    When I access community resources through care economy
+    Then the Value Scanner provides access based on care participation, not means-testing
+    And doesn't require exposing private trauma to gatekeepers
+    And validates my care contributions as basis for receiving support
+    And preserves my privacy and dignity
+    And connects me to resources efficiently without bureaucratic barriers
+    And my personal_agent helps me navigate with minimal burden
+    And recognizes that care economy support differs from institutional charity
+    And provides dignified alternative to degrading social services

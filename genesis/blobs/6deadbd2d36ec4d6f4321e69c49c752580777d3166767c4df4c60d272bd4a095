@@ -1,0 +1,10 @@
+Scenario: Board member evaluates superintendent recommendation to close schools
+    Given superintendent recommends closing three schools for efficiency
+    And 200-page closure analysis emphasizes cost savings and facility utilization
+    And affected communities organized opposition but lack data to counter staff analysis
+    When the board member requests Observer independent analysis
+    Then they receive impact assessment showing commute time increases for affected families
+    And see enrollment data contradicting claims of declining student numbers
+    And access demographic analysis showing closures disproportionately affect low-income students
+    And get comparison of how peer districts addressed facility challenges without closure
+    And independent analysis reveals information staff presentation minimized

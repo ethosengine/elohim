@@ -1,0 +1,11 @@
+Scenario: Household resilience built through care economy participation
+    Given Robert and Jennifer manage enormous complexity
+    And they face potential crises: parent health emergencies, child crises, financial shocks
+    When household_elohim builds resilience
+    Then it should help them build emergency preparedness
+    And connect them to community resources that can provide backup support
+    And ensure they have networks to lean on in crisis
+    And recognize that care economy participation builds reciprocal support
+    And surface their accumulated social capital
+    And help them understand that their care contributions create household resilience
+    And support sustainable household functioning amid unpredictable demands

@@ -1,13 +1,17 @@
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ThemeService, Theme } from '../../services/theme.service';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+
+// @coverage: 84.2% (2026-02-05)
+
 import { Subscription } from 'rxjs';
+
+import { ThemeService, Theme } from '../../services/theme.service';
 
 @Component({
   selector: 'app-theme-toggle',
   imports: [CommonModule],
   templateUrl: './theme-toggle.component.html',
-  styleUrl: './theme-toggle.component.css'
+  styleUrl: './theme-toggle.component.css',
 })
 export class ThemeToggleComponent implements OnInit, OnDestroy {
   @Input() inline = false;
@@ -43,7 +47,7 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
   private getEffectiveTheme(): 'light' | 'dark' {
     if (this.currentTheme === 'device') {
       // Check system preference
-      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      return globalThis.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
     return this.currentTheme;
   }

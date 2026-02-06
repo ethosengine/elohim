@@ -1,0 +1,334 @@
+/* Holochain Availability Banner Styling */
+
+.availability-banner {
+  width: 100%;
+  padding: 16px 0;
+  border-bottom: 2px solid;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 14px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0%;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 100%;
+  }
+}
+
+/* Status-specific styling */
+.availability-banner.connected {
+  background-color: #d4edda;
+  color: #155724;
+  border-bottom-color: #28a745;
+}
+
+.availability-banner.connecting {
+  background-color: #fff3cd;
+  color: #856404;
+  border-bottom-color: #ffc107;
+}
+
+.availability-banner.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-bottom-color: #dc3545;
+}
+
+.availability-banner.offline {
+  background-color: #e7e7e7;
+  color: #383d41;
+  border-bottom-color: #6c757d;
+}
+
+/* Banner container */
+.banner-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 24px;
+}
+
+/* Status section */
+.status-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.banner-icon {
+  font-size: 20px;
+  font-weight: bold;
+  min-width: 24px;
+  text-align: center;
+  animation: pulse 2s infinite;
+}
+
+.banner-icon.icon-connecting {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 100%;
+  }
+
+  50% {
+    opacity: 70%;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-message {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.degradation-message {
+  font-size: 13px;
+  opacity: 90%;
+}
+
+/* Actions section */
+.actions-section {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* Buttons */
+.btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-retry {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-retry:hover {
+  background-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgb(220 53 69 / 30%);
+}
+
+.btn-sync {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-sync:hover:not(:disabled) {
+  background-color: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgb(40 167 69 / 30%);
+}
+
+.btn-sync:disabled {
+  background-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+  opacity: 60%;
+}
+
+.btn-dismiss {
+  background-color: transparent;
+  color: inherit;
+  padding: 4px 8px;
+  font-size: 16px;
+  opacity: 60%;
+  transition: opacity 0.2s;
+}
+
+.btn-dismiss:hover {
+  opacity: 100%;
+}
+
+/* Degradation info section */
+.degradation-info {
+  max-width: 1400px;
+  margin: 12px auto 0;
+  padding: 0 24px;
+}
+
+.features-list {
+  cursor: pointer;
+  user-select: none;
+}
+
+.features-list summary {
+  font-weight: 600;
+  padding: 8px 0;
+  transition: color 0.2s;
+}
+
+.features-list summary:hover {
+  opacity: 80%;
+}
+
+.features-section {
+  margin-left: 20px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.features-section h4 {
+  margin: 8px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 90%;
+}
+
+.available-features,
+.degraded-features {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+}
+
+.available-features li,
+.degraded-features li {
+  padding: 4px 0 4px 24px;
+  position: relative;
+  font-size: 13px;
+}
+
+.feature-icon {
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+  min-width: 16px;
+}
+
+.queue-info {
+  padding: 8px 12px;
+  background-color: rgb(255 255 255 / 30%);
+  border-radius: 3px;
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+.help-section {
+  margin-top: 12px;
+}
+
+.help-section h4 {
+  margin: 8px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.help-steps {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+}
+
+.help-steps li {
+  padding: 3px 0 3px 24px;
+  position: relative;
+  font-size: 13px;
+}
+
+.help-steps li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+}
+
+/* Responsive design */
+@media (width <= 768px) {
+  .banner-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 0 16px;
+  }
+
+  .status-section {
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .actions-section {
+    justify-content: flex-start;
+  }
+
+  .degradation-info {
+    padding: 0 16px;
+  }
+
+  .banner-icon {
+    font-size: 18px;
+  }
+}
+
+@media (width <= 480px) {
+  .availability-banner {
+    padding: 12px 0;
+    font-size: 12px;
+  }
+
+  .banner-container {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .status-section {
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .banner-icon {
+    font-size: 16px;
+  }
+
+  .status-message {
+    font-size: 13px;
+  }
+
+  .degradation-message {
+    font-size: 12px;
+  }
+}

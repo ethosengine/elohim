@@ -1,0 +1,72 @@
+{
+  "id": "human-matthew-manager",
+  "did": "did:web:elohim.host:human:matthew-manager",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Matthew",
+  "description": "EthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.",
+  "content": "# Matthew\n\nEthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.\n\n**Profile Reach:** community\n\n**Is Pseudonymous:** false\n\n**Accepting Connections:** true\n\n**Primary Location:** {\n  \"layer\": \"neighborhood\",\n  \"displayName\": \"Tech Valley\",\n  \"reach\": \"community\"\n}\n\n**Organizations:** [object Object]\n\n**Communities:** community-local-church\n\n**Public Affinities:** governance, ai-ethics, holochain, family-systems, christian-theology\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "humans/matthew-manager/profile.json",
+  "tags": [
+    "holochain",
+    "governance",
+    "core-family",
+    "christian-theology",
+    "ai-ethics",
+    "family-systems",
+    "role-founder",
+    "layer-neighborhood",
+    "human-graph",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "core-family",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "neighborhood",
+      "workplace",
+      "community"
+    ],
+    "organizationCount": 1,
+    "communityCount": 1
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Matthew",
+    "ogDescription": "EthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-matthew-manager",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-matthew-manager.jpg",
+    "ogImageAlt": "Matthew's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-matthew-manager",
+    "identifier": "did:web:elohim.host:human:matthew-manager",
+    "name": "Matthew",
+    "description": "EthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Tech Valley",
+      "description": "neighborhood"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "EthosEngine",
+        "@id": "org-ethosengine"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328330",
+  "updatedAt": "2025-12-24T03:05:26.335Z"
+}

@@ -1,0 +1,8 @@
+Scenario: Owner achieves fair compensation for years of sweat equity
+    Given Rosa built business through 15 years of underpaid 60-hour weeks
+    And business is worth $200K but no ethical buyer exists
+    When EAE offers $180K acquisition
+    Then Rosa receives payment reflecting equipment value, customer base, and sweat equity
+    And payment comes from community investment pool, not worker exploitation
+    And Rosa can pay debts, fund retirement, achieve financial breathing room
+    And fair value is recognized without requiring community institution destruction

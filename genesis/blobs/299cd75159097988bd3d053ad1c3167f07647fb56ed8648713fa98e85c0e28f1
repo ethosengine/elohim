@@ -1,0 +1,11 @@
+Scenario: Emergency preparedness includes disability considerations
+    Given emergencies affect disabled people disproportionately
+    And Alex has specific emergency needs
+    When the neighborhood plans for emergencies
+    Then Alex should be included in emergency planning
+    And neighborhood should know about residents with access needs
+    And evacuation plans should accommodate wheelchair users
+    And the neighborhood_elohim should coordinate disability-inclusive preparedness
+    And Alex's expertise should shape neighborhood emergency protocols
+    And disabled neighbors should be protected, not forgotten
+    And inclusive planning should reduce vulnerability for all residents

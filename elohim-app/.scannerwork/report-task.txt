@@ -1,0 +1,6 @@
+projectKey=elohim-app-alpha
+serverUrl=https://sonarqube.ethosengine.com
+serverVersion=25.12.0.117093
+dashboardUrl=https://sonarqube.ethosengine.com/dashboard?id=elohim-app-alpha
+ceTaskId=19e63650-6af7-4556-885b-e36a40a31659
+ceTaskUrl=https://sonarqube.ethosengine.com/api/ce/task?id=19e63650-6af7-4556-885b-e36a40a31659

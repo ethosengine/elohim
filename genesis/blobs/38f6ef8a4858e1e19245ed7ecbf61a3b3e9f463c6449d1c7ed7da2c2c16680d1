@@ -1,0 +1,7 @@
+Scenario: Addressing industry culture of exploitation
+    Given food service industry culture normalizes worker exploitation
+    When workers want to transform industry culture
+    Then the protocol should support cultural change advocacy
+    And help workers articulate vision for dignified food service work
+    And build consciousness that current conditions are unjust not inevitable
+    And create movement for care-economy-aligned industry transformation

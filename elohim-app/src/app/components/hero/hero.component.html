@@ -3,63 +3,73 @@
     <div class="content-container">
       <div class="logo-section" [class.hidden]="isVideoVisible || isDeepDiveVisible">
         <div class="logo-container">
-          <img src="/images/elohim_logo_light.png" alt="Elohim Protocol Logo" class="hero-logo">
+          <img src="/images/elohim_logo_light.png" alt="Elohim Protocol Logo" class="hero-logo" />
         </div>
         <h1>Elohim Protocol</h1>
-        <p class="hero-subtitle">Digital guardians for human flourishing. Technology organized around love.</p>
-        <button class="listen-button" (click)="toggleVideo()">
-          Play to Learn
-        </button>
+        <p class="hero-subtitle">
+          Digital guardians for human flourishing. Technology organized around love.
+        </p>
+        <button type="button" class="listen-button" (click)="toggleVideo()">Play to Learn</button>
       </div>
-      
+
       <div class="video-section intro-video" [class.visible]="isVideoVisible">
         <div class="hero-video">
-          <iframe 
-            width="560" 
-            height="315" 
-            src="https://www.youtube.com/embed/6g6v7ZMEAxk" 
-            title="The Elohim Protocol: Reimagining Digital Infrastructure for Human Flourishing & the Care Economy" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-            allowfullscreen>
-          </iframe>
+          <iframe
+            width="560"
+            height="315"
+            src="https://www.youtube.com/embed/6g6v7ZMEAxk"
+            title="The Elohim Protocol: Reimagining Digital Infrastructure for Human Flourishing & the Care Economy"
+            allow="
+              accelerometer;
+              autoplay;
+              clipboard-write;
+              encrypted-media;
+              gyroscope;
+              picture-in-picture;
+              web-share;
+            "
+            allowfullscreen
+          ></iframe>
         </div>
         <p class="video-subtitle">Summary (~7min)</p>
         <div class="video-buttons">
-          <button class="back-to-logo-button" (click)="hideVideo()">
-            Back
-          </button>
-          <button class="deep-dive-button" (click)="toggleDeepDive()">
+          <button type="button" class="back-to-logo-button" (click)="hideVideo()">Back</button>
+          <button type="button" class="deep-dive-button" (click)="toggleDeepDive()">
             Deep Dive
           </button>
         </div>
       </div>
-      
+
       <div class="video-section deep-dive-video" [class.visible]="isDeepDiveVisible">
         <div class="hero-video">
-          <iframe 
-            width="560" 
-            height="315" 
-            src="https://www.youtube.com/embed/sVXwZ087ffA" 
-            title="Elohim Protocol Deep Dive - Technical Overview" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-            allowfullscreen>
-          </iframe>
+          <iframe
+            width="560"
+            height="315"
+            src="https://www.youtube.com/embed/sVXwZ087ffA"
+            title="Elohim Protocol Deep Dive - Technical Overview"
+            allow="
+              accelerometer;
+              autoplay;
+              clipboard-write;
+              encrypted-media;
+              gyroscope;
+              picture-in-picture;
+              web-share;
+            "
+            allowfullscreen
+          ></iframe>
         </div>
         <p class="video-subtitle">Deep Dive Podcast (~51min)</p>
         <div class="video-buttons">
-          <button class="back-to-logo-button" (click)="hideVideo()">
-            Back
-          </button>
-          <button class="intro-video-button" (click)="toggleVideo()">
-            Summary
-          </button>
+          <button type="button" class="back-to-logo-button" (click)="hideVideo()">Back</button>
+          <button type="button" class="intro-video-button" (click)="toggleVideo()">Summary</button>
         </div>
       </div>
     </div>
   </div>
   <div class="scroll-indicator">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <path d="M12 16l-6-6h12z"/>
+      <path d="M12 16l-6-6h12z" />
     </svg>
   </div>
 </section>

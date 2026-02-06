@@ -1,0 +1,10 @@
+Scenario: Tracking health considerations relevant to safe childcare
+    Given Margaret takes medications and has health conditions
+    And she needs to provide safe, active care for young children
+    When the personal_agent monitors Margaret's health status
+    Then it should track whether health enables safe childcare
+    And it should flag if medications or conditions affect caregiving capacity
+    And it should suggest when to communicate limitations to family
+    And it should support Margaret's health management
+    And it should ensure children's safety while preserving Margaret's dignity
+    And health monitoring should enable safe, sustainable care provision

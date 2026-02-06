@@ -1,0 +1,12 @@
+Scenario: Industry leadership diversity includes care economy advocates
+    Given industry leadership shapes sector culture and policy
+    And care economy advocates need representation in leadership
+    And Robert has accumulated experience and standing
+    When industry_elohim supports leadership advancement
+    Then it should help Robert pursue industry leadership positions
+    And recognize his care economy expertise as leadership qualification
+    And support him in bringing care economy perspective to leadership
+    And build industry leadership that includes caregivers and care economy advocates
+    And advance care economy through leadership representation
+    And demonstrate that care experience qualifies for industry leadership
+    And transform industry through leadership diversity

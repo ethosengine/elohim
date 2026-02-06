@@ -8,9 +8,8 @@ describe('DesignPrinciplesComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DesignPrinciplesComponent]
-    })
-    .compileComponents();
+      imports: [DesignPrinciplesComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(DesignPrinciplesComponent);
     component = fixture.componentInstance;
@@ -42,7 +41,7 @@ describe('DesignPrinciplesComponent', () => {
     const cardHeadings = compiled.querySelectorAll('.card h3');
     expect(cardHeadings.length).toBe(6);
 
-    const headingTexts = Array.from(cardHeadings).map((h: any) => h.textContent);
+    const headingTexts = Array.from(cardHeadings).map(h => (h as HTMLElement).textContent);
     expect(headingTexts).toContain('Peer-to-Peer Architecture');
     expect(headingTexts).toContain('Graduated Intimacy');
     expect(headingTexts).toContain('Transparency as Immune System');

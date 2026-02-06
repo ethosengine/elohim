@@ -1,0 +1,9 @@
+Scenario: Farmworker voice prevents owner burnout and distributes responsibility
+    Given Tom carried full farm responsibility alone causing stress and burnout
+    And sole proprietorship meant he couldn't take breaks without farm crisis
+    When democratic governance distributes responsibility across worker-owners
+    Then Tom (if staying as cooperative member) is freed from sole responsibility burden
+    And farmworkers collectively manage farm reducing individual stress
+    And vacation and health breaks become possible for all including Tom
+    And democratic distribution of responsibility enables sustainable work-life balance
+    And workplace_elohim ensures responsibility distribution is equitable and sustainable

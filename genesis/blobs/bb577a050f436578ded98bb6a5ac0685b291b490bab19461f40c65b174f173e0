@@ -1,0 +1,9 @@
+Scenario: Household resource allocation prioritizes care sustainability
+    Given household resources are severely limited
+    And care needs are high and increasing
+    When household resources are allocated
+    Then the household_elohim should prioritize care sustainability
+    And it should ensure James has resources for respite
+    And it should allocate funds for both David's and James's needs
+    And resource decisions should prevent caregiver burnout
+    And household economics should serve sustainable caregiving

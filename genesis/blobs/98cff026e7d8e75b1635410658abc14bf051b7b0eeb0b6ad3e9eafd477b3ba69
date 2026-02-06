@@ -1,0 +1,9 @@
+Scenario: Learning agency within appropriate boundaries
+    Given Tommy needs to develop healthy sense of agency
+    And he also needs safety and guidance
+    When Tommy makes choices in the Value Scanner
+    Then he should experience genuine decision-making power
+    And he should learn that his choices have real consequences
+    And he should discover natural limits through experience
+    And boundaries should teach safety, not powerlessness
+    And he should learn both capability and humility

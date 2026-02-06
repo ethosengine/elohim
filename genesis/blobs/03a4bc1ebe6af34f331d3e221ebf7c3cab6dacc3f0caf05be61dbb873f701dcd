@@ -1,0 +1,9 @@
+Scenario: Household resilience planning for single-adult vulnerability
+    Given Maria's household depends entirely on her continued functioning
+    And there's no backup adult if something happens to her
+    When the household_elohim assesses resilience
+    Then it should help Maria create emergency plans for if she's incapacitated
+    And it should identify emergency contacts for children
+    And it should coordinate with extended family or community for backup care
+    And it should ensure children know what to do in various emergencies
+    And Maria should have peace of mind that children will be cared for if she can't

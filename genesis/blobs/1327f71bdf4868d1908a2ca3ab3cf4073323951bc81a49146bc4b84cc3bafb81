@@ -1,0 +1,9 @@
+Scenario: Parent discovers coalition for youth recreation programs
+    Given municipal budget cuts threaten youth sports and rec programs
+    And the parent's child participates in city soccer league
+    When the Observer detects 180 parents whose children use these programs
+    Then parents form rapid coalition to defend youth programs
+    And present coordinated data on program participation and benefits
+    And show economic value of city programs vs private alternatives
+    And municipal budget priorities respond to organized parent power
+    And youth recreation programs are preserved

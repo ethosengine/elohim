@@ -1,0 +1,9 @@
+Given protocol operates across state boundaries
+And consistency is needed for coordination
+When I work on interstate compact for protocol recognition
+Then we establish: mutual recognition of council decisions across states
+And we create: conflict resolution mechanisms for disputes
+And we maintain: state sovereignty and variation
+And we enable: coordination without centralization
+And we show: federalism working for AI governance
+And states cooperate: while preserving local autonomy

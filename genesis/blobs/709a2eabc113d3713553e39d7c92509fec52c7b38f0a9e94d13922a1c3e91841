@@ -1,0 +1,8 @@
+Scenario: Distributing household tasks based on capacity
+    Given different household members have different time and energy
+    And my work leaves me with minimal capacity
+    When we allocate household responsibilities
+    Then the protocol should suggest distribution based on actual capacity
+    And recognize that my 50+ hour work week limits my availability
+    And propose fair alternatives when I can't do time-intensive tasks
+    And help us find equitable arrangements

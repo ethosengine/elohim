@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { ProgressMigrationService } from './progress-migration.service';
-import { DataLoaderService } from './data-loader.service';
-import { AgentProgress } from '../models/agent.model';
-import { LearningPath, PathStep } from '../models/learning-path.model';
+import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { LearningPath, PathStep } from '../models';
+import { AgentProgress } from '@app/elohim/models/agent.model';
 
 describe('ProgressMigrationService', () => {
   let service: ProgressMigrationService;
@@ -28,8 +28,8 @@ describe('ProgressMigrationService', () => {
     steps: [
       { resourceId: 'resource-1', stepTitle: 'Step 1', stepNarrative: 'First step' },
       { resourceId: 'resource-2', stepTitle: 'Step 2', stepNarrative: 'Second step' },
-      { resourceId: 'resource-3', stepTitle: 'Step 3', stepNarrative: 'Third step' }
-    ] as PathStep[]
+      { resourceId: 'resource-3', stepTitle: 'Step 3', stepNarrative: 'Third step' },
+    ] as PathStep[],
   };
 
   const mockProgress1: AgentProgress = {
@@ -42,7 +42,7 @@ describe('ProgressMigrationService', () => {
     stepAffinity: {},
     stepNotes: {},
     reflectionResponses: {},
-    attestationsEarned: []
+    attestationsEarned: [],
   };
 
   const mockProgress2: AgentProgress = {
@@ -55,7 +55,7 @@ describe('ProgressMigrationService', () => {
     stepAffinity: {},
     stepNotes: {},
     reflectionResponses: {},
-    attestationsEarned: []
+    attestationsEarned: [],
   };
 
   const mockProgress3: AgentProgress = {
@@ -68,33 +68,41 @@ describe('ProgressMigrationService', () => {
     stepAffinity: {},
     stepNotes: {},
     reflectionResponses: {},
-    attestationsEarned: []
+    attestationsEarned: [],
   };
 
   beforeEach(() => {
     const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
       'getPath',
       'getLocalProgress',
-      'saveAgentProgress'
+      'saveAgentProgress',
     ]);
 
     // Mock localStorage
     localStorageMock = {};
     mockStorage = {
       getItem: (key: string) => localStorageMock[key] || null,
-      setItem: (key: string, value: string) => { localStorageMock[key] = value; },
-      removeItem: (key: string) => { delete localStorageMock[key]; },
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key];
+      },
       key: (index: number) => Object.keys(localStorageMock)[index] || null,
-      get length() { return Object.keys(localStorageMock).length; },
-      clear: () => { localStorageMock = {}; }
+      get length() {
+        return Object.keys(localStorageMock).length;
+      },
+      clear: () => {
+        localStorageMock = {};
+      },
     };
     spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
 
     TestBed.configureTestingModule({
       providers: [
         ProgressMigrationService,
-        { provide: DataLoaderService, useValue: dataLoaderSpyObj }
-      ]
+        { provide: DataLoaderService, useValue: dataLoaderSpyObj },
+      ],
     });
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
@@ -118,7 +126,7 @@ describe('ProgressMigrationService', () => {
   // =========================================================================
 
   describe('migrateAllProgress', () => {
-    it('should return empty stats when no progress records exist', (done) => {
+    it('should return empty stats when no progress records exist', done => {
       service.migrateAllProgress().subscribe(result => {
         expect(result.agentsMigrated).toBe(0);
         expect(result.pathsMigrated).toBe(0);
@@ -129,7 +137,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should migrate progress for single agent', (done) => {
+    it('should migrate progress for single agent', done => {
       // Setup localStorage with progress record
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
 
@@ -142,7 +150,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should migrate progress for multiple agents', (done) => {
+    it('should migrate progress for multiple agents', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
       localStorageMock['lamad-progress-agent-2-test-path'] = JSON.stringify(mockProgress3);
 
@@ -153,7 +161,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should migrate multiple paths for same agent', (done) => {
+    it('should migrate multiple paths for same agent', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
       localStorageMock['lamad-progress-agent-1-another-path'] = JSON.stringify(mockProgress2);
 
@@ -170,7 +178,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should handle errors loading paths gracefully', (done) => {
+    it('should handle errors loading paths gracefully', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
       dataLoaderSpy.getPath.and.returnValue(throwError(() => new Error('Path not found')));
 
@@ -181,7 +189,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should skip malformed localStorage entries', (done) => {
+    it('should skip malformed localStorage entries', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = 'invalid json';
       localStorageMock['lamad-progress-agent-2-test-path'] = JSON.stringify(mockProgress3);
 
@@ -191,7 +199,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should merge with existing global progress', (done) => {
+    it('should merge with existing global progress', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
 
       const existingGlobal: AgentProgress = {
@@ -205,7 +213,7 @@ describe('ProgressMigrationService', () => {
         stepNotes: {},
         reflectionResponses: {},
         attestationsEarned: [],
-        completedContentIds: ['existing-resource']
+        completedContentIds: ['existing-resource'],
       };
       dataLoaderSpy.getLocalProgress.and.returnValue(existingGlobal);
 
@@ -223,7 +231,7 @@ describe('ProgressMigrationService', () => {
   // =========================================================================
 
   describe('previewMigration', () => {
-    it('should return empty preview when no progress', (done) => {
+    it('should return empty preview when no progress', done => {
       service.previewMigration().subscribe(preview => {
         expect(preview.totalAgents).toBe(0);
         expect(preview.totalPaths).toBe(0);
@@ -232,7 +240,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should preview migration stats', (done) => {
+    it('should preview migration stats', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
       localStorageMock['lamad-progress-agent-2-test-path'] = JSON.stringify(mockProgress3);
 
@@ -244,10 +252,10 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should skip existing __global__ records in preview', (done) => {
+    it('should skip existing __global__ records in preview', done => {
       const globalProgress: AgentProgress = {
         ...mockProgress1,
-        pathId: '__global__'
+        pathId: '__global__',
       };
       localStorageMock['lamad-progress-agent-1-__global__'] = JSON.stringify(globalProgress);
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
@@ -258,7 +266,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should estimate content nodes from completed steps', (done) => {
+    it('should estimate content nodes from completed steps', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
 
       service.previewMigration().subscribe(preview => {
@@ -274,11 +282,11 @@ describe('ProgressMigrationService', () => {
   // =========================================================================
 
   describe('verifyMigration', () => {
-    it('should return valid when all agents have global progress', (done) => {
+    it('should return valid when all agents have global progress', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
       localStorageMock['lamad-progress-agent-1-__global__'] = JSON.stringify({
         ...mockProgress1,
-        pathId: '__global__'
+        pathId: '__global__',
       });
 
       service.verifyMigration().subscribe(result => {
@@ -288,7 +296,7 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should return invalid when some agents missing global progress', (done) => {
+    it('should return invalid when some agents missing global progress', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
       // No __global__ record for agent-1
 
@@ -299,11 +307,11 @@ describe('ProgressMigrationService', () => {
       });
     });
 
-    it('should count agents correctly', (done) => {
+    it('should count agents correctly', done => {
       localStorageMock['lamad-progress-agent-1-test-path'] = JSON.stringify(mockProgress1);
       localStorageMock['lamad-progress-agent-1-__global__'] = JSON.stringify({
         ...mockProgress1,
-        pathId: '__global__'
+        pathId: '__global__',
       });
       localStorageMock['lamad-progress-agent-2-test-path'] = JSON.stringify(mockProgress3);
 

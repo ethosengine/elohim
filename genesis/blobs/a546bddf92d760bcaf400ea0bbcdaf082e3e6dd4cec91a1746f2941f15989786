@@ -1,0 +1,9 @@
+Scenario: Workplace recognizes employees' care responsibilities
+    Given Sarah balances full-time teaching with intensive parenting
+    And her care responsibilities affect her work capacity
+    When workplace policies are designed
+    Then the workplace_elohim should make employees' care work visible
+    And Sarah's care responsibilities should be recognized, not ignored
+    And workplace should acknowledge that workers have lives beyond employment
+    And policies should support work-care integration, not create conflict
+    And care economy should inform workplace culture

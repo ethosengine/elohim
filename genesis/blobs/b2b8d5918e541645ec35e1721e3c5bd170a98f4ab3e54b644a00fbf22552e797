@@ -1,0 +1,9 @@
+Scenario: Workers respond to community crisis with mutual aid
+    Given neighborhood experiences crisis (fire, flood, or emergency)
+    And community members need food and gathering space
+    When workers learn of community crisis
+    Then workers immediately open ChickenMax for community support
+    And workers provide free meals to affected community members
+    And workers coordinate with community_elohim for broader support network
+    And workers demonstrate solidarity through material aid
+    And community reciprocates support when workers need it

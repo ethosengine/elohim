@@ -1,0 +1,9 @@
+Scenario: Workers democratically hire new team members
+    Given ChickenMax needs to hire an additional worker
+    And hiring was previously manager's unilateral decision
+    When the hiring process begins
+    Then workers collectively develop job description and qualifications
+    And multiple workers participate in interviewing candidates
+    And workers evaluate candidates based on skill fit and values alignment
+    And final hiring decision requires worker council approval
+    And new hires integrate into democratic culture from day one

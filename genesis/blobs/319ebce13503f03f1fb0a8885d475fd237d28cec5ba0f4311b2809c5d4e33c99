@@ -1,0 +1,9 @@
+Scenario: Journalist coordinates regional investigation across 15 municipalities
+    Given affordable housing crisis affects entire metropolitan region
+    And the journalist collaborates with reporters in neighboring coverage areas
+    When the Observer provides civic surveillance across all municipalities
+    Then journalists access comprehensive data from all 15 cities
+    And identify common patterns in zoning and development approval
+    And compare policy approaches and housing production outcomes
+    And publish coordinated regional investigation
+    And local stories reveal regional systemic failure

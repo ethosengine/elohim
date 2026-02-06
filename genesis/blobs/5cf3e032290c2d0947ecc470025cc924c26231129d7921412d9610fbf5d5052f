@@ -1,0 +1,11 @@
+Scenario: Participate in 7-year Constitutional Convention
+    Given the First Global Constitutional Convention convenes
+    And 10,000 randomly-selected citizens are delegates
+    And Marcus is not selected but his case is referenced
+    When delegates deliberate on privacy and mental health amendment
+    Then Marcus's appeal precedent is studied by delegates
+    And Marcus's experience of violation-despite-care informs understanding
+    And researchers present data on appeals like Marcus's
+    And delegates hear from appellants worldwide
+    And amendment proposal incorporates lessons from appeals
+    And constitutional evolution is grounded in lived experience

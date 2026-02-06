@@ -1,0 +1,10 @@
+Scenario: Lifelong learning beyond formal education
+    Given Kenji's learning will continue after graduation
+    And education is lifelong process, not just college phase
+    When the educational_elohim supports ongoing learning
+    Then it should help Kenji develop self-directed learning capabilities
+    And it should recognize informal learning as valuable as formal coursework
+    And it should encourage learning from community, work, and life experience
+    And lifelong learning should be valued as care economy participation
+    And the system should support learning as continuous development
+    And education should be understood as lifelong care economy investment

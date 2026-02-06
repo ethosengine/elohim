@@ -1,0 +1,8 @@
+Scenario: Connecting with community mutual aid networks
+    Given workers need mutual aid during economic precarity
+    And community has mutual aid organizing
+    When I participate in mutual aid networks
+    Then the protocol should connect me to appropriate networks
+    And facilitate giving and receiving support
+    And recognize that mutual aid is care economy practice
+    And support building community resilience beyond market systems

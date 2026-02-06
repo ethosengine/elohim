@@ -1,0 +1,10 @@
+Scenario: Coordinating work schedule with personal life
+    Given Jordan has medical appointments and personal commitments
+    And all employees need schedule flexibility sometimes
+    When Jordan needs to request time off
+    Then the personal_agent helps Jordan submit the request
+    And the request process is accessible and clear
+    And Jordan's time-off requests are handled like any employee's
+    And the workplace_elohim facilitates reasonable accommodation
+    And Jordan can balance work and personal life with dignity
+    And Jordan's needs are honored without special pleading

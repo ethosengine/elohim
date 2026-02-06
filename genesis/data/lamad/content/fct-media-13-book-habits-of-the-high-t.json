@@ -1,0 +1,56 @@
+{
+  "id": "fct-media-13-book-habits-of-the-high-t",
+  "contentType": "book",
+  "title": "Habits of the High-Tech Heart",
+  "description": "Book by Quentin Schultze",
+  "content": "# Habits of the High-Tech Heart\n\n**Author:** Quentin Schultze\n**Format:** book",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "mediaType": "book",
+    "author": "Quentin Schultze"
+  },
+  "_contributor": "Quentin Schultze",
+  "createdAt": "2025-11-28T21:10:19.225124",
+  "updatedAt": "2025-12-26T21:04:01.813Z",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Habits of the High-Tech Heart",
+    "ogDescription": "Book by Quentin Schultze",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-13-book-habits-of-the-high-t",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Habits of the High-Tech Heart - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-13-book-habits-of-the-high-t",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Habits of the High-Tech Heart",
+    "description": "Book by Quentin Schultze",
+    "dateCreated": "2025-11-28T21:10:19.225124",
+    "dateModified": "2025-11-28T21:10:19.225125",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Quentin Schultze"
+    }
+  }
+}

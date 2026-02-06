@@ -1,0 +1,9 @@
+Scenario: Customer loyalty deepens through values alignment and relationship
+    Given corporate loyalty was transactional (rewards programs) or habitual (convenience)
+    And Ms. Johnson's loyalty to ChickenMax was weak and circumstantial
+    When democratic ownership creates genuine basis for loyalty
+    Then loyalty comes from values alignment (supporting worker ownership)
+    And relationships with workers create emotional connection
+    And community commitment makes leaving feel like betraying neighbors
+    And loyalty is authentic, not manufactured through manipulation
+    And community_elohim tracks loyalty through retention, not surveillance rewards programs

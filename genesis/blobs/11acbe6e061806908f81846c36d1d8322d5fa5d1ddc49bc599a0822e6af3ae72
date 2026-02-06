@@ -1,0 +1,9 @@
+Scenario: Developer faces accountability for school impact promises
+    Given a developer claimed previous project would "support local schools"
+    And implied tax revenue would benefit education
+    When the Observer tracks actual school impacts
+    Then analysis shows: enrollment increased 120 students
+    And district had to add 6 portable classrooms
+    And property tax revenue was $400K but school costs were $900K annually
+    And promised "school support" was marketing not actual benefit
+    And accountability creates pressure for honest impact assessment

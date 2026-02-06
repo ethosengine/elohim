@@ -1,0 +1,8 @@
+Scenario: Advocating for predictable scheduling
+    Given unpredictable scheduling destroys my capacity for care work
+    And I cannot manage household, health, or family needs without schedule stability
+    When I want to advocate for predictable scheduling
+    Then the protocol should help me build the case for schedule predictability
+    And provide evidence of how current scheduling harms my well-being
+    And support me in requesting schedule improvements
+    And connect me with co-workers who share this need

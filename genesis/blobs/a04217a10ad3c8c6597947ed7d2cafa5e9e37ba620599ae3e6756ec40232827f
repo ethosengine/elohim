@@ -1,0 +1,9 @@
+Scenario: Legislator distinguishes constituent calls from corporate astroturf
+    Given the politician's office receives 500 calls opposing regulation
+    And callers claim to be concerned constituents
+    When the Observer analyzes campaign origins
+    Then they see calls coordinated by corporate lobbying firm
+    And identify script language and coordinated timing
+    And distinguish 12 genuine constituent concerns from 488 manufactured contacts
+    And understand industry opposition versus authentic community sentiment
+    And vote based on constituent interests not manufactured pressure

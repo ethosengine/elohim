@@ -1,0 +1,10 @@
+Scenario: Educational resources for continuing professional development
+    Given adult learning is lifelong
+    And Aisha wants professional skill development
+    When Aisha seeks professional education
+    Then the personal_agent should surface relevant learning resources
+    And it should connect her to workshops, courses, or certifications
+    And it should help her plan skill development trajectory
+    And professional education should be accessible and affordable
+    And the system should support continuous capability building
+    And career growth should be facilitated through education access

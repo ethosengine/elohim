@@ -1,0 +1,9 @@
+Scenario: Community respite care accessible through care economy
+    Given James needs regular respite to prevent burnout
+    And formal respite care costs $20-30/hour he cannot afford
+    When James accesses community respite resources
+    Then his care token accumulation should subsidize respite costs
+    And community should provide respite care at accessible rates
+    And respite should be professional-quality and reliable
+    And care economy should ensure caregivers get necessary breaks
+    And community should invest in caregiver sustainability

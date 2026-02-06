@@ -1,0 +1,9 @@
+Scenario: Owner preserves legacy through democratic conversion
+    Given Rosa built community institution over 15 years
+    And selling to corporate chain would destroy what she created
+    When Rosa chooses EAE conversion over extractive sale
+    Then her legacy becomes democratic institution serving neighborhood
+    And her trust relationships are institutionalized, not erased
+    And she becomes founder who chose community over individual wealth
+    And legacy is preserved beyond her personal involvement
+    And community honors her wisdom in transition choice

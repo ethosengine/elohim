@@ -1,0 +1,10 @@
+Scenario: Building adult financial literacy through practice
+    Given Aisha received no practical finance education in school
+    And she's learning by doing with real consequences
+    When Aisha makes financial decisions in the scanner
+    Then the personal_agent should provide contextual education
+    And it should explain trade-offs in accessible language
+    And it should help her understand opportunity costs
+    And education should integrate seamlessly with decision-making
+    And Aisha should build financial competence through supported practice
+    And the system should prevent catastrophic mistakes while enabling learning

@@ -1,0 +1,1300 @@
+/* ============================================================================
+   Elohim Navigator - Unified Navigation Component
+   ============================================================================ */
+
+/* Header */
+.elohim-header {
+  background: rgb(30 41 59 / 95%); /* High opacity solid-ish background */
+  border-bottom: 1px solid var(--lamad-border);
+  padding: 0.375rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  /* backdrop-filter removed to fix mobile tray fixed positioning */
+}
+
+:host-context(body[data-theme='light']) .elohim-header {
+  background: rgb(255 255 255 / 95%);
+}
+
+.header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ============================================================================
+   Left Nav Group (Logo + Context Switcher)
+   ============================================================================ */
+
+.left-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* App Logo Link */
+.app-logo-link {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  text-decoration: none;
+  border-radius: 0.375rem;
+  transition: background 0.2s;
+}
+
+.app-logo-link:hover {
+  background: rgb(99 102 241 / 10%);
+}
+
+.app-icon {
+  font-size: 1.125rem;
+  line-height: 1;
+  background: var(--lamad-accent-gradient);
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: var(--lamad-accent-gradient);
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Context Switcher */
+.context-switcher-container {
+  position: relative;
+
+  /* On desktop, this is grouped with the logo */
+}
+
+.context-switch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem; /* Increased from 1.25rem */
+  height: 2rem; /* Increased from 1.25rem */
+  padding: 0;
+  background: rgb(255 255 255 / 5%); /* Slight background */
+  border: 1px solid var(--lamad-border); /* Add border */
+  border-radius: 0.375rem; /* Slightly larger radius */
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.context-switch-btn:hover {
+  background: rgb(99 102 241 / 10%);
+  border-color: var(--lamad-accent-primary);
+}
+
+.dropdown-arrow {
+  width: 14px; /* Slightly larger */
+  height: 14px;
+  color: var(--lamad-text-secondary); /* brighter color */
+  transition: transform 0.2s;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Header Separator */
+.header-separator {
+  color: var(--lamad-border);
+  font-size: 0.75rem;
+  margin: 0 0.125rem;
+}
+
+/* Protocol Link in Header */
+.protocol-link {
+  font-size: 0.7rem;
+  color: var(--lamad-text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.protocol-link:hover {
+  color: var(--lamad-accent-primary);
+}
+
+/* Context Switcher Dropdown */
+.context-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 280px;
+  background: var(--lamad-bg-secondary); /* Solid background */
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 25%); /* Stronger shadow */
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+  z-index: 1000; /* Ensure high z-index on desktop too */
+  display: flex;
+  flex-direction: column; /* Enable flex for proper content distribution */
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0%;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 100%;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--lamad-border);
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.dropdown-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--lamad-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.scrollable-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* for smoother scrolling on iOS */
+  padding: 0.5rem;
+}
+
+.context-apps-list {
+  padding: 0.5rem;
+}
+
+.context-app-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.context-app-item:hover:not([disabled]) {
+  background: rgb(99 102 241 / 10%);
+}
+
+.context-app-item.coming-soon {
+  opacity: 70%;
+}
+
+.context-app-item[disabled] {
+  cursor: not-allowed;
+}
+
+.app-item-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+  background: var(--lamad-accent-gradient);
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.app-item-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--lamad-text-primary);
+}
+
+.app-item-tagline {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+.coming-soon-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  background: rgb(99 102 241 / 10%);
+  color: var(--lamad-accent-primary);
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+}
+
+/* Note: dropdown-footer removed - protocol link now in header */
+
+/* ============================================================================
+   Search (Center)
+   ============================================================================ */
+
+.search-container {
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.5rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--lamad-accent-primary);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 10%);
+}
+
+.search-input::placeholder {
+  color: var(--lamad-text-muted);
+}
+
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
+}
+
+.search-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================================================
+   Profile Bubble (Right) - Imago Dei / Traveler
+   ============================================================================ */
+
+.profile-bubble-container {
+  position: relative;
+}
+
+.profile-bubble {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--lamad-accent-gradient);
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.profile-bubble:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
+}
+
+.profile-avatar {
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Profile Tray Dropdown */
+.profile-tray {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 280px;
+  background: var(--lamad-bg-secondary); /* Solid background */
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 25%); /* Stronger shadow */
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column; /* Enable flex for proper content distribution */
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgb(99 102 241 / 5%);
+  border-bottom: 1px solid var(--lamad-border);
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.profile-avatar-large {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--lamad-accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.profile-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--lamad-text-primary);
+}
+
+.profile-stats {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+/* Profile Actions */
+.profile-actions {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.profile-action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.profile-action:hover {
+  background: rgb(99 102 241 / 10%);
+}
+
+.action-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 70%;
+}
+
+.action-label {
+  font-size: 0.875rem;
+  color: var(--lamad-text-secondary);
+}
+
+/* Settings Section */
+.settings-section {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--lamad-border);
+  flex-shrink: 0;
+}
+
+.settings-header {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--lamad-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-label {
+  font-size: 0.85rem;
+  color: var(--lamad-text-secondary);
+}
+
+/* Theme toggle styling within settings */
+.settings-row ::ng-deep .theme-toggle {
+  position: static;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  background: rgb(99 102 241 / 10%);
+  border: 1px solid var(--lamad-border);
+  box-shadow: none;
+}
+
+.settings-row ::ng-deep .theme-toggle:hover {
+  background: rgb(99 102 241 / 20%);
+  transform: none;
+}
+
+.settings-row ::ng-deep .theme-icon {
+  font-size: 1rem;
+}
+
+/* Profile Footer */
+.profile-footer {
+  padding: 0.75rem 1rem;
+  text-align: center;
+  flex-shrink: 0; /* Prevent footer from shrinking */
+}
+
+.session-indicator {
+  font-size: 0.7rem;
+  color: var(--lamad-text-muted);
+  font-style: italic;
+}
+
+/* Logout Action */
+.logout-action:hover {
+  background: rgb(239 68 68 / 10%) !important;
+}
+
+.logout-action:hover .action-icon {
+  color: #ef4444;
+}
+
+.logout-action:hover .action-label {
+  color: #ef4444;
+}
+
+/* ============================================================================
+   Auth Buttons (Visitor State)
+   ============================================================================ */
+
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auth-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.auth-btn-link {
+  background: transparent;
+  border: none;
+  color: var(--lamad-text-secondary);
+}
+
+.auth-btn-link:hover {
+  color: var(--lamad-accent-primary);
+  background: rgb(99 102 241 / 5%);
+}
+
+.auth-btn-primary {
+  background: var(--lamad-accent-gradient);
+  border: none;
+  color: white;
+}
+
+.auth-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
+}
+
+/* ============================================================================
+   Edge Node Section
+   ============================================================================ */
+
+.edge-node-section {
+  border-top: 1px solid var(--lamad-border);
+}
+
+.edge-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--lamad-text-muted);
+}
+
+.edge-node-header:hover {
+  color: var(--lamad-text-secondary);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-text {
+  font-size: 0.7rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.expand-arrow {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.expand-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+/* Status Indicator Dot */
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-connected {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgb(34 197 94 / 50%);
+}
+
+.status-connecting {
+  background: #eab308;
+  animation: pulse 1.5s infinite;
+}
+
+.status-error {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgb(239 68 68 / 50%);
+}
+
+.status-disconnected {
+  background: var(--lamad-text-muted);
+  opacity: 50%;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 100%;
+  }
+
+  50% {
+    opacity: 40%;
+  }
+}
+
+/* Edge Node Details Panel */
+.edge-node-details {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--lamad-border);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0.375rem 0;
+  font-size: 0.8rem;
+  gap: 0.5rem;
+}
+
+.detail-label {
+  color: var(--lamad-text-muted);
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.detail-value {
+  color: var(--lamad-text-secondary);
+  text-align: right;
+  word-break: break-all;
+}
+
+.detail-value.monospace {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.detail-value.small {
+  font-size: 0.7rem;
+}
+
+.detail-value.truncated {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-value-with-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.error-row .error-text {
+  color: #ef4444;
+  font-size: 0.75rem;
+}
+
+/* Copy Button */
+.copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--lamad-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover {
+  background: rgb(99 102 241 / 10%);
+  border-color: var(--lamad-accent-primary);
+}
+
+.copy-btn svg {
+  width: 14px;
+  height: 14px;
+  color: var(--lamad-text-muted);
+}
+
+.copy-btn:hover svg {
+  color: var(--lamad-accent-primary);
+}
+
+/* Reconnect Button */
+.edge-node-actions {
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--lamad-border);
+}
+
+.reconnect-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background: rgb(99 102 241 / 10%);
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.5rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reconnect-btn:hover:not(:disabled) {
+  background: rgb(99 102 241 / 20%);
+  border-color: var(--lamad-accent-primary);
+}
+
+.reconnect-btn:disabled {
+  opacity: 50%;
+  cursor: not-allowed;
+}
+
+.reconnect-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================================================
+   Upgrade Banner
+   ============================================================================ */
+
+.upgrade-banner {
+  background: linear-gradient(90deg, rgb(99 102 241 / 10%) 0%, rgb(139 92 246 / 10%) 100%);
+  border-bottom: 1px solid var(--lamad-border);
+  padding: 0.5rem 1rem;
+}
+
+.upgrade-banner-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upgrade-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.upgrade-text {
+  flex: 1;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.upgrade-text strong {
+  color: var(--lamad-accent-primary);
+}
+
+.upgrade-text span {
+  color: var(--lamad-text-secondary);
+}
+
+.upgrade-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-upgrade {
+  padding: 0.25rem 0.75rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-upgrade:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
+}
+
+.btn-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--lamad-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 60%;
+  transition: opacity 0.2s;
+}
+
+.btn-dismiss:hover {
+  opacity: 100%;
+}
+
+/* ============================================================================
+   Main Content Area
+   ============================================================================ */
+
+.elohim-main {
+  flex: 1;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ============================================================================
+   Upgrade Modal
+   ============================================================================ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 60%);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  border: none;
+}
+
+.upgrade-modal {
+  background: var(--lamad-surface);
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--lamad-text-muted);
+  cursor: pointer;
+  opacity: 60%;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  opacity: 100%;
+}
+
+.modal-header {
+  padding: 2rem 2rem 1rem;
+  text-align: center;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.modal-header h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  background: var(--lamad-accent-gradient);
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-subtitle {
+  margin: 0;
+  color: var(--lamad-text-secondary);
+  font-size: 0.9rem;
+}
+
+.modal-body {
+  padding: 1.5rem 2rem;
+}
+
+.upgrade-benefits h3,
+.upgrade-how h3,
+.session-summary h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: var(--lamad-text-secondary);
+}
+
+.upgrade-benefits ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+
+.upgrade-benefits li {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.upgrade-benefits li:last-child {
+  border-bottom: none;
+}
+
+.benefit-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lamad-accent-primary);
+}
+
+.upgrade-benefits strong {
+  display: block;
+  color: var(--lamad-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.upgrade-benefits p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--lamad-text-muted);
+}
+
+.upgrade-how {
+  margin-bottom: 1.5rem;
+}
+
+.upgrade-how ol {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.upgrade-how li {
+  padding: 0.5rem 0;
+  color: var(--lamad-text-secondary);
+}
+
+.session-summary {
+  background: rgb(99 102 241 / 5%);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--lamad-border);
+}
+
+.summary-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--lamad-accent-primary);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+.summary-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--lamad-text-muted);
+  font-style: italic;
+}
+
+.modal-footer {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--lamad-border);
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.5rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgb(99 102 241 / 5%);
+  border-color: var(--lamad-accent-primary);
+}
+
+.btn-primary {
+  padding: 0.5rem 1rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
+}
+
+.btn-primary:disabled {
+  opacity: 60%;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Responsive
+   ============================================================================ */
+
+/* Mobile Backdrop */
+.mobile-menu-backdrop {
+  display: none;
+}
+
+@media (width <= 768px) {
+  .elohim-header {
+    padding: 0.375rem 0.5rem; /* Reduce horizontal padding on mobile */
+  }
+
+  .header-content {
+    display: flex; /* Use flexbox for simpler left-to-right layout */
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  /* Left Nav Group - stays on the left */
+  .left-nav-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0; /* Prevent shrinking */
+  }
+
+  /* App Logo Link - compact on mobile */
+  .app-logo-link {
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+
+  /* App Name - smaller on mobile */
+  .app-name {
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  /* Context Switcher - smaller touch target on mobile */
+  .context-switch-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  /* Profile Bubble - rightmost */
+  .profile-bubble-container {
+    flex-shrink: 0;
+  }
+
+  /* Auth Buttons - compact on mobile */
+  .auth-buttons {
+    flex-shrink: 0;
+    gap: 0.25rem;
+  }
+
+  .auth-btn {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  .auth-btn-link {
+    padding: 0.25rem 0.375rem;
+  }
+
+  /* Hide elements not needed on mobile */
+  .header-separator,
+  .protocol-link,
+  .search-container {
+    display: none;
+  }
+
+  /* Mobile Backdrop */
+  .mobile-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 40%);
+    backdrop-filter: blur(2px);
+    z-index: 99;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Bottom Sheet Styles for Trays */
+  .context-switcher-dropdown,
+  .profile-tray {
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+    min-width: 0; /* Override desktop min-width */
+    max-height: 85vh;
+    background: var(--lamad-bg-secondary); /* Solid background */
+    border-radius: 1.5rem 1.5rem 0 0;
+    border: none;
+    box-shadow: 0 -4px 30px rgb(0 0 0 / 15%);
+    z-index: 101; /* Above backdrop */
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding-bottom: env(safe-area-inset-bottom); /* Handle iPhone home bar */
+    display: flex; /* Ensure flex container */
+    flex-direction: column; /* Stack children vertically */
+
+    /* overflow-y: auto;  Removed from parent, now handled by scrollable-content-wrapper */
+  }
+
+  /* Add a "handle" visual for bottom sheets */
+  .context-switcher-dropdown::before,
+  .profile-tray::before {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 4px;
+    background: var(--lamad-border);
+    border-radius: 2px;
+    margin: 0.75rem auto 0;
+    flex-shrink: 0;
+  }
+
+  /* Adjust internal padding for bottom sheets */
+  .dropdown-header,
+  .profile-header {
+    border-bottom: none; /* Cleaner look on mobile */
+    padding-top: 0.5rem;
+    flex-shrink: 0; /* Prevent header from shrinking */
+  }
+
+  /* Larger touch targets */
+  .context-app-item,
+  .profile-action {
+    padding: 1rem;
+  }
+
+  /* Profile Actions and Settings Section need flex-shrink: 0 too */
+  .profile-actions,
+  .settings-section,
+  .profile-footer {
+    flex-shrink: 0;
+  }
+
+  /* Upgrade Banner Mobile */
+  .upgrade-banner-content {
+    flex-wrap: wrap;
+  }
+
+  .upgrade-text {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  /* Modal Mobile */
+  .modal-overlay {
+    padding: 1rem;
+    align-items: flex-end; /* Sheet-like on mobile too? Or center. Center is fine. */
+  }
+
+  .upgrade-modal {
+    border-radius: 1rem;
+    max-height: 85vh;
+  }
+
+  .modal-header {
+    padding: 1.5rem 1.5rem 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem 1.5rem;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer button {
+    width: 100%;
+    padding: 0.75rem; /* Larger touch target */
+  }
+
+  .summary-stats {
+    gap: 1rem;
+    justify-content: space-around;
+  }
+
+  /* Edge Node Mobile Adjustments */
+  .edge-node-section {
+    flex-shrink: 0;
+  }
+
+  .detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .detail-value {
+    text-align: left;
+  }
+
+  .detail-value.truncated {
+    max-width: 100%;
+  }
+
+  .detail-value-with-action {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .reconnect-btn {
+    padding: 0.75rem 1rem; /* Larger touch target */
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0%;
+  }
+
+  to {
+    opacity: 100%;
+  }
+}

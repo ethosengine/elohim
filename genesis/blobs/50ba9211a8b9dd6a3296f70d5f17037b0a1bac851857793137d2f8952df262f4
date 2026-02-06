@@ -1,0 +1,12 @@
+Scenario: Accessible interface design respects aging-related needs
+    Given Margaret is using the Value Scanner
+    And she has age-related vision and dexterity changes
+    When Margaret opens the scanner application
+    Then the interface should display large, high-contrast fonts
+    And touch targets should be large and forgiving
+    And voice interface options should be available
+    And navigation should be simple and consistent
+    And no time-limited interactions should be required
+    And the pace should be patient without being patronizing
+    And the interface should feel respectful and empowering
+    And cognitive load should be minimized

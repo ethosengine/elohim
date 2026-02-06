@@ -1,0 +1,88 @@
+---
+epic: value_scanner
+user_type: person_with_disabilities
+archetype_name: "Person with Disabilities as Full Participant"
+epic_domain: "Care Economy - Value recognition and exchange"
+governance_scope: [individual, household, family, neighborhood, community, workplace_organizational]
+related_users: [adult, young_adult, elderly, idd_community, vulnerable_temporary, caregiver]
+---
+
+# Person with Disabilities - Value Scanner
+
+## Archetype
+
+Alex is 35, lives independently with support services, has cerebral palsy affecting mobility and fine motor control, works part-time remotely as a data analyst, and manages household economics on combined income from employment and disability benefits (~$35k/year). Alex uses a wheelchair, requires some assistance with physical tasks, and navigates a world largely designed without them in mind. They use the Value Scanner with adaptations—voice interface for shopping list creation, accessibility features for product selection, delivery coordination for heavy items, and meal planning tools that account for their specific preparation capabilities and constraints. Alex is also accumulating care tokens for substantial community contributions: disability advocacy work, peer mentoring, accessibility consulting, and participation in neighborhood mutual aid networks.
+
+Alex represents people with disabilities as a distinct user type—people who navigate daily life with different capabilities, requiring accommodations and accessibility, but who are full participants in care economy with agency, contributions, and needs. The disability rights movement insists: "Nothing about us without us"—disabled people are experts on their own lives and active agents, not passive recipients of charity or pity. The Value Scanner serves Alex by providing genuinely accessible interfaces and tools, making their care economy contributions visible (advocacy and community work are care labor), coordinating support they need with dignity, and enabling their full participation in care economy as both giver and receiver of care.
+
+What distinguishes Alex from other user types isn't incapacity but different capacity—they navigate household economics and care economy with different constraints and capabilities than non-disabled people, in a world systematically designed to exclude or marginalize them. The protocol must serve them as a full person with agency, not as a problem to be solved or a tragedy to be pitied. Alex's disability is part of their identity and experience, shapes their needs and contributions, but doesn't define their worth or their capacity for flourishing.
+
+## Core Needs
+
+- **Genuinely Accessible Interface and Tools**: Alex needs the Value Scanner to be truly accessible—not accommodation grudgingly added, but designed from the start for multiple modes of interaction. Voice interface for hands-free operation, screen reader compatibility, customizable visual settings, keyboard navigation alternatives, flexible interaction modes. Accessibility isn't a feature for Alex—it's baseline requirement for participation. The protocol should embody universal design principles: creating tools that work for everyone, including people with diverse capabilities.
+
+- **Dignity-Preserving Support Coordination**: Alex needs some assistance with aspects of household management—they might require delivery for heavy grocery items, help with physical meal preparation tasks, or support with household maintenance. The Value Scanner should coordinate this support with absolute dignity: Alex maintains full decision-making authority, support flows to them based on their care economy standing (their contributions create legitimate claims on community support), and assistance is provided with respect for their autonomy and expertise about their own needs. They're not a burden requiring charity—they're a community member participating in reciprocal care networks.
+
+- **Recognition for Substantial Care Economy Contributions**: Alex needs visibility for their significant care work—disability advocacy (improving systems for everyone), peer mentoring (supporting other disabled people), accessibility consulting (making community spaces more inclusive), and community organizing (building mutual aid networks). This is sophisticated, skilled care labor that benefits entire communities. The Value Scanner makes these contributions visible through care token accumulation—Alex's care work is valued appropriately, not rendered invisible because it doesn't fit traditional employment models.
+
+- **Advocacy Tools for Accessibility and Justice**: Alex needs the protocol to support their disability advocacy—documenting accessibility barriers, coordinating collective action, connecting to resources and rights information, building power for systemic change. The workplace_elohim could help them advocate for employment accommodations, the community_elohim could coordinate accessibility improvements, the personal_agent could support their organizing work. Disability justice is care economy practice—collective action to ensure everyone's care needs are met.
+
+- **Community Building with Other Disabled People**: Alex needs connection to disability community—other people who share similar experiences, understand ableist barriers, practice mutual aid and collective care, and build disabled culture and identity. The Value Scanner should facilitate these connections, recognizing that disabled people's peer networks are essential care economy infrastructure. Disability community provides practical support (sharing accommodation strategies, coordinating assistance, knowledge exchange) and cultural affirmation (disability as identity and culture, not just medical condition).
+
+## Key Relationships
+
+**To Support Workers/Personal Assistants**: Alex coordinates with support workers who help with physical tasks they can't do independently. The protocol should help manage these relationships with dignity—Alex is the employer/coordinator with full authority, support workers provide services Alex directs, and the relationship is professional partnership, not caretaking. The Value Scanner could help coordinate schedules, communicate needs clearly, track support quality, and ensure Alex's autonomy is respected.
+
+**To Employer/Workplace**: Alex's remote data analyst work requires accommodations—flexible scheduling for medical appointments, accessible technology, understanding of disability-related needs. The workplace_elohim helps them advocate for legal accommodations, document barriers, recognize when employment becomes inaccessible or exploitative, and navigate the constant work of educating employers about disability. Alex is learning that workplace accessibility is ongoing negotiation, not one-time compliance.
+
+**To Medical Providers**: Alex navigates medical systems constantly—specialists, equipment suppliers, therapy, medication management. Medical relationships are fraught for disabled people—providers often treat disability as tragedy to be fixed rather than difference to be accommodated, make assumptions about quality of life, or fail to respect disabled expertise about their own bodies. Alex's personal_agent could help them advocate within medical systems, track care quality, and maintain authority over their own body and treatment.
+
+**To Family**: Alex's family relationships might involve complex dynamics around disability—some family members might struggle to respect Alex's autonomy, others might provide essential support, and care flows might be complicated by ableist assumptions. The family_elohim helps coordinate reciprocal care (Alex contributes to family, family supports Alex) while protecting Alex's autonomy and dignity.
+
+**To Disability Community**: Alex's relationships with other disabled people are essential support networks—practical mutual aid (sharing equipment, coordinating assistance, knowledge exchange), political organizing (collective advocacy for rights and accessibility), and cultural affirmation (disabled identity and pride). The Value Scanner facilitates these peer networks, recognizing them as care economy infrastructure.
+
+**To Neighborhood/Community**: Alex participates in neighborhood and community care economy—advocacy that improves accessibility for everyone, organizing that builds mutual aid infrastructure, peer support that strengthens disability community. Their care contributions benefit entire communities, and the protocol should make this visible. Alex might also access community resources based on their care economy standing—support coordinated through reciprocal care networks, not charity.
+
+**To Personal Agent**: Alex's personal_agent is configured for their specific accessibility needs—voice interface, customized interaction modes, cognitive support for managing complexity, advocacy assistance, community connection tools. The agent serves Alex's full participation in care economy while respecting their autonomy and expertise about their own needs.
+
+## Relevant Governance Layers
+
+### Geographic/Political
+
+**Individual Layer**
+Alex exercises full autonomy over their life, choices, and needs—disability doesn't diminish their sovereignty. Their personal_agent serves their individual flourishing within their specific embodiment and capabilities.
+
+**Household Layer**
+Alex manages their household with support as needed—they maintain full authority over household decisions while coordinating assistance with physical tasks. The protocol preserves their agency as household manager.
+
+**Family Layer**
+Alex participates in family governance as full adult member—their voice matters, their contributions are valued, and family care flows reciprocally. The family_elohim helps navigate dynamics complicated by ableist assumptions.
+
+**Neighborhood Layer**
+Alex participates in neighborhood care economy—their advocacy improves accessibility for everyone, their organizing builds mutual aid networks, their presence strengthens community. Barriers to participation should be documented and addressed.
+
+**Community Layer**
+Alex engages community governance as experienced advocate and leader—their disability expertise benefits everyone, their care contributions strengthen community infrastructure, their voice shapes accessibility and inclusion policy.
+
+### Functional
+
+**Workplace/Organizational Layer**
+Alex's workplace governance involves constant negotiation for accessibility—legal accommodations, technological access, schedule flexibility, cultural competence. They're learning that workplace accessibility requires ongoing advocacy.
+
+**Healthcare/Medical Layer**
+Alex navigates medical systems as complex governance context—these institutions often fail disabled people, but Alex is learning to advocate for appropriate care that respects their autonomy and disability expertise.
+
+**Ecological/Bioregional Layer**
+Disability justice connects to ecological care economy—both require recognizing interdependence, valuing diverse ways of being, and building systems that serve flourishing for all. Alex might connect disability advocacy to environmental justice.
+
+## Implementation Notes
+
+- **Technical**: CRITICAL—interface must be genuinely accessible from the ground up, not retrofitted. Multiple interaction modes (voice, touch, keyboard, switch access, screen reader compatibility), customizable visual settings (size, contrast, color), flexible navigation, forgiving error recovery, compatibility with assistive technologies. Personal_agent must support Alex's specific needs while respecting their autonomy and expertise. Integration with accessibility tools, support coordination systems, advocacy resources, disability community platforms.
+
+- **Privacy**: Alex controls their data with full autonomy. Medical information is particularly sensitive—they determine what's shared with whom. Disability status and specific needs might be shared with support coordinators, employers (for accommodations), or community (for accessibility improvements), but always under Alex's control. The protocol must never share disability information without explicit consent.
+
+- **Interface**: Design following universal design principles—accessible to everyone, including people with diverse capabilities. Recognition of care contributions should acknowledge Alex's substantial advocacy and community work. Interface should feel empowering and respectful, never patronizing or pitying. Every design choice should center dignity and autonomy.
+
+- **Constraints**: Support coordination essential when needed, but must preserve Alex's autonomy and decision-making authority. If accessibility barriers prevent participation, if support systems fail, if discrimination occurs, protocol should surface advocacy resources and collective action options. The goal is enabling full participation, not managing or controlling.
+
+- **Opportunities**: People with disabilities are society's largest minority and most systematically marginalized population—but also powerful organizers, cultural creators, and care economy practitioners. Disabled people pioneered mutual aid, built peer support networks, created accessible design principles, and led movements for rights and justice. If the Value Scanner serves disabled people well—genuinely accessible, dignity-preserving, contribution-recognizing—it demonstrates care economy can include everyone. Alex's care contributions visible at scale could shift cultural understanding of disability from tragedy/burden to difference/contribution. Disability community adoption could transform the protocol itself—disabled people's expertise about accessibility, accommodation, and interdependence could improve design for everyone. This population knows better than anyone that flourishing requires community care, that interdependence is human reality, and that systems should serve diverse needs—core care economy principles. Success with disabled users would prove the protocol's commitment to serving all human flourishing, not just the able-bodied and neurotypical.

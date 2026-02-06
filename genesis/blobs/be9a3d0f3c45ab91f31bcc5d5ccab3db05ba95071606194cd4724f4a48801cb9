@@ -1,0 +1,9 @@
+Scenario: Journalist monitors multiple state agencies despite limited capacity
+    Given the journalist covers state government
+    And must track legislature, education department, environmental agency, and 8 others
+    When the Observer monitors all state agencies and legislative committees
+    Then the journalist reviews all consequential meetings and decisions
+    And receives alerts for newsworthy developments
+    And tracks legislation through committee process automatically
+    And comprehensive state surveillance becomes sustainable
+    And important policy changes don't escape coverage

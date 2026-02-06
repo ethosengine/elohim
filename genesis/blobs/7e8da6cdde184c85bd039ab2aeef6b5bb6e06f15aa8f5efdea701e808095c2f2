@@ -1,0 +1,10 @@
+Scenario: Seasonal eating patterns support bioregional food systems
+    Given Margaret shops for seasonal produce
+    And seasonal eating reduces food miles and supports local agriculture
+    When the bioregional_elohim tracks food choices
+    Then seasonal eating patterns should be recognized
+    And Margaret's choices should support bioregional food systems
+    And local, seasonal food should be prioritized in recommendations
+    And eating with seasons should be encouraged and facilitated
+    And bioregional awareness should develop through practice
+    And Margaret's food choices should strengthen local food economy

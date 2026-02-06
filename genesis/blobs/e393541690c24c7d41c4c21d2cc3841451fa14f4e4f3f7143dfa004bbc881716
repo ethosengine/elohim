@@ -1,0 +1,10 @@
+Scenario: Regional research consortium collaboration
+    Given I am part of network studying protocol across multiple regions
+    And we coordinate methods to enable comparison
+    When we conduct parallel studies with shared protocols
+    Then we can: pool data to increase statistical power
+    And we enable: replication across different contexts
+    And we identify: universal patterns vs context-specific findings
+    And we learn: from each other's methodological innovations
+    And we create: cumulative knowledge building across research community
+    And My regional work contributes to: global understanding of democratic AI governance

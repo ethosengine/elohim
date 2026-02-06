@@ -1,0 +1,11 @@
+Scenario: Traditional sustainable practices preserved through elder teaching
+    Given Helen learned pre-consumer household management
+    And she knows seasonal food preservation, waste reduction, and resource conservation
+    When Helen teaches traditional sustainable practices
+    Then her knowledge should be recognized as environmental education
+    And younger generations should learn low-impact living from her experience
+    And traditional practices should inform modern sustainability efforts
+    And Helen should be valued as expert in sustainable living
+    And the protocol should facilitate skills transfer from pre-disposable era
+    And ecological wisdom should be preserved through intergenerational teaching
+    And Helen's knowledge should contribute to reduced environmental impact

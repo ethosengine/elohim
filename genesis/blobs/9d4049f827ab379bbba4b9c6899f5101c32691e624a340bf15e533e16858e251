@@ -1,0 +1,9 @@
+Scenario: Oldest child becoming household partner without losing childhood
+    Given Maria's 14-year-old is becoming a genuine household contributor
+    And this is necessary given their circumstances
+    When the household_elohim tracks the teen's contributions
+    Then it should recognize his age-appropriate household help
+    And it should warn if he's taking on too much adult responsibility
+    And it should help Maria preserve his childhood while accepting necessary help
+    And it should prevent parentification while valuing legitimate contribution
+    And the protocol should navigate this concerning but realistic dynamic carefully

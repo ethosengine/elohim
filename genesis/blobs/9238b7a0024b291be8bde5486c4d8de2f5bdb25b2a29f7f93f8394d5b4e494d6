@@ -1,0 +1,9 @@
+Scenario: Caregiver employee resource groups provide peer support
+    Given James is isolated from professional community by caregiving
+    And connection to other caregiver employees would help
+    When the workplace_elohim organizes caregiver support
+    Then employee resource groups should include caregivers
+    And caregiver employees should connect with each other
+    And workplace should facilitate caregiver peer support
+    And professional isolation should be reduced through connection
+    And caregivers should have voice in workplace policy

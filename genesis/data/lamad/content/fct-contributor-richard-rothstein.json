@@ -1,0 +1,50 @@
+{
+  "id": "fct-contributor-richard-rothstein",
+  "contentType": "contributor",
+  "title": "Richard Rothstein",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": "# Richard Rothstein\n\n**Role:** author\n\n**Works:** The Color of Law\n\n",
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice",
+    "fct-media-11-book-the-color-of-law"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-12-fairness-justice"
+  },
+  "createdAt": "2025-11-28T21:10:19.219751",
+  "updatedAt": "2025-12-24T03:05:26.078Z",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Richard Rothstein",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-richard-rothstein",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Richard Rothstein - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-richard-rothstein",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Richard Rothstein",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.219751",
+    "dateModified": "2025-11-28T21:10:19.219752",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+Scenario: Accessible interface respects aging-related needs without patronizing
+    Given Frank is experiencing some age-related vision changes
+    And he may have reduced dexterity for small touch targets
+    When Frank uses the Value Scanner interface
+    Then the interface should display large, high-contrast fonts
+    And touch targets should be large and forgiving
+    And voice interface options should be available
+    And navigation should be simple and consistent
+    And no time-limited interactions should be required
+    And the design should be accessible without feeling condescending
+    And Frank should experience the interface as respectful and empowering
+    And cognitive load should be minimized

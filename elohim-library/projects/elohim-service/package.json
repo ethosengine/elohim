@@ -1,0 +1,45 @@
+{
+  "name": "@elohim/service",
+  "version": "0.1.0",
+  "description": "Elohim content intelligence service - import, analysis, and path generation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "import": "ts-node src/cli/index.ts import",
+    "import:all": "ts-node src/cli/index.ts import all",
+    "import:domain": "ts-node src/cli/index.ts import domain",
+    "analyze": "ts-node src/cli/index.ts analyze",
+    "test": "jest"
+  },
+  "bin": {
+    "elohim": "./dist/cli/index.js"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.20.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "glob": "^10.3.0",
+    "js-yaml": "^4.1.0",
+    "kuzu": "^0.11.3"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/jest": "^29.5.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.4.0"
+  },
+  "keywords": [
+    "elohim",
+    "content-import",
+    "lamad",
+    "learning-paths"
+  ],
+  "author": "Elohim Protocol",
+  "license": "MIT"
+}

@@ -1,0 +1,9 @@
+Scenario: Personal agent prevents burnout through proactive monitoring
+    Given Sarah is at high risk for burnout
+    And she tends to sacrifice herself unsustainably
+    When her personal_agent detects warning signs
+    Then it should watch for nutrition suffering, exercise disappearing, social connection eroding
+    And it should proactively surface help options before crisis
+    And it should connect Sarah to community support resources
+    And it should recognize that her capacity to care depends on her well-being
+    And intervention should be timely, dignified, and effective

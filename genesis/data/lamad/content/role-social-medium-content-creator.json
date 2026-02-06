@@ -1,0 +1,46 @@
+{
+  "id": "role-social-medium-content-creator",
+  "contentType": "role",
+  "title": "Content Creator",
+  "description": "Digital Communication - Relationship-centered social media",
+  "content": "---\nepic: social_medium\nuser_type: content_creator\narchetype_name: \"Content Creator\"\nepic_domain: \"Digital Communication - Relationship-centered social media\"\ngovernance_scope: [individual, community, neighborhood, affinity_network, cultural_linguistic, global]\nrelated_users: [child, elder, activist, community_moderator]\n---\n\n# Content Creator - Social Medium\n\n## Archetype\n\nA content creator is someone who produces educational, cultural, artistic, or informational content for communities. Unlike traditional social media influencers who optimize for engagement, Elohim content creators earn reach through genuine value, quality, and community appreciation. They include educators, journalists, artists, documentarians, cultural preservationists, and community storytellers who prioritize truth and service over viral growth.\n\nKey characteristics:\n- Age range: Varies widely (teens to elders)\n- Earns reach through quality and value, not algorithmic manipulation\n- Accountable to evidence and truth for factual content\n- Sustainable through community support and value recognition\n- Serves communities rather than extracting attention\n- Can operate locally or globally based on content relevance\n- Maintains creative freedom while respecting community standards\n\n## Core Needs\n\n- **Earned Reach Through Quality**: Content travels based on genuine appreciation and value, not engagement hacking\n- **Sustainable Support**: Compensation from communities who value their work, not surveillance capitalism\n- **Creative Freedom**: Ability to create without platform censorship while remaining accountable to truth\n- **Audience Relationship**: Real connection with audience rather than parasocial extraction\n- **Truth Accountability**: For factual content, verification and counter-evidence systems ensure accuracy\n\n## Key Relationships\n\n- **child**: Creates age-appropriate educational and creative content; teaches media literacy\n- **elder**: Documents elder wisdom, preserves cultural memory, creates intergenerational content\n- **activist**: Collaborates on movement storytelling; creates evidence-based advocacy content\n- **community_moderator**: Works within community standards; receives feedback on content impact\n- **Elohim Verification Agent**: Interacts with agents that verify factual claims and surface counter-evidence\n\n## Relevant Governance Layers\n\n### Geographic/Political\n\n- **individual**: Personal creative identity, portfolio, and direct audience relationships\n- **community**: Local content creation, community storytelling, neighborhood documentation\n- **neighborhood**: Hyper-local content serving immediate geographic area\n- **global**: Content that earns wide reach through demonstrated value across communities\n\n### Functional\n\n- **affinity_network**: Content for interest-based communities (education, arts, hobbies, etc.)\n- **cultural_linguistic**: Cultural preservation, language content, indigenous storytelling\n- **educational**: Teaching content, skill sharing, knowledge transmission\n\n## Implementation Notes\n\n- **No Viral Manipulation**: Content spreads through genuine appreciation, not algorithmic amplification\n- **Evidence Standards**: Factual content requires verification; counter-evidence surfaces automatically\n- **Community Support**: Creators supported by communities who value their work, not advertisers\n- **Quality Over Quantity**: System rewards depth and value, not posting frequency or engagement bait\n- **Transparent Reach**: Creators see how and why content travels; no hidden algorithms\n- **Accountability**: Misinformation consequences include reduced reach; truth-telling earns trust\n- **No Exploitation**: Can't build audience through outrage, fear, or parasocial manipulation\n- **Cultural Respect**: Content must respect cultural boundaries and community standards\n- **Age-Appropriate**: Content automatically filtered for age-appropriateness based on target audience\n- **Attribution**: Original creators credited; derivative work requires permission and attribution\n- **Sustainable Economics**: Value flows to creators from communities, not extraction from users\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "social_medium",
+    "content-creator",
+    "archetype",
+    "role",
+    "archetype"
+  ],
+  "sourcePath": "/projects/elohim/data/content/elohim-protocol/social_medium/content_creator/README.md",
+  "relatedNodeIds": [
+    "archetype-child",
+    "archetype-elder",
+    "archetype-activist",
+    "archetype-community-moderator",
+    "source-social-medium-content-creator-archetype",
+    "epic-social_medium"
+  ],
+  "metadata": {
+    "category": "archetype",
+    "epic": "social_medium",
+    "userType": "content_creator",
+    "source": "elohim-import",
+    "sourceVersion": "1.0.0",
+    "derivedFrom": "source-social-medium-content-creator-archetype",
+    "extractionMethod": "direct-import",
+    "archetypeName": "Content Creator",
+    "epicDomain": "Digital Communication - Relationship-centered social media",
+    "governanceScope": [
+      "individual",
+      "community",
+      "neighborhood",
+      "affinity_network",
+      "cultural_linguistic",
+      "global"
+    ]
+  },
+  "reach": "commons",
+  "createdAt": "2025-12-05T18:41:24.261Z",
+  "updatedAt": "2025-12-05T18:41:24.261Z"
+}

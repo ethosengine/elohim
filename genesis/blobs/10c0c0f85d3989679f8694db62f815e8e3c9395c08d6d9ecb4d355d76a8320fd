@@ -1,0 +1,7 @@
+Scenario: Advocating for worker-friendly neighborhood policies
+    Given neighborhood governance makes decisions affecting workers
+    When policies could support workers' care needs and participation
+    Then the protocol should help me participate in neighborhood advocacy
+    And connect me with other workers for collective voice
+    And support advocacy for worker-supportive policies
+    And build neighborhood culture that values workers' care needs

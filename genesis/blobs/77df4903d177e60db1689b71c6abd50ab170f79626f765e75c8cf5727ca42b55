@@ -1,0 +1,9 @@
+Scenario: Journalist tracks district promises on equity initiatives
+    Given district announced equity plan with specific commitments
+    And the journalist covered initial announcement 18 months ago
+    When the Observer monitors equity plan implementation
+    Then the journalist finds only 2 of 12 commitments implemented
+    And sees budget that was supposed to fund initiatives redirected
+    And identifies resistance from administrators in board meeting discussions
+    And documents continued inequities despite equity rhetoric
+    And publishes accountability story on broken equity promises

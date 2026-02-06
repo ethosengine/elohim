@@ -1,0 +1,10 @@
+Scenario: Family decision-making includes Margaret's voice
+    Given Margaret makes substantial contributions to family flourishing
+    And family decisions affect her care capacity
+    When family decisions are being made
+    Then Margaret's care contributions should give her legitimate standing
+    And her voice should carry weight in family governance
+    And decisions should consider impact on her care capacity
+    And Margaret should be respected as autonomous adult contributor
+    And family governance should be multigenerational and equitable
+    And her retirement doesn't diminish her authority in family

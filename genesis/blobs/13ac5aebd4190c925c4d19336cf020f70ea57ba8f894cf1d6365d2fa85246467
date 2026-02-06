@@ -1,0 +1,12 @@
+Scenario: Retirement planning integrates care economy participation
+    Given Robert is in pre-retirement years
+    And retirement planning should include care economy dimensions
+    And his care contributions should be valued in retirement
+    When workplace_elohim supports retirement planning
+    Then it should help him plan retirement that honors care economy participation
+    And surface how accumulated care tokens could support retirement
+    And explore retirement roles that leverage care economy expertise
+    And help him transition from full-time employment to care economy contribution
+    And recognize that retirement can include meaningful care economy participation
+    And build retirement vision that includes continued community contribution
+    And demonstrate that care economy operates across full lifecycle

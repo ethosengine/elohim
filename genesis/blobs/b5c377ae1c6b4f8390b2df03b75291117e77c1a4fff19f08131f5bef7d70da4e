@@ -1,0 +1,9 @@
+Scenario: Personal agent adapts to Sarah's individual values and culture
+    Given Sarah has specific cultural background and personal values
+    And her family has chosen value frameworks
+    When the personal_agent provides guidance
+    Then it should align with Sarah's cultural context
+    And it should respect her personal value priorities
+    And it should serve her chosen framework, not impose external values
+    And diverse cultural approaches to care should be honored
+    And the protocol should be culturally adaptive, not prescriptive

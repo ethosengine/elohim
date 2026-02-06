@@ -1,0 +1,11 @@
+Scenario: Protecting Alex from workplace discrimination
+    Given workplace discrimination against disabled people is common
+    And ableism often operates subtly
+    When potential discrimination occurs
+    Then the workplace_elohim should help Alex identify discriminatory patterns
+    And it should document incidents that might constitute discrimination
+    And it should connect Alex to legal resources and advocacy support
+    And patterns across time should be made visible
+    And Alex should have tools to protect their workplace rights
+    And the protocol should recognize that workplaces can be hostile
+    And evidence collection should be systematic and thorough

@@ -1,0 +1,9 @@
+Scenario: Community privacy protects Maria's dignity while enabling support
+    Given Maria needs community support but also privacy protection
+    And some aspects of her situation are sensitive and personal
+    When Maria participates in community care economy
+    Then the community_elohim should only share what Maria consents to
+    And her household details should remain private unless she chooses to disclose
+    And support access should not require invasive disclosure
+    And privacy should be protected even while receiving community assistance
+    And Maria should maintain dignity and control over personal information

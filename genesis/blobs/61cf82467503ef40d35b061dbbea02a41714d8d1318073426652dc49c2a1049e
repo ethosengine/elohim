@@ -1,0 +1,9 @@
+Scenario: Single parent household recognized in community leadership
+    Given Maria's care contributions are extraordinary
+    And she deserves voice in community governance despite time constraints
+    When community leadership positions are filled
+    Then Maria's quantified care work should be visible qualification
+    And her solo parenting should be recognized as demonstrated community commitment
+    And community should make leadership accessible to time-constrained parents
+    And single parents should have governance voice proportionate to care contributions
+    And Maria should be valued as community leader, not marginalized as struggling victim

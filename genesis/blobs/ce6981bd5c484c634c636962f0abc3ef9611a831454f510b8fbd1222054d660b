@@ -1,0 +1,9 @@
+Scenario: Climate adaptation strategies are developed and shared bioregionally
+    Given climate change creates new agricultural challenges (droughts, floods, heat, pests)
+    And adaptation requires experimentation and knowledge sharing
+    When democratic farms collaborate on climate adaptation
+    Then drought-resistant varieties are tested and shared across network
+    And water conservation practices spread through successful demonstration
+    And extreme weather response strategies are coordinated bioregionally
+    And climate resilience increases through collaborative adaptation
+    And bioregional_elohim coordinates climate adaptation research and implementation

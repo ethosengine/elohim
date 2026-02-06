@@ -1,0 +1,10 @@
+Scenario: Expressing preferences for support style
+    Given Jordan works with multiple support workers
+    And different workers have different support styles
+    When Jordan uses the support preference feature
+    Then the interface asks simple questions about what helps Jordan
+    And Jordan can indicate preferences using pictures and simple choices
+    And the system communicates Jordan's preferences to support team
+    And support workers honor Jordan's expressed preferences
+    And Jordan's voice shapes how they receive support
+    And Jordan's dignity is preserved through preference respect

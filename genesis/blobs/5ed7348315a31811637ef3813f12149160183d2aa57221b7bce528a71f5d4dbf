@@ -1,0 +1,11 @@
+Scenario: Garden and plant knowledge shared with community
+    Given Helen has decades of gardening experience
+    And she knows local plants, soil conditions, and growing patterns
+    When Helen shares gardening and plant knowledge
+    Then her expertise should be recognized as ecological contribution
+    And community gardens should benefit from elder expertise
+    And traditional plant knowledge should be preserved
+    And care tokens should reflect her environmental teaching
+    And the protocol should connect elder plant experts with community gardens
+    And bioregional food sovereignty should be supported by elder knowledge
+    And Helen's experience should enable local food production

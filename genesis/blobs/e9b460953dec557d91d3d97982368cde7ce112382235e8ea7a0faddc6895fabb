@@ -1,0 +1,11 @@
+Scenario: Advising National Council on fundamental constitutional tension
+    Given National Council deliberates care vs privacy at constitutional level
+    And technical capabilities shape what's constitutionally possible
+    When I testify about technical constraints and possibilities
+    Then I explain: what surveillance capabilities would enable better care
+    And I clarify: technical limits on achieving privacy while providing protection
+    And I present: tradeoff between optimization and dignity
+    And I stop: before dictating which values should prevail
+    And I inform: constitutional interpretation with technical reality
+    And I respect: that council must choose values not just optimize outcomes
+    And I demonstrate: expertise serving democratic judgment

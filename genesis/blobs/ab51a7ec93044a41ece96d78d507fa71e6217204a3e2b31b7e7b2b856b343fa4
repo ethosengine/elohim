@@ -1,0 +1,7 @@
+Scenario: Supporting family members during crisis
+    Given a family member experiences health crisis or emergency
+    When I want to help but have employment obligations
+    Then the protocol should help me assess my options
+    And coordinate with other family members for coverage
+    And help me communicate with my employer about family needs
+    And support me in balancing work demands with family care

@@ -1,0 +1,9 @@
+Scenario: Teacher challenges state teacher evaluation mandate
+    Given state law requires evaluation system based on student test scores
+    And teachers know this creates perverse incentives and doesn't improve teaching
+    When teachers organize statewide campaign through Observer
+    Then teachers provide evidence on evaluation system failures
+    And show how it drives teaching to test not student learning
+    And present research on effective teacher evaluation approaches
+    And build parent coalition around learning-centered not test-centered education
+    And state evaluation policy becomes political accountability issue

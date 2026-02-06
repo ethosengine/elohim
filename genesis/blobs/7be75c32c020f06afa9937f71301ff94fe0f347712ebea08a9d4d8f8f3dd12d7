@@ -1,0 +1,9 @@
+Scenario: Citizen verifies municipal service delivery claims
+    Given city officials claim streets are maintained equitably
+    And the citizen's neighborhood has persistent potholes
+    When the Observer tracks service delivery patterns
+    Then the citizen sees which neighborhoods receive infrastructure investment
+    And compares response times across different areas
+    And identifies disparities in municipal services
+    And presents evidence for accountability demands
+    And equitable service delivery becomes measurable

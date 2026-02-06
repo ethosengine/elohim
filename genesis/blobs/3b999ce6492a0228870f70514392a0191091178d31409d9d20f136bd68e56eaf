@@ -1,0 +1,10 @@
+Scenario: Teaching traditional crafts, arts, and creative skills
+    Given Margaret has skills in knitting, cooking, gardening, or crafts
+    And grandchildren learn creativity through hands-on activities
+    When Margaret teaches traditional arts and crafts
+    Then the educational_elohim should recognize artistic teaching
+    And it should value traditional skills transmission
+    And it should track creative skill development
+    And arts education should accumulate care tokens
+    And Margaret's creative teaching should be recognized as valuable learning
+    And traditional knowledge should be preserved through teaching

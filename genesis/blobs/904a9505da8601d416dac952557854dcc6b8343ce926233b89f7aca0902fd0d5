@@ -1,0 +1,10 @@
+Scenario: Teen coordinates care work across community contexts
+    Given Jasmine works part-time, volunteers, and contributes to family
+    And these contexts are all part of community care economy
+    When the community_elohim aggregates her contributions
+    Then all care work should be visible in integrated view
+    And she should see how her contributions connect across contexts
+    And understand that paid work, household labor, and volunteering are all care economy
+    And develop sophisticated understanding of how care creates value in multiple forms
+    And learn to manage complexity while maintaining coherent identity
+    And see herself as participating in integrated community care economy

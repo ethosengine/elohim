@@ -1,0 +1,10 @@
+Scenario: Planning commissioner discovers voting pattern aligned with developer interests
+    Given commissioner has served for two years making numerous land use decisions
+    And local newspaper questions commissioner's independence
+    And commissioner wants to understand their own voting record
+    When the commissioner uses Observer accountability tracking
+    Then they see their votes on developments categorized by community support levels
+    And discover they voted for 85% of projects opposed by neighborhood associations
+    And find their votes consistently favor developments with higher density than staff recommended
+    And access campaign contribution data showing developer funding sources
+    And accountability transparency helps commissioner reflect on whose interests they serve

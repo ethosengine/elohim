@@ -1,0 +1,27 @@
+{
+  "id": "unit-community-moderation",
+  "title": "Community Moderation: Beyond Content Police",
+  "content": "# Community Moderation: Beyond Content Police\n\n## The Moderation Crisis\n\nEvery online community faces the same challenge: how do you maintain healthy discourse at scale?\n\n**Current approaches are failing:**\n- Platforms can't moderate billions of posts\n- AI moderation has systematic biases\n- Human moderators face trauma and burnout\n- Rules are inconsistent and contested\n- Marginalized groups are disproportionately harmed\n\n## What Moderation Usually Looks Like\n\n### Platform-Centralized\n- One company sets rules for billions\n- Enforcement by AI with human review\n- Opaque decisions, limited appeals\n- \"Community standards\" that aren't community-derived\n\n### Problems with Centralization\n- **Scale**: Can't review everything meaningfully\n- **Context**: Global rules miss local norms\n- **Power**: Platform interests override community needs\n- **Accountability**: No one to appeal to\n- **Trust**: Users don't trust moderators they didn't choose\n\n### The \"Free Speech\" Fantasy\nUnmoderated spaces don't stay open:\n- Harassment drives out targeted groups\n- Organized bad actors dominate\n- Quality collapses; good-faith participants leave\n- \"Freedom\" becomes freedom to abuse\n\n## Alternative Approaches\n\n### Community-Based Moderation\nLet communities moderate themselves:\n- Each community sets its own norms\n- Moderators chosen by community\n- Different spaces for different discourse styles\n- Interoperability with filtering\n\n### Reputation-Based Filtering\nTrust networks determine visibility:\n- See content from trusted sources\n- Trust propagates through networks\n- Communities vouch for members\n- Bad actors lose reach, not voice\n\n### Contextual Consent\nDifferent rules for different contexts:\n- Public square vs. private group\n- Professional vs. personal\n- Deliberation vs. debate\n- Different expectations, different moderation\n\n### Restorative Over Punitive\nFocus on repair, not punishment:\n- What harm was done?\n- Who was affected?\n- What would make it right?\n- How do we prevent recurrence?\n\n## The Elohim Approach\n\n### Distributed Moderation\nModeration happens at appropriate levels:\n- Individual: your Elohim filters for you\n- Interpersonal: conflict resolution tools\n- Community: community-chosen moderators\n- Cross-community: reputation and trust\n\n### Your Elohim as Shield and Filter\nPersonal AI protection:\n- Blocks content you don't want to see\n- Alerts you to manipulation attempts\n- Manages your visibility to others\n- Helps you navigate conflicts\n\n### Constitutional Constraints\nEven community moderation has limits:\n- Dignity violations aren't community choice\n- Harassment isn't \"discourse style\"\n- Some content is harmful everywhere\n- Meta-moderation for serious violations\n\n### Transparency and Due Process\nModeration actions are:\n- Explained with reasoning\n- Subject to appeal\n- Consistent with stated rules\n- Logged for accountability\n\n## For Policy Makers: Moderation Regulation\n\nLegal frameworks for moderation:\n- Mandate due process for takedowns\n- Require transparency in enforcement\n- Create appeals processes with teeth\n- Distinguish types of content and harm\n\n### The Section 230 Question\nCurrent law immunizes platforms from content liability. Reform options:\n- Condition immunity on process standards\n- Distinguish by platform size or type\n- Create oversight bodies\n- Enable interoperability to reduce power\n\n## For Developers: Moderation Infrastructure\n\nTechnical requirements:\n- **Rule systems**: Clear, contestable, contextual\n- **Reputation**: Trust scores that propagate\n- **Appeals**: Structured review processes\n- **Transparency**: What happened, why, by whom\n- **Interoperability**: Move between communities\n\n### Design Considerations\n- Make reporting easy, false reporting costly\n- Provide context to moderators\n- Support gradual sanctions\n- Enable community customization\n- Protect moderator wellbeing\n\n## For Influencers: Your Moderation Role\n\nYou're already moderating:\n- Your comments sections\n- Your community spaces\n- Your audience expectations\n\nDo it consciously:\n- Set clear expectations\n- Enforce consistently\n- Model good discourse\n- Support targets of harassment\n- Build moderation capacity in your community\n\n## For Everyone: Participating in Moderation\n\nHealthy communities require participation:\n- Report actual problems\n- Don't pile on\n- Support community moderators\n- Engage with conflict constructively\n- Accept that some spaces aren't for you\n\n## Connection to Economic Coordination\n\nCommunication enables coordination. The final chapter explores how the Elohim Protocol coordinates economic activity—the value flows that make everything else possible.",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/social_medium/epic.md",
+  "tags": [
+    "social-medium",
+    "moderation",
+    "community",
+    "unit",
+    "discourse",
+    "governance"
+  ],
+  "relationships": [
+    {
+      "target": "social-medium-epic",
+      "type": "DERIVED_FROM"
+    },
+    {
+      "target": "unit-digital-dignity",
+      "type": "DEPENDS_ON"
+    }
+  ],
+  "createdAt": "2025-12-17T01:41:02.235Z",
+  "updatedAt": "2025-12-17T01:41:18.272Z"
+}

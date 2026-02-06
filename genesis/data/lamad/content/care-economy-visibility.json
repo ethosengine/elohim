@@ -1,0 +1,22 @@
+{
+  "id": "care-economy-visibility",
+  "title": "Economic Visibility: Seeing Invisible Labor",
+  "content": "# Economic Visibility: The Care Economy's Foundation\n\n## The Problem: Invisible Value\n\nTraditional economies make much labor invisible:\n\n| Type of Work | Traditional Value | Actual Value |\n|--------------|-------------------|--------------|\n| Nursing care | Hourly wage | Lives saved, comfort given, learning shared |\n| Parenting | $0 | Human development, social stability |\n| Eldercare | Minimal | Dignity preserved, wisdom transmitted |\n| Mentoring | Often unpaid | Careers launched, skills developed |\n| Community organizing | Volunteer | Social cohesion, collective action |\n\nThe gap between recognition and contribution is **extraction**.\n\n## The Okonkwo Family's Value Gap\n\nFrom the Economic Coordination epic:\n\n```\nTraditional Economy (What you receive):\n└── Adaeze (Nursing): ₦180,000/month\n\nElohim Network (What you create):\n└── Adaeze (Care + Training): ₦2,300,000/month\n\nValue Gap: ₦2,120,000/month extracted\n```\n\n## REA Makes Value Visible\n\nWith REA accounting, every contribution is recorded:\n\n```json\n{\n  \"event\": \"Emergency_Stabilization\",\n  \"resources_created\": {\n    \"patient_stability\": \"critical → stable\",\n    \"family_peace\": \"anxiety → hope\",\n    \"junior_nurse_learning\": \"witnessed and documented\",\n    \"hospital_cost_avoided\": \"ICU transfer prevented\"\n  },\n  \"value_flows\": {\n    \"care_tokens_to_adaeze\": 23,\n    \"skill_attestation\": \"emergency_stabilization_witnessed\",\n    \"monetary_equivalent\": \"₦78,000\"\n  }\n}\n```\n\n## From Visibility to Recognition\n\nThe path:\n1. **Document**: Record economic events as they happen\n2. **Witness**: Others observe and validate contributions\n3. **Aggregate**: Value accumulates over time\n4. **Recognize**: Tokens, attestations, reputation flow to contributors\n5. **Circulate**: Recognition becomes economic power\n\n## The Network That Sees You\n\n> \"The old economy is blind. It sees transactions, not transformation. It counts money, not meaning.\"\n\nThe care economy sees:\n- The nurse's 3 AM compassion\n- The repair tech's environmental stewardship\n- The student's peer tutoring\n- The parent's invisible labor\n- The elder's accumulated wisdom\n\n**And having seen, it recognizes.**",
+  "contentFormat": "markdown",
+  "sourceDoc": "elohim-protocol/economic_coordination/epic.md",
+  "tags": [
+    "care-economy",
+    "visibility",
+    "invisible-labor",
+    "recognition",
+    "value-gap"
+  ],
+  "relationships": [
+    {
+      "target": "economic-coordination-epic",
+      "type": "extends"
+    }
+  ],
+  "createdAt": "2025-12-16T03:29:02.873Z",
+  "updatedAt": "2025-12-16T03:29:42.458Z"
+}

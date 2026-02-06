@@ -1,0 +1,10 @@
+Scenario: Balancing workplace contribution with personal capacity
+    Given Aisha has limited energy and time
+    And workplace demands compete with personal needs
+    When Aisha allocates her care capacity
+    Then the personal_agent should help her balance commitments
+    And it should recognize that workplace care is one of multiple obligations
+    And it should flag when work encroaches on essential personal care
+    And the system should support sustainable allocation of capacity
+    And she should learn that professional success requires personal foundation
+    And work-life balance should be actively maintained

@@ -1,0 +1,10 @@
+Scenario: Learning safety skills for community independence
+    Given Jordan wants to navigate community more independently
+    And safety education supports risk-taking and growth
+    When Jordan takes community safety education
+    Then the training covers real-world scenarios (crossing streets, stranger danger)
+    And instruction uses visual supports and repeated practice
+    And Jordan can demonstrate understanding in accessible ways
+    And safety skills increase Jordan's independent community access
+    And education balances safety with dignity and autonomy
+    And Jordan's capability for safe independence grows through learning

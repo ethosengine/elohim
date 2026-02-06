@@ -1,0 +1,7 @@
+Scenario: Maintaining family connection despite limited time
+    Given my work schedule leaves minimal time for family
+    When I want to stay connected to parents and siblings
+    Then the family_elohim should help me maintain meaningful connection
+    And suggest efficient ways to participate in family care
+    And recognize that my work constraints don't diminish my care commitment
+    And coordinate around my limited availability

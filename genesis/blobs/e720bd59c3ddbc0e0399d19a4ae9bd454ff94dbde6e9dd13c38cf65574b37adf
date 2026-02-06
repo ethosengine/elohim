@@ -1,0 +1,11 @@
+Scenario: Establishing legal recognition of Constitutional Council decisions
+    Given courts need to know how to treat council precedents
+    And government agencies must understand council authority
+    When I craft legislation recognizing council legitimacy
+    Then I establish: statutory basis for council decisions
+    And I specify: courts recognize precedents in protocol-related cases
+    And I ensure: agencies defer to council constitutional interpretation
+    And I maintain: judicial review for constitutional questions
+    And I create: legal framework for sortition governance
+    And councils gain: legitimacy within existing legal system
+    And new democratic form: integrates with traditional structures

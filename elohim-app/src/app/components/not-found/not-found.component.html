@@ -10,24 +10,22 @@
 
     <!-- Message -->
     <h1>Page Not Found</h1>
-    <p class="message">
-      The page you're looking for seems to have drifted into uncharted space.
-    </p>
+    <p class="message">The page you're looking for seems to have drifted into uncharted space.</p>
     <p class="attempted-url" *ngIf="attemptedUrl">
       <code>{{ attemptedUrl }}</code>
     </p>
 
     <!-- Navigation Options -->
     <div class="actions">
-      <button class="btn btn-primary" (click)="goHome()">
+      <button type="button" class="btn btn-primary" (click)="goHome()">
         <i class="fa-solid fa-house"></i>
         Go Home
       </button>
-      <button class="btn btn-secondary" (click)="goToLamad()">
+      <button type="button" class="btn btn-secondary" (click)="goToLamad()">
         <i class="fa-solid fa-graduation-cap"></i>
         Explore Lamad
       </button>
-      <button class="btn btn-ghost" (click)="goBack()">
+      <button type="button" class="btn btn-ghost" (click)="goBack()">
         <i class="fa-solid fa-arrow-left"></i>
         Go Back
       </button>

@@ -1,0 +1,9 @@
+Scenario: Council member faces developer donation pressure with transparency
+    Given the politician received campaign contributions from developers
+    And developer seeks vote on controversial project
+    When the Observer documents the relationship publicly
+    Then they see their campaign finance connections made visible
+    And understand constituents can track voting patterns
+    And face accountability for aligning votes with donors versus community
+    And navigate pressure with transparent decision-making
+    And explain vote rationale with evidence regardless of decision

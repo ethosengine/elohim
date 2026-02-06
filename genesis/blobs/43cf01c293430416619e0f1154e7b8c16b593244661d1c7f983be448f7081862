@@ -1,0 +1,10 @@
+Scenario: Parent educational labor outside formal schooling hours
+    Given Sarah teaches Tommy and Emma during evenings and weekends
+    And homework support, life skills, critical thinking happen at home
+    When the educational_elohim tracks Sarah's teaching time
+    Then it should quantify hours spent on educational labor
+    And it should recognize teaching homework as skilled instructional work
+    And it should value informal education alongside formal instruction
+    And Sarah's non-school teaching should accumulate care tokens
+    And the system should make invisible educational labor visible
+    And parent teaching should be recognized as professional-grade work

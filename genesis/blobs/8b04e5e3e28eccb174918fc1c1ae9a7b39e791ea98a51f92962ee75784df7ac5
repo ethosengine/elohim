@@ -1,0 +1,10 @@
+Scenario: Connecting to neighborhood resources appropriate for students
+    Given Kenji has limited budget and might face emergencies
+    And neighborhoods often have resources (food banks, tool libraries, mutual aid)
+    When the neighborhood_elohim connects Kenji to resources
+    Then it should inform him of neighborhood food bank access
+    And it should show shared resources: "Neighborhood tool library 3 blocks away"
+    And it should reduce barriers to accessing community support
+    And it should normalize resource sharing as care economy
+    And the system should connect students to neighborhood safety nets
+    And resource access should be dignified and easy

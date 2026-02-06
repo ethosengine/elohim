@@ -1,0 +1,9 @@
+Scenario: Organizer identifies living wage campaign opportunity
+    Given city council will consider minimum wage ordinance
+    And workers struggle with poverty wages despite full-time work
+    When the Observer surfaces the organizing opportunity
+    Then the organizer sees local wage patterns and living wage gap
+    And identifies which workers and communities are most affected
+    And gets analysis showing public subsidies to low-wage employers
+    And receives alert early enough to organize worker-community coalition
+    And municipal wage policy becomes organizing opportunity

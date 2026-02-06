@@ -1,0 +1,9 @@
+Scenario: Seasonal eating aligned with bioregional food production
+    Given Sarah's bioregion has seasonal food availability
+    And seasonal eating reduces environmental impact and cost
+    When Sarah plans meals
+    Then the bioregional_elohim should suggest seasonal options
+    And it should educate about bioregional growing patterns
+    And it should help Sarah align purchases with local seasons
+    And seasonal eating should be framed as care for place
+    And bioregional awareness should shape consumption patterns

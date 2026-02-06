@@ -1,0 +1,11 @@
+Scenario: Funding community protocol infrastructure sustainably
+    Given Riverside needs resources for community nodes and maintenance
+    And we are relatively poor community
+    When I cobble together funding from multiple sources
+    Then we allocate: municipal budget treating this as public infrastructure
+    And we create: community ownership cooperative with resident investment
+    And we apply: for state and federal grants
+    And we participate: in mutual aid with wealthier communities
+    And we ensure: community retains ownership
+    And we plan: for 10-year sustainability not just pilot
+    And public investment: supports democratic governance tools

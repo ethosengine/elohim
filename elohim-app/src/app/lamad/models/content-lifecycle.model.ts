@@ -278,10 +278,7 @@ export type MasteryTransferPolicy =
 /**
  * Default lifecycle configuration by content type.
  */
-export const DEFAULT_LIFECYCLE_BY_TYPE: Record<
-  string,
-  Partial<ContentLifecycle>
-> = {
+export const DEFAULT_LIFECYCLE_BY_TYPE: Record<string, Partial<ContentLifecycle>> = {
   concept: {
     refreshInterval: 'P1Y', // Concepts: yearly review
     staleAction: 'flag',

@@ -1,0 +1,7 @@
+Scenario: Recognizing household labor in care economy
+    Given all household work is care contribution
+    When household members clean, cook, maintain, and organize
+    Then the protocol should recognize this as valuable care work
+    And accumulate care tokens for household contributions
+    And make visible that domestic labor supports everyone's flourishing
+    And validate that this work deserves recognition even though unpaid

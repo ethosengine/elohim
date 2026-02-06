@@ -1,0 +1,10 @@
+Scenario: Personal agent recognizes parent as individual beyond caregiving role
+    Given Sarah has been performing intensive care labor all day
+    And she has attended to children's needs, household needs, and work needs
+    When Sarah's personal_agent assesses her daily patterns
+    Then the agent should recognize Sarah as a person with individual needs
+    And the agent should prompt "When did you last do something just for yourself?"
+    And the system should validate that self-care enables care for others
+    And Sarah should be reminded that she exists beyond her caregiving roles
+    And individual identity should be actively preserved
+    And the agent should protect space for Sarah's autonomous personhood

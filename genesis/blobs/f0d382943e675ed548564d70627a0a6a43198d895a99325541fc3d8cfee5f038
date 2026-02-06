@@ -1,0 +1,10 @@
+Scenario: Learning sustainable farming practices benefit everyone
+    Given Marcus is developing systems thinking
+    And agricultural practices affect long-term food security
+    When Marcus learns about food production methods
+    Then the personal_agent should explain sustainable vs. extractive farming
+    And it should teach that care for soil creates long-term abundance
+    And it should connect farm stewardship to household stewardship
+    And he should understand that ecological care serves human flourishing
+    And sustainable agriculture should be framed through care economy
+    And his generation should expect farming that cares for land

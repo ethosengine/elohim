@@ -1,0 +1,9 @@
+Scenario: Manager participates in community economic development as practitioner
+    Given municipality seeks input on economic development strategies
+    And Marcus has practical experience with democratic business model
+    When community economic development planning occurs
+    Then Marcus shares operational insights about democratic coordination
+    And Marcus explains how eliminating extraction enabled higher wages and community programs
+    And Marcus advocates for policies supporting democratic business conversions
+    And Marcus participates as community member with expertise, not as business representative
+    And community_elohim connects his testimony to broader movement for economic democracy

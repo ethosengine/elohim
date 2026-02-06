@@ -1,0 +1,10 @@
+Scenario: Teen's care contributions give standing in municipal conversations
+    Given Jasmine has accumulated significant care economy participation
+    And she contributes household labor, paid work, volunteering, and civic engagement
+    When municipal discussions about youth policy occur
+    Then her care contributions should give her legitimate standing
+    And municipal_elohim should recognize her as a constitutional participant
+    And she should not be dismissed due to age
+    And her voice should carry weight based on demonstrated contribution
+    And the municipality should recognize teens as current participants, not future constituents
+    And youth civic engagement should be valued as care work for democratic governance

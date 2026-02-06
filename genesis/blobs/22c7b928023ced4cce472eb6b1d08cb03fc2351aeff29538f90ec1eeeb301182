@@ -1,0 +1,10 @@
+Scenario: Learning technology skills for independence
+    Given Jordan wants to use a smartphone more independently
+    And technology skills increase autonomy
+    When Jordan takes assistive technology training
+    Then instruction is patient, repetitive, and accessible
+    And the trainer adapts to Jordan's learning pace
+    And Jordan practices each skill until it becomes comfortable
+    And the personal_agent provides ongoing coaching
+    And Jordan's technology capability increases over time
+    And Jordan experiences growing independence through skill development

@@ -1,0 +1,12 @@
+Scenario: Deliberating on adolescent autonomy constitutional amendment
+    Given many national councils identified adolescent autonomy tension
+    And amendment proposal came from accumulated appeal precedents
+    When we deliberate whether "developing autonomy is itself constitutional value"
+    Then we hear: testimony from youth, parents, developmental experts
+    And we examine: how different cultures understand adolescent autonomy
+    And we consider: implications for millions of families globally
+    And we discuss: in small groups with translation support
+    And we grapple: with balancing protection and independence
+    And we vote: on amendment after extensive deliberation
+    And we create: constitutional evolution responsive to lived experience
+    And we demonstrate: citizens can govern profound questions

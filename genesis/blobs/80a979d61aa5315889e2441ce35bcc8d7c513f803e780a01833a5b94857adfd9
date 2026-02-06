@@ -1,0 +1,10 @@
+Scenario: Supporting adult children through financial constraints
+    Given Margaret has very limited resources herself
+    And her adult children sometimes face financial challenges
+    When Margaret provides non-financial support
+    Then her care contributions should be recognized as valuable
+    And the family_elohim should show how her labor saves money
+    And childcare provided prevents need for paid care
+    And her contributions have real economic impact
+    And Margaret's value to family doesn't require financial resources
+    And care economy should be visible alongside financial economy

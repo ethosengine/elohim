@@ -1,0 +1,12 @@
+Scenario: Neighborhood supports work-life balance for middle-aged adults
+    Given Robert manages intense work and care demands
+    And neighborhood support could ease his burden
+    And he can also provide flexibility support to neighbors
+    When neighborhood_elohim coordinates flexible support
+    Then it should connect neighbors who can provide backup care
+    And help Robert find local support for care emergencies
+    And recognize his contributions when he helps neighbors
+    And build mutual support networks for managing work-life balance
+    And reduce isolation of managing demands alone
+    And demonstrate that neighborhoods can support balanced lives
+    And strengthen community through practical mutual aid

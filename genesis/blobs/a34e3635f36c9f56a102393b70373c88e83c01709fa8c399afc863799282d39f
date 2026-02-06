@@ -1,0 +1,12 @@
+Scenario: Participating in neighborhood mutual aid and care economy
+    Given my neighborhood has informal mutual aid networks
+    And I can contribute even while receiving support
+    When I engage with neighborhood care economy
+    Then the Value Scanner connects me to local mutual aid networks
+    And makes visible my contributions (childcare exchanges, skill sharing, information sharing)
+    And facilitates reciprocal care relationships in neighborhood
+    And tracks my care economy participation with care tokens
+    And validates that I have valuable contributions despite crisis
+    And my personal_agent identifies opportunities to contribute
+    And recognizes mutual aid participation as community-building work
+    And supports reciprocal relationships, not one-way charity

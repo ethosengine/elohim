@@ -1,0 +1,10 @@
+Scenario: Volunteer work accessibility for aging participants
+    Given Frank is 70 and managing age-related physical changes
+    And he wants to continue contributing through volunteer work
+    When the community_elohim coordinates accessibility
+    Then it should match Frank to work appropriate for his capabilities
+    And surface modifications that enable continued participation
+    And recognize when physical limitations require adaptation
+    And help transition to less physically demanding roles if needed
+    And protect Frank's safety while maximizing contribution
+    And enable continued meaningful participation throughout aging

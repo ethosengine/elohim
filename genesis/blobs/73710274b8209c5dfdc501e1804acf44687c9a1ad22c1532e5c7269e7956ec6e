@@ -1,0 +1,11 @@
+Scenario: Community resource allocation prioritizes aging in place
+    Given community resources are limited
+    And policy choices affect elder care
+    When community governance makes allocation decisions
+    Then the community_elohim should surface elder needs
+    And aging in place should be prioritized over institutionalization
+    And Helen's voice should be included in community decisions
+    And resources should flow to enable dignity-preserving care
+    And the protocol should inform community policy
+    And care economy data should demonstrate what elders need to flourish
+    And community should invest in infrastructure that serves all ages

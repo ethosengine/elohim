@@ -1,4 +1,7 @@
-<div class="content-viewer-container">
+<div
+  class="content-viewer-container focused-view-container"
+  [class.focused-view-active]="isFocusedView"
+>
   <!-- Loading state -->
   <div *ngIf="isLoading" class="loading-state">
     <div class="spinner"></div>
@@ -8,18 +11,26 @@
   <!-- Error state -->
   <div *ngIf="error && !isLoading" class="error-state">
     <h2>⚠️ {{ error }}</h2>
-    <button class="btn-primary" (click)="backToHome()">Back to Lamad</button>
+    <button type="button" class="btn-primary" (click)="backToHome()">Back to Lamad</button>
   </div>
 
   <!-- Content -->
   <div *ngIf="node && !isLoading" class="content">
     <!-- Header -->
     <div class="content-header">
-      <button
-        class="back-button"
-        (click)="backToHome()">
-        ← Back to Lamad
-      </button>
+      <div class="header-nav">
+        <button type="button" class="back-button" (click)="backToHome()">← Back to Lamad</button>
+
+        <!-- Return to Path button (shown when viewing from a detour) -->
+        <button
+          type="button"
+          *ngIf="hasReturnPath"
+          class="return-to-path-btn"
+          (click)="returnToPath()"
+        >
+          ← Return to {{ pathContext?.pathTitle }}
+        </button>
+      </div>
 
       <div class="header-main">
         <div class="content-type-badge">
@@ -34,47 +45,68 @@
           <span *ngIf="getMetadataCategory()" class="meta-item">
             📁 {{ getMetadataCategory() }}
           </span>
-          <span *ngIf="getMetadataAuthors()" class="meta-item">
-            ✍️ {{ getMetadataAuthors() }}
-          </span>
-          <span *ngIf="getMetadataVersion()" class="meta-item">
-            🏷️ v{{ getMetadataVersion() }}
-          </span>
+          <span *ngIf="getMetadataAuthors()" class="meta-item">✍️ {{ getMetadataAuthors() }}</span>
+          <span *ngIf="getMetadataVersion()" class="meta-item">🏷️ v{{ getMetadataVersion() }}</span>
         </div>
 
         <div class="tags" *ngIf="node.tags.length > 0">
           <span *ngFor="let tag of node.tags" class="tag">#{{ tag }}</span>
         </div>
 
-        <!-- Download button -->
+        <!-- Content actions -->
         <div class="content-actions">
           <app-content-download [node]="node"></app-content-download>
+          <a
+            *ngIf="canEditContent"
+            [routerLink]="['/lamad/resource', node.id, 'edit']"
+            class="btn-edit"
+          >
+            ✏️ Edit
+          </a>
         </div>
       </div>
 
       <!-- Affinity controls -->
       <div class="affinity-panel">
         <div class="affinity-display">
-          <div class="affinity-circle" [ngClass]="'affinity-' + getAffinityLevel()">
-            {{ getAffinityPercentage() }}%
-          </div>
+          <div [ngClass]="'affinity-' + getAffinityLevel()">{{ getAffinityPercentage() }}%</div>
           <div class="affinity-label">Your Affinity</div>
         </div>
 
         <div class="affinity-controls">
-          <button class="btn-affinity" (click)="adjustAffinity(-0.1)" [disabled]="affinity <= 0">
+          <button
+            type="button"
+            class="btn-affinity"
+            (click)="adjustAffinity(-0.1)"
+            [disabled]="affinity <= 0"
+          >
             - Decrease
           </button>
-          <button class="btn-affinity" (click)="adjustAffinity(0.1)" [disabled]="affinity >= 1">
+          <button
+            type="button"
+            class="btn-affinity"
+            (click)="adjustAffinity(0.1)"
+            [disabled]="affinity >= 1"
+          >
             + Increase
           </button>
         </div>
 
         <div class="quick-actions">
-          <button class="btn-quick" (click)="setAffinity(0.5)" [ngClass]="{'active': affinity >= 0.4 && affinity <= 0.6}">
+          <button
+            type="button"
+            class="btn-quick"
+            (click)="setAffinity(0.5)"
+            [ngClass]="{ active: affinity >= 0.4 && affinity <= 0.6 }"
+          >
             📚 Practicing
           </button>
-          <button class="btn-quick" (click)="setAffinity(1.0)" [ngClass]="{'active': affinity > 0.9}">
+          <button
+            type="button"
+            class="btn-quick"
+            (click)="setAffinity(1.0)"
+            [ngClass]="{ active: affinity > 0.9 }"
+          >
             ✅ Mastered
           </button>
         </div>
@@ -83,31 +115,58 @@
           <div
             class="affinity-bar-fill"
             [style.width.%]="getAffinityPercentage()"
-            [ngClass]="'affinity-' + getAffinityLevel()">
-          </div>
+            [ngClass]="'affinity-' + getAffinityLevel()"
+          ></div>
         </div>
       </div>
     </div>
 
     <!-- Tabs Navigation -->
     <div class="viewer-tabs">
-      <button class="tab-btn" (click)="setActiveTab('content')" [class.active]="activeTab === 'content'">
+      <button
+        type="button"
+        class="tab-btn"
+        (click)="setActiveTab('content')"
+        [class.active]="activeTab === 'content'"
+      >
         Content
       </button>
-      <button class="tab-btn" (click)="setActiveTab('trust')" [class.active]="activeTab === 'trust'">
+      <button
+        type="button"
+        class="tab-btn"
+        (click)="setActiveTab('trust')"
+        [class.active]="activeTab === 'trust'"
+      >
         Attestations
       </button>
-      <button class="tab-btn" (click)="setActiveTab('governance')" [class.active]="activeTab === 'governance'">
+      <button
+        type="button"
+        class="tab-btn"
+        (click)="setActiveTab('governance')"
+        [class.active]="activeTab === 'governance'"
+      >
         Governance
       </button>
-      <button class="tab-btn" (click)="setActiveTab('network')" [class.active]="activeTab === 'network'">
+      <button
+        type="button"
+        class="tab-btn"
+        (click)="setActiveTab('network')"
+        [class.active]="activeTab === 'network'"
+      >
         Network
       </button>
     </div>
 
     <!-- Tab Content -->
     <div [ngSwitch]="activeTab" class="tab-content">
-      
+      <!-- Content Toolbar (fixed at top in focused view) -->
+      <div class="content-toolbar">
+        <app-focused-view-toggle
+          [isActive]="isFocusedView"
+          (toggled)="onFocusedViewToggle($event)"
+        ></app-focused-view-toggle>
+      </div>
+
       <!-- Content Tab -->
       <section *ngSwitchCase="'content'">
         <!-- Main content -->
@@ -118,7 +177,8 @@
           <!-- Fallback: Plain text content (when no renderer registered) -->
           <div
             *ngIf="!hasRegisteredRenderer && node.contentFormat === 'plaintext'"
-            class="plaintext-content">
+            class="plaintext-content"
+          >
             <pre>{{ getStringContent(node.content) }}</pre>
           </div>
 
@@ -126,25 +186,96 @@
           <div
             *ngIf="!hasRegisteredRenderer && node.contentFormat === 'html'"
             class="html-content"
-            [innerHTML]="node.content">
-          </div>
+            [innerHTML]="node.content"
+          ></div>
 
           <!-- Fallback: Unknown format -->
           <div
-            *ngIf="!hasRegisteredRenderer && node.contentFormat !== 'plaintext' && node.contentFormat !== 'html'"
-            class="fallback-content">
+            *ngIf="
+              !hasRegisteredRenderer &&
+              node.contentFormat !== 'plaintext' &&
+              node.contentFormat !== 'html'
+            "
+            class="fallback-content"
+          >
             <p class="fallback-notice">Content format: {{ node.contentFormat }}</p>
             <pre>{{ getStringContent(node.content) }}</pre>
+          </div>
+        </div>
+
+        <!-- Contextual Feedback Section -->
+        <div class="feedback-section" *ngIf="showFeedbackSection && node">
+          <h2 class="feedback-section-title">📣 Share Your Feedback</h2>
+
+          <!-- Reaction Bar (Low Friction) -->
+          <div class="reaction-section">
+            <app-reaction-bar
+              [contentId]="node.id"
+              [allowedReactions]="allowedReactions"
+              [constraints]="feedbackProfile?.emotionalReactionConstraints"
+              [contentType]="mapContentTypeToProfileType(node.contentType)"
+              [showCounts]="true"
+            ></app-reaction-bar>
+          </div>
+
+          <!-- Graduated Feedback (Medium Friction) -->
+          <div class="graduated-section">
+            <app-graduated-feedback
+              [contentId]="node.id"
+              [context]="feedbackContext"
+              [requiresReasoning]="false"
+              [showAggregates]="true"
+            ></app-graduated-feedback>
+          </div>
+
+          <!-- Signal Summary (when aggregates exist) -->
+          <div
+            class="signal-summary"
+            *ngIf="aggregatedSignals && aggregatedSignals.reactionCounts.total > 0"
+          >
+            <div class="signal-metric">
+              <span class="metric-label">Community Sentiment</span>
+              <span
+                class="metric-value"
+                [ngClass]="{
+                  positive: aggregatedSignals.sentimentScore > 0.6,
+                  neutral:
+                    aggregatedSignals.sentimentScore >= 0.4 &&
+                    aggregatedSignals.sentimentScore <= 0.6,
+                  negative: aggregatedSignals.sentimentScore < 0.4,
+                }"
+              >
+                {{ aggregatedSignals.sentimentScore * 100 | number: '1.0-0' }}%
+              </span>
+            </div>
+            <div class="signal-metric" *ngIf="aggregatedSignals.effectivenessScore > 0">
+              <span class="metric-label">Effectiveness</span>
+              <span class="metric-value">
+                {{ aggregatedSignals.effectivenessScore * 100 | number: '1.0-0' }}%
+              </span>
+            </div>
+            <div class="signal-metric">
+              <span class="metric-label">Consensus</span>
+              <span
+                class="metric-value consensus-badge"
+                [ngClass]="aggregatedSignals.consensusState.level"
+              >
+                {{ aggregatedSignals.consensusState.level | titlecase }}
+              </span>
+            </div>
           </div>
         </div>
 
         <!-- Appears in Paths (Wikipedia-style back-links) -->
         <div *ngIf="containingPaths.length > 0 || loadingPaths" class="paths-section">
           <h2>📚 Appears in Learning Paths</h2>
-          <p class="paths-description">This content is part of the following curated learning journeys:</p>
+          <p class="paths-description">
+            This content is part of the following curated learning journeys:
+          </p>
 
           <div *ngIf="loadingPaths" class="paths-loading">
-            <span class="spinner-small"></span> Loading paths...
+            <span class="spinner-small"></span>
+            Loading paths...
           </div>
 
           <div *ngIf="!loadingPaths && containingPaths.length > 0" class="paths-list">
@@ -152,7 +283,8 @@
               *ngFor="let pathRef of containingPaths"
               class="path-card"
               (click)="navigateToPath(pathRef.pathId, pathRef.stepIndex)"
-              type="button">
+              type="button"
+            >
               <div class="path-header">
                 <span class="path-icon">🗺️</span>
                 <span class="path-title">{{ pathRef.pathTitle }}</span>
@@ -174,12 +306,11 @@
               class="related-card"
               (click)="viewRelatedContent(relatedNode)"
               (keydown.enter)="viewRelatedContent(relatedNode)"
-              type="button">
+              type="button"
+            >
               <div class="related-header">
                 <span class="related-type">{{ relatedNode.contentType }}</span>
-                <span class="related-affinity">
-                  {{ getRelatedNodeAffinity(relatedNode.id) }}%
-                </span>
+                <span class="related-affinity">{{ getRelatedNodeAffinity(relatedNode.id) }}%</span>
               </div>
               <h3 class="related-title">{{ relatedNode.title }}</h3>
               <p class="related-description">{{ relatedNode.description }}</p>
@@ -201,7 +332,7 @@
 
         <div *ngIf="trustBadge" class="trust-tab-content">
           <!-- Main Trust Card -->
-          <div class="trust-summary-card" [class]="'trust-' + trustBadge.trustLevel">
+          <div class="trust-summary-card" [ngClass]="'trust-' + trustBadge.trustLevel">
             <div class="trust-header">
               <div class="trust-score">
                 <span class="score-val">{{ trustBadge.trustPercentage }}%</span>
@@ -219,7 +350,8 @@
               </div>
             </div>
             <div class="trust-reach">
-              <strong>Reach Level:</strong> {{ trustBadge.reachLabel | titlecase }}
+              <strong>Reach Level:</strong>
+              {{ trustBadge.reachLabel | titlecase }}
             </div>
           </div>
 
@@ -241,7 +373,11 @@
           <div class="trust-badges-section" *ngIf="trustBadge.secondary.length > 0">
             <h3>Verified Attributes</h3>
             <div class="badges-grid">
-              <div *ngFor="let badge of trustBadge.secondary" class="badge-card" [class]="'badge-' + badge.color">
+              <div
+                *ngFor="let badge of trustBadge.secondary"
+                class="badge-card"
+                [ngClass]="'badge-' + badge.color"
+              >
                 <div class="badge-icon">{{ badge.icon }}</div>
                 <div class="badge-info">
                   <h4>{{ badge.label }}</h4>
@@ -258,10 +394,13 @@
           <div class="trust-actions" *ngIf="trustBadge.actions?.length">
             <h3>Available Actions</h3>
             <div class="actions-list">
-              <button *ngFor="let action of trustBadge.actions" 
-                      class="btn-secondary"
-                      [disabled]="!action.available"
-                      (click)="handleAction(action)">
+              <button
+                type="button"
+                *ngFor="let action of trustBadge.actions"
+                class="btn-secondary"
+                [disabled]="!action.available"
+                (click)="handleAction(action)"
+              >
                 <span class="action-icon">{{ action.icon }}</span>
                 {{ action.label }}
               </button>
@@ -269,23 +408,128 @@
           </div>
         </div>
       </section>
-      
+
       <!-- Governance Tab -->
-      <section *ngSwitchCase="'governance'">
-        <div class="placeholder-tab">
-          <h3>Governance History</h3>
-          <p>Change logs and discussions coming soon.</p>
+      <section *ngSwitchCase="'governance'" class="governance-tab">
+        <div *ngIf="isLoadingGovernance" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading governance data...</p>
+        </div>
+
+        <div *ngIf="!isLoadingGovernance" class="governance-content">
+          <!-- Status Card -->
+          <div
+            class="governance-status-card"
+            [ngClass]="'status-' + (governanceState?.status || 'unreviewed')"
+          >
+            <div class="status-header">
+              <span class="status-icon">{{ getGovernanceStatusIcon() }}</span>
+              <h3>{{ getGovernanceStatusLabel() }}</h3>
+            </div>
+            <div class="status-meta" *ngIf="governanceState">
+              <span>Last updated: {{ formatGovernanceDate(governanceState.lastUpdated) }}</span>
+            </div>
+
+            <!-- Active Labels -->
+            <div class="labels-section" *ngIf="governanceState?.labels?.length">
+              <h4>Active Labels</h4>
+              <div class="labels-list">
+                <ng-container *ngIf="governanceState">
+                  <span
+                    *ngFor="let label of governanceState.labels"
+                    class="label-badge"
+                    [ngClass]="'severity-' + label.severity"
+                  >
+                    {{ label.labelType }}
+                  </span>
+                </ng-container>
+              </div>
+            </div>
+          </div>
+
+          <!-- Challenges Section -->
+          <div class="challenges-section">
+            <h3>⚖️ Challenges</h3>
+
+            <div *ngIf="challenges.length === 0" class="empty-state">
+              <p>No challenges filed against this content.</p>
+              <button type="button" class="btn-secondary">File a Challenge</button>
+            </div>
+
+            <div *ngIf="challenges.length > 0" class="challenges-list">
+              <div
+                *ngFor="let challenge of challenges"
+                class="challenge-card"
+                [ngClass]="'status-' + challenge.status"
+              >
+                <div class="challenge-header">
+                  <span class="challenge-grounds">{{ challenge.grounds }}</span>
+                  <span class="challenge-status">{{ challenge.status }}</span>
+                </div>
+                <p class="challenge-description">{{ challenge.description }}</p>
+                <div class="challenge-meta">
+                  <span>Filed: {{ formatGovernanceDate(challenge.filedAt) }}</span>
+                  <span [ngClass]="['sla-indicator', getSlaStatus(challenge)]">
+                    SLA: {{ getDaysRemaining(challenge.slaDeadline) }} days remaining
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Discussions Section (Talk Page) -->
+          <div class="discussions-section">
+            <h3>💬 Discussions</h3>
+
+            <div *ngIf="discussions.length === 0" class="empty-state">
+              <p>No discussions about this content yet.</p>
+              <button type="button" class="btn-secondary">Start Discussion</button>
+            </div>
+
+            <div *ngIf="discussions.length > 0" class="discussions-list">
+              <div *ngFor="let discussion of discussions" class="discussion-card">
+                <div class="discussion-header">
+                  <span class="discussion-category">{{ discussion.category }}</span>
+                  <span class="discussion-status">{{ discussion.status }}</span>
+                </div>
+                <h4 class="discussion-topic">{{ discussion.title }}</h4>
+                <div class="discussion-meta">
+                  <span>{{ discussion.messageCount }} messages</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       <!-- Network Tab -->
-      <section *ngSwitchCase="'network'">
-        <div class="placeholder-tab">
-          <h3>Network Context</h3>
-          <p>Graph relationships visualization coming soon.</p>
+      <section *ngSwitchCase="'network'" class="network-tab">
+        <div class="network-header">
+          <h3>Content Neighborhood</h3>
+          <p>Explore related concepts in the knowledge graph</p>
+        </div>
+
+        <!-- Mini Graph Visualization -->
+        <div class="mini-graph-container">
+          <app-mini-graph
+            *ngIf="node"
+            [focusNodeId]="node.id"
+            [depth]="1"
+            [maxNodes]="20"
+            [height]="350"
+            (nodeSelected)="onGraphNodeSelected($event)"
+            (exploreRequested)="exploreInGraph()"
+          ></app-mini-graph>
+        </div>
+
+        <!-- Explore in Full Graph Button -->
+        <div class="network-actions">
+          <button type="button" class="btn-explore-graph" (click)="exploreInGraph()">
+            <span class="icon">🔭</span>
+            Explore in Full Graph
+          </button>
         </div>
       </section>
-
     </div>
   </div>
 </div>

@@ -1,0 +1,9 @@
+Scenario: Professional teaching work recognized as care labor
+    Given Sarah works full-time as a teacher
+    And education is one of society's most important care functions
+    When Sarah's professional work is tracked in care economy
+    Then teaching should be recognized as care labor
+    And the educational_elohim should quantify Sarah's care contributions to students
+    And professional education should be valued alongside household care
+    And Sarah should see her career as care work, not separate from care economy
+    And teaching should be explicitly valued as caring for next generation

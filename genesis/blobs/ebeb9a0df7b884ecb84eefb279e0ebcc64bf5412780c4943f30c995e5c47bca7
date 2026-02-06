@@ -1,0 +1,9 @@
+Scenario: Household care labor made visible despite reduced monetary income
+    Given James's care work is worth $50k+/year professionally
+    And household monetary income is only $40k/year
+    When household economics are evaluated
+    Then the household_elohim should show total household value
+    And James's care labor should be valued alongside income
+    And household should be recognized as generating $90k+ total value
+    And care work should count as household economic contribution
+    And reduced monetary income should not mean reduced household value

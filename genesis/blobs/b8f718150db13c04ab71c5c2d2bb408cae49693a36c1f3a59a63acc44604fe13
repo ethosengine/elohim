@@ -1,0 +1,8 @@
+Scenario: Activist connects community issue to citywide pattern
+    Given the activist is fighting playground neglect locally
+    When the Observer shows citywide park maintenance data
+    Then the activist sees systematic under-investment in certain neighborhoods
+    And identifies which communities face similar conditions
+    And connects local organizing to citywide advocacy
+    And frames individual grievance as structural injustice
+    And builds power through pattern recognition

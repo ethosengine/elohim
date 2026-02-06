@@ -1,0 +1,12 @@
+Scenario: Transitioning from primarily receiving to balanced care economy participation
+    Given I am moving from acute crisis toward greater stability
+    And my capacity to contribute is increasing
+    When I rebuild capability to contribute more to community
+    Then the Value Scanner supports my transition to greater contribution
+    And celebrates increasing capacity without pressuring premature independence
+    And helps me find meaningful ways to contribute as I'm able
+    And validates that recovery enables greater community participation
+    And tracks my evolving care economy participation over time
+    And my personal_agent identifies contribution opportunities matching increasing capacity
+    And recognizes that care economy support enabled my rebuilding
+    And supports gradual shift toward balanced reciprocity

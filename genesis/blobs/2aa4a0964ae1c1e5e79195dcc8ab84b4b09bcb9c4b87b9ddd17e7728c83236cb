@@ -1,0 +1,12 @@
+Scenario: Respite and rest built into household governance
+    Given Robert and Jennifer both experience care burden
+    And sustainable care requires rest and renewal
+    And they may deprioritize their own rest
+    When household_elohim monitors wellbeing
+    Then it should recognize when both partners need respite
+    And prompt: "Neither of you has had break from care responsibilities in 6 weeks"
+    And help them plan respite care for parents
+    And coordinate breaks from care demands
+    And validate that rest is essential, not selfish
+    And support them in maintaining capacity for sustainable care
+    And prevent burnout that would harm all family members

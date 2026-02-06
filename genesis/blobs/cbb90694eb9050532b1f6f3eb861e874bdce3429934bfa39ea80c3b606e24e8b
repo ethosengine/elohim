@@ -1,0 +1,9 @@
+Scenario: Neighborhood mutual aid network provides crisis support
+    Given Sarah or her neighbors may face crises
+    And traditional systems often fail to provide timely support
+    When a household experiences emergency
+    Then the neighborhood_elohim should activate mutual aid network
+    And neighbors with capacity should be prompted to help
+    And support should be immediate and community-based
+    And neighborhood should function as first-line safety net
+    And mutual aid should be coordinated effectively

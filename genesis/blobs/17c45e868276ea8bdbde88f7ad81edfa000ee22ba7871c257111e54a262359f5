@@ -1,0 +1,12 @@
+Scenario: Neighborhood repairs and maintenance using construction skills
+    Given Frank has construction expertise
+    And neighborhoods need ongoing maintenance and repairs
+    And Frank's time freedom enables contribution
+    When the neighborhood_elohim coordinates maintenance needs
+    Then it should connect Frank's skills to neighborhood repair opportunities
+    And coordinate small repair projects utilizing his expertise
+    And recognize his skilled labor as valuable contribution
+    And facilitate tool sharing and material coordination
+    And quantify the market value of construction skills applied
+    And enable Frank to contribute meaningfully to neighborhood quality
+    And his skills should serve collective neighborhood benefit

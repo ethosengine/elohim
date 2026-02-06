@@ -1,0 +1,10 @@
+Scenario: Board member evaluates superintendent performance with outcome data
+    Given board conducts annual superintendent evaluation
+    And superintendent's self-evaluation emphasizes accomplishments and progress
+    And board wants objective assessment of district performance during tenure
+    When the board member uses Observer accountability tracking
+    Then they receive longitudinal data on student outcomes since superintendent started
+    And see progress on board priorities and strategic plan goals
+    And access comparison of district performance trajectory to similar districts
+    And discover some promised improvements didn't materialize or regressed
+    And objective data helps board evaluate performance beyond self-reporting

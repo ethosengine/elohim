@@ -1,0 +1,11 @@
+Scenario: Household privacy protected from service providers
+    Given support workers and service providers enter Alex's household
+    And this creates potential privacy vulnerabilities
+    When household data is collected
+    Then Alex should control what household information is shared with service providers
+    And support workers should access only information necessary for their tasks
+    And Alex's medical and personal information should remain private
+    And household patterns should not be shared without Alex's consent
+    And the household_elohim should protect Alex's privacy systematically
+    And Alex should feel secure in their own home
+    And privacy protections should be robust even with frequent visitors

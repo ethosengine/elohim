@@ -1,0 +1,9 @@
+Scenario: Journalist collaborates with local reporters on state policy impacts
+    Given state budget cuts affect services across all communities
+    And the journalist coordinates with local reporters statewide
+    When the Observer provides shared state surveillance infrastructure
+    Then all journalists access same comprehensive state policy data
+    And local reporters show impacts in their specific communities
+    And state reporter synthesizes statewide pattern
+    And collaborative investigation publishes simultaneously across outlets
+    And state policy accountability serves whole state not just capital

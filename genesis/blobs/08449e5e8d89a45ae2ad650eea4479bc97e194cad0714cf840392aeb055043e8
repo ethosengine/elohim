@@ -1,0 +1,10 @@
+Scenario: Conservation board member detects greenwashing in sustainability initiative
+    Given municipality proposes sustainability plan with ambitious climate goals
+    And plan emphasizes renewable energy targets and green building standards
+    And board wants to understand if plan will achieve meaningful emissions reductions
+    When the board member uses Observer sustainability analysis
+    Then they see plan's projected emissions reductions compared to climate science needs
+    And discover plan excludes transportation sector responsible for largest emissions
+    And find renewable energy targets rely on questionable carbon offset accounting
+    And access comparison to peer cities with more comprehensive climate action
+    And independent analysis distinguishes authentic sustainability from greenwashing

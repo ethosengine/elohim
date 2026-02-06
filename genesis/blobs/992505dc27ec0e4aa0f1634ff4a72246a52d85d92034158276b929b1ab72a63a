@@ -1,0 +1,10 @@
+Scenario: Elder coordinates neighborhood elder check-in system
+    Given several elders in the neighborhood live alone
+    And Rose wants to ensure everyone has daily connection
+    When Rose proposes a daily elder check-in system
+    And volunteers agree to participate in rotation
+    Then the coordination agent helps organize the schedule
+    And each elder receives daily contact from neighbors
+    And any concerns are immediately surfaced to family and community
+    And Rose experiences agency in building community care
+    And isolation is prevented through systematic connection

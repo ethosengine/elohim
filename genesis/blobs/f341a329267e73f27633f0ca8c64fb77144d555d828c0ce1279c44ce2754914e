@@ -1,0 +1,12 @@
+Scenario: Exercising the right to change my mind and try different approaches
+    Given I am trying various strategies for rebuilding stability
+    And some approaches work better than others
+    When I decide to change direction or try something new
+    Then the Value Scanner supports my experimentation without judgment
+    And does not penalize me for changing course
+    And helps me learn from what didn't work
+    And validates that finding the right path takes trial and error
+    And institutional partners respect my right to redirect
+    And my personal_agent helps me evaluate different approaches
+    And tracks what I've learned, not just what "failed"
+    And my agency to pivot is preserved and supported

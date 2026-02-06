@@ -1,0 +1,9 @@
+Scenario: Teacher documents inadequate support staff
+    Given the school lacks sufficient counselors and specialists
+    And students with learning needs aren't getting services
+    When teachers collectively document support staff gaps through Observer
+    Then aggregated data shows 300 students per counselor vs 250 recommended
+    And student impact patterns become visible
+    And teachers coordinate advocacy with parents for resources
+    And principal takes evidence to district for staffing increase
+    And professional knowledge drives resource allocation

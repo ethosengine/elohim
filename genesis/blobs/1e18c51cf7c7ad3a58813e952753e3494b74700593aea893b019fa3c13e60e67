@@ -1,0 +1,11 @@
+Scenario: Household budget management on severely reduced income
+    Given household income dropped from $80k to ~$40k/year
+    And medical expenses have increased significantly
+    And caregiving prevents James from full-time employment
+    When James manages household finances
+    Then the household_elohim should track constrained budget carefully
+    And it should help prioritize essential expenses
+    And it should identify financial assistance resources
+    And it should recognize economic strain as care-related
+    And household should access care economy support based on need
+    And financial precarity should be addressed systematically

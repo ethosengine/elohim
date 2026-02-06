@@ -1,0 +1,9 @@
+Scenario: Developer receives honest cost-benefit analysis
+    Given a developer projects $5M annual tax revenue from proposed development
+    But omits infrastructure costs and school capacity burden
+    When the Observer provides independent analysis
+    Then the developer sees: net tax impact only $800K after infrastructure costs
+    And school enrollment increase requires $2M capacity expansion
+    And traffic impacts need $1.5M intersection improvements
+    And honest accounting reveals actual community trade-offs
+    And realistic projections inform better civic decisions

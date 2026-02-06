@@ -1,0 +1,10 @@
+Scenario: Participating in staff meetings as equal colleague
+    Given the library holds monthly staff meetings
+    And all employees should participate in workplace decisions
+    When Jordan attends the staff meeting
+    Then the personal_agent helps Jordan prepare for participation
+    And meeting facilitators use accessible communication practices
+    And Jordan can share ideas and concerns
+    And Jordan's input is valued alongside other staff members
+    And workplace decisions consider Jordan's perspective
+    And Jordan experiences being a respected colleague, not just a client

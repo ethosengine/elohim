@@ -1,0 +1,8 @@
+Scenario: Making visible that workers enable community flourishing
+    Given community depends on workers' labor for functioning
+    And workers are often invisible or undervalued
+    When the community assesses what makes life possible
+    Then the protocol should make visible workers' essential contributions
+    And demonstrate that workers deserve dignity and fair compensation
+    And build community consciousness about care labor embedded in all work
+    And catalyze community support for worker justice and care economy principles

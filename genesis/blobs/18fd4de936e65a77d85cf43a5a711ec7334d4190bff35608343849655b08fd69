@@ -1,0 +1,10 @@
+Scenario: Privacy protection for parent's personal life
+    Given Sarah's care work generates extensive data
+    And she has full privacy rights as an individual
+    When care economy data is collected
+    Then Sarah must have complete control over her personal information
+    And no third party access should be permitted without explicit consent
+    And her parenting patterns should not be monetized
+    And the system should protect her from surveillance capitalism
+    And privacy should be default, not opt-in
+    And Sarah's dignity should be protected through data sovereignty

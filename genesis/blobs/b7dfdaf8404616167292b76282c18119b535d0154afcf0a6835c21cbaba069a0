@@ -1,0 +1,9 @@
+Scenario: Business space becomes community gathering place beyond commercial function
+    Given auto repair shop could serve community beyond car service
+    And neighborhood lacks gathering spaces for organizing and connection
+    When democratic governance considers community space usage
+    Then workers offer shop space for community meetings after business hours
+    And neighborhood organizing groups can use facilities for free
+    And youth apprenticeship programs connect young people to skilled trades
+    And community bulletin board shares neighborhood information and mutual aid
+    And business becomes community hub, not just commercial enterprise

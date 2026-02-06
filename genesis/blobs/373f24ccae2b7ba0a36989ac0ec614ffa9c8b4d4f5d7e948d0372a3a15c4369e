@@ -1,0 +1,10 @@
+Scenario: Learning value literacy, not just price comparison
+    Given Emma is building complex understanding of value
+    And value extends far beyond simple price
+    When Emma uses the Value Scanner for education
+    Then she should learn to see multiple value dimensions
+    And nutritional value should be explored
+    And environmental impact should be age-appropriately introduced
+    And care labor embedded in production should be made visible
+    And community benefit should be considered
+    And she should learn to read complexity, not just price tags

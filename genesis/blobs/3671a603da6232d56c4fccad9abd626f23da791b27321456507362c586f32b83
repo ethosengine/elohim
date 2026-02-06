@@ -1,0 +1,8 @@
+Scenario: Activist manages multiple digital identities safely
+    Given the activist works on both local neighborhood issues and sensitive human rights cases
+    When they create separate personas for different organizing contexts
+    Then each persona has independent privacy settings
+    And connections between personas are cryptographically isolated
+    And the activist can switch contexts without cross-contamination
+    And each persona's contributions earn reach independently
+    And protection protocols apply to all personas

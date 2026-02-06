@@ -1,0 +1,10 @@
+Scenario: Managing household budget participation
+    Given the group home has a shared household budget
+    And housemates collectively decide on discretionary spending
+    When the household discusses buying a new game system
+    Then Jordan participates in the budget discussion with support
+    And the interface shows budget information with visual aids
+    And Jordan can express their opinion on the purchase
+    And Jordan's vote counts equally with other housemates
+    And supported decision-making helps Jordan understand options
+    And Jordan experiences democratic household governance

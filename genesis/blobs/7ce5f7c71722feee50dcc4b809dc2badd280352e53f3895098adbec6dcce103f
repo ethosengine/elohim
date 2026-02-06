@@ -1,0 +1,10 @@
+Scenario: Individual flourishing metrics beyond caregiving productivity
+    Given Sarah's value extends far beyond care productivity
+    And she is a complete person deserving of flourishing
+    When the system measures Sarah's well-being
+    Then it should track her joy, rest, creative expression, and growth
+    And it should measure whether she's experiencing life beyond caregiving
+    And it should flag if she has no non-caregiving identity markers
+    And individual flourishing should be valued as essential
+    And Sarah should be supported in being whole, not just productive
+    And the care economy should enable her complete humanity

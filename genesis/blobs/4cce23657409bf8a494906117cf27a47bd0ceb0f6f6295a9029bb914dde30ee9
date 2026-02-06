@@ -1,0 +1,10 @@
+Scenario: Building household community through shared care
+    Given Kenji and roommates are temporarily living together
+    And they could just be strangers sharing space
+    When the household_elohim fosters care economy culture
+    Then it should help them build genuine community
+    And it should recognize shared meals as community building
+    And it should value emotional support among roommates
+    And it should show how care contributions create belonging
+    And the system should help transform roommates into household family
+    And student households should be recognized as temporary but real communities

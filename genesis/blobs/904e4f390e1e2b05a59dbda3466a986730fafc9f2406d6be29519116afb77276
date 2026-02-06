@@ -1,0 +1,12 @@
+Scenario: Presenting employment capabilities despite resume gaps and crisis circumstances
+    Given I have gaps in my employment history due to domestic violence and crisis
+    And potential employers may discriminate based on gaps or circumstances
+    When I apply for employment opportunities
+    Then the workplace_elohim helps me present my capabilities effectively
+    And provides strategies for explaining employment gaps honestly but strategically
+    And helps me articulate transferable skills and competencies
+    And recognizes my crisis navigation as demonstrating valuable skills
+    And validates that gaps don't erase my professional capability
+    And my personal_agent helps me craft application materials
+    And tracks my employment search efforts and outcomes
+    And celebrates my courage in seeking employment during recovery

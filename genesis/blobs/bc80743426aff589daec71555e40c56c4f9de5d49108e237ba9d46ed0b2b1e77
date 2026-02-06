@@ -1,0 +1,9 @@
+Scenario: Parent opposes park closure affecting children's play space
+    Given the municipality proposes closing neighborhood park
+    And selling land to developer "to increase tax revenue"
+    When the parent reviews Observer's park access analysis
+    Then they see this eliminates closest play space for 400 children
+    And understand remaining parks are across dangerous intersections
+    And view data on child physical activity and green space access
+    And connect with pediatricians concerned about children's health
+    And parent advocacy preserves children's play infrastructure

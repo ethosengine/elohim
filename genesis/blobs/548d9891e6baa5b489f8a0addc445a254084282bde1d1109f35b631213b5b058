@@ -1,0 +1,10 @@
+Scenario: Building household management skills incrementally
+    Given Aisha has never managed a household before
+    And she's learning essential adult skills
+    When Aisha uses household management features
+    Then the personal_agent should teach skills progressively
+    And it should provide checklists for routine maintenance
+    And it should remind her of non-obvious tasks (changing air filters, etc.)
+    And education should integrate with task management
+    And Aisha should build comprehensive household competence
+    And the learning curve should feel supportive, not judgmental

@@ -1,0 +1,10 @@
+Scenario: Household care tokens reflect combined family contributions
+    Given household participates in care token economy
+    And both adults and children contribute care labor
+    When household care tokens are calculated
+    Then tokens should accumulate from all members' contributions
+    And Sarah's care work should be valued appropriately
+    And partner's contributions should be recognized
+    And children's age-appropriate care work should count
+    And household should receive care token supplements for income level
+    And the scanner should be accessible regardless of economic status

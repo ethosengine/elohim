@@ -1,0 +1,11 @@
+Scenario: Family care coordination prevents caregiver burnout
+    Given Sarah provides most of Helen's family care
+    And unsustainable care burden causes burnout
+    When the family_elohim analyzes care patterns
+    Then it should identify when Sarah's burden is too heavy
+    And it should suggest care distribution across family members
+    And it should surface when professional support is needed
+    And it should intervene before crisis occurs
+    And Sarah should not have to advocate for her own limits
+    And the system should protect both Helen and Sarah
+    And sustainable multigenerational care should be built proactively

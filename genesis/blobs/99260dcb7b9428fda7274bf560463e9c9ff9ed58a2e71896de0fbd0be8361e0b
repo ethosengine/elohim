@@ -1,0 +1,9 @@
+Scenario: Parent challenges special education service cuts
+    Given the parent's child receives special education services
+    And the district proposes reducing support staff "for efficiency"
+    When the parent reviews Observer's analysis of legal requirements
+    Then they understand federal law mandates these services
+    And see which services would be cut and impacts on IEPs
+    And connect with other special education parents
+    And can cite specific legal protections in testimony
+    And district cannot quietly violate disability rights without accountability

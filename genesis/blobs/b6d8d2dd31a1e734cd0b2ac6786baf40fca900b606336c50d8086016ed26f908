@@ -1,0 +1,10 @@
+Scenario: Part-time work integrated with care economy understanding
+    Given Jasmine's income from work is part of her broader economic participation
+    And she also contributes unpaid household labor and community volunteering
+    When her personal_agent aggregates her economic activity
+    Then it should integrate paid work with other care contributions
+    And show that her economic life includes market and non-market work
+    And help her understand comprehensive view of her economic participation
+    And recognize that unpaid care work is as valuable as paid work
+    And build sophisticated understanding that economy is broader than paid employment
+    And internalize care economy framework as normal economic thinking

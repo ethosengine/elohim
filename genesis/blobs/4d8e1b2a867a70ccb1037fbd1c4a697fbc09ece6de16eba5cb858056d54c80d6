@@ -1,0 +1,11 @@
+Scenario: Comparative analysis of protocol adoption across 100+ nations
+    Given protocol has different adoption rates and outcomes globally
+    And I want to understand what predicts success across contexts
+    When I analyze adoption patterns and outcomes worldwide
+    Then I examine: economic factors (wealth, inequality, development stage)
+    And I assess: political factors (democracy, authoritarianism, stability)
+    And I explore: cultural factors (individualism, trust, religious tradition)
+    And I identify: historical factors (colonialism, technology access, institutional quality)
+    And I analyze: which factors are necessary, sufficient, or contingent
+    And My comparative research identifies: pathways to democratic AI governance
+    And Findings inform: international development and adoption strategies

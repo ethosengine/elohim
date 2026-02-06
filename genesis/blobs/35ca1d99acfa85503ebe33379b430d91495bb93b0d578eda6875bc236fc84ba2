@@ -1,0 +1,11 @@
+Scenario: Alex's chosen family recognized alongside biological family
+    Given Alex may have close relationships in disability community
+    And chosen family might be more supportive than biological family
+    When the family_elohim defines family relationships
+    Then it should include Alex's chosen family members
+    And disability community bonds should be recognized as family
+    And care flows with chosen family should be tracked and valued
+    And Alex should be able to define their own family
+    And the protocol should honor diverse family structures
+    And biological family should not be privileged over chosen family
+    And Alex's full support network should be acknowledged

@@ -1,0 +1,9 @@
+Scenario: Politician tracks accountability for climate action commitments
+    Given the politician pledged to reduce municipal carbon emissions
+    And committed to specific climate resilience investments
+    When the Observer monitors climate commitment implementation
+    Then they see actual emissions trends versus reduction targets
+    And identify which climate initiatives launched versus stalled
+    And understand budget allocation for climate versus other priorities
+    And receive alerts when commitments fall behind schedule
+    And maintain accountability for climate action promises

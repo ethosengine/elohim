@@ -1,0 +1,11 @@
+Scenario: End-of-life planning as family governance issue
+    Given Helen is facing mortality consciously
+    And her death will affect entire family
+    When family discusses Helen's end-of-life wishes
+    Then the family_elohim should facilitate dignity-preserving conversations
+    And Helen's wishes should be documented and shared with family
+    And family should understand and commit to honoring her preferences
+    And emotional complexity should be supported
+    And Helen's voice should be authoritative about her own death
+    And family should be prepared to advocate for her wishes
+    And the protocol should support family through end-of-life planning

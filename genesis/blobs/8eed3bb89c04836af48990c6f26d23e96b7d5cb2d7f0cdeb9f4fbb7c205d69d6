@@ -1,0 +1,10 @@
+Scenario: Neighborhood resource sharing reduces household costs
+    Given Margaret has tools, skills, and time
+    And she has limited budget for purchasing services
+    When the neighborhood_elohim coordinates resource sharing
+    Then Margaret should share tools she owns but neighbors need
+    And she should borrow tools she needs occasionally
+    And skill sharing should reduce need for paid services
+    And neighborhood tool library should benefit all members
+    And Margaret's resources should be accessible to community
+    And she should access neighbors' resources when needed

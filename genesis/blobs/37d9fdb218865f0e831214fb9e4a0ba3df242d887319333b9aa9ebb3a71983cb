@@ -1,0 +1,10 @@
+Scenario: Connection to community resources without stigma
+    Given Marcus's family needs support
+    And traditional social services often involve stigma
+    When Marcus accesses community resources
+    Then the protocol should preserve his dignity completely
+    And he should not feel like he's receiving charity
+    And the framing should always be reciprocal care exchange
+    And his contributions should be valued genuinely
+    And community support should strengthen rather than shame
+    And care economy should eliminate stigma from receiving help

@@ -1,0 +1,9 @@
+Scenario: Family care tokens reflect Maria's role as sole active parent
+    Given Maria provides all active parenting for three children
+    And she's performing care work of two parents alone
+    When family care tokens are calculated
+    Then Maria's tokens should reflect solo parenting of multiple children
+    And the protocol should recognize she's providing all emotional support, guidance, and presence
+    And her care contributions should be valued higher than partnered parents
+    And quantified solo parenting work should validate her superhuman efforts
+    And society should see undeniable proof that single parents deserve extraordinary support

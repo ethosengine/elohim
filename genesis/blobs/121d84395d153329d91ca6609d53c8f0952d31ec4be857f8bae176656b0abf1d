@@ -1,0 +1,87 @@
+@epic:public_observer
+@user_type:journalist
+@governance_layer:municipality
+@related_users:politician,activist,board_member,citizen,journalist
+@related_layers:community,county_regional,provincial_state
+@elohim_agents:public_observer,municipal_elohim,pattern_elohim
+
+Feature: City Hall Accountability Journalism for Journalist
+  As a journalist in the public_observer system
+  Operating at the municipality governance layer
+  I want comprehensive civic surveillance across all municipal bodies
+  So that accountability journalism survives despite newsroom cuts
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the journalist user is registered in the system
+    And the municipality governance context is active
+
+  Scenario: Journalist monitors 12 civic bodies with comprehensive surveillance
+    Given the journalist is sole reporter covering city hall
+    And must cover city council, planning, housing, transit, and 8 other bodies
+    When the Observer monitors all municipal meetings simultaneously
+    Then the journalist reviews every meeting that happened this week
+    And receives alerts prioritizing newsworthy decisions
+    And searches across all bodies for patterns and connections
+    And comprehensive municipal coverage replaces selective attention
+    And one reporter with Observer infrastructure outperforms pre-crisis newsroom
+
+  Scenario: Journalist exposes corruption through pattern recognition
+    Given a developer receives zoning variances in three meetings
+    And each approval seems procedurally normal in isolation
+    When the Observer tracks developer across all city bodies
+    Then the journalist sees developer got 8 variances in 18 months
+    And identifies campaign donations to council members before each vote
+    And finds same developer denied variances in other cities for violations
+    And documents revolving door between planning staff and developer
+    And publishes investigation exposing systematic corruption
+
+  Scenario: Journalist fact-checks mayor's budget claims in real-time
+    Given the mayor gives state of city address with budget claims
+    And the journalist watches speech with deadline pressure
+    When the Observer provides instant fact-checking against city records
+    Then the journalist verifies mayor claims crime is down (true by 3%)
+    And fact-checks claim of record affordable housing investment (false - down 12%)
+    And checks police budget claim against actual spending (misleading framing)
+    And publishes real-time fact-check during speech
+    And rhetoric meets evidence-based accountability immediately
+
+  Scenario: Journalist investigates municipal service delivery disparities
+    Given residents in certain neighborhoods report neglected infrastructure
+    And the journalist suspects systematic discrimination
+    When the Observer analyzes municipal operations by neighborhood
+    Then the journalist sees pothole repairs average 2 days in white areas
+    And same repairs take 47 days in Black neighborhoods
+    And code enforcement targets rental properties in immigrant communities
+    And documents service quality correlating with neighborhood race and income
+    And publishes investigation exposing structural racism in city operations
+
+  Scenario: Journalist tracks city promises to accountability
+    Given city council approved affordable housing plan 3 years ago
+    And the journalist covered initial announcement and then moved on
+    When the Observer alerts on promise implementation timeline
+    Then the journalist investigates and finds only 12% of promised units built
+    And sees budget that was supposed to fund program redirected elsewhere
+    And identifies which council members voted for budget changes
+    And publishes accountability story on broken housing commitments
+    And politicians learn promises will be tracked and verified
+
+  Scenario: Journalist develops whistleblower source on contract fraud
+    Given a city employee witnesses fraudulent contracting
+    And fears retaliation for speaking to press
+    When the Observer provides secure anonymous channel
+    Then the whistleblower shares documents through protected system
+    And journalist receives evidence of no-bid contracts to connected firms
+    And investigates without exposing source identity
+    And publishes investigation based on documents and additional reporting
+    And source protection enables accountability journalism
+
+  Scenario: Journalist compares city policies to neighboring municipalities
+    Given city council debates new approach to homelessness
+    And politicians claim no alternatives exist
+    When the Observer provides comparative policy analysis
+    Then the journalist sees 3 nearby cities using housing-first approach
+    And reviews outcome data showing reduced homelessness
+    And finds cost comparison showing housing cheaper than criminalization
+    And interviews officials in cities with successful programs
+    And publishes story presenting evidence-based alternatives

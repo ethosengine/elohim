@@ -1,0 +1,10 @@
+Scenario: Mental health and emotional support in student community
+    Given students face high stress, anxiety, and mental health challenges
+    And formal mental health services are often inadequate
+    When students provide emotional support to peers
+    Then the community_elohim should recognize emotional labor as care work
+    And it should value listening, validating, and supporting peers in crisis
+    And it should accumulate care tokens for emotional care work
+    And mental health support should be understood as community care
+    And the system should validate peer emotional support as real work
+    And student community should be recognized as mental health resource

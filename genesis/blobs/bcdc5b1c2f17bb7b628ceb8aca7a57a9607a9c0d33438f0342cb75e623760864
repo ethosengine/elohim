@@ -1,0 +1,10 @@
+Scenario: Serving on community boards and governance bodies
+    Given Margaret has time, experience, and judgment to contribute
+    And community boards need skilled, committed members
+    When Margaret serves on nonprofit boards or advisory committees
+    Then the community_elohim should recognize governance work
+    And it should value her time and expertise in decision-making
+    And it should track her board service as care contribution
+    And governance participation should accumulate care tokens
+    And community should benefit from her wisdom and service
+    And retired elders should be valued in community leadership

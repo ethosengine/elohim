@@ -1,0 +1,9 @@
+Scenario: Responsible developer demonstrates quality job creation
+    Given a responsible developer prioritizes workforce development
+    And creates genuine employment opportunities for local residents
+    When the Observer documents employment track record
+    Then analysis shows: 85% of jobs went to local residents
+    And median wage is $24/hour with benefits
+    And developer provides apprenticeship programs for construction trades
+    And permanent jobs offer career advancement opportunities
+    And quality employment becomes competitive advantage for approvals

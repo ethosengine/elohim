@@ -1,0 +1,10 @@
+Scenario: Balancing care contributions with household needs
+    Given Margaret provides extensive care outside her household
+    And household tasks still require attention
+    When the household_elohim monitors Margaret's overall care burden
+    Then it should track time spent on external care commitments
+    And it should ensure household needs aren't neglected
+    And it should flag if Margaret's care burden becomes overwhelming
+    And it should suggest balance between giving and self-care
+    And Margaret's own household should remain a priority
+    And burnout prevention should be built into system

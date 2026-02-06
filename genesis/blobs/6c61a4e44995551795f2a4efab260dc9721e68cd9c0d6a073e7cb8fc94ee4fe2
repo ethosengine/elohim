@@ -1,0 +1,10 @@
+Scenario: Teen participates in neighborhood care patterns as full member
+    Given Jasmine's neighborhood has established care economy practices
+    And she has accumulated care contributions across contexts
+    When Jasmine engages neighborhood-level activities
+    Then she should be recognized as a full participant, not a future member
+    And her care contributions should aggregate with neighbors' contributions
+    And she should have access to neighborhood collective resources
+    And the neighborhood_elohim should recognize her as a constitutional participant
+    And her voice should matter in neighborhood decisions
+    And she should experience being a valued member of her neighborhood community

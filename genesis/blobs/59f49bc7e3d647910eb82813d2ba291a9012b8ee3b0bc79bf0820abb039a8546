@@ -1,0 +1,9 @@
+Scenario: Owner lifts crushing burden of sole responsibility
+    Given Rosa carries weight of three employees' livelihoods alone
+    And she cannot vacation, get sick, or take breaks without business crisis
+    When EAE acquisition completes
+    Then Rosa is freed from sole responsibility for business survival
+    And employees are protected and elevated to co-owners
+    And Rosa can exit completely or stay as transition steward
+    And crushing weight of individual ownership is distributed democratically
+    And workplace_elohim ensures transition protects all parties

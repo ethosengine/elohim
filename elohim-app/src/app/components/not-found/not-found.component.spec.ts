@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { NotFoundComponent } from './not-found.component';
+
 import { SeoService } from '../../services/seo.service';
+
+import { NotFoundComponent } from './not-found.component';
 
 describe('NotFoundComponent', () => {
   let component: NotFoundComponent;
@@ -14,10 +16,7 @@ describe('NotFoundComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [NotFoundComponent],
-      providers: [
-        provideRouter([]),
-        { provide: SeoService, useValue: seoServiceSpy }
-      ]
+      providers: [provideRouter([]), { provide: SeoService, useValue: seoServiceSpy }],
     }).compileComponents();
 
     router = TestBed.inject(Router);
@@ -41,10 +40,12 @@ describe('NotFoundComponent', () => {
   it('should update SEO with noIndex on init', () => {
     fixture.detectChanges();
 
-    expect(seoServiceSpy.updateSeo).toHaveBeenCalledWith(jasmine.objectContaining({
-      title: 'Page Not Found',
-      noIndex: true
-    }));
+    expect(seoServiceSpy.updateSeo).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        title: 'Page Not Found',
+        noIndex: true,
+      })
+    );
   });
 
   it('should navigate to home', () => {

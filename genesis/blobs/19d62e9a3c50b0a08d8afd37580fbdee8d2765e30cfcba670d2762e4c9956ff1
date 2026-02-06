@@ -1,0 +1,10 @@
+Scenario: Community care economy prevents teen labor exploitation
+    Given Jasmine works part-time in retail
+    And young workers are vulnerable to exploitation
+    When her workplace conditions are monitored through community care economy
+    Then the community_elohim should track whether her labor is fairly compensated
+    And flag if work hours interfere with education or development
+    And recognize if workplace conditions become exploitative
+    And surface resources about worker rights and fair labor practices
+    And provide community support if she faces workplace problems
+    And demonstrate that care economy extends to protecting young workers

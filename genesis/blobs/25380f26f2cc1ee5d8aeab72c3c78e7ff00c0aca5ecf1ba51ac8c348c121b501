@@ -1,0 +1,9 @@
+Scenario: Voice guidance ensures accessibility for pre-readers
+    Given Tommy is 5 and may have limited reading ability
+    And accessibility is required for equitable education
+    When Tommy uses the educational features of the scanner
+    Then voice guidance should be available throughout
+    And visual feedback should be primary
+    And no reading ability should be required for core functionality
+    And audio should be warm, encouraging, and developmentally appropriate
+    And the system should be accessible to all children regardless of reading level

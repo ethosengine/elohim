@@ -1,0 +1,9 @@
+Scenario: Teacher reveals disparate working conditions
+    Given some teachers have adequate planning time while others don't
+    And resource distribution within school is inequitable
+    When the Observer documents working conditions by department
+    Then disparities become visible (English: 45min planning, Math: 90min)
+    And teachers identify structural causes vs individual complaints
+    And principal sees evidence requiring fair scheduling
+    And working conditions equity improves school-wide
+    And transparency drives fairness

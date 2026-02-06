@@ -1,0 +1,9 @@
+Scenario: Communication methods accommodate working single parent schedule
+    Given Maria cannot answer phone calls during work hours
+    And she manages communications for three children across different schools
+    When schools communicate with parents
+    Then the educational_elohim should coordinate school communications efficiently
+    And schools should use methods accessible to working parents (email, portal, evening calls)
+    And Maria should not miss critical information due to daytime-only communication
+    And communication should be consolidated and efficient for time-constrained parents
+    And schools should respect that single working parents have limited availability

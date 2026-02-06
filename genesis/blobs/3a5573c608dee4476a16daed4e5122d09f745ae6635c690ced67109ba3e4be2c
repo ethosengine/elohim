@@ -1,0 +1,9 @@
+Scenario: Teacher builds parent-teacher coalition for education quality
+    Given parents and teachers share commitment to student learning
+    But often lack coordination around education policy
+    When the Observer facilitates parent-teacher alignment
+    Then teachers share professional insights on education policy impacts
+    And parents provide family perspective on student experiences
+    And shared analysis reveals common interests (smaller classes, arts, counselors)
+    And parent-teacher coalition advocates together to decision-makers
+    And cross-stakeholder solidarity transforms education advocacy power

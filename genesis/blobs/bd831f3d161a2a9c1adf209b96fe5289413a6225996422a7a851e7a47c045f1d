@@ -1,0 +1,10 @@
+Scenario: Managing family crisis with supported participation
+    Given there's a family emergency requiring quick decisions
+    And Jordan's input is important but time is limited
+    When the family gathers to respond to the crisis
+    Then the personal_agent helps Jordan understand the situation quickly
+    And the interface presents information in most accessible format
+    And Jordan's voice is heard even under time pressure
+    And the family doesn't automatically exclude Jordan from decisions
+    And supported decision-making works even in crisis
+    And Jordan's family membership is honored in difficult times

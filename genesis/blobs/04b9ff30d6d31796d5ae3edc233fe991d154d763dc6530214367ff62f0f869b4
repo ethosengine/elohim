@@ -1,0 +1,10 @@
+Scenario: Teen learns bioregional water and energy systems
+    Given Jasmine lives in a watershed with specific water dynamics
+    And her consumption affects water and energy resources
+    When her personal_agent explains resource connections
+    Then it should teach her about local water sources and constraints
+    And show how her choices affect regional water availability
+    And explain energy systems powering her community
+    And connect individual consumption to collective resource management
+    And build understanding of herself as participant in bioregional systems
+    And develop ecological citizenship grounded in local ecosystems

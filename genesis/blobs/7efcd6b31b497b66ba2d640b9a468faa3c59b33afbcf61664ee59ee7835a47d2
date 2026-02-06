@@ -1,0 +1,12 @@
+Scenario: Managing educational implications of children's trauma behaviors
+    Given my children's trauma manifests in school behaviors (acting out, withdrawal, academic struggles)
+    And school may not understand trauma-informed responses
+    When children's trauma affects their school experience
+    Then the Value Scanner helps me advocate for trauma-informed school responses
+    And provides information on trauma's educational impacts
+    And helps schools understand children's behaviors as trauma responses, not "bad" behavior
+    And coordinates with school mental health support
+    And tracks children's behavioral patterns and triggers
+    And my personal_agent alerts me to concerning school incidents
+    And recognizes trauma advocacy as sophisticated parenting labor
+    And validates that trauma-informed education protects children

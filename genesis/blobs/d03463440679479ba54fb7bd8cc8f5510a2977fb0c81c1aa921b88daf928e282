@@ -1,0 +1,11 @@
+Scenario: Documenting medical discrimination and ableism
+    Given medical systems frequently discriminate against disabled people
+    And ableism in healthcare can be life-threatening
+    When Alex experiences medical discrimination
+    Then the personal_agent should help Alex document discriminatory incidents
+    And it should identify patterns of discriminatory treatment
+    And it should connect Alex to legal resources and advocacy organizations
+    And documentation should support complaints to licensing boards
+    And the protocol should take medical discrimination seriously
+    And Alex should have tools to protect themselves from medical harm
+    And systemic patterns should be made visible for accountability

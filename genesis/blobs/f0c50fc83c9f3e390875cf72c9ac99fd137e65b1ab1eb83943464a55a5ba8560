@@ -1,0 +1,9 @@
+Scenario: Customer experiences price reduction while worker wages increase
+    Given corporate model claimed low prices required low wages
+    And Ms. Johnson paid $9.99 for meal while workers earned $11/hour
+    When extraction is eliminated through democratic ownership
+    Then meal costs $8.99 (11% price reduction)
+    And workers earn $18/hour (64% wage increase)
+    And both price and wage improvements are possible by eliminating corporate extraction
+    And false trade-off between customer affordability and worker dignity is exposed
+    And community_elohim documents value distribution showing extraction was the real cost

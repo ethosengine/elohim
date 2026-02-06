@@ -1,0 +1,12 @@
+Scenario: Household consumption patterns analyzed for ecological impact
+    Given Robert's household consumes resources and generates waste
+    And consumption choices affect ecological systems
+    And middle-aged adults often have highest consumption footprint
+    When bioregional_elohim analyzes household ecological impact
+    Then it should track resource consumption, energy use, and waste generation
+    And surface patterns: "Your household consumes 40% above bioregional sustainable average"
+    And help Robert understand ecological impact of consumption choices
+    And connect consumption to bioregional carrying capacity
+    And support reduction strategies that maintain quality of life
+    And demonstrate that care economy includes ecological care
+    And build household practices that serve bioregional health

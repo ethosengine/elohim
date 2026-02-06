@@ -1,0 +1,10 @@
+Scenario: Moderator resolves conflict with restorative approach
+    Given two community members have an escalating disagreement
+    And the moderation agent alerts Alex to rising tension
+    When Alex reviews the full context and conversation history
+    And sees both parties have history of positive contributions
+    Then Alex initiates restorative dialogue process
+    And both parties can express their concerns privately
+    And Alex helps them find common ground and mutual understanding
+    And the conflict is resolved without punitive action
+    And both parties remain active, valued community members

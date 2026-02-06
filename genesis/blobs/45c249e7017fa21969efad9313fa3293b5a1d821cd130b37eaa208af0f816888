@@ -1,0 +1,12 @@
+Scenario: Tracking changing nutritional needs for health management
+    Given Margaret is managing early-stage diabetes
+    And she needs more protein and calcium, less sodium
+    And medications affect her appetite and digestion
+    When Margaret shops for groceries
+    Then her personal_agent should track nutrition across time
+    And it should suggest foods appropriate for her health conditions
+    And it should flag items high in sodium or sugar
+    And it should highlight protein and calcium-rich options
+    And it should help her balance health needs with budget constraints
+    And nutritional guidance should feel supportive, not controlling
+    And Margaret should maintain agency over food choices

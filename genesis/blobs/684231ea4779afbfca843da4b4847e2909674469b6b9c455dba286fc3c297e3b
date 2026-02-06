@@ -1,0 +1,11 @@
+Scenario: End-of-life ecological considerations in care planning
+    Given Helen is planning for end of life
+    And death has ecological dimensions
+    When Helen makes end-of-life care decisions
+    Then ecological options should be presented as available choices
+    And natural burial or green funeral options should be surfaced
+    And her values about environmental impact should extend through death
+    And the protocol should support ecological considerations in dying
+    And bioregional care economy should include sustainable death practices
+    And Helen's environmental values should guide her death as they guided her life
+    And end of life should be opportunity to minimize environmental harm

@@ -1,0 +1,10 @@
+Scenario: Alternative education models aligned with care economy
+    Given traditional higher education often fails care economy principles
+    And alternative models exist (cooperative education, free universities, community learning)
+    When Kenji explores educational alternatives
+    Then the educational_elohim should inform him of care-aligned options
+    And it should help him evaluate educational models against care principles
+    And it should recognize diverse pathways for learning and development
+    And the system should support student exploration of alternative education
+    And education should serve flourishing, not just credential accumulation
+    And care economy education should be accessible and diverse

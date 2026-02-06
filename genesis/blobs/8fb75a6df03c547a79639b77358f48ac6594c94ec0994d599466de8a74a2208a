@@ -1,0 +1,10 @@
+Scenario: Making the invisible mental load visible to self
+    Given Sarah manages complex care coordination across multiple people
+    And she tracks schedules, preferences, allergies, developmental needs, and household inventory
+    When the personal_agent monitors Sarah's cognitive labor
+    Then it should quantify the mental load she carries
+    And it should make visible the dozens of decisions she makes hourly
+    And it should show "Today you managed 127 care-related decisions"
+    And Sarah should see that her mental labor is real work
+    And the invisible should become undeniably visible
+    And her cognitive labor should be valued as professional-grade skill

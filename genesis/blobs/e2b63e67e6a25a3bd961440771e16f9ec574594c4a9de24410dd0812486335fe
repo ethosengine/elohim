@@ -1,0 +1,9 @@
+Scenario: Politician evaluates economic development subsidy proposal with accountability
+    Given corporation seeks tax breaks for promised job creation
+    And presents rosy projections of economic benefits
+    When the Observer analyzes company track record and subsidy impacts
+    Then they see company's job creation performance in other jurisdictions
+    And understand actual jobs created versus promised in past subsidies
+    And calculate public cost per job versus wage quality
+    And identify whether subsidized jobs pay living wages or require public assistance
+    And demand accountability provisions in economic development deals

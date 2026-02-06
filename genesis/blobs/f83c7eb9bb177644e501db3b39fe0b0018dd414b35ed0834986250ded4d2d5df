@@ -1,0 +1,12 @@
+Scenario: Receiving community support during acute crisis escalation
+    Given I am experiencing crisis escalation (domestic violence, housing loss, severe resource depletion)
+    And I need rapid community response
+    When acute crisis requires immediate support
+    Then the community_elohim coordinates rapid community response
+    And connects me to community members who can provide immediate help
+    And organizes material support, emergency housing, safety assistance
+    And provides crisis support with dignity and urgency
+    And validates that crisis escalation requires collective response
+    And my personal_agent alerts community to my urgent needs appropriately
+    And recognizes that care economy enables rapid crisis response
+    And ensures community mobilizes to support member in danger

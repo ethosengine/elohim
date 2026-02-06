@@ -1,0 +1,9 @@
+Scenario: Politician monitors municipal employment practices as major employer
+    Given the politician has authority over city or state employment
+    And serves as model employer in jurisdiction
+    When the Observer analyzes public sector employment patterns
+    Then they see whether public wages meet living wage standards
+    And identify disparities in public sector compensation by role
+    And understand whether public employment offers quality jobs
+    And learn contractor and subcontractor wage and labor practices
+    And ensure public sector models worker-centered employment practices

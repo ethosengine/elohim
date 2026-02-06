@@ -1,0 +1,11 @@
+Scenario: Participating in IDD cultural events and celebrations
+    Given the IDD community is hosting a pride celebration
+    And the event celebrates IDD culture, identity, and accomplishments
+    When Jordan attends the celebration
+    Then the personal_agent provides event details accessibly
+    And the entire event is designed for cognitive accessibility
+    And Jordan sees IDD peers being celebrated for their contributions
+    And Jordan participates in activities, performances, and community
+    And Jordan experiences IDD pride and cultural affirmation
+    And Jordan rejects ableist narratives of tragedy and burden
+    And Jordan celebrates disability as difference and community strength

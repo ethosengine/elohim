@@ -1,0 +1,11 @@
+Scenario: Reviewing my first appeal case with fellow council members
+    Given Marcus appealed his Family Elohim's mental health intervention decision
+    And I am reviewing this case with my diverse council
+    When we deliberate on whether the agent followed constitutional bounds
+    Then I bring: my nurse perspective on mental health and care
+    And retired teacher brings: education and developmental insights
+    And construction worker brings: working-class resource constraint understanding
+    And grad student brings: research and analytical skills
+    And business owner brings: economic and practical judgment
+    And together we form: collective wisdom greater than any individual
+    And we ask: "Did this demonstrate love as committed action?"

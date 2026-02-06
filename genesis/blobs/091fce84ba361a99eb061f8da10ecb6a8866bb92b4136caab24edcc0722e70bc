@@ -1,0 +1,12 @@
+Scenario: Maintaining children's nutrition on catastrophically limited food budget
+    Given I have approximately $X per week for groceries
+    And I need to provide nutritious meals for growing children
+    When I plan household meals and shopping
+    Then the Value Scanner helps me maximize nutrition within extreme constraints
+    And surfaces local food assistance programs and resources
+    And provides meal planning that works with my cooking capacity and time
+    And helps me navigate food pantries and assistance with dignity
+    And tracks children's nutritional needs and preferences
+    And my personal_agent suggests creative solutions for healthy eating on no money
+    And recognizes my food provision as sophisticated care economy work
+    And validates that feeding children well under these constraints is remarkable achievement

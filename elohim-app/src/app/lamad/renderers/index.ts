@@ -14,7 +14,7 @@ export { RendererInitializerService } from './renderer-initializer.service';
 export type {
   ContentRenderer,
   InteractiveRenderer,
-  RendererCompletionEvent
+  RendererCompletionEvent,
 } from './renderer-registry.service';
 
 // Built-in renderers

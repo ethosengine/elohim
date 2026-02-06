@@ -1,0 +1,9 @@
+Scenario: Reducing food waste through care economy planning
+    Given household food waste has environmental and economic costs
+    And Sarah wants to minimize waste
+    When Sarah plans shopping and meals
+    Then the bioregional_elohim should help prevent overbuying
+    And it should track household consumption patterns
+    And it should suggest portions appropriate to family size
+    And food waste should be minimized through better planning
+    And care for food should include using what is purchased

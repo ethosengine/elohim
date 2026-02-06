@@ -1,0 +1,10 @@
+Scenario: Neighborhood emotional support and parent mental health
+    Given parenting is emotionally intense and often isolating
+    And Sarah needs connection to parents who understand
+    When the neighborhood_elohim facilitates parent support
+    Then it should enable parent peer support groups
+    And it should provide spaces for parents to share struggles
+    And emotional support should be recognized as care labor
+    And receiving support should not be stigmatized
+    And parent mental health should be community priority
+    And the system should reduce parenting isolation

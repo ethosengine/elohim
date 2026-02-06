@@ -1,0 +1,9 @@
+Scenario: Journalist compares county policies to state and national patterns
+    Given county debates approach to criminal justice reform
+    And the journalist provides context on policy options
+    When the Observer enables comparative policy research
+    Then the journalist reviews outcomes from counties with reform policies
+    And analyzes data on recidivism, cost, and community safety
+    And interviews officials and residents in comparison jurisdictions
+    And provides evidence-based policy journalism
+    And regional coverage connects to national criminal justice debate

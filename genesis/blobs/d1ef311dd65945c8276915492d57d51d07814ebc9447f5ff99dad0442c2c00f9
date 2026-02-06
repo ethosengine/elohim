@@ -1,0 +1,119 @@
+# Stakeholder Roles: Who Participates in AI Governance
+
+## Beyond "Users and Developers"
+
+Traditional software has two main roles: people who build it and people who use it. AI governance requires a richer taxonomy.
+
+Why? Because AI decisions affect people who never chose to interact with the system. The person denied a loan, the community subjected to predictive policing, the workers displaced by automation—they're stakeholders whether they signed up or not.
+
+## The Stakeholder Map
+
+### Appellants
+**Who**: Anyone adversely affected by an AI decision
+**Role**: Challenge specific decisions, surface problems
+**Powers**: 
+- File appeals at appropriate level
+- Access explanation of decisions affecting them
+- Participate in hearings about their cases
+
+**For policy makers**: This role needs legal protection and accessible processes.
+
+### Community Leaders
+**Who**: Representatives of affected communities
+**Role**: Aggregate concerns, represent collective interests
+**Powers**:
+- Propose agenda items for council review
+- Participate in policy development
+- Communicate between communities and governance bodies
+
+**For influencers**: This might be you—translating between systems and the people they affect.
+
+### Constitutional Council Members
+**Who**: Appointed or elected oversight body members
+**Role**: Set policy, review systemic issues, adjudicate appeals
+**Powers**:
+- Vote on constraint changes
+- Commission investigations
+- Modify system parameters
+
+**For policy makers**: This is the governance role you understand—but applied to AI.
+
+### Policy Makers
+**Who**: Government officials, regulatory bodies
+**Role**: Set legal framework, enforce compliance
+**Powers**:
+- Define mandatory requirements
+- Investigate violations
+- Impose penalties
+
+**This is you**: The Elohim framework gives you levers that actually work at AI speed.
+
+### Researchers
+**Who**: Academic and independent researchers
+**Role**: Study system behavior, identify problems, propose solutions
+**Powers**:
+- Access data for research (with appropriate protections)
+- Publish findings
+- Advise councils
+
+**For developers**: This is the external validation that makes your systems trustworthy.
+
+### Technical Experts
+**Who**: Engineers, data scientists, AI researchers
+**Role**: Implement constraints, evaluate feasibility, translate
+**Powers**:
+- Assess technical implications of proposed policies
+- Implement approved changes
+- Flag infeasibility or unintended consequences
+
+**For developers**: This is your primary role—but accountable to the broader stakeholder system.
+
+## How Roles Interact
+
+```
+Appellants → surface problems → Community Leaders
+                                      ↓
+                              Council Members ← Researchers
+                                      ↓
+                              Policy Makers
+                                      ↓
+                              Technical Experts → implement → System
+                                      ↓
+                              [Feedback to Appellants]
+```
+
+No single role has complete authority. Each constrains and enables the others.
+
+## The Elohim: Your AI Representative
+
+Every individual in the Elohim system has an AI assistant—their personal Elohim. This assistant:
+- Explains decisions that affect you
+- Helps navigate governance processes
+- Advocates for your interests within constitutional bounds
+- Learns your values and context
+
+**For content creators**: Imagine an AI that actually works for you, not for advertisers.
+
+## Governance Layers
+
+Stakeholder roles exist at every governance layer:
+
+| Layer | Example Appellants | Example Councils |
+|-------|-------------------|------------------|
+| Individual | Personal AI users | User-level constraints |
+| Family | Family members | Household governance |
+| Community | Neighborhood residents | Community councils |
+| Municipal | City residents | Municipal AI oversight |
+| Regional | State/province residents | Regional coordination |
+| National | Citizens | National AI policy |
+| Global | Everyone | Global commons governance |
+
+## Getting Involved
+
+You don't need to wait for the full system:
+- **Policy makers**: Start requiring stakeholder input in AI procurement
+- **Developers**: Build feedback mechanisms into your systems
+- **Influencers**: Amplify affected community voices
+- **Everyone**: Pay attention to AI decisions in your life
+
+Constitutional AI governance starts with recognizing that you're a stakeholder.
