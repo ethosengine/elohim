@@ -212,7 +212,7 @@ spec:
         # Production uses versioned tags for stability
         - name: doorway
           image: harbor.ethosengine.com/ethosengine/elohim-doorway:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - "--listen"
             - "0.0.0.0:8080"
@@ -268,7 +268,7 @@ spec:
         # hApp is fetched by init container, not baked into image
         - name: happ-installer
           image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: CONDUCTOR_URL
               value: "ws://localhost:4444"
@@ -294,7 +294,7 @@ spec:
         # Handles heavy R/W operations, forwards to conductor
         - name: elohim-storage
           image: harbor.ethosengine.com/ethosengine/elohim-storage:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: RUST_LOG
               value: "warn,elohim_storage=info"
@@ -338,7 +338,7 @@ spec:
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
           image: harbor.ethosengine.com/ethosengine/doorway-app:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: operator-ui
               containerPort: 80
