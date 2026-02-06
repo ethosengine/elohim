@@ -393,7 +393,13 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   private handleError(err: unknown): void {
-    this.error = err instanceof Error ? err.message : 'Failed to load learning path';
+    if (err instanceof Error) {
+      this.error = err.message;
+    } else if (typeof err === 'object' && err !== null && 'message' in err) {
+      this.error = String((err as { message: unknown }).message);
+    } else {
+      this.error = 'Failed to load learning path';
+    }
     this.isLoading = false;
   }
 

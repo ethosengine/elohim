@@ -89,7 +89,7 @@ const _CHECK_TIMEOUT = 5_000;
 // Service Implementation
 // =============================================================================
 
-const UNKNOWN_ERROR = UNKNOWN_ERROR;
+const UNKNOWN_ERROR = 'Unknown error';
 
 @Injectable({ providedIn: 'root' })
 export class HealthCheckService implements OnDestroy {

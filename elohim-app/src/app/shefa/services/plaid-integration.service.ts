@@ -84,6 +84,7 @@ interface PlaidTransactionSyncResponse {
 
 /** Shape of Plaid /transactions/get request body */
 interface PlaidTransactionsRequest {
+  [key: string]: unknown;
   access_token: string;
   start_date: string;
   end_date: string;
@@ -94,6 +95,7 @@ interface PlaidTransactionsRequest {
 
 /** Shape of Plaid /transactions/sync request body */
 interface PlaidTransactionSyncRequest {
+  [key: string]: unknown;
   access_token: string;
   options: { include_personal_finance_category: boolean; include_counterparties: boolean };
   cursor?: string;
@@ -235,7 +237,7 @@ export class PlaidIntegrationService {
   private exchangePublicToken(
     publicToken: string
   ): Observable<{ accessToken: string; itemId: string }> {
-    const env = environment as Record<string, unknown>;
+    const env = environment as unknown as Record<string, unknown>;
     const plaid = (env['plaid'] as Record<string, string> | undefined) ?? {};
     const requestBody = {
       public_token: publicToken,

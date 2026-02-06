@@ -155,9 +155,13 @@ export class TauriAuthService {
     const { listen } = window.__TAURI__.event;
 
     // Listen for OAuth callback from deep link
-    this.unsubscribeOAuthCallback = await listen<OAuthCallbackPayload>('oauth-callback', event => {
-      void this.handleOAuthCallback(event.payload);
-    });
+    this.unsubscribeOAuthCallback = await listen<OAuthCallbackPayload>(
+      'oauth-callback',
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises -- callback must be async to await OAuth flow
+      async event => {
+        await this.handleOAuthCallback(event.payload);
+      }
+    );
 
     // Listen for deep link errors
     this.unsubscribeDeepLinkError = await listen<DeepLinkError>('deep-link-error', event => {

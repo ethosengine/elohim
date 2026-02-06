@@ -314,7 +314,7 @@ export class ContentService {
         const contentBody = data.contentBody ?? '';
 
         const isBlobReference =
-          contentBody.startsWith('sha256:') ?? contentBody.startsWith('sha256-');
+          contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
         const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 

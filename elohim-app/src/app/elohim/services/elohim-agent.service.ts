@@ -42,7 +42,7 @@ import { DataLoaderService } from './data-loader.service';
  * 3. Spiral detection: Request monitoring → Get intervention suggestions
  * 4. Path analysis: Request analysis → Get improvement suggestions
  */
-const CAPABILITY_ATTESTATION_RECOMMENDATION = CAPABILITY_ATTESTATION_RECOMMENDATION;
+const CAPABILITY_ATTESTATION_RECOMMENDATION = 'attestation-recommendation';
 
 @Injectable({ providedIn: 'root' })
 export class ElohimAgentService {
@@ -399,7 +399,7 @@ export class ElohimAgentService {
     const times: Partial<Record<ElohimCapability, number>> = {
       'content-safety-review': 1500,
       'accuracy-verification': 2000,
-      CAPABILITY_ATTESTATION_RECOMMENDATION: 1200,
+      [CAPABILITY_ATTESTATION_RECOMMENDATION]: 1200,
       'knowledge-map-synthesis': 3000,
       'spiral-detection': 800,
       'path-analysis': 2500,
