@@ -170,7 +170,7 @@ export class RegisterComponent implements OnInit {
     if (this.hasSession()) {
       const session = this.sessionHumanService.getSession();
       if (session) {
-        this.form.displayName = session.displayName !== 'Traveler' ? session.displayName : '';
+        this.form.displayName = session.displayName === 'Traveler' ? '' : session.displayName;
         this.form.bio = session.bio ?? '';
         this.form.affinities = session.interests?.join(', ') ?? '';
       }

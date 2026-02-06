@@ -473,9 +473,9 @@ export class TrustBadgeService {
         label: 'Endorse',
         icon: '👍',
         available: agentAttestations.includes('community-member'),
-        unavailableReason: !agentAttestations.includes('community-member')
-          ? 'Requires community membership'
-          : undefined,
+        unavailableReason: agentAttestations.includes('community-member')
+          ? undefined
+          : 'Requires community membership',
       });
     }
 

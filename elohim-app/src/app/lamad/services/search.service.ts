@@ -169,7 +169,7 @@ export class SearchService {
         contentType: 'path' as ContentType,
         tags: path.tags ?? [],
         reach: 'commons' as ContentReach, // Paths are typically commons
-        trustScore: 1.0,
+        trustScore: 1,
         createdAt: pathRecord['createdAt'] as string | undefined,
         updatedAt: pathRecord['updatedAt'] as string | undefined,
       };
@@ -194,7 +194,7 @@ export class SearchService {
         contentType: 'path',
         tags: path.tags ?? [],
         reach: 'commons',
-        trustScore: 1.0,
+        trustScore: 1,
         trustLevel: 'trusted' as TrustLevel,
         hasFlags: false,
         relevanceScore: score,
@@ -414,7 +414,7 @@ export class SearchService {
         contentType: node.contentType,
         tags: node.tags ?? [],
         reach: node.reach ?? 'commons',
-        trustScore: node.trustScore ?? 1.0,
+        trustScore: node.trustScore ?? 1,
         trustLevel,
         hasFlags: (node.flags ?? []).length > 0,
         relevanceScore: score,
@@ -459,12 +459,12 @@ export class SearchService {
   }
 
   private passesTagFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
-    const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
+    const nodeTags = new Set((node.tags ?? []).map(t => t.toLowerCase()));
 
     if (
       query.tags &&
       query.tags.length > 0 &&
-      !query.tags.some(t => nodeTags.includes(t.toLowerCase()))
+      !query.tags.some(t => nodeTags.has(t.toLowerCase()))
     ) {
       return false;
     }
@@ -472,7 +472,7 @@ export class SearchService {
     if (
       query.requiredTags &&
       query.requiredTags.length > 0 &&
-      !query.requiredTags.every(t => nodeTags.includes(t.toLowerCase()))
+      !query.requiredTags.every(t => nodeTags.has(t.toLowerCase()))
     ) {
       return false;
     }
@@ -482,7 +482,7 @@ export class SearchService {
 
   private passesTrustScoreFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
     if (query.minTrustScore === undefined) return true;
-    const trustScore = node.trustScore ?? 1.0;
+    const trustScore = node.trustScore ?? 1;
     return trustScore >= query.minTrustScore;
   }
 
@@ -601,13 +601,13 @@ export class SearchService {
    */
   private getMatchType(text: string, word: string): keyof typeof SEARCH_MATCH_BONUSES | null {
     // Check for exact word match (word boundaries)
-    const exactRegex = new RegExp(`\\b${this.escapeRegex(word)}\\b`, 'i');
+    const exactRegex = new RegExp(String.raw`\b${this.escapeRegex(word)}\b`, 'i');
     if (exactRegex.test(text)) {
       return 'exactMatch';
     }
 
     // Check for prefix match (word starts with search term)
-    const prefixRegex = new RegExp(`\\b${this.escapeRegex(word)}`, 'i');
+    const prefixRegex = new RegExp(String.raw`\b${this.escapeRegex(word)}`, 'i');
     if (prefixRegex.test(text)) {
       return 'prefixMatch';
     }
@@ -624,7 +624,7 @@ export class SearchService {
    * Escape special regex characters.
    */
   private escapeRegex(str: string): string {
-    return str.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   }
 
   // ===========================================================================

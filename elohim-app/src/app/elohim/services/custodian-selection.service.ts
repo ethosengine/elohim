@@ -271,10 +271,10 @@ export class CustodianSelectionService {
    */
   private calculateLatencyScore(latencyMs: number): number {
     if (latencyMs > 2000) return 0;
-    if (latencyMs < 50) return 1.0;
+    if (latencyMs < 50) return 1;
 
     // Linear interpolation
-    return 1.0 - (latencyMs - 50) / (2000 - 50);
+    return 1 - (latencyMs - 50) / (2000 - 50);
   }
 
   /**
@@ -290,7 +290,7 @@ export class CustodianSelectionService {
     if (utilizationPercent > 95) return 0;
     if (utilizationPercent > 80) return 0.25;
     if (utilizationPercent > 50) return 0.75;
-    return 1.0;
+    return 1;
   }
 
   /**

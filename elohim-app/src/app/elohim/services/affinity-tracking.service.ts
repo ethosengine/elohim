@@ -86,7 +86,7 @@ export class AffinityTrackingService implements OnDestroy {
    * @returns Affinity value (0.0 to 1.0), defaults to 0.0
    */
   getAffinity(nodeId: string): number {
-    return this.affinitySubject.value.affinity[nodeId] ?? 0.0;
+    return this.affinitySubject.value.affinity[nodeId] ?? 0;
   }
 
   /**
@@ -96,7 +96,7 @@ export class AffinityTrackingService implements OnDestroy {
    */
   setAffinity(nodeId: string, value: number): void {
     // Clamp value between 0.0 and 1.0
-    const clampedValue = Math.max(0.0, Math.min(1.0, value));
+    const clampedValue = Math.max(0, Math.min(1, value));
     const oldValue = this.getAffinity(nodeId);
 
     if (oldValue === clampedValue) {
@@ -178,7 +178,7 @@ export class AffinityTrackingService implements OnDestroy {
     const typeMap = new Map<string, number[]>();
 
     nodes.forEach(node => {
-      const nodeAffinity = affinity[node.id] || 0.0;
+      const nodeAffinity = affinity[node.id] || 0;
 
       // Track engagement
       if (nodeAffinity > 0) {

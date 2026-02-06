@@ -171,7 +171,7 @@ export class PathContextService {
 
     // If there are more detours, return to the previous detour's content
     if (current.detourStack.length > 0) {
-      const previousDetour = current.detourStack[current.detourStack.length - 1];
+      const previousDetour = current.detourStack.at(-1)!;
       return ['/lamad/resource', previousDetour.toContentId];
     }
 

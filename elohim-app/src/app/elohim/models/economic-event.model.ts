@@ -905,12 +905,12 @@ export function transformEventFromWire(wire: EconomicEventWire): EconomicEvent {
     receiver: wire.receiver,
     resourceConformsTo: wire.resourceConformsTo ?? undefined,
     resourceQuantity:
-      wire.resourceQuantityValue !== null
-        ? {
+      wire.resourceQuantityValue === null
+        ? undefined
+        : {
             hasNumericalValue: wire.resourceQuantityValue,
             hasUnit: wire.resourceQuantityUnit ?? 'unit-each',
-          }
-        : undefined,
+          },
     hasPointInTime: wire.hasPointInTime,
     state: wire.state as EventState,
     metadata,

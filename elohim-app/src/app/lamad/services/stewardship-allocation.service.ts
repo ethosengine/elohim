@@ -331,7 +331,7 @@ export class StewardshipAllocationService {
     const inputs: CreateAllocationInput[] = contentIds.map(contentId => ({
       contentId,
       stewardPresenceId,
-      allocationRatio: 1.0,
+      allocationRatio: 1,
       allocationMethod: 'manual',
       contributionType,
       note: 'Bootstrap steward assignment',

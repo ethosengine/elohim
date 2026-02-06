@@ -477,7 +477,7 @@ export class BlobManagerService {
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    a.remove();
     this.revokeBlobUrl(url);
   }
 

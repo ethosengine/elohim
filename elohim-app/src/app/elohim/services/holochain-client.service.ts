@@ -501,7 +501,7 @@ export class HolochainClientService {
     const connectionValidation = await this.validateConnection(callContext, timer);
     if (!connectionValidation.valid) {
       // Non-null assertion needed: TypeScript doesn't narrow discriminated unions correctly here
-      return connectionValidation.error!;
+      return connectionValidation.error;
     }
 
     const { appWs, cellIds } = connectionValidation;
@@ -509,11 +509,11 @@ export class HolochainClientService {
     // Look up the correct cell ID for this role
     const cellIdResult = this.getCellIdForRole(cellIds, roleName, callContext, timer);
     if (!cellIdResult.success) {
-      return cellIdResult.error!;
+      return cellIdResult.error;
     }
 
     // Execute the zome call
-    return this.executeZomeCall(appWs, cellIdResult.cellId!, input, callContext, timer);
+    return this.executeZomeCall(appWs, cellIdResult.cellId, input, callContext, timer);
   }
 
   /**
@@ -685,7 +685,7 @@ export class HolochainClientService {
     // Ensure we have cell IDs for DNA hash lookup
     const cellIdsResult = await this.ensureCellIds(startTime);
     if (!cellIdsResult.success) {
-      return cellIdsResult.error!;
+      return cellIdsResult.error;
     }
 
     const { cellIds } = cellIdsResult;
@@ -693,11 +693,11 @@ export class HolochainClientService {
     // Look up the correct cell ID for this role
     const cellIdResult = this.lookupCellId(cellIds, roleName, startTime);
     if (!cellIdResult.success) {
-      return cellIdResult.error!;
+      return cellIdResult.error;
     }
 
     // Build REST API URL
-    const dnaHash = this.uint8ArrayToBase64(cellIdResult.cellId![0]);
+    const dnaHash = this.uint8ArrayToBase64(cellIdResult.cellId[0]);
     const restUrl = this.resolveRestUrl(dnaHash, input.zomeName, input.fnName);
 
     // Execute the REST call

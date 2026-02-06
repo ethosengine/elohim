@@ -334,12 +334,18 @@ describe('BlobManagerService', () => {
       const filename = 'test.mp4';
 
       spyOn(document.body, 'appendChild');
-      spyOn(document.body, 'removeChild');
+      const removeSpy = jasmine.createSpy('remove');
+      spyOn(document, 'createElement').and.returnValue({
+        set href(_: string) { /* noop */ },
+        set download(_: string) { /* noop */ },
+        click: jasmine.createSpy('click'),
+        remove: removeSpy,
+      } as unknown as HTMLElement);
 
       service.downloadBlobToFile(blob, filename);
 
       expect(document.body.appendChild).toHaveBeenCalled();
-      expect(document.body.removeChild).toHaveBeenCalled();
+      expect(removeSpy).toHaveBeenCalled();
     });
 
     it('createBlobUrl should return string', () => {

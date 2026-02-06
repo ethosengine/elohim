@@ -674,7 +674,7 @@ export class BlobStreamingService {
       return {
         variant: 'default',
         bitrateMbps: blob.bitrateMbps ?? 5,
-        reasoningScore: 1.0,
+        reasoningScore: 1,
       };
     }
 

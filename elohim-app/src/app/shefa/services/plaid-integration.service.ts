@@ -145,7 +145,7 @@ export class PlaidIntegrationService {
       return {
         token: linkToken,
         userId: stewardId,
-        redirectUrl: `${window.location.origin}/shefa/plaid-callback`,
+        redirectUrl: `${globalThis.location.origin}/shefa/plaid-callback`,
       };
     } catch (error) {
       throw new Error('Failed to initiate Plaid connection: ' + String(error));
@@ -500,8 +500,8 @@ export class PlaidIntegrationService {
 
       // Extract components
       const iv = combined.slice(0, 12);
-      const salt = combined.slice(combined.length - 32); // 32 bytes for salt
-      const ciphertext = combined.slice(12, combined.length - 32);
+      const salt = combined.slice(-32); // 32 bytes for salt
+      const ciphertext = combined.slice(12, -32);
 
       // Derive key using same salt
       const derivedKey = await this.deriveEncryptionKey(salt ?? undefined);

@@ -353,7 +353,7 @@ export function highlightMatches(text: string, query: string): string {
  * Escape special regex characters.
  */
 function escapeRegex(str: string): string {
-  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 /**

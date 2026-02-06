@@ -10,12 +10,7 @@ import { InjectionToken, Provider } from '@angular/core';
 
 // @coverage: 100.0% (2026-02-05)
 
-import {
-  ElohimClient,
-  ElohimClientConfig,
-  detectClientMode,
-  ReachLevel,
-} from '@elohim/service/client';
+import { ElohimClient, ElohimClientConfig } from '@elohim/service/client';
 
 /**
  * Local injection token for ElohimClient
@@ -43,7 +38,12 @@ export function provideElohimClient(config: ElohimClientConfig): Provider[] {
 }
 
 // Re-export class and functions (values)
-export { ElohimClient, detectClientMode, ReachLevel };
 
 // Re-export types
-export type { ElohimClientConfig };
+
+export {
+  detectClientMode,
+  ElohimClient,
+  ReachLevel,
+  type ElohimClientConfig,
+} from '@elohim/service/client';

@@ -271,15 +271,15 @@ export class InsuranceMutualService {
     const allMemberEvents = await firstValueFrom(
       this.economicService.getEventsForAgent(memberId, 'provider')
     );
-    const relevantEventTypes = [
+    const relevantEventTypes = new Set([
       'preventive-care-completed',
       'community-support-provided',
       'claim-filed',
       'risk-reduction-verified',
-    ];
+    ]);
     const memberEvents = allMemberEvents.filter(e => {
       const eventType = e.metadata?.['lamadEventType'];
-      return typeof eventType === 'string' && relevantEventTypes.includes(eventType);
+      return typeof eventType === 'string' && relevantEventTypes.has(eventType);
     });
 
     // Step 3: Extract care maintenance score from preventive events
@@ -1655,7 +1655,7 @@ function calculateCommunityConnectednessScore(supportEvents: EconomicEvent[]): n
  */
 function calculateHistoricalClaimsRate(claimEvents: EconomicEvent[], previousRate: number): number {
   // Assume 1-year assessment period
-  const currentRate = Math.min(1.0, claimEvents.length / 10);
+  const currentRate = Math.min(1, claimEvents.length / 10);
 
   // Exponential smoothing: 70% old rate, 30% new rate
   const smoothedRate = previousRate * 0.7 + currentRate * 0.3;

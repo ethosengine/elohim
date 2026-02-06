@@ -91,7 +91,7 @@ export interface DiscussionMessage {
  * - Escalation paths are constitutional
  * - Feedback loops are visible
  */
-const ACTIVE_CHALLENGE_STATUSES = ['acknowledged', 'under-review'];
+const ACTIVE_CHALLENGE_STATUSES = new Set(['acknowledged', 'under-review']);
 
 @Injectable({ providedIn: 'root' })
 export class GovernanceService {
@@ -134,8 +134,7 @@ export class GovernanceService {
       this.getDiscussions(),
     ]).pipe(
       map(([challenges, proposals, precedents, discussions]) => ({
-        activeChallenges: challenges.filter(c => ACTIVE_CHALLENGE_STATUSES.includes(c.status))
-          .length,
+        activeChallenges: challenges.filter(c => ACTIVE_CHALLENGE_STATUSES.has(c.status)).length,
         votingProposals: proposals.filter(p => p.status === 'voting').length,
         recentPrecedents: precedents.filter(p => p.status === 'active').length,
         activeDiscussions: discussions.filter(d => d.status === 'active').length,
@@ -173,7 +172,7 @@ export class GovernanceService {
    */
   isEntityChallenged(entityType: string, entityId: string): Observable<boolean> {
     return this.getChallengesForEntity(entityType, entityId).pipe(
-      map(challenges => challenges.some(c => ACTIVE_CHALLENGE_STATUSES.includes(c.status)))
+      map(challenges => challenges.some(c => ACTIVE_CHALLENGE_STATUSES.has(c.status)))
     );
   }
 
@@ -485,7 +484,7 @@ export class GovernanceService {
       map(challenges =>
         challenges.filter(c => {
           if (!c.slaDeadline) return false;
-          if (!ACTIVE_CHALLENGE_STATUSES.includes(c.status)) return false;
+          if (!ACTIVE_CHALLENGE_STATUSES.has(c.status)) return false;
 
           const deadline = new Date(c.slaDeadline);
           return deadline <= cutoff;

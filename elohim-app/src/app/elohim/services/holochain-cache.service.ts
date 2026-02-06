@@ -101,7 +101,7 @@ export class HolochainCacheService {
   /**
    * Ensure database is initialized before operations
    */
-  private ensureInitialized(): Promise<void> {
+  private async ensureInitialized(): Promise<void> {
     this.initPromise ??= this.initDatabase();
     return this.initPromise;
   }
@@ -163,14 +163,14 @@ export class HolochainCacheService {
     if (this.db) {
       const entry = await this.getFromIndexedDB(key);
       if (entry) {
-        if (!this.isExpired(entry)) {
+        if (this.isExpired(entry)) {
+          // Expired - remove from L2
+          await this.deleteFromIndexedDB(key);
+        } else {
           // Load to L1 for next access
           this.memoryCache.set(key, entry);
           this.stats.update(s => ({ ...s, hits: s.hits + 1 }));
           return entry.value as T;
-        } else {
-          // Expired - remove from L2
-          await this.deleteFromIndexedDB(key);
         }
       }
     }

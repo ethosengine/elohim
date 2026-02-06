@@ -195,10 +195,10 @@ export class IframeRendererComponent implements OnChanges {
    * Detect if running in Eclipse Che environment (via Che endpoint URL).
    */
   private isCheEnvironment(): boolean {
-    if (typeof window === 'undefined') return false;
+    if (globalThis.window === undefined) return false;
     return (
-      window.location.hostname.includes('.devspaces.') ||
-      window.location.hostname.includes('.code.ethosengine.com')
+      globalThis.location.hostname.includes('.devspaces.') ||
+      globalThis.location.hostname.includes('.code.ethosengine.com')
     );
   }
 
@@ -206,8 +206,10 @@ export class IframeRendererComponent implements OnChanges {
    * Detect local development environment.
    */
   private isLocalDevelopment(): boolean {
-    if (typeof window === 'undefined') return false;
-    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (globalThis.window === undefined) return false;
+    return (
+      globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1'
+    );
   }
 
   /**
@@ -215,7 +217,7 @@ export class IframeRendererComponent implements OnChanges {
    * Converts angular-dev endpoint to hc-dev endpoint.
    */
   private getCheDevProxyUrl(): string | null {
-    const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
+    const hostname = globalThis.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
     return `https://${hostname}`;
   }
 

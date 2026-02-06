@@ -100,6 +100,7 @@ export class TauriAuthService {
    * Check if running in Tauri environment.
    */
   isTauriEnvironment(): boolean {
+    // eslint-disable-next-line unicorn/prefer-global-this -- window is correct here: Tauri extends Window, not globalThis
     return typeof window !== 'undefined' && '__TAURI__' in window;
   }
 
@@ -148,10 +149,12 @@ export class TauriAuthService {
    * Set up Tauri event listeners for OAuth callbacks.
    */
   private async setupEventListeners(): Promise<void> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     if (!window.__TAURI__?.event) {
       return;
     }
 
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     const { listen } = window.__TAURI__.event;
 
     // Listen for OAuth callback from deep link
@@ -195,8 +198,7 @@ export class TauriAuthService {
         throw new Error(`Session API error: ${response.status}`);
       }
 
-      const session = (await response.json()) as LocalSession;
-      return session;
+      return (await response.json()) as LocalSession;
     } catch (err) {
       // Session retrieval failure is non-critical - returns null to allow app to continue
       // This can happen if sidecar is not running or network is unavailable

@@ -97,6 +97,6 @@ export class LamadNotFoundComponent implements OnInit {
    * Go back to previous page
    */
   goBack(): void {
-    window.history.back();
+    globalThis.history.back();
   }
 }

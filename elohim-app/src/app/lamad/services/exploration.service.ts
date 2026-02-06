@@ -286,9 +286,9 @@ export class ExplorationService {
             attestationRequired: requiredAttestation ?? undefined,
             rateLimitImpact: `${agentStatus.explorationRemaining} of ${agentStatus.explorationLimit} queries remaining this hour`,
             canExecute: canAfford,
-            blockedReason: !canAfford
-              ? this.getBlockedReason(depth, agentStatus.maxDepth)
-              : undefined,
+            blockedReason: canAfford
+              ? undefined
+              : this.getBlockedReason(depth, agentStatus.maxDepth),
           };
         }
 
@@ -303,7 +303,7 @@ export class ExplorationService {
             attestationRequired: TIER_PATH_CREATOR,
             rateLimitImpact: `${agentStatus.pathfindingRemaining} of ${agentStatus.pathfindingLimit} pathfinding queries remaining`,
             canExecute: canAfford,
-            blockedReason: !canAfford ? ('insufficient-attestation' as const) : undefined,
+            blockedReason: canAfford ? undefined : ('insufficient-attestation' as const),
           };
         }
 
@@ -786,9 +786,9 @@ export class ExplorationService {
         }
 
         const allowed = requestedDepth <= maxDepth;
-        const requiredAttestation = !allowed
-          ? DEPTH_ATTESTATION_REQUIREMENTS[requestedDepth]
-          : undefined;
+        const requiredAttestation = allowed
+          ? undefined
+          : DEPTH_ATTESTATION_REQUIREMENTS[requestedDepth];
 
         return {
           allowed,

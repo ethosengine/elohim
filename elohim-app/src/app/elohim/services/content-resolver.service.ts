@@ -66,15 +66,6 @@ import type {
 } from '@elohim/service/connection';
 
 // Re-export types and enums for convenience
-export {
-  SourceTier,
-  type IContentResolver,
-  type ResolutionResult,
-  type ResolutionError,
-  type AppResolutionResult,
-  type ResolverStats,
-  type SourceInfo,
-};
 
 /** Service state */
 export type ResolverServiceState = 'uninitialized' | 'initializing' | 'ready' | 'error';
@@ -911,3 +902,13 @@ export class ContentResolverService implements OnDestroy {
     this.stateSubject.complete();
   }
 }
+
+export {
+  SourceTier,
+  type ResolutionResult,
+  type IContentResolver,
+  type ResolutionError,
+  type ResolverStats,
+  type AppResolutionResult,
+  type SourceInfo,
+} from '@elohim/service/cache/content-resolver';

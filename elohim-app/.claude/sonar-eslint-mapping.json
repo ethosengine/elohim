@@ -1,0 +1,375 @@
+{
+  "_comment": "SonarQube rule → ESLint rule mapping for quality campaign alignment. Source of truth for quality-orchestrator agents.",
+  "_updated": "2026-02-06",
+  "_project": "elohim-app-alpha",
+  "rules": {
+    "typescript:S4325": {
+      "eslint": "@typescript-eslint/no-unnecessary-type-assertion",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Remove the redundant `as Type` or `!` assertion — TypeScript already knows the type",
+      "autofix": true
+    },
+    "typescript:S7776": {
+      "eslint": "unicorn/prefer-set-has",
+      "severity": "MEDIUM",
+      "category": "maintainability",
+      "fixHint": "Convert array to `new Set([...])` and use `.has()` instead of `.includes()`",
+      "autofix": false
+    },
+    "typescript:S7748": {
+      "eslint": "unicorn/no-zero-fractions",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Replace `0.0` with `0`, `1.0` with `1`, etc.",
+      "autofix": true
+    },
+    "typescript:S7746": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Replace `return Promise.resolve(value)` with `return value`; replace `return Promise.reject(error)` with `throw error`",
+      "autofix": true,
+      "note": "SonarQube-only rule. No ESLint equivalent. sonarjs plugin may cover in future versions."
+    },
+    "typescript:S7773": {
+      "eslint": "unicorn/prefer-number-properties",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `Number.isNaN()` instead of `isNaN()`, `Number.parseInt()` instead of `parseInt()`",
+      "autofix": true
+    },
+    "typescript:S7758": {
+      "eslint": "unicorn/prefer-code-point",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `String.fromCodePoint()` instead of `String.fromCharCode()`",
+      "autofix": true
+    },
+    "typescript:S7753": {
+      "eslint": "unicorn/prefer-array-index-of",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `.indexOf()` instead of `.findIndex()` when checking for simple values",
+      "autofix": true
+    },
+    "typescript:S7741": {
+      "eslint": "unicorn/no-typeof-undefined",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `=== undefined` instead of `typeof x === 'undefined'`",
+      "autofix": true
+    },
+    "typescript:S7763": {
+      "eslint": "unicorn/prefer-export-from",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `export { Foo } from './bar'` instead of importing then re-exporting",
+      "autofix": true
+    },
+    "typescript:S3735": {
+      "eslint": "no-void",
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Remove `void` operator. For fire-and-forget promises, use a comment instead.",
+      "autofix": false,
+      "note": "Conflicts with @typescript-eslint/no-floating-promises which recommends `void`. Configured with allowAsStatement:true to permit `void promise` pattern."
+    },
+    "typescript:S4123": {
+      "eslint": "@typescript-eslint/await-thenable",
+      "severity": "HIGH",
+      "category": "reliability",
+      "fixHint": "Remove `await` — the value is not a Promise/Thenable",
+      "autofix": true
+    },
+    "typescript:S1135": {
+      "eslint": "no-warning-comments",
+      "severity": "INFO",
+      "category": "maintainability",
+      "fixHint": "Complete the TODO or convert to a tracked issue",
+      "autofix": false,
+      "note": "INFO severity — tracked but not blocking. 100+ open TODOs in codebase."
+    },
+    "typescript:S107": {
+      "eslint": "@typescript-eslint/max-params",
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Extract parameters into an options object",
+      "autofix": false
+    },
+    "typescript:S3776": {
+      "eslint": "sonarjs/cognitive-complexity",
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Extract helper methods to reduce cognitive complexity below 15",
+      "autofix": false,
+      "note": "Already configured in ESLint with threshold 15"
+    },
+    "typescript:S108": {
+      "eslint": "no-empty",
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Add logic to empty block or add a comment explaining why it's empty",
+      "autofix": false
+    },
+    "typescript:S2486": {
+      "eslint": "sonarjs/no-ignored-exceptions",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Handle the exception or remove the try-catch",
+      "autofix": false,
+      "note": "Already configured in ESLint"
+    },
+    "typescript:S3358": {
+      "eslint": "sonarjs/no-nested-conditional",
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Extract nested ternary into a separate variable or if/else",
+      "autofix": false,
+      "note": "Already configured in ESLint"
+    },
+    "typescript:S6544": {
+      "eslint": "@typescript-eslint/no-misused-promises",
+      "severity": "HIGH",
+      "category": "reliability",
+      "fixHint": "Don't return Promise from void-return lifecycle methods",
+      "autofix": false,
+      "note": "Already configured in ESLint"
+    },
+    "typescript:S7718": {
+      "eslint": null,
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Rename catch parameter `_err` to `error_` (SonarQube convention)",
+      "autofix": true,
+      "note": "SonarQube-only naming convention. Conflicts with ESLint _prefix convention."
+    },
+    "typescript:S7059": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Move async operations from constructor to an init() method",
+      "autofix": false,
+      "note": "SonarQube-only. Angular pattern: use ngOnInit instead of constructor for async."
+    },
+    "typescript:S1607": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Remove xit/xdescribe or add a reason comment",
+      "autofix": false,
+      "note": "SonarQube-only. Detects skipped/ignored tests."
+    },
+    "typescript:S125": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Remove commented-out code blocks",
+      "autofix": true,
+      "note": "SonarQube-only. eslint-plugin-sonarjs may cover this."
+    },
+    "typescript:S4030": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Use the collection's contents or remove it",
+      "autofix": false,
+      "note": "SonarQube-only."
+    },
+    "typescript:S6551": {
+      "eslint": null,
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Don't use object in string context — access a specific property",
+      "autofix": false,
+      "note": "SonarQube-only."
+    },
+    "typescript:S4043": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Use `.toSorted()` or move `.sort()` to a separate statement",
+      "autofix": false,
+      "note": "SonarQube-only."
+    },
+    "css:S7924": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "accessibility",
+      "fixHint": "Increase text contrast ratio to meet WCAG 2.1 AA (4.5:1 for normal text)",
+      "autofix": false,
+      "note": "CSS-only rule. Requires stylelint or manual fix. 6 open issues."
+    },
+    "css:S4656": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Remove duplicate CSS property declaration",
+      "autofix": true,
+      "note": "CSS-only rule. Stylelint equivalent: declaration-block-no-duplicate-properties"
+    },
+    "css:S4670": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "reliability",
+      "fixHint": "Remove or fix the unknown CSS type selector",
+      "autofix": false,
+      "note": "CSS-only rule. 1 open issue in perseus.css vendor bundle (excluded from ESLint)."
+    },
+    "typescript:S7764": {
+      "eslint": "unicorn/prefer-global-this",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `globalThis` instead of `window` for cross-environment compatibility",
+      "autofix": true
+    },
+    "typescript:S7735": {
+      "eslint": "unicorn/no-negated-condition",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Swap if/else branches to remove the negation",
+      "autofix": true
+    },
+    "typescript:S6571": {
+      "eslint": null,
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use a type alias for long union types",
+      "autofix": false,
+      "note": "SonarQube-only. sonarjs/use-type-alias may partially cover this."
+    },
+    "typescript:S7778": {
+      "eslint": "unicorn/no-array-push-push",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `arr.push(a, b, c)` in one call instead of multiple `.push()` calls",
+      "autofix": true
+    },
+    "typescript:S4323": {
+      "eslint": null,
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Replace union type with a type alias for readability",
+      "autofix": false,
+      "note": "SonarQube-only. Related to typescript:S6571."
+    },
+    "typescript:S7780": {
+      "eslint": "unicorn/prefer-string-raw",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `String.raw` to avoid manual escaping of backslashes",
+      "autofix": true
+    },
+    "typescript:S7756": {
+      "eslint": "unicorn/prefer-blob-reading-methods",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `Blob.text()` instead of `FileReader.readAsText(blob)`",
+      "autofix": false
+    },
+    "typescript:S7762": {
+      "eslint": "unicorn/prefer-dom-node-remove",
+      "severity": "MEDIUM",
+      "category": "maintainability",
+      "fixHint": "Use `childNode.remove()` instead of `parentNode.removeChild(childNode)`",
+      "autofix": true
+    },
+    "typescript:S7765": {
+      "eslint": "unicorn/prefer-array-some",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `.some()` instead of `.includes()` for complex predicates, or `.includes()` for simple values",
+      "autofix": true
+    },
+    "typescript:S7771": {
+      "eslint": "unicorn/prefer-negative-index",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use negative index with `.slice(-n)` instead of `.slice(arr.length - n)`",
+      "autofix": true
+    },
+    "typescript:S7754": {
+      "eslint": "unicorn/prefer-array-some",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `.some()` instead of `.find()` when only checking existence",
+      "autofix": true
+    },
+    "typescript:S7755": {
+      "eslint": "unicorn/prefer-at",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `.at(-1)` instead of `[arr.length - 1]`",
+      "autofix": true
+    },
+    "typescript:S7784": {
+      "eslint": "unicorn/prefer-structured-clone",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Use `structuredClone(obj)` instead of `JSON.parse(JSON.stringify(obj))`",
+      "autofix": true
+    },
+    "typescript:S7785": {
+      "eslint": "unicorn/prefer-top-level-await",
+      "severity": "MEDIUM",
+      "category": "maintainability",
+      "fixHint": "Use top-level await instead of wrapping in a promise chain",
+      "autofix": false
+    },
+    "typescript:S1874": {
+      "eslint": "@typescript-eslint/no-deprecated",
+      "severity": "LOW",
+      "category": "maintainability",
+      "fixHint": "Replace with the non-deprecated alternative",
+      "autofix": false,
+      "note": "Already configured in ESLint as warn."
+    },
+    "typescript:S4165": {
+      "eslint": null,
+      "severity": "MEDIUM",
+      "category": "maintainability",
+      "fixHint": "Remove the redundant assignment — variable already holds this value",
+      "autofix": true,
+      "note": "SonarQube-only."
+    },
+    "typescript:S7651": {
+      "eslint": null,
+      "severity": "BLOCKER",
+      "category": "maintainability",
+      "fixHint": "Rename output binding to avoid standard DOM event names (e.g., `click` → `itemClick`)",
+      "autofix": false,
+      "note": "SonarQube-only. Angular-specific rule."
+    },
+    "Web:S6840": {
+      "eslint": null,
+      "severity": "MEDIUM",
+      "category": "reliability",
+      "fixHint": "Add correct `autocomplete` attribute to form inputs",
+      "autofix": false,
+      "note": "Web-only rule. @angular-eslint/template may partially cover."
+    },
+    "Web:S7927": {
+      "eslint": null,
+      "severity": "HIGH",
+      "category": "maintainability",
+      "fixHint": "Ensure the accessible name includes the visible label text",
+      "autofix": false,
+      "note": "Web-only rule. WCAG 2.5.3 Label in Name."
+    },
+    "css:S4666": {
+      "eslint": null,
+      "severity": "MEDIUM",
+      "category": "maintainability",
+      "fixHint": "Remove or merge duplicate CSS selectors",
+      "autofix": false,
+      "note": "CSS-only rule. Stylelint equivalent: no-duplicate-selectors."
+    }
+  },
+  "coverage": {
+    "total_sonar_rules_seen": 48,
+    "mapped_to_eslint": 28,
+    "sonar_only": 20,
+    "already_configured": 7,
+    "newly_added": 21
+  }
+}

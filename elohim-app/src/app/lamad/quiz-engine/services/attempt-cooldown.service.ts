@@ -383,11 +383,11 @@ export class AttemptCooldownService {
 
     // Update subject
     let subject = this.statusSubjects.get(key);
-    if (!subject) {
+    if (subject) {
+      subject.next(getCooldownStatus(record, this.config));
+    } else {
       subject = new BehaviorSubject(getCooldownStatus(record, this.config));
       this.statusSubjects.set(key, subject);
-    } else {
-      subject.next(getCooldownStatus(record, this.config));
     }
 
     // Persist

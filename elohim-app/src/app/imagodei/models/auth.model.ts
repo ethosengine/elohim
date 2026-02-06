@@ -65,7 +65,6 @@ export type AuthCredentials = PasswordCredentials | PasskeyCredentials | OAuthCr
 
 // ProfileReach imported from identity.model.ts to avoid duplication
 import type { ProfileReach } from './identity.model';
-export type { ProfileReach };
 
 // @coverage: 71.4% (2026-02-05)
 
@@ -347,3 +346,5 @@ export function parseExpiryDate(expiresAt: string | number | null | undefined): 
     return null;
   }
 }
+
+export { type ProfileReach } from './identity.model';

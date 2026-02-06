@@ -468,11 +468,11 @@ export class CustodianBlobDistributionService {
 
     // Bandwidth suitability (more bandwidth = better, up to 10x needed)
     const bandwidthNeeded = (blob.bitrateMbps ?? 5) * 2; // 2x overhead
-    const bandwidthScore = Math.min(custodian.availableBandwidthMbps / bandwidthNeeded, 1.0);
+    const bandwidthScore = Math.min(custodian.availableBandwidthMbps / bandwidthNeeded, 1);
     score += bandwidthScore * 40; // 40% weight
 
     // Latency suitability (lower latency = better)
-    const latencyScore = Math.max(0, 1.0 - custodian.latencyMs / criteria.maxLatencyMs);
+    const latencyScore = Math.max(0, 1 - custodian.latencyMs / criteria.maxLatencyMs);
     score += latencyScore * 30; // 30% weight
 
     // Uptime reliability (higher uptime = better)

@@ -884,7 +884,7 @@ export class ContentService {
       sourceId: data.sourceId ?? '',
       targetId: data.targetId ?? '',
       relationshipType: data.relationshipType ?? '',
-      confidence: data.confidence ?? 1.0,
+      confidence: data.confidence ?? 1,
       inferenceSource: data.inferenceSource ?? 'explicit',
       metadata: data.metadata,
       createdAt: data.createdAt,
@@ -909,7 +909,7 @@ export class ContentService {
     return {
       contentId: data.contentId ?? '',
       relationshipType: data.relationshipType ?? '',
-      confidence: data.confidence ?? 1.0,
+      confidence: data.confidence ?? 1,
       children: (data.children ?? []).map(child => this.transformContentGraphNode(child)),
     };
   }
