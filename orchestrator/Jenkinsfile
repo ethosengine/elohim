@@ -14,9 +14,9 @@
  * Dependency Graph:
  *   elohim-holochain (DNA/hApp, WASM)
  *       ├──► elohim-edge (infrastructure) ──┐
- *       ├──► elohim (Angular app) ──────────┼──► elohim-genesis (seed + test)
+ *       │                                   ├──► elohim-genesis (seed + test)
  *       └──► elohim-steward (manual only)   │
- *                                           └───────────────────────────────►
+ *   elohim (Angular app) ──────────────────┘
  */
 
 // =============================================================================
@@ -28,7 +28,7 @@ import groovy.transform.Field
 @Field def PIPELINES = [
     'elohim-holochain': [
         jenkinsPath: 'holochain/dna/Jenkinsfile',
-        changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/', 'holochain/rna/'],
+        changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/', 'holochain/rna/', 'VERSION'],
         artifacts: ['elohim.happ'],
         dependsOn: [],
         triggersGenesis: true,
@@ -36,7 +36,7 @@ import groovy.transform.Field
     ],
     'elohim-edge': [
         jenkinsPath: 'holochain/Jenkinsfile',
-        changePatterns: ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/manifests/', 'holochain/crates/'],
+        changePatterns: ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/manifests/', 'holochain/crates/', 'VERSION', 'environments/'],
         artifacts: ['elohim-doorway', 'doorway-app', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
         dependsOn: ['elohim-holochain'],
         triggersGenesis: true,
@@ -50,7 +50,7 @@ import groovy.transform.Field
         jenkinsPath: 'Jenkinsfile',
         changePatterns: ['elohim-app/', 'elohim-library/', 'VERSION'],
         artifacts: ['elohim-app'],
-        dependsOn: ['elohim-holochain'],
+        dependsOn: [],
         triggersGenesis: true,
         deploymentCheck: [
             dev: 'https://alpha.elohim.host',
@@ -62,7 +62,7 @@ import groovy.transform.Field
         jenkinsPath: 'genesis/Jenkinsfile',
         changePatterns: ['genesis/', 'data/'],
         artifacts: [],
-        dependsOn: ['elohim-holochain', 'elohim-edge', 'elohim'],
+        dependsOn: ['elohim-edge', 'elohim'],
         triggersGenesis: false,
         deploymentCheck: null
     ],
@@ -267,6 +267,32 @@ def orderByDependencies(pipelineList) {
     }
 
     return ordered
+}
+
+/**
+ * If a pipeline is building, auto-include all pipelines that depend on it.
+ * Uses fixed-point iteration for transitive propagation.
+ * Example: DNA builds → edge auto-includes (dependsOn DNA) → genesis auto-includes (dependsOn edge)
+ */
+def propagateDependencies(pipelines, analysis) {
+    def added = true
+    while (added) {
+        added = false
+        PIPELINES.each { name, config ->
+            if (pipelines.contains(name)) return          // already building
+            if (config.manualOnly) return                  // never auto-trigger
+
+            def deps = config.dependsOn ?: []
+            def buildingDep = deps.find { pipelines.contains(it) }
+            if (buildingDep) {
+                pipelines.add(name)
+                analysis[name].shouldRun = true
+                analysis[name].matchedPatterns.add("dependency:${buildingDep}")
+                added = true
+            }
+        }
+    }
+    return pipelines
 }
 
 /**
@@ -553,6 +579,19 @@ spec:
                             }
 
                             pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
+
+                            // Propagate: if a dependency is building, auto-include its dependents
+                            pipelines = propagateDependencies(pipelines, analysis)
+
+                            // Safety net: auto-include genesis if any triggering pipeline builds
+                            if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
+                                def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
+                                if (triggeringPipeline) {
+                                    pipelines.add('elohim-genesis')
+                                    analysis['elohim-genesis'].shouldRun = true
+                                    analysis['elohim-genesis'].matchedPatterns.add("triggered-by:${triggeringPipeline}")
+                                }
+                            }
 
                         } else {
                             // Manual forced builds

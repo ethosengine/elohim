@@ -54,6 +54,12 @@ def withBuildVars(props, Closure body) {
         "BASE_VERSION=${props.BASE_VERSION ?: ''}",
         "GIT_COMMIT_HASH=${props.GIT_COMMIT_HASH ?: ''}",
         "IMAGE_TAG=${props.IMAGE_TAG ?: ''}",
+        "EDGENODE_TAG=${props.EDGENODE_TAG ?: props.IMAGE_TAG ?: ''}",
+        "DOORWAY_TAG=${props.DOORWAY_TAG ?: props.IMAGE_TAG ?: ''}",
+        "STORAGE_TAG=${props.STORAGE_TAG ?: props.IMAGE_TAG ?: ''}",
+        "HAPP_INSTALLER_TAG=${props.HAPP_INSTALLER_TAG ?: props.IMAGE_TAG ?: ''}",
+        "DOORWAY_APP_TAG=${props.DOORWAY_APP_TAG ?: props.IMAGE_TAG ?: ''}",
+        "HAPP_TAG=${props.HAPP_TAG ?: props.IMAGE_TAG ?: ''}",
         "BRANCH_NAME=${props.BRANCH_NAME ?: env.BRANCH_NAME}"
     ]) {
         body()
@@ -159,6 +165,43 @@ def checkEdgeNodeHealth(String url) {
         returnStdout: true
     ).trim()
     return result == '200'
+}
+
+/**
+ * Deploy edge node using environment manifest for per-component tags.
+ * Reads tag values from envFile, substitutes named placeholders in the manifest template,
+ * validates no placeholders remain, then applies to Kubernetes.
+ */
+def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile) {
+    def versions = readProperties(file: envFile)
+    def sedArgs = [
+        "s/EDGENODE_TAG_PLACEHOLDER/${versions.EDGENODE_TAG}/g",
+        "s/DOORWAY_TAG_PLACEHOLDER/${versions.DOORWAY_TAG}/g",
+        "s/STORAGE_TAG_PLACEHOLDER/${versions.STORAGE_TAG}/g",
+        "s/HAPP_INSTALLER_TAG_PLACEHOLDER/${versions.HAPP_INSTALLER_TAG}/g",
+        "s/DOORWAY_APP_TAG_PLACEHOLDER/${versions.DOORWAY_APP_TAG}/g",
+        "s/HAPP_TAG_PLACEHOLDER/${versions.HAPP_TAG}/g"
+    ].collect { "-e '${it}'" }.join(' ')
+
+    def outputFile = manifestTemplate.replace('.yaml', "-${env}.rendered.yaml")
+    sh "sed ${sedArgs} ${manifestTemplate} > ${outputFile}"
+
+    // Fail fast if any placeholders remain
+    def remaining = sh(script: "grep -c '_TAG_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
+    if (remaining != '0') {
+        error "Unresolved placeholders in ${outputFile}!"
+    }
+
+    // Preview what we're deploying
+    sh """
+        echo '==== Edge manifest preview ===='
+        grep 'image:\\|happ-version:' ${outputFile}
+        echo '==============================='
+    """
+
+    sh "kubectl apply -f ${outputFile}"
+    sh "kubectl rollout restart deployment/elohim-edgenode-${env} -n ${namespace}"
+    sh "kubectl rollout status deployment/elohim-edgenode-${env} -n ${namespace} --timeout=300s"
 }
 
 pipeline {
@@ -326,24 +369,48 @@ spec:
                     script {
                         sh 'git config --global --add safe.directory "*"'
 
-                        // Parse VERSION file in key-value format
+                        // Parse VERSION file with component-specific versions
                         def versionMap = parseVersionFile()
-                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
-
                         def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
 
-                        def imageTag = (env.BRANCH_NAME == 'main')
-                            ? baseVersion
-                            : "${baseVersion}-${sanitizedBranch}-${gitHash}"
+                        // Compute tag: main→baseVersion, others→baseVersion-branch-hash
+                        def computeTag = { String baseVer ->
+                            (env.BRANCH_NAME == 'main') ? baseVer : "${baseVer}-${sanitizedBranch}-${gitHash}"
+                        }
+
+                        // Per-component tags
+                        def edgenodeTag = computeTag(versionMap['EDGENODE_VERSION'] ?: '1.0.0')
+                        def doorwayTag = computeTag(versionMap['DOORWAY_VERSION'] ?: '1.0.0')
+                        def storageTag = computeTag(versionMap['STORAGE_VERSION'] ?: '1.0.0')
+                        def happInstallerTag = computeTag(versionMap['HAPP_INSTALLER_VERSION'] ?: '1.0.0')
+                        def doorwayAppTag = computeTag(versionMap['DOORWAY_APP_VERSION'] ?: '1.0.0')
+                        def happTag = computeTag(versionMap['HAPP_VERSION'] ?: '1.0.0')
+
+                        // Backward compat: IMAGE_TAG = edgenode tag (primary image)
+                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
 
                         def buildEnvContent = """BASE_VERSION=${baseVersion}
 GIT_COMMIT_HASH=${gitHash}
-IMAGE_TAG=${imageTag}
+IMAGE_TAG=${edgenodeTag}
+EDGENODE_TAG=${edgenodeTag}
+DOORWAY_TAG=${doorwayTag}
+STORAGE_TAG=${storageTag}
+HAPP_INSTALLER_TAG=${happInstallerTag}
+DOORWAY_APP_TAG=${doorwayAppTag}
+HAPP_TAG=${happTag}
 BRANCH_NAME=${env.BRANCH_NAME}"""
 
                         writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
                         archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
+
+                        echo "Component tags:"
+                        echo "  EDGENODE_TAG=${edgenodeTag}"
+                        echo "  DOORWAY_TAG=${doorwayTag}"
+                        echo "  STORAGE_TAG=${storageTag}"
+                        echo "  HAPP_INSTALLER_TAG=${happInstallerTag}"
+                        echo "  DOORWAY_APP_TAG=${doorwayAppTag}"
+                        echo "  HAPP_TAG=${happTag}"
                     }
                 }
             }
@@ -563,14 +630,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
 
+                                // Push each component with its own tag
                                 def edgeNodePushed = sh(
                                     script: """
                                         if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
-                                            echo "Pushing Edge Node image..."
-                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                            echo "Pushing Edge Node image: ${EDGENODE_TAG}"
+                                            nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${EDGENODE_TAG}
                                             nerdctl -n k8s.io tag elohim-edgenode:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
 
-                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG}
+                                            nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${EDGENODE_TAG}
                                             nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-edgenode:${GIT_COMMIT_HASH}
                                             exit 0
                                         else
@@ -587,11 +655,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 sh """
                                     if nerdctl -n k8s.io images | grep -q "elohim-doorway.*${IMAGE_TAG}"; then
-                                        echo "Pushing Doorway image..."
-                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG}
+                                        echo "Pushing Doorway image: ${DOORWAY_TAG}"
+                                        nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
                                         nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG}
                                         nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-doorway:${GIT_COMMIT_HASH}
                                     else
                                         echo "Doorway image not found, skipping push"
@@ -600,11 +668,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 sh """
                                     if nerdctl -n k8s.io images | grep -q "elohim-storage.*${IMAGE_TAG}"; then
-                                        echo "Pushing elohim-storage image..."
-                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG}
+                                        echo "Pushing elohim-storage image: ${STORAGE_TAG}"
+                                        nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${STORAGE_TAG}
                                         nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${STORAGE_TAG}
                                         nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-storage:${GIT_COMMIT_HASH}
                                     else
                                         echo "elohim-storage image not found, skipping push"
@@ -613,11 +681,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 sh """
                                     if nerdctl -n k8s.io images | grep -q "elohim-happ-installer.*${IMAGE_TAG}"; then
-                                        echo "Pushing hApp Installer image..."
-                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG}
+                                        echo "Pushing hApp Installer image: ${HAPP_INSTALLER_TAG}"
+                                        nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${HAPP_INSTALLER_TAG}
                                         nerdctl -n k8s.io tag elohim-happ-installer:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${HAPP_INSTALLER_TAG}
                                         nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-happ-installer:${GIT_COMMIT_HASH}
                                     else
                                         echo "hApp Installer image not found, skipping push"
@@ -626,17 +694,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 sh """
                                     if nerdctl -n k8s.io images | grep -q "doorway-app.*${IMAGE_TAG}"; then
-                                        echo "Pushing Doorway App image..."
-                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${IMAGE_TAG}
+                                        echo "Pushing Doorway App image: ${DOORWAY_APP_TAG}"
+                                        nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${DOORWAY_APP_TAG}
                                         nerdctl -n k8s.io tag doorway-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
 
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${IMAGE_TAG}
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${DOORWAY_APP_TAG}
                                         nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/doorway-app:${GIT_COMMIT_HASH}
                                     else
                                         echo "Doorway App image not found, skipping push"
                                     fi
                                 """
 
+                                // Also push dev-latest aliases on dev branch for backward compat
                                 if (env.BRANCH_NAME == 'dev') {
                                     sh """
                                         if nerdctl -n k8s.io images | grep -q "elohim-edgenode.*${IMAGE_TAG}"; then
@@ -756,10 +825,21 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-alpha.yaml > holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f holochain/manifests/edgenode-alpha-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-alpha -n elohim-alpha"
-                            sh "kubectl rollout status deployment/elohim-edgenode-alpha -n elohim-alpha --timeout=300s"
+                            // Write environment manifest with current build tags
+                            // (preserve SITE_TAG from git — app pipeline manages that independently)
+                            def envFile = 'environments/alpha.env'
+                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
+                            writeFile file: envFile, text: """# Alpha Environment - auto-updated by pipeline after each deploy
+# Format: COMPONENT_TAG=harbor-image-tag
+SITE_TAG=${currentSiteTag}
+EDGENODE_TAG=${EDGENODE_TAG}
+DOORWAY_TAG=${DOORWAY_TAG}
+STORAGE_TAG=${STORAGE_TAG}
+HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
+DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
+HAPP_TAG=${HAPP_TAG}
+"""
+                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'holochain/manifests/edgenode-alpha.yaml', envFile)
 
                             sh 'sleep 15'
 
@@ -793,10 +873,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                         withBuildVars(props) {
                             echo "Deploying Edge Node to Staging: ${IMAGE_TAG}"
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-staging.yaml > holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f holochain/manifests/edgenode-staging-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-staging -n elohim-staging"
-                            sh "kubectl rollout status deployment/elohim-edgenode-staging -n elohim-staging --timeout=300s"
+                            // Write environment manifest with current build tags
+                            def envFile = 'environments/staging.env'
+                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
+                            writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
+# Format: COMPONENT_TAG=harbor-image-tag
+SITE_TAG=${currentSiteTag}
+EDGENODE_TAG=${EDGENODE_TAG}
+DOORWAY_TAG=${DOORWAY_TAG}
+STORAGE_TAG=${STORAGE_TAG}
+HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
+DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
+HAPP_TAG=${HAPP_TAG}
+"""
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'holochain/manifests/edgenode-staging.yaml', envFile)
                             sh 'sleep 15'
                             if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
                                 echo "Edge Node Staging deployed and healthy"
@@ -875,10 +965,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' holochain/manifests/edgenode-prod.yaml > holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f holochain/manifests/edgenode-prod-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-edgenode-prod -n elohim-prod"
-                            sh "kubectl rollout status deployment/elohim-edgenode-prod -n elohim-prod --timeout=300s"
+                            // Write environment manifest with current build tags
+                            def envFile = 'environments/prod.env'
+                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
+                            writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
+# Format: COMPONENT_TAG=harbor-image-tag
+SITE_TAG=${currentSiteTag}
+EDGENODE_TAG=${EDGENODE_TAG}
+DOORWAY_TAG=${DOORWAY_TAG}
+STORAGE_TAG=${STORAGE_TAG}
+HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
+DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
+HAPP_TAG=${HAPP_TAG}
+"""
+                            deployEdgeWithManifest('prod', 'elohim-prod', 'holochain/manifests/edgenode-prod.yaml', envFile)
 
                             sh 'sleep 15'
 
