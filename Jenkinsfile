@@ -84,18 +84,25 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
     // Validate ConfigMap exists
     sh "kubectl get configmap elohim-config-${environment} -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
 
-    // Update deployment manifest with image tag
-    sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml"
+    // Update deployment manifest with image tag (SITE_TAG_PLACEHOLDER)
+    def outputFile = manifestPath.replace('.yaml', "-${environment}.rendered.yaml")
+    sh "sed 's/SITE_TAG_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
+
+    // Fail fast if any placeholders remain
+    def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
+    if (remaining != '0') {
+        error "Unresolved placeholders in ${outputFile}!"
+    }
 
     // Preview manifest
     sh """
         echo '==== Deployment manifest preview ===='
-        grep 'image:' ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml
+        grep 'image:' ${outputFile}
         echo '===================================='
     """
 
     // Deploy and rollout
-    sh "kubectl apply -f ${manifestPath.replace('.yaml', '')}-${imageTag}.yaml"
+    sh "kubectl apply -f ${outputFile}"
     sh "kubectl rollout restart deployment/${deploymentName} -n ${namespace}"
     sh "kubectl rollout status deployment/${deploymentName} -n ${namespace} --timeout=300s"
 

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: elohim-site-staging
-        image: harbor.ethosengine.com/ethosengine/elohim-site:BUILD_NUMBER_PLACEHOLDER
+        image: harbor.ethosengine.com/ethosengine/elohim-site:SITE_TAG_PLACEHOLDER
         imagePullPolicy: Always
         ports:
         - containerPort: 80

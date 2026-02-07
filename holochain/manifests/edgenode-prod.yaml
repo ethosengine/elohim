@@ -33,7 +33,7 @@ metadata:
   namespace: elohim-prod
 data:
   # hApp version to fetch from Harbor (latest = main branch builds)
-  happ-version: "latest"
+  happ-version: "HAPP_TAG_PLACEHOLDER"
   conductor-config.yaml: |
     # Holochain Conductor Configuration for Elohim Protocol (Production)
     admin_interfaces:
@@ -157,7 +157,7 @@ spec:
       containers:
         # Main Holochain conductor
         - name: edgenode
-          image: harbor.ethosengine.com/ethosengine/elohim-edgenode:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/elohim-edgenode:EDGENODE_TAG_PLACEHOLDER
           env:
             - name: CONDUCTOR_MODE
               value: "true"
@@ -223,7 +223,7 @@ spec:
         # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
         # Production uses versioned tags for stability
         - name: doorway
-          image: harbor.ethosengine.com/ethosengine/elohim-doorway:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/elohim-doorway:DOORWAY_TAG_PLACEHOLDER
           imagePullPolicy: Always
           args:
             - "--listen"
@@ -281,7 +281,7 @@ spec:
         # Production uses versioned tags for stability
         # hApp is fetched by init container, not baked into image
         - name: happ-installer
-          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:HAPP_INSTALLER_TAG_PLACEHOLDER
           imagePullPolicy: Always
           env:
             - name: CONDUCTOR_URL
@@ -307,7 +307,7 @@ spec:
         # elohim-storage - Blob storage and import processing sidecar
         # Handles heavy R/W operations, forwards to conductor
         - name: elohim-storage
-          image: harbor.ethosengine.com/ethosengine/elohim-storage:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/elohim-storage:STORAGE_TAG_PLACEHOLDER
           imagePullPolicy: Always
           env:
             - name: RUST_LOG
@@ -351,7 +351,7 @@ spec:
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
-          image: harbor.ethosengine.com/ethosengine/doorway-app:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
           imagePullPolicy: Always
           ports:
             - name: operator-ui
