@@ -33,7 +33,7 @@ metadata:
   namespace: elohim-prod
 data:
   # hApp version to fetch from Harbor (latest = main branch builds)
-  happ-version: "latest"
+  happ-version: "HAPP_TAG_PLACEHOLDER"
   conductor-config.yaml: |
     # Holochain Conductor Configuration for Elohim Protocol (Production)
     admin_interfaces:
@@ -75,6 +75,18 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: storage-data-prod
+  namespace: elohim-prod
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: microk8s-hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-data-prod
   namespace: elohim-prod
 spec:
   accessModes: [ReadWriteOnce]
@@ -145,7 +157,7 @@ spec:
       containers:
         # Main Holochain conductor
         - name: edgenode
-          image: harbor.ethosengine.com/ethosengine/elohim-edgenode:BUILD_NUMBER_PLACEHOLDER
+          image: harbor.ethosengine.com/ethosengine/elohim-edgenode:EDGENODE_TAG_PLACEHOLDER
           env:
             - name: CONDUCTOR_MODE
               value: "true"
@@ -211,8 +223,8 @@ spec:
         # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
         # Production uses versioned tags for stability
         - name: doorway
-          image: harbor.ethosengine.com/ethosengine/elohim-doorway:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: harbor.ethosengine.com/ethosengine/elohim-doorway:DOORWAY_TAG_PLACEHOLDER
+          imagePullPolicy: Always
           args:
             - "--listen"
             - "0.0.0.0:8080"
@@ -223,6 +235,8 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            - name: DEV_MODE
+              value: "true"
             - name: RUST_LOG
               value: "warn,doorway=info"
             - name: STORAGE_URL
@@ -267,8 +281,8 @@ spec:
         # Production uses versioned tags for stability
         # hApp is fetched by init container, not baked into image
         - name: happ-installer
-          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: harbor.ethosengine.com/ethosengine/elohim-happ-installer:HAPP_INSTALLER_TAG_PLACEHOLDER
+          imagePullPolicy: Always
           env:
             - name: CONDUCTOR_URL
               value: "ws://localhost:4444"
@@ -293,8 +307,8 @@ spec:
         # elohim-storage - Blob storage and import processing sidecar
         # Handles heavy R/W operations, forwards to conductor
         - name: elohim-storage
-          image: harbor.ethosengine.com/ethosengine/elohim-storage:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: harbor.ethosengine.com/ethosengine/elohim-storage:STORAGE_TAG_PLACEHOLDER
+          imagePullPolicy: Always
           env:
             - name: RUST_LOG
               value: "warn,elohim_storage=info"
@@ -337,8 +351,8 @@ spec:
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
-          image: harbor.ethosengine.com/ethosengine/doorway-app:BUILD_NUMBER_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
+          imagePullPolicy: Always
           ports:
             - name: operator-ui
               containerPort: 80
@@ -365,6 +379,70 @@ spec:
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 30
+        # MongoDB - persistent document store for doorway
+        # Used for: API keys, OAuth sessions, host registry, user profiles
+        - name: mongodb
+          image: mongo:7
+          ports:
+            - name: mongodb
+              containerPort: 27017
+              protocol: TCP
+          env:
+            - name: MONGO_INITDB_DATABASE
+              value: "doorway"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+        # NATS - lightweight messaging for inter-service communication
+        # Used for: orchestrator provisioning, heartbeats, disaster recovery
+        - name: nats
+          image: nats:2-alpine
+          args:
+            - "--js"
+          ports:
+            - name: nats-client
+              containerPort: 4222
+              protocol: TCP
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          readinessProbe:
+            tcpSocket:
+              port: 4222
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 4222
+            initialDelaySeconds: 10
+            periodSeconds: 30
       volumes:
         # Shared volume for hApp (fetched by init container)
         - name: happ-volume
@@ -375,6 +453,9 @@ spec:
         - name: storage-data
           persistentVolumeClaim:
             claimName: storage-data-prod
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: mongodb-data-prod
         - name: conductor-config
           configMap:
             name: elohim-edgenode-prod-config
