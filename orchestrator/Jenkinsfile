@@ -36,7 +36,7 @@ import groovy.transform.Field
     ],
     'elohim-edge': [
         jenkinsPath: 'holochain/Jenkinsfile',
-        changePatterns: ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/manifests/', 'holochain/crates/', 'VERSION', 'environments/'],
+        changePatterns: ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/crates/', 'VERSION'],
         artifacts: ['elohim-doorway', 'doorway-app', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
         dependsOn: ['elohim-holochain'],
         triggersGenesis: true,
@@ -87,18 +87,18 @@ import groovy.transform.Field
     'app-prod': 'https://elohim.host/version.json'
 ]
 
-@Field def HEALTH_ENDPOINTS = [
-    'doorway-alpha': 'https://doorway-alpha.elohim.host/health',
-    'doorway-staging': 'https://doorway-staging.elohim.host/health',
-    'doorway-prod': 'https://doorway.elohim.host/health',
-    'alpha': 'https://alpha.elohim.host',
-    'staging': 'https://staging.elohim.host',
-    'prod': 'https://elohim.host'
-]
-
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+// Derive health endpoints from PIPELINES.deploymentCheck — single source of truth
+def getHealthEndpoints() {
+    def endpoints = [:]
+    PIPELINES.each { name, config ->
+        config.deploymentCheck?.each { env, url -> endpoints["${name}-${env}"] = url }
+    }
+    return endpoints
+}
 
 def getGitCommitHash() {
     return sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
@@ -520,7 +520,7 @@ spec:
 └──────────────────────────────────────────────────────────────────────────────┘'''
 
                         def healthResults = [:]
-                        HEALTH_ENDPOINTS.each { name, url ->
+                        getHealthEndpoints().each { name, url ->
                             def result = checkHealth(name, url)
                             healthResults[name] = result
                             echo "${result.healthy ? '✅' : '❌'} ${name}: HTTP ${result.status} - ${url}"
@@ -784,7 +784,7 @@ spec:
 └──────────────────────────────────────────────────────────────────────────────┘'''
 
                         def healthResults = [:]
-                        HEALTH_ENDPOINTS.each { name, url ->
+                        getHealthEndpoints().each { name, url ->
                             def result = checkHealth(name, url)
                             healthResults[name] = result
                             echo "${result.healthy ? '✅' : '❌'} ${name}: HTTP ${result.status}"

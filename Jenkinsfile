@@ -6,7 +6,6 @@
  *
  * What this pipeline builds:
  *   - elohim-app Angular application
- *   - UI Playground (dev branches only, when elohim-ui-playground/** changes)
  *   - Docker images pushed to Harbor registry
  *
  * Environment Architecture:
@@ -868,144 +867,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Install UI Playground Dependencies') {
-            when {
-                allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
-                    not { branch 'main' }; not { branch 'staging' }
-                    changeset "elohim-ui-playground/**"
-                }
-            }
-            steps {
-                container('builder'){
-                    dir('elohim-library') {
-                        script {
-                            echo 'Installing npm dependencies for UI Playground workspace'
-                            sh 'npm ci'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Build UI Playground') {
-            when {
-                allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
-                    not { branch 'main' }; not { branch 'staging' }
-                    changeset "elohim-ui-playground/**"
-                }
-            }
-            steps {
-                container('builder'){
-                    dir('elohim-library') {
-                        script {
-                            echo 'Building lamad-ui library'
-                            sh 'npm run build lamad-ui'
-
-                            echo 'Building UI Playground Angular application'
-                            sh 'npm run build elohim-ui-playground -- --base-href=/ui-playground/'
-                            sh 'ls -la dist/'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Build UI Playground Image') {
-            when {
-                allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
-                    not { branch 'main' }; not { branch 'staging' }
-                    changeset "elohim-ui-playground/**"
-                }
-            }
-            steps {
-                container('builder'){
-                    script {
-                        def props = loadBuildVars()
-
-                        withBuildVars(props) {
-                            echo 'Building UI Playground container image'
-                            echo "Image tag: ${IMAGE_TAG}"
-
-                            sh """#!/bin/bash
-                                set -euo pipefail
-
-                                # Verify BuildKit
-                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
-
-                                # Create build context
-                                mkdir -p /tmp/build-context-playground
-                                cp -r elohim-library /tmp/build-context-playground/
-                                cp elohim-ui-playground/images/Dockerfile.ui-playground /tmp/build-context-playground/Dockerfile
-                                cp elohim-ui-playground/images/nginx-ui-playground.conf /tmp/build-context-playground/
-
-                                # Build image
-                                cd /tmp/build-context-playground
-                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                  nerdctl -n k8s.io build -t elohim-ui-playground:${IMAGE_TAG} -f Dockerfile .
-
-                                # Additional tags
-                                nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} elohim-ui-playground:${GIT_COMMIT_HASH}
-
-                                if [ "${BRANCH_NAME}" = "main" ]; then
-                                    nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} elohim-ui-playground:latest
-                                fi
-                            """
-
-                            echo 'UI Playground container image built successfully'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Push UI Playground to Harbor Registry') {
-            when {
-                allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
-                    not { branch 'main' }; not { branch 'staging' }
-                    changeset "elohim-ui-playground/**"
-                }
-            }
-            steps {
-                container('builder'){
-                    script {
-                        def props = loadBuildVars()
-
-                        withBuildVars(props) {
-                            withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
-                                echo 'Logging into Harbor registry'
-                                sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
-
-                                echo "Tagging and pushing UI Playground image: ${IMAGE_TAG}"
-                                sh """
-                                    nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-ui-playground:${IMAGE_TAG}
-                                    nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-ui-playground:${GIT_COMMIT_HASH}
-
-                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-ui-playground:${IMAGE_TAG}
-                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-ui-playground:${GIT_COMMIT_HASH}
-                                """
-
-                                if (env.BRANCH_NAME == 'main') {
-                                    sh """
-                                        nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-ui-playground:latest
-                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-ui-playground:latest
-                                    """
-                                }
-
-                                echo 'Successfully pushed UI Playground to Harbor registry'
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Note: Holochain infrastructure (holochain/**) is built by a separate pipeline
-        // (elohim-edge) that triggers independently via webhook when holochain files change.
-        // This avoids duplicate builds and allows parallel execution.
+        // Note: Holochain infrastructure is built by elohim-edge pipeline,
+        // triggered by the orchestrator when holochain source files change.
 
         stage('Deploy to Staging') {
             when {
@@ -1020,7 +883,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('staging', 'elohim-staging', 'elohim-site-staging',
-                                'elohim-app/manifests/staging-deployment.yaml', IMAGE_TAG)
+                                'orchestrator/manifests/elohim-app/staging.yaml', IMAGE_TAG)
                         }
                     }
                 }
@@ -1050,7 +913,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             """
 
                             deployAppToEnvironment('alpha', 'elohim-alpha', 'elohim-site-alpha',
-                                'elohim-app/manifests/alpha-deployment.yaml', IMAGE_TAG)
+                                'orchestrator/manifests/elohim-app/alpha.yaml', IMAGE_TAG)
 
                             echo """
                             ═══════════════════════════════════════════════════════════
@@ -1141,37 +1004,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Deploy UI Playground to Alpha') {
-            when {
-                allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
-                    changeset "elohim-ui-playground/**"
-                }
-            }
-            steps {
-                container('builder'){
-                    script {
-                        def props = loadBuildVars()
-
-                        withBuildVars(props) {
-                            echo "Deploying UI Playground to Alpha: ${IMAGE_TAG}"
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' elohim-ui-playground/manifests/alpha-deployment-ui-playground.yaml > elohim-ui-playground/manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
-
-                            // Deploy
-                            sh "kubectl apply -f elohim-ui-playground/manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-ui-playground-alpha -n elohim-alpha"
-                            sh 'kubectl rollout status deployment/elohim-ui-playground-alpha -n elohim-alpha --timeout=300s'
-
-                            echo 'UI Playground Alpha deployment completed!'
-                        }
-                    }
-                }
-            }
-        }
-
         stage('E2E Testing - Alpha Validation') {
             when {
                 allOf {
@@ -1254,7 +1086,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('prod', 'elohim-prod', 'elohim-site',
-                                'elohim-app/manifests/prod-deployment.yaml', IMAGE_TAG)
+                                'orchestrator/manifests/elohim-app/prod.yaml', IMAGE_TAG)
                         }
                     }
                 }
@@ -1306,17 +1138,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     nerdctl -n k8s.io rmi elohim-app:${GIT_COMMIT_HASH} || true
                                     nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG} || true
                                     nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH} || true
-                                    nerdctl -n k8s.io rmi elohim-ui-playground:${IMAGE_TAG} || true
-                                    nerdctl -n k8s.io rmi elohim-ui-playground:${GIT_COMMIT_HASH} || true
-                                    nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-ui-playground:${IMAGE_TAG} || true
-                                    nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-ui-playground:${GIT_COMMIT_HASH} || true
                                 """
                                 if (env.BRANCH_NAME == 'main') {
                                     sh """
                                         nerdctl -n k8s.io rmi elohim-app:latest || true
                                         nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true
-                                        nerdctl -n k8s.io rmi elohim-ui-playground:latest || true
-                                        nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-ui-playground:latest || true
                                     """
                                 }
                                 sh "nerdctl -n k8s.io system prune -af --volumes || true"

@@ -32,7 +32,7 @@ This manifesto proposes technology that actively defends against corruption whil
 
 ### Key Concepts
 
-**Distributed Infrastructure**: Peer-to-peer networks that eliminate single points of control and enable community sovereignty
+**Distributed Infrastructure**: Peer-to-peer networks that eliminate single points of control and enable community stewardship
 
 **Graduated Intimacy**: Spaces for personal exploration alongside protected commons, with consent boundaries preventing extremes from corrupting shared spaces
 
@@ -45,60 +45,89 @@ This manifesto proposes technology that actively defends against corruption whil
 ```
 ├── devfile.yaml              # Eclipse Che workspace configuration
 ├── Jenkinsfile               # CI/CD pipeline definition
-├── VERSION                   # Semantic versioning (1.0.0)
+├── VERSION                   # Semantic versioning
 │
-├── genesis/                  # Meta-infrastructure: source → seed → validate
+├── orchestrator/             # CI/CD Orchestrator
+│   ├── Jenkinsfile           # Central pipeline controller
+│   ├── environments/         # Environment configurations
+│   └── manifests/            # Orchestrator deployments
+│
+├── genesis/                  # Content Pipeline: source → seed → validate
 │   ├── Jenkinsfile           # Seed + validate pipeline
-│   ├── docs/                 # Raw source documentation
-│   │   └── content/          # Markdown, Gherkin source files
-│   ├── data/                 # Structured seed data
-│   │   └── lamad/            # Learning content JSON
+│   ├── docs/                 # Raw source documentation (markdown, Gherkin)
+│   ├── data/                 # Structured seed data (JSON)
+│   ├── blobs/                # Binary content (images, videos)
+│   ├── assets/               # Static assets
 │   └── seeder/               # Holochain seeding tools
 │
-├── elohim-app/               # Angular application (Main Platform)
+├── elohim-app/               # Angular Application (Main Platform)
 │   └── src/app/
 │       ├── components/       # Landing page components
+│       ├── core/             # Core utilities and guards
 │       ├── elohim/           # Core infrastructure services
-│       │   ├── models/       # Holochain connection, protocol types
-│       │   ├── services/     # Holochain client, Kuzu graph DB
-│       │   └── components/   # Navigator, settings tray
-│       ├── imagodei/         # Human identity & sovereignty
-│       │   ├── models/       # Sovereignty stages, data residency
-│       │   └── services/     # Session management, sovereignty state
-│       ├── lamad/            # Learning infrastructure module
-│       │   ├── models/       # ContentNode, LearningPath, mastery
-│       │   ├── services/     # Data loading, progress tracking
-│       │   ├── components/   # Path navigator, content viewer
-│       │   └── renderers/    # Markdown, video, assessment
-│       ├── qahal/            # Community governance (planned)
-│       └── shefa/            # Resource flows (planned)
+│       ├── imagodei/         # Human identity & stewardship
+│       ├── lamad/            # Learning infrastructure
+│       ├── qahal/            # Community governance
+│       ├── shefa/            # Resource flows & economics
+│       ├── doorway/          # Gateway integration
+│       └── services/         # Shared services
 │
-├── elohim-library/           # Shared Libraries & Services
+├── elohim-library/           # Shared Libraries
 │   └── projects/
-│       ├── elohim-service/   # Import pipeline, content models
-│       └── lamad-ui/         # UI Pattern Library
+│       ├── elohim-service/   # Import pipeline, content models, CLI
+│       ├── lamad-ui/         # UI Pattern Library
+│       └── html5-app-plugin/ # HTML5 app integration
 │
-├── holochain/                # Holochain Edge Node Infrastructure
-│   ├── doorway/              # Gateway service (auth, routing, caching)
-│   ├── dna/                  # DNA definitions and zomes
-│   ├── manifests/            # K8s deployments for Edge Nodes
-│   └── Jenkinsfile           # CI/CD for Holochain components
+├── sophia/                   # Sophia Assessment Engine (git submodule)
+│   └── packages/             # Person-centered assessment rendering
+│       ├── sophia-element/   # <sophia-question> web component
+│       ├── sophia-core/      # Core types (Moment, Recognition)
+│       ├── perseus-score/    # Mastery scoring (graded)
+│       └── psyche-survey/    # Discovery & reflection (psychometric)
 │
-└── manifests/                # Kubernetes deployment manifests
-    ├── *-deployment.yaml     # Environment-specific deployments
-    ├── ingress.yaml          # Ingress configuration
-    └── service.yaml          # Service definitions
+├── doorway/                  # Rust Gateway Service
+│   └── src/                  # Bootstrap, Signal, Gateway consolidation
+│
+├── doorway-app/              # Angular Doorway UI
+│   └── src/                  # Doorway admin interface
+│
+├── elohim/                   # Rust Agent Infrastructure
+│   ├── constitution/         # Constitutional AI constraints
+│   ├── elohim-agent/         # Autonomous agent runtime
+│   └── eae/                  # Elohim Autonomous Entities
+│
+├── elohim-node/              # Rust Node Runtime
+│   └── src/                  # Always-on family node daemon
+│
+├── steward/                  # Tauri Desktop Application
+│   ├── src-tauri/            # Rust backend with Holochain
+│   └── ui/                   # Desktop UI
+│
+├── holochain/                # Holochain Infrastructure
+│   ├── dna/                  # DNA definitions (elohim, imagodei, lamad, etc.)
+│   ├── edgenode/             # Edge node implementation
+│   ├── elohim-storage/       # P2P blob storage layer
+│   ├── sdk/                  # TypeScript SDK for Holochain
+│   ├── rna/                  # RNA components
+│   └── manifests/            # K8s deployments for Edge Nodes
+│
+├── mcp-servers/              # Model Context Protocol Servers
+│   └── elohim-content/       # Content management MCP
+│
+└── research/                 # Research & Exploration
+    ├── matrix/               # Matrix protocol research
+    └── economic/             # Economic model research
 ```
 
-## Progressive Sovereignty
+## Progressive Stewardship
 
-The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to fully sovereign node operator:
+The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to full node steward:
 
 | Stage | Description | Data Location |
 |-------|-------------|---------------|
 | **Visitor** | Anonymous browsing, no account | Browser memory only |
 | **Hosted User** | Account on elohim.host, custodial keys | DHT network (hosted) |
-| **App User** | Desktop app, self-sovereign keys | Local device + DHT |
+| **App User** | Desktop app, self-custodied keys | Local device + DHT |
 | **Node Operator** | Always-on infrastructure | Self-hosted + DHT |
 
 This progressive model ensures no one is excluded due to technical barriers, while incentivizing deeper participation over time. Keys can always be exported for migration between stages.
@@ -107,10 +136,24 @@ This progressive model ensures no one is excluded due to technical barriers, whi
 
 The protocol runs on [Holochain](https://holochain.org/), a framework for distributed applications without global consensus. Each user maintains their own source chain, validated by peers through a distributed hash table (DHT).
 
-**Edge Nodes** provide the network infrastructure:
-- Run the Holochain conductor with the Lamad hApp
+**DNA Modules** (`holochain/dna/`):
+- **elohim**: Core protocol coordination
+- **imagodei**: Human identity and stewardship
+- **lamad-v1**: Learning content and paths
+- **infrastructure**: Network coordination
+- **node-registry**: Node discovery and health
+
+**Edge Nodes** (`holochain/edgenode/`) provide network infrastructure:
+- Run the Holochain conductor with protocol hApps
 - Serve as DHT shard holders and bootstrap nodes
-- Enable web browsers to connect via authenticated WebSocket proxy
+- Enable web browsers to connect via Doorway gateway
+
+**Elohim Storage** (`holochain/elohim-storage/`) provides P2P blob storage:
+- Large content that exceeds Holochain's DHT limits
+- Reed-Solomon erasure coding for redundancy
+- Integration with content seeder pipeline
+
+**SDK** (`holochain/sdk/`) provides TypeScript bindings for frontend integration.
 
 See [`holochain/claude.md`](./holochain/claude.md) for Edge Node setup and configuration.
 
@@ -120,11 +163,53 @@ See [`holochain/claude.md`](./holochain/claude.md) for Edge Node setup and confi
 
 - **Territory (ContentNode)**: Immutable units of knowledge - videos, docs, simulations
 - **Journey (LearningPath)**: Curated paths that add narrative meaning and sequence
-- **Traveler (Agent)**: Sovereign agents whose progress and attestations shape their experience
+- **Traveler (Agent)**: Learners whose progress and attestations shape their experience
 
 See [`elohim-app/src/app/lamad/README.md`](./elohim-app/src/app/lamad/README.md) for detailed documentation.
 
+## Key Infrastructure Components
+
+### Doorway (Gateway)
+
+The consolidated Web2 gateway that makes P2P networks accessible:
+- **Bootstrap**: Agent discovery ("Who's in the space?")
+- **Signal**: WebRTC signaling ("Connect to peers")
+- **Gateway**: Conductor access with caching ("Get the data")
+
+One domain (`doorway.elohim.host`) serves all three functions. See [`doorway/ARCHITECTURE.md`](./doorway/ARCHITECTURE.md).
+
+### Elohim Agents (Constitutional AI)
+
+Rust infrastructure for autonomous AI agents:
+- **constitution/**: Runtime constitutional constraints (not trained values)
+- **elohim-agent/**: Agent runtime with streaming LLM backends
+- **eae/**: Elohim Autonomous Entities (worker-owned AI organizations)
+
+### Elohim Node (Family Infrastructure)
+
+Always-on nodes that form the network backbone:
+- Device-to-node sync (phone/laptop to family node)
+- Cluster-to-cluster replication
+- Backup and recovery
+
+See [`elohim-node/README.md`](./elohim-node/README.md).
+
+### Steward (Desktop App)
+
+Tauri-based desktop application for running your own Holochain node as a steward of co-creation.
+
+### Sophia (Assessment Engine)
+
+Person-centered assessment rendering infrastructure, transforming Khan Academy's Perseus with three assessment modes:
+- **Mastery**: Graded exercises (correct/incorrect)
+- **Discovery**: Resonance mapping to reveal affinities (psychometric aggregation)
+- **Reflection**: Open-ended capture without grading
+
+Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`sophia/README.md`](./sophia/README.md).
+
 ## CI/CD
+
+The repository uses a central orchestrator pattern. All GitHub webhooks go to the orchestrator, which analyzes changesets and triggers appropriate pipelines.
 
 See [`orchestrator/README.md`](./orchestrator/README.md) for pipeline architecture and configuration.
 
@@ -177,7 +262,8 @@ The infrastructure we build today will shape human consciousness for generations
 ## Further Reading
 
 - [Holochain](https://holochain.org/) - Distributed application framework
-- [Digital Infrastructure for Human Flourishing Manifesto](./elohim-app/src/app/components/) - Full vision document
+- [Shefa Economic Whitepaper](./genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md) - Economic layer philosophy
+- [Constitution Documentation](./genesis/docs/content/elohim-protocol/constitution.md) - Governance architecture
 - [Scandinavian Social Democracy](https://en.wikipedia.org/wiki/Nordic_model) - Proven high-trust governance
 - [AI Alignment Research](https://www.anthropic.com/research) - Values-based AI development
 
