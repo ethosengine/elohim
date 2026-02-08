@@ -895,8 +895,7 @@ HAPP_TAG=${HAPP_TAG}
             }
         }
 
-        // NOTE: Seeding is now handled by genesis/Jenkinsfile (separate pipeline)
-        // Run genesis pipeline manually after deployment or on schedule
+        // NOTE: Seeding is handled by genesis/Jenkinsfile, auto-triggered by the orchestrator
 
         stage('Deploy Edge Node - Prod') {
             when {
