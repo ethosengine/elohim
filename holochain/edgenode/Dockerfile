@@ -5,7 +5,7 @@
 #
 # NOTE: hApp is NOT baked into this image. It is fetched at runtime
 # by an init container and mounted via a shared volume.
-# See: holochain/manifests/edgenode-*.yaml
+# See: orchestrator/manifests/edgenode/*.yaml
 
 FROM ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom
 
