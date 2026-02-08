@@ -3,7 +3,7 @@
 #
 # NOTE: hApp is NOT baked into this image. It is fetched at runtime
 # by an init container and mounted via a shared volume at /opt/holochain.
-# See: holochain/manifests/edgenode-*.yaml
+# See: orchestrator/manifests/edgenode/*.yaml
 
 # Use slim instead of alpine for better ESM module compatibility
 # (libsodium-wrappers has ESM resolution issues on Alpine)

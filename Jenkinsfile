@@ -1020,7 +1020,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('staging', 'elohim-staging', 'elohim-site-staging',
-                                'elohim-app/manifests/staging-deployment.yaml', IMAGE_TAG)
+                                'orchestrator/manifests/elohim-app/staging.yaml', IMAGE_TAG)
                         }
                     }
                 }
@@ -1050,7 +1050,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             """
 
                             deployAppToEnvironment('alpha', 'elohim-alpha', 'elohim-site-alpha',
-                                'elohim-app/manifests/alpha-deployment.yaml', IMAGE_TAG)
+                                'orchestrator/manifests/elohim-app/alpha.yaml', IMAGE_TAG)
 
                             echo """
                             ═══════════════════════════════════════════════════════════
@@ -1254,7 +1254,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('prod', 'elohim-prod', 'elohim-site',
-                                'elohim-app/manifests/prod-deployment.yaml', IMAGE_TAG)
+                                'orchestrator/manifests/elohim-app/prod.yaml', IMAGE_TAG)
                         }
                     }
                 }

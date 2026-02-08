@@ -2,7 +2,7 @@
  * Elohim Edge Infrastructure Pipeline (elohim-edge)
  *
  * Builds container images and deploys Edge Node to dev/prod environments.
- * Triggered by orchestrator when doorway/, holochain/elohim-storage/, holochain/edgenode/, or holochain/manifests/ change.
+ * Triggered by orchestrator when doorway/, holochain/elohim-storage/, or holochain/edgenode/ change.
  *
  * What this pipeline builds:
  *   - elohim-doorway (HTTP gateway)
@@ -165,31 +165,6 @@ def checkEdgeNodeHealth(String url) {
         returnStdout: true
     ).trim()
     return result == '200'
-}
-
-/**
- * Detect if only deployment config changed (manifests, environments).
- * When true, skip image builds and deploy with existing Harbor images.
- */
-def isDeployOnly() {
-    def buildPatterns = ['doorway/', 'doorway-app/', 'holochain/edgenode/', 'holochain/elohim-storage/', 'holochain/crates/', 'VERSION']
-
-    def baseCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
-    if (!baseCommit) return false  // No baseline — conservative, do full build
-
-    def exists = sh(script: "git cat-file -t ${baseCommit} 2>/dev/null || echo 'missing'", returnStdout: true).trim()
-    if (exists != 'commit') return false
-
-    def changedFiles = sh(
-        script: "git diff --name-only ${baseCommit}..HEAD",
-        returnStdout: true
-    ).trim().split('\n').findAll { it }
-
-    if (changedFiles.isEmpty()) return true
-
-    return !changedFiles.any { file ->
-        buildPatterns.any { pattern -> file.startsWith(pattern) }
-    }
 }
 
 /**
@@ -382,18 +357,6 @@ spec:
                         sh 'git reset --hard HEAD'
 
                         echo "Building Holochain infrastructure for branch: ${env.BRANCH_NAME}"
-
-                        if (isDeployOnly()) {
-                            echo """
-                            ═══════════════════════════════════════════════════════════
-                            DEPLOY-ONLY MODE
-                            ═══════════════════════════════════════════════════════════
-                            No image source code changed — only manifests/config.
-                            Skipping image builds, deploying with existing Harbor images.
-                            ═══════════════════════════════════════════════════════════
-                            """
-                            env.DEPLOY_ONLY = 'true'
-                        }
                     }
                 }
             }
@@ -454,7 +417,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Setup Nix Cache') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -478,7 +441,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         // This pipeline now only builds infrastructure (container images)
 
         stage('Build Doorway') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -507,7 +470,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Doorway App') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -537,7 +500,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Storage') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -567,7 +530,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Edge Node Image') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -608,7 +571,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build hApp Installer') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -657,7 +620,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
@@ -789,7 +752,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 changeset "doorway/**"
                                 changeset "holochain/elohim-storage/**"
                                 changeset "holochain/edgenode/**"
-                                changeset "holochain/manifests/**"
                             }
                             anyOf {
                                 expression { return env.BRANCH_NAME ==~ /feat-.+/ }
@@ -862,12 +824,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            def envFile = 'environments/alpha.env'
-                            if (env.DEPLOY_ONLY != 'true') {
-                                // Write environment manifest with current build tags
-                                // (preserve SITE_TAG from git — app pipeline manages that independently)
-                                def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
-                                writeFile file: envFile, text: """# Alpha Environment - auto-updated by pipeline after each deploy
+                            // Write environment manifest with current build tags
+                            // (preserve SITE_TAG from git — app pipeline manages that independently)
+                            def envFile = 'orchestrator/environments/alpha.env'
+                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
+                            writeFile file: envFile, text: """# Alpha Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
@@ -877,10 +838,7 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
-                            } else {
-                                echo "Deploy-only: using existing image tags from ${envFile}"
-                            }
-                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'holochain/manifests/edgenode-alpha.yaml', envFile)
+                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/edgenode/alpha.yaml', envFile)
 
                             sh 'sleep 15'
 
@@ -914,10 +872,9 @@ HAPP_TAG=${HAPP_TAG}
 
                         withBuildVars(props) {
                             echo "Deploying Edge Node to Staging: ${IMAGE_TAG}"
-                            def envFile = 'environments/staging.env'
-                            if (env.DEPLOY_ONLY != 'true') {
-                                def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
-                                writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
+                            def envFile = 'orchestrator/environments/staging.env'
+                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
+                            writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
@@ -927,10 +884,7 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
-                            } else {
-                                echo "Deploy-only: using existing image tags from ${envFile}"
-                            }
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'holochain/manifests/edgenode-staging.yaml', envFile)
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/edgenode/staging.yaml', envFile)
                             sh 'sleep 15'
                             if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
                                 echo "Edge Node Staging deployed and healthy"
@@ -1009,10 +963,9 @@ HAPP_TAG=${HAPP_TAG}
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            def envFile = 'environments/prod.env'
-                            if (env.DEPLOY_ONLY != 'true') {
-                                def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
-                                writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
+                            def envFile = 'orchestrator/environments/prod.env'
+                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
+                            writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
@@ -1022,10 +975,7 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
-                            } else {
-                                echo "Deploy-only: using existing image tags from ${envFile}"
-                            }
-                            deployEdgeWithManifest('prod', 'elohim-prod', 'holochain/manifests/edgenode-prod.yaml', envFile)
+                            deployEdgeWithManifest('prod', 'elohim-prod', 'orchestrator/manifests/edgenode/prod.yaml', envFile)
 
                             sh 'sleep 15'
 
@@ -1041,7 +991,7 @@ HAPP_TAG=${HAPP_TAG}
         }
 
         stage('Cleanup') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' && env.DEPLOY_ONLY != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {

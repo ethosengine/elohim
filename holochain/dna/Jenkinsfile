@@ -462,7 +462,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             ${env.BUILD_URL}artifact/
 
             To trigger infrastructure rebuild:
-            - Push to holochain/doorway/**, holochain/edgenode/**, or holochain/manifests/**
+            - Push to holochain/doorway/**, holochain/edgenode/**
             - Or run elohim-edge with FORCE_BUILD=true
             ═══════════════════════════════════════════════════════════
             """
