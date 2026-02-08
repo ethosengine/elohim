@@ -32,7 +32,7 @@ This manifesto proposes technology that actively defends against corruption whil
 
 ### Key Concepts
 
-**Distributed Infrastructure**: Peer-to-peer networks that eliminate single points of control and enable community sovereignty
+**Distributed Infrastructure**: Peer-to-peer networks that eliminate single points of control and enable community stewardship
 
 **Graduated Intimacy**: Spaces for personal exploration alongside protected commons, with consent boundaries preventing extremes from corrupting shared spaces
 
@@ -65,7 +65,7 @@ This manifesto proposes technology that actively defends against corruption whil
 │       ├── components/       # Landing page components
 │       ├── core/             # Core utilities and guards
 │       ├── elohim/           # Core infrastructure services
-│       ├── imagodei/         # Human identity & sovereignty
+│       ├── imagodei/         # Human identity & stewardship
 │       ├── lamad/            # Learning infrastructure
 │       ├── qahal/            # Community governance
 │       ├── shefa/            # Resource flows & economics
@@ -76,8 +76,14 @@ This manifesto proposes technology that actively defends against corruption whil
 │   └── projects/
 │       ├── elohim-service/   # Import pipeline, content models, CLI
 │       ├── lamad-ui/         # UI Pattern Library
-│       ├── html5-app-plugin/ # HTML5 app integration
-│       └── perseus-plugin/   # Perseus integration
+│       └── html5-app-plugin/ # HTML5 app integration
+│
+├── sophia/                   # Sophia Assessment Engine (git submodule)
+│   └── packages/             # Person-centered assessment rendering
+│       ├── sophia-element/   # <sophia-question> web component
+│       ├── sophia-core/      # Core types (Moment, Recognition)
+│       ├── perseus-score/    # Mastery scoring (graded)
+│       └── psyche-survey/    # Discovery & reflection (psychometric)
 │
 ├── doorway/                  # Rust Gateway Service
 │   └── src/                  # Bootstrap, Signal, Gateway consolidation
@@ -113,15 +119,15 @@ This manifesto proposes technology that actively defends against corruption whil
     └── economic/             # Economic model research
 ```
 
-## Progressive Sovereignty
+## Progressive Stewardship
 
-The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to fully sovereign node operator:
+The Elohim Protocol meets users where they are, providing a gradual path from curious visitor to full node steward:
 
 | Stage | Description | Data Location |
 |-------|-------------|---------------|
 | **Visitor** | Anonymous browsing, no account | Browser memory only |
 | **Hosted User** | Account on elohim.host, custodial keys | DHT network (hosted) |
-| **App User** | Desktop app, self-sovereign keys | Local device + DHT |
+| **App User** | Desktop app, self-custodied keys | Local device + DHT |
 | **Node Operator** | Always-on infrastructure | Self-hosted + DHT |
 
 This progressive model ensures no one is excluded due to technical barriers, while incentivizing deeper participation over time. Keys can always be exported for migration between stages.
@@ -132,7 +138,7 @@ The protocol runs on [Holochain](https://holochain.org/), a framework for distri
 
 **DNA Modules** (`holochain/dna/`):
 - **elohim**: Core protocol coordination
-- **imagodei**: Human identity and sovereignty
+- **imagodei**: Human identity and stewardship
 - **lamad-v1**: Learning content and paths
 - **infrastructure**: Network coordination
 - **node-registry**: Node discovery and health
@@ -157,7 +163,7 @@ See [`holochain/claude.md`](./holochain/claude.md) for Edge Node setup and confi
 
 - **Territory (ContentNode)**: Immutable units of knowledge - videos, docs, simulations
 - **Journey (LearningPath)**: Curated paths that add narrative meaning and sequence
-- **Traveler (Agent)**: Sovereign agents whose progress and attestations shape their experience
+- **Traveler (Agent)**: Learners whose progress and attestations shape their experience
 
 See [`elohim-app/src/app/lamad/README.md`](./elohim-app/src/app/lamad/README.md) for detailed documentation.
 
@@ -191,6 +197,15 @@ See [`elohim-node/README.md`](./elohim-node/README.md).
 ### Steward (Desktop App)
 
 Tauri-based desktop application for running your own Holochain node as a steward of co-creation.
+
+### Sophia (Assessment Engine)
+
+Person-centered assessment rendering infrastructure, transforming Khan Academy's Perseus with three assessment modes:
+- **Mastery**: Graded exercises (correct/incorrect)
+- **Discovery**: Resonance mapping to reveal affinities (psychometric aggregation)
+- **Reflection**: Open-ended capture without grading
+
+Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`sophia/README.md`](./sophia/README.md).
 
 ## CI/CD
 
