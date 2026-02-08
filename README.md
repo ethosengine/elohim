@@ -78,8 +78,12 @@ This manifesto proposes technology that actively defends against corruption whil
 │       ├── lamad-ui/         # UI Pattern Library
 │       └── html5-app-plugin/ # HTML5 app integration
 │
-├── sophia/                   # Sophia Assessment Engine (WIP)
-│   └── (psychometric aggregation fork of Perseus)
+├── sophia/                   # Sophia Assessment Engine (git submodule)
+│   └── packages/             # Person-centered assessment rendering
+│       ├── sophia-element/   # <sophia-question> web component
+│       ├── sophia-core/      # Core types (Moment, Recognition)
+│       ├── perseus-score/    # Mastery scoring (graded)
+│       └── psyche-survey/    # Discovery & reflection (psychometric)
 │
 ├── doorway/                  # Rust Gateway Service
 │   └── src/                  # Bootstrap, Signal, Gateway consolidation
@@ -193,6 +197,15 @@ See [`elohim-node/README.md`](./elohim-node/README.md).
 ### Steward (Desktop App)
 
 Tauri-based desktop application for running your own Holochain node as a steward of co-creation.
+
+### Sophia (Assessment Engine)
+
+Person-centered assessment rendering infrastructure, transforming Khan Academy's Perseus with three assessment modes:
+- **Mastery**: Graded exercises (correct/incorrect)
+- **Discovery**: Resonance mapping to reveal affinities (psychometric aggregation)
+- **Reflection**: Open-ended capture without grading
+
+Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what learner demonstrated, not just "answer"). See [`sophia/README.md`](./sophia/README.md).
 
 ## CI/CD
 
