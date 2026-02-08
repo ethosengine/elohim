@@ -951,7 +951,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         // Check if holochain edge node is running
                         def holochainStatus = sh(
                             script: '''
-                                kubectl get deployment elohim-edgenode-dev -n ethosengine -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0"
+                                kubectl get deployment elohim-edgenode-alpha -n elohim-alpha -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0"
                             ''',
                             returnStdout: true
                         ).trim()

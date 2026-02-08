@@ -1,0 +1,34 @@
+# Elohim K8s Namespaces
+#
+# Declarative namespace definitions for all environments.
+# Apply once per cluster:
+#   kubectl apply -f orchestrator/manifests/namespaces.yaml
+#
+# Environments:
+#   - alpha:   Development builds from dev branch
+#   - staging: Pre-production validation from staging branch
+#   - prod:    Production from main branch
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: elohim-alpha
+  labels:
+    app.kubernetes.io/part-of: elohim
+    elohim/environment: alpha
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: elohim-staging
+  labels:
+    app.kubernetes.io/part-of: elohim
+    elohim/environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: elohim-prod
+  labels:
+    app.kubernetes.io/part-of: elohim
+    elohim/environment: prod

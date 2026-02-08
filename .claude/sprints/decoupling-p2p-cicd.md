@@ -39,44 +39,40 @@ Transform the monorepo from tightly-coupled sequential builds to independent, ve
 
 | Sprint | Focus | Status | Priority |
 |--------|-------|--------|----------|
-| 3 | K8s Environment Isolation | **~85% COMPLETE** | ~~IMMEDIATE~~ |
-| 0 | Schema Versioning Foundation | **~10% COMPLETE** | **NEXT** |
-| 1 | Artifact Storage Decoupling | Not started | HIGH |
-| 2 | Pipeline Parallelization | Not started | HIGH |
+| 3 | K8s Environment Isolation | **COMPLETE** (code); operational deploy pending | ~~IMMEDIATE~~ |
+| 0 | Schema Versioning Foundation | **COMPLETE** | ~~NEXT~~ |
+| 1 | Artifact Storage Decoupling | **COMPLETE** (was already done) | ~~HIGH~~ |
+| 2 | Pipeline Parallelization | **~30%** -- orchestrator needs parallel refactor | **NEXT** |
 | 4 | Seeder Version Negotiation | Not started | MEDIUM |
 | 6 | P2P Activation | Not started | MEDIUM |
 | 7 | Network Topology Modeling | Not started | FUTURE |
 | 5 | DNA Build Isolation | Not started | **DEFERRED** |
 
-**Execution Order**: ~~0 → 3~~ → finish Sprint 3 cleanup → 0 → 1 → 2 → 4 → 6 → 7 (Sprint 5 deferred)
+**Execution Order**: ~~0 → 3 → 1~~ → 2 → 4 → 6 → 7 (Sprints 0, 1, 3 complete; Sprint 5 deferred)
 
 ---
 
-## Sprint 0: Schema Versioning Foundation -- ~10% COMPLETE
+## Sprint 0: Schema Versioning Foundation -- COMPLETE
 
 **Goal**: Establish version-aware data contracts before any other decoupling.
 
-**Status**: Partial. `#[serde(default)]` widely used (89 occurrences in views.rs) but tolerant reader pattern and schemaVersion not yet added.
+**Status**: Complete. All InputView structs versioned, TypeScript types regenerated, compile-time lint enforces discipline.
 
 ### What's Done
 
 | Item | Status | Evidence |
 |------|--------|----------|
-| `#[serde(default)]` on InputView fields | PARTIAL | 89 occurrences in `views.rs`; coverage audit needed |
+| `#[serde(default)]` on InputView fields | DONE | 100% of optional fields covered (audit confirmed) |
+| `schema_version: u32` on all InputViews | DONE | 11 structs in `views.rs`, default=1 via `default_schema_version()` |
+| Tolerant reader guarantee | DONE | Serde ignores unknown fields by default (no `deny_unknown_fields`); tests prove it |
+| `schemaVersion` on TS seed entities | DONE | 3 interfaces + 4 builder sites in `seed-entities.ts` |
+| Generate TypeScript types from ts-rs | DONE | `generate-types.sh` run; all 11 InputView types export `schemaVersion: number` |
+| Compile-time lint for schema_version | DONE | `all_input_views_have_schema_version_field` test covers all 11 structs; fails to compile if new struct omits field |
+| `#[serde(flatten)] HashMap` | SKIPPED | Unnecessary: serde already ignores unknown fields. Would disable fast-path deserialization and interact poorly with `rename_all = "camelCase"`. |
 
-### What Remains
-
-| Item | Priority | Notes |
-|------|----------|-------|
-| Add `schemaVersion` to seed JSON models | HIGH | `genesis/seeder/src/seed-entities.ts` interfaces need field |
-| Complete `#[serde(default)]` audit | MEDIUM | Verify ALL optional fields covered in `views.rs` |
-| Add `#[serde(flatten)] extra: HashMap<String, Value>` | HIGH | Tolerant reader for unknown fields |
-| Generate TypeScript types from ts-rs | MEDIUM | `cargo test export_bindings` (ts annotations exist) |
-| Add CI lint check for required fields | LOW | Enforce schema discipline |
-
-**Files to Modify**:
-- `holochain/elohim-storage/src/views.rs` - Complete `#[serde(default)]` + add `#[serde(flatten)] extra: HashMap<String, Value>`
-- `genesis/seeder/src/seed-entities.ts` - Add `schemaVersion: number` to all content types
+**Files Modified**:
+- `holochain/elohim-storage/src/views.rs` - Added `default_schema_version()` helper, `schema_version` field to all 11 InputView structs, 4 schema version tests
+- `genesis/seeder/src/seed-entities.ts` - Added `schemaVersion` to 3 interfaces + 4 builder call sites
 - `genesis/seeder/src/validation-constants.ts` - Export from ts-rs bindings
 
 **Verification**:
@@ -89,41 +85,19 @@ curl -X POST http://localhost:8090/db/content/bulk \
 
 ---
 
-## Sprint 1: Artifact Storage Decoupling (Harbor)
+## Sprint 1: Artifact Storage Decoupling (Harbor) -- COMPLETE (already implemented)
 
 **Goal**: Remove Jenkins `lastSuccessfulBuild` artifact fetching; use versioned Harbor artifacts.
 
-**Scope**:
-1. Create Harbor project `elohim-artifacts` for versioned hApp storage
-2. Modify DNA pipeline to push `elohim.happ` with version tag to Harbor
-3. Modify Edge/App/Steward pipelines to fetch from Harbor by version
-4. Add `HAPP_VERSION` to VERSION file
+**Status**: Already fully implemented prior to sprint plan creation. Discovered during audit 2026-02-08.
 
-**Files to Modify**:
-- `holochain/dna/Jenkinsfile` - Add Harbor push stage after hApp build
-- `holochain/Jenkinsfile` - Replace `fetchHappArtifact()` with Harbor fetch
-- `Jenkinsfile` (app) - Replace WASM fetch with Harbor
-- `steward/Jenkinsfile` - Replace hApp fetch with Harbor
-- `VERSION` - Add `HAPP_VERSION=x.y.z` line
-
-**Harbor Setup**:
-```bash
-# Create Harbor project (one-time)
-curl -X POST "https://harbor.ethosengine.com/api/v2.0/projects" \
-  -d '{"project_name":"elohim-artifacts","public":false}'
-```
-
-**Forcing Function**:
-- Remove `fetchHappArtifact()` function entirely
-- CI fails if `HAPP_VERSION` not found in VERSION file
-- Harbor artifacts require explicit version tag (no `latest` allowed)
-
-**Verification**:
-```bash
-# Verify artifact in Harbor
-curl https://harbor.ethosengine.com/api/v2.0/projects/elohim/repositories/happ/artifacts
-# Should show versioned tags, not "latest"
-```
+**Evidence**:
+- DNA pipeline (`holochain/dna/Jenkinsfile`): "Push to Harbor" stage using `oras` CLI with commit + floating tags
+- Edge pipeline (`holochain/Jenkinsfile`): `fetchHappFromHarbor()` helper, floating tag strategy
+- App pipeline (`Jenkinsfile`): Fetches WASM from Harbor via `oras pull`, pushes `elohim-site` images
+- Steward pipeline (`steward/Jenkinsfile`): Fetches hApp from Harbor with fallback to local build
+- VERSION file: Contains `HAPP_VERSION=1.0.0` and all other component versions
+- No `lastSuccessfulBuild` pattern remains anywhere
 
 ---
 
@@ -157,11 +131,11 @@ curl -X POST "https://jenkins/job/elohim-edge/job/dev/build"
 
 ---
 
-## Sprint 3: K8s Environment Isolation ⭐ ~85% COMPLETE
+## Sprint 3: K8s Environment Isolation ⭐ COMPLETE (code)
 
 **Goal**: Separate alpha/staging/prod into independent deployments with dedicated namespaces.
 
-**Status**: Substantially complete. Core isolation is operational. Cleanup items remain.
+**Status**: All code changes complete. Operational deployment (kubectl apply, merge dev→staging) pending.
 
 ### What's Done
 
@@ -183,16 +157,24 @@ curl -X POST "https://jenkins/job/elohim-edge/job/dev/build"
 | Staging deployment stages | DONE | Edge + App pipelines have dedicated staging deploy stages |
 | dev → staging promotion | DONE | Pushed to dev, ready for merge to staging branch |
 
-### What Remains
+### Additional Items Completed (2026-02-08)
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Delete `edgenode-dev.yaml` | DONE | `holochain/manifests/edgenode-dev.yaml` removed |
+| Zero `doorway-dev` references | DONE | Last reference in IMPORT_PIPELINE_DEBUG.md updated to `doorway-alpha` |
+| Version-control `namespaces.yaml` | DONE | `orchestrator/manifests/namespaces.yaml` declares alpha/staging/prod |
+| NetworkPolicy cross-env isolation | DONE | `orchestrator/manifests/network-policies.yaml` denies cross-namespace ingress |
+| App ingress namespace | N/A | All ingresses already in correct namespaces (`elohim-alpha`/`staging`/`prod`) |
+
+### Operational Items Remaining (cluster access required)
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Apply staging ConfigMap to K8s | **PRE-MERGE** | `kubectl apply -f elohim-app/manifests/staging/configmap.yaml` |
+| Apply namespaces | ONE-TIME | `kubectl apply -f orchestrator/manifests/namespaces.yaml` |
+| Apply network policies | ONE-TIME | `kubectl apply -f orchestrator/manifests/network-policies.yaml` |
+| Apply staging ConfigMap | **PRE-MERGE** | `kubectl apply -f orchestrator/manifests/elohim-app/staging/configmap.yaml` |
 | Merge dev → staging | **NEXT** | First staging build will deploy all components |
-| Delete `edgenode-dev.yaml` | AFTER VERIFY | Anti-regression safeguard; delete after staging verified healthy |
-| App ingress namespace migration | LOW | `elohim-app/manifests/ingress.yaml` still uses `ethosengine` namespace |
-| Version-control `namespaces.yaml` | LOW | Namespaces deployed but not in repo |
-| NetworkPolicy for cross-env isolation | LOW | Nice-to-have; not blocking |
 
 **Verification** (after staging merge):
 ```bash
@@ -419,7 +401,7 @@ Each sprint includes safeguards that make regression difficult:
 
 ## Quick Reference: Current Sprint Checklists
 
-### Sprint 3 Checklist (K8s Isolation) -- ~85% COMPLETE
+### Sprint 3 Checklist (K8s Isolation) -- CODE COMPLETE
 - [x] Create namespaces: elohim-alpha, elohim-staging, elohim-prod
 - [x] Create edgenode-alpha.yaml (from edgenode-dev)
 - [x] Create edgenode-staging.yaml (new)
@@ -432,14 +414,21 @@ Each sprint includes safeguards that make regression difficult:
 - [x] Rename "Deploy Edge Node - Dev" → "Deploy Edge Node - Alpha"
 - [x] Fix SonarQube issues (sophia-renderer, related-concepts, budget-reconciliation)
 - [x] Push all fixes to dev
-- [ ] Apply staging ConfigMap to K8s cluster (`kubectl apply -f elohim-app/manifests/staging/configmap.yaml`)
-- [ ] Merge dev → staging and verify staging health
-- [ ] Delete edgenode-dev.yaml after staging verified healthy
-- [ ] Migrate app ingress from `ethosengine` namespace (low priority)
+- [x] Delete edgenode-dev.yaml (removed `holochain/manifests/edgenode-dev.yaml`)
+- [x] Eliminate ALL `doorway-dev` references from repo (last one was in IMPORT_PIPELINE_DEBUG.md)
+- [x] Version-control namespaces (`orchestrator/manifests/namespaces.yaml`)
+- [x] NetworkPolicy for cross-env isolation (`orchestrator/manifests/network-policies.yaml`)
+- [x] App ingress namespaces verified correct (all use `elohim-alpha`/`staging`/`prod`)
+- [ ] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/namespaces.yaml`
+- [ ] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/network-policies.yaml`
+- [ ] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/elohim-app/staging/configmap.yaml`
+- [ ] **OPERATIONAL**: Merge dev → staging and verify staging health
 
-### Sprint 0 Checklist (Schema Versioning) -- ~10% COMPLETE
-- [~] Add `#[serde(default)]` to all optional InputView fields (89 occurrences exist; audit needed)
-- [ ] Add `schemaVersion` to seed JSON models
-- [ ] Add `#[serde(flatten)] extra: HashMap<String, Value>` for unknown fields
-- [ ] Generate TypeScript types from ts-rs
-- [ ] Add CI lint check for required fields
+### Sprint 0 Checklist (Schema Versioning) -- COMPLETE
+- [x] Add `#[serde(default)]` to all optional InputView fields (100% coverage confirmed)
+- [x] Add `schema_version: u32` to all 11 InputView structs (default=1)
+- [x] Add `schemaVersion` to seed entity TS interfaces + builders
+- [x] Tolerant reader tests (5 tests: default, explicit, unknown fields, multi-struct, all-struct lint)
+- [x] Generate TypeScript types from ts-rs (`generate-types.sh` -- all 11 types export `schemaVersion`)
+- [x] Compile-time lint (`all_input_views_have_schema_version_field` -- fails to compile if new struct misses field)
+- [~] ~~`#[serde(flatten)] HashMap`~~ SKIPPED (serde already ignores unknown fields; flatten hurts perf)

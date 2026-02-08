@@ -48,7 +48,7 @@ import groovy.transform.Field
     ],
     'elohim': [
         jenkinsPath: 'Jenkinsfile',
-        changePatterns: ['elohim-app/', 'elohim-library/', 'VERSION'],
+        changePatterns: ['elohim-app/', 'elohim-library/', 'holochain/sdk/', 'VERSION'],
         artifacts: ['elohim-app'],
         dependsOn: [],
         triggersGenesis: true,

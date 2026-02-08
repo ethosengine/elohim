@@ -4,4 +4,4 @@ import type { CreateStepInputView } from "./CreateStepInputView";
 /**
  * Input for creating a chapter - camelCase API boundary type
  */
-export type CreateChapterInputView = { id: string, title: string, description: string | null, orderIndex: number, estimatedDuration: string | null, steps: Array<CreateStepInputView>, };
+export type CreateChapterInputView = { id: string, title: string, schemaVersion: number, description: string | null, orderIndex: number, estimatedDuration: string | null, steps: Array<CreateStepInputView>, };

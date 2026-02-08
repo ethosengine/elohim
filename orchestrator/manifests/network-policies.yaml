@@ -1,0 +1,115 @@
+# Elohim Cross-Environment Isolation NetworkPolicies
+#
+# Prevents pods in one environment from communicating with pods in another.
+# Each namespace gets:
+#   1. Default deny all ingress from other elohim namespaces
+#   2. Allow ingress from within the same namespace
+#   3. Allow ingress from ingress controller (external traffic)
+#   4. Allow DNS resolution (kube-system)
+#
+# Apply per cluster:
+#   kubectl apply -f orchestrator/manifests/network-policies.yaml
+#
+# Prerequisites:
+#   - CNI plugin must support NetworkPolicy (Calico, Cilium, etc.)
+#   - Namespaces must have labels: elohim/environment: alpha|staging|prod
+#     (defined in namespaces.yaml)
+
+---
+# ============================================================================
+# Alpha Environment
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-cross-env
+  namespace: elohim-alpha
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic from within the same namespace
+    - from:
+        - podSelector: {}
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+    # Allow DNS resolution
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ============================================================================
+# Staging Environment
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-cross-env
+  namespace: elohim-staging
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic from within the same namespace
+    - from:
+        - podSelector: {}
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+    # Allow DNS resolution
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ============================================================================
+# Production Environment
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-cross-env
+  namespace: elohim-prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic from within the same namespace
+    - from:
+        - podSelector: {}
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+    # Allow DNS resolution
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
