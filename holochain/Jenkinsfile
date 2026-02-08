@@ -377,7 +377,8 @@ spec:
                         def storageTag = computeTag(versionMap['STORAGE_VERSION'] ?: '1.0.0')
                         def happInstallerTag = computeTag(versionMap['HAPP_INSTALLER_VERSION'] ?: '1.0.0')
                         def doorwayAppTag = computeTag(versionMap['DOORWAY_APP_VERSION'] ?: '1.0.0')
-                        def happTag = computeTag(versionMap['HAPP_VERSION'] ?: '1.0.0')
+                        // hApp is built by DNA pipeline — use floating tag, not commit-specific
+                        def happTag = getHappFloatingTag()
 
                         // Backward compat: IMAGE_TAG = edgenode tag (primary image)
                         def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
