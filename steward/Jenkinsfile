@@ -188,16 +188,12 @@ spec:
                             }
                             def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
 
-                            // Compute Harbor tag using same logic as DNA pipeline producer
+                            // Use floating tag from DNA pipeline, or explicit override
                             def happVersion
-                            if (params.HAPP_VERSION != 'dev-latest') {
+                            if (params.HAPP_VERSION && params.HAPP_VERSION != 'dev-latest') {
                                 happVersion = params.HAPP_VERSION
-                            } else if (env.BRANCH_NAME == 'main') {
-                                happVersion = baseVersion
                             } else {
-                                def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                                def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
-                                happVersion = "${baseVersion}-${sanitizedBranch}-${gitHash}"
+                                happVersion = (env.BRANCH_NAME == 'main') ? 'latest' : 'dev-latest'
                             }
 
                             echo """

@@ -83,21 +83,13 @@ def parseVersionFile() {
 }
 
 /**
- * Compute the Harbor image tag using the same logic as the producer (DNA pipeline)
- * On main branch: baseVersion (e.g., 1.0.0)
- * On other branches: baseVersion-branch-gitHash (e.g., 1.0.0-dev-f0268fc9)
+ * Get the floating hApp tag published by the DNA pipeline.
+ * DNA pushes both a commit-specific tag and a floating tag on every build:
+ *   main  → 'latest'
+ *   other → 'dev-latest'
  */
-def computeHarborTag() {
-    def versionMap = parseVersionFile()
-    def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
-
-    if (env.BRANCH_NAME == 'main') {
-        return baseVersion
-    } else {
-        def gitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
-        return "${baseVersion}-${sanitizedBranch}-${gitHash}"
-    }
+def getHappFloatingTag() {
+    return (env.BRANCH_NAME == 'main') ? 'latest' : 'dev-latest'
 }
 
 /**
@@ -105,9 +97,9 @@ def computeHarborTag() {
  * Returns true if hApp was successfully fetched, false otherwise
  */
 def fetchHappFromHarbor(String destPath, String version = null) {
-    // Compute version tag using same logic as DNA pipeline producer
+    // Use floating tag from DNA pipeline (dev-latest / latest)
     if (!version) {
-        version = computeHarborTag()
+        version = getHappFloatingTag()
     }
 
     echo "Fetching hApp from Harbor: harbor.ethosengine.com/ethosengine/elohim-happ:${version}"
