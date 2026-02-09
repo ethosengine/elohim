@@ -12,11 +12,11 @@
  *   - Deployment manifest comparing expected vs actual versions
  *
  * Dependency Graph:
- *   elohim-holochain (DNA/hApp, WASM)
- *       ├──► elohim-edge (infrastructure) ──┐
- *       │                                   ├──► elohim-genesis (seed + test)
- *       └──► elohim-steward (manual only)   │
- *   elohim (Angular app) ──────────────────┘
+ *   elohim-holochain (DNA/hApp, WASM) [cascades: false]
+ *       ├──► elohim-edge (builds after DNA when both change, but DNA doesn't auto-trigger Edge)
+ *       │                                    ├──► elohim-genesis (seed + test)
+ *       └──► elohim-steward (manual only)    │
+ *   elohim (Angular app) ───────────────────┘
  */
 
 // =============================================================================
@@ -31,6 +31,7 @@ import groovy.transform.Field
         changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/', 'holochain/rna/', 'VERSION'],
         artifacts: ['elohim.happ'],
         dependsOn: [],
+        cascades: false,      // Sprint 5: DNA changes don't auto-trigger Edge rebuilds
         triggersGenesis: true,
         deploymentCheck: null  // No deployment, just artifacts
     ],
@@ -307,7 +308,12 @@ def propagateDependencies(pipelines, analysis) {
             if (config.manualOnly) return                  // never auto-trigger
 
             def deps = config.dependsOn ?: []
-            def buildingDep = deps.find { pipelines.contains(it) }
+            def buildingDep = deps.find { dep ->
+                if (!pipelines.contains(dep)) return false
+                // Sprint 5: respect cascades flag (default true for backward compat)
+                def depConfig = PIPELINES[dep]
+                return (depConfig.cascades == null) ? true : depConfig.cascades
+            }
             if (buildingDep) {
                 pipelines.add(name)
                 analysis[name].shouldRun = true

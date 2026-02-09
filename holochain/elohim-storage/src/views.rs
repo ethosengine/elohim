@@ -1542,6 +1542,41 @@ impl From<UpdateAllocationInputView> for UpdateAllocationInput {
 }
 
 // ============================================================================
+// Content Mastery Input View
+// ============================================================================
+
+use crate::db::content_mastery::CreateMasteryInput;
+
+/// Input for creating/updating content mastery - camelCase API boundary type
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateMasteryInputView {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    pub human_id: String,
+    pub content_id: String,
+    #[serde(default)]
+    pub mastery_level: Option<String>,
+    #[serde(default)]
+    pub content_version_at_mastery: Option<String>,
+}
+
+impl From<CreateMasteryInputView> for CreateMasteryInput {
+    fn from(v: CreateMasteryInputView) -> Self {
+        Self {
+            id: v.id,
+            human_id: v.human_id,
+            content_id: v.content_id,
+            mastery_level: v.mastery_level.unwrap_or_else(|| "not_started".to_string()),
+            content_version_at_mastery: v.content_version_at_mastery,
+        }
+    }
+}
+
+// ============================================================================
 // Schema Version Tests
 // ============================================================================
 
@@ -1633,6 +1668,9 @@ mod schema_version_tests {
         let update_alloc: UpdateAllocationInputView = serde_json::from_value(
             serde_json::json!({})
         ).unwrap();
+        let mastery: CreateMasteryInputView = serde_json::from_value(
+            serde_json::json!({"humanId":"h","contentId":"c"})
+        ).unwrap();
 
         // The lint: accessing .schema_version on each. Fails to compile if missing.
         assert_eq!(content.schema_version, 1);
@@ -1646,6 +1684,7 @@ mod schema_version_tests {
         assert_eq!(event.schema_version, 1);
         assert_eq!(alloc.schema_version, 1);
         assert_eq!(update_alloc.schema_version, 1);
+        assert_eq!(mastery.schema_version, 1);
     }
 
     #[test]

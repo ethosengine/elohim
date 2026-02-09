@@ -437,6 +437,14 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         info!("  POST /db/paths/bulk      - Bulk create paths");
     }
 
+    // Wire P2P services into HTTP server
+    #[cfg(feature = "p2p")]
+    if let Some(ref node) = p2p_node {
+        http_server = http_server.with_sync_manager(node.sync_manager().clone());
+        http_server = http_server.with_p2p_handle(node.handle());
+        info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
+    }
+
     let http_server = Arc::new(http_server);
 
     // Start import handler if enabled

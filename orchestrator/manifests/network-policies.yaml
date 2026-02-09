@@ -83,6 +83,60 @@ spec:
 
 ---
 # ============================================================================
+# P2P Cross-Namespace Rules (alpha <-> staging on port 9876)
+# ============================================================================
+
+# Allow P2P traffic: staging → alpha
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-from-staging
+  namespace: elohim-alpha
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              elohim/environment: staging
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+
+---
+# Allow P2P traffic: alpha → staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-from-alpha
+  namespace: elohim-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              elohim/environment: alpha
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+
+---
+# ============================================================================
 # Production Environment
 # ============================================================================
 apiVersion: networking.k8s.io/v1

@@ -1,14 +1,16 @@
-# Edge Node Staging Deployment
+# Edge Node Staging StatefulSet
 #
-# Provides stable Holochain conductor for Eclipse Che workspaces.
+# Provides stable Holochain conductor with P2P networking support.
 #
 # Architecture:
 #   Browser -> Doorway Gateway (auth + whitelist + worker pool) -> Conductor (localhost)
+#   P2P: elohim-storage nodes discover each other via headless service DNS
 #
 # Ports:
 #   - 4444: Conductor Admin WebSocket (localhost only)
 #   - 8444: socat proxy (pod-internal, for legacy/direct access)
 #   - 8080: Doorway Gateway (public, authenticated)
+#   - 9876: P2P libp2p transport (cross-namespace via NetworkPolicy)
 ---
 # Secret for Doorway Gateway API keys
 apiVersion: v1
@@ -82,7 +84,7 @@ spec:
   storageClassName: microk8s-hostpath
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: elohim-edgenode-staging
   namespace: elohim-staging
@@ -90,7 +92,11 @@ metadata:
     app: elohim-edgenode
     environment: staging
 spec:
+  serviceName: elohim-edgenode-staging-headless
   replicas: 1
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: elohim-edgenode
@@ -287,6 +293,19 @@ spec:
               value: "50"
             - name: IMPORT_CHUNK_DELAY_MS
               value: "300"
+            - name: ENABLE_P2P
+              value: "true"
+            - name: P2P_PORT
+              value: "9876"
+            - name: DISABLE_MDNS
+              value: "true"
+          ports:
+            - name: storage-http
+              containerPort: 8090
+              protocol: TCP
+            - name: p2p
+              containerPort: 9876
+              protocol: TCP
           resources:
             requests:
               memory: "128Mi"
@@ -382,6 +401,27 @@ spec:
           configMap:
             name: elohim-edgenode-staging-config
 ---
+# Headless service for StatefulSet DNS-based peer discovery
+# Each pod gets a stable DNS name: elohim-edgenode-staging-{N}.elohim-edgenode-staging-headless.elohim-staging.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-edgenode-staging-headless
+  namespace: elohim-staging
+  labels:
+    app: elohim-edgenode
+    environment: staging
+spec:
+  clusterIP: None
+  selector:
+    app: elohim-edgenode
+    environment: staging
+  ports:
+    - name: p2p
+      port: 9876
+      targetPort: 9876
+      protocol: TCP
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -412,6 +452,11 @@ spec:
     - name: operator-ui
       port: 8081
       targetPort: 80
+      protocol: TCP
+    # P2P libp2p transport
+    - name: p2p
+      port: 9876
+      targetPort: 9876
       protocol: TCP
   selector:
     app: elohim-edgenode

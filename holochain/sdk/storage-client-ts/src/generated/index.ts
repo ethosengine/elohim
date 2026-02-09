@@ -30,6 +30,7 @@ export * from './CreateContentInputView';
 export * from './CreateContributorPresenceInputView';
 export * from './CreateEconomicEventInputView';
 export * from './CreateHumanRelationshipInputView';
+export * from './CreateMasteryInputView';
 export * from './CreatePathInputView';
 export * from './CreateRelationshipInputView';
 export * from './CreateStepInputView';

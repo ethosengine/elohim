@@ -1023,6 +1023,24 @@ async function seedViaDoorway(): Promise<SeedResult> {
   }
 
   // ========================================
+  // SCHEMA VERSION PRE-FLIGHT CHECK
+  // ========================================
+  console.log('\n📋 Checking schema compatibility...');
+  try {
+    const schemaInfo = await doorwayClient.getSchemaInfo();
+    if (!schemaInfo.supportedVersions.includes(1)) {
+      console.error(`❌ Storage does not support schema version 1. Supported: ${schemaInfo.supportedVersions.join(', ')}`);
+      console.error('   Seeder requires schema version 1. Update the seeder or storage to match.');
+      process.exit(1);
+    }
+    console.log(`   Schema versions supported: ${schemaInfo.supportedVersions.join(', ')} (current: ${schemaInfo.currentVersion})`);
+  } catch (error) {
+    // Non-fatal: older storage versions may not have /db/schema endpoint
+    console.warn(`   ⚠️ Schema check unavailable: ${error instanceof Error ? error.message : error}`);
+    console.warn('   Proceeding without schema validation (storage may be an older version)');
+  }
+
+  // ========================================
   // LOAD CONTENT
   // ========================================
   let filteredConcepts: { concept: ConceptJson; file: string }[] = [];

@@ -192,8 +192,12 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
     """
 
     sh "kubectl apply -f ${outputFile}"
-    sh "kubectl rollout restart deployment/elohim-edgenode-${env} -n ${namespace}"
-    sh "kubectl rollout status deployment/elohim-edgenode-${env} -n ${namespace} --timeout=300s"
+    def resourceType = sh(
+        script: "grep -q 'kind: StatefulSet' ${manifestTemplate} && echo 'statefulset' || echo 'deployment'",
+        returnStdout: true
+    ).trim()
+    sh "kubectl rollout restart ${resourceType}/elohim-edgenode-${env} -n ${namespace}"
+    sh "kubectl rollout status ${resourceType}/elohim-edgenode-${env} -n ${namespace} --timeout=300s"
 }
 
 pipeline {
@@ -537,6 +541,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             def haveHapp = fetchHappFromHarbor('holochain/edgenode/elohim.happ')
 
                             if (haveHapp) {
+                                // DNA version awareness (Sprint 5)
+                                def versionMap = parseVersionFile()
+                                def expectedHappVersion = versionMap['HAPP_VERSION'] ?: 'unknown'
+                                def happTag = getHappFloatingTag()
+                                echo """
+    ═══════════════════════════════════════════
+    DNA ARTIFACT INFO
+    ═══════════════════════════════════════════
+    Expected HAPP_VERSION: ${expectedHappVersion}
+    Fetched via tag:       ${happTag}
+    ═══════════════════════════════════════════"""
+
                                 env.HAPP_AVAILABLE = 'true'
                                 sh """#!/bin/bash
                                     set -euo pipefail

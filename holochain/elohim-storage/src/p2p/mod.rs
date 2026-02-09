@@ -36,10 +36,12 @@ use futures::StreamExt;
 use libp2p::{
     kad,
     mdns, noise,
+    multiaddr::Protocol,
     request_response,
     swarm::{Swarm, SwarmEvent},
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
+use serde::Serialize;
 use sha2::{Sha256, Digest};
 use std::sync::Arc;
 use std::time::Duration;
@@ -101,6 +103,32 @@ pub struct P2PNode {
     sync_manager: Arc<SyncManager>,
     /// Shutdown signal
     shutdown_tx: broadcast::Sender<()>,
+    /// Status broadcast for HttpServer handle
+    status_tx: tokio::sync::watch::Sender<P2PStatusInfo>,
+}
+
+/// P2P node status for observability
+#[derive(Debug, Clone, Serialize)]
+pub struct P2PStatusInfo {
+    pub peer_id: String,
+    pub listen_addresses: Vec<String>,
+    pub connected_peers: usize,
+    pub bootstrap_nodes: Vec<String>,
+    pub sync_documents: usize,
+}
+
+/// Send+Sync handle for querying P2P status from HttpServer.
+/// Separated from P2PNode because libp2p Swarm types are not Send.
+#[derive(Clone)]
+pub struct P2PHandle {
+    status_rx: tokio::sync::watch::Receiver<P2PStatusInfo>,
+}
+
+impl P2PHandle {
+    /// Get the latest P2P status snapshot
+    pub fn status(&self) -> P2PStatusInfo {
+        self.status_rx.borrow().clone()
+    }
 }
 
 impl P2PNode {
@@ -140,6 +168,15 @@ impl P2PNode {
 
         let (shutdown_tx, _) = broadcast::channel(1);
 
+        let initial_status = P2PStatusInfo {
+            peer_id: peer_id.to_string(),
+            listen_addresses: vec![],
+            connected_peers: 0,
+            bootstrap_nodes: config.bootstrap_nodes.clone(),
+            sync_documents: 0,
+        };
+        let (status_tx, _) = tokio::sync::watch::channel(initial_status);
+
         info!(peer_id = %peer_id, "Created P2P node with sync support");
 
         Ok(Self {
@@ -149,6 +186,7 @@ impl P2PNode {
             blob_store,
             sync_manager,
             shutdown_tx,
+            status_tx,
         })
     }
 
@@ -172,18 +210,60 @@ impl P2PNode {
                 .map_err(|e| StorageError::P2PNetwork(format!("Listen error: {}", e)))?;
         }
 
+        // Dial bootstrap nodes
+        for addr_str in &self.config.bootstrap_nodes {
+            let addr: Multiaddr = match addr_str.parse() {
+                Ok(a) => a,
+                Err(e) => {
+                    warn!("Invalid bootstrap multiaddr '{}': {}", addr_str, e);
+                    continue;
+                }
+            };
+
+            // Extract PeerId from multiaddr if present
+            let peer_id = addr.iter().find_map(|p| {
+                if let Protocol::P2p(peer_id) = p {
+                    Some(peer_id)
+                } else {
+                    None
+                }
+            });
+
+            match swarm.dial(addr.clone()) {
+                Ok(_) => {
+                    info!("Dialing bootstrap node: {}", addr);
+                    if let Some(peer_id) = peer_id {
+                        swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to dial bootstrap node {}: {}", addr, e);
+                }
+            }
+        }
+
         info!("P2P node started");
         Ok(())
     }
 
     /// Run the event loop (call in background task)
     pub async fn run(&self, mut shutdown: broadcast::Receiver<()>) {
+        // Initial status snapshot after start
+        self.refresh_status().await;
+
+        let mut status_interval = tokio::time::interval(Duration::from_secs(30));
+
         loop {
             let mut swarm = self.swarm.write().await;
 
             tokio::select! {
                 event = swarm.select_next_some() => {
+                    drop(swarm); // Release write lock before handling
                     self.handle_event(event).await;
+                }
+                _ = status_interval.tick() => {
+                    drop(swarm);
+                    self.refresh_status().await;
                 }
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
@@ -201,9 +281,11 @@ impl P2PNode {
             }
             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                 debug!(peer = %peer_id, "Connected to peer");
+                self.refresh_status().await;
             }
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");
+                self.refresh_status().await;
             }
             SwarmEvent::Behaviour(event) => {
                 self.handle_behaviour_event(event).await;
@@ -551,5 +633,32 @@ impl P2PNode {
     /// Get reference to sync manager for external use
     pub fn sync_manager(&self) -> &Arc<SyncManager> {
         &self.sync_manager
+    }
+
+    /// Create a Send+Sync handle for HttpServer to query P2P status
+    pub fn handle(&self) -> P2PHandle {
+        P2PHandle {
+            status_rx: self.status_tx.subscribe(),
+        }
+    }
+
+    /// Refresh the status snapshot (called from event loop)
+    async fn refresh_status(&self) {
+        let swarm = self.swarm.read().await;
+        let connected_peers = swarm.connected_peers().count();
+        let listen_addresses: Vec<String> = swarm.listeners()
+            .map(|a| a.to_string())
+            .collect();
+        let bootstrap_nodes: Vec<String> = self.config.bootstrap_nodes.clone();
+        let sync_documents = self.sync_manager.count_documents("_all").await.unwrap_or(0) as usize;
+
+        let status = P2PStatusInfo {
+            peer_id: self.peer_id().to_string(),
+            listen_addresses,
+            connected_peers,
+            bootstrap_nodes,
+            sync_documents,
+        };
+        let _ = self.status_tx.send(status);
     }
 }
