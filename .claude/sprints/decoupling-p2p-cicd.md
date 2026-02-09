@@ -3,16 +3,16 @@
 ## Vision
 Transform the monorepo from tightly-coupled sequential builds to independent, version-aware components that can model real P2P network topology using Kubernetes.
 
-## Current State (as of 2026-02-05)
+## Current State (as of 2026-02-08)
 
 **Resolved:**
 1. ~~**Shared Infrastructure**: Alpha + Staging share `doorway-dev.elohim.host`~~ -- **FIXED** (Sprint 3)
 2. ~~**Ephemeral Storage**: `emptyDir` volumes lose data on restart~~ -- **FIXED** (PVCs deployed)
+3. ~~**Pipeline Coupling**: DNA → Edge → App → Genesis runs sequentially~~ -- **FIXED** (Sprint 2: parallel levels)
+4. ~~**No Schema Versioning**: Seeder JSON has no `schema_version`~~ -- **FIXED** (Sprint 0: tolerant readers + schemaVersion)
+5. ~~**Artifact Fragility**: `wget lastSuccessfulBuild` fetches from Jenkins~~ -- **FIXED** (Sprint 1: Harbor + floating tags)
 
 **Remaining:**
-3. **Pipeline Coupling**: DNA → Edge → App → Genesis runs sequentially; one failure blocks all
-4. **No Schema Versioning**: Seeder JSON has no `schema_version`; Rust structs have tight serde coupling
-5. **Artifact Fragility**: `wget lastSuccessfulBuild` fetches from Jenkins (race conditions, timeouts)
 6. **Dormant P2P**: libp2p is 95% built but not activated
 
 ## Target State
@@ -39,16 +39,16 @@ Transform the monorepo from tightly-coupled sequential builds to independent, ve
 
 | Sprint | Focus | Status | Priority |
 |--------|-------|--------|----------|
-| 3 | K8s Environment Isolation | **COMPLETE** (code); operational deploy pending | ~~IMMEDIATE~~ |
+| 3 | K8s Environment Isolation | **COMPLETE** | ~~IMMEDIATE~~ |
 | 0 | Schema Versioning Foundation | **COMPLETE** | ~~NEXT~~ |
 | 1 | Artifact Storage Decoupling | **COMPLETE** (was already done) | ~~HIGH~~ |
-| 2 | Pipeline Parallelization | **~30%** -- orchestrator needs parallel refactor | **NEXT** |
+| 2 | Pipeline Parallelization | **COMPLETE** (genesis cron deferred as low-value) | ~~NEXT~~ |
 | 4 | Seeder Version Negotiation | Not started | MEDIUM |
 | 6 | P2P Activation | Not started | MEDIUM |
 | 7 | Network Topology Modeling | Not started | FUTURE |
 | 5 | DNA Build Isolation | Not started | **DEFERRED** |
 
-**Execution Order**: ~~0 → 3 → 1~~ → 2 → 4 → 6 → 7 (Sprints 0, 1, 3 complete; Sprint 5 deferred)
+**Execution Order**: ~~0 → 3 → 1 → 2~~ → 4 → 6 → 7 (Sprints 0, 1, 2, 3 complete; Sprint 5 deferred)
 
 ---
 
@@ -101,41 +101,56 @@ curl -X POST http://localhost:8090/db/content/bulk \
 
 ---
 
-## Sprint 2: Pipeline Parallelization
+## Sprint 2: Pipeline Parallelization -- COMPLETE
 
 **Goal**: Enable parallel Edge + App builds; decouple Genesis from deployment.
 
-**Scope**:
-1. Modify orchestrator to run Edge + App in parallel (not sequential)
-2. Add branch-specific webhook triggers to Edge/App pipelines
-3. Convert Genesis to scheduled job (not deployment-triggered)
-4. Add manual re-seed capability
+**Status**: Parallel execution implemented. Genesis cron is optional (deferred as low-value).
 
-**Files to Modify**:
-- `orchestrator/Jenkinsfile` - Parallel stage for Edge + App (lines 226-248)
-- `holochain/Jenkinsfile` - Add webhook trigger for `holochain/**` changes
-- `Jenkinsfile` (app) - Add webhook trigger for `elohim-app/**` changes
-- `genesis/Jenkinsfile` - Add cron trigger, remove orchestrator dependency
+### What's Done
 
-**Forcing Function**:
-- Orchestrator `PIPELINES` map removes `dependsOn` for Edge/App
-- Genesis pipeline has `triggers { cron('H */6 * * *') }`
-- Each pipeline can run standalone without orchestrator
+| Item | Status | Evidence |
+|------|--------|----------|
+| Parallel Edge + App builds | DONE | `groupByDependencyLevel()` in orchestrator groups pipelines by dependency level; `parallel` block executes same-level builds concurrently |
+| Dependency-aware ordering | DONE | DNA builds first (level 0), then Edge + App in parallel (level 1), then Genesis last |
+| Fail-fast across levels | DONE | If any pipeline in a level fails, subsequent levels are aborted |
+| Genesis runs after all builds | DONE | Excluded from levels, triggered sequentially after all builds succeed |
+| Manual re-seed capability | DONE | Genesis trigger check allows `UserIdCause` (manual Jenkins build) |
+| Dependency propagation | DONE | `propagateDependencies()` auto-includes dependents when dependencies build |
+
+### Decided Against
+
+| Item | Decision | Rationale |
+|------|----------|-----------|
+| Webhook triggers on downstream pipelines | REJECTED | Contradicts single-webhook-receiver architecture. Orchestrator is the only pipeline receiving GitHub webhooks; downstream uses `overrideIndexTriggers(false)`. Adding webhooks would cause duplicate builds. |
+| Remove `dependsOn` from PIPELINES map | REJECTED | Edge correctly depends on DNA (`dependsOn: ['elohim-holochain']`). This ensures DNA builds before Edge when both are triggered. Parallel execution handles this via dependency levels. |
+| Genesis cron trigger | DEFERRED | Low value: orchestrator already auto-triggers genesis after builds. Cron would cause unnecessary re-seeds. Can add later if independent seed scheduling is needed. |
+
+### Execution Plan (typical build)
+
+```
+Level 0:  [elohim-holochain]          (DNA, if triggered)
+Level 1:  [elohim-edge + elohim]      (parallel)
+Finally:  elohim-genesis              (seed + test)
+```
+
+**Files Modified**:
+- `orchestrator/Jenkinsfile` - Added `groupByDependencyLevel()`, refactored Execute Builds stage to use `parallel` block within each level, genesis runs last
 
 **Verification**:
 ```bash
-# Trigger Edge pipeline directly (not via orchestrator)
-curl -X POST "https://jenkins/job/elohim-edge/job/dev/build"
-# Should succeed without DNA rebuild
+# Orchestrator build log should show parallel execution:
+#   Plan: elohim-holochain -> [elohim-edge + elohim] -> genesis
+# Edge + App run concurrently in Level 1
 ```
 
 ---
 
-## Sprint 3: K8s Environment Isolation ⭐ COMPLETE (code)
+## Sprint 3: K8s Environment Isolation -- COMPLETE
 
 **Goal**: Separate alpha/staging/prod into independent deployments with dedicated namespaces.
 
-**Status**: All code changes complete. Operational deployment (kubectl apply, merge dev→staging) pending.
+**Status**: Complete. Code changes deployed, namespaces/policies applied, staging merged.
 
 ### What's Done
 
@@ -146,8 +161,8 @@ curl -X POST "https://jenkins/job/elohim-edge/job/dev/build"
 | `edgenode-staging.yaml` | DONE | Full manifest: namespace, ConfigMap, secrets, PVCs, Deployment, Ingress |
 | PVCs for alpha | DONE | `holochain-data-alpha` (10Gi), `storage-data-alpha` (5Gi) embedded in manifest |
 | PVCs for staging | DONE | `holochain-data-staging` (10Gi), `storage-data-staging` (5Gi) embedded in manifest |
-| App ConfigMaps | DONE | `elohim-app/manifests/alpha/configmap.yaml` → `doorway-alpha.elohim.host` |
-| | | `elohim-app/manifests/staging/configmap.yaml` → `doorway-staging.elohim.host` |
+| App ConfigMaps | DONE | `orchestrator/manifests/elohim-app/alpha/configmap.yaml` → `doorway-alpha.elohim.host` |
+| | | `orchestrator/manifests/elohim-app/staging/configmap.yaml` → `doorway-staging.elohim.host` |
 | Edge Ingress (alpha) | DONE | `doorway-alpha.elohim.host`, `signal.doorway-alpha.elohim.host` |
 | Edge Ingress (staging) | DONE | `doorway-staging.elohim.host`, `signal.doorway-staging.elohim.host` |
 | Jenkinsfile updates | DONE | All 4 Jenkinsfiles updated: namespace refs, stage names, health URLs |
@@ -167,26 +182,14 @@ curl -X POST "https://jenkins/job/elohim-edge/job/dev/build"
 | NetworkPolicy cross-env isolation | DONE | `orchestrator/manifests/network-policies.yaml` denies cross-namespace ingress |
 | App ingress namespace | N/A | All ingresses already in correct namespaces (`elohim-alpha`/`staging`/`prod`) |
 
-### Operational Items Remaining (cluster access required)
+### Operational Items -- COMPLETE
 
-| Item | Priority | Notes |
-|------|----------|-------|
-| Apply namespaces | ONE-TIME | `kubectl apply -f orchestrator/manifests/namespaces.yaml` |
-| Apply network policies | ONE-TIME | `kubectl apply -f orchestrator/manifests/network-policies.yaml` |
-| Apply staging ConfigMap | **PRE-MERGE** | `kubectl apply -f orchestrator/manifests/elohim-app/staging/configmap.yaml` |
-| Merge dev → staging | **NEXT** | First staging build will deploy all components |
-
-**Verification** (after staging merge):
-```bash
-# Health checks
-curl -sf https://doorway-alpha.elohim.host/health
-curl -sf https://doorway-staging.elohim.host/health
-curl -sf https://staging.elohim.host
-
-# Version match
-curl -sf https://staging.elohim.host/version.json
-curl -sf https://alpha.elohim.host/version.json
-```
+| Item | Status | Notes |
+|------|--------|-------|
+| Apply namespaces | DONE | `kubectl apply -f orchestrator/manifests/namespaces.yaml` |
+| Apply network policies | DONE | `kubectl apply -f orchestrator/manifests/network-policies.yaml` |
+| Apply staging ConfigMap | DONE | `kubectl apply -f orchestrator/manifests/elohim-app/staging/configmap.yaml` |
+| Merge dev → staging | DONE | Staging builds deploying all components |
 
 ---
 
@@ -298,13 +301,13 @@ curl http://staging-storage:8090/db/content/test-id
 4. Add network partition testing capability
 
 **Files to Create**:
-- `holochain/manifests/edgenode-alpha-statefulset.yaml`
-- `holochain/manifests/edgenode-staging-statefulset.yaml`
-- `holochain/manifests/headless-service-alpha.yaml`
-- `holochain/manifests/headless-service-staging.yaml`
+- `orchestrator/manifests/edgenode/alpha-statefulset.yaml`
+- `orchestrator/manifests/edgenode/staging-statefulset.yaml`
+- `orchestrator/manifests/edgenode/headless-service-alpha.yaml`
+- `orchestrator/manifests/edgenode/headless-service-staging.yaml`
 
 **Files to Modify**:
-- `holochain/manifests/edgenode-*.yaml` - Convert to StatefulSet
+- `orchestrator/manifests/edgenode/*.yaml` - Convert Deployments to StatefulSets
 - `holochain/edgenode/conductor-config.yaml` - Shared bootstrap URL
 
 **Forcing Function**:
@@ -332,19 +335,13 @@ kubectl logs edgenode-alpha-0 -c conductor | grep "peer discovered"
 ## Dependencies Between Sprints (Updated)
 
 ```
-Sprint 3 (K8s Isolation) ─────── ~85% DONE ✓
-    │
-    ├── Finish: merge dev→staging, verify, delete edgenode-dev.yaml
+Sprint 3 (K8s Isolation) ─────── COMPLETE ✓
+Sprint 0 (Schema Versioning) ── COMPLETE ✓
+Sprint 1 (Artifact Storage) ─── COMPLETE ✓ (was already done)
+Sprint 2 (Pipeline Parallel) ── COMPLETE ✓ (parallel execution, genesis cron deferred)
     │
     ▼
-Sprint 0 (Schema Versioning) ── ~10% DONE, NEXT UP
-    │
-    ├──► Sprint 1 (Artifact Storage) ───┐
-    │                                    │
-    │    Sprint 2 (Pipeline Parallel) ◄──┘
-    │         │
-    ▼         ▼
-Sprint 4 (Seeder Versioning) ◄───────────┘
+Sprint 4 (Seeder Versioning) ── NEXT
     │
     ▼
 Sprint 6 (P2P Activation)
@@ -355,12 +352,10 @@ Sprint 7 (Network Topology)
 [Sprint 5 (DNA Isolation) - DEFERRED]
 ```
 
-**Recommended Execution** (updated 2026-02-05):
-1. **NOW**: Finish Sprint 3 -- merge dev→staging, verify staging health, delete `edgenode-dev.yaml`
-2. **Next session**: Sprint 0 (Schema foundation -- tolerant readers + schemaVersion)
-3. **Following**: Sprints 1+2 in parallel (pipeline decoupling)
-4. **Then**: Sprint 4 (seeder versioning)
-5. **Future**: Sprints 6+7 (P2P activation and topology)
+**Recommended Execution** (updated 2026-02-08):
+1. **DONE**: Sprints 0, 1, 2, 3 all complete (code + operational)
+2. **Next**: Sprint 4 (seeder version negotiation)
+3. **Future**: Sprints 6+7 (P2P activation and topology)
 
 ---
 
@@ -387,11 +382,8 @@ Each sprint includes safeguards that make regression difficult:
 
 1. **Sprint 0**: CI lint check rejects required fields without defaults
 2. **Sprint 1**: `fetchHappArtifact()` function deleted entirely
-3. **Sprint 2**: Orchestrator `dependsOn` removed from config
-4. **Sprint 3**: ~~Shared `edgenode-dev.yaml` deleted after staging works~~ -- PENDING: delete after staging verified
-   - DONE: All `doorway-dev` refs eliminated from Jenkinsfiles (can't accidentally route to wrong env)
-   - DONE: Dedicated PVCs per environment (can't use emptyDir anymore)
-   - DONE: Orchestrator endpoints point to per-environment URLs
+3. **Sprint 2**: `groupByDependencyLevel()` replaces sequential execution; `parallel` block in Execute Builds stage
+4. **Sprint 3**: Shared `edgenode-dev.yaml` deleted; all `doorway-dev` refs eliminated; dedicated PVCs per environment; orchestrator endpoints point to per-environment URLs
 5. **Sprint 4**: Old bulk endpoint deprecated with warning logs
 6. **Sprint 5**: DNA builds require explicit trigger flag
 7. **Sprint 6**: `--enable-p2p` required for inter-node sync
@@ -401,7 +393,7 @@ Each sprint includes safeguards that make regression difficult:
 
 ## Quick Reference: Current Sprint Checklists
 
-### Sprint 3 Checklist (K8s Isolation) -- CODE COMPLETE
+### Sprint 3 Checklist (K8s Isolation) -- COMPLETE
 - [x] Create namespaces: elohim-alpha, elohim-staging, elohim-prod
 - [x] Create edgenode-alpha.yaml (from edgenode-dev)
 - [x] Create edgenode-staging.yaml (new)
@@ -419,10 +411,10 @@ Each sprint includes safeguards that make regression difficult:
 - [x] Version-control namespaces (`orchestrator/manifests/namespaces.yaml`)
 - [x] NetworkPolicy for cross-env isolation (`orchestrator/manifests/network-policies.yaml`)
 - [x] App ingress namespaces verified correct (all use `elohim-alpha`/`staging`/`prod`)
-- [ ] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/namespaces.yaml`
-- [ ] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/network-policies.yaml`
-- [ ] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/elohim-app/staging/configmap.yaml`
-- [ ] **OPERATIONAL**: Merge dev → staging and verify staging health
+- [x] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/namespaces.yaml`
+- [x] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/network-policies.yaml`
+- [x] **OPERATIONAL**: `kubectl apply -f orchestrator/manifests/elohim-app/staging/configmap.yaml`
+- [x] **OPERATIONAL**: Merge dev → staging and verify staging health
 
 ### Sprint 0 Checklist (Schema Versioning) -- COMPLETE
 - [x] Add `#[serde(default)]` to all optional InputView fields (100% coverage confirmed)
