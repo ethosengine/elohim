@@ -270,6 +270,30 @@ def orderByDependencies(pipelineList) {
 }
 
 /**
+ * Group pipelines into dependency levels for parallel execution.
+ * Pipelines in the same level have no dependencies on each other.
+ * Genesis is excluded (always runs last after all builds succeed).
+ */
+def groupByDependencyLevel(pipelineList) {
+    def nonGenesis = pipelineList.findAll { it != 'elohim-genesis' }
+    def levels = []
+    def placed = [] as Set
+
+    while (placed.size() < nonGenesis.size()) {
+        def currentLevel = nonGenesis.findAll { name ->
+            if (placed.contains(name)) return false
+            def deps = (PIPELINES[name].dependsOn ?: [])
+            deps.every { dep -> !nonGenesis.contains(dep) || placed.contains(dep) }
+        }
+        if (currentLevel.isEmpty()) break
+        levels.add(currentLevel)
+        placed.addAll(currentLevel)
+    }
+
+    return levels
+}
+
+/**
  * If a pipeline is building, auto-include all pipelines that depend on it.
  * Uses fixed-point iteration for transitive propagation.
  * Example: DNA builds → edge auto-includes (dependsOn DNA) → genesis auto-includes (dependsOn edge)
@@ -668,45 +692,64 @@ spec:
                             return
                         }
 
+                        def levels = groupByDependencyLevel(pipelines)
+                        def hasGenesis = pipelines.contains('elohim-genesis')
+                        def levelDesc = levels.collect { lvl ->
+                            lvl.size() > 1 ? "[${lvl.join(' + ')}]" : lvl[0]
+                        }.join(' → ')
+                        if (hasGenesis) levelDesc += ' → genesis'
+
                         echo """
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                              EXECUTING BUILDS                                 │
+│                          EXECUTING BUILDS (PARALLEL)                          │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│  Order: ${pipelines.join(' → ')}
+│  Plan: ${levelDesc}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
-                        // Execute in dependency order
-                        pipelines.each { name ->
-                            if (name == 'elohim-genesis') {
-                                // Genesis runs after all others, skip for now
-                                return
-                            }
-
+                        // Execute in dependency-level order (parallel within each level)
+                        levels.eachWithIndex { level, idx ->
                             echo ''
                             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                            echo "🔨 Building: ${name}"
+                            echo "📦 Level ${idx}: ${level.join(' + ')}"
                             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                            def result = triggerPipeline(name, env.BRANCH_NAME, true)
-                            results[name] = result
-
-                            if (result.success) {
-                                echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                            if (level.size() == 1) {
+                                def name = level[0]
+                                echo "🔨 Building: ${name}"
+                                def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                results[name] = result
+                                if (result.success) {
+                                    echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                } else {
+                                    echo "❌ ${name}: ${result.result}"
+                                    if (result.error) echo "   Error: ${result.error}"
+                                }
                             } else {
-                                echo "❌ ${name}: ${result.result}"
-                                if (result.error) echo "   Error: ${result.error}"
+                                def parallelBuilds = [:]
+                                level.each { name ->
+                                    parallelBuilds[name] = {
+                                        echo "🔨 Building: ${name}"
+                                        def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                        results[name] = result
+                                        if (result.success) {
+                                            echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                        } else {
+                                            echo "❌ ${name}: ${result.result}"
+                                            if (result.error) echo "   Error: ${result.error}"
+                                        }
+                                    }
+                                }
+                                parallel parallelBuilds
+                            }
+
+                            // Fail fast: abort if any pipeline in this level failed
+                            def levelFailed = level.findAll { !results[it]?.success }
+                            if (levelFailed) {
+                                error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
                             }
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
-
-                        // Check if all succeeded before genesis
-                        def allSucceeded = results.every { k, v -> v.success }
-
-                        if (!allSucceeded) {
-                            def failed = results.findAll { k, v -> !v.success }.keySet()
-                            error "Build(s) failed: ${failed.join(', ')} - Aborting genesis"
-                        }
 
                         // Run genesis if requested
                         if (pipelines.contains('elohim-genesis')) {
