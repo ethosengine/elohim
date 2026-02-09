@@ -1236,6 +1236,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
     // Backend uses serde rename_all = "camelCase" so expects camelCase field names
     // Coerce null values to undefined for optional fields (TypeScript compatibility)
     const transformedItems = itemsToSeed.map(item => ({
+      schemaVersion: 1,
       id: item.id,
       title: item.title,
       description: item.description,
@@ -1310,6 +1311,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
             if (!seen.has(key) && item.id !== targetId) {
               seen.add(key);
               relationships.push({
+                schemaVersion: 1,
                 sourceId: item.id,
                 targetId: targetId,
                 relationshipType: 'RELATES_TO',
@@ -1333,6 +1335,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                   if (!seen.has(key)) {
                     seen.add(key);
                     relationships.push({
+                      schemaVersion: 1,
                       sourceId: item.id,
                       targetId: targetId,
                       relationshipType: relType.toUpperCase(),
@@ -1857,6 +1860,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       }
 
       return {
+        schemaVersion: 1,
         id: pathData.id,
         title: pathData.title,
         description: pathData.description || '',

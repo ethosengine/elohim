@@ -755,6 +755,7 @@ export class DoorwayClient {
    */
   async bulkCreateContent(
     items: Array<{
+      schemaVersion?: number;
       id: string;
       title: string;
       contentType?: string;
@@ -775,7 +776,7 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/content/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000, // 2 min for bulk ops
     });
@@ -796,6 +797,7 @@ export class DoorwayClient {
    */
   async bulkCreatePaths(
     items: Array<{
+      schemaVersion?: number;
       id: string;
       title: string;
       description?: string;
@@ -830,7 +832,7 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/paths/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000,
     });
@@ -851,6 +853,7 @@ export class DoorwayClient {
    */
   async bulkCreateRelationships(
     items: Array<{
+      schemaVersion?: number;
       sourceId: string;
       targetId: string;
       relationshipType: string;
@@ -866,7 +869,7 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/relationships/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000,
     });

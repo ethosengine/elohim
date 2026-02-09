@@ -47,6 +47,7 @@ use crate::views::{
     CreateHumanRelationshipInputView, CreateContributorPresenceInputView,
     CreateEconomicEventInputView, CreateAllocationInputView, UpdateAllocationInputView,
     InitiateClaimInputView, CreateChapterInputView, CreateStepInputView,
+    validate_schema_versions,
 };
 use crate::db::policy_cache::{PolicyEnforcement, ContentMetadata, PolicyDecision, PolicyEvent, PolicyEventType};
 use crate::error::StorageError;
@@ -618,7 +619,7 @@ impl HttpServer {
             .status(StatusCode::OK)
             .header("Access-Control-Allow-Origin", "*")
             .header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, HEAD, OPTIONS")
-            .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Agent-Id")
+            .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Agent-Id, X-Schema-Version")
             .header("Access-Control-Max-Age", "86400")
             .body(Full::new(Bytes::new()))
             .unwrap()
@@ -1604,6 +1605,10 @@ impl HttpServer {
         // Deserialize camelCase InputViews, convert to internal DB types
         let input_views: Vec<CreateContentInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let items: Vec<db::content::CreateContentInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         let count = items.len();
@@ -1883,6 +1888,10 @@ impl HttpServer {
             // Deserialize camelCase InputViews, convert to internal DB types
             let input_views: Vec<CreatePathInputView> = serde_json::from_slice(&body_bytes)
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+            if let Err(msg) = validate_schema_versions(&versions) {
+                return Ok(response::error_response(StorageError::InvalidInput(msg)));
+            }
             let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
 
             let count = paths.len();
@@ -1908,6 +1917,10 @@ impl HttpServer {
         // Deserialize camelCase InputViews, convert to internal DB types
         let input_views: Vec<CreatePathInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         let count = paths.len();
@@ -2204,6 +2217,10 @@ impl HttpServer {
             // Deserialize camelCase InputViews, convert to internal DB types
             let input_views: Vec<CreateRelationshipInputView> = serde_json::from_slice(&body_bytes)
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+            if let Err(msg) = validate_schema_versions(&versions) {
+                return Ok(response::error_response(StorageError::InvalidInput(msg)));
+            }
             let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
 
             return Ok(response::from_result(services.relationship.bulk_create(inputs)));
@@ -2226,6 +2243,10 @@ impl HttpServer {
         // Deserialize camelCase InputViews, convert to internal DB types
         let input_views: Vec<CreateRelationshipInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         content_db.with_conn_mut(|conn| {

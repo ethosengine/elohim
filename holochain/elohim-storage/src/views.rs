@@ -37,6 +37,21 @@ fn parse_json(json_str: &str) -> Value {
 /// Clients that omit schemaVersion are implicitly version 1.
 fn default_schema_version() -> u32 { 1 }
 
+/// Supported schema versions. Reject anything not in this set.
+/// Extend this array when introducing a new schema version.
+pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1];
+
+/// Validate that all schema versions in a batch are supported.
+pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
+    if let Some(&bad) = versions.iter().find(|v| !SUPPORTED_SCHEMA_VERSIONS.contains(v)) {
+        return Err(format!(
+            "Unsupported schema version: {}. Supported: {:?}",
+            bad, SUPPORTED_SCHEMA_VERSIONS
+        ));
+    }
+    Ok(())
+}
+
 use crate::db::models::{
     App, Chapter, ChapterWithSteps, Content, ContentMastery, ContentStewardship, ContentWithTags,
     ContributorPresence, EconomicEvent, HumanRelationship, LocalSession, Path, PathAttestation,
@@ -1631,5 +1646,27 @@ mod schema_version_tests {
         assert_eq!(event.schema_version, 1);
         assert_eq!(alloc.schema_version, 1);
         assert_eq!(update_alloc.schema_version, 1);
+    }
+
+    #[test]
+    fn validate_supported_version_accepted() {
+        assert!(super::validate_schema_versions(&[1]).is_ok());
+    }
+
+    #[test]
+    fn validate_unsupported_version_rejected() {
+        let err = super::validate_schema_versions(&[99]).unwrap_err();
+        assert!(err.contains("Unsupported schema version: 99"));
+        assert!(err.contains("Supported:"));
+    }
+
+    #[test]
+    fn validate_empty_batch_ok() {
+        assert!(super::validate_schema_versions(&[]).is_ok());
+    }
+
+    #[test]
+    fn supported_versions_includes_default() {
+        assert!(super::SUPPORTED_SCHEMA_VERSIONS.contains(&super::default_schema_version()));
     }
 }
