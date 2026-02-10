@@ -847,8 +847,9 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
-                            // Deploy infra (MongoDB) — idempotent
+                            // Deploy infra (MongoDB + NATS) — idempotent
                             sh "kubectl apply -f orchestrator/manifests/infra/alpha-mongodb.yaml"
+                            sh "kubectl apply -f orchestrator/manifests/infra/alpha-nats.yaml"
 
                             deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/edgenode/alpha.yaml', envFile)
                             deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/doorway/alpha.yaml', envFile, 'elohim-doorway')
@@ -897,8 +898,9 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
-                            // Deploy infra (MongoDB) — idempotent
+                            // Deploy infra (MongoDB + NATS) — idempotent
                             sh "kubectl apply -f orchestrator/manifests/infra/staging-mongodb.yaml"
+                            sh "kubectl apply -f orchestrator/manifests/infra/staging-nats.yaml"
 
                             deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/edgenode/staging.yaml', envFile)
                             deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/doorway/staging.yaml', envFile, 'elohim-doorway')

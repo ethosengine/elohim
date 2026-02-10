@@ -62,6 +62,8 @@ spec:
               value: "http://elohim-edgenode-staging:8090"
             - name: THRESHOLD_URL
               value: "http://localhost:80"
+            - name: NATS_URL
+              value: "nats://nats.elohim-staging:4222"
             - name: MONGODB_URI
               value: "mongodb://mongodb.elohim-staging:27017"
             - name: MONGODB_DB

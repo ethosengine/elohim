@@ -83,6 +83,8 @@ spec:
               value: "http://elohim-edgenode-alpha:8090"
             - name: THRESHOLD_URL
               value: "http://localhost:80"
+            - name: NATS_URL
+              value: "nats://nats.elohim-alpha:4222"
             - name: MONGODB_URI
               value: "mongodb://mongodb.elohim-alpha:27017"
             - name: MONGODB_DB
