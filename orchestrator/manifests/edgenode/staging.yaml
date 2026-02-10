@@ -71,6 +71,8 @@ spec:
         app: elohim-edgenode
         environment: staging
     spec:
+      securityContext:
+        fsGroup: 1000
       nodeSelector:
         node-type: operations
       # Init container fetches hApp from Harbor registry using oras
