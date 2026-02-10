@@ -35,11 +35,11 @@ def resolveDoorwayHost(String targetHost, String explicitDoorway) {
 def resolveInternalDoorwayUrl(String doorwayHost) {
     // Map external DNS to internal Kubernetes service DNS
     if (doorwayHost.contains('doorway-alpha.elohim.host')) {
-        return 'elohim-edgenode-alpha.elohim-alpha.svc.cluster.local:8080'
+        return 'elohim-doorway-alpha.elohim-alpha.svc.cluster.local:8080'
     } else if (doorwayHost.contains('doorway-staging.elohim.host')) {
-        return 'elohim-edgenode-staging.elohim-staging.svc.cluster.local:8080'
+        return 'elohim-doorway-staging.elohim-staging.svc.cluster.local:8080'
     } else if (doorwayHost.contains('doorway.elohim.host') && !doorwayHost.contains('doorway-')) {
-        return 'elohim-edgenode-prod.elohim-prod.svc.cluster.local:8080'
+        return 'elohim-doorway-prod.elohim-prod.svc.cluster.local:8080'
     }
     // Fallback for custom hosts
     return doorwayHost.replace('https://', '').replace('http://', '')
