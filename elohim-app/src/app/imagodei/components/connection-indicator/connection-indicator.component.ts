@@ -18,6 +18,7 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { type IdentityMode } from '../../models/identity.model';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
+import { TauriAuthService } from '../../services/tauri-auth.service';
 
 /** Extended connection status including transient states */
 export type ConnectionMode = IdentityMode | 'connecting' | 'offline';
@@ -42,12 +43,24 @@ export class ConnectionIndicatorComponent {
   private readonly identityService = inject(IdentityService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly holochainService = inject(HolochainClientService);
+  private readonly tauriAuth = inject(TauriAuthService);
 
   /** Current connection status computed from services */
   readonly status = computed<ConnectionStatus>(() => {
     const identityMode = this.identityService.mode();
     const holochainState = this.holochainService.state();
     const selectedDoorway = this.doorwayRegistry.selected();
+
+    // Graduating state (during stewardship confirmation)
+    if (this.tauriAuth.graduationStatus() === 'confirming') {
+      return {
+        mode: 'migrating' as ConnectionMode,
+        label: 'Graduating...',
+        icon: 'swap_horiz',
+        color: '#f59e0b',
+        cssClass: 'status-graduating',
+      };
+    }
 
     // Connecting state
     if (holochainState === 'connecting' || holochainState === 'authenticating') {

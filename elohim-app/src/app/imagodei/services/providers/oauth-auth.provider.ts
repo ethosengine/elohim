@@ -119,11 +119,11 @@ export class OAuthAuthProvider implements AuthProvider {
     };
     sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(oauthState));
 
-    // Build authorization URL
+    // Build authorization URL (snake_case per OAuth 2.0 RFC 6749)
     const params = new URLSearchParams({
-      clientId: 'elohim-app',
-      redirectUri: redirectUri,
-      responseType: 'code',
+      client_id: 'elohim-app',
+      redirect_uri: redirectUri,
+      response_type: 'code',
       state,
     });
 
@@ -215,10 +215,10 @@ export class OAuthAuthProvider implements AuthProvider {
     const tokenUrl = `${doorwayUrl}/auth/token`;
 
     const body = {
-      grantType: 'authorization_code',
+      grant_type: 'authorization_code',
       code,
-      redirectUri: redirectUri ?? `${globalThis.location.origin}/auth/callback`,
-      clientId: 'elohim-app',
+      redirect_uri: redirectUri ?? `${globalThis.location.origin}/auth/callback`,
+      client_id: 'elohim-app',
     };
 
     try {

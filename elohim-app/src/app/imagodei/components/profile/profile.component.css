@@ -436,6 +436,143 @@
   color: var(--text-color-secondary, #6c757d);
 }
 
+/* Upgrade / Graduation Section */
+.upgrade-section {
+  padding: 1.25rem;
+  border: 1px solid var(--primary-200, #bfdbfe);
+  border-left: 4px solid var(--primary-500, #3b82f6);
+  border-radius: 8px;
+  background: var(--primary-50, #eff6ff);
+}
+
+.upgrade-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.upgrade-benefits li::before {
+  content: '\2713  ';
+  color: var(--green-600, #16a34a);
+  font-weight: 600;
+}
+
+.upgrade-benefits li {
+  font-size: 0.9rem;
+  color: var(--text-color, #1a1a2e);
+}
+
+.graduation-form {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--surface-card, #fff);
+  border-radius: 8px;
+  border: 1px solid var(--surface-border, #dee2e6);
+}
+
+.graduation-prompt {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--text-color-secondary, #6c757d);
+  line-height: 1.5;
+}
+
+.graduation-form .form-group input[type='password'] {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--surface-border, #dee2e6);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+  background: var(--surface-ground, #f8f9fa);
+}
+
+.graduation-form .form-group input[type='password']:focus {
+  border-color: var(--primary-400, #60a5fa);
+  box-shadow: 0 0 0 3px var(--primary-100, #dbeafe);
+  background: var(--surface-card, #fff);
+  outline: none;
+}
+
+.graduation-form .form-group input[type='password']:disabled {
+  opacity: 60%;
+  cursor: not-allowed;
+}
+
+.graduation-form .btn {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+.graduation-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin-top: 1rem;
+  background: var(--green-50, #f0fdf4);
+  border: 1px solid var(--green-200, #bbf7d0);
+  border-radius: 8px;
+  color: var(--green-700, #15803d);
+}
+
+.graduation-success .material-icons {
+  font-size: 1.5rem;
+  color: var(--green-600, #16a34a);
+  flex-shrink: 0;
+}
+
+.graduation-success strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.graduation-success p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.upgrade-browser-info {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--surface-card, #fff);
+  border-radius: 8px;
+  border: 1px solid var(--surface-border, #dee2e6);
+}
+
+.upgrade-browser-info p {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.upgrade-steps {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.upgrade-steps li {
+  font-size: 0.9rem;
+  color: var(--text-color, #1a1a2e);
+}
+
+.upgrade-browser-info .btn {
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+}
+
 /* Context Links Section */
 .context-links-section {
   padding-top: 1.5rem;

@@ -193,6 +193,13 @@ describe('AgencyBadgeComponent', () => {
       });
       component.onUpgrade();
     });
+
+    it('should navigate to profile upgrade section', () => {
+      component.onUpgrade();
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/identity/profile'], {
+        fragment: 'upgrade',
+      });
+    });
   });
 
   describe('onReconnect()', () => {

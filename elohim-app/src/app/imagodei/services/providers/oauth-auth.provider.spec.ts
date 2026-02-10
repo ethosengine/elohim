@@ -81,8 +81,8 @@ describe('OAuthAuthProvider', () => {
       provider.initiateLogin(doorwayUrl);
 
       expect(window.location.href).toContain(`${doorwayUrl}/auth/authorize`);
-      expect(window.location.href).toContain('clientId=elohim-app');
-      expect(window.location.href).toContain('responseType=code');
+      expect(window.location.href).toContain('client_id=elohim-app');
+      expect(window.location.href).toContain('response_type=code');
       expect(window.location.href).toContain('state=');
     });
 
@@ -106,7 +106,7 @@ describe('OAuthAuthProvider', () => {
 
       provider.initiateLogin(doorwayUrl, returnUrl);
 
-      expect(window.location.href).toContain(`redirectUri=${encodeURIComponent(returnUrl)}`);
+      expect(window.location.href).toContain(`redirect_uri=${encodeURIComponent(returnUrl)}`);
 
       const storedState = sessionStorage.getItem(OAUTH_STATE_KEY);
       const state = JSON.parse(storedState!);
@@ -153,7 +153,7 @@ describe('OAuthAuthProvider', () => {
       const req = httpMock.expectOne('https://doorway.example.com/auth/token');
       expect(req.request.method).toBe('POST');
       expect(req.request.body.code).toBe('auth-code-123');
-      expect(req.request.body.grantType).toBe('authorization_code');
+      expect(req.request.body.grant_type).toBe('authorization_code');
 
       req.flush(mockTokenResponse);
 

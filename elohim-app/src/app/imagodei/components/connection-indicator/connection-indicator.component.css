@@ -95,6 +95,26 @@
   color: #8b5cf6;
 }
 
+.status-graduating {
+  --indicator-color: #f59e0b;
+}
+
+.status-graduating .status-icon {
+  color: #f59e0b;
+  animation: pulse-graduating 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-graduating {
+  0%,
+  100% {
+    opacity: 100%;
+  }
+
+  50% {
+    opacity: 40%;
+  }
+}
+
 /* Doorway URL Badge */
 .doorway-url-badge {
   font-family: 'SF Mono', Monaco, Inconsolata, monospace;

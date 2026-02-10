@@ -52,6 +52,92 @@
             <span class="agency-value">{{ agencyInfo().label }}</span>
           </div>
 
+          <!-- Upgrade / Graduation Section -->
+          @if (canUpgrade()) {
+            <div class="upgrade-section" id="upgrade">
+              <span class="section-title">Upgrade to {{ nextStageLabel() }}</span>
+              @if (nextStageInfo(); as info) {
+                <p class="section-description">{{ info.description }}</p>
+                <ul class="upgrade-benefits">
+                  @for (benefit of info.benefits; track benefit) {
+                    <li>{{ benefit }}</li>
+                  }
+                </ul>
+              }
+
+              <!-- Graduation form (Tauri only) -->
+              @if (isGraduationEligible()) {
+                @if (graduationStatus() === 'confirmed') {
+                  <div class="graduation-success">
+                    <span class="material-icons">verified</span>
+                    <div>
+                      <strong>Stewardship confirmed!</strong>
+                      <p>
+                        Your keys are now on your device. The doorway conductor has been retired.
+                      </p>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="graduation-form">
+                    <p class="graduation-prompt">
+                      Enter your password to sign the stewardship confirmation. This moves your
+                      identity to your device and frees doorway capacity.
+                    </p>
+                    <div class="form-group">
+                      <label for="graduationPassword">Password</label>
+                      <input
+                        id="graduationPassword"
+                        type="password"
+                        [(ngModel)]="graduationPassword"
+                        [disabled]="graduationStatus() === 'confirming'"
+                        placeholder="Your doorway password"
+                      />
+                    </div>
+                    @if (graduationError()) {
+                      <div class="error-banner" role="alert">
+                        <span class="error-icon">&#x2715;</span>
+                        <span>{{ graduationError() }}</span>
+                      </div>
+                    }
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      (click)="confirmGraduation()"
+                      [disabled]="graduationStatus() === 'confirming' || !graduationPassword"
+                    >
+                      @if (graduationStatus() === 'confirming') {
+                        <span class="spinner"></span>
+                        Confirming...
+                      } @else {
+                        Confirm Stewardship
+                      }
+                    </button>
+                  </div>
+                }
+              }
+
+              <!-- Browser path (not Tauri) -->
+              @if (!isTauriApp()) {
+                <div class="upgrade-browser-info">
+                  <p>To upgrade to App Steward, download the Elohim desktop app:</p>
+                  <ol class="upgrade-steps">
+                    <li>Download and install the Elohim app</li>
+                    <li>Login to your doorway from the app</li>
+                    <li>Confirm stewardship to take control of your keys</li>
+                  </ol>
+                  <a
+                    href="https://elohim.host/download"
+                    target="_blank"
+                    rel="noopener"
+                    class="btn btn-secondary"
+                  >
+                    Download Elohim App
+                  </a>
+                </div>
+              }
+            </div>
+          }
+
           <!-- Profile Details -->
           @if (profile(); as p) {
             <div class="profile-details">

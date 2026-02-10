@@ -29,9 +29,11 @@ import {
 } from '@app/lamad/quiz-engine/models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
+import { AGENCY_STAGES, type AgencyStageInfo } from '../../models/agency.model';
 import { AgencyService } from '../../services/agency.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
+import { TauriAuthService } from '../../services/tauri-auth.service';
 
 @Component({
   selector: 'app-profile',
@@ -45,6 +47,7 @@ export class ProfileComponent implements OnInit {
   private readonly agencyService = inject(AgencyService);
   private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
+  private readonly tauriAuth = inject(TauriAuthService);
   private readonly router = inject(Router);
 
   // ==========================================================================
@@ -82,6 +85,29 @@ export class ProfileComponent implements OnInit {
 
   readonly agencyStage = this.agencyService.currentStage;
   readonly agencyInfo = this.agencyService.stageInfo;
+  readonly canUpgrade = this.agencyService.canUpgrade;
+
+  // ==========================================================================
+  // Graduation Signals
+  // ==========================================================================
+
+  readonly isTauriApp = this.tauriAuth.isTauri;
+  readonly graduationStatus = this.tauriAuth.graduationStatus;
+  readonly graduationError = this.tauriAuth.graduationError;
+  readonly isGraduationEligible = this.tauriAuth.isGraduationEligible;
+
+  /** Password for graduation form */
+  graduationPassword = '';
+
+  /** Info about the next agency stage */
+  readonly nextStageInfo = computed<AgencyStageInfo | null>(() => {
+    const nextStage = this.agencyService.agencyState().migrationTarget;
+    if (!nextStage) return null;
+    return AGENCY_STAGES[nextStage];
+  });
+
+  /** Label for the next stage */
+  readonly nextStageLabel = computed(() => this.nextStageInfo()?.label ?? 'Next Stage');
 
   // ==========================================================================
   // Discovery Signals
@@ -222,6 +248,23 @@ export class ProfileComponent implements OnInit {
       this.error.set(errorMessage);
     } finally {
       this.isSaving.set(false);
+    }
+  }
+
+  /**
+   * Confirm graduation — call Tauri IPC to sign stewardship.
+   */
+  async confirmGraduation(): Promise<void> {
+    if (!this.graduationPassword.trim()) {
+      return;
+    }
+
+    const success = await this.tauriAuth.confirmStewardship(this.graduationPassword);
+
+    if (success) {
+      this.graduationPassword = '';
+      this.successMessage.set('Stewardship confirmed! Your keys are now on your device.');
+      setTimeout(() => this.successMessage.set(null), 5000);
     }
   }
 

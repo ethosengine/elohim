@@ -6,6 +6,7 @@ import { ProfileComponent } from './profile.component';
 import { IdentityService } from '../../services/identity.service';
 import { AgencyService } from '../../services/agency.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { TauriAuthService } from '../../services/tauri-auth.service';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 import type { HumanProfile } from '../../models/identity.model';
 
@@ -78,6 +79,16 @@ describe('ProfileComponent', () => {
             selected: signal(null),
             selectedUrl: signal(null),
             hasSelection: signal(false),
+          },
+        },
+        {
+          provide: TauriAuthService,
+          useValue: {
+            isTauri: signal(false),
+            graduationStatus: signal('idle'),
+            graduationError: signal(''),
+            isGraduationEligible: signal(false),
+            confirmStewardship: jasmine.createSpy('confirmStewardship').and.returnValue(Promise.resolve(false)),
           },
         },
         { provide: Router, useValue: mockRouter },

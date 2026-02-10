@@ -8,6 +8,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ConnectionIndicatorComponent, type ConnectionStatus } from './connection-indicator.component';
 import { IdentityService } from '../../services/identity.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { TauriAuthService } from '../../services/tauri-auth.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { signal } from '@angular/core';
 
@@ -50,6 +51,12 @@ describe('ConnectionIndicatorComponent', () => {
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
         { provide: HolochainClientService, useValue: mockHolochainService },
+        {
+          provide: TauriAuthService,
+          useValue: {
+            graduationStatus: signal('idle'),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -137,6 +144,45 @@ describe('ConnectionIndicatorComponent', () => {
     const newComponent = newFixture.componentInstance;
 
     expect(newComponent.isVisible()).toBe(false);
+  });
+
+  // ==========================================================================
+  // ConnectionStatus Interface
+  // ==========================================================================
+
+  // ==========================================================================
+  // Status Computation - Graduating State
+  // ==========================================================================
+
+  it('should return graduating status when graduation is confirming', () => {
+    const graduatingFixture = TestBed.createComponent(ConnectionIndicatorComponent);
+    const graduatingComponent = graduatingFixture.componentInstance;
+
+    // Override TauriAuthService with confirming status
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ConnectionIndicatorComponent],
+      providers: [
+        { provide: IdentityService, useValue: mockIdentityService },
+        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
+        { provide: HolochainClientService, useValue: mockHolochainService },
+        {
+          provide: TauriAuthService,
+          useValue: {
+            graduationStatus: signal('confirming'),
+          },
+        },
+      ],
+    });
+
+    const newFixture = TestBed.createComponent(ConnectionIndicatorComponent);
+    const newComponent = newFixture.componentInstance;
+    const status = newComponent.status();
+
+    expect(status.mode).toBe('migrating');
+    expect(status.label).toBe('Graduating...');
+    expect(status.cssClass).toBe('status-graduating');
+    expect(status.icon).toBe('swap_horiz');
   });
 
   // ==========================================================================

@@ -20,12 +20,15 @@ import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 import { DoorwayRegistryService } from './doorway-registry.service';
 
-/** Tauri global interface for event listening */
+/** Tauri global interface for event listening and IPC */
 declare global {
   interface Window {
     __TAURI__?: {
       event: {
         listen: <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
+      };
+      core: {
+        invoke: <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
       };
     };
   }
@@ -73,6 +76,7 @@ interface LocalSession {
 }
 
 export type TauriAuthStatus = 'idle' | 'checking' | 'needs_login' | 'authenticated' | 'error';
+export type GraduationStatus = 'idle' | 'confirming' | 'confirmed' | 'error';
 
 @Injectable({
   providedIn: 'root',
@@ -87,10 +91,19 @@ export class TauriAuthService {
   readonly errorMessage = signal<string>('');
   readonly currentSession = signal<LocalSession | null>(null);
 
+  // Graduation signals
+  readonly graduationStatus = signal<GraduationStatus>('idle');
+  readonly graduationError = signal<string>('');
+
   // Computed state
   readonly isAuthenticated = computed(() => this.status() === 'authenticated');
   readonly needsLogin = computed(() => this.status() === 'needs_login');
   readonly isTauri = computed(() => this.isTauriEnvironment());
+
+  /** Whether this user is eligible to graduate (Tauri + authenticated) */
+  readonly isGraduationEligible = computed(
+    () => this.isTauri() && this.isAuthenticated() && this.status() === 'authenticated'
+  );
 
   // Event unsubscribe callbacks
   private unsubscribeOAuthCallback?: () => void;
@@ -326,6 +339,45 @@ export class TauriAuthService {
     }
 
     return (await response.json()) as LocalSession;
+  }
+
+  /**
+   * Confirm stewardship — graduate from hosted to app-steward.
+   *
+   * Calls the Tauri IPC command which:
+   * 1. Decrypts the key bundle with the user's password
+   * 2. Signs the stewardship challenge
+   * 3. Calls doorway's POST /auth/confirm-stewardship
+   * 4. Doorway retires the conductor cell and marks user as steward
+   *
+   * @param password - The user's doorway password (used to decrypt key bundle)
+   * @returns true on success, false on failure
+   */
+  async confirmStewardship(password: string): Promise<boolean> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) {
+      this.graduationStatus.set('error');
+      this.graduationError.set('Tauri IPC not available');
+      return false;
+    }
+
+    this.graduationStatus.set('confirming');
+    this.graduationError.set('');
+
+    try {
+      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      await window.__TAURI__.core.invoke('doorway_confirm_stewardship', { password });
+
+      // Update auth state — identity is now local
+      this.status.set('authenticated');
+      this.graduationStatus.set('confirmed');
+
+      return true;
+    } catch (err) {
+      this.graduationStatus.set('error');
+      this.graduationError.set(err instanceof Error ? err.message : String(err));
+      return false;
+    }
   }
 
   /**

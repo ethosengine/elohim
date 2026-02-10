@@ -81,7 +81,7 @@ export class AgencyBadgeComponent {
    */
   onUpgrade(): void {
     this.upgrade.emit();
-    // TODO: Open upgrade modal or navigate to upgrade flow
+    void this.router.navigate(['/identity/profile'], { fragment: 'upgrade' });
   }
 
   /**
