@@ -58,6 +58,8 @@ pub struct HealthResponse {
     pub node_id: String,
     /// Conductor connection status - IMPORTANT: seeder should check conductor.connected!
     pub conductor: ConductorHealth,
+    /// Projection role (writer or reader)
+    pub projection: ProjectionRole,
     /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -79,6 +81,19 @@ pub struct ConductorHealth {
     pub connected_workers: usize,
     /// Total number of workers
     pub total_workers: usize,
+    /// Number of conductors in the pool
+    pub pool_size: usize,
+    /// Per-conductor pools with at least one connected worker
+    pub pools_healthy: usize,
+    /// Total per-conductor pools (one per conductor in CONDUCTOR_URLS)
+    pub pools_total: usize,
+}
+
+/// Projection role details
+#[derive(Serialize)]
+pub struct ProjectionRole {
+    /// Whether this instance is the projection writer
+    pub writer: bool,
 }
 
 /// Build health response with current state
@@ -97,6 +112,20 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             (false, 0, 0)
         }
     };
+
+    // Conductor pool size from registry
+    let pool_size = state
+        .conductor_registry
+        .as_ref()
+        .map(|r| r.conductor_count())
+        .unwrap_or(0);
+
+    // Per-conductor pool health from router
+    let (pools_healthy, pools_total) = state
+        .conductor_router
+        .as_ref()
+        .map(|r| (r.pools().healthy_count(), r.pools().total_count()))
+        .unwrap_or((0, 0));
 
     // In dev mode, conductor connection is optional
     // Doorway can operate as pure HTTP bridge to elohim-storage
@@ -169,6 +198,12 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             connected: conductor_connected,
             connected_workers,
             total_workers,
+            pool_size,
+            pools_healthy,
+            pools_total,
+        },
+        projection: ProjectionRole {
+            writer: args.projection_writer,
         },
         error,
     }
@@ -203,9 +238,16 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let response = build_health_response(&state);
 
-    // In dev mode, conductor.connected is always true (set by build_health_response)
-    // so this check will pass even without actual conductor connection
-    let is_ready = response.conductor.connected;
+    // Readiness depends on role:
+    // - Writer instances: need conductor connection (to write projections)
+    // - Reader instances: only need MongoDB (conductor is optional)
+    // - Dev mode: always ready (conductor.connected is forced true)
+    let is_ready = if !state.args.projection_writer {
+        // Read replicas are ready if they have a projection store (MongoDB)
+        state.projection.is_some() || state.args.dev_mode
+    } else {
+        response.conductor.connected
+    };
 
     let body = serde_json::to_string(&response)
         .unwrap_or_else(|_| r#"{"healthy":false,"error":"Serialization failed"}"#.to_string());

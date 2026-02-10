@@ -18,6 +18,7 @@
 
 pub mod custodian;
 pub mod did_resolver;
+pub mod federation;
 pub mod discovery;
 pub mod elohim_verifier;
 pub mod import_client;
@@ -28,6 +29,7 @@ pub mod route_registry;
 pub mod shard_resolver;
 pub mod storage_registration;
 pub mod verification;
+pub mod zome_caller;
 
 pub use custodian::{
     CommitmentStatus, CustodianBlobCommitment, CustodianCapability, CustodianSelectionCriteria,
@@ -77,3 +79,5 @@ pub use elohim_verifier::{
     QuestionAnswer, QuestionCategory, QuizScore, UserProfileData, VerificationQuestion,
     VerificationResult, MAX_ELOHIM_CONFIDENCE, MIN_ACCURACY_THRESHOLD, QUESTION_COUNT,
 };
+pub use zome_caller::ZomeCaller;
+pub use federation::FederationConfig;

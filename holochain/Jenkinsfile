@@ -164,7 +164,7 @@ def checkEdgeNodeHealth(String url) {
  * Reads tag values from envFile, substitutes named placeholders in the manifest template,
  * validates no placeholders remain, then applies to Kubernetes.
  */
-def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile) {
+def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile, String resourceName = 'elohim-edgenode') {
     def versions = readProperties(file: envFile)
     def sedArgs = [
         "s/EDGENODE_TAG_PLACEHOLDER/${versions.EDGENODE_TAG}/g",
@@ -186,7 +186,7 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
 
     // Preview what we're deploying
     sh """
-        echo '==== Edge manifest preview ===='
+        echo '==== Manifest preview: ${resourceName}-${env} ===='
         grep 'image:\\|happ-version:' ${outputFile}
         echo '==============================='
     """
@@ -196,8 +196,8 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
         script: "grep -q 'kind: StatefulSet' ${manifestTemplate} && echo 'statefulset' || echo 'deployment'",
         returnStdout: true
     ).trim()
-    sh "kubectl rollout restart ${resourceType}/elohim-edgenode-${env} -n ${namespace}"
-    sh "kubectl rollout status ${resourceType}/elohim-edgenode-${env} -n ${namespace} --timeout=300s"
+    sh "kubectl rollout restart ${resourceType}/${resourceName}-${env} -n ${namespace}"
+    sh "kubectl rollout status ${resourceType}/${resourceName}-${env} -n ${namespace} --timeout=300s"
 }
 
 pipeline {
@@ -847,7 +847,11 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
+                            // Deploy infra (MongoDB) — idempotent
+                            sh "kubectl apply -f orchestrator/manifests/infra/alpha-mongodb.yaml"
+
                             deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/edgenode/alpha.yaml', envFile)
+                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/doorway/alpha.yaml', envFile, 'elohim-doorway')
 
                             sh 'sleep 15'
 
@@ -893,7 +897,12 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
+                            // Deploy infra (MongoDB) — idempotent
+                            sh "kubectl apply -f orchestrator/manifests/infra/staging-mongodb.yaml"
+
                             deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/edgenode/staging.yaml', envFile)
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/doorway/staging.yaml', envFile, 'elohim-doorway')
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/doorway/staging-read.yaml', envFile, 'elohim-doorway-read')
                             sh 'sleep 15'
                             if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
                                 echo "Edge Node Staging deployed and healthy"

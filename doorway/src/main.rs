@@ -8,6 +8,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use doorway::{
+    conductor::{ConductorInfo, ConductorPoolMap, ConductorRegistry, ConductorRouter},
     config::Args,
     db::MongoClient,
     nats::NatsClient,
@@ -50,9 +51,14 @@ async fn main() -> anyhow::Result<()> {
     info!("Node ID: {}", args.node_id);
     info!("Listen: {}", args.listen);
     info!("Mode: {}", if args.dev_mode { "DEVELOPMENT" } else { "PRODUCTION" });
+    info!("Projection writer: {}", args.projection_writer);
+    let conductor_urls = args.conductor_url_list();
     let startup_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
     info!("Conductor admin: {} (discovery, list_apps)", args.admin_url());
-    info!("Conductor app: {} (zome calls)", startup_app_url);
+    info!("Conductor pool: {} conductor(s)", conductor_urls.len());
+    for (i, url) in conductor_urls.iter().enumerate() {
+        info!("  conductor-{}: {}", i, url);
+    }
     info!("App ports: {}-{}", args.app_port_min, args.app_port_max);
     info!("NATS: {}", args.nats.nats_url);
     info!("MongoDB: {}", args.mongodb_uri);
@@ -190,42 +196,151 @@ async fn main() -> anyhow::Result<()> {
         import_app_url
     );
 
+    // Initialize Conductor Registry — available on ALL instances (writer + reader)
+    // Tracks which conductor hosts which agent for future per-request routing
+    let registry_collection = state.mongo.as_ref().map(|m| {
+        m.inner()
+            .database(m.db_name())
+            .collection::<bson::Document>("conductor_registry")
+    });
+    let registry = ConductorRegistry::new(registry_collection).await;
+
+    // Register all conductors from config
+    for (i, url) in conductor_urls.iter().enumerate() {
+        let conductor_id = format!("conductor-{}", i);
+        // Derive admin URL from app URL (replace port with admin port)
+        let admin_url = derive_admin_url_from_app(url, 4444);
+        registry.register_conductor(ConductorInfo {
+            conductor_id,
+            conductor_url: url.clone(),
+            admin_url,
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+    }
+
+    let registry = Arc::new(registry);
+    state.conductor_registry = Some(Arc::clone(&registry));
+    info!(
+        "Conductor registry initialized: {} conductor(s), {} agent mapping(s)",
+        registry.conductor_count(),
+        registry.agent_count()
+    );
+
+    // Create per-conductor WorkerPools for multi-conductor routing
+    // Each conductor in CONDUCTOR_URLS gets its own pool of workers
+    // Requires a default pool (always exists in production; absent only in dev mode without conductor)
+    if let Some(ref default_pool) = state.pool {
+        let pool_map = ConductorPoolMap::new(Arc::clone(default_pool));
+
+        let mut pools_created = 0usize;
+        for (i, url) in conductor_urls.iter().enumerate() {
+            let conductor_id = format!("conductor-{}", i);
+            let app_url = derive_app_url(url, args.app_port_min);
+            match WorkerPool::new(PoolConfig {
+                worker_count: 2, // Per-conductor pools are smaller than the main pool
+                conductor_url: app_url.clone(),
+                request_timeout_ms: args.request_timeout_ms,
+                max_queue_size: 500,
+            })
+            .await
+            {
+                Ok(pool) => {
+                    pool_map.add_pool(&conductor_id, Arc::new(pool));
+                    pools_created += 1;
+                    info!(
+                        conductor = %conductor_id,
+                        url = %app_url,
+                        "Per-conductor pool created (2 workers)"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        conductor = %conductor_id,
+                        url = %app_url,
+                        error = %e,
+                        "Failed to create per-conductor pool, conductor will use default"
+                    );
+                }
+            }
+        }
+
+        let pool_map = Arc::new(pool_map);
+        let router = ConductorRouter::new(Arc::clone(&registry), pool_map);
+        state.conductor_router = Some(Arc::new(router));
+        info!(
+            "Conductor router initialized: {}/{} per-conductor pools created",
+            pools_created,
+            conductor_urls.len()
+        );
+    }
+
+    // Generate node Ed25519 signing key for federation
+    // This key is used in the DID document and JWKS endpoint
+    {
+        let (_, verifying_key) = doorway::custodial_keys::crypto::generate_keypair();
+        state.node_verifying_key = Some(verifying_key);
+        info!("Node signing key generated for federation");
+    }
+
+    // Create ZomeCaller for federation + service registration
+    {
+        let admin_url = args.admin_url().to_string();
+        let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+        let zome_caller = services::ZomeCaller::new(
+            &admin_url,
+            &app_url,
+            &args.installed_app_id,
+        );
+        state.zome_caller = Some(Arc::new(zome_caller));
+        info!("ZomeCaller created for federation (admin: {}, app: {})", admin_url, app_url);
+    }
+
     let state = Arc::new(state);
 
     // Start zome capability discovery (import configs, cache rules)
     // This populates zome_configs and import_config_store for route matching
-    if let Some(ref import_config_store) = state.import_config_store {
-        let admin_url = args.admin_url().to_string();
-        let discovery_config = DiscoveryConfig {
-            admin_url: admin_url.clone(),
-            installed_app_id: args.installed_app_id.clone(),
-            zome_name: "content_store".to_string(), // TODO: make configurable
-            ..DiscoveryConfig::default()
-        };
+    // Only needed on writer instances (readers serve from shared MongoDB)
+    if args.projection_writer {
+        if let Some(ref import_config_store) = state.import_config_store {
+            let admin_url = args.admin_url().to_string();
+            let discovery_config = DiscoveryConfig {
+                admin_url: admin_url.clone(),
+                installed_app_id: args.installed_app_id.clone(),
+                zome_name: "content_store".to_string(), // TODO: make configurable
+                ..DiscoveryConfig::default()
+            };
 
-        let _discovery_handle = spawn_discovery_task(
-            discovery_config,
-            Arc::clone(&state.zome_configs),
-            Arc::clone(import_config_store),
-        );
-        info!(
-            "Zome capability discovery started (admin: {}, import routes will be available after discovery completes)",
-            admin_url
-        );
+            let _discovery_handle = spawn_discovery_task(
+                discovery_config,
+                Arc::clone(&state.zome_configs),
+                Arc::clone(import_config_store),
+            );
+            info!(
+                "Zome capability discovery started (admin: {}, import routes will be available after discovery completes)",
+                admin_url
+            );
+        } else {
+            warn!("Import config store not initialized, skipping zome discovery");
+        }
     } else {
-        warn!("Import config store not initialized, skipping zome discovery");
+        info!("Zome discovery skipped (read replica mode)");
     }
 
     // Start Projection Engine (if projection store is available)
-    // Note: In dev mode, the signal subscriber is disabled because:
-    // 1. Holochain 0.3+ requires app interface authentication (IssueAppAuthenticationToken)
-    // 2. The projection store is memory-only without MongoDB anyway
-    // Production mode uses app_auth module for proper IssueAppAuthenticationToken flow
+    //
+    // Gating logic (projection_writer flag):
+    //   projection_writer=true  → starts signal subscriber (populates MongoDB from DHT signals)
+    //   projection_writer=false → reads from shared MongoDB, no subscriber (read replica mode)
+    //
+    // In dev mode, the signal subscriber is always disabled (app interface requires auth).
     let _projection_handle = if let Some(ref projection_store) = state.projection {
-        if args.dev_mode {
-            // In dev mode, create engine without signal subscriber
-            // The projection store can still be queried, just won't receive real-time signals
-            info!("Projection engine started (dev mode: signal subscriber disabled, app interface requires auth)");
+        if args.dev_mode || !args.projection_writer {
+            if !args.projection_writer {
+                info!("Projection reader: using shared MongoDB (PROJECTION_WRITER=false)");
+            } else {
+                info!("Projection engine started (dev mode: signal subscriber disabled, app interface requires auth)");
+            }
 
             // Create engine without signals (it will still work for manual queries)
             let engine = Arc::new(ProjectionEngine::new(
@@ -240,12 +355,11 @@ async fn main() -> anyhow::Result<()> {
 
             Some((tokio::spawn(async {}), engine_handle))
         } else {
-            // Production mode: require proper app interface authentication
-            // Use conductor URL for admin interface, derive app URL from port
+            // Production mode + projection_writer=true: start signal subscriber
             let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
 
             info!(
-                "Starting projection engine (admin: {}, app: {})",
+                "Starting projection engine with signal subscriber (admin: {}, app: {})",
                 args.conductor_url, app_url
             );
 
@@ -266,7 +380,7 @@ async fn main() -> anyhow::Result<()> {
             let signal_rx = subscriber.subscribe();
             let engine_handle = spawn_engine_task(engine, signal_rx);
 
-            info!("Projection engine started");
+            info!("Projection engine started (writer mode)");
             Some((subscriber_handle, engine_handle))
         }
     } else {
@@ -325,6 +439,47 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Federation: register in DHT + start heartbeat task
+    // Requires doorway_id + doorway_url to be configured
+    if let Some(fed_config) = services::FederationConfig::from_args(&args) {
+        let zome_caller = state.zome_caller.clone();
+        let fed_state = Arc::clone(&state);
+        let fed_config_clone = fed_config.clone();
+
+        if let Some(zome_caller) = zome_caller {
+            // Spawn registration with 5s delay (conductor readiness)
+            let zc = Arc::clone(&zome_caller);
+            let fc = fed_config.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                info!("Federation: registering doorway '{}' in DHT...", fc.doorway_id);
+
+                let mut capabilities = vec!["gateway".to_string()];
+                if !fc.doorway_url.is_empty() {
+                    capabilities.push("bootstrap".to_string());
+                    capabilities.push("signal".to_string());
+                }
+
+                if let Err(e) = services::federation::register_doorway_in_dht(
+                    &fc, &zc, capabilities,
+                ).await {
+                    warn!("Federation registration failed (non-fatal): {}", e);
+                }
+            });
+
+            // Spawn heartbeat task
+            let _heartbeat = services::federation::spawn_heartbeat_task(
+                fed_config_clone,
+                zome_caller,
+                fed_state,
+            );
+            info!(
+                "Federation enabled: doorway_id={}, heartbeat every {}s",
+                fed_config.doorway_id, fed_config.heartbeat_interval_secs,
+            );
+        }
+    }
+
     // Run the server
     if let Err(e) = server::run(state).await {
         error!("Server error: {:?}", e);
@@ -332,6 +487,18 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Derive admin WebSocket URL from app URL by replacing the port
+fn derive_admin_url_from_app(app_url: &str, admin_port: u16) -> String {
+    if let Some(host_start) = app_url.find("://") {
+        let after_scheme = &app_url[host_start + 3..];
+        if let Some(port_start) = after_scheme.rfind(':') {
+            let host = &after_scheme[..port_start];
+            return format!("{}://{}:{}", &app_url[..host_start], host, admin_port);
+        }
+    }
+    format!("ws://localhost:{}", admin_port)
 }
 
 /// Derive app WebSocket URL from conductor admin URL

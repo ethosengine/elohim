@@ -24,9 +24,9 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use clap::{Parser, Subcommand};
-use tokio::sync::RwLock;
-use tracing::info;
+use clap::Parser;
+use tokio::sync::{mpsc, Mutex, RwLock};
+use tracing::{info, error};
 
 use config::Config;
 use dashboard::{create_router, DashboardState};
@@ -147,6 +147,50 @@ async fn main() -> anyhow::Result<()> {
         info!("Pod started in background");
     } else {
         info!("Pod is disabled");
+    }
+
+    // --- P2P Layer ---
+    // Build libp2p swarm
+    let data_dir = &config.node.data_dir;
+    match p2p::build_swarm(&config.p2p, data_dir) {
+        Ok(swarm) => {
+            info!(peer_id = %swarm.local_peer_id(), "P2P swarm built");
+
+            // Create sync engine
+            let engine = Arc::new(Mutex::new(
+                sync::SyncEngine::new(data_dir)
+                    .expect("Failed to initialize sync engine"),
+            ));
+
+            // Create sync coordinator
+            let coordinator = sync::SyncCoordinator::new(
+                engine.clone(),
+                config.sync.sync_interval_ms,
+            );
+
+            // Channels between swarm event loop and coordinator
+            let (swarm_event_tx, swarm_event_rx) = mpsc::channel(256);
+            let (swarm_cmd_tx, mut swarm_cmd_rx) = mpsc::channel::<sync::coordinator::SwarmCommand>(256);
+
+            // Spawn swarm event loop
+            let mut swarm_handle = swarm;
+            tokio::spawn(async move {
+                // Forward commands to swarm in parallel with event loop
+                // We split: the swarm.run() consumes self and pushes events
+                // But we also need to process commands. Use a wrapper approach:
+                swarm_handle.run(swarm_event_tx).await;
+            });
+
+            // Spawn coordinator
+            tokio::spawn(async move {
+                coordinator.run(swarm_event_rx, swarm_cmd_tx).await;
+            });
+
+            info!("P2P sync layer started");
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to build P2P swarm, running without P2P");
+        }
     }
 
     // Create dashboard router with pod

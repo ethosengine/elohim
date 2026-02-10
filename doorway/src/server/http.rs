@@ -20,6 +20,7 @@ use crate::cache::{
     self, CacheConfig, CacheRuleStore, ContentCache, TieredBlobCache, TieredCacheConfig,
     spawn_tiered_cleanup_task, DoorwayResolver, DeliveryRelay,
 };
+use crate::conductor::{ConductorRegistry, ConductorRouter};
 use crate::orchestrator::OrchestratorState;
 use crate::services::{
     CustodianService, CustodianServiceConfig, VerificationService, VerifyBlobRequest,
@@ -82,6 +83,18 @@ pub struct AppState {
     pub import_client: Option<Arc<crate::services::ImportClient>>,
     /// Debug event hub for real-time debugging via WebSocket
     pub debug_hub: Arc<routes::DebugHub>,
+    /// Conductor pool registry — maps agents to conductors, available on ALL instances
+    pub conductor_registry: Option<Arc<ConductorRegistry>>,
+    /// Per-request conductor routing (agent → conductor pool)
+    /// When set, authenticated requests route to the conductor hosting that agent.
+    /// When None, all requests use the default pool (backwards compat).
+    pub conductor_router: Option<Arc<ConductorRouter>>,
+    /// Node Ed25519 verifying (public) key for federation signing
+    /// Generated at startup, used in DID document and JWKS endpoint
+    pub node_verifying_key: Option<ed25519_dalek::VerifyingKey>,
+    /// ZomeCaller for federation and service registration
+    /// Shared by federation service, heartbeat task, and federation routes
+    pub zome_caller: Option<Arc<crate::services::ZomeCaller>>,
 }
 
 impl AppState {
@@ -135,7 +148,11 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
-            debug_hub: Arc::new(routes::DebugHub::new(true))
+            debug_hub: Arc::new(routes::DebugHub::new(true)),
+            conductor_registry: None,
+            conductor_router: None,
+            node_verifying_key: None,
+            zome_caller: None,
         }
     }
 
@@ -197,7 +214,11 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
-            debug_hub: Arc::new(routes::DebugHub::new(true))
+            debug_hub: Arc::new(routes::DebugHub::new(true)),
+            conductor_registry: None,
+            conductor_router: None,
+            node_verifying_key: None,
+            zome_caller: None,
         }
     }
 
@@ -266,7 +287,11 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
-            debug_hub: Arc::new(routes::DebugHub::new(true))
+            debug_hub: Arc::new(routes::DebugHub::new(true)),
+            conductor_registry: None,
+            conductor_router: None,
+            node_verifying_key: None,
+            zome_caller: None,
         }
     }
 
@@ -337,7 +362,11 @@ impl AppState {
             import_config_store: Some(Arc::new(crate::services::ImportConfigStore::new())),
             zome_configs: Arc::new(dashmap::DashMap::new()),
             import_client: None, // Set later via set_import_client()
-            debug_hub: Arc::new(routes::DebugHub::new(true))
+            debug_hub: Arc::new(routes::DebugHub::new(true)),
+            conductor_registry: None,
+            conductor_router: None,
+            node_verifying_key: None,
+            zome_caller: None,
         })
     }
 
@@ -504,6 +533,16 @@ async fn handle_request(
             to_boxed(routes::handle_did_endpoint(Arc::clone(&state)))
         }
 
+        // Doorway public signing keys (JWKS format) for federation
+        (Method::GET, "/.well-known/doorway-keys") => {
+            to_boxed(routes::handle_doorway_keys(Arc::clone(&state)))
+        }
+
+        // Federation doorway listing
+        (Method::GET, "/api/v1/federation/doorways") => {
+            to_boxed(routes::handle_federation_doorways(Arc::clone(&state)).await)
+        }
+
         // CORS preflight
         (Method::OPTIONS, _) => to_boxed(preflight_response()),
 
@@ -575,6 +614,62 @@ async fn handle_request(
         // ====================================================================
         // Admin API endpoints for Shefa compute resources dashboard
         // ====================================================================
+
+        // Conductor pool visibility (available on ALL instances)
+        (Method::GET, "/admin/conductors") => {
+            to_boxed(routes::handle_list_conductors(Arc::clone(&state)).await)
+        }
+
+        // Conductor agents listing
+        (Method::GET, p) if p.starts_with("/admin/conductors/") && p.ends_with("/agents") => {
+            let conductor_id = p
+                .strip_prefix("/admin/conductors/")
+                .and_then(|s| s.strip_suffix("/agents"))
+                .unwrap_or("");
+            to_boxed(routes::handle_conductor_agents(Arc::clone(&state), conductor_id).await)
+        }
+
+        // Manual agent→conductor assignment
+        (Method::POST, "/admin/conductors/assign") => {
+            return Ok(to_boxed(routes::handle_assign_agent(req, Arc::clone(&state)).await));
+        }
+
+        // Hosted users — manual provisioning
+        (Method::POST, "/admin/hosted-users") => {
+            return Ok(to_boxed(routes::handle_provision_user(req, Arc::clone(&state)).await));
+        }
+
+        // Hosted users — list users with conductor assignments
+        (Method::GET, "/admin/hosted-users") => {
+            to_boxed(routes::handle_list_hosted_users(Arc::clone(&state)).await)
+        }
+
+        // Hosted users — deprovision an agent
+        (Method::DELETE, p) if p.starts_with("/admin/hosted-users/") => {
+            let agent_key = p.strip_prefix("/admin/hosted-users/").unwrap_or("");
+            to_boxed(routes::handle_deprovision_user(Arc::clone(&state), agent_key).await)
+        }
+
+        // Graduation endpoints — conductor retirement for steward users
+        (Method::GET, "/admin/graduation/pending") => {
+            to_boxed(routes::handle_graduation_pending(Arc::clone(&state)).await)
+        }
+        (Method::GET, "/admin/graduation/completed") => {
+            to_boxed(routes::handle_graduation_completed(Arc::clone(&state)).await)
+        }
+        (Method::POST, p) if p.starts_with("/admin/graduation/force/") => {
+            let agent_key = p.strip_prefix("/admin/graduation/force/").unwrap_or("");
+            to_boxed(routes::handle_force_graduation(Arc::clone(&state), agent_key).await)
+        }
+
+        // Agent conductor lookup
+        (Method::GET, p) if p.starts_with("/admin/agents/") && p.ends_with("/conductor") => {
+            let agent_key = p
+                .strip_prefix("/admin/agents/")
+                .and_then(|s| s.strip_suffix("/conductor"))
+                .unwrap_or("");
+            to_boxed(routes::handle_agent_conductor(Arc::clone(&state), agent_key).await)
+        }
 
         // List all nodes with detailed resource and social metrics
         (Method::GET, "/admin/nodes") => {

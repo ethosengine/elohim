@@ -17,6 +17,7 @@
 pub mod auth;
 pub mod bootstrap;
 pub mod cache;
+pub mod conductor;
 pub mod config;
 pub mod custodial_keys;
 pub mod db;

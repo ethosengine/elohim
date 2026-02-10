@@ -1,6 +1,7 @@
 //! HTTP routes for Doorway
 
 pub mod admin;
+pub mod admin_conductors;
 pub mod admin_users;
 pub mod api;
 pub mod apps;
@@ -9,6 +10,7 @@ pub mod blob;
 pub mod dashboard_ws;
 pub mod db;
 pub mod debug_stream;
+pub mod federation;
 pub mod health;
 pub mod identity;
 pub mod import;
@@ -23,6 +25,12 @@ pub use admin::{
     handle_nodes, handle_node_by_id, handle_cluster_metrics,
     handle_resources, handle_custodians,
 };
+pub use admin_conductors::{
+    handle_list_conductors, handle_conductor_agents, handle_agent_conductor,
+    handle_assign_agent,
+    handle_provision_user, handle_list_hosted_users, handle_deprovision_user,
+    handle_graduation_pending, handle_graduation_completed, handle_force_graduation,
+};
 pub use api::handle_api_request;
 pub use apps::handle_app_request;
 pub use auth_routes::handle_auth_request;
@@ -33,6 +41,7 @@ pub use blob::{
 };
 pub use dashboard_ws::handle_dashboard_ws;
 pub use health::{health_check, readiness_check, version_info};
+pub use federation::{handle_federation_doorways, handle_doorway_keys};
 pub use identity::{handle_did_document, handle_did_endpoint};
 pub use db::handle_db_request;
 pub use import::{handle_import_request, match_import_route};

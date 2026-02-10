@@ -200,14 +200,17 @@ fn build_did_document(state: &AppState) -> DIDDocument {
         ],
         id: did.clone(),
         verification_method: vec![
-            // Note: In production, this should include actual signing keys
-            // For now, we include a placeholder that indicates the verification
-            // method type without exposing actual key material
             VerificationMethod {
                 id: format!("{}#node-key", did),
                 method_type: "Ed25519VerificationKey2020".to_string(),
                 controller: did.clone(),
-                public_key_multibase: None, // TODO: Add actual key when signing is implemented
+                public_key_multibase: state.node_verifying_key.as_ref().map(|key| {
+                    // Multibase z-prefix (base58btc) with Ed25519 multicodec prefix 0xed01
+                    let pub_bytes = key.to_bytes();
+                    let mut prefixed = vec![0xed, 0x01];
+                    prefixed.extend_from_slice(&pub_bytes);
+                    format!("z{}", bs58::encode(&prefixed).into_string())
+                }),
             },
         ],
         authentication: vec![format!("{}#node-key", did)],
@@ -215,7 +218,9 @@ fn build_did_document(state: &AppState) -> DIDDocument {
         service: services,
         elohim_capabilities: capabilities,
         elohim_region: args.region.clone(),
-        elohim_holochain_cell_id: None, // TODO: Populate from conductor connection
+        elohim_holochain_cell_id: state.zome_configs
+            .get("infrastructure")
+            .map(|entry| format!("{:?}", entry.value())),
     }
 }
 

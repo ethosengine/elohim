@@ -21,7 +21,7 @@ use crate::db::schemas::Metadata;
 /// password using Argon2id + ChaCha20-Poly1305. This gives them true Holochain
 /// agent identity while the doorway holds custody of the key.
 ///
-/// When users migrate to sovereignty (Tauri app), they export and decrypt
+/// When users migrate to stewardship (Tauri app), they export and decrypt
 /// this key material to gain full control of their identity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustodialKeyMaterial {
@@ -187,14 +187,19 @@ pub struct UserDoc {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custodial_key: Option<CustodialKeyMaterial>,
 
-    /// Whether this user has migrated to sovereign key management (Tauri app).
+    /// Whether this user has migrated to steward key management (Tauri app).
     /// Once true, the doorway no longer holds custody of their key.
-    #[serde(default)]
-    pub is_sovereign: bool,
+    #[serde(default, alias = "is_sovereign")]
+    pub is_steward: bool,
 
-    /// When the user migrated to sovereignty.
+    /// When the user migrated to stewardship.
+    #[serde(skip_serializing_if = "Option::is_none", alias = "sovereignty_at")]
+    pub stewardship_at: Option<DateTime>,
+
+    /// Which conductor hosts this user's agent (e.g., "conductor-0").
+    /// None for legacy users or dev mode registrations.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sovereignty_at: Option<DateTime>,
+    pub conductor_id: Option<String>,
 }
 
 fn default_identifier_type() -> String {
@@ -236,8 +241,9 @@ impl UserDoc {
             usage: UserUsage::default(),
             quota: UserQuota::default(),
             custodial_key,
-            is_sovereign: false,
-            sovereignty_at: None,
+            is_steward: false,
+            stewardship_at: None,
+            conductor_id: None,
         }
     }
 
@@ -283,15 +289,18 @@ impl UserDoc {
 
     /// Check if user has a custodial key that can be activated.
     pub fn has_custodial_key(&self) -> bool {
-        self.custodial_key.is_some() && !self.is_sovereign
+        self.custodial_key.is_some() && !self.is_steward
     }
 
-    /// Mark the user as sovereign (key exported and confirmed).
-    pub fn mark_sovereign(&mut self) {
-        self.is_sovereign = true;
-        self.sovereignty_at = Some(DateTime::now());
-        // Optionally clear custodial_key to reduce storage
-        // self.custodial_key = None;
+    /// Set the conductor hosting this user's agent.
+    pub fn set_conductor(&mut self, id: String) {
+        self.conductor_id = Some(id);
+    }
+
+    /// Mark the user as steward (key exported and confirmed).
+    pub fn mark_steward(&mut self) {
+        self.is_steward = true;
+        self.stewardship_at = Some(DateTime::now());
     }
 
     /// Check if user is over any quota limit
@@ -378,6 +387,16 @@ impl IntoIndexes for UserDoc {
                 Some(
                     IndexOptions::builder()
                         .name("is_active_index".to_string())
+                        .build(),
+                ),
+            ),
+            // Index on conductor_id for hosted user queries
+            (
+                doc! { "conductor_id": 1 },
+                Some(
+                    IndexOptions::builder()
+                        .name("conductor_id_index".to_string())
+                        .sparse(true)
                         .build(),
                 ),
             ),

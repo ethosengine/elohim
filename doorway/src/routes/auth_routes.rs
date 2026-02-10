@@ -21,6 +21,7 @@ use crate::auth::{
     extract_token_from_header, hash_password, verify_password, Claims, JwtValidator,
     PermissionLevel, TokenInput,
 };
+use crate::conductor::AgentProvisioner;
 use crate::custodial_keys::{CustodialKeyService, KeyExportFormat};
 use crate::db::schemas::{
     get_registered_clients, validate_redirect_uri, CustodialKeyMaterial, OAuthSessionDoc, UserDoc,
@@ -206,8 +207,8 @@ pub struct OAuthErrorResponse {
 // =============================================================================
 
 /// Response for native handoff endpoint.
-/// Returns identity info for Tauri to create a local session.
-/// Content syncs via P2P (DHT gossip), not from doorway.
+/// Returns identity + network context for Tauri to create a local session.
+/// Content syncs via P2P (DHT gossip) once the native conductor joins the network.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeHandoffResponse {
@@ -215,6 +216,8 @@ pub struct NativeHandoffResponse {
     pub human_id: String,
     /// User identifier (email/username)
     pub identifier: String,
+    /// Conductor-generated agent public key (base64)
+    pub agent_pub_key: String,
     /// Doorway ID that issued this session
     pub doorway_id: String,
     /// Doorway URL for future recovery
@@ -228,10 +231,25 @@ pub struct NativeHandoffResponse {
     /// Bootstrap URL for P2P discovery (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bootstrap_url: Option<String>,
+    /// Signal relay URL for WebRTC signaling (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal_url: Option<String>,
+    /// Custom network seed (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network_seed: Option<String>,
+    /// Installed app ID on the doorway conductor
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub installed_app_id: Option<String>,
+    /// Which conductor hosts this user's agent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conductor_id: Option<String>,
+    /// Encrypted key bundle for identity import (inline, non-destructive)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_bundle: Option<KeyExportFormat>,
 }
 
 // =============================================================================
-// Key Export Types (Sovereignty Migration)
+// Key Export Types (Stewardship Migration)
 // =============================================================================
 
 /// Response containing the encrypted key bundle for migration to Tauri.
@@ -246,11 +264,11 @@ pub struct KeyExportResponse {
     pub instructions: String,
 }
 
-/// Request to confirm sovereignty migration.
+/// Request to confirm stewardship migration.
 /// Called by Tauri app after successful key import.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ConfirmSovereigntyRequest {
+pub struct ConfirmStewardshipRequest {
     /// Signature proving possession of the key (signs the human_id)
     pub signature: String,
 }
@@ -259,7 +277,7 @@ pub struct ConfirmSovereigntyRequest {
 // Recovery Request/Response Types
 // =============================================================================
 
-/// Request to initiate disaster recovery for a sovereign user.
+/// Request to initiate disaster recovery for a steward user.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecoverCustodyRequest {
@@ -427,14 +445,14 @@ pub struct QuestionFeedback {
     pub message: String,
 }
 
-/// Response for sovereignty confirmation.
+/// Response for stewardship confirmation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SovereigntyConfirmedResponse {
+pub struct StewardshipConfirmedResponse {
     pub success: bool,
     pub message: String,
-    /// When the user became sovereign
-    pub sovereignty_at: String,
+    /// When the user became a steward
+    pub stewardship_at: String,
 }
 
 // =============================================================================
@@ -643,6 +661,29 @@ async fn handle_register(
         (body.human_id.clone(), body.agent_pub_key.clone(), None)
     };
 
+    // Attempt agent provisioning on a conductor (non-fatal)
+    let provisioned = if state.conductor_registry.is_some() && !state.args.dev_mode {
+        let registry = state.conductor_registry.as_ref().unwrap();
+        let provisioner = AgentProvisioner::new(Arc::clone(registry))
+            .with_app_id(state.args.installed_app_id.clone());
+        match provisioner.provision_agent(&body.identifier).await {
+            Ok(p) => {
+                info!(
+                    conductor = %p.conductor_id,
+                    agent = %p.agent_pub_key,
+                    "Agent provisioned on conductor during registration"
+                );
+                Some(p)
+            }
+            Err(e) => {
+                warn!("Agent provisioning failed, falling back to local keys: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Validate password strength (minimum 8 characters)
     if body.password.len() < 8 {
         return json_response(
@@ -762,17 +803,27 @@ async fn handle_register(
         }
     };
 
-    // Use custodial key's public key as the agent_pub_key
-    let actual_agent_pub_key = custodial_key.public_key.clone();
+    // Use conductor-generated key if provisioned, otherwise use custodial key
+    let actual_agent_pub_key = if let Some(ref p) = provisioned {
+        p.agent_pub_key.clone()
+    } else {
+        custodial_key.public_key.clone()
+    };
 
     // Create user document with custodial key
-    let user = UserDoc::new_with_custodial_key(
+    let mut user = UserDoc::new_with_custodial_key(
         body.identifier.clone(),
         body.identifier_type.clone(),
         password_hash,
         human_id.clone(),
         custodial_key,
     );
+
+    // If agent was provisioned on a conductor, set conductor_id and override agent key
+    if let Some(ref p) = provisioned {
+        user.set_conductor(p.conductor_id.clone());
+        user.agent_pub_key = p.agent_pub_key.clone();
+    }
 
     // Insert into MongoDB
     if let Err(e) = collection.insert_one(user).await {
@@ -1198,17 +1249,85 @@ async fn handle_native_handoff(
         }
     };
 
-    // Get bootstrap URL from config (optional)
+    // Get network config from args
     let bootstrap_url = state.args.bootstrap_url.clone();
+    let signal_url = state.args.signal_url.clone();
 
-    // TODO: Fetch display_name and profile_image_hash from user profile in MongoDB
-    // For now, return None for these optional fields
-    let display_name: Option<String> = None;
-    let profile_image_hash: Option<String> = None;
+    // Look up UserDoc from MongoDB for agent_pub_key, conductor_id, custodial key
+    let (agent_pub_key, conductor_id, display_name, profile_image_hash, key_bundle) =
+        if let Some(ref mongo) = state.mongo {
+            match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+                Ok(collection) => {
+                    match collection
+                        .find_one(doc! { "identifier": &claims.identifier })
+                        .await
+                    {
+                        Ok(Some(user)) => {
+                            // Export key bundle inline (non-destructive, does NOT mark as exported)
+                            let bundle = if user.has_custodial_key() {
+                                let key_service = CustodialKeyService::new();
+                                match key_service.export_key(&user, &doorway_id) {
+                                    Ok(export) => Some(export),
+                                    Err(e) => {
+                                        warn!(
+                                            identifier = %claims.identifier,
+                                            error = %e,
+                                            "Failed to export key for native handoff"
+                                        );
+                                        None
+                                    }
+                                }
+                            } else {
+                                None
+                            };
+
+                            (
+                                user.agent_pub_key.clone(),
+                                user.conductor_id.clone(),
+                                None::<String>, // TODO: display_name from profile
+                                None::<String>, // TODO: profile_image_hash from profile
+                                bundle,
+                            )
+                        }
+                        Ok(None) => {
+                            warn!(
+                                identifier = %claims.identifier,
+                                "User not found in MongoDB during native handoff"
+                            );
+                            (claims.human_id.clone(), None, None, None, None)
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "MongoDB lookup failed during native handoff");
+                            (claims.human_id.clone(), None, None, None, None)
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to get collection during native handoff");
+                    (claims.human_id.clone(), None, None, None, None)
+                }
+            }
+        } else {
+            (claims.human_id.clone(), None, None, None, None)
+        };
+
+    // Look up installed_app_id from conductor registry
+    let installed_app_id = if let Some(ref registry) = state.conductor_registry {
+        if let Some(entry) = registry.get_conductor_for_agent(&agent_pub_key) {
+            Some(entry.app_id)
+        } else {
+            Some(state.args.installed_app_id.clone())
+        }
+    } else {
+        None
+    };
 
     info!(
-        "Native handoff: {} migrating to native session",
-        claims.identifier
+        identifier = %claims.identifier,
+        agent_pub_key = %agent_pub_key,
+        conductor_id = ?conductor_id,
+        has_key_bundle = key_bundle.is_some(),
+        "Native handoff: identity + network context provided"
     );
 
     json_response(
@@ -1216,22 +1335,28 @@ async fn handle_native_handoff(
         &NativeHandoffResponse {
             human_id: claims.human_id,
             identifier: claims.identifier,
+            agent_pub_key,
             doorway_id,
             doorway_url,
             display_name,
             profile_image_hash,
             bootstrap_url,
+            signal_url,
+            network_seed: None, // reserved for future custom network seeds
+            installed_app_id,
+            conductor_id,
+            key_bundle,
         },
     )
 }
 
 // =============================================================================
-// Sovereignty Migration Handlers
+// Stewardship Migration Handlers
 // =============================================================================
 
 /// GET /auth/export-key
 ///
-/// Export the user's encrypted key bundle for migration to sovereignty (Tauri).
+/// Export the user's encrypted key bundle for migration to stewardship (Tauri).
 /// The private key remains encrypted with the user's password - they must
 /// enter their password in the Tauri app to decrypt it.
 ///
@@ -1369,7 +1494,7 @@ async fn handle_export_key(
     }
 
     info!(
-        "Exported custodial key for {} (preparing for sovereignty)",
+        "Exported custodial key for {} (preparing for stewardship)",
         claims.identifier
     );
 
@@ -1379,13 +1504,13 @@ async fn handle_export_key(
             key_bundle: export,
             instructions: "Import this key bundle into your Elohim Tauri app. \
                 You will need to enter your password to decrypt the key. \
-                Once imported, call /auth/confirm-sovereignty to complete migration."
+                Once imported, call /auth/confirm-stewardship to complete migration."
                 .to_string(),
         },
     )
 }
 
-/// POST /auth/confirm-sovereignty
+/// POST /auth/confirm-stewardship
 ///
 /// Confirm that the user has successfully migrated their key to Tauri.
 /// Called by the Tauri app after successful key import and decryption.
@@ -1395,13 +1520,18 @@ async fn handle_export_key(
 ///
 /// This endpoint:
 /// 1. Validates the JWT token
-/// 2. Verifies the signature proves key possession
-/// 3. Marks the user as sovereign in MongoDB
-/// 4. Clears their cached signing key
-async fn handle_confirm_sovereignty(
+/// 2. Verifies Ed25519 signature proves key possession
+/// 3. Marks the user as steward in MongoDB
+/// 4. Deprovisions conductor cell (best effort)
+/// 5. Clears conductor_id on UserDoc
+/// 6. Deactivates ALL cached signing keys
+async fn handle_confirm_stewardship(
     req: Request<hyper::body::Incoming>,
     state: Arc<AppState>,
 ) -> Response<BoxBody> {
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+    use ed25519_dalek::Verifier;
+
     // Get auth header before consuming request
     let auth_header = req
         .headers()
@@ -1410,7 +1540,7 @@ async fn handle_confirm_sovereignty(
         .map(|s| s.to_string());
 
     // Parse request body
-    let body: ConfirmSovereigntyRequest = match parse_json_body(req).await {
+    let body: ConfirmStewardshipRequest = match parse_json_body(req).await {
         Ok(b) => b,
         Err(e) => {
             return json_response(
@@ -1455,9 +1585,6 @@ async fn handle_confirm_sovereignty(
 
     let claims = result.claims.unwrap();
 
-    // TODO: Verify signature proves key possession
-    // For now, we trust that if they have a valid token and the exported key,
-    // they're the rightful owner. In production, we should verify the signature.
     if body.signature.is_empty() {
         return json_response(
             StatusCode::BAD_REQUEST,
@@ -1482,7 +1609,7 @@ async fn handle_confirm_sovereignty(
         }
     };
 
-    // Update user to mark as sovereign
+    // Fetch user from MongoDB (need custodial_key.public_key for sig verification)
     let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
         Ok(c) => c,
         Err(e) => {
@@ -1496,14 +1623,165 @@ async fn handle_confirm_sovereignty(
         }
     };
 
-    let sovereignty_time = bson::DateTime::now();
+    let user = match collection
+        .find_one(doc! { "identifier": &claims.identifier })
+        .await
+    {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return json_response(
+                StatusCode::NOT_FOUND,
+                &ErrorResponse {
+                    error: "User not found".into(),
+                    code: Some("USER_NOT_FOUND".into()),
+                },
+            )
+        }
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: format!("Database error: {}", e),
+                    code: Some("DB_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    // Idempotency check: if already steward, return success immediately
+    if user.is_steward {
+        info!(
+            "User {} already a steward, returning success (idempotent)",
+            claims.identifier
+        );
+        return json_response(
+            StatusCode::OK,
+            &StewardshipConfirmedResponse {
+                success: true,
+                message: "Already a steward.".into(),
+                stewardship_at: user
+                    .stewardship_at
+                    .map(|dt| {
+                        chrono::DateTime::from_timestamp(
+                            dt.timestamp_millis() / 1000,
+                            ((dt.timestamp_millis() % 1000) * 1_000_000) as u32,
+                        )
+                        .unwrap_or_default()
+                        .to_rfc3339()
+                    })
+                    .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+            },
+        );
+    }
+
+    // Verify Ed25519 signature — steward signs human_id, we verify with custodial public key
+    let custodial_key = match &user.custodial_key {
+        Some(k) => k,
+        None => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: "User has no custodial key to verify against".into(),
+                    code: Some("NO_CUSTODIAL_KEY".into()),
+                },
+            )
+        }
+    };
+
+    let pub_key_bytes = match BASE64.decode(&custodial_key.public_key) {
+        Ok(b) if b.len() == 32 => b,
+        Ok(b) => {
+            warn!(
+                "Invalid custodial public key length for {}: expected 32, got {}",
+                claims.identifier,
+                b.len()
+            );
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: "Invalid custodial key format".into(),
+                    code: Some("KEY_FORMAT_ERROR".into()),
+                },
+            );
+        }
+        Err(e) => {
+            warn!("Failed to decode custodial public key: {}", e);
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: "Failed to decode custodial key".into(),
+                    code: Some("KEY_DECODE_ERROR".into()),
+                },
+            );
+        }
+    };
+
+    let verifying_key = match ed25519_dalek::VerifyingKey::from_bytes(
+        pub_key_bytes.as_slice().try_into().unwrap(),
+    ) {
+        Ok(k) => k,
+        Err(e) => {
+            warn!("Invalid Ed25519 verifying key for {}: {}", claims.identifier, e);
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: "Invalid custodial key".into(),
+                    code: Some("KEY_ERROR".into()),
+                },
+            );
+        }
+    };
+
+    let sig_bytes = match BASE64.decode(&body.signature) {
+        Ok(b) if b.len() == 64 => b,
+        Ok(b) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: format!("Invalid signature length: expected 64, got {}", b.len()),
+                    code: Some("INVALID_SIGNATURE".into()),
+                },
+            )
+        }
+        Err(e) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: format!("Invalid signature encoding: {}", e),
+                    code: Some("INVALID_SIGNATURE".into()),
+                },
+            )
+        }
+    };
+
+    let signature = ed25519_dalek::Signature::from_bytes(sig_bytes.as_slice().try_into().unwrap());
+    if verifying_key
+        .verify(user.human_id.as_bytes(), &signature)
+        .is_err()
+    {
+        warn!(
+            "Stewardship signature verification failed for {}",
+            claims.identifier
+        );
+        return json_response(
+            StatusCode::FORBIDDEN,
+            &ErrorResponse {
+                error: "Signature verification failed — cannot prove key possession".into(),
+                code: Some("SIGNATURE_INVALID".into()),
+            },
+        );
+    }
+
+    // Mark is_steward: true + set stewardship_at in MongoDB
+    let stewardship_time = bson::DateTime::now();
     if let Err(e) = collection
         .update_one(
             doc! { "identifier": &claims.identifier },
             doc! {
                 "$set": {
-                    "is_sovereign": true,
-                    "sovereignty_at": sovereignty_time,
+                    "is_steward": true,
+                    "stewardship_at": stewardship_time,
+                    "conductor_id": bson::Bson::Null,
                 }
             },
         )
@@ -1518,23 +1796,42 @@ async fn handle_confirm_sovereignty(
         );
     }
 
-    // Clear cached signing key if session_id exists
-    if let Some(session_id) = &claims.session_id {
-        let key_service = CustodialKeyService::new();
-        key_service.deactivate_key(session_id);
+    // Deprovision conductor cell (best effort)
+    if let Some(ref registry) = state.conductor_registry {
+        let provisioner = AgentProvisioner::new(Arc::clone(registry))
+            .with_app_id(state.args.installed_app_id.clone());
+        match provisioner.deprovision_agent(&user.agent_pub_key).await {
+            Ok(()) => {
+                info!(
+                    agent = %user.agent_pub_key,
+                    "Conductor cell deprovisioned during stewardship graduation"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    agent = %user.agent_pub_key,
+                    error = %e,
+                    "Failed to deprovision conductor cell during graduation (will be cleaned up later)"
+                );
+            }
+        }
     }
 
+    // Deactivate ALL cached signing keys for this user
+    let key_service = CustodialKeyService::new();
+    key_service.deactivate_all(&user.human_id);
+
     info!(
-        "User {} has migrated to sovereignty! Custodial keys no longer needed.",
+        "User {} has graduated to stewardship! Conductor cell retired.",
         claims.identifier
     );
 
     json_response(
         StatusCode::OK,
-        &SovereigntyConfirmedResponse {
+        &StewardshipConfirmedResponse {
             success: true,
-            message: "Welcome to sovereignty! You now have full control of your identity.".into(),
-            sovereignty_at: chrono::Utc::now().to_rfc3339(),
+            message: "Welcome to stewardship! You now have full control of your identity.".into(),
+            stewardship_at: chrono::Utc::now().to_rfc3339(),
         },
     )
 }
@@ -1545,11 +1842,11 @@ async fn handle_confirm_sovereignty(
 
 /// POST /auth/recover-custody
 ///
-/// Initiate disaster recovery for a sovereign user who has lost device access.
+/// Initiate disaster recovery for a steward user who has lost device access.
 /// This creates a RecoveryRequest in the DHT and notifies emergency contacts.
 ///
 /// Flow:
-/// 1. Validate user exists and is_sovereign == true
+/// 1. Validate user exists and is_steward == true
 /// 2. Create RecoveryRequest in DHT via imagodei zome
 /// 3. Return request_id, required_approvals, expires_at
 async fn handle_recover_custody(
@@ -1640,13 +1937,13 @@ async fn handle_recover_custody(
         }
     };
 
-    // Verify user is sovereign (recovery only applies to sovereign users)
-    if !user.is_sovereign {
+    // Verify user is a steward (recovery only applies to steward users)
+    if !user.is_steward {
         return json_response(
             StatusCode::BAD_REQUEST,
             &ErrorResponse {
-                error: "Recovery is only available for sovereign users. Use regular login.".into(),
-                code: Some("NOT_SOVEREIGN".into()),
+                error: "Recovery is only available for steward users. Use regular login.".into(),
+                code: Some("NOT_STEWARD".into()),
             },
         );
     }
@@ -1762,7 +2059,7 @@ async fn handle_check_recovery_status(
 /// Flow:
 /// 1. Validate recovery session token
 /// 2. Generate NEW custodial keypair (old key is lost)
-/// 3. Update user: custodial_key = new, is_sovereign = false
+/// 3. Update user: custodial_key = new, is_steward = false
 /// 4. Activate key, generate JWT with recovery_mode flag
 async fn handle_activate_recovery(
     req: Request<hyper::body::Incoming>,
@@ -2676,9 +2973,10 @@ pub async fn handle_auth_request(
         // Native handoff (Tauri session migration)
         (&Method::GET, "/auth/native-handoff") => handle_native_handoff(req, state).await,
 
-        // Sovereignty migration endpoints
+        // Stewardship migration endpoints
         (&Method::GET, "/auth/export-key") => handle_export_key(req, state).await,
-        (&Method::POST, "/auth/confirm-sovereignty") => handle_confirm_sovereignty(req, state).await,
+        (&Method::POST, "/auth/confirm-stewardship")
+        | (&Method::POST, "/auth/confirm-sovereignty") => handle_confirm_stewardship(req, state).await,
 
         // Disaster recovery endpoints
         (&Method::POST, "/auth/recover-custody") => handle_recover_custody(req, state).await,
@@ -2699,6 +2997,7 @@ pub async fn handle_auth_request(
         | (_, "/auth/token")
         | (_, "/auth/native-handoff")
         | (_, "/auth/export-key")
+        | (_, "/auth/confirm-stewardship")
         | (_, "/auth/confirm-sovereignty")
         | (_, "/auth/recover-custody")
         | (_, "/auth/check-recovery-status")

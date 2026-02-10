@@ -136,6 +136,18 @@ pub struct Args {
     #[arg(long, env = "THRESHOLD_URL", default_value = "http://localhost:8081")]
     pub threshold_url: String,
 
+    /// Whether this instance runs the projection signal subscriber
+    /// When true (default): starts signal subscriber to populate projection from DHT signals
+    /// When false: reads projection from shared MongoDB, no subscriber (read replica mode)
+    #[arg(long, env = "PROJECTION_WRITER", default_value = "true")]
+    pub projection_writer: bool,
+
+    /// Comma-separated list of conductor app interface URLs for multi-conductor pool
+    /// e.g. "ws://cond-0:4445,ws://cond-1:4445"
+    /// If set, takes precedence over CONDUCTOR_URL for the conductor pool
+    #[arg(long, env = "CONDUCTOR_URLS")]
+    pub conductor_urls: Option<String>,
+
     /// Holochain installed app ID for projections and signal subscriptions
     #[arg(long, env = "INSTALLED_APP_ID", default_value = "elohim")]
     pub installed_app_id: String,
@@ -148,6 +160,11 @@ pub struct Args {
     /// Returned in native-handoff response for Tauri clients to join network
     #[arg(long, env = "BOOTSTRAP_URL")]
     pub bootstrap_url: Option<String>,
+
+    /// Signal relay URL for WebRTC signaling
+    /// Returned in native-handoff response for Tauri clients
+    #[arg(long, env = "SIGNAL_URL")]
+    pub signal_url: Option<String>,
 }
 
 /// NATS connection configuration
@@ -182,6 +199,19 @@ impl Args {
             self.jwt_secret
                 .clone()
                 .expect("JWT_SECRET is required in production mode")
+        }
+    }
+
+    /// Get the list of conductor app interface URLs
+    /// Prefers CONDUCTOR_URLS (multi-conductor) over single CONDUCTOR_URL
+    pub fn conductor_url_list(&self) -> Vec<String> {
+        if let Some(ref urls) = self.conductor_urls {
+            urls.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        } else {
+            vec![self.conductor_url.clone()]
         }
     }
 

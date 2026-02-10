@@ -7,7 +7,7 @@
 //! - Generate and encrypt keypairs at registration
 //! - Decrypt and cache keys at login
 //! - Provide signing keys for zome calls
-//! - Export keys for migration to sovereignty
+//! - Export keys for migration to stewardship
 
 use std::sync::Arc;
 
@@ -29,7 +29,7 @@ use super::crypto::{
 // Key Export Format
 // =============================================================================
 
-/// Export format for key migration to Tauri (sovereignty).
+/// Export format for key migration to Tauri (stewardship).
 ///
 /// This bundle contains everything needed to decrypt and use the key
 /// in a Tauri app. The private key is still encrypted - the user must
@@ -158,15 +158,15 @@ impl CustodialKeyService {
             .as_ref()
             .ok_or_else(|| DoorwayError::Auth("User has no custodial key".into()))?;
 
-        // Block activation for sovereign users in normal login flow.
+        // Block activation for steward users in normal login flow.
         // For disaster recovery, the recovery endpoint first:
         // 1. Validates recovery approval (M-of-N votes, Elohim check)
         // 2. Generates a NEW custodial key
-        // 3. Updates user: custodial_key = new_key, is_sovereign = false
-        // 4. Then calls activate_key (which passes because is_sovereign is now false)
-        if user.is_sovereign {
+        // 3. Updates user: custodial_key = new_key, is_steward = false
+        // 4. Then calls activate_key (which passes because is_steward is now false)
+        if user.is_steward {
             return Err(DoorwayError::Auth(
-                "User has migrated to sovereignty - use recovery flow to regain custody".into(),
+                "User has migrated to stewardship - use recovery flow to regain custody".into(),
             ));
         }
 
@@ -263,7 +263,7 @@ impl CustodialKeyService {
         }
     }
 
-    /// Export key material for migration to Tauri (sovereignty).
+    /// Export key material for migration to Tauri (stewardship).
     ///
     /// The exported bundle still has the private key encrypted - the user
     /// must provide their password to the Tauri app to decrypt it.
@@ -278,9 +278,9 @@ impl CustodialKeyService {
             .as_ref()
             .ok_or_else(|| DoorwayError::Auth("User has no custodial key to export".into()))?;
 
-        if user.is_sovereign {
+        if user.is_steward {
             return Err(DoorwayError::Auth(
-                "User has already migrated to sovereignty".into(),
+                "User has already migrated to stewardship".into(),
             ));
         }
 
@@ -299,7 +299,7 @@ impl CustodialKeyService {
         info!(
             human_id = %user.human_id,
             identifier = %user.identifier,
-            "Exported custodial key for migration to sovereignty"
+            "Exported custodial key for migration to stewardship"
         );
 
         Ok(export)
@@ -463,13 +463,13 @@ mod tests {
     }
 
     #[test]
-    fn test_sovereign_user_cannot_activate() {
+    fn test_steward_user_cannot_activate() {
         let service = CustodialKeyService::new();
         let password = "test-password";
         let mut user = create_test_user(&service, password);
 
-        // Mark as sovereign
-        user.mark_sovereign();
+        // Mark as steward
+        user.mark_steward();
 
         // Try to activate - should fail
         let result = service.activate_key("session-123", &user, password);
@@ -477,13 +477,13 @@ mod tests {
     }
 
     #[test]
-    fn test_sovereign_user_cannot_export() {
+    fn test_steward_user_cannot_export() {
         let service = CustodialKeyService::new();
         let password = "test-password";
         let mut user = create_test_user(&service, password);
 
-        // Mark as sovereign
-        user.mark_sovereign();
+        // Mark as steward
+        user.mark_steward();
 
         // Try to export - should fail
         let result = service.export_key(&user, "doorway-1");
