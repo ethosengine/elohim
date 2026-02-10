@@ -24,6 +24,7 @@ import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
+import { TauriAuthService } from '../../services/tauri-auth.service';
 import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 
 /** Login step type */
@@ -41,6 +42,7 @@ export class LoginComponent implements OnInit {
   private readonly passwordProvider = inject(PasswordAuthProvider);
   private readonly identityService = inject(IdentityService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
+  private readonly tauriAuth = inject(TauriAuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -65,6 +67,9 @@ export class LoginComponent implements OnInit {
   /** Current login step */
   readonly currentStep = signal<LoginStep>('doorway');
 
+  /** Whether this is a first-launch Tauri launcher experience */
+  readonly isLauncher = signal(false);
+
   /** Return URL after successful login */
   private returnUrl = '/';
 
@@ -88,10 +93,18 @@ export class LoginComponent implements OnInit {
       this.authService.registerProvider(this.passwordProvider);
     }
 
-    // Get return URL from query params
+    // Get return URL and launcher mode from query params
     this.route.queryParams.subscribe(params => {
       this.returnUrl = (params['returnUrl'] as string) ?? '/';
+      if (params['launcher'] === 'true') {
+        this.isLauncher.set(true);
+      }
     });
+
+    // Also activate launcher mode when Tauri has no doorway selected
+    if (this.tauriAuth.isTauri() && !this.doorwayRegistry.hasSelection()) {
+      this.isLauncher.set(true);
+    }
 
     // Pre-fill identifier if remembered
     const storedIdentifier = localStorage.getItem(AUTH_IDENTIFIER_KEY);

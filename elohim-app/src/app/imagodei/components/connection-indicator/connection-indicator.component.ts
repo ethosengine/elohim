@@ -116,6 +116,9 @@ export class ConnectionIndicatorComponent {
     };
   });
 
+  /** Doorway URL for display in hosted mode */
+  readonly doorwayUrl = computed(() => this.doorwayRegistry.selectedUrl());
+
   /** Whether the indicator should be visible */
   readonly isVisible = computed(() => {
     const mode = this.identityService.mode();
@@ -129,5 +132,10 @@ export class ConnectionIndicatorComponent {
 
   toggleExpanded(): void {
     this.expanded = !this.expanded;
+  }
+
+  /** Strip protocol and trailing slash from URL for compact display */
+  shortenUrl(url: string): string {
+    return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
   }
 }

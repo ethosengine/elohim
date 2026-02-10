@@ -30,6 +30,7 @@ import {
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
 import { AgencyService } from '../../services/agency.service';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
 
 @Component({
@@ -43,6 +44,7 @@ export class ProfileComponent implements OnInit {
   private readonly identityService = inject(IdentityService);
   private readonly agencyService = inject(AgencyService);
   private readonly discoveryService = inject(DiscoveryAttestationService);
+  private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly router = inject(Router);
 
   // ==========================================================================
@@ -90,6 +92,16 @@ export class ProfileComponent implements OnInit {
 
   /** All discovery results */
   readonly allDiscoveryResults = this.discoveryService.results;
+
+  // ==========================================================================
+  // Doorway Signals
+  // ==========================================================================
+
+  /** Registered doorways with health status */
+  readonly registeredDoorways = this.doorwayRegistry.doorwaysWithHealth;
+
+  /** Currently active doorway */
+  readonly activeDoorway = computed(() => this.doorwayRegistry.selected()?.doorway ?? null);
 
   // ==========================================================================
   // Computed

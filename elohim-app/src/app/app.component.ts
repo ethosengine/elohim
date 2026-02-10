@@ -80,8 +80,10 @@ export class AppComponent implements OnInit, OnDestroy {
       // If no session, TauriAuthService will set status to 'needs_login'
       // The user should be routed to doorway picker
       if (this.tauriAuth.needsLogin()) {
-        // No Tauri session found - routing to identity setup
-        void this.router.navigate(['/identity/login']);
+        // No Tauri session found - routing to identity setup with launcher mode
+        void this.router.navigate(['/identity/login'], {
+          queryParams: { launcher: 'true' },
+        });
         return;
       }
 

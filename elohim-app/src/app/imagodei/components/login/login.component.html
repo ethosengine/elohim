@@ -1,6 +1,12 @@
 <div class="login-container">
   <!-- Step 1: Doorway Selection -->
   @if (currentStep() === 'doorway') {
+    @if (isLauncher()) {
+      <div class="launcher-header">
+        <h1>Connect to a Doorway</h1>
+        <p>Enter a doorway URL or discover nearby doorways to get started.</p>
+      </div>
+    }
     <app-doorway-picker
       [mode]="'login'"
       (doorwaySelected)="onDoorwaySelected($event)"

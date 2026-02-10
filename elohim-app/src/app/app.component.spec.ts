@@ -278,7 +278,9 @@ describe('AppComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/login']);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/login'], {
+        queryParams: { launcher: 'true' },
+      });
     });
 
     it('should continue initialization when Tauri session exists', async () => {

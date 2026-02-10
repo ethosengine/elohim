@@ -5,6 +5,7 @@ import { signal } from '@angular/core';
 import { ProfileComponent } from './profile.component';
 import { IdentityService } from '../../services/identity.service';
 import { AgencyService } from '../../services/agency.service';
+import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 import type { HumanProfile } from '../../models/identity.model';
 
@@ -70,6 +71,15 @@ describe('ProfileComponent', () => {
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: AgencyService, useValue: mockAgencyService },
         { provide: DiscoveryAttestationService, useValue: mockDiscoveryService },
+        {
+          provide: DoorwayRegistryService,
+          useValue: {
+            doorwaysWithHealth: signal([]),
+            selected: signal(null),
+            selectedUrl: signal(null),
+            hasSelection: signal(false),
+          },
+        },
         { provide: Router, useValue: mockRouter },
       ],
     }).compileComponents();

@@ -143,6 +143,39 @@
             </div>
           }
 
+          <!-- My Doorways -->
+          <div class="doorways-section">
+            <span class="section-title">My Doorways</span>
+            <p class="section-description">
+              Doorways are your connections to the Elohim network. Multiple doorways provide
+              redundancy for identity recovery.
+            </p>
+            <div class="doorway-cards">
+              @for (doorway of registeredDoorways(); track doorway.id) {
+                <div class="doorway-card" [class.active]="doorway.id === activeDoorway()?.id">
+                  <div class="doorway-header">
+                    <span
+                      class="doorway-status-dot"
+                      [class.online]="doorway.isReachable"
+                      [class.offline]="!doorway.isReachable"
+                    ></span>
+                    <strong>{{ doorway.name || doorway.id }}</strong>
+                    @if (doorway.id === activeDoorway()?.id) {
+                      <span class="doorway-active-badge">Active</span>
+                    }
+                  </div>
+                  <span class="doorway-url">{{ doorway.url }}</span>
+                  @if (doorway.latencyMs) {
+                    <span class="doorway-latency">{{ doorway.latencyMs }}ms</span>
+                  }
+                </div>
+              }
+            </div>
+            <button type="button" class="btn btn-secondary" routerLink="/identity/login">
+              + Add Doorway
+            </button>
+          </div>
+
           <!-- Contextual Settings Links -->
           <div class="context-links-section">
             <span class="section-title">Manage in Context</span>
@@ -161,11 +194,21 @@
                 </div>
                 <span class="material-icons">chevron_right</span>
               </a>
-              <a routerLink="/lamad/profile" class="context-link">
+              <a routerLink="/lamad/human" class="context-link">
                 <span class="context-icon material-icons">school</span>
                 <div class="context-info">
                   <strong>Learning Profile</strong>
                   <span>View your learning paths, progress, and achievements</span>
+                </div>
+                <span class="material-icons">chevron_right</span>
+              </a>
+              <a routerLink="/identity/login" class="context-link">
+                <span class="context-icon material-icons">dns</span>
+                <div class="context-info">
+                  <strong>Doorway & Network</strong>
+                  <span>
+                    Manage your doorway connections, recovery contacts, and network access
+                  </span>
                 </div>
                 <span class="material-icons">chevron_right</span>
               </a>

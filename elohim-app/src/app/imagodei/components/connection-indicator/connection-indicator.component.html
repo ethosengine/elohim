@@ -16,6 +16,11 @@
     <!-- Label (shown when not compact) -->
     <span class="status-label">{{ status().label }}</span>
 
+    <!-- Doorway URL badge (hosted mode) -->
+    @if (status().mode === 'hosted' && doorwayUrl()) {
+      <span class="doorway-url-badge">{{ shortenUrl(doorwayUrl()!) }}</span>
+    }
+
     <!-- Tooltip/Dropdown on hover -->
     @if (expanded) {
       <div class="status-tooltip">
