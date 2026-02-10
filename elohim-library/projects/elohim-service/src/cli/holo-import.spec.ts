@@ -68,7 +68,7 @@ describe('CLI holo-import commands', () => {
       program
         .command('holo:import')
         .option('-s, --source <dir>', 'Source directory', './docs/content')
-        .option('--admin-url <url>', 'Admin URL', 'wss://doorway-dev.elohim.host')
+        .option('--admin-url <url>', 'Admin URL', 'wss://doorway-alpha.elohim.host')
         .option('--app-id <id>', 'App ID', 'elohim')
         .option('--batch-size <n>', 'Batch size', '50')
         .option('-f, --full', 'Full import', false)

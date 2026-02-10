@@ -182,7 +182,7 @@ export const BOOTSTRAP_DOORWAYS: DoorwayInfo[] = [
   {
     id: 'doorway-dev-elohim-host',
     name: 'Dev Gateway',
-    url: 'https://doorway-dev.elohim.host',
+    url: 'https://doorway-alpha.elohim.host',
     description:
       'Development doorway operated by Matthew Dowell @ Ethos Engine. For alpha/dev testing.',
     region: 'north-america',

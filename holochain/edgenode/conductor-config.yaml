@@ -17,7 +17,7 @@ admin_interfaces:
         - "https://alpha.elohim.host"
         - "https://staging.elohim.host"
         - "https://doorway.elohim.host"
-        - "https://doorway-dev.elohim.host"
+        - "https://doorway-alpha.elohim.host"
         - "http://localhost:4200"
         - "http://localhost:8080"
 

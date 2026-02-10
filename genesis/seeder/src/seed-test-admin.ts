@@ -7,7 +7,7 @@
  *   npx tsx src/seed-test-admin.ts [options]
  *
  * Environment variables:
- *   ADMIN_PROXY_URL     Doorway URL (default: https://doorway-dev.elohim.host)
+ *   ADMIN_PROXY_URL     Doorway URL (default: https://doorway-alpha.elohim.host)
  *   HOLOCHAIN_APP_URL   Holochain app URL (default: ws://localhost:4445)
  *   TEST_ADMIN_PASSWORD Override default test password
  *
@@ -94,7 +94,7 @@ function uint8ArrayToBase64(arr: Uint8Array): string {
 }
 
 function getAdminProxyUrl(): string {
-  return process.env.ADMIN_PROXY_URL || process.env.DOORWAY_URL || 'https://doorway-dev.elohim.host';
+  return process.env.ADMIN_PROXY_URL || process.env.DOORWAY_URL || 'https://doorway-alpha.elohim.host';
 }
 
 function getAdminWsUrl(): string {

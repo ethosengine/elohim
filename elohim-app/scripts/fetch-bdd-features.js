@@ -13,7 +13,7 @@
  *
  * Usage:
  *   node scripts/fetch-bdd-features.js \
- *     --doorway-url https://doorway-dev.elohim.host \
+ *     --doorway-url https://doorway-alpha.elohim.host \
  *     --test-path-id bdd-smoke-tests \
  *     --output-dir cypress/e2e/features/dynamic \
  *     --tags @smoke,@lamad
@@ -29,7 +29,7 @@ const http = require('http');
 // ============================================================================
 
 const DEFAULT_CONFIG = {
-  doorwayUrl: process.env.DOORWAY_HOST || 'https://doorway-dev.elohim.host',
+  doorwayUrl: process.env.DOORWAY_HOST || 'https://doorway-alpha.elohim.host',
   testPathId: 'bdd-smoke-tests',
   outputDir: 'cypress/e2e/features/dynamic',
   tags: '',
@@ -89,7 +89,7 @@ USAGE:
 
 OPTIONS:
   --doorway-url <url>    Doorway API URL
-                         Default: DOORWAY_HOST env or https://doorway-dev.elohim.host
+                         Default: DOORWAY_HOST env or https://doorway-alpha.elohim.host
   --test-path-id <id>    ID of the test path in the content graph
                          Default: bdd-smoke-tests
   --output-dir <dir>     Output directory for .feature files

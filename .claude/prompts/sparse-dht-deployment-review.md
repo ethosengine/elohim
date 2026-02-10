@@ -77,7 +77,7 @@ match batch.batch_type.as_str() {
 
 **Already configured for blob storage:**
 - `BlobManagerService.getBlobUrl(hash)` - Strategy-aware URL construction
-- Doorway mode: `https://doorway-dev.elohim.host/store/{hash}`
+- Doorway mode: `https://doorway-alpha.elohim.host/store/{hash}`
 - Direct mode: `http://localhost:8090/store/{hash}` (Tauri)
 
 ---
@@ -102,13 +102,13 @@ match batch.batch_type.as_str() {
 
 ```bash
 # 1. Check doorway health
-curl https://doorway-dev.elohim.host/health
+curl https://doorway-alpha.elohim.host/health
 
 # 2. Check doorway status (conductor + storage)
-curl https://doorway-dev.elohim.host/status | jq
+curl https://doorway-alpha.elohim.host/status | jq
 
 # 3. Test blob retrieval (any content hash from seed data)
-curl -I https://doorway-dev.elohim.host/store/sha256-$(cat genesis/blobs/* | head -1 | sha256sum | cut -d' ' -f1)
+curl -I https://doorway-alpha.elohim.host/store/sha256-$(cat genesis/blobs/* | head -1 | sha256sum | cut -d' ' -f1)
 
 # 4. Test content loading in app
 open https://alpha.elohim.host/lamad

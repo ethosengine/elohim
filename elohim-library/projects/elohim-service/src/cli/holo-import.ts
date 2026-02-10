@@ -25,7 +25,7 @@ const program = new Command();
 
 // Default configuration
 const DEFAULT_CONFIG: HolochainImportConfig = {
-  adminUrl: 'wss://doorway-dev.elohim.host',
+  adminUrl: 'wss://doorway-alpha.elohim.host',
   appId: 'elohim',
   batchSize: 50,
 };

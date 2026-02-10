@@ -10,7 +10,7 @@
  */
 
 export interface DoorwayClientConfig {
-  /** Base URL for the doorway (e.g., "https://doorway-dev.elohim.host") */
+  /** Base URL for the doorway (e.g., "https://doorway-alpha.elohim.host") */
   baseUrl: string;
   /** Optional API key for authentication */
   apiKey?: string;
@@ -195,7 +195,7 @@ export class DoorwayClient {
  */
 export function createDevDoorwayClient(): DoorwayClient {
   return new DoorwayClient({
-    baseUrl: 'https://doorway-dev.elohim.host',
+    baseUrl: 'https://doorway-alpha.elohim.host',
     apiKey: 'dev-elohim-auth-2024',
   });
 }
@@ -204,7 +204,7 @@ export function createDevDoorwayClient(): DoorwayClient {
  * Create a doorway client from environment variables
  */
 export function createDoorwayClientFromEnv(): DoorwayClient {
-  const baseUrl = process.env['DOORWAY_URL'] || 'https://doorway-dev.elohim.host';
+  const baseUrl = process.env['DOORWAY_URL'] || 'https://doorway-alpha.elohim.host';
   const apiKey = process.env['DOORWAY_API_KEY'] || 'dev-elohim-auth-2024';
   const timeout = parseInt(process.env['DOORWAY_TIMEOUT'] || '5000', 10);
 

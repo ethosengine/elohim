@@ -25,7 +25,7 @@ All commands run from `elohim-library/projects/elohim-service/`:
 # Full import
 npx ts-node src/cli/holo-import.ts holo:import \
   --source ./docs/content \
-  --admin-url wss://doorway-dev.elohim.host \
+  --admin-url wss://doorway-alpha.elohim.host \
   --app-id elohim \
   --batch-size 50
 
@@ -295,7 +295,7 @@ const service = createLamadImportService('wss://holochain-dev.elohim.host');
 
 // Or with custom config
 const service = new HolochainImportService({
-  adminUrl: 'wss://doorway-dev.elohim.host',
+  adminUrl: 'wss://doorway-alpha.elohim.host',
   appId: 'elohim',
   batchSize: 50,
 });

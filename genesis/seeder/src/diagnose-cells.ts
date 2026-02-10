@@ -3,7 +3,7 @@
  * Diagnostic script to check cell discovery on the conductor
  *
  * Usage:
- *   HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=...' npx tsx src/diagnose-cells.ts
+ *   HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=...' npx tsx src/diagnose-cells.ts
  */
 
 import { AdminWebsocket } from '@holochain/client';

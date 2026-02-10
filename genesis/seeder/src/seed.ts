@@ -22,7 +22,7 @@
  *
  * ## Environment Variables
  *
- * - DOORWAY_URL (required): Doorway endpoint (e.g., https://doorway-dev.elohim.host)
+ * - DOORWAY_URL (required): Doorway endpoint (e.g., https://doorway-alpha.elohim.host)
  * - STORAGE_URL (optional): Direct storage URL for blob sync
  * - SKIP_VERIFICATION: Skip pre/post-flight conductor checks
  * - SKIP_BLOB_SYNC: Skip genesis blob sync
@@ -452,8 +452,8 @@ const CONTENT_ONLY = args.includes('--content-only') || process.env.SEED_CONTENT
 // =============================================================================
 
 // Doorway URL is REQUIRED - seeder only works through doorway
-const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway-dev.elohim.host'
-const HOLOCHAIN_ADMIN_URL = process.env.HOLOCHAIN_ADMIN_URL; // e.g., 'wss://doorway-dev.elohim.host?apiKey=...'
+const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway-alpha.elohim.host'
+const HOLOCHAIN_ADMIN_URL = process.env.HOLOCHAIN_ADMIN_URL; // e.g., 'wss://doorway-alpha.elohim.host?apiKey=...'
 const SKIP_VERIFICATION = process.env.SKIP_VERIFICATION === 'true';
 const SKIP_BLOB_SYNC = process.env.SKIP_BLOB_SYNC === 'true';
 const APP_ID = 'elohim';
@@ -1957,7 +1957,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
  * Seeds content through doorway → elohim-storage → conductor.
  *
  * Usage:
- *   DOORWAY_URL=https://doorway-dev.elohim.host npm run seed
+ *   DOORWAY_URL=https://doorway-alpha.elohim.host npm run seed
  *
  * Options:
  *   --limit=N     Limit to N concepts
@@ -1973,7 +1973,7 @@ async function seed() {
     console.error('\n❌ DOORWAY_URL environment variable is required');
     console.error('');
     console.error('Usage:');
-    console.error('  DOORWAY_URL=https://doorway-dev.elohim.host npm run seed');
+    console.error('  DOORWAY_URL=https://doorway-alpha.elohim.host npm run seed');
     console.error('');
     console.error('The seeder works through doorway, which relays to elohim-storage.');
     console.error('Architecture: Seeder → Doorway → elohim-storage → Conductor');

@@ -253,7 +253,7 @@ export class StorageClientService {
    */
   getStorageBaseUrl(): string {
     // Strategy provides the base URL based on mode
-    // In doorway mode: returns doorway URL (e.g., https://doorway-dev.elohim.host)
+    // In doorway mode: returns doorway URL (e.g., https://doorway-alpha.elohim.host)
     // In direct mode: returns storage URL (e.g., http://localhost:8090)
     return this.strategy.getStorageBaseUrl(this.buildConnectionConfig());
   }

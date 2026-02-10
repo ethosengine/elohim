@@ -20,8 +20,8 @@ const DEFAULT_BOOTSTRAP_URL: &str = "https://doorway.elohim.host/bootstrap";
 const DEFAULT_SIGNAL_URL: &str = "wss://signal.doorway.elohim.host";
 
 // Dev environment endpoints (for builds targeting dev/alpha)
-const DEV_BOOTSTRAP_URL: &str = "https://doorway-dev.elohim.host/bootstrap";
-const DEV_SIGNAL_URL: &str = "wss://signal.doorway-dev.elohim.host";
+const ALPHA_BOOTSTRAP_URL: &str = "https://doorway-alpha.elohim.host/bootstrap";
+const ALPHA_SIGNAL_URL: &str = "wss://signal.doorway-alpha.elohim.host";
 
 /// OAuth callback payload emitted to frontend when deep link is received
 #[derive(Debug, Clone, Serialize)]
@@ -88,7 +88,7 @@ fn network_config() -> NetworkConfig {
         let bootstrap_url = option_env!("ELOHIM_BOOTSTRAP_URL")
             .or_else(|| {
                 if option_env!("ELOHIM_ENV") == Some("dev") {
-                    Some(DEV_BOOTSTRAP_URL)
+                    Some(ALPHA_BOOTSTRAP_URL)
                 } else {
                     None
                 }
@@ -98,7 +98,7 @@ fn network_config() -> NetworkConfig {
         let signal_url = option_env!("ELOHIM_SIGNAL_URL")
             .or_else(|| {
                 if option_env!("ELOHIM_ENV") == Some("dev") {
-                    Some(DEV_SIGNAL_URL)
+                    Some(ALPHA_SIGNAL_URL)
                 } else {
                     None
                 }

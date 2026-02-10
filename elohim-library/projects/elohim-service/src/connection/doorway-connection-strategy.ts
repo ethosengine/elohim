@@ -5,7 +5,7 @@
  * Used in browser deployments where same-origin restrictions apply.
  *
  * Connection path:
- *   Browser → Doorway (wss://doorway-dev.elohim.host) → Conductor
+ *   Browser → Doorway (wss://doorway-alpha.elohim.host) → Conductor
  *
  * Blob storage:
  *   Uses Doorway's /api/blob/{hash} endpoint

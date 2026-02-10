@@ -8,7 +8,7 @@
  * Usage:
  * ```typescript
  * const service = new HolochainImportService({
- *   adminUrl: 'wss://doorway-dev.elohim.host',
+ *   adminUrl: 'wss://doorway-alpha.elohim.host',
  *   appId: 'elohim',
  *   batchSize: 50,
  * });
@@ -250,12 +250,12 @@ export class HolochainImportService {
 /**
  * Create a pre-configured import service for the elohim app
  *
- * @param adminUrl - Admin WebSocket URL (default: wss://doorway-dev.elohim.host)
+ * @param adminUrl - Admin WebSocket URL (default: wss://doorway-alpha.elohim.host)
  * @param batchSize - Number of entries per bulk call (default: 50)
  * @param happPath - Optional path to .happ file for installation
  */
 export function createElohimImportService(
-  adminUrl = 'wss://doorway-dev.elohim.host',
+  adminUrl = 'wss://doorway-alpha.elohim.host',
   batchSize = 50,
   happPath?: string
 ): HolochainImportService {

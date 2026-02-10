@@ -10,7 +10,7 @@ HINTS = {
     'elohim-holochain': ('DNA_BUILD', 'Check Rust/WASM. cargo build locally.'),
     'elohim-edge': ('INFRASTRUCTURE', 'Check container. Verify hApp artifact.'),
     'elohim': ('APP_BUILD', 'Check TypeScript. npm run build locally.'),
-    'elohim-genesis': ('SEEDING', 'Check doorway-dev.elohim.host/health'),
+    'elohim-genesis': ('SEEDING', 'Check doorway-alpha.elohim.host/health'),
     'elohim-orchestrator': ('ORCHESTRATOR', 'Fetch ci-summary.json artifact.')
 }
 

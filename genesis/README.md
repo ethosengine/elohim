@@ -94,8 +94,8 @@ When triggered by the orchestrator, `TARGET_HOST` is auto-detected from branch:
 
 | Branch | Target Host | Doorway |
 |--------|-------------|---------|
-| `dev`, `feat-*`, `claude/*` | alpha.elohim.host | doorway-dev.elohim.host |
-| `staging*` | staging.elohim.host | doorway-dev.elohim.host |
+| `dev`, `feat-*`, `claude/*` | alpha.elohim.host | doorway-alpha.elohim.host |
+| `staging*` | staging.elohim.host | doorway-alpha.elohim.host |
 | `main` | elohim.host | doorway.elohim.host |
 
 ### Feature Areas
@@ -132,7 +132,7 @@ jenkins job trigger genesis/Jenkinsfile \
 # Directly
 cd genesis/seeder
 npm install
-HOLOCHAIN_ADMIN_URL="wss://doorway-dev.elohim.host?apiKey=..." npm run seed
+HOLOCHAIN_ADMIN_URL="wss://doorway-alpha.elohim.host?apiKey=..." npm run seed
 ```
 
 ### Validate Only

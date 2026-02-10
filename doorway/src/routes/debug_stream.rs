@@ -8,7 +8,7 @@
 //!
 //! ```bash
 //! # Connect via websocat
-//! websocat 'wss://doorway-dev.elohim.host/debug/stream?apiKey=...'
+//! websocat 'wss://doorway-alpha.elohim.host/debug/stream?apiKey=...'
 //!
 //! # Or use the seeder debug command
 //! npm run debug:stream

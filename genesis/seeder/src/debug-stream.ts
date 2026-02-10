@@ -15,7 +15,7 @@
  *
  * Examples:
  *   # Connect to dev environment
- *   DOORWAY_URL='https://doorway-dev.elohim.host' \
+ *   DOORWAY_URL='https://doorway-alpha.elohim.host' \
  *   DOORWAY_API_KEY='dev-elohim-auth-2024' \
  *   npm run debug:stream
  */
@@ -110,7 +110,7 @@ function formatEvent(event: DebugEvent): string {
 function connect() {
   if (!DOORWAY_URL) {
     console.error('Error: DOORWAY_URL not set');
-    console.error('Usage: DOORWAY_URL=https://doorway-dev.elohim.host npm run debug:stream');
+    console.error('Usage: DOORWAY_URL=https://doorway-alpha.elohim.host npm run debug:stream');
     process.exit(1);
   }
 
