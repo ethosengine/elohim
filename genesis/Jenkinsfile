@@ -45,6 +45,19 @@ def resolveInternalDoorwayUrl(String doorwayHost) {
     return doorwayHost.replace('https://', '').replace('http://', '')
 }
 
+def resolveInternalStorageUrl(String doorwayHost) {
+    // elohim-storage runs on the edgenode service (port 8090), not doorway
+    if (doorwayHost.contains('alpha.elohim.host')) {
+        return 'elohim-edgenode-alpha.elohim-alpha.svc.cluster.local:8090'
+    } else if (doorwayHost.contains('staging.elohim.host')) {
+        return 'elohim-edgenode-staging.elohim-staging.svc.cluster.local:8090'
+    } else if (doorwayHost.contains('elohim.host') && !doorwayHost.contains('alpha') && !doorwayHost.contains('staging')) {
+        return 'elohim-edgenode-prod.elohim-prod.svc.cluster.local:8090'
+    }
+    // Fallback: swap doorway→edgenode and port
+    return doorwayHost.replace('https://', '').replace('http://', '').replace('doorway', 'edgenode').replaceAll(':\\d+', ':8090')
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -183,10 +196,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         env.RESOLVED_DOORWAY_HOST = doorwayHost
                         env.INTERNAL_DOORWAY_URL = internalDoorway
+                        env.INTERNAL_STORAGE_URL = resolveInternalStorageUrl(doorwayHost)
 
                         echo "✅ Target host: ${targetHost}"
                         echo "✅ Doorway API (external): ${doorwayHost}"
                         echo "✅ Doorway API (internal): ${internalDoorway}"
+                        echo "✅ Storage API (internal): ${env.INTERNAL_STORAGE_URL}"
                     }
                 }
             }
@@ -351,10 +366,10 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 exit 1
                             fi
 
-                            # Verify SQLite database is available on storage port 8090
+                            # Verify SQLite database is available on elohim-storage (edgenode service)
                             echo ""
                             echo "🔍 Checking SQLite database availability..."
-                            STORAGE_URL="\${DOORWAY_BASE_URL/8080/8090}"
+                            STORAGE_URL="http://${env.INTERNAL_STORAGE_URL}"
                             DB_STATS=\$(curl -sf "\$STORAGE_URL/db/stats" 2>/dev/null || echo '{}')
                             DB_READY=\$(echo "\$DB_STATS" | jq -r 'has("content_count")' 2>/dev/null || echo 'false')
 
@@ -381,9 +396,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        def internalDoorway = env.INTERNAL_DOORWAY_URL
-                        // Storage runs on port 8090 in the same pod
-                        def internalStorage = internalDoorway.replace(':8080', ':8090')
+                        def internalStorage = env.INTERNAL_STORAGE_URL
                         def seedIds = params.SEED_IDS
 
                         dir('genesis/seeder') {
@@ -419,8 +432,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        def internalDoorway = env.INTERNAL_DOORWAY_URL
-                        def internalStorage = internalDoorway.replace(':8080', ':8090')
+                        def internalStorage = env.INTERNAL_STORAGE_URL
 
                         sh """#!/bin/bash
                             set -euo pipefail
