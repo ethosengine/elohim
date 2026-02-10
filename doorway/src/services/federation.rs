@@ -530,6 +530,154 @@ pub async fn get_all_doorways(
     }
 }
 
+// =============================================================================
+// Peer Discovery (HTTP-based federation)
+// =============================================================================
+
+/// Cached peer doorway info from HTTP federation queries
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerDoorway {
+    pub id: String,
+    pub url: String,
+    pub region: Option<String>,
+    pub capabilities: Vec<String>,
+    pub source_peer: String,
+}
+
+/// Shared cache of known peer doorways, refreshed periodically
+pub type PeerCache = Arc<tokio::sync::RwLock<Vec<PeerDoorway>>>;
+
+/// Create a new empty peer cache
+pub fn new_peer_cache() -> PeerCache {
+    Arc::new(tokio::sync::RwLock::new(Vec::new()))
+}
+
+/// Fetch federation info from a single peer doorway.
+/// Queries `{peer_url}/api/v1/federation/doorways` and returns parsed doorways.
+async fn fetch_single_peer(
+    client: &reqwest::Client,
+    peer_url: &str,
+) -> Vec<PeerDoorway> {
+    let url = format!("{}/api/v1/federation/doorways", peer_url.trim_end_matches('/'));
+
+    match client.get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            // Parse the FederationDoorwaysResponse shape
+            #[derive(Deserialize)]
+            struct PeerResponse {
+                doorways: Vec<PeerEntry>,
+            }
+            #[derive(Deserialize)]
+            struct PeerEntry {
+                id: String,
+                url: String,
+                region: Option<String>,
+                capabilities: Vec<String>,
+                #[allow(dead_code)]
+                status: Option<String>,
+            }
+
+            match resp.json::<PeerResponse>().await {
+                Ok(parsed) => {
+                    parsed.doorways.into_iter().map(|d| PeerDoorway {
+                        id: d.id,
+                        url: d.url,
+                        region: d.region,
+                        capabilities: d.capabilities,
+                        source_peer: peer_url.to_string(),
+                    }).collect()
+                }
+                Err(e) => {
+                    warn!(peer = %peer_url, error = %e, "Failed to parse peer federation response");
+                    Vec::new()
+                }
+            }
+        }
+        Ok(resp) => {
+            debug!(peer = %peer_url, status = %resp.status(), "Peer federation query returned non-success");
+            Vec::new()
+        }
+        Err(e) => {
+            debug!(peer = %peer_url, error = %e, "Failed to reach peer doorway");
+            Vec::new()
+        }
+    }
+}
+
+/// Refresh the peer cache by querying all configured peers.
+/// Deduplicates by doorway id — if multiple peers report the same doorway,
+/// the first occurrence wins.
+pub async fn refresh_peer_cache(
+    peer_urls: &[String],
+    self_id: Option<&str>,
+    cache: &PeerCache,
+) {
+    if peer_urls.is_empty() {
+        return;
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_default();
+
+    let mut all_peers = Vec::new();
+    let mut seen_ids = std::collections::HashSet::new();
+
+    // Exclude self from results
+    if let Some(id) = self_id {
+        seen_ids.insert(id.to_string());
+    }
+
+    for peer_url in peer_urls {
+        let discovered = fetch_single_peer(&client, peer_url).await;
+        for peer in discovered {
+            if seen_ids.insert(peer.id.clone()) {
+                all_peers.push(peer);
+            }
+        }
+    }
+
+    let count = all_peers.len();
+    {
+        let mut cache_write = cache.write().await;
+        *cache_write = all_peers;
+    }
+
+    if count > 0 {
+        info!(
+            peers = count,
+            sources = peer_urls.len(),
+            "Federation peer cache refreshed"
+        );
+    }
+}
+
+/// Spawn a background task that periodically refreshes the peer cache.
+/// Initial fetch happens after `initial_delay`, then every `interval`.
+pub fn spawn_peer_discovery_task(
+    peer_urls: Vec<String>,
+    self_id: Option<String>,
+    cache: PeerCache,
+    initial_delay: std::time::Duration,
+    interval: std::time::Duration,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        // Wait for startup to settle (peer doorways may still be booting)
+        tokio::time::sleep(initial_delay).await;
+
+        loop {
+            refresh_peer_cache(&peer_urls, self_id.as_deref(), &cache).await;
+            tokio::time::sleep(interval).await;
+        }
+    })
+}
+
+/// Get the current list of known peers from the cache
+pub async fn get_cached_peers(cache: &PeerCache) -> Vec<PeerDoorway> {
+    cache.read().await.clone()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

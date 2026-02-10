@@ -65,7 +65,7 @@ pub async fn handle_federation_doorways(state: Arc<AppState>) -> Response<Full<B
     let self_id = state.args.doorway_id.clone();
 
     // Try to query DHT if we have a ZomeCaller
-    let doorways = if let Some(ref zome_caller) = state.zome_caller {
+    let mut doorways = if let Some(ref zome_caller) = state.zome_caller {
         if let Some(config) = FederationConfig::from_args(&state.args) {
             match federation::get_all_doorways(zome_caller, &config).await {
                 Ok(infos) => infos.into_iter().map(|d| {
@@ -91,6 +91,22 @@ pub async fn handle_federation_doorways(state: Arc<AppState>) -> Response<Full<B
     } else {
         build_self_only_doorway(&state)
     };
+
+    // Merge in peer-discovered doorways from HTTP federation
+    let peer_doorways = crate::services::federation::get_cached_peers(&state.peer_cache).await;
+    let mut seen_ids: std::collections::HashSet<String> = doorways.iter().map(|d| d.id.clone()).collect();
+    for peer in peer_doorways {
+        if seen_ids.insert(peer.id.clone()) {
+            doorways.push(DoorwaySummary {
+                id: peer.id,
+                url: peer.url,
+                region: peer.region,
+                tier: "Federated".to_string(),
+                capabilities: peer.capabilities,
+                status: "online".to_string(),
+            });
+        }
+    }
 
     let total = doorways.len();
     let response = FederationDoorwaysResponse {

@@ -95,6 +95,8 @@ pub struct AppState {
     /// ZomeCaller for federation and service registration
     /// Shared by federation service, heartbeat task, and federation routes
     pub zome_caller: Option<Arc<crate::services::ZomeCaller>>,
+    /// Cache of peer doorways discovered via HTTP federation
+    pub peer_cache: crate::services::federation::PeerCache,
 }
 
 impl AppState {
@@ -153,6 +155,7 @@ impl AppState {
             conductor_router: None,
             node_verifying_key: None,
             zome_caller: None,
+            peer_cache: crate::services::federation::new_peer_cache(),
         }
     }
 
@@ -219,6 +222,7 @@ impl AppState {
             conductor_router: None,
             node_verifying_key: None,
             zome_caller: None,
+            peer_cache: crate::services::federation::new_peer_cache(),
         }
     }
 
@@ -292,6 +296,7 @@ impl AppState {
             conductor_router: None,
             node_verifying_key: None,
             zome_caller: None,
+            peer_cache: crate::services::federation::new_peer_cache(),
         }
     }
 
@@ -367,6 +372,7 @@ impl AppState {
             conductor_router: None,
             node_verifying_key: None,
             zome_caller: None,
+            peer_cache: crate::services::federation::new_peer_cache(),
         })
     }
 

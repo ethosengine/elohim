@@ -99,6 +99,8 @@ spec:
               value: "wss://signal.doorway-staging.elohim.host"
             - name: INSTALLED_APP_ID
               value: "elohim"
+            - name: FEDERATION_PEERS
+              value: "https://doorway-alpha.elohim.host,https://doorway.elohim.host"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:

@@ -439,6 +439,24 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Federation peer discovery (HTTP-based)
+    // Queries FEDERATION_PEERS URLs to discover other doorways in the network
+    if !args.federation_peers.is_empty() {
+        let peer_urls = args.federation_peers.clone();
+        let self_id = args.doorway_id.clone();
+        let cache = state.peer_cache.clone();
+        let peer_count = peer_urls.len();
+
+        services::federation::spawn_peer_discovery_task(
+            peer_urls,
+            self_id,
+            cache,
+            std::time::Duration::from_secs(10),  // initial delay (let peers boot)
+            std::time::Duration::from_secs(60),   // refresh interval
+        );
+        info!("Federation peer discovery started: {} peer(s) configured", peer_count);
+    }
+
     // Federation: register in DHT + start heartbeat task
     // Requires doorway_id + doorway_url to be configured
     if let Some(fed_config) = services::FederationConfig::from_args(&args) {

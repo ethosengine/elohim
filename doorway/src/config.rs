@@ -156,6 +156,12 @@ pub struct Args {
     #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
     pub orchestrator_admin_port: u16,
 
+    /// Comma-separated list of peer doorway URLs for federation discovery
+    /// Each peer is queried at startup and periodically for cross-doorway awareness
+    /// e.g. "https://doorway-staging.elohim.host,https://doorway.elohim.host"
+    #[arg(long, env = "FEDERATION_PEERS", value_delimiter = ',')]
+    pub federation_peers: Vec<String>,
+
     /// Bootstrap URL for P2P discovery (Holochain kitsune bootstrap)
     /// Returned in native-handoff response for Tauri clients to join network
     #[arg(long, env = "BOOTSTRAP_URL")]
