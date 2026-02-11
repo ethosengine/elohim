@@ -140,15 +140,20 @@ export class LoginComponent implements OnInit {
       !!doorwayUrl && !doorwayUrl.includes('localhost') && !doorwayUrl.includes('127.0.0.1');
     const hasSavedDoorway = this.hasDoorwaySelected();
 
-    if (isProductionLike || hasSavedDoorway) {
-      // Auto-redirect to OAuth (production environments, or returning dev user)
-      const targetUrl = hasSavedDoorway ? this.doorwayRegistry.selectedUrl()! : doorwayUrl!;
+    if (isProductionLike) {
+      // Production: environment doorwayUrl always wins (app is deployed FOR this doorway)
       this.currentStep.set('redirecting');
-      if (!hasSavedDoorway) {
-        this.doorwayRegistry.selectDoorwayByUrl(targetUrl);
-      }
+      this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
       const callbackUrl = `${globalThis.location.origin}/auth/callback`;
-      this.oauthProvider.initiateLogin(targetUrl, callbackUrl);
+      this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl);
+      return;
+    }
+
+    if (hasSavedDoorway) {
+      // Returning dev user: use their saved doorway
+      this.currentStep.set('redirecting');
+      const callbackUrl = `${globalThis.location.origin}/auth/callback`;
+      this.oauthProvider.initiateLogin(this.doorwayRegistry.selectedUrl()!, callbackUrl);
       return;
     }
 
