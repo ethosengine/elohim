@@ -43,17 +43,17 @@ interface OAuthState {
   timestamp: number;
 }
 
-/** Response from POST /auth/token */
+/** Response from POST /auth/token (snake_case per OAuth 2.0 + doorway extensions) */
 interface OAuthTokenResponse {
-  accessToken: string;
-  tokenType: string;
-  expiresIn: number;
-  refreshToken?: string;
-  humanId: string;
-  agentPubKey: string;
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token?: string;
+  human_id: string;
+  agent_pub_key: string;
   identifier: string;
-  doorwayId?: string;
-  doorwayUrl?: string;
+  doorway_id?: string;
+  doorway_url?: string;
 }
 
 /** Error response from OAuth endpoints */
@@ -233,13 +233,13 @@ export class OAuthAuthProvider implements AuthProvider {
       );
 
       // Calculate expiry time
-      const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
+      const expiresAt = new Date(Date.now() + response.expires_in * 1000);
 
       return {
         success: true,
-        token: response.accessToken,
-        humanId: response.humanId,
-        agentPubKey: response.agentPubKey,
+        token: response.access_token,
+        humanId: response.human_id,
+        agentPubKey: response.agent_pub_key,
         expiresAt: expiresAt.toISOString(),
         identifier: response.identifier,
       };
@@ -289,13 +289,13 @@ export class OAuthAuthProvider implements AuthProvider {
         )
       );
 
-      const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
+      const expiresAt = new Date(Date.now() + response.expires_in * 1000);
 
       return {
         success: true,
-        token: response.accessToken,
-        humanId: response.humanId,
-        agentPubKey: response.agentPubKey,
+        token: response.access_token,
+        humanId: response.human_id,
+        agentPubKey: response.agent_pub_key,
         expiresAt: expiresAt.toISOString(),
         identifier: response.identifier,
       };

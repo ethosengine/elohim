@@ -128,11 +128,11 @@ describe('OAuthAuthProvider', () => {
 
   describe('handleCallback', () => {
     const mockTokenResponse = {
-      accessToken: 'access-token-123',
-      tokenType: 'Bearer',
-      expiresIn: 3600,
-      humanId: 'human-123',
-      agentPubKey: 'agent-pub-key-123',
+      access_token: 'access-token-123',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      human_id: 'human-123',
+      agent_pub_key: 'agent-pub-key-123',
       identifier: 'user@example.com',
     };
 
@@ -307,11 +307,11 @@ describe('OAuthAuthProvider', () => {
       };
 
       const mockTokenResponse = {
-        accessToken: 'access-token-123',
-        tokenType: 'Bearer',
-        expiresIn: 3600,
-        humanId: 'human-123',
-        agentPubKey: 'agent-pub-key-123',
+        access_token: 'access-token-123',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        human_id: 'human-123',
+        agent_pub_key: 'agent-pub-key-123',
         identifier: 'user@example.com',
       };
 
@@ -351,11 +351,11 @@ describe('OAuthAuthProvider', () => {
   describe('refreshToken', () => {
     it('should call doorway refresh endpoint', async () => {
       const mockRefreshResponse = {
-        accessToken: 'refreshed-token-456',
-        tokenType: 'Bearer',
-        expiresIn: 3600,
-        humanId: 'human-123',
-        agentPubKey: 'agent-pub-key-123',
+        access_token: 'refreshed-token-456',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        human_id: 'human-123',
+        agent_pub_key: 'agent-pub-key-123',
         identifier: 'user@example.com',
       };
 
