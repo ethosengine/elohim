@@ -261,6 +261,32 @@ export class DoorwayRegistryService {
   }
 
   /**
+   * Select a doorway by URL (for auto-selection in hosted contexts).
+   * Finds the doorway in known list or creates a minimal entry.
+   */
+  selectDoorwayByUrl(url: string): void {
+    if (this.selectedUrl() === url) return;
+
+    const known = this.doorwaysSignal().find(d => d.url === url);
+    if (known) {
+      this.selectDoorway(known, false);
+    } else {
+      const doorway: DoorwayInfo = {
+        id: url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/g, '-'),
+        name: new URL(url).hostname,
+        url,
+        description: '',
+        region: 'global',
+        operator: '',
+        features: [],
+        status: 'unknown',
+        registrationOpen: true,
+      };
+      this.selectDoorway(doorway, false);
+    }
+  }
+
+  /**
    * Clear current selection.
    */
   clearSelection(): void {

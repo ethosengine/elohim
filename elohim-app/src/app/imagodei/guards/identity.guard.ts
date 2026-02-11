@@ -19,13 +19,13 @@ import { isNetworkMode } from '../models/identity.model';
 import { IdentityService } from '../services/identity.service';
 import { SessionHumanService } from '../services/session-human.service';
 
-/** Registration route for unauthenticated users */
-const REGISTER_ROUTE = '/identity/register';
+/** Login route for unauthenticated users */
+const LOGIN_ROUTE = '/identity/login';
 
 /**
  * Guard that requires network authentication.
  *
- * Redirects to /register if not authenticated via network.
+ * Redirects to /login if not authenticated via network.
  * Passes return URL as query parameter for post-auth redirect.
  */
 // eslint-disable-next-line sonarjs/function-return-type
@@ -39,8 +39,8 @@ export const identityGuard: CanActivateFn = (route, state): boolean | UrlTree =>
     return true;
   }
 
-  // Redirect to register with return URL
-  return router.createUrlTree([REGISTER_ROUTE], {
+  // Redirect to login with return URL
+  return router.createUrlTree([LOGIN_ROUTE], {
     queryParams: { returnUrl: state.url },
   });
 };
@@ -68,8 +68,8 @@ export const sessionOrAuthGuard: CanActivateFn = (): boolean | UrlTree => {
     return true;
   }
 
-  // Neither - redirect to register
-  return router.createUrlTree([REGISTER_ROUTE]);
+  // Neither - redirect to login
+  return router.createUrlTree([LOGIN_ROUTE]);
 };
 
 /**
@@ -91,7 +91,7 @@ export function attestationGuard(requiredAttestation: string): CanActivateFn {
     // Must be network authenticated (hosted or steward)
     const mode = identityService.mode();
     if (!isNetworkMode(mode) || !identityService.isAuthenticated()) {
-      return router.createUrlTree([REGISTER_ROUTE], {
+      return router.createUrlTree([LOGIN_ROUTE], {
         queryParams: { returnUrl: state.url },
       });
     }

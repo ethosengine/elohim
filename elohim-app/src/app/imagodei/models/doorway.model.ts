@@ -290,6 +290,50 @@ export function getFeatureDisplay(feature: DoorwayFeature): { label: string; ico
 }
 
 /**
+ * Parse a federated identifier (user@gateway.host) into parts.
+ */
+export function parseFederatedIdentifier(identifier: string): {
+  username: string;
+  gatewayDomain: string;
+} | null {
+  const trimmed = identifier.trim().replace(/^@/, '');
+  const atIndex = trimmed.lastIndexOf('@');
+  if (atIndex <= 0 || atIndex === trimmed.length - 1) return null;
+  return {
+    username: trimmed.substring(0, atIndex),
+    gatewayDomain: trimmed.substring(atIndex + 1),
+  };
+}
+
+/**
+ * Resolve a gateway domain to a doorway URL.
+ *
+ * Strategy:
+ * 1. Check BOOTSTRAP_DOORWAYS for matching URL
+ * 2. Convention: domain -> https://doorway-{subdomain}.{rest}
+ * 3. Fallback: try https://{domain} directly
+ */
+export function resolveGatewayToDoorwayUrl(
+  gatewayDomain: string,
+  knownDoorways: DoorwayInfo[] = BOOTSTRAP_DOORWAYS
+): string {
+  // 1. Check known doorways (match by URL containing the domain)
+  const known = knownDoorways.find(
+    d => d.url.includes(gatewayDomain) || d.url.includes(`doorway-${gatewayDomain.split('.')[0]}`)
+  );
+  if (known) return known.url;
+
+  // 2. Convention: alpha.elohim.host -> doorway-alpha.elohim.host
+  const parts = gatewayDomain.split('.');
+  if (parts.length >= 3 && !parts[0].startsWith('doorway-')) {
+    return `https://doorway-${gatewayDomain}`;
+  }
+
+  // 3. Fallback: use domain directly (it might BE the doorway)
+  return `https://${gatewayDomain}`;
+}
+
+/**
  * Sort doorways by relevance.
  * Prioritizes: online status, registration open, vouch count.
  */

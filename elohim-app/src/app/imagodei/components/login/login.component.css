@@ -335,6 +335,52 @@
   text-decoration: underline;
 }
 
+/* Federated Login */
+.federated-login {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface-card, #fff);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 30%);
+  padding: 2rem;
+}
+
+/* Link Button (styled as inline text link) */
+.link-button {
+  background: none;
+  border: none;
+  color: var(--primary-500, #3b82f6);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 0;
+  text-decoration: none;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+/* Redirecting State */
+.redirecting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  color: white;
+}
+
+.redirecting p {
+  font-size: 1.1rem;
+  opacity: 80%;
+}
+
+.spinner-large {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+}
+
 /* Responsive */
 @media (width <= 480px) {
   .login-container {

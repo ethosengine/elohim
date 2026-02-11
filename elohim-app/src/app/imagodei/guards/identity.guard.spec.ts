@@ -86,7 +86,7 @@ describe('Identity Guards', () => {
       );
 
       expect(result).toBe(mockUrlTree);
-      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/register'], {
+      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login'], {
         queryParams: { returnUrl: '/protected/resource' },
       });
     });
@@ -175,7 +175,7 @@ describe('Identity Guards', () => {
       );
 
       expect(result).toBe(mockUrlTree);
-      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/register']);
+      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login']);
     });
 
     it('should prefer network auth over session', () => {
@@ -227,7 +227,7 @@ describe('Identity Guards', () => {
       );
 
       expect(result).toBe(mockUrlTree);
-      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/register'], {
+      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login'], {
         queryParams: { returnUrl: '/protected/resource' },
       });
     });
@@ -376,7 +376,7 @@ describe('Identity Guards', () => {
         identityGuard(mockRoute, mockState2)
       );
 
-      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/register'], {
+      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login'], {
         queryParams: { returnUrl: '/deeply/nested/protected/resource?foo=bar' },
       });
     });

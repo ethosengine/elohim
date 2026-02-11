@@ -106,7 +106,7 @@ export class OAuthAuthProvider implements AuthProvider {
    * @param doorwayUrl - URL of the doorway to authenticate with
    * @param returnUrl - URL to redirect back to after auth (default: current page)
    */
-  initiateLogin(doorwayUrl: string, returnUrl?: string): void {
+  initiateLogin(doorwayUrl: string, returnUrl?: string, loginHint?: string): void {
     const state = this.generateState();
     const redirectUri = returnUrl ?? `${globalThis.location.origin}/auth/callback`;
 
@@ -126,6 +126,10 @@ export class OAuthAuthProvider implements AuthProvider {
       response_type: 'code',
       state,
     });
+
+    if (loginHint) {
+      params.set('login_hint', loginHint);
+    }
 
     const authorizeUrl = `${doorwayUrl}/auth/authorize?${params.toString()}`;
 

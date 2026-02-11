@@ -14,6 +14,84 @@
     />
   }
 
+  <!-- Federated Identifier Input (dev browser, first-time) -->
+  @if (currentStep() === 'federated') {
+    <div class="federated-login">
+      <div class="login-header">
+        <h1>Sign In</h1>
+        <p class="subtitle">Enter your Elohim identity to sign in via your doorway</p>
+      </div>
+
+      @if (error()) {
+        <div class="error-banner" role="alert">
+          <span class="error-icon" aria-hidden="true">&#x2715;</span>
+          <span>{{ error() }}</span>
+          <button
+            type="button"
+            class="error-dismiss"
+            aria-label="Dismiss error"
+            (click)="clearError()"
+          >
+            Dismiss
+          </button>
+        </div>
+      }
+
+      <form class="login-form" (ngSubmit)="onFederatedLogin()">
+        <div class="form-group">
+          <label for="federatedId">Your identity</label>
+          <input
+            id="federatedId"
+            type="text"
+            [(ngModel)]="federatedIdentifier"
+            name="federatedId"
+            placeholder="you@your-doorway.host"
+            autocomplete="username"
+            [disabled]="isLoading()"
+          />
+        </div>
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="isLoading() || !federatedIdentifier.trim()"
+          >
+            @if (isLoading()) {
+              <span class="spinner"></span>
+              Connecting...
+            } @else {
+              Continue
+            }
+          </button>
+        </div>
+      </form>
+
+      <div class="login-footer">
+        <p class="register-prompt">
+          Don't have an account?
+          <a
+            routerLink="/identity/register"
+            [queryParams]="{ returnUrl: returnUrl }"
+            class="register-link"
+          >
+            Create one
+          </a>
+        </p>
+        <button type="button" class="link-button" (click)="showDoorwayBrowser()">
+          Browse doorways
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Redirecting to doorway OAuth -->
+  @if (currentStep() === 'redirecting') {
+    <div class="redirecting">
+      <div class="spinner spinner-large"></div>
+      <p>Redirecting to your doorway...</p>
+    </div>
+  }
+
   <!-- Step 2: Credentials -->
   @if (currentStep() === 'credentials') {
     <div class="login-card">

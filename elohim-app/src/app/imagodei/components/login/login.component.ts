@@ -18,17 +18,23 @@ import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-05)
 
+import { environment } from '../../../../environments/environment';
 import { type PasswordCredentials, AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
-import { type DoorwayInfo } from '../../models/doorway.model';
+import {
+  type DoorwayInfo,
+  parseFederatedIdentifier,
+  resolveGatewayToDoorwayUrl,
+} from '../../models/doorway.model';
 import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
+import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { TauriAuthService } from '../../services/tauri-auth.service';
 import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 
 /** Login step type */
-type LoginStep = 'doorway' | 'credentials';
+type LoginStep = 'doorway' | 'credentials' | 'federated' | 'redirecting';
 
 @Component({
   selector: 'app-login',
@@ -40,6 +46,7 @@ type LoginStep = 'doorway' | 'credentials';
 export class LoginComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly passwordProvider = inject(PasswordAuthProvider);
+  private readonly oauthProvider = inject(OAuthAuthProvider);
   private readonly identityService = inject(IdentityService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly tauriAuth = inject(TauriAuthService);
@@ -56,6 +63,9 @@ export class LoginComponent implements OnInit {
     rememberMe: true,
   };
 
+  /** Federated identifier input (user@gateway.host) */
+  federatedIdentifier = '';
+
   // ==========================================================================
   // Component State
   // ==========================================================================
@@ -71,7 +81,7 @@ export class LoginComponent implements OnInit {
   readonly isLauncher = signal(false);
 
   /** Return URL after successful login */
-  private returnUrl = '/';
+  returnUrl = '/';
 
   // ==========================================================================
   // Doorway State
@@ -101,26 +111,49 @@ export class LoginComponent implements OnInit {
       }
     });
 
-    // Also activate launcher mode when Tauri has no doorway selected
-    if (this.tauriAuth.isTauri() && !this.doorwayRegistry.hasSelection()) {
-      this.isLauncher.set(true);
-    }
-
     // Pre-fill identifier if remembered
     const storedIdentifier = localStorage.getItem(AUTH_IDENTIFIER_KEY);
     if (storedIdentifier) {
       this.form.identifier = storedIdentifier;
     }
 
-    // Skip doorway selection if already chosen
-    if (this.hasDoorwaySelected()) {
-      this.currentStep.set('credentials');
-    }
-
-    // Check if already authenticated - redirect if so
+    // Already authenticated -> redirect
     if (this.authService.isAuthenticated()) {
       void this.router.navigate([this.returnUrl]);
+      return;
     }
+
+    // === Context routing ===
+
+    // Tauri -> existing behavior (doorway picker for bootstrap)
+    if (this.tauriAuth.isTauri()) {
+      if (!this.doorwayRegistry.hasSelection()) {
+        this.isLauncher.set(true);
+      }
+      this.currentStep.set(this.hasDoorwaySelected() ? 'credentials' : 'doorway');
+      return;
+    }
+
+    // Browser: determine auto-redirect vs manual
+    const doorwayUrl = environment.client?.doorwayUrl;
+    const isProductionLike =
+      !!doorwayUrl && !doorwayUrl.includes('localhost') && !doorwayUrl.includes('127.0.0.1');
+    const hasSavedDoorway = this.hasDoorwaySelected();
+
+    if (isProductionLike || hasSavedDoorway) {
+      // Auto-redirect to OAuth (production environments, or returning dev user)
+      const targetUrl = hasSavedDoorway ? this.doorwayRegistry.selectedUrl()! : doorwayUrl!;
+      this.currentStep.set('redirecting');
+      if (!hasSavedDoorway) {
+        this.doorwayRegistry.selectDoorwayByUrl(targetUrl);
+      }
+      const callbackUrl = `${globalThis.location.origin}/auth/callback`;
+      this.oauthProvider.initiateLogin(targetUrl, callbackUrl);
+      return;
+    }
+
+    // Dev/generic browser, no saved doorway -> federated identifier input
+    this.currentStep.set('federated');
   }
 
   // ==========================================================================
@@ -227,6 +260,36 @@ export class LoginComponent implements OnInit {
    * Go back to doorway selection.
    */
   goBackToDoorway(): void {
+    this.currentStep.set('doorway');
+  }
+
+  /**
+   * Handle federated login (user@gateway.host).
+   * Parses the identifier, resolves the gateway, and initiates OAuth.
+   */
+  onFederatedLogin(): void {
+    this.error.set(null);
+
+    const parsed = parseFederatedIdentifier(this.federatedIdentifier);
+    if (!parsed) {
+      this.error.set('Please enter a valid identity (e.g. you@your-doorway.host)');
+      return;
+    }
+
+    this.isLoading.set(true);
+
+    const doorwayUrl = resolveGatewayToDoorwayUrl(parsed.gatewayDomain);
+    this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
+
+    this.currentStep.set('redirecting');
+    const callbackUrl = `${globalThis.location.origin}/auth/callback`;
+    this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl, parsed.username);
+  }
+
+  /**
+   * Switch to doorway browser/picker view.
+   */
+  showDoorwayBrowser(): void {
     this.currentStep.set('doorway');
   }
 }
