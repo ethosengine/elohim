@@ -63,7 +63,7 @@ type RegisterState =
       <div class="register-card">
         <!-- Doorway branding -->
         <div class="branding">
-          <img src="/assets/elohim-logo.svg" alt="Elohim" class="logo" />
+          <img src="/threshold/images/elohim_logo_light.png" alt="Elohim" class="logo" />
           <h1>Create Account</h1>
           <p class="doorway-name">{{ doorwayName() }}</p>
         </div>
@@ -102,15 +102,20 @@ type RegisterState =
 
             <div class="form-group">
               <label for="email">Email</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                [(ngModel)]="form.email"
-                required
-                autocomplete="email"
-                placeholder="you@example.com"
-              />
+              <div class="identifier-wrapper">
+                <input
+                  type="text"
+                  id="email"
+                  name="email"
+                  [(ngModel)]="form.email"
+                  required
+                  autocomplete="email"
+                  placeholder="username"
+                  class="identifier-input"
+                />
+                <span class="domain-suffix">&#64;{{ gatewayDomain() }}</span>
+              </div>
+              <p class="input-hint">Or use your full email address</p>
             </div>
 
             <div class="form-group">
@@ -150,6 +155,15 @@ type RegisterState =
             >
               Create Account
             </button>
+
+            @if (oauthParams()) {
+              <div class="federated-section">
+                <div class="divider"><span>or</span></div>
+                <a [href]="federatedRegisterUrl()" class="federated-link">
+                  Register with a different doorway
+                </a>
+              </div>
+            }
           </form>
         }
 
@@ -404,6 +418,88 @@ type RegisterState =
       .footer a:hover {
         text-decoration: underline;
       }
+
+      .identifier-wrapper {
+        display: flex;
+        align-items: center;
+        background: #0f172a;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.5rem;
+        transition: border-color 0.2s;
+      }
+
+      .identifier-wrapper:focus-within {
+        border-color: #6366f1;
+      }
+
+      .identifier-input {
+        flex: 1;
+        border: none !important;
+        background: transparent !important;
+        border-radius: 0.5rem 0 0 0.5rem;
+        min-width: 0;
+      }
+
+      .identifier-input:focus {
+        border-color: transparent !important;
+      }
+
+      .domain-suffix {
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 0.875rem;
+        padding: 0 0.75rem;
+        white-space: nowrap;
+        user-select: none;
+      }
+
+      .input-hint {
+        color: rgba(255, 255, 255, 0.35);
+        font-size: 0.75rem;
+        margin: 0;
+      }
+
+      .federated-section {
+        margin-top: 1rem;
+      }
+
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .divider::before,
+      .divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .divider span {
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .federated-link {
+        display: block;
+        text-align: center;
+        color: #818cf8;
+        text-decoration: none;
+        font-size: 0.875rem;
+        padding: 0.625rem 1rem;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        border-radius: 0.5rem;
+        transition: background 0.2s, border-color 0.2s;
+      }
+
+      .federated-link:hover {
+        background: rgba(99, 102, 241, 0.1);
+        border-color: rgba(99, 102, 241, 0.5);
+      }
     `,
   ],
 })
@@ -427,8 +523,13 @@ export class ThresholdRegisterComponent implements OnInit {
 
   // Computed values
   readonly doorwayName = computed(() => {
-    // Get doorway name from window location
     return window.location.hostname;
+  });
+
+  readonly gatewayDomain = computed(() => {
+    const hostname = window.location.hostname;
+    // doorway-alpha.elohim.host --> alpha.elohim.host
+    return hostname.startsWith('doorway-') ? hostname.replace(/^doorway-/, '') : hostname;
   });
 
   readonly clientDisplayName = computed(() => {
@@ -460,6 +561,23 @@ export class ThresholdRegisterComponent implements OnInit {
       return `/threshold/login?${searchParams.toString()}`;
     }
     return '/threshold/login';
+  });
+
+  readonly federatedRegisterUrl = computed(() => {
+    const params = this.oauthParams();
+    if (params) {
+      const searchParams = new URLSearchParams({
+        client_id: params.clientId,
+        redirect_uri: params.redirectUri,
+        response_type: params.responseType,
+        state: params.state,
+      });
+      if (params.scope) {
+        searchParams.set('scope', params.scope);
+      }
+      return `/threshold/doorways?${searchParams.toString()}`;
+    }
+    return '/threshold/doorways';
   });
 
   ngOnInit(): void {

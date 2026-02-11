@@ -159,6 +159,8 @@ pub struct OAuthAuthorizeRequest {
     pub state: String,
     #[serde(default)]
     pub scope: Option<String>,
+    #[serde(default)]
+    pub login_hint: Option<String>,
 }
 
 /// OAuth token exchange request body.
@@ -2519,15 +2521,19 @@ async fn handle_authorize(
 
     // User not authenticated - redirect to login page with OAuth params
     // The login page will handle authentication and then call /auth/authorize again
+    let mut login_params = vec![
+        ("client_id", params.client_id.as_str()),
+        ("redirect_uri", params.redirect_uri.as_str()),
+        ("response_type", params.response_type.as_str()),
+        ("state", params.state.as_str()),
+        ("scope", params.scope.as_deref().unwrap_or("")),
+    ];
+    if let Some(ref hint) = params.login_hint {
+        login_params.push(("login_hint", hint.as_str()));
+    }
     let login_url = format!(
         "/threshold/login?{}",
-        serde_urlencoded::to_string(&[
-            ("client_id", params.client_id.as_str()),
-            ("redirect_uri", params.redirect_uri.as_str()),
-            ("response_type", params.response_type.as_str()),
-            ("state", params.state.as_str()),
-            ("scope", params.scope.as_deref().unwrap_or("")),
-        ]).unwrap_or_default()
+        serde_urlencoded::to_string(&login_params).unwrap_or_default()
     );
 
     info!("OAuth authorize: redirecting to login page");

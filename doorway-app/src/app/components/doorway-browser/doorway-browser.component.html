@@ -1,0 +1,112 @@
+<div class="browser-container">
+  <div class="browser-content">
+    <!-- Header -->
+    <div class="header">
+      <img src="/threshold/images/elohim_logo_light.png" alt="Elohim" class="logo" />
+      <h1>Select a Doorway</h1>
+      <p class="subtitle">Choose a doorway to authenticate with</p>
+    </div>
+
+    <!-- Error -->
+    @if (error()) {
+      <div class="error-banner">
+        <span>{{ error() }}</span>
+        <button class="btn-secondary" (click)="retry()">Retry</button>
+      </div>
+    }
+
+    <!-- Loading -->
+    @if (loading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Discovering doorways...</p>
+      </div>
+    }
+
+    <!-- Filters -->
+    @if (!loading() && doorways().length > 0) {
+      <div class="filters">
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Search doorways..."
+          [(ngModel)]="searchQuery"
+          (input)="applySearch()"
+        />
+        @if (regions().length > 1) {
+          <select
+            class="region-select"
+            [(ngModel)]="regionFilter"
+            (change)="applyRegionFilter()"
+          >
+            <option value="">All regions</option>
+            @for (region of regions(); track region) {
+              <option [value]="region">{{ region }}</option>
+            }
+          </select>
+        }
+      </div>
+    }
+
+    <!-- Doorway Grid -->
+    @if (!loading() && filteredDoorways().length > 0) {
+      <div class="doorway-grid">
+        @for (doorway of filteredDoorways(); track doorway.id) {
+          <button
+            class="doorway-card"
+            [class.current]="isSelf(doorway)"
+            [class.unreachable]="!doorway.isReachable && doorway.latencyMs === null && !loading()"
+            (click)="selectDoorway(doorway)"
+          >
+            <!-- Status indicator -->
+            <div class="card-header">
+              <span
+                class="status-dot"
+                [class.online]="doorway.isReachable"
+                [class.checking]="doorway.latencyMs === null && !doorway.isReachable"
+              ></span>
+              @if (isSelf(doorway)) {
+                <span class="current-badge">Current</span>
+              }
+            </div>
+
+            <!-- Doorway info -->
+            <div class="card-body">
+              <h3 class="doorway-id">{{ doorway.id }}</h3>
+              <p class="doorway-url">{{ doorway.url }}</p>
+              @if (doorway.region) {
+                <p class="doorway-region">{{ doorway.region }}</p>
+              }
+            </div>
+
+            <!-- Footer -->
+            <div class="card-footer">
+              <span class="doorway-tier">{{ doorway.tier }}</span>
+              @if (doorway.isReachable && doorway.latencyMs !== null) {
+                <span class="doorway-latency">{{ doorway.latencyMs }}ms</span>
+              }
+            </div>
+          </button>
+        }
+      </div>
+    }
+
+    <!-- Empty state -->
+    @if (!loading() && !error() && filteredDoorways().length === 0 && doorways().length > 0) {
+      <div class="empty-state">
+        <p>No doorways match your search</p>
+      </div>
+    }
+
+    @if (!loading() && !error() && doorways().length === 0) {
+      <div class="empty-state">
+        <p>No federated doorways found</p>
+      </div>
+    }
+
+    <!-- Back link -->
+    <div class="footer">
+      <a [href]="loginUrl()" class="back-link">Back to login</a>
+    </div>
+  </div>
+</div>
