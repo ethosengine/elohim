@@ -180,8 +180,8 @@ export interface DoorwayCacheEntry {
  */
 export const BOOTSTRAP_DOORWAYS: DoorwayInfo[] = [
   {
-    id: 'doorway-dev-elohim-host',
-    name: 'Dev Gateway',
+    id: 'doorway-alpha-elohim-host',
+    name: 'Alpha Gateway',
     url: 'https://doorway-alpha.elohim.host',
     description:
       'Development doorway operated by Matthew Dowell @ Ethos Engine. For alpha/dev testing.',

@@ -11,7 +11,7 @@ export const environment: Environment = {
   environment: 'alpha',
   gitHash: 'GIT_HASH_PLACEHOLDER',
   // Holochain Edge Node configuration (legacy - used by HolochainClientService)
-  // Alpha and Staging share doorway-dev for pre-production testing
+  // Alpha environment uses doorway-alpha for pre-production testing
   holochain: {
     adminUrl: DOORWAY_ALPHA_WSS,
     appUrl: DOORWAY_ALPHA_WSS,
