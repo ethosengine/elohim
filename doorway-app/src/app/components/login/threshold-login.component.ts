@@ -609,29 +609,21 @@ export class ThresholdLoginComponent implements OnInit {
       authorizeUrl.searchParams.set('scope', params.scope);
     }
 
-    // Make request with auth token - this should redirect
-    // Use fetch to follow redirect
+    // Request authorization code. Backend returns JSON { redirect_uri }
+    // when it sees a Bearer token (SPA flow), avoiding cross-origin 302.
     const response = await fetch(authorizeUrl.toString(), {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
       },
-      redirect: 'follow',
     });
 
-    // If we get a 3xx redirect, follow it
-    if (response.redirected) {
-      window.location.href = response.url;
-    } else if (response.ok) {
-      // Check if response contains a redirect URL
-      try {
-        const data = await response.json();
-        if (data.redirect_uri) {
-          window.location.href = data.redirect_uri;
-        }
-      } catch {
-        // Not JSON, might be HTML - check for meta refresh or location header
-        this.error.set('Authorization completed but redirect failed');
+    if (response.ok) {
+      const data = await response.json();
+      if (data.redirect_uri) {
+        window.location.href = data.redirect_uri;
+      } else {
+        this.error.set('Authorization completed but no redirect received');
         this.state.set('error');
       }
     } else {

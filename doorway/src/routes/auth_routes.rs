@@ -2471,6 +2471,14 @@ async fn handle_authorize(
         );
     }
 
+    // Check if this is an AJAX/fetch request (Bearer token = SPA calling us)
+    // SPA fetch requests can't follow cross-origin redirects due to CORS,
+    // so we return JSON with the redirect URL instead of a 302.
+    let is_ajax = req.headers().get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.starts_with("Bearer "))
+        .unwrap_or(false);
+
     // Check if user is already authenticated (via cookie or header)
     let auth_header = get_auth_header(&req);
     let token = extract_token_from_header(auth_header);
@@ -2530,9 +2538,18 @@ async fn handle_authorize(
             );
 
             info!(
-                "OAuth authorize: redirecting {} to client with code",
+                "OAuth authorize: {} {} to client with code",
+                if is_ajax { "returning redirect_uri to" } else { "redirecting" },
                 claims.identifier
             );
+
+            // SPA fetch can't follow cross-origin 302s (CORS), so return JSON
+            if is_ajax {
+                return json_response(
+                    StatusCode::OK,
+                    &serde_json::json!({ "redirect_uri": redirect_url }),
+                );
+            }
 
             return Response::builder()
                 .status(StatusCode::FOUND)
