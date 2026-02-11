@@ -67,6 +67,10 @@ pub struct RegisterRequest {
     /// Optional location
     #[serde(default)]
     pub location: Option<String>,
+    /// Bootstrap key to grant Admin permission on registration.
+    /// Must match the API_KEY_ADMIN environment variable.
+    #[serde(default)]
+    pub admin_bootstrap_key: Option<String>,
 }
 
 fn default_profile_reach() -> String {
@@ -718,6 +722,7 @@ async fn handle_register(
             None, // No session_id for registration (key not activated yet)
             StatusCode::CREATED,
             profile,
+            PermissionLevel::Authenticated,
         );
     }
 
@@ -827,6 +832,21 @@ async fn handle_register(
         user.agent_pub_key = p.agent_pub_key.clone();
     }
 
+    // Check admin bootstrap key - promote to Admin if key matches API_KEY_ADMIN
+    if let Some(ref bootstrap_key) = body.admin_bootstrap_key {
+        if let Some(ref admin_key) = state.args.api_key_admin {
+            if !admin_key.is_empty() && bootstrap_key == admin_key {
+                user.permission_level = PermissionLevel::Admin;
+                info!("Admin bootstrap: promoting {} to Admin", body.identifier);
+            } else {
+                warn!("Admin bootstrap key mismatch for {}", body.identifier);
+            }
+        }
+    }
+
+    // Capture permission level before user is moved into insert
+    let user_permission_level = user.permission_level.clone();
+
     // Insert into MongoDB
     if let Err(e) = collection.insert_one(user).await {
         // Check for duplicate key error (race condition)
@@ -860,6 +880,7 @@ async fn handle_register(
         None, // No session_id for registration (key not activated yet)
         StatusCode::CREATED,
         profile,
+        user_permission_level,
     )
 }
 
@@ -916,6 +937,7 @@ async fn handle_login(
             Some(dev_session_id),
             StatusCode::OK,
             None,
+            PermissionLevel::Admin, // Dev mode gets admin access
         );
     }
 
@@ -1030,7 +1052,7 @@ async fn handle_login(
         }
     }
 
-    info!("Login successful: {}", body.identifier);
+    info!("Login successful: {} (permission: {:?})", body.identifier, user.permission_level);
 
     generate_auth_response(
         &jwt,
@@ -1041,6 +1063,7 @@ async fn handle_login(
         Some(session_id),
         StatusCode::OK,
         None,
+        user.permission_level,
     )
 }
 
@@ -1111,6 +1134,7 @@ async fn handle_refresh(
         old_claims.session_id, // Preserve session_id from old token
         StatusCode::OK,
         None,
+        old_claims.permission_level, // Preserve permission from old token
     )
 }
 
@@ -2893,6 +2917,7 @@ fn generate_auth_response(
     session_id: Option<String>,
     status: StatusCode,
     profile: Option<HumanProfileResponse>,
+    permission_level: PermissionLevel,
 ) -> Response<BoxBody> {
     // Get doorway identity from config
     let doorway_id = state.args.doorway_id.clone();
@@ -2902,7 +2927,7 @@ fn generate_auth_response(
         human_id: human_id.to_string(),
         agent_pub_key: agent_pub_key.to_string(),
         identifier: identifier.to_string(),
-        permission_level: PermissionLevel::Authenticated,
+        permission_level,
         session_id,
         doorway_id: doorway_id.clone(),
         doorway_url: doorway_url.clone(),
