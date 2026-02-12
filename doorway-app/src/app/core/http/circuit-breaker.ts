@@ -53,7 +53,6 @@ export class CircuitBreaker {
       if (timeSinceOpen >= this.config.resetTimeoutMs) {
         this.state = CircuitState.HALF_OPEN;
         this.lastStateChange = Date.now();
-        console.log(`[CircuitBreaker:${this.name}] HALF_OPEN - Testing service`);
       } else {
         const resetIn = this.config.resetTimeoutMs - timeSinceOpen;
         throw new CircuitBreakerOpenError(
@@ -85,7 +84,6 @@ export class CircuitBreaker {
         this.lastStateChange = Date.now();
         this.failures = [];
         this.consecutiveSuccesses = 0;
-        console.log(`[CircuitBreaker:${this.name}] CLOSED - Service recovered`);
       }
     } else {
       this.consecutiveSuccesses = 0;
@@ -147,6 +145,5 @@ export class CircuitBreaker {
     this.failures = [];
     this.consecutiveSuccesses = 0;
     this.lastStateChange = Date.now();
-    console.log(`[CircuitBreaker:${this.name}] Manually reset to CLOSED`);
   }
 }
