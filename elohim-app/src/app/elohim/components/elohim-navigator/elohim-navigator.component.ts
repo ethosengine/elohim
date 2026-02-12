@@ -181,6 +181,15 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
    */
   readonly identityMode = computed(() => this.identityService.mode());
 
+  /** Authenticated user's identifier (email) */
+  readonly authenticatedIdentifier = computed(() => this.authService.identifier());
+
+  /** Authenticated user's human ID */
+  readonly authenticatedHumanId = computed(() => this.identityService.humanId());
+
+  /** Doorway URL */
+  readonly doorwayUrl = computed(() => this.authService.doorwayUrl());
+
   ngOnInit(): void {
     // Start context detection to determine if operator mode is available
     this.runningContext.startPeriodicDetection();
@@ -494,6 +503,13 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   formatConnectedTime(date: Date | null): string {
     if (!date) return 'N/A';
     return date.toLocaleString();
+  }
+
+  /**
+   * Shorten a doorway URL for display (strip protocol, trailing slash)
+   */
+  shortenDoorwayUrl(url: string): string {
+    return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
   }
 
   /**

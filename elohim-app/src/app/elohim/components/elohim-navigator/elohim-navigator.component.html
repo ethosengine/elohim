@@ -119,6 +119,9 @@
             <div class="profile-avatar-large">{{ getInitials() }}</div>
             <div class="profile-info">
               <span class="profile-name">{{ authenticatedDisplayName() }}</span>
+              <span class="profile-identifier" *ngIf="authenticatedIdentifier()">
+                {{ authenticatedIdentifier() }}
+              </span>
               <span class="profile-stats">
                 {{ identityMode() === 'hosted' ? 'Hosted Identity' : 'Steward' }}
               </span>
@@ -126,6 +129,20 @@
           </div>
 
           <div class="scrollable-content-wrapper">
+            <!-- Connection Details -->
+            <div class="profile-connection-details" *ngIf="doorwayUrl() || authenticatedHumanId()">
+              <div class="connection-detail" *ngIf="doorwayUrl()">
+                <span class="detail-label">Doorway</span>
+                <span class="detail-value">{{ shortenDoorwayUrl(doorwayUrl()!) }}</span>
+              </div>
+              <div class="connection-detail" *ngIf="authenticatedHumanId()">
+                <span class="detail-label">Human ID</span>
+                <span class="detail-value monospace">
+                  {{ truncateHash(authenticatedHumanId()) }}
+                </span>
+              </div>
+            </div>
+
             <!-- Actions -->
             <div class="profile-actions">
               <button type="button" class="profile-action" (click)="goToProfile()" role="menuitem">

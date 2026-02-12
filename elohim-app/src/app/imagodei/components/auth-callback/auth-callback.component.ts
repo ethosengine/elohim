@@ -18,6 +18,7 @@ import { Router } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-05)
 
+import { SeoService } from '../../../services/seo.service';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 
@@ -200,6 +201,7 @@ export class AuthCallbackComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly oauthProvider = inject(OAuthAuthProvider);
   private readonly authService = inject(AuthService);
+  private readonly seoService = inject(SeoService);
 
   readonly status = signal<CallbackStatus>('processing');
   readonly errorMessage = signal<string>('');
@@ -243,6 +245,7 @@ export class AuthCallbackComponent implements OnInit {
         this.authService.setAuthFromResult(result);
 
         this.status.set('success');
+        this.seoService.setTitle('Welcome');
 
         // Redirect to lamad after brief delay for UX
         setTimeout(() => {

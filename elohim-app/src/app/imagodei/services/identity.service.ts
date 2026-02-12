@@ -355,6 +355,13 @@ export class IdentityService {
       if (isConnected && currentMode === 'session') {
         // Holochain just connected - check if we have an identity there
         void this.checkHolochainIdentity();
+      } else if (
+        isConnected &&
+        currentMode === 'hosted' &&
+        !untracked(() => this.identitySignal().profile)
+      ) {
+        // Holochain connected late - re-fetch profile from DHT
+        void this.retryHolochainProfileFetch();
       } else if (!isConnected && isNetworkMode(currentMode)) {
         // Holochain disconnected - fall back to session
         this.fallbackToSession();
@@ -1154,13 +1161,17 @@ export class IdentityService {
     // Generate DID for hosted identity
     const did = generateDID('hosted', humanId, agentPubKey, null);
 
+    // Use identifier (email) as display name, not humanId (UUID/pub key)
+    const identifier = this.authService.identifier();
+    const displayName = identifier ?? humanId;
+
     this.updateState({
       mode: 'hosted',
       isAuthenticated: true,
       humanId,
       agentPubKey,
       did,
-      displayName: humanId, // Use humanId as fallback display name
+      displayName,
       agencyStage: 'hosted',
       keyLocation: 'custodial',
       canExportKeys: true,
@@ -1170,6 +1181,28 @@ export class IdentityService {
       isLoading: false,
       error: null,
     });
+  }
+
+  /**
+   * Retry fetching the Holochain profile after late connection.
+   * Called when Holochain connects after setMinimalAuthenticatedState was used.
+   */
+  private async retryHolochainProfileFetch(): Promise<void> {
+    if (this.isCheckingIdentity) return;
+    this.isCheckingIdentity = true;
+    try {
+      const result = await this.fetchHolochainIdentity();
+      if (result.success && result.data) {
+        this.updateAuthenticatedIdentityState(result.data);
+      }
+    } catch (error) {
+      console.warn(
+        '[IdentityService] Retry profile fetch failed:',
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      this.isCheckingIdentity = false;
+    }
   }
 
   // ==========================================================================

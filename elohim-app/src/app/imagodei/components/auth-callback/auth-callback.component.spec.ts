@@ -8,6 +8,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 
 import { AuthCallbackComponent } from './auth-callback.component';
+import { SeoService } from '../../../services/seo.service';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 
@@ -16,6 +17,7 @@ describe('AuthCallbackComponent', () => {
   let fixture: ComponentFixture<AuthCallbackComponent>;
   let mockAuthService: jasmine.SpyObj<AuthService>;
   let mockOAuthProvider: jasmine.SpyObj<OAuthAuthProvider>;
+  let mockSeoService: jasmine.SpyObj<SeoService>;
   let mockRouter: jasmine.SpyObj<Router>;
   let originalLocation: Location;
 
@@ -32,6 +34,7 @@ describe('AuthCallbackComponent', () => {
       'clearCallbackParams',
     ]);
 
+    mockSeoService = jasmine.createSpyObj('SeoService', ['setTitle']);
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
 
     // Configure default mock returns
@@ -42,6 +45,7 @@ describe('AuthCallbackComponent', () => {
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: OAuthAuthProvider, useValue: mockOAuthProvider },
+        { provide: SeoService, useValue: mockSeoService },
         { provide: Router, useValue: mockRouter },
       ],
     }).compileComponents();

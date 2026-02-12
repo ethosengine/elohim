@@ -391,6 +391,49 @@
   color: var(--lamad-text-muted);
 }
 
+.profile-identifier {
+  font-size: 0.75rem;
+  color: var(--lamad-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+/* Connection Details */
+.profile-connection-details {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.connection-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+}
+
+.connection-detail .detail-label {
+  color: var(--lamad-text-muted);
+  font-size: 0.75rem;
+}
+
+.connection-detail .detail-value {
+  color: var(--lamad-text-secondary);
+  font-size: 0.75rem;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.connection-detail .detail-value.monospace {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+}
+
 /* Profile Actions */
 .profile-actions {
   padding: 0.5rem;
