@@ -263,7 +263,10 @@ async fn main() -> anyhow::Result<()> {
         let mut pools_created = 0usize;
         for (i, url) in conductor_urls.iter().enumerate() {
             let conductor_id = format!("conductor-{}", i);
-            let app_url = derive_app_url(url, args.app_port_min);
+            // Use URL as-is from CONDUCTOR_URLS — it already contains the correct port.
+            // derive_app_url would replace the port with app_port_min (4445), which breaks
+            // headless k8s services where the socat proxy listens on a different port (e.g. 8445).
+            let app_url = url.clone();
             match WorkerPool::new(PoolConfig {
                 worker_count: 2, // Per-conductor pools are smaller than the main pool
                 conductor_url: app_url.clone(),
