@@ -329,11 +329,60 @@ These tools continue to work alongside the team system:
 
 | Tool | Purpose | Usage |
 |------|---------|-------|
-| `extract-lint-issues.sh` | Regenerate manifest | Before campaigns, at checkpoints |
+| `extract-lint-issues.sh` | Regenerate manifest | Before campaigns, at checkpoints. Use `--project` for per-project extraction |
 | `generate-campaigns.py` | Group issues into campaigns | Phase 1 |
 | `lint-orchestrator.py` | Status tracking, escalation queries | `show-status`, `get-escalations` |
 | `pre-flight-check.py` | Build health validation | Phase 1 |
 | PostToolUse hooks | Auto-lint on every edit | Continuous (automatic) |
+
+---
+
+## Multi-Project Campaigns
+
+The quality system supports all four projects. Use `--project` to scope campaigns.
+
+### Per-Project Commands
+
+| Project | Extract | Campaigns | Lint Command |
+|---------|---------|-----------|-------------|
+| elohim-app | `.claude/scripts/extract-lint-issues.sh` | `--project elohim-app` | `npx eslint src --ext .ts,.html` |
+| doorway | `.claude/scripts/extract-lint-issues.sh --project doorway` | `--project doorway` | `RUSTFLAGS="" cargo clippy` |
+| doorway-app | `.claude/scripts/extract-lint-issues.sh --project doorway-app` | `--project doorway-app` | `npx eslint src --ext .ts,.html` |
+| sophia | `.claude/scripts/extract-lint-issues.sh --project sophia` | `--project sophia` | `pnpm lint` |
+| all | `.claude/scripts/extract-lint-issues.sh --project all` | (no filter) | — |
+
+### Project-Specific Caveats
+
+**Doorway (Rust):**
+- Always use `RUSTFLAGS=""` — system RUSTFLAGS break native cargo builds
+- Clippy issues map to `clippy::*` ruleIds in the manifest
+- Rust files use module extraction: `doorway/src/<module>/`
+
+**Sophia (React):**
+- sophia is a git submodule — changes need separate commits inside `sophia/`
+- Test files use `.test.ts`/`.test.tsx` (not `.spec.ts`)
+- Uses pnpm monorepo — packages extracted as `packages/<name>/`
+
+**Doorway-App (Angular):**
+- Same Angular patterns as elohim-app
+- Smaller codebase — typically fits in fewer campaigns
+
+### Multi-Project Workflow
+
+```bash
+# 1. Extract from all projects
+.claude/scripts/extract-lint-issues.sh --project all
+
+# 2. Review per-project summary
+python3 .claude/scripts/generate-campaigns.py --summary
+
+# 3. Run one project at a time
+python3 .claude/scripts/generate-campaigns.py --project doorway --summary
+python3 .claude/scripts/generate-campaigns.py --project sophia --tier mechanical --summary
+
+# 4. Or run all together — campaigns auto-sort by tier
+python3 .claude/scripts/generate-campaigns.py --task-descriptions
+```
 
 ---
 
@@ -350,8 +399,11 @@ python3 .claude/scripts/generate-campaigns.py --tier mechanical --summary
 # Skip deep/architect entirely
 ```
 
-Similarly for targeted module work:
+Similarly for targeted module or project work:
 ```bash
+# Filter by project
+python3 .claude/scripts/generate-campaigns.py --project doorway --tier mechanical
+
 # Filter campaigns by examining the JSON output
 python3 .claude/scripts/generate-campaigns.py | \
   python3 -c "import sys,json; [print(json.dumps(c)) for c in json.load(sys.stdin) if 'lamad' in str(c.get('files',{}))]"

@@ -75,6 +75,15 @@ import groovy.transform.Field
         manualOnly: true,
         triggersGenesis: false,
         deploymentCheck: null
+    ],
+    'elohim-sophia': [
+        jenkinsPath: 'sophia/Jenkinsfile',
+        changePatterns: ['sophia/'],
+        artifacts: ['sophia-element'],
+        dependsOn: [],
+        cascades: true,        // sophia changes should trigger elohim (app) rebuild
+        triggersGenesis: false,
+        deploymentCheck: null   // Library, not a deployed service
     ]
 ]
 
@@ -108,14 +117,16 @@ def getGitCommitHash() {
 // CI Summary helpers for Claude triage
 def categorizeFailure(String p) {
     ['elohim-holochain':'DNA_BUILD', 'elohim-edge':'INFRASTRUCTURE',
-     'elohim':'APP_BUILD', 'elohim-genesis':'SEEDING', 'elohim-steward':'DESKTOP_BUILD'][p] ?: 'UNKNOWN'
+     'elohim':'APP_BUILD', 'elohim-genesis':'SEEDING', 'elohim-steward':'DESKTOP_BUILD',
+     'elohim-sophia':'SOPHIA_BUILD'][p] ?: 'UNKNOWN'
 }
 def getRemediationHint(String p) {
     ['elohim-holochain':'Check RUSTFLAGS, cargo build locally',
      'elohim-edge':'Check hApp artifact, Harbor creds',
      'elohim':'Run npm run build locally',
      'elohim-genesis':'Check doorway-alpha.elohim.host/health or doorway-staging.elohim.host/health',
-     'elohim-steward':'Check Tauri build, hApp artifact'][p] ?: 'Check logs'
+     'elohim-steward':'Check Tauri build, hApp artifact',
+     'elohim-sophia':'cd sophia && pnpm lint && pnpm test'][p] ?: 'Check logs'
 }
 def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 ? 'HIGH' : u > 0 ? 'MEDIUM' : 'LOW' }
 

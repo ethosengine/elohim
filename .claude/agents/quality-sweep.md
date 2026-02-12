@@ -182,6 +182,47 @@ cargo fmt
 rustfmt src/lib.rs
 ```
 
+## Project-Specific Commands
+
+### Doorway (Rust)
+```bash
+# IMPORTANT: Always use RUSTFLAGS="" for doorway (not WASM)
+cd /projects/elohim/doorway
+RUSTFLAGS="" cargo clippy -- -W clippy::all
+RUSTFLAGS="" cargo clippy --fix --allow-dirty
+cargo fmt --check
+cargo fmt
+```
+
+Common mechanical clippy fixes:
+- `unnecessary_clone` - remove `.clone()` when ownership transfers
+- `needless_return` - remove explicit `return` at end of function
+- `manual_map` - replace manual match with `.map()`
+- `needless_borrow` - remove `&` when value is already a reference
+- `redundant_closure` - replace `|x| foo(x)` with `foo`
+
+### Sophia (React/TypeScript)
+```bash
+cd /projects/elohim/sophia
+pnpm lint                    # ESLint via @khanacademy config
+pnpm lint -- --fix           # Auto-fix
+pnpm test -- --ci            # Jest
+```
+
+Notes:
+- Test files use `.test.ts` / `.test.tsx` (NOT `.spec.ts`)
+- React hooks rules: `exhaustive-deps`, `rules-of-hooks`
+- sophia is a git submodule - changes need separate commits
+
+### Doorway-App (Angular)
+```bash
+cd /projects/elohim/doorway-app
+npx eslint src --ext .ts,.html
+npx eslint src --ext .ts,.html --fix
+```
+
+Notes: Same Angular patterns as elohim-app but smaller scope.
+
 ## Common Issues & Fixes
 
 ### TypeScript/ESLint

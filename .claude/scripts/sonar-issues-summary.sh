@@ -24,6 +24,7 @@ SUMMARY_FILE="$OUTPUT_DIR/sonar-issues-summary.json"
 
 # SonarQube config
 SONAR_URL="${SONAR_HOST_URL:-https://sonarqube.ethosengine.com}"
+# Project keys: elohim-app-alpha, doorway-alpha, sophia-alpha
 SONAR_PROJECT="${SONAR_PROJECT_KEY:-elohim-app-alpha}"
 SONAR_TOKEN="${SONAR_TOKEN:-${SONARQUBE_TOKEN:-}}"
 

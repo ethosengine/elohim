@@ -11,7 +11,9 @@ HINTS = {
     'elohim-edge': ('INFRASTRUCTURE', 'Check container. Verify hApp artifact.'),
     'elohim': ('APP_BUILD', 'Check TypeScript. npm run build locally.'),
     'elohim-genesis': ('SEEDING', 'Check doorway-alpha.elohim.host/health'),
-    'elohim-orchestrator': ('ORCHESTRATOR', 'Fetch ci-summary.json artifact.')
+    'elohim-orchestrator': ('ORCHESTRATOR', 'Fetch ci-summary.json artifact.'),
+    'elohim-sophia': ('SOPHIA_BUILD', 'cd sophia && pnpm lint && pnpm test'),
+    'doorway-quality': ('DOORWAY_QUALITY', 'cd doorway && RUSTFLAGS="" cargo clippy && cargo fmt --check'),
 }
 
 def main():

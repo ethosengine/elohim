@@ -437,6 +437,26 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         // NOTE: Build WASM Cache Core and Build DNA stages moved to holochain/dna/Jenkinsfile
         // This pipeline now only builds infrastructure (container images)
 
+        stage('Quality Gate: Doorway') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        try {
+                            dir('doorway') {
+                                sh 'cargo fmt --check'
+                                sh 'RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all'
+                                sh 'RUSTFLAGS="" cargo test --lib --bins'
+                            }
+                        } catch (Exception e) {
+                            echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
+                            unstable('Doorway quality gate has warnings')
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build Doorway') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
@@ -460,6 +480,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} elohim-doorway:${GIT_COMMIT_HASH}
                             """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate: Doorway App') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        try {
+                            dir('doorway-app') {
+                                sh 'npm ci && npx eslint src --ext .ts,.html'
+                            }
+                        } catch (Exception e) {
+                            echo "Quality Gate: Doorway App - issues found (non-blocking): ${e.message}"
+                            unstable('Doorway App quality gate has warnings')
                         }
                     }
                 }
