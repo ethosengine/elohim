@@ -121,9 +121,7 @@ def buildSophiaPlugin() {
     echo 'Building sophia monorepo packages...'
 
     // Initialize and update submodule if needed
-    sh '''
-        git submodule update --init --recursive sophia || true
-    '''
+    sh 'git submodule update --init --recursive sophia'
 
     dir('sophia') {
         sh '''
