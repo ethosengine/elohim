@@ -307,7 +307,7 @@ impl DiscoveryService {
                 Value::String("type".into()),
                 Value::String("list_apps".into()),
             ),
-            (Value::String("data".into()), Value::Nil),
+            (Value::String("value".into()), Value::Nil),
         ]);
 
         let mut buf = Vec::new();

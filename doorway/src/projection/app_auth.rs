@@ -127,7 +127,7 @@ fn build_issue_token_request(installed_app_id: &str, expiry_seconds: u64) -> Vec
             Value::String("type".into()),
             Value::String("issue_app_authentication_token".into()),
         ),
-        (Value::String("data".into()), data),
+        (Value::String("value".into()), data),
     ]);
 
     let mut buf = Vec::new();
@@ -180,9 +180,13 @@ fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
     // Response format: { id, type: "response", data: <bytes> }
     if let Value::Map(ref map) = value {
         // Check for error response
+        // Error envelopes use "value" field: { type: "error", value: { type: "...", value: "..." } }
         if let Some(response_type) = get_string_field(map, "type") {
             if response_type == "error" {
-                if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
+                if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
+                    if let Some(msg) = get_string_field(err_data, "value") {
+                        return Err(format!("Admin error: {}", msg));
+                    }
                     if let Some(msg) = get_string_field(err_data, "message") {
                         return Err(format!("Admin error: {}", msg));
                     }
@@ -197,9 +201,9 @@ fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
             let inner = rmpv::decode::read_value(&mut inner_cursor)
                 .map_err(|e| format!("Failed to decode inner response: {}", e))?;
 
-            // Inner: { type: "app_authentication_token_issued", data: { token: <bytes> } }
+            // Inner: { type: "app_authentication_token_issued", value: { token: <bytes> } }
             if let Value::Map(ref inner_map) = inner {
-                if let Some(Value::Map(ref token_data)) = get_field(inner_map, "data") {
+                if let Some(Value::Map(ref token_data)) = get_field(inner_map, "value") {
                     if let Some(Value::Binary(token_bytes)) = get_field(token_data, "token") {
                         return Ok(AppAuthToken {
                             token: token_bytes.clone(),

@@ -208,7 +208,7 @@ fn build_call_zome_request(
             Value::String("type".into()),
             Value::String("call_zome".into()),
         ),
-        (Value::String("data".into()), data),
+        (Value::String("value".into()), data),
     ]);
 
     let mut buf = Vec::new();
@@ -243,9 +243,13 @@ fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
 
     if let Value::Map(ref map) = value {
         // Check for error response
+        // Error envelopes use "value" field: { type: "error", value: { type: "...", value: "..." } }
         if let Some(response_type) = get_string_field(map, "type") {
             if response_type == "error" {
-                if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
+                if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
+                    if let Some(msg) = get_string_field(err_data, "value") {
+                        return Err(format!("Zome call error: {}", msg));
+                    }
                     if let Some(msg) = get_string_field(err_data, "message") {
                         return Err(format!("Zome call error: {}", msg));
                     }
@@ -262,13 +266,13 @@ fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
             let inner = rmpv::decode::read_value(&mut inner_cursor)
                 .map_err(|e| format!("Failed to decode inner response: {}", e))?;
 
-            // The zome call result is wrapped in { type: "...", data: <result bytes> }
+            // The zome call result is wrapped in { type: "...", value: <result bytes> }
             if let Value::Map(ref inner_map) = inner {
-                if let Some(Value::Binary(result_bytes)) = get_field(inner_map, "data") {
+                if let Some(Value::Binary(result_bytes)) = get_field(inner_map, "value") {
                     return Ok(result_bytes.clone());
                 }
-                // Some responses may have the data directly
-                if let Some(Value::Map(ref result_map)) = get_field(inner_map, "data") {
+                // Some responses may have the value directly as a map
+                if let Some(Value::Map(ref result_map)) = get_field(inner_map, "value") {
                     let mut buf = Vec::new();
                     rmpv::encode::write_value(&mut buf, &Value::Map(result_map.clone()))
                         .map_err(|e| format!("Failed to re-encode result: {}", e))?;

@@ -484,15 +484,11 @@ impl SignalSubscriber {
         rmpv::encode::write_value(&mut inner_buf, &inner)
             .map_err(|e| format!("Failed to encode auth request: {}", e))?;
 
-        // Wrap in request envelope with id=0
+        // Wrap in authenticate envelope (Holochain 0.6 format: { type: "authenticate", data: <binary> })
         let envelope = rmpv::Value::Map(vec![
             (
-                rmpv::Value::String("id".into()),
-                rmpv::Value::Integer(0.into()),
-            ),
-            (
                 rmpv::Value::String("type".into()),
-                rmpv::Value::String("request".into()),
+                rmpv::Value::String("authenticate".into()),
             ),
             (
                 rmpv::Value::String("data".into()),

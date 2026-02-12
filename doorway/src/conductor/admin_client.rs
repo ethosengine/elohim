@@ -46,23 +46,23 @@ impl AdminClient {
     ///
     /// Returns the raw 39-byte agent key from the conductor.
     pub async fn generate_agent_pub_key(&self) -> Result<Vec<u8>, String> {
-        // Build inner request: { type: "generate_agent_pub_key", data: null }
+        // Build inner request: { type: "generate_agent_pub_key", value: null }
         let inner = Value::Map(vec![
             (
                 Value::String("type".into()),
                 Value::String("generate_agent_pub_key".into()),
             ),
-            (Value::String("data".into()), Value::Nil),
+            (Value::String("value".into()), Value::Nil),
         ]);
 
         let response = self.send_request(&inner).await?;
 
-        // Response inner: { type: "agent_pub_key_generated", data: <39 bytes> }
+        // Response inner: { type: "agent_pub_key_generated", value: <39 bytes> }
         if let Value::Map(ref map) = response {
             // Check for error
             if let Some(err_type) = get_string_field(map, "type") {
                 if err_type == "error" {
-                    if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
+                    if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
                         if let Some(msg) = get_string_field(err_data, "message") {
                             return Err(format!("Admin error: {}", msg));
                         }
@@ -71,8 +71,8 @@ impl AdminClient {
                 }
             }
 
-            // Extract agent key from data field
-            if let Some(Value::Binary(key_bytes)) = get_field(map, "data") {
+            // Extract agent key from value field
+            if let Some(Value::Binary(key_bytes)) = get_field(map, "value") {
                 return Ok(key_bytes.clone());
             }
         }
@@ -112,7 +112,7 @@ impl AdminClient {
                 Value::String("type".into()),
                 Value::String("install_app".into()),
             ),
-            (Value::String("data".into()), data),
+            (Value::String("value".into()), data),
         ]);
 
         let response = self.send_request(&inner).await?;
@@ -123,7 +123,7 @@ impl AdminClient {
 
     /// Enable an installed app on the conductor.
     pub async fn enable_app(&self, installed_app_id: &str) -> Result<(), String> {
-        // Build inner request: { type: "enable_app", data: { installed_app_id } }
+        // Build inner request: { type: "enable_app", value: { installed_app_id } }
         let data = Value::Map(vec![(
             Value::String("installed_app_id".into()),
             Value::String(installed_app_id.into()),
@@ -134,7 +134,7 @@ impl AdminClient {
                 Value::String("type".into()),
                 Value::String("enable_app".into()),
             ),
-            (Value::String("data".into()), data),
+            (Value::String("value".into()), data),
         ]);
 
         let response = self.send_request(&inner).await?;
@@ -145,7 +145,7 @@ impl AdminClient {
 
     /// Uninstall an app from the conductor (cleanup).
     pub async fn uninstall_app(&self, installed_app_id: &str) -> Result<(), String> {
-        // Build inner request: { type: "uninstall_app", data: { installed_app_id } }
+        // Build inner request: { type: "uninstall_app", value: { installed_app_id } }
         let data = Value::Map(vec![(
             Value::String("installed_app_id".into()),
             Value::String(installed_app_id.into()),
@@ -156,7 +156,7 @@ impl AdminClient {
                 Value::String("type".into()),
                 Value::String("uninstall_app".into()),
             ),
-            (Value::String("data".into()), data),
+            (Value::String("value".into()), data),
         ]);
 
         let response = self.send_request(&inner).await?;
@@ -246,7 +246,7 @@ impl AdminClient {
         if let Value::Map(ref map) = response {
             if let Some(resp_type) = get_string_field(map, "type") {
                 if resp_type == "error" {
-                    if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
+                    if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
                         if let Some(msg) = get_string_field(err_data, "message") {
                             return Err(format!("Admin error ({}): {}", operation, msg));
                         }
@@ -303,9 +303,13 @@ fn parse_response_envelope(data: &[u8]) -> Result<Value, String> {
 
     if let Value::Map(ref map) = value {
         // Check for error at envelope level
+        // Error envelopes use "value" field: { type: "error", value: { type: "...", value: "..." } }
         if let Some(resp_type) = get_string_field(map, "type") {
             if resp_type == "error" {
-                if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
+                if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
+                    if let Some(msg) = get_string_field(err_data, "value") {
+                        return Err(format!("Admin error: {}", msg));
+                    }
                     if let Some(msg) = get_string_field(err_data, "message") {
                         return Err(format!("Admin error: {}", msg));
                     }
@@ -373,7 +377,7 @@ mod tests {
                 Value::String("type".into()),
                 Value::String("generate_agent_pub_key".into()),
             ),
-            (Value::String("data".into()), Value::Nil),
+            (Value::String("value".into()), Value::Nil),
         ]);
         let inner_bytes = encode_msgpack(&inner).unwrap();
         let envelope = build_request_envelope(1, &inner_bytes);
@@ -390,13 +394,13 @@ mod tests {
 
     #[test]
     fn test_parse_response_envelope_success() {
-        // Build a mock success response
+        // Build a mock success response (Holochain 0.6 uses "value" for inner payload)
         let inner = Value::Map(vec![
             (
                 Value::String("type".into()),
                 Value::String("agent_pub_key_generated".into()),
             ),
-            (Value::String("data".into()), Value::Binary(vec![0u8; 39])),
+            (Value::String("value".into()), Value::Binary(vec![0u8; 39])),
         ]);
         let inner_bytes = encode_msgpack(&inner).unwrap();
 
@@ -423,15 +427,22 @@ mod tests {
 
     #[test]
     fn test_parse_response_envelope_error() {
-        let err_data = Value::Map(vec![(
-            Value::String("message".into()),
-            Value::String("something went wrong".into()),
-        )]);
+        // Holochain 0.6 error format: { type: "error", value: { type: "...", value: "..." } }
+        let err_data = Value::Map(vec![
+            (
+                Value::String("type".into()),
+                Value::String("deserialization".into()),
+            ),
+            (
+                Value::String("value".into()),
+                Value::String("something went wrong".into()),
+            ),
+        ]);
 
         let envelope = Value::Map(vec![
             (Value::String("id".into()), Value::Integer(1.into())),
             (Value::String("type".into()), Value::String("error".into())),
-            (Value::String("data".into()), err_data),
+            (Value::String("value".into()), err_data),
         ]);
         let envelope_bytes = encode_msgpack(&envelope).unwrap();
 
@@ -450,15 +461,15 @@ mod tests {
                 Value::String("type".into()),
                 Value::String("app_installed".into()),
             ),
-            (Value::String("data".into()), Value::Nil),
+            (Value::String("value".into()), Value::Nil),
         ]);
         assert!(client.check_error_response(&ok_response, "test").is_ok());
 
-        // Error response should return Err
+        // Error response should return Err (Holochain 0.6 error format)
         let err_response = Value::Map(vec![
             (Value::String("type".into()), Value::String("error".into())),
             (
-                Value::String("data".into()),
+                Value::String("value".into()),
                 Value::Map(vec![(
                     Value::String("message".into()),
                     Value::String("app not found".into()),
