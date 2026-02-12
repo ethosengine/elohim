@@ -4,12 +4,16 @@
 //! No message filtering needed - app interfaces handle their own auth.
 
 use futures_util::{SinkExt, StreamExt};
-use tokio_tungstenite::{connect_async_with_config, tungstenite::{protocol::Message, http::Request}};
+use tokio_tungstenite::{
+    connect_async_with_config,
+    tungstenite::{http::Request, protocol::Message},
+};
 use tracing::{debug, error, info};
 
 use crate::types::{DoorwayError, Result};
 
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 /// Run the app proxy between client and conductor app interface
 pub async fn run_proxy(
@@ -19,14 +23,14 @@ pub async fn run_proxy(
     query: Option<String>,
 ) -> Result<()> {
     // Build app interface URL
-    // Filter out Doorway-specific params (apiKey, token) - conductor uses its own auth
+    // Strip Doorway-specific params (apiKey) but KEEP conductor params (token)
+    // The token= param is the Holochain app authentication token issued by the conductor
+    // via issueAppAuthenticationToken() - the conductor needs it to authorize the connection
     let mut app_url = format!("ws://localhost:{}", port);
     if let Some(q) = query {
         let filtered: Vec<&str> = q
             .split('&')
-            .filter(|param| {
-                !param.starts_with("apiKey=") && !param.starts_with("token=")
-            })
+            .filter(|param| !param.starts_with("apiKey="))
             .collect();
         if !filtered.is_empty() {
             app_url = format!("{}?{}", app_url, filtered.join("&"));
@@ -43,13 +47,18 @@ pub async fn run_proxy(
         .header("Connection", "Upgrade")
         .header("Upgrade", "websocket")
         .header("Sec-WebSocket-Version", "13")
-        .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
+        .header(
+            "Sec-WebSocket-Key",
+            tokio_tungstenite::tungstenite::handshake::client::generate_key(),
+        )
         .body(())
         .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {}", e)))?;
 
     let (conductor_ws, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to app interface: {}", e)))?;
+        .map_err(|e| {
+            DoorwayError::Holochain(format!("Failed to connect to app interface: {}", e))
+        })?;
 
     info!("Connected to app interface on port {}", port);
 

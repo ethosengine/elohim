@@ -76,7 +76,7 @@ spec:
             - name: PROJECTION_WRITER
               value: "true"
             - name: CONDUCTOR_URLS
-              value: "ws://elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless:4445"
+              value: "ws://elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless:8445"
             - name: CONDUCTOR_ADMIN_URL
               value: "ws://elohim-edgenode-alpha:4444"
             - name: STORAGE_URL
