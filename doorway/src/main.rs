@@ -235,8 +235,8 @@ async fn main() -> anyhow::Result<()> {
     // Register all conductors from config
     for (i, url) in conductor_urls.iter().enumerate() {
         let conductor_id = format!("conductor-{}", i);
-        // Derive admin URL from app URL (replace port with admin port)
-        let admin_url = derive_admin_url_from_app(url, 4444);
+        // Derive admin URL: same host, port - 1 (socat convention: 8444=admin, 8445=app)
+        let admin_url = derive_admin_url_from_app(url);
         registry.register_conductor(ConductorInfo {
             conductor_id,
             conductor_url: url.clone(),
@@ -539,15 +539,21 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// Derive admin WebSocket URL from app URL by replacing the port
-fn derive_admin_url_from_app(app_url: &str, admin_port: u16) -> String {
+fn derive_admin_url_from_app(app_url: &str) -> String {
     if let Some(host_start) = app_url.find("://") {
         let after_scheme = &app_url[host_start + 3..];
         if let Some(port_start) = after_scheme.rfind(':') {
             let host = &after_scheme[..port_start];
+            let port_str = &after_scheme[port_start + 1..];
+            // Admin port = app port - 1 (socat convention: 8444=admin, 8445=app; 4444/4445)
+            let admin_port = port_str
+                .parse::<u16>()
+                .map(|p| p.saturating_sub(1))
+                .unwrap_or(4444);
             return format!("{}://{}:{}", &app_url[..host_start], host, admin_port);
         }
     }
-    format!("ws://localhost:{}", admin_port)
+    "ws://localhost:4444".to_string()
 }
 
 /// Derive app WebSocket URL from conductor admin URL

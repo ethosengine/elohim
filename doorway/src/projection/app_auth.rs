@@ -177,10 +177,9 @@ fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
     let value = rmpv::decode::read_value(&mut cursor)
         .map_err(|e| format!("Failed to decode response: {}", e))?;
 
-    // Response format: { id, type: "response", data: <bytes> }
     if let Value::Map(ref map) = value {
         // Check for error response
-        // Error envelopes use "value" field: { type: "error", value: { type: "...", value: "..." } }
+        // Error format: { type: "error", value: { type: "...", value: "..." } }
         if let Some(response_type) = get_string_field(map, "type") {
             if response_type == "error" {
                 if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
@@ -195,27 +194,52 @@ fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
             }
         }
 
-        // Parse success response
+        // Try envelope format first: { id, type: "response", data: <binary inner> }
         if let Some(Value::Binary(inner_bytes)) = get_field(map, "data") {
             let mut inner_cursor = Cursor::new(inner_bytes.as_slice());
-            let inner = rmpv::decode::read_value(&mut inner_cursor)
-                .map_err(|e| format!("Failed to decode inner response: {}", e))?;
-
-            // Inner: { type: "app_authentication_token_issued", value: { token: <bytes> } }
-            if let Value::Map(ref inner_map) = inner {
-                if let Some(Value::Map(ref token_data)) = get_field(inner_map, "value") {
-                    if let Some(Value::Binary(token_bytes)) = get_field(token_data, "token") {
-                        return Ok(AppAuthToken {
-                            token: token_bytes.clone(),
-                        });
-                    }
+            if let Ok(inner) = rmpv::decode::read_value(&mut inner_cursor) {
+                if let Some(token) = extract_token_from_map(&inner) {
+                    return Ok(token);
                 }
             }
+        }
+
+        // Try unwrapped format: { type: "app_authentication_token_issued", value: { token, expires_at } }
+        if let Some(token) = extract_token_from_map(&value) {
+            return Ok(token);
         }
     }
 
     error!("Unexpected token response format: {:?}", value);
     Err("Unexpected token response format".to_string())
+}
+
+/// Extract token from a response map (either inner or unwrapped).
+/// Handles: { type: "app_authentication_token_issued", value: { token: <bytes or array> } }
+fn extract_token_from_map(value: &Value) -> Option<AppAuthToken> {
+    if let Value::Map(ref map) = value {
+        if let Some(Value::Map(ref token_data)) = get_field(map, "value") {
+            if let Some(token_value) = get_field(token_data, "token") {
+                let token_bytes = match token_value {
+                    Value::Binary(bytes) => Some(bytes.clone()),
+                    Value::Array(arr) => {
+                        // Token may be an array of integers (Holochain 0.6 msgpack variant)
+                        arr.iter()
+                            .map(|v| match v {
+                                Value::Integer(i) => i.as_u64().map(|n| n as u8),
+                                _ => None,
+                            })
+                            .collect::<Option<Vec<u8>>>()
+                    }
+                    _ => None,
+                };
+                if let Some(bytes) = token_bytes {
+                    return Some(AppAuthToken { token: bytes });
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Parse the authentication response
