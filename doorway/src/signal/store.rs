@@ -17,14 +17,8 @@ use tracing::debug;
 use super::PubKey;
 
 /// Type alias for the WebSocket write half
-pub type WsSink = Arc<
-    Mutex<
-        SplitSink<
-            WebSocketStream<TokioIo<hyper::upgrade::Upgraded>>,
-            Message,
-        >,
-    >,
->;
+pub type WsSink =
+    Arc<Mutex<SplitSink<WebSocketStream<TokioIo<hyper::upgrade::Upgraded>>, Message>>>;
 
 /// Connection entry in the store
 struct ConnectionEntry {
@@ -101,7 +95,9 @@ impl SignalStore {
 
     /// Get the write half of a connection by public key
     pub fn get(&self, pk: &PubKey) -> Option<WsSink> {
-        self.connections.get(pk).map(|entry| Arc::clone(&entry.write))
+        self.connections
+            .get(pk)
+            .map(|entry| Arc::clone(&entry.write))
     }
 
     /// Check if a public key is connected
@@ -113,6 +109,7 @@ impl SignalStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use std::net::Ipv6Addr;
 
     fn make_pk(byte: u8) -> PubKey {

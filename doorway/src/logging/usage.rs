@@ -149,10 +149,7 @@ impl UsageLogger {
 
     /// Initialize file logging to the specified path
     pub async fn init_file(&self, path: PathBuf) -> std::io::Result<()> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
 
         let writer = BufWriter::new(file);
 

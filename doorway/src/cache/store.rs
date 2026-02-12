@@ -24,6 +24,14 @@ use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
 
+/// Type alias for complex blob streaming result to satisfy clippy
+type BlobStreamResult = (
+    Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+    usize,
+    String,
+    String,
+);
+
 /// A cached entry with metadata
 #[derive(Debug, Clone)]
 pub struct CacheEntry {
@@ -238,7 +246,11 @@ impl ContentCache {
         }
 
         if count > 0 {
-            debug!(pattern = pattern, count = count, "Invalidated cache entries");
+            debug!(
+                pattern = pattern,
+                count = count,
+                "Invalidated cache entries"
+            );
         }
         count
     }
@@ -401,16 +413,7 @@ impl ContentCache {
     /// # Returns
     /// * `Some(stream)` if blob exists and is valid
     /// * `None` if not found or expired
-    pub fn stream_blob(
-        &self,
-        storage_key: &str,
-        chunk_size: usize,
-    ) -> Option<(
-        Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
-        usize,
-        String,
-        String,
-    )> {
+    pub fn stream_blob(&self, storage_key: &str, chunk_size: usize) -> Option<BlobStreamResult> {
         let entry = self.entries.get(storage_key)?;
 
         if entry.is_expired() {
@@ -435,7 +438,11 @@ impl ContentCache {
         );
 
         // Use 64KB chunks if not specified
-        let chunk_size = if chunk_size == 0 { 64 * 1024 } else { chunk_size };
+        let chunk_size = if chunk_size == 0 {
+            64 * 1024
+        } else {
+            chunk_size
+        };
 
         // Create chunked stream
         let stream = stream::iter((0..total_size).step_by(chunk_size).map(move |start| {
@@ -458,12 +465,7 @@ impl ContentCache {
         storage_key: &str,
         range: Range<usize>,
         chunk_size: usize,
-    ) -> Option<(
-        Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
-        usize,
-        String,
-        String,
-    )> {
+    ) -> Option<BlobStreamResult> {
         let entry = self.entries.get(storage_key)?;
 
         if entry.is_expired() {
@@ -494,7 +496,11 @@ impl ContentCache {
             "Streaming range"
         );
 
-        let chunk_size = if chunk_size == 0 { 64 * 1024 } else { chunk_size };
+        let chunk_size = if chunk_size == 0 {
+            64 * 1024
+        } else {
+            chunk_size
+        };
 
         let stream = stream::iter((0..range_size).step_by(chunk_size).map(move |start| {
             let end = std::cmp::min(start + chunk_size, range_size);
@@ -597,8 +603,11 @@ mod tests {
         assert_eq!(entry.etag, entry2.etag);
 
         // Different data should have different ETag
-        let entry3 =
-            CacheEntry::new(b"different".to_vec(), Duration::from_secs(60), "application/json");
+        let entry3 = CacheEntry::new(
+            b"different".to_vec(),
+            Duration::from_secs(60),
+            "application/json",
+        );
         assert_ne!(entry.etag, entry3.etag);
     }
 
@@ -611,7 +620,12 @@ mod tests {
         assert!(cache.get(key).is_none());
 
         // Set and get
-        cache.set(key, b"test data".to_vec(), "application/json", Duration::from_secs(300));
+        cache.set(
+            key,
+            b"test data".to_vec(),
+            "application/json",
+            Duration::from_secs(300),
+        );
         let entry = cache.get(key).expect("Should have entry");
         assert_eq!(entry.data, b"test data");
 
@@ -628,7 +642,12 @@ mod tests {
         let cache = ContentCache::new(config);
         let key = "dna:zome:fn:args";
 
-        cache.set(key, b"will expire".to_vec(), "application/json", Duration::from_millis(10));
+        cache.set(
+            key,
+            b"will expire".to_vec(),
+            "application/json",
+            Duration::from_millis(10),
+        );
 
         // Should exist immediately
         assert!(cache.get(key).is_some());
@@ -662,9 +681,24 @@ mod tests {
         let cache = ContentCache::with_defaults();
         let ttl = Duration::from_secs(300);
 
-        cache.set("dna:zome:get_content:a", b"1".to_vec(), "application/json", ttl);
-        cache.set("dna:zome:get_content:b", b"2".to_vec(), "application/json", ttl);
-        cache.set("dna:zome:get_path:c", b"3".to_vec(), "application/json", ttl);
+        cache.set(
+            "dna:zome:get_content:a",
+            b"1".to_vec(),
+            "application/json",
+            ttl,
+        );
+        cache.set(
+            "dna:zome:get_content:b",
+            b"2".to_vec(),
+            "application/json",
+            ttl,
+        );
+        cache.set(
+            "dna:zome:get_path:c",
+            b"3".to_vec(),
+            "application/json",
+            ttl,
+        );
 
         assert_eq!(cache.stats().entries, 3);
 

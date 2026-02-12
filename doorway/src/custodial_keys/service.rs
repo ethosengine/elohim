@@ -14,7 +14,7 @@ use std::sync::Arc;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::db::schemas::{CustodialKeyMaterial, UserDoc};
 use crate::types::{DoorwayError, Result};
@@ -457,7 +457,10 @@ mod tests {
         assert_eq!(export.version, 1);
         assert_eq!(export.identifier, user.identifier);
         assert_eq!(export.human_id, user.human_id);
-        assert_eq!(export.public_key, user.custodial_key.as_ref().unwrap().public_key);
+        assert_eq!(
+            export.public_key,
+            user.custodial_key.as_ref().unwrap().public_key
+        );
         assert_eq!(export.doorway_id, "doorway-1");
         assert!(!export.exported_at.is_empty());
     }

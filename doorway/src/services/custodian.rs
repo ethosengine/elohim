@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::orchestrator::OrchestratorState;
 use crate::projection::ProjectionStore;
@@ -51,6 +51,7 @@ fn current_time_ms() -> u64 {
 /// Reach level for content access control
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum ReachLevel {
     /// Only the creator can access
     Private,
@@ -67,17 +68,13 @@ pub enum ReachLevel {
     /// Regional/country level
     Regional,
     /// Public/commons access
+    #[default]
     Commons,
-}
-
-impl Default for ReachLevel {
-    fn default() -> Self {
-        ReachLevel::Commons
-    }
 }
 
 impl ReachLevel {
     /// Parse from string
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "private" => ReachLevel::Private,
@@ -182,7 +179,11 @@ impl CustodianCapability {
 
     /// Generate fallback URL for a content hash
     pub fn blob_url(&self, blob_hash: &str) -> String {
-        format!("{}/store/{}", self.base_url.trim_end_matches('/'), blob_hash)
+        format!(
+            "{}/store/{}",
+            self.base_url.trim_end_matches('/'),
+            blob_hash
+        )
     }
 
     /// Generate chunk URL for a content hash and chunk index
@@ -354,14 +355,20 @@ impl CustodianService {
     }
 
     /// Create with projection store for querying commitments
-    pub fn with_projection(config: CustodianServiceConfig, projection: Arc<ProjectionStore>) -> Self {
+    pub fn with_projection(
+        config: CustodianServiceConfig,
+        projection: Arc<ProjectionStore>,
+    ) -> Self {
         let mut service = Self::new(config);
         service.projection = Some(projection);
         service
     }
 
     /// Create with orchestrator state for human-scale metrics integration
-    pub fn with_orchestrator(config: CustodianServiceConfig, orchestrator: Arc<OrchestratorState>) -> Self {
+    pub fn with_orchestrator(
+        config: CustodianServiceConfig,
+        orchestrator: Arc<OrchestratorState>,
+    ) -> Self {
         let mut service = Self::new(config);
         service.orchestrator = Some(orchestrator);
         service
@@ -380,7 +387,8 @@ impl CustodianService {
             region = ?capability.region,
             "Registered custodian"
         );
-        self.capabilities.insert(capability.agent_id.clone(), capability);
+        self.capabilities
+            .insert(capability.agent_id.clone(), capability);
     }
 
     /// Unregister a custodian
@@ -454,7 +462,11 @@ impl CustodianService {
     }
 
     /// Select the single best URL for a blob
-    pub fn select_best_url(&self, blob_hash: &str, criteria: &CustodianSelectionCriteria) -> Option<String> {
+    pub fn select_best_url(
+        &self,
+        blob_hash: &str,
+        criteria: &CustodianSelectionCriteria,
+    ) -> Option<String> {
         let custodians = self.select_custodians(blob_hash, criteria);
         custodians.first().map(|c| c.blob_url(blob_hash))
     }
@@ -648,7 +660,9 @@ impl CustodianService {
         blob_hash: &str,
         criteria: &CustodianSelectionCriteria,
     ) -> Option<String> {
-        let custodians = self.select_custodians_with_metrics(blob_hash, criteria).await;
+        let custodians = self
+            .select_custodians_with_metrics(blob_hash, criteria)
+            .await;
         custodians.first().map(|c| c.blob_url(blob_hash))
     }
 
@@ -678,9 +692,7 @@ impl CustodianService {
         // Match to registered capabilities
         ranked_nodes
             .iter()
-            .filter_map(|node| {
-                self.capabilities.get(&node.node_id).map(|c| c.clone())
-            })
+            .filter_map(|node| self.capabilities.get(&node.node_id).map(|c| c.clone()))
             .take(max_count)
             .collect()
     }
@@ -696,18 +708,19 @@ impl CustodianService {
         // Update blob_custodians mapping
         self.blob_custodians
             .entry(commitment.blob_hash.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(commitment.custodian_id.clone());
 
         // Store commitment
-        self.commitments
-            .entry(key)
-            .or_insert_with(Vec::new)
-            .push(commitment);
+        self.commitments.entry(key).or_default().push(commitment);
     }
 
     /// Get commitments for a blob
-    pub fn get_commitments(&self, content_id: &str, blob_hash: &str) -> Vec<CustodianBlobCommitment> {
+    pub fn get_commitments(
+        &self,
+        content_id: &str,
+        blob_hash: &str,
+    ) -> Vec<CustodianBlobCommitment> {
         let key = format!("{}:{}", content_id, blob_hash);
         self.commitments
             .get(&key)
@@ -735,7 +748,10 @@ impl CustodianService {
         let key = format!("{}:{}", content_id, blob_hash);
 
         if let Some(mut commitments) = self.commitments.get_mut(&key) {
-            if let Some(commitment) = commitments.iter_mut().find(|c| c.custodian_id == custodian_id) {
+            if let Some(commitment) = commitments
+                .iter_mut()
+                .find(|c| c.custodian_id == custodian_id)
+            {
                 commitment.status = status;
                 return true;
             }
@@ -756,7 +772,10 @@ impl CustodianService {
         let key = format!("{}:{}", content_id, blob_hash);
 
         if let Some(mut commitments) = self.commitments.get_mut(&key) {
-            if let Some(commitment) = commitments.iter_mut().find(|c| c.custodian_id == custodian_id) {
+            if let Some(commitment) = commitments
+                .iter_mut()
+                .find(|c| c.custodian_id == custodian_id)
+            {
                 commitment.replication_progress = progress.min(100);
                 commitment.bandwidth_mbps = bandwidth;
                 commitment.last_verified_at = Some(
@@ -893,11 +912,7 @@ impl CustodianService {
 
     /// Probe all registered custodians
     pub async fn probe_all_custodians(&self) -> (usize, usize) {
-        let agent_ids: Vec<String> = self
-            .capabilities
-            .iter()
-            .map(|e| e.key().clone())
-            .collect();
+        let agent_ids: Vec<String> = self.capabilities.iter().map(|e| e.key().clone()).collect();
 
         let mut success = 0;
         let mut failure = 0;
@@ -914,7 +929,11 @@ impl CustodianService {
             }
         }
 
-        info!(success = success, failure = failure, "Completed health probe cycle");
+        info!(
+            success = success,
+            failure = failure,
+            "Completed health probe cycle"
+        );
         (success, failure)
     }
 
@@ -971,10 +990,7 @@ impl CustodianStats {
 // ============================================================================
 
 /// Spawn background health probe task
-pub fn spawn_health_probe_task(
-    service: Arc<CustodianService>,
-    interval: Duration,
-) {
+pub fn spawn_health_probe_task(service: Arc<CustodianService>, interval: Duration) {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(interval).await;
@@ -1125,7 +1141,7 @@ mod tests {
         let service = CustodianService::new(CustodianServiceConfig::default());
 
         // Add two commitments, one active, one pending
-        let mut c1 = CustodianBlobCommitment {
+        let c1 = CustodianBlobCommitment {
             content_id: "content1".to_string(),
             blob_hash: "hash123".to_string(),
             custodian_id: "agent1".to_string(),

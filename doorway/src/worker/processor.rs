@@ -193,7 +193,10 @@ impl Worker {
             .await
             .map_err(|e| DoorwayError::Nats(format!("Failed to create stream: {}", e)))?;
 
-        info!("Using stream {} with subjects {}.>", STREAM_NAME, SUBJECT_PREFIX);
+        info!(
+            "Using stream {} with subjects {}.>",
+            STREAM_NAME, SUBJECT_PREFIX
+        );
         Ok(stream)
     }
 
@@ -304,7 +307,10 @@ impl Worker {
             .publish(request.reply_subject.clone(), response_json.into())
             .await
         {
-            error!("Failed to publish response to {}: {}", request.reply_subject, e);
+            error!(
+                "Failed to publish response to {}: {}",
+                request.reply_subject, e
+            );
         } else {
             debug!(
                 "Published response for {} to {}",

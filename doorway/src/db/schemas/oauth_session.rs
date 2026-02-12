@@ -8,8 +8,8 @@ use chrono::{DateTime, Utc};
 use mongodb::options::IndexOptions;
 use serde::{Deserialize, Serialize};
 
-use crate::db::mongo::{IntoIndexes, MutMetadata};
 use super::metadata::Metadata;
+use crate::db::mongo::{IntoIndexes, MutMetadata};
 
 /// Collection name for OAuth sessions
 pub const OAUTH_SESSION_COLLECTION: &str = "oauth_sessions";
@@ -75,6 +75,7 @@ fn default_expires_at() -> DateTime<Utc> {
 
 impl OAuthSessionDoc {
     /// Create a new OAuth session with 5-minute expiry.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         code: String,
         client_id: String,
@@ -222,11 +223,23 @@ mod tests {
 
     #[test]
     fn test_uri_pattern_matching() {
-        assert!(matches_uri_pattern("http://localhost:*", "http://localhost:4200"));
-        assert!(matches_uri_pattern("http://localhost:*", "http://localhost:4200/callback"));
-        assert!(matches_uri_pattern("https://*.elohim.host/*", "https://app.elohim.host/callback"));
+        assert!(matches_uri_pattern(
+            "http://localhost:*",
+            "http://localhost:4200"
+        ));
+        assert!(matches_uri_pattern(
+            "http://localhost:*",
+            "http://localhost:4200/callback"
+        ));
+        assert!(matches_uri_pattern(
+            "https://*.elohim.host/*",
+            "https://app.elohim.host/callback"
+        ));
         assert!(matches_uri_pattern("/threshold/*", "/threshold/callback"));
-        assert!(!matches_uri_pattern("http://localhost:*", "http://example.com:4200"));
+        assert!(!matches_uri_pattern(
+            "http://localhost:*",
+            "http://example.com:4200"
+        ));
     }
 
     #[test]

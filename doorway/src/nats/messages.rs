@@ -267,11 +267,8 @@ mod tests {
 
     #[test]
     fn test_response_success() {
-        let resp = HcWsResponse::success(
-            "req-123".to_string(),
-            "host-456".to_string(),
-            vec![1, 2, 3],
-        );
+        let resp =
+            HcWsResponse::success("req-123".to_string(), "host-456".to_string(), vec![1, 2, 3]);
 
         assert!(resp.success);
         assert!(resp.error.is_none());
@@ -280,8 +277,11 @@ mod tests {
 
     #[test]
     fn test_response_error() {
-        let resp =
-            HcWsResponse::error("req-123".to_string(), "host-456".to_string(), "oops".to_string());
+        let resp = HcWsResponse::error(
+            "req-123".to_string(),
+            "host-456".to_string(),
+            "oops".to_string(),
+        );
 
         assert!(!resp.success);
         assert_eq!(resp.error, Some("oops".to_string()));

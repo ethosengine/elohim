@@ -230,8 +230,8 @@ pub fn spawn_cleanup_task(store: Arc<BootstrapStore>) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::KITSUNE_BIN_LEN;
+    use super::*;
 
     #[test]
     fn test_agent_key_display() {

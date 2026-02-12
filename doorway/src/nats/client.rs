@@ -144,10 +144,7 @@ impl NatsClient {
     }
 
     /// Subscribe to a subject
-    pub async fn subscribe(
-        &self,
-        subject: &str,
-    ) -> Result<async_nats::Subscriber, DoorwayError> {
+    pub async fn subscribe(&self, subject: &str) -> Result<async_nats::Subscriber, DoorwayError> {
         self.client
             .subscribe(subject.to_string())
             .await

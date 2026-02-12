@@ -25,11 +25,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use doorway_client::{
-    AgentCapability, AgentRegistration, AgentRegistrationResponse, BlobProxyConfig,
-    DoorwayRoutes, HttpMethod, Route, StreamProxyConfig,
+    AgentCapability, AgentRegistration, AgentRegistrationResponse, BlobProxyConfig, DoorwayRoutes,
+    HttpMethod, StreamProxyConfig,
 };
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 // =============================================================================
 // Types
@@ -54,7 +54,7 @@ impl Default for RouteRegistryConfig {
             max_external_agents: 100,
             default_registration_ttl_secs: 86400, // 24 hours
             cleanup_interval: Duration::from_secs(300), // 5 minutes
-            max_timestamp_age_secs: 300, // 5 minutes
+            max_timestamp_age_secs: 300,          // 5 minutes
         }
     }
 }
@@ -97,7 +97,10 @@ pub enum RouteSource {
     /// Discovered from a DNA
     Dna { dna_hash: String, role_name: String },
     /// Registered by an external agent
-    ExternalAgent { agent_pubkey: String, registration_id: String },
+    ExternalAgent {
+        agent_pubkey: String,
+        registration_id: String,
+    },
     /// Built-in doorway route
     Builtin,
 }
@@ -118,13 +121,9 @@ pub enum RouteTarget {
         path_suffix: Option<String>,
     },
     /// Serve blobs from elohim-storage
-    BlobProxy {
-        config: BlobProxyConfig,
-    },
+    BlobProxy { config: BlobProxyConfig },
     /// Serve media streams
-    StreamProxy {
-        config: StreamProxyConfig,
-    },
+    StreamProxy { config: StreamProxyConfig },
 }
 
 /// Route registry statistics
@@ -166,7 +165,7 @@ struct DnaRouteEntry {
     /// Discovered routes
     routes: DoorwayRoutes,
     /// When discovered
-    discovered_at: Instant,
+    _discovered_at: Instant,
 }
 
 impl RouteRegistry {
@@ -203,7 +202,7 @@ impl RouteRegistry {
             role_name: role_name.to_string(),
             zome_name: zome_name.to_string(),
             routes,
-            discovered_at: Instant::now(),
+            _discovered_at: Instant::now(),
         };
 
         let mut dna_routes = self.dna_routes.write().await;
@@ -312,7 +311,10 @@ impl RouteRegistry {
         self.recompile_routes().await;
 
         // Build base URL for this agent
-        let base_url = format!("/agent/{}", &registration.agent_pubkey[..12.min(registration.agent_pubkey.len())]);
+        let base_url = format!(
+            "/agent/{}",
+            &registration.agent_pubkey[..12.min(registration.agent_pubkey.len())]
+        );
 
         AgentRegistrationResponse {
             success: true,
@@ -470,7 +472,10 @@ impl RouteRegistry {
     /// Compile routes from an external agent entry
     fn compile_agent_routes(&self, entry: &AgentRouteEntry) -> Vec<CompiledRoute> {
         let mut compiled = Vec::new();
-        let base_path = format!("/agent/{}", &entry.registration.agent_pubkey[..12.min(entry.registration.agent_pubkey.len())]);
+        let base_path = format!(
+            "/agent/{}",
+            &entry.registration.agent_pubkey[..12.min(entry.registration.agent_pubkey.len())]
+        );
 
         // If agent provided explicit routes, use those
         if let Some(ref routes) = entry.registration.routes {
@@ -686,7 +691,7 @@ fn path_matches(pattern: &str, path: &str) -> bool {
     let path_parts: Vec<&str> = path.split('/').collect();
 
     let mut pi = 0;
-    for (i, pp) in pattern_parts.iter().enumerate() {
+    for pp in pattern_parts.iter() {
         if pp.starts_with('*') {
             // Wildcard matches rest of path
             return true;

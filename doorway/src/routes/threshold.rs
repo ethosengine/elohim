@@ -39,10 +39,7 @@ pub async fn handle_threshold_request(
 }
 
 /// Forward a /threshold/* request to doorway-app
-async fn forward_threshold_request(
-    threshold_url: &str,
-    path: &str,
-) -> Response<Full<Bytes>> {
+async fn forward_threshold_request(threshold_url: &str, path: &str) -> Response<Full<Bytes>> {
     // Build the doorway-app endpoint URL
     // path is /threshold/... - forward as-is to doorway-app
     let target_url = format!("{}{}", threshold_url.trim_end_matches('/'), path);
@@ -98,9 +95,7 @@ async fn forward_threshold_request(
                         builder = builder.header("ETag", et);
                     }
 
-                    builder
-                        .body(Full::new(Bytes::from(body.to_vec())))
-                        .unwrap()
+                    builder.body(Full::new(Bytes::from(body.to_vec()))).unwrap()
                 }
                 Err(e) => {
                     warn!(error = %e, "Failed to read doorway-app response body");

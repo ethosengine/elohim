@@ -104,7 +104,8 @@ impl MongoUsageTracker {
 #[async_trait::async_trait]
 impl UsageTracker for MongoUsageTracker {
     async fn increment_queries(&self, user_id: &str, count: u64) -> Result<(), String> {
-        let collection = self.mongo
+        let collection = self
+            .mongo
             .collection::<UserDoc>(USER_COLLECTION)
             .await
             .map_err(|e| e.to_string())?;
@@ -125,7 +126,8 @@ impl UsageTracker for MongoUsageTracker {
     }
 
     async fn increment_bandwidth(&self, user_id: &str, bytes: u64) -> Result<(), String> {
-        let collection = self.mongo
+        let collection = self
+            .mongo
             .collection::<UserDoc>(USER_COLLECTION)
             .await
             .map_err(|e| e.to_string())?;
@@ -146,7 +148,8 @@ impl UsageTracker for MongoUsageTracker {
     }
 
     async fn update_storage(&self, user_id: &str, bytes: u64) -> Result<(), String> {
-        let collection = self.mongo
+        let collection = self
+            .mongo
             .collection::<UserDoc>(USER_COLLECTION)
             .await
             .map_err(|e| e.to_string())?;
@@ -169,7 +172,8 @@ impl UsageTracker for MongoUsageTracker {
     }
 
     async fn get_usage(&self, user_id: &str) -> Result<UserUsage, String> {
-        let collection = self.mongo
+        let collection = self
+            .mongo
             .collection::<UserDoc>(USER_COLLECTION)
             .await
             .map_err(|e| e.to_string())?;
@@ -185,7 +189,8 @@ impl UsageTracker for MongoUsageTracker {
     }
 
     async fn reset_usage(&self, user_id: &str) -> Result<(), String> {
-        let collection = self.mongo
+        let collection = self
+            .mongo
             .collection::<UserDoc>(USER_COLLECTION)
             .await
             .map_err(|e| e.to_string())?;
@@ -241,7 +246,8 @@ impl MongoQuotaEnforcer {
 #[async_trait::async_trait]
 impl QuotaEnforcer for MongoQuotaEnforcer {
     async fn check_quota(&self, user_id: &str) -> Result<QuotaStatus, String> {
-        let collection = self.mongo
+        let collection = self
+            .mongo
             .collection::<UserDoc>(USER_COLLECTION)
             .await
             .map_err(|e| e.to_string())?;
@@ -257,7 +263,8 @@ impl QuotaEnforcer for MongoQuotaEnforcer {
         let u = &user.usage;
 
         let storage_exceeded = q.storage_limit > 0 && u.storage_bytes > q.storage_limit;
-        let queries_exceeded = q.daily_query_limit > 0 && u.projection_queries > q.daily_query_limit;
+        let queries_exceeded =
+            q.daily_query_limit > 0 && u.projection_queries > q.daily_query_limit;
         let bandwidth_exceeded =
             q.daily_bandwidth_limit > 0 && u.bandwidth_bytes > q.daily_bandwidth_limit;
 
@@ -290,7 +297,8 @@ impl QuotaEnforcer for MongoQuotaEnforcer {
     }
 
     async fn update_quota(&self, user_id: &str, quota: UserQuota) -> Result<(), String> {
-        let collection = self.mongo
+        let collection = self
+            .mongo
             .collection::<UserDoc>(USER_COLLECTION)
             .await
             .map_err(|e| e.to_string())?;
@@ -357,12 +365,8 @@ impl ListUsersQuery {
                         "permissionLevel" | "permission_level" => {
                             params.permission_level = Some(value.to_string())
                         }
-                        "isActive" | "is_active" => {
-                            params.is_active = value.parse().ok()
-                        }
-                        "overQuota" | "over_quota" => {
-                            params.over_quota = value.parse().ok()
-                        }
+                        "isActive" | "is_active" => params.is_active = value.parse().ok(),
+                        "overQuota" | "over_quota" => params.over_quota = value.parse().ok(),
                         "sortBy" | "sort_by" => params.sort_by = value.to_string(),
                         "sortDir" | "sort_dir" => params.sort_dir = value.to_string(),
                         _ => {}
@@ -537,20 +541,20 @@ fn get_auth_header(req: &Request<Incoming>) -> Option<&str> {
         .and_then(|v| v.to_str().ok())
 }
 
+#[allow(clippy::result_large_err)]
 fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<FullBody>> {
     if state.args.dev_mode {
         Ok(JwtValidator::new_dev())
     } else {
         match &state.args.jwt_secret {
-            Some(secret) => {
-                JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).map_err(|e| {
+            Some(secret) => JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds)
+                .map_err(|e| {
                     error_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         &format!("JWT config error: {}", e),
                         Some("JWT_CONFIG_ERROR"),
                     )
-                })
-            }
+                }),
             None => Err(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "JWT secret not configured",
@@ -632,13 +636,19 @@ pub async fn handle_admin_users_request(
 
         // PUT /admin/users/{id}/status - Update status
         (Method::PUT, p) if p.ends_with("/status") => {
-            let id = p.strip_prefix('/').and_then(|s| s.strip_suffix("/status")).unwrap_or("");
+            let id = p
+                .strip_prefix('/')
+                .and_then(|s| s.strip_suffix("/status"))
+                .unwrap_or("");
             handle_update_status(req, state, id).await
         }
 
         // POST /admin/users/{id}/force-logout - Force logout
         (Method::POST, p) if p.ends_with("/force-logout") => {
-            let id = p.strip_prefix('/').and_then(|s| s.strip_suffix("/force-logout")).unwrap_or("");
+            let id = p
+                .strip_prefix('/')
+                .and_then(|s| s.strip_suffix("/force-logout"))
+                .unwrap_or("");
             handle_force_logout(req, state, id).await
         }
 
@@ -650,25 +660,37 @@ pub async fn handle_admin_users_request(
 
         // POST /admin/users/{id}/reset-password - Reset password
         (Method::POST, p) if p.ends_with("/reset-password") => {
-            let id = p.strip_prefix('/').and_then(|s| s.strip_suffix("/reset-password")).unwrap_or("");
+            let id = p
+                .strip_prefix('/')
+                .and_then(|s| s.strip_suffix("/reset-password"))
+                .unwrap_or("");
             handle_reset_password(req, state, id).await
         }
 
         // PUT /admin/users/{id}/permission - Update permission
         (Method::PUT, p) if p.ends_with("/permission") => {
-            let id = p.strip_prefix('/').and_then(|s| s.strip_suffix("/permission")).unwrap_or("");
+            let id = p
+                .strip_prefix('/')
+                .and_then(|s| s.strip_suffix("/permission"))
+                .unwrap_or("");
             handle_update_permission(req, state, id).await
         }
 
         // PUT /admin/users/{id}/quota - Update quota
         (Method::PUT, p) if p.ends_with("/quota") => {
-            let id = p.strip_prefix('/').and_then(|s| s.strip_suffix("/quota")).unwrap_or("");
+            let id = p
+                .strip_prefix('/')
+                .and_then(|s| s.strip_suffix("/quota"))
+                .unwrap_or("");
             handle_update_quota(req, state, id).await
         }
 
         // POST /admin/users/{id}/usage/reset - Reset usage
         (Method::POST, p) if p.ends_with("/usage/reset") => {
-            let id = p.strip_prefix('/').and_then(|s| s.strip_suffix("/usage/reset")).unwrap_or("");
+            let id = p
+                .strip_prefix('/')
+                .and_then(|s| s.strip_suffix("/usage/reset"))
+                .unwrap_or("");
             handle_reset_usage(req, state, id).await
         }
 
@@ -838,12 +860,20 @@ async fn handle_get_user(
 
     let oid = match ObjectId::parse_str(user_id) {
         Ok(o) => o,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid user ID", Some("INVALID_ID")),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
     };
 
     let user = match collection.find_one(doc! { "_id": oid }).await {
         Ok(Some(u)) => u,
-        Ok(None) => return error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
+        Ok(None) => {
+            return error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND"))
+        }
         Err(e) => {
             warn!("Error finding user: {}", e);
             return error_response(
@@ -893,13 +923,23 @@ async fn handle_update_status(
         Ok(c) => c,
         Err(e) => {
             warn!("Error getting collection: {}", e);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"));
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
         }
     };
 
     let oid = match ObjectId::parse_str(user_id) {
         Ok(o) => o,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid user ID", Some("INVALID_ID")),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
     };
 
     let result = collection
@@ -916,8 +956,15 @@ async fn handle_update_status(
 
     match result {
         Ok(r) if r.modified_count > 0 => {
-            let action = if request.is_active { "activated" } else { "deactivated" };
-            info!("User {} {} by admin {}", user_id, action, admin_claims.identifier);
+            let action = if request.is_active {
+                "activated"
+            } else {
+                "deactivated"
+            };
+            info!(
+                "User {} {} by admin {}",
+                user_id, action, admin_claims.identifier
+            );
             json_response(
                 StatusCode::OK,
                 &SuccessResponse {
@@ -929,7 +976,11 @@ async fn handle_update_status(
         Ok(_) => error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
         Err(e) => {
             warn!("Error updating user status: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"))
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            )
         }
     }
 }
@@ -960,13 +1011,23 @@ async fn handle_force_logout(
         Ok(c) => c,
         Err(e) => {
             warn!("Error getting collection: {}", e);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"));
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
         }
     };
 
     let oid = match ObjectId::parse_str(user_id) {
         Ok(o) => o,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid user ID", Some("INVALID_ID")),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
     };
 
     let result = collection
@@ -981,7 +1042,10 @@ async fn handle_force_logout(
 
     match result {
         Ok(r) if r.modified_count > 0 => {
-            info!("Force logout for user {} by admin {}", user_id, admin_claims.identifier);
+            info!(
+                "Force logout for user {} by admin {}",
+                user_id, admin_claims.identifier
+            );
             json_response(
                 StatusCode::OK,
                 &SuccessResponse {
@@ -993,7 +1057,11 @@ async fn handle_force_logout(
         Ok(_) => error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
         Err(e) => {
             warn!("Error forcing logout: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"))
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            )
         }
     }
 }
@@ -1024,13 +1092,23 @@ async fn handle_delete_user(
         Ok(c) => c,
         Err(e) => {
             warn!("Error getting collection: {}", e);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"));
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
         }
     };
 
     let oid = match ObjectId::parse_str(user_id) {
         Ok(o) => o,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid user ID", Some("INVALID_ID")),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
     };
 
     let result = collection
@@ -1048,7 +1126,10 @@ async fn handle_delete_user(
 
     match result {
         Ok(r) if r.modified_count > 0 => {
-            info!("User {} deleted by admin {}", user_id, admin_claims.identifier);
+            info!(
+                "User {} deleted by admin {}",
+                user_id, admin_claims.identifier
+            );
             json_response(
                 StatusCode::OK,
                 &SuccessResponse {
@@ -1060,7 +1141,11 @@ async fn handle_delete_user(
         Ok(_) => error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
         Err(e) => {
             warn!("Error deleting user: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"))
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            )
         }
     }
 }
@@ -1109,7 +1194,11 @@ async fn handle_reset_password(
         Ok(h) => h,
         Err(e) => {
             warn!("Error hashing password: {}", e);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Password hash error", None);
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Password hash error",
+                None,
+            );
         }
     };
 
@@ -1117,13 +1206,23 @@ async fn handle_reset_password(
         Ok(c) => c,
         Err(e) => {
             warn!("Error getting collection: {}", e);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"));
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
         }
     };
 
     let oid = match ObjectId::parse_str(user_id) {
         Ok(o) => o,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid user ID", Some("INVALID_ID")),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
     };
 
     let result = collection
@@ -1141,7 +1240,10 @@ async fn handle_reset_password(
 
     match result {
         Ok(r) if r.modified_count > 0 => {
-            info!("Password reset for user {} by admin {}", user_id, admin_claims.identifier);
+            info!(
+                "Password reset for user {} by admin {}",
+                user_id, admin_claims.identifier
+            );
             json_response(
                 StatusCode::OK,
                 &SuccessResponse {
@@ -1153,7 +1255,11 @@ async fn handle_reset_password(
         Ok(_) => error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
         Err(e) => {
             warn!("Error resetting password: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"))
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            )
         }
     }
 }
@@ -1207,13 +1313,23 @@ async fn handle_update_permission(
         Ok(c) => c,
         Err(e) => {
             warn!("Error getting collection: {}", e);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"));
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
         }
     };
 
     let oid = match ObjectId::parse_str(user_id) {
         Ok(o) => o,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid user ID", Some("INVALID_ID")),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
     };
 
     let result = collection
@@ -1245,7 +1361,11 @@ async fn handle_update_permission(
         Ok(_) => error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
         Err(e) => {
             warn!("Error updating permission: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"))
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            )
         }
     }
 }
@@ -1292,7 +1412,10 @@ async fn handle_update_quota(
         set_doc.insert("quota.daily_query_limit", query_limit as i64);
     }
     if let Some(bandwidth_mb) = request.daily_bandwidth_limit_mb {
-        set_doc.insert("quota.daily_bandwidth_limit", (bandwidth_mb * 1024.0 * 1024.0) as i64);
+        set_doc.insert(
+            "quota.daily_bandwidth_limit",
+            (bandwidth_mb * 1024.0 * 1024.0) as i64,
+        );
     }
     if let Some(enforce) = request.enforce_hard_limit {
         set_doc.insert("quota.enforce_hard_limit", enforce);
@@ -1302,13 +1425,23 @@ async fn handle_update_quota(
         Ok(c) => c,
         Err(e) => {
             warn!("Error getting collection: {}", e);
-            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"));
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            );
         }
     };
 
     let oid = match ObjectId::parse_str(user_id) {
         Ok(o) => o,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid user ID", Some("INVALID_ID")),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "Invalid user ID",
+                Some("INVALID_ID"),
+            )
+        }
     };
 
     let result = collection
@@ -1317,7 +1450,10 @@ async fn handle_update_quota(
 
     match result {
         Ok(r) if r.modified_count > 0 => {
-            info!("Quota updated for user {} by admin {}", user_id, admin_claims.identifier);
+            info!(
+                "Quota updated for user {} by admin {}",
+                user_id, admin_claims.identifier
+            );
             json_response(
                 StatusCode::OK,
                 &SuccessResponse {
@@ -1329,7 +1465,11 @@ async fn handle_update_quota(
         Ok(_) => error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND")),
         Err(e) => {
             warn!("Error updating quota: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"))
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Database error",
+                Some("DB_ERROR"),
+            )
         }
     }
 }
@@ -1360,7 +1500,10 @@ async fn handle_reset_usage(
 
     match tracker.reset_usage(user_id).await {
         Ok(()) => {
-            info!("Usage reset for user {} by admin {}", user_id, admin_claims.identifier);
+            info!(
+                "Usage reset for user {} by admin {}",
+                user_id, admin_claims.identifier
+            );
             json_response(
                 StatusCode::OK,
                 &SuccessResponse {
@@ -1374,7 +1517,11 @@ async fn handle_reset_usage(
             if e.contains("not found") {
                 error_response(StatusCode::NOT_FOUND, "User not found", Some("NOT_FOUND"))
             } else {
-                error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error", Some("DB_ERROR"))
+                error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Database error",
+                    Some("DB_ERROR"),
+                )
             }
         }
     }
@@ -1458,7 +1605,8 @@ pub fn try_extract_user_id_for_tracking<B>(
     jwt_secret: Option<&str>,
     dev_mode: bool,
 ) -> Option<String> {
-    let auth_header = req.headers()
+    let auth_header = req
+        .headers()
         .get(hyper::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
 
@@ -1496,10 +1644,7 @@ pub async fn track_bandwidth_if_user(
 
 /// Track projection query usage for a request.
 /// Call this after executing a projection query for a user.
-pub async fn track_query_if_user(
-    tracker: &dyn UsageTracker,
-    user_id: Option<&str>,
-) {
+pub async fn track_query_if_user(tracker: &dyn UsageTracker, user_id: Option<&str>) {
     if let Some(uid) = user_id {
         if let Err(e) = tracker.increment_queries(uid, 1).await {
             warn!("Failed to track query for user {}: {}", uid, e);

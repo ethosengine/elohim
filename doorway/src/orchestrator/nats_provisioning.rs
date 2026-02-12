@@ -61,11 +61,7 @@ impl NatsProvisioner {
     }
 
     /// Configure signing key paths
-    pub fn with_signing_keys(
-        mut self,
-        operator_sk_path: String,
-        hpos_sk_path: String,
-    ) -> Self {
+    pub fn with_signing_keys(mut self, operator_sk_path: String, hpos_sk_path: String) -> Self {
         self.operator_sk_path = Some(operator_sk_path);
         self.hpos_sk_path = Some(hpos_sk_path);
         self
@@ -104,9 +100,7 @@ impl NatsProvisioner {
             account: "HPOS".to_string(),
             role: "workload_role".to_string(),
             server_urls: vec![self.nats_url.clone()],
-            expires_at: Some(
-                (chrono::Utc::now() + chrono::Duration::days(365)).to_rfc3339()
-            ),
+            expires_at: Some((chrono::Utc::now() + chrono::Duration::days(365)).to_rfc3339()),
         };
 
         debug!(
@@ -149,7 +143,7 @@ fn generate_placeholder_key() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("{:X}", timestamp)[..40].to_string()
+    format!("{:040X}", timestamp)
 }
 
 /// NATS permission template for workload role
@@ -253,9 +247,18 @@ mod tests {
     fn test_workload_permissions() {
         let perms = WorkloadPermissions::default();
 
-        assert!(perms.publish.allow.contains(&"WORKLOAD.orchestrator.>".to_string()));
-        assert!(perms.publish.allow.contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
-        assert!(perms.subscribe.allow.contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
+        assert!(perms
+            .publish
+            .allow
+            .contains(&"WORKLOAD.orchestrator.>".to_string()));
+        assert!(perms
+            .publish
+            .allow
+            .contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
+        assert!(perms
+            .subscribe
+            .allow
+            .contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
     }
 
     #[test]

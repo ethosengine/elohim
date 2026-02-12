@@ -25,7 +25,7 @@ use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use std::sync::Arc;
 
-use crate::cache::{BlobMetadata, VariantMetadata};
+use crate::cache::BlobMetadata;
 use crate::server::AppState;
 use crate::services::CustodianSelectionCriteria;
 
@@ -189,7 +189,11 @@ pub async fn handle_chunk(
 
     // For now, return a redirect to the first custodian URL
     // In production, we would fetch and cache the chunk
-    let chunk_url = format!("{}/chunk/{}", urls[0].trim_end_matches(&format!("/{}", blob_hash)), chunk_index);
+    let chunk_url = format!(
+        "{}/chunk/{}",
+        urls[0].trim_end_matches(&format!("/{}", blob_hash)),
+        chunk_index
+    );
 
     Response::builder()
         .status(StatusCode::TEMPORARY_REDIRECT)
@@ -209,8 +213,16 @@ pub async fn handle_blob_range(
     range_end: usize,
 ) -> Response<Full<Bytes>> {
     // Try to get range from tiered cache
-    if let Some(data) = state.tiered_cache.get_blob_range(blob_hash, range_start, range_end) {
-        let content_range = format!("bytes {}-{}/{}", range_start, range_end - 1, range_end - range_start);
+    if let Some(data) = state
+        .tiered_cache
+        .get_blob_range(blob_hash, range_start, range_end)
+    {
+        let content_range = format!(
+            "bytes {}-{}/{}",
+            range_start,
+            range_end - 1,
+            range_end - range_start
+        );
         return Response::builder()
             .status(StatusCode::PARTIAL_CONTENT)
             .header("Content-Type", "application/octet-stream")
@@ -285,19 +297,22 @@ pub fn generate_hls_variant(
     duration_secs: u32,
     segment_duration: u32,
     base_url: &str,
-    chunk_size: usize,
+    _chunk_size: usize,
 ) -> String {
     let mut playlist = String::new();
 
     // Header
     playlist.push_str("#EXTM3U\n");
     playlist.push_str("#EXT-X-VERSION:3\n");
-    playlist.push_str(&format!("#EXT-X-TARGETDURATION:{}\n", DEFAULT_TARGET_DURATION));
+    playlist.push_str(&format!(
+        "#EXT-X-TARGETDURATION:{}\n",
+        DEFAULT_TARGET_DURATION
+    ));
     playlist.push_str("#EXT-X-MEDIA-SEQUENCE:0\n");
 
     // Calculate number of segments
     let num_segments = if duration_secs > 0 {
-        (duration_secs + segment_duration - 1) / segment_duration
+        duration_secs.div_ceil(segment_duration)
     } else {
         1
     };
@@ -338,7 +353,7 @@ pub fn generate_hls_variant(
 /// * `base_url` - Base URL for segment endpoints
 pub fn generate_dash_mpd(
     metadata: &BlobMetadata,
-    content_id: &str,
+    _content_id: &str,
     duration_secs: u32,
     base_url: &str,
 ) -> String {
@@ -472,9 +487,7 @@ pub async fn handle_stream_request(
 
     match parts.as_slice() {
         // HLS master playlist: /api/stream/hls/{content_id}
-        ["hls", content_id] => {
-            handle_hls_master(state, content_id, base_url).await
-        }
+        ["hls", content_id] => handle_hls_master(state, content_id, base_url).await,
 
         // HLS variant playlist: /api/stream/hls/{content_id}/{variant}.m3u8
         ["hls", content_id, variant] => {
@@ -483,17 +496,13 @@ pub async fn handle_stream_request(
         }
 
         // DASH manifest: /api/stream/dash/{content_id}
-        ["dash", content_id] => {
-            handle_dash_mpd(state, content_id, base_url).await
-        }
+        ["dash", content_id] => handle_dash_mpd(state, content_id, base_url).await,
 
         // Chunk: /api/stream/chunk/{hash}/{index}
-        ["chunk", hash, index] => {
-            match index.parse::<usize>() {
-                Ok(idx) => handle_chunk(state, hash, idx).await,
-                Err(_) => error_response(StatusCode::BAD_REQUEST, "Invalid chunk index"),
-            }
-        }
+        ["chunk", hash, index] => match index.parse::<usize>() {
+            Ok(idx) => handle_chunk(state, hash, idx).await,
+            Err(_) => error_response(StatusCode::BAD_REQUEST, "Invalid chunk index"),
+        },
 
         _ => error_response(StatusCode::NOT_FOUND, "Unknown streaming endpoint"),
     }
@@ -506,6 +515,7 @@ pub async fn handle_stream_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::VariantMetadata;
 
     fn test_metadata() -> BlobMetadata {
         BlobMetadata {

@@ -11,14 +11,14 @@
 //! 3. Discover cell_id for role_name via list_apps
 //! 4. Build CallZome envelope (MessagePack), send, parse response
 
+use rmpv::Value;
+use serde::{de::DeserializeOwned, Serialize};
 use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
-use rmpv::Value;
-use serde::{de::DeserializeOwned, Serialize};
 
-use crate::projection::app_auth::{self, AppAuthToken};
+use crate::projection::app_auth::{self};
 use crate::worker::ConductorConnection;
 
 /// Generic zome call client with single-connection lazy init
@@ -81,14 +81,18 @@ impl ZomeCaller {
             &self.admin_url,
             &self.installed_app_id,
             300, // 5 minute token
-        ).await?;
+        )
+        .await?;
 
         // Connect to app interface
         // ConductorConnection.connect handles the auth handshake internally
         // We need to pass the token as part of the URL or via the connection
         // Following the pattern from projection/subscriber.rs which connects with auth
-        let app_url_with_token = format!("{}?token={}", self.app_url,
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &token.token));
+        let app_url_with_token = format!(
+            "{}?token={}",
+            self.app_url,
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &token.token)
+        );
 
         info!("ZomeCaller connecting to app interface at {}", self.app_url);
         let conn = ConductorConnection::connect(&app_url_with_token)
@@ -118,12 +122,7 @@ impl ZomeCaller {
         let conn = self.get_connection().await?;
 
         // Build CallZome request envelope
-        let call_zome_request = build_call_zome_request(
-            role_name,
-            zome_name,
-            fn_name,
-            payload,
-        );
+        let call_zome_request = build_call_zome_request(role_name, zome_name, fn_name, payload);
 
         let request_id = 1u64;
         let envelope = build_request_envelope(request_id, &call_zome_request);
@@ -159,10 +158,12 @@ impl ZomeCaller {
         fn_name: &str,
         input: &I,
     ) -> Result<O, String> {
-        let payload = rmp_serde::to_vec(input)
-            .map_err(|e| format!("Failed to serialize input: {}", e))?;
+        let payload =
+            rmp_serde::to_vec(input).map_err(|e| format!("Failed to serialize input: {}", e))?;
 
-        let response_bytes = self.call_zome(role_name, zome_name, fn_name, payload).await?;
+        let response_bytes = self
+            .call_zome(role_name, zome_name, fn_name, payload)
+            .await?;
 
         rmp_serde::from_slice(&response_bytes)
             .map_err(|e| format!("Failed to deserialize response: {}", e))
@@ -199,10 +200,7 @@ fn build_call_zome_request(
             Value::String("fn_name".into()),
             Value::String(fn_name.into()),
         ),
-        (
-            Value::String("payload".into()),
-            Value::Binary(payload),
-        ),
+        (Value::String("payload".into()), Value::Binary(payload)),
     ]);
 
     let inner = Value::Map(vec![
@@ -283,7 +281,7 @@ fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
         }
     }
 
-    Err(format!("Unexpected zome call response format"))
+    Err("Unexpected zome call response format".to_string())
 }
 
 /// Get a string field from a MessagePack map

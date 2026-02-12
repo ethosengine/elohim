@@ -16,7 +16,6 @@ use tracing::{debug, error, info, warn};
 
 use crate::types::{DoorwayError, Result};
 
-
 /// Conductor connection manager
 pub struct ConductorConnection {
     /// URL of the conductor
@@ -113,10 +112,7 @@ async fn connection_loop(
         }
 
         // Wait before reconnecting
-        warn!(
-            "Reconnecting to conductor in {:?}...",
-            reconnect_delay
-        );
+        warn!("Reconnecting to conductor in {:?}...", reconnect_delay);
         tokio::time::sleep(reconnect_delay).await;
         reconnect_delay = (reconnect_delay * 2).min(max_reconnect_delay);
     }

@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::config::Args;
 use crate::server::AppState;
@@ -176,12 +176,15 @@ pub async fn register_doorway_in_dht(
         "Registering doorway in infrastructure DHT"
     );
 
-    match zome_caller.call::<RegisterDoorwayInput, DoorwayOutput>(
-        &config.infrastructure_role,
-        &config.zome_name,
-        "register_doorway",
-        &input,
-    ).await {
+    match zome_caller
+        .call::<RegisterDoorwayInput, DoorwayOutput>(
+            &config.infrastructure_role,
+            &config.zome_name,
+            "register_doorway",
+            &input,
+        )
+        .await
+    {
         Ok(_output) => {
             info!(
                 doorway_id = %config.doorway_id,
@@ -195,12 +198,15 @@ pub async fn register_doorway_in_dht(
                 doorway_id = %config.doorway_id,
                 "Doorway already registered, updating..."
             );
-            match zome_caller.call::<RegisterDoorwayInput, DoorwayOutput>(
-                &config.infrastructure_role,
-                &config.zome_name,
-                "update_doorway",
-                &input,
-            ).await {
+            match zome_caller
+                .call::<RegisterDoorwayInput, DoorwayOutput>(
+                    &config.infrastructure_role,
+                    &config.zome_name,
+                    "update_doorway",
+                    &input,
+                )
+                .await
+            {
                 Ok(_) => {
                     info!("Doorway registration updated successfully");
                     Ok(())
@@ -246,13 +252,15 @@ pub fn spawn_heartbeat_task(
             tokio::time::sleep(interval).await;
 
             // Gather live metrics from AppState
-            let active_connections = state.pool.as_ref()
+            let active_connections = state
+                .pool
+                .as_ref()
                 .map(|p| p.connected_count() as u32)
                 .unwrap_or(0);
 
             // Increment a rough content served counter based on cache stats
             let cache_hits = state.cache.stats().hits;
-            content_served_total = content_served_total.wrapping_add(cache_hits as u64);
+            content_served_total = content_served_total.wrapping_add(cache_hits);
 
             let input = RecordHeartbeatInput {
                 doorway_id: config.doorway_id.clone(),
@@ -268,12 +276,15 @@ pub fn spawn_heartbeat_task(
                 "Recording heartbeat"
             );
 
-            match zome_caller.call::<RecordHeartbeatInput, Vec<u8>>(
-                &config.infrastructure_role,
-                &config.zome_name,
-                "record_heartbeat",
-                &input,
-            ).await {
+            match zome_caller
+                .call::<RecordHeartbeatInput, Vec<u8>>(
+                    &config.infrastructure_role,
+                    &config.zome_name,
+                    "record_heartbeat",
+                    &input,
+                )
+                .await
+            {
                 Ok(_) => {
                     debug!("Heartbeat recorded successfully");
                 }
@@ -324,12 +335,16 @@ pub async fn fetch_from_remote_doorway(
         online_only: Some(true),
     };
 
-    let publishers_result = zome_caller.call_zome(
-        &config.infrastructure_role,
-        &config.zome_name,
-        "find_publishers",
-        rmp_serde::to_vec(&input).map_err(|e| FederationError::ZomeCallFailed(e.to_string()))?,
-    ).await.map_err(|e| FederationError::ZomeCallFailed(e))?;
+    let publishers_result = zome_caller
+        .call_zome(
+            &config.infrastructure_role,
+            &config.zome_name,
+            "find_publishers",
+            rmp_serde::to_vec(&input)
+                .map_err(|e| FederationError::ZomeCallFailed(e.to_string()))?,
+        )
+        .await
+        .map_err(FederationError::ZomeCallFailed)?;
 
     // Parse publishers response
     #[derive(Deserialize)]
@@ -361,8 +376,9 @@ pub async fn fetch_from_remote_doorway(
         protocol: String,
     }
 
-    let output: FindPublishersOutput = rmp_serde::from_slice(&publishers_result)
-        .map_err(|e| FederationError::ZomeCallFailed(format!("Failed to parse publishers: {}", e)))?;
+    let output: FindPublishersOutput = rmp_serde::from_slice(&publishers_result).map_err(|e| {
+        FederationError::ZomeCallFailed(format!("Failed to parse publishers: {}", e))
+    })?;
 
     if output.publishers.is_empty() {
         return Err(FederationError::NoPublishers(content_hash.to_string()));
@@ -390,23 +406,21 @@ pub async fn fetch_from_remote_doorway(
                 .send()
                 .await
             {
-                Ok(resp) if resp.status().is_success() => {
-                    match resp.bytes().await {
-                        Ok(bytes) => {
-                            info!(
-                                content_hash = %content_hash,
-                                source = %endpoint.url,
-                                size = bytes.len(),
-                                "Federation fetch successful"
-                            );
-                            return Ok(bytes.to_vec());
-                        }
-                        Err(e) => {
-                            warn!("Failed to read response body from {}: {}", blob_url, e);
-                            continue;
-                        }
+                Ok(resp) if resp.status().is_success() => match resp.bytes().await {
+                    Ok(bytes) => {
+                        info!(
+                            content_hash = %content_hash,
+                            source = %endpoint.url,
+                            size = bytes.len(),
+                            "Federation fetch successful"
+                        );
+                        return Ok(bytes.to_vec());
                     }
-                }
+                    Err(e) => {
+                        warn!("Failed to read response body from {}: {}", blob_url, e);
+                        continue;
+                    }
+                },
                 Ok(resp) => {
                     debug!(
                         status = %resp.status(),
@@ -434,7 +448,9 @@ pub async fn fetch_from_remote_doorway(
                 match did_resolver.resolve(&did).await {
                     Ok(doc) => {
                         // Find ElohimBlobStore service endpoint
-                        if let Some(blob_service) = doc.service.iter()
+                        if let Some(blob_service) = doc
+                            .service
+                            .iter()
                             .find(|s| s.service_type == "ElohimBlobStore")
                         {
                             let blob_url = format!(
@@ -485,11 +501,7 @@ fn extract_domain_from_url(url: &str) -> Option<String> {
         .or_else(|| url.strip_prefix("http://"))
         .unwrap_or(url);
 
-    let domain = without_scheme
-        .split('/')
-        .next()?
-        .split(':')
-        .next()?;
+    let domain = without_scheme.split('/').next()?.split(':').next()?;
 
     if domain.is_empty() {
         None
@@ -515,12 +527,15 @@ pub async fn get_all_doorways(
     // A full implementation would use a "list all" anchor pattern.
 
     // Try to get our own doorway registration as proof of concept
-    match zome_caller.call::<String, Option<DoorwayOutput>>(
-        &config.infrastructure_role,
-        &config.zome_name,
-        "get_doorway_by_id",
-        &config.doorway_id,
-    ).await {
+    match zome_caller
+        .call::<String, Option<DoorwayOutput>>(
+            &config.infrastructure_role,
+            &config.zome_name,
+            "get_doorway_by_id",
+            &config.doorway_id,
+        )
+        .await
+    {
         Ok(Some(output)) => Ok(vec![output.doorway]),
         Ok(None) => Ok(vec![]),
         Err(e) => {
@@ -554,11 +569,11 @@ pub fn new_peer_cache() -> PeerCache {
 
 /// Fetch federation info from a single peer doorway.
 /// Queries `{peer_url}/api/v1/federation/doorways` and returns parsed doorways.
-async fn fetch_single_peer(
-    client: &reqwest::Client,
-    peer_url: &str,
-) -> Vec<PeerDoorway> {
-    let url = format!("{}/api/v1/federation/doorways", peer_url.trim_end_matches('/'));
+async fn fetch_single_peer(client: &reqwest::Client, peer_url: &str) -> Vec<PeerDoorway> {
+    let url = format!(
+        "{}/api/v1/federation/doorways",
+        peer_url.trim_end_matches('/')
+    );
 
     match client.get(&url).send().await {
         Ok(resp) if resp.status().is_success() => {
@@ -578,15 +593,17 @@ async fn fetch_single_peer(
             }
 
             match resp.json::<PeerResponse>().await {
-                Ok(parsed) => {
-                    parsed.doorways.into_iter().map(|d| PeerDoorway {
+                Ok(parsed) => parsed
+                    .doorways
+                    .into_iter()
+                    .map(|d| PeerDoorway {
                         id: d.id,
                         url: d.url,
                         region: d.region,
                         capabilities: d.capabilities,
                         source_peer: peer_url.to_string(),
-                    }).collect()
-                }
+                    })
+                    .collect(),
                 Err(e) => {
                     warn!(peer = %peer_url, error = %e, "Failed to parse peer federation response");
                     Vec::new()
@@ -607,11 +624,7 @@ async fn fetch_single_peer(
 /// Refresh the peer cache by querying all configured peers.
 /// Deduplicates by doorway id — if multiple peers report the same doorway,
 /// the first occurrence wins.
-pub async fn refresh_peer_cache(
-    peer_urls: &[String],
-    self_id: Option<&str>,
-    cache: &PeerCache,
-) {
+pub async fn refresh_peer_cache(peer_urls: &[String], self_id: Option<&str>, cache: &PeerCache) {
     if peer_urls.is_empty() {
         return;
     }
@@ -687,16 +700,22 @@ mod tests {
     fn test_federation_config_from_args_none() {
         let args = Args::parse_from(["doorway"]);
         let config = FederationConfig::from_args(&args);
-        assert!(config.is_none(), "Should be None when doorway_id/url not set");
+        assert!(
+            config.is_none(),
+            "Should be None when doorway_id/url not set"
+        );
     }
 
     #[test]
     fn test_federation_config_from_args_some() {
         let args = Args::parse_from([
             "doorway",
-            "--doorway-id", "alpha-elohim-host",
-            "--doorway-url", "https://alpha.elohim.host",
-            "--region", "us-west",
+            "--doorway-id",
+            "alpha-elohim-host",
+            "--doorway-url",
+            "https://alpha.elohim.host",
+            "--region",
+            "us-west",
         ]);
         let config = FederationConfig::from_args(&args).unwrap();
         assert_eq!(config.doorway_id, "alpha-elohim-host");
@@ -715,10 +734,7 @@ mod tests {
             extract_domain_from_url("http://localhost:8080/api"),
             Some("localhost".to_string())
         );
-        assert_eq!(
-            extract_domain_from_url(""),
-            None
-        );
+        assert_eq!(extract_domain_from_url(""), None);
     }
 
     #[test]

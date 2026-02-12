@@ -14,7 +14,10 @@ pub mod zome_call;
 pub use conductor::ConductorConnection;
 pub use pool::{PoolConfig, WorkerPool};
 pub use processor::{
-    Worker, WorkerConfig, WorkerRequest, WorkerResponse,
-    CONSUMER_NAME_PREFIX, STREAM_NAME, SUBJECT_PREFIX,
+    Worker, WorkerConfig, WorkerRequest, WorkerResponse, CONSUMER_NAME_PREFIX, STREAM_NAME,
+    SUBJECT_PREFIX,
 };
-pub use zome_call::{ZomeCallBuilder, ZomeCallConfig, DoorwayGetInput, DoorwayWriteInput, DoorwayBatchInput, RequesterIdentity};
+pub use zome_call::{
+    DoorwayBatchInput, DoorwayGetInput, DoorwayWriteInput, RequesterIdentity, ZomeCallBuilder,
+    ZomeCallConfig,
+};

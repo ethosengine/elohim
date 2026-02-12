@@ -67,9 +67,7 @@ fn try_parse_client_envelope(
 
             if let Value::Map(ref inner_map) = inner {
                 if let Some(operation) = get_string_field(inner_map, "type") {
-                    let data = get_field(inner_map, "data")
-                        .cloned()
-                        .unwrap_or(Value::Nil);
+                    let data = get_field(inner_map, "data").cloned().unwrap_or(Value::Nil);
                     return Ok(Some(ParsedMessage { operation, data }));
                 }
             }
@@ -123,10 +121,7 @@ fn get_field<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
 /// Encode an error response in MessagePack format
 pub fn encode_error(message: &str) -> Vec<u8> {
     let error_map = Value::Map(vec![
-        (
-            Value::String("type".into()),
-            Value::String("error".into()),
-        ),
+        (Value::String("type".into()), Value::String("error".into())),
         (
             Value::String("data".into()),
             Value::Map(vec![(

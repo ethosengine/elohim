@@ -47,7 +47,10 @@ pub struct DIDDocument {
     pub elohim_region: Option<String>,
 
     /// Elohim-specific: Holochain cell ID (if connected)
-    #[serde(rename = "elohim:holochainCellId", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "elohim:holochainCellId",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub elohim_holochain_cell_id: Option<String>,
 }
 
@@ -119,11 +122,7 @@ fn extract_domain(url: &str) -> Option<String> {
         .unwrap_or(url);
 
     // Take everything before the first "/" or ":"
-    let domain = without_scheme
-        .split('/')
-        .next()?
-        .split(':')
-        .next()?;
+    let domain = without_scheme.split('/').next()?.split(':').next()?;
 
     if domain.is_empty() {
         None
@@ -199,26 +198,25 @@ fn build_did_document(state: &AppState) -> DIDDocument {
             "https://elohim-protocol.org/ns/v1".to_string(),
         ],
         id: did.clone(),
-        verification_method: vec![
-            VerificationMethod {
-                id: format!("{}#node-key", did),
-                method_type: "Ed25519VerificationKey2020".to_string(),
-                controller: did.clone(),
-                public_key_multibase: state.node_verifying_key.as_ref().map(|key| {
-                    // Multibase z-prefix (base58btc) with Ed25519 multicodec prefix 0xed01
-                    let pub_bytes = key.to_bytes();
-                    let mut prefixed = vec![0xed, 0x01];
-                    prefixed.extend_from_slice(&pub_bytes);
-                    format!("z{}", bs58::encode(&prefixed).into_string())
-                }),
-            },
-        ],
+        verification_method: vec![VerificationMethod {
+            id: format!("{}#node-key", did),
+            method_type: "Ed25519VerificationKey2020".to_string(),
+            controller: did.clone(),
+            public_key_multibase: state.node_verifying_key.as_ref().map(|key| {
+                // Multibase z-prefix (base58btc) with Ed25519 multicodec prefix 0xed01
+                let pub_bytes = key.to_bytes();
+                let mut prefixed = vec![0xed, 0x01];
+                prefixed.extend_from_slice(&pub_bytes);
+                format!("z{}", bs58::encode(&prefixed).into_string())
+            }),
+        }],
         authentication: vec![format!("{}#node-key", did)],
         assertion_method: vec![format!("{}#node-key", did)],
         service: services,
         elohim_capabilities: capabilities,
         elohim_region: args.region.clone(),
-        elohim_holochain_cell_id: state.zome_configs
+        elohim_holochain_cell_id: state
+            .zome_configs
             .get("infrastructure")
             .map(|entry| format!("{:?}", entry.value())),
     }

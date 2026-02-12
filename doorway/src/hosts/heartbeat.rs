@@ -35,11 +35,7 @@ pub struct HeartbeatService {
 
 impl HeartbeatService {
     /// Create a new heartbeat service
-    pub fn new(
-        node_id: String,
-        nats: Option<NatsClient>,
-        max_connections: i32,
-    ) -> Self {
+    pub fn new(node_id: String, nats: Option<NatsClient>, max_connections: i32) -> Self {
         Self {
             node_id,
             nats,

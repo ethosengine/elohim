@@ -192,7 +192,9 @@ pub struct NatsArgs {
 impl Args {
     /// Get effective admin URL (falls back to conductor_url if not set)
     pub fn admin_url(&self) -> &str {
-        self.conductor_admin_url.as_deref().unwrap_or(&self.conductor_url)
+        self.conductor_admin_url
+            .as_deref()
+            .unwrap_or(&self.conductor_url)
     }
 
     /// Get effective JWT secret (uses default in dev mode)
@@ -228,10 +230,8 @@ impl Args {
 
     /// Validate configuration
     pub fn validate(&self) -> Result<(), String> {
-        if !self.dev_mode {
-            if self.jwt_secret.is_none() {
-                return Err("JWT_SECRET is required in production mode".to_string());
-            }
+        if !self.dev_mode && self.jwt_secret.is_none() {
+            return Err("JWT_SECRET is required in production mode".to_string());
         }
 
         if self.app_port_min > self.app_port_max {

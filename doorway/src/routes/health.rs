@@ -160,10 +160,8 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     // - 'degraded': running but conductor not connected (limited functionality)
     // - 'offline': would return early if service truly down
     // - 'maintenance': reserved for planned maintenance
-    let status = if conductor_connected {
+    let status = if conductor_connected || args.dev_mode {
         "online"
-    } else if args.dev_mode {
-        "online" // Dev mode is always "online" for picker purposes
     } else {
         "degraded"
     };

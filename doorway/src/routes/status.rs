@@ -172,11 +172,17 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     };
 
     if !conductor_connected && !state.args.dev_mode {
-        recommendations.push("Conductor not connected - seeding will fail. Check worker pool health.".to_string());
+        recommendations.push(
+            "Conductor not connected - seeding will fail. Check worker pool health.".to_string(),
+        );
     }
 
     let conductor = ConductorStats {
-        connected: if state.args.dev_mode { true } else { conductor_connected },
+        connected: if state.args.dev_mode {
+            true
+        } else {
+            conductor_connected
+        },
         connected_workers,
         total_workers,
     };
@@ -195,7 +201,10 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
                 error: None,
             },
             Err(e) => {
-                recommendations.push(format!("Cannot reach elohim-storage: {} - imports will fail", e));
+                recommendations.push(format!(
+                    "Cannot reach elohim-storage: {} - imports will fail",
+                    e
+                ));
                 StorageStats {
                     configured: true,
                     url: Some(storage_url.clone()),
@@ -263,13 +272,26 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
                 let status_str = match &node_status.status {
                     NodeHealthStatus::Discovered => "discovered",
                     NodeHealthStatus::Registering => "registering",
-                    NodeHealthStatus::Online => { online += 1; "online" },
-                    NodeHealthStatus::Degraded => { degraded += 1; "degraded" },
-                    NodeHealthStatus::Offline => { failed += 1; "offline" },
-                    NodeHealthStatus::Failed => { failed += 1; "failed" },
+                    NodeHealthStatus::Online => {
+                        online += 1;
+                        "online"
+                    }
+                    NodeHealthStatus::Degraded => {
+                        degraded += 1;
+                        "degraded"
+                    }
+                    NodeHealthStatus::Offline => {
+                        failed += 1;
+                        "offline"
+                    }
+                    NodeHealthStatus::Failed => {
+                        failed += 1;
+                        "failed"
+                    }
                 };
 
-                let last_heartbeat_secs_ago = node_status.last_heartbeat.map(|t| t.elapsed().as_secs());
+                let last_heartbeat_secs_ago =
+                    node_status.last_heartbeat.map(|t| t.elapsed().as_secs());
 
                 // Extract social metrics if available
                 let (steward_tier, trust_score, impact_score) = match &node_status.social_metrics {
@@ -305,7 +327,11 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
         }
         None => OrchestratorStats {
             enabled: false,
-            region: state.args.region.clone().unwrap_or_else(|| "default".to_string()),
+            region: state
+                .args
+                .region
+                .clone()
+                .unwrap_or_else(|| "default".to_string()),
             total_nodes: 0,
             online_nodes: 0,
             degraded_nodes: 0,
@@ -372,11 +398,11 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 struct StorageHealthResponse {
     status: String,
     #[serde(default)]
-    blobs: u64,
+    _blobs: u64,
     #[serde(default)]
-    bytes: u64,
+    _bytes: u64,
     #[serde(default)]
-    manifests: u64,
+    _manifests: u64,
     #[serde(default)]
     import_enabled: bool,
 }
@@ -415,16 +441,21 @@ async fn fetch_storage_status(storage_url: &str) -> Result<StorageStatusInfo, St
 
     // Fetch health
     let health_url = format!("{}/health", base_url);
-    let health_resp = client.get(&health_url)
+    let health_resp = client
+        .get(&health_url)
         .send()
         .await
         .map_err(|e| format!("Connection failed: {}", e))?;
 
     if !health_resp.status().is_success() {
-        return Err(format!("Health check failed: HTTP {}", health_resp.status()));
+        return Err(format!(
+            "Health check failed: HTTP {}",
+            health_resp.status()
+        ));
     }
 
-    let health: StorageHealthResponse = health_resp.json()
+    let health: StorageHealthResponse = health_resp
+        .json()
         .await
         .map_err(|e| format!("Invalid health response: {}", e))?;
 
@@ -433,12 +464,15 @@ async fn fetch_storage_status(storage_url: &str) -> Result<StorageStatusInfo, St
     let import_enabled = health.import_enabled;
 
     // Try to fetch batches (may not be available if import API disabled)
-    let batches = match fetch_import_batches(&client, base_url).await {
-        Ok(b) => b,
-        Err(_) => vec![], // Import API might not be enabled
-    };
+    let batches: Vec<ImportBatchSummary> = fetch_import_batches(&client, base_url)
+        .await
+        .unwrap_or_default();
 
-    Ok(StorageStatusInfo { healthy, import_enabled, batches })
+    Ok(StorageStatusInfo {
+        healthy,
+        import_enabled,
+        batches,
+    })
 }
 
 /// Fetch import batches from elohim-storage
@@ -447,7 +481,8 @@ async fn fetch_import_batches(
     base_url: &str,
 ) -> Result<Vec<ImportBatchSummary>, String> {
     let url = format!("{}/import/batches", base_url);
-    let resp = client.get(&url)
+    let resp = client
+        .get(&url)
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
@@ -456,12 +491,14 @@ async fn fetch_import_batches(
         return Err(format!("HTTP {}", resp.status()));
     }
 
-    let data: StorageBatchesResponse = resp.json()
+    let data: StorageBatchesResponse = resp
+        .json()
         .await
         .map_err(|e| format!("Invalid response: {}", e))?;
 
     // Take only last 5 batches
-    let batches: Vec<ImportBatchSummary> = data.batches
+    let batches: Vec<ImportBatchSummary> = data
+        .batches
         .into_iter()
         .take(5)
         .map(|b| ImportBatchSummary {
@@ -500,13 +537,11 @@ mod tests {
                 healthy: Some(true),
                 import_enabled: Some(true),
                 active_batches: 1,
-                recent_batches: vec![
-                    ImportBatchSummary {
-                        batch_id: "test-batch-1".to_string(),
-                        status: "completed".to_string(),
-                        progress: "100/100".to_string(),
-                    },
-                ],
+                recent_batches: vec![ImportBatchSummary {
+                    batch_id: "test-batch-1".to_string(),
+                    status: "completed".to_string(),
+                    progress: "100/100".to_string(),
+                }],
                 error: None,
             },
             bootstrap: BootstrapStats {
@@ -527,18 +562,16 @@ mod tests {
                 online_nodes: 4,
                 degraded_nodes: 1,
                 failed_nodes: 0,
-                nodes: vec![
-                    NodeSummary {
-                        node_id: "node-1".to_string(),
-                        status: "online".to_string(),
-                        nats_provisioned: true,
-                        last_heartbeat_secs_ago: Some(5),
-                        combined_score: 0.85,
-                        steward_tier: Some("guardian".to_string()),
-                        trust_score: Some(0.9),
-                        impact_score: Some(0.75),
-                    },
-                ],
+                nodes: vec![NodeSummary {
+                    node_id: "node-1".to_string(),
+                    status: "online".to_string(),
+                    nats_provisioned: true,
+                    last_heartbeat_secs_ago: Some(5),
+                    combined_score: 0.85,
+                    steward_tier: Some("guardian".to_string()),
+                    trust_score: Some(0.9),
+                    impact_score: Some(0.75),
+                }],
             },
             diagnostics: Diagnostics {
                 status: "healthy".to_string(),

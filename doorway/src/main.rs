@@ -13,9 +13,14 @@ use doorway::{
     db::MongoClient,
     nats::NatsClient,
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
-    projection::{EngineConfig, ProjectionEngine, SubscriberConfig, spawn_engine_task, spawn_subscriber},
+    projection::{
+        spawn_engine_task, spawn_subscriber, EngineConfig, ProjectionEngine, SubscriberConfig,
+    },
     server,
-    services::{self, DiscoveryConfig, StorageRegistrationConfig, register_local_storage, spawn_discovery_task},
+    services::{
+        self, register_local_storage, spawn_discovery_task, DiscoveryConfig,
+        StorageRegistrationConfig,
+    },
     worker::{PoolConfig, WorkerPool},
 };
 
@@ -50,11 +55,21 @@ async fn main() -> anyhow::Result<()> {
     info!("======================================");
     info!("Node ID: {}", args.node_id);
     info!("Listen: {}", args.listen);
-    info!("Mode: {}", if args.dev_mode { "DEVELOPMENT" } else { "PRODUCTION" });
+    info!(
+        "Mode: {}",
+        if args.dev_mode {
+            "DEVELOPMENT"
+        } else {
+            "PRODUCTION"
+        }
+    );
     info!("Projection writer: {}", args.projection_writer);
     let conductor_urls = args.conductor_url_list();
-    let startup_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-    info!("Conductor admin: {} (discovery, list_apps)", args.admin_url());
+    let _startup_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+    info!(
+        "Conductor admin: {} (discovery, list_apps)",
+        args.admin_url()
+    );
     info!("Conductor pool: {} conductor(s)", conductor_urls.len());
     for (i, url) in conductor_urls.iter().enumerate() {
         info!("  conductor-{}: {}", i, url);
@@ -73,7 +88,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("MongoDB connection failed (dev mode, continuing without): {}", e);
+                warn!(
+                    "MongoDB connection failed (dev mode, continuing without): {}",
+                    e
+                );
                 None
             } else {
                 error!("MongoDB connection failed: {}", e);
@@ -90,7 +108,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("NATS connection failed (dev mode, continuing without): {}", e);
+                warn!(
+                    "NATS connection failed (dev mode, continuing without): {}",
+                    e
+                );
                 None
             } else {
                 error!("NATS connection failed: {}", e);
@@ -125,7 +146,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("App worker pool failed to start (dev mode, using direct proxy): {}", e);
+                warn!(
+                    "App worker pool failed to start (dev mode, using direct proxy): {}",
+                    e
+                );
                 None
             } else {
                 error!("App worker pool failed to start: {}", e);
@@ -153,7 +177,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("Admin worker pool failed to start (dev mode, using direct proxy): {}", e);
+                warn!(
+                    "Admin worker pool failed to start (dev mode, using direct proxy): {}",
+                    e
+                );
                 None
             } else {
                 error!("Admin worker pool failed to start: {}", e);
@@ -287,13 +314,12 @@ async fn main() -> anyhow::Result<()> {
     {
         let admin_url = args.admin_url().to_string();
         let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-        let zome_caller = services::ZomeCaller::new(
-            &admin_url,
-            &app_url,
-            &args.installed_app_id,
-        );
+        let zome_caller = services::ZomeCaller::new(&admin_url, &app_url, &args.installed_app_id);
         state.zome_caller = Some(Arc::new(zome_caller));
-        info!("ZomeCaller created for federation (admin: {}, app: {})", admin_url, app_url);
+        info!(
+            "ZomeCaller created for federation (admin: {}, app: {})",
+            admin_url, app_url
+        );
     }
 
     let state = Arc::new(state);
@@ -419,12 +445,8 @@ async fn main() -> anyhow::Result<()> {
     let storage_config = StorageRegistrationConfig::from_env();
     if storage_config.enabled {
         let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-        let result = register_local_storage(
-            &storage_config,
-            &app_url,
-            &args.installed_app_id,
-        )
-        .await;
+        let result =
+            register_local_storage(&storage_config, &app_url, &args.installed_app_id).await;
 
         if result.success {
             info!(
@@ -451,10 +473,13 @@ async fn main() -> anyhow::Result<()> {
             peer_urls,
             self_id,
             cache,
-            std::time::Duration::from_secs(10),  // initial delay (let peers boot)
-            std::time::Duration::from_secs(60),   // refresh interval
+            std::time::Duration::from_secs(10), // initial delay (let peers boot)
+            std::time::Duration::from_secs(60), // refresh interval
         );
-        info!("Federation peer discovery started: {} peer(s) configured", peer_count);
+        info!(
+            "Federation peer discovery started: {} peer(s) configured",
+            peer_count
+        );
     }
 
     // Federation: register in DHT + start heartbeat task
@@ -470,7 +495,10 @@ async fn main() -> anyhow::Result<()> {
             let fc = fed_config.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                info!("Federation: registering doorway '{}' in DHT...", fc.doorway_id);
+                info!(
+                    "Federation: registering doorway '{}' in DHT...",
+                    fc.doorway_id
+                );
 
                 let mut capabilities = vec!["gateway".to_string()];
                 if !fc.doorway_url.is_empty() {
@@ -478,9 +506,9 @@ async fn main() -> anyhow::Result<()> {
                     capabilities.push("signal".to_string());
                 }
 
-                if let Err(e) = services::federation::register_doorway_in_dht(
-                    &fc, &zc, capabilities,
-                ).await {
+                if let Err(e) =
+                    services::federation::register_doorway_in_dht(&fc, &zc, capabilities).await
+                {
                     warn!("Federation registration failed (non-fatal): {}", e);
                 }
             });

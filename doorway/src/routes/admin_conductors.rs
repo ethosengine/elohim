@@ -247,7 +247,11 @@ pub async fn handle_assign_agent(
 
     // Register the assignment
     match registry
-        .register_agent(&request.agent_pub_key, &request.conductor_id, &request.app_id)
+        .register_agent(
+            &request.agent_pub_key,
+            &request.conductor_id,
+            &request.app_id,
+        )
         .await
     {
         Ok(()) => {

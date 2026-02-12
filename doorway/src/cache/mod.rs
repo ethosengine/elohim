@@ -45,16 +45,21 @@ pub mod rules;
 pub mod store;
 pub mod tiered;
 
-pub use access_control::{can_serve_at_reach, geographic_distance, prioritize_sources, CustodianSource, RequesterContext};
-pub use delivery_relay::{DeliveryRelay, DeliveryRelayConfig, CoalescedRequest};
+pub use access_control::{
+    can_serve_at_reach, geographic_distance, prioritize_sources, CustodianSource, RequesterContext,
+};
+pub use delivery_relay::{CoalescedRequest, DeliveryRelay, DeliveryRelayConfig};
 pub use keys::CacheKey;
-pub use reach_aware_serving::{create_reach_aware_cache_key, extract_reach_from_response, should_serve_response, extract_requester_context};
+pub use reach_aware_serving::{
+    create_reach_aware_cache_key, extract_reach_from_response, extract_requester_context,
+    should_serve_response,
+};
 pub use resolution::{DoorwayResolver, ResolutionResult, ResolutionStats};
 pub use rules::{CacheRule, CacheRuleStore, DefaultRules, DnaRules, CACHE_RULES_FN};
 pub use store::{CacheEntry, ContentCache};
 pub use tiered::{
-    BlobMetadata, CacheError, CaptionMetadata, TieredBlobCache, TieredCacheConfig, TieredCacheStats,
-    TierStats, VariantMetadata, spawn_tiered_cleanup_task,
+    spawn_tiered_cleanup_task, BlobMetadata, CacheError, CaptionMetadata, TierStats,
+    TieredBlobCache, TieredCacheConfig, TieredCacheStats, VariantMetadata,
 };
 
 use std::time::Duration;
@@ -78,10 +83,10 @@ impl Default for CacheConfig {
     fn default() -> Self {
         Self {
             max_entries: 10_000,
-            content_ttl: Duration::from_secs(3600),      // 1 hour
-            list_ttl: Duration::from_secs(300),          // 5 minutes
-            user_ttl: Duration::from_secs(60),           // 1 minute
-            cleanup_interval: Duration::from_secs(60),   // Run cleanup every minute
+            content_ttl: Duration::from_secs(3600), // 1 hour
+            list_ttl: Duration::from_secs(300),     // 5 minutes
+            user_ttl: Duration::from_secs(60),      // 1 minute
+            cleanup_interval: Duration::from_secs(60), // Run cleanup every minute
         }
     }
 }

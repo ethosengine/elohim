@@ -22,9 +22,9 @@ use tokio_tungstenite::{
     connect_async_with_config,
     tungstenite::{http::Request, protocol::Message},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
-use super::{ImportConfigStore, ImportConfig, RouteRegistry};
+use super::{ImportConfig, ImportConfigStore, RouteRegistry};
 use crate::worker::ZomeCallConfig;
 
 // =============================================================================
@@ -133,7 +133,10 @@ impl DiscoveryService {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to get cells from admin interface: {}", e);
-                warn!("Falling back to default import configuration for '{}'", self.config.installed_app_id);
+                warn!(
+                    "Falling back to default import configuration for '{}'",
+                    self.config.installed_app_id
+                );
 
                 // Fallback: Use default config when admin interface is unavailable
                 // This allows seeding to work even when we can't enumerate cells
@@ -142,32 +145,37 @@ impl DiscoveryService {
                 let fallback_agent = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string();
 
                 // Store a placeholder ZomeCallConfig
-                self.zome_configs.insert(fallback_dna_hash.clone(), ZomeCallConfig {
-                    dna_hash: fallback_dna_hash.clone(),
-                    agent_pub_key: fallback_agent,
-                    zome_name: self.config.zome_name.clone(),
-                    app_id: self.config.installed_app_id.clone(),
-                    role_name: "lamad".to_string(), // Default fallback role
-                });
+                self.zome_configs.insert(
+                    fallback_dna_hash.clone(),
+                    ZomeCallConfig {
+                        dna_hash: fallback_dna_hash.clone(),
+                        agent_pub_key: fallback_agent,
+                        zome_name: self.config.zome_name.clone(),
+                        app_id: self.config.installed_app_id.clone(),
+                        role_name: "lamad".to_string(), // Default fallback role
+                    },
+                );
 
                 // Store default import config
                 let default_import_config = ImportConfig {
                     enabled: true,
                     base_route: "/import".to_string(),
-                    batch_types: vec![
-                        doorway_client::ImportBatchType::new("content")
-                            .queue_fn("queue_import")
-                            .process_fn("process_import_chunk")
-                            .status_fn("get_import_status")
-                            .max_items(5000)
-                            .chunk_size(50),
-                    ],
+                    batch_types: vec![doorway_client::ImportBatchType::new("content")
+                        .queue_fn("queue_import")
+                        .process_fn("process_import_chunk")
+                        .status_fn("get_import_status")
+                        .max_items(5000)
+                        .chunk_size(50)],
                     require_auth: false,
                     allowed_agents: None,
                 };
-                self.import_config_store.set_config(&fallback_dna_hash, default_import_config);
+                self.import_config_store
+                    .set_config(&fallback_dna_hash, default_import_config);
 
-                result.errors.push(format!("Admin connection failed ({}), using fallback config", e));
+                result.errors.push(format!(
+                    "Admin connection failed ({}), using fallback config",
+                    e
+                ));
                 result.import_configs_found = 1;
 
                 info!("Fallback import config registered for /import/content");
@@ -189,13 +197,15 @@ impl DiscoveryService {
             };
 
             // Store zome config for later use
-            self.zome_configs.insert(cell.dna_hash.clone(), zome_config.clone());
+            self.zome_configs
+                .insert(cell.dna_hash.clone(), zome_config.clone());
             debug!(dna = %cell.dna_hash, role = %cell.role_name, "Stored ZomeCallConfig");
 
             // Discover import config
             match self.discover_import_config(&cell, &zome_config).await {
                 Ok(Some(import_config)) => {
-                    self.import_config_store.set_config(&cell.dna_hash, import_config);
+                    self.import_config_store
+                        .set_config(&cell.dna_hash, import_config);
                     result.import_configs_found += 1;
                     info!(
                         dna = %cell.dna_hash,
@@ -217,12 +227,14 @@ impl DiscoveryService {
             if let Some(ref route_registry) = self.route_registry {
                 match self.discover_routes(&cell, &zome_config).await {
                     Ok(Some(routes)) => {
-                        route_registry.register_dna_routes(
-                            &cell.dna_hash,
-                            &cell.role_name,
-                            &zome_config.zome_name,
-                            routes,
-                        ).await;
+                        route_registry
+                            .register_dna_routes(
+                                &cell.dna_hash,
+                                &cell.role_name,
+                                &zome_config.zome_name,
+                                routes,
+                            )
+                            .await;
                         result.routes_found += 1;
                         info!(
                             dna = %cell.dna_hash,
@@ -235,7 +247,9 @@ impl DiscoveryService {
                     }
                     Err(e) => {
                         warn!(dna = %cell.dna_hash, error = %e, "Failed to discover routes");
-                        result.errors.push(format!("Routes {}: {}", cell.dna_hash, e));
+                        result
+                            .errors
+                            .push(format!("Routes {}: {}", cell.dna_hash, e));
                     }
                 }
             }
@@ -243,7 +257,10 @@ impl DiscoveryService {
 
         info!(
             "Discovery complete: {} cells, {} import configs, {} routes, {} errors",
-            result.cells_discovered, result.import_configs_found, result.routes_found, result.errors.len()
+            result.cells_discovered,
+            result.import_configs_found,
+            result.routes_found,
+            result.errors.len()
         );
 
         result
@@ -252,7 +269,9 @@ impl DiscoveryService {
     /// Get cells from conductor admin interface
     async fn get_cells(&self) -> Result<Vec<CellInfo>, String> {
         // Connect to admin interface
-        let host = self.config.admin_url
+        let host = self
+            .config
+            .admin_url
             .split("//")
             .last()
             .unwrap_or("localhost:4444");
@@ -284,7 +303,10 @@ impl DiscoveryService {
 
         // Send list_apps request
         let list_apps = rmpv::Value::Map(vec![
-            (Value::String("type".into()), Value::String("list_apps".into())),
+            (
+                Value::String("type".into()),
+                Value::String("list_apps".into()),
+            ),
             (Value::String("data".into()), Value::Nil),
         ]);
 
@@ -292,7 +314,9 @@ impl DiscoveryService {
         rmpv::encode::write_value(&mut buf, &list_apps)
             .map_err(|e| format!("Failed to encode: {}", e))?;
 
-        write.send(Message::Binary(buf)).await
+        write
+            .send(Message::Binary(buf))
+            .await
             .map_err(|e| format!("Failed to send: {}", e))?;
 
         // Read response
@@ -317,7 +341,8 @@ impl DiscoveryService {
             .map_err(|e| format!("Failed to decode response: {}", e))?;
 
         // Response format: { type: "list_apps", data: [{ installed_app_id, cell_info: [...] }] }
-        let data = value.as_map()
+        let data = value
+            .as_map()
             .and_then(|m| m.iter().find(|(k, _)| k.as_str() == Some("data")))
             .map(|(_, v)| v)
             .ok_or("Missing 'data' field")?;
@@ -330,7 +355,8 @@ impl DiscoveryService {
             let app_map = app.as_map().ok_or("Expected app object")?;
 
             // Check if this is our app
-            let app_id = app_map.iter()
+            let app_id = app_map
+                .iter()
                 .find(|(k, _)| k.as_str() == Some("installed_app_id"))
                 .and_then(|(_, v)| v.as_str())
                 .unwrap_or("");
@@ -340,7 +366,8 @@ impl DiscoveryService {
             }
 
             // Extract cell_info
-            let cell_info = app_map.iter()
+            let cell_info = app_map
+                .iter()
                 .find(|(k, _)| k.as_str() == Some("cell_info"))
                 .map(|(_, v)| v)
                 .ok_or("Missing cell_info")?;
@@ -358,14 +385,19 @@ impl DiscoveryService {
                                 for (variant_type, variant_data) in variant_map {
                                     if variant_type.as_str() == Some("provisioned") {
                                         if let Some(data_map) = variant_data.as_map() {
-                                            if let Some(cell_id) = data_map.iter()
+                                            if let Some(cell_id) = data_map
+                                                .iter()
                                                 .find(|(k, _)| k.as_str() == Some("cell_id"))
                                                 .map(|(_, v)| v)
                                             {
                                                 if let Some(id_arr) = cell_id.as_array() {
                                                     if id_arr.len() >= 2 {
-                                                        let dna_hash = encode_base64(id_arr[0].as_slice().unwrap_or(&[]));
-                                                        let agent_pub_key = encode_base64(id_arr[1].as_slice().unwrap_or(&[]));
+                                                        let dna_hash = encode_base64(
+                                                            id_arr[0].as_slice().unwrap_or(&[]),
+                                                        );
+                                                        let agent_pub_key = encode_base64(
+                                                            id_arr[1].as_slice().unwrap_or(&[]),
+                                                        );
 
                                                         cells.push(CellInfo {
                                                             dna_hash,
@@ -408,14 +440,12 @@ impl DiscoveryService {
         Ok(Some(ImportConfig {
             enabled: true,
             base_route: "/import".to_string(),
-            batch_types: vec![
-                doorway_client::ImportBatchType::new("content")
-                    .queue_fn("queue_import")
-                    .process_fn("process_import_chunk")
-                    .status_fn("get_import_status")
-                    .max_items(5000)
-                    .chunk_size(50),
-            ],
+            batch_types: vec![doorway_client::ImportBatchType::new("content")
+                .queue_fn("queue_import")
+                .process_fn("process_import_chunk")
+                .status_fn("get_import_status")
+                .max_items(5000)
+                .chunk_size(50)],
             require_auth: false,
             allowed_agents: None,
         }))

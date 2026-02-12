@@ -90,7 +90,7 @@ pub struct RecordingConfig {
 impl Default for RecordingConfig {
     fn default() -> Self {
         Self {
-            max_duration_secs: 3600, // 1 hour
+            max_duration_secs: 3600,            // 1 hour
             max_size_bytes: 1024 * 1024 * 1024, // 1 GB
             container_format: ContainerFormat::WebM,
             video_codec: Some(VideoCodec::Vp9),
@@ -383,12 +383,8 @@ impl RecordingService {
         }
 
         let config = config.unwrap_or_else(|| self.config.default_config.clone());
-        let session = RecordingSession::new(
-            recording_id.clone(),
-            media_session_id,
-            initiator,
-            config,
-        );
+        let session =
+            RecordingSession::new(recording_id.clone(), media_session_id, initiator, config);
 
         info!(recording_id = %recording_id, "Started recording");
         recordings.insert(recording_id, session);
@@ -397,11 +393,7 @@ impl RecordingService {
     }
 
     /// Add a media chunk to a recording
-    pub async fn add_chunk(
-        &self,
-        recording_id: &str,
-        data: Vec<u8>,
-    ) -> Result<(), RecordingError> {
+    pub async fn add_chunk(&self, recording_id: &str, data: Vec<u8>) -> Result<(), RecordingError> {
         let mut recordings = self.recordings.write().await;
 
         let session = recordings
@@ -448,13 +440,15 @@ impl RecordingService {
     /// Get recording status
     pub async fn get_status(&self, recording_id: &str) -> Option<RecordingStatusResponse> {
         let recordings = self.recordings.read().await;
-        recordings.get(recording_id).map(|s| RecordingStatusResponse {
-            recording_id: s.id.clone(),
-            status: s.status,
-            bytes_received: s.bytes_received,
-            duration_secs: s.duration().as_secs(),
-            blob_hash: None, // Set when completed
-        })
+        recordings
+            .get(recording_id)
+            .map(|s| RecordingStatusResponse {
+                recording_id: s.id.clone(),
+                status: s.status,
+                bytes_received: s.bytes_received,
+                duration_secs: s.duration().as_secs(),
+                blob_hash: None, // Set when completed
+            })
     }
 
     /// Cleanup idle recordings

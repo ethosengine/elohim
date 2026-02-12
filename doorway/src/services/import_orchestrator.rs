@@ -34,8 +34,8 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, mpsc, RwLock};
-use tracing::{debug, error, info, warn};
+use tokio::sync::{broadcast, RwLock};
+use tracing::{debug, error, info};
 
 // ============================================================================
 // Types
@@ -206,10 +206,10 @@ pub trait BlobStore: Send + Sync {
 /// State for an active import batch
 struct ActiveBatch {
     batch_id: String,
-    batch_type: String,
+    _batch_type: String,
     blob_hash: String,
     total_items: u32,
-    items_json: String,
+    _items_json: String,
     status: ImportStatus,
     processed_count: u32,
     error_count: u32,
@@ -235,11 +235,7 @@ pub struct ImportOrchestrator<Z: ZomeClient, B: BlobStore> {
 
 impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
     /// Create a new import orchestrator
-    pub fn new(
-        config: ImportOrchestratorConfig,
-        zome_client: Arc<Z>,
-        blob_store: Arc<B>,
-    ) -> Self {
+    pub fn new(config: ImportOrchestratorConfig, zome_client: Arc<Z>, blob_store: Arc<B>) -> Self {
         let (progress_tx, _) = broadcast::channel(100);
         Self {
             config,
@@ -287,16 +283,19 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
         );
 
         // 1. Write blob to store (blazing fast)
-        let blob_hash = self.blob_store.write_blob(input.items_json.as_bytes()).await?;
+        let blob_hash = self
+            .blob_store
+            .write_blob(input.items_json.as_bytes())
+            .await?;
         debug!(batch_id = %input.batch_id, blob_hash = %blob_hash, "Blob written");
 
         // 2. Create active batch record
         let batch = ActiveBatch {
             batch_id: input.batch_id.clone(),
-            batch_type: input.batch_type.clone(),
+            _batch_type: input.batch_type.clone(),
             blob_hash: blob_hash.clone(),
             total_items,
-            items_json: input.items_json.clone(),
+            _items_json: input.items_json.clone(),
             status: ImportStatus::Queuing,
             processed_count: 0,
             error_count: 0,
@@ -404,12 +403,12 @@ impl<Z: ZomeClient + 'static> ImportOrchestratorHandle<Z> {
     /// Process a batch in chunks
     async fn process_batch(&self, batch_id: &str, items_json: &str) -> Result<(), ImportError> {
         // Parse items
-        let items: Vec<serde_json::Value> = serde_json::from_str(items_json)
-            .map_err(|e| ImportError::ParseError(e.to_string()))?;
+        let items: Vec<serde_json::Value> =
+            serde_json::from_str(items_json).map_err(|e| ImportError::ParseError(e.to_string()))?;
 
         let total_items = items.len();
         let chunk_size = self.config.chunk_size;
-        let total_chunks = (total_items + chunk_size - 1) / chunk_size;
+        let total_chunks = total_items.div_ceil(chunk_size);
 
         info!(
             batch_id = %batch_id,

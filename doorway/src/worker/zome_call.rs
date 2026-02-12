@@ -252,8 +252,9 @@ impl ZomeCallBuilder {
             if let Some(Value::Binary(ref data)) = get_field(map, "data") {
                 // The data is MessagePack-encoded ExternIO
                 // Holochain wraps the actual return value
-                let result: Option<T> = rmp_serde::from_slice(data)
-                    .map_err(|e| DoorwayError::Holochain(format!("Failed to parse result: {}", e)))?;
+                let result: Option<T> = rmp_serde::from_slice(data).map_err(|e| {
+                    DoorwayError::Holochain(format!("Failed to parse result: {}", e))
+                })?;
                 return Ok(result);
             }
         }

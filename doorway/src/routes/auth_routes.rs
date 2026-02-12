@@ -24,12 +24,12 @@ use crate::auth::{
 use crate::conductor::AgentProvisioner;
 use crate::custodial_keys::{CustodialKeyService, KeyExportFormat};
 use crate::db::schemas::{
-    get_registered_clients, validate_redirect_uri, CustodialKeyMaterial, OAuthSessionDoc, UserDoc,
+    get_registered_clients, validate_redirect_uri, OAuthSessionDoc, UserDoc,
     OAUTH_SESSION_COLLECTION, USER_COLLECTION,
 };
+use crate::routes::zome_helpers::{call_create_human, get_agent_pub_key, CreateHumanInput};
 use crate::server::AppState;
 use crate::types::DoorwayError;
-use crate::routes::zome_helpers::{call_create_human, get_agent_pub_key, CreateHumanInput};
 use rand::Rng;
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
@@ -473,7 +473,10 @@ fn json_response<T: Serialize>(status: StatusCode, body: &T) -> Response<BoxBody
         .header("Content-Type", "application/json")
         .header("Access-Control-Allow-Origin", "*")
         .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        .header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        )
         .body(full_body(json))
         .unwrap()
 }
@@ -483,7 +486,10 @@ fn cors_preflight() -> Response<BoxBody> {
         .status(StatusCode::NO_CONTENT)
         .header("Access-Control-Allow-Origin", "*")
         .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        .header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        )
         .header("Access-Control-Max-Age", "86400")
         .body(empty_body())
         .unwrap()
@@ -514,8 +520,7 @@ async fn parse_json_body<T: for<'de> Deserialize<'de>>(
         return Err(DoorwayError::Http("Request body too large".into()));
     }
 
-    serde_json::from_slice(&bytes)
-        .map_err(|e| DoorwayError::Http(format!("Invalid JSON: {}", e)))
+    serde_json::from_slice(&bytes).map_err(|e| DoorwayError::Http(format!("Invalid JSON: {}", e)))
 }
 
 fn get_auth_header(req: &Request<hyper::body::Incoming>) -> Option<&str> {
@@ -569,122 +574,131 @@ async fn handle_register(
 
     // Determine display name for registration
     let display_name = if body.display_name.is_empty() {
-        body.identifier.split('@').next().unwrap_or("User").to_string()
+        body.identifier
+            .split('@')
+            .next()
+            .unwrap_or("User")
+            .to_string()
     } else {
         body.display_name.clone()
     };
 
     // For doorway-hosted registration, create identity via imagodei zome
-    let (human_id, agent_pub_key, profile) = if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
-        // Generate UUID for human_id
-        let generated_human_id = uuid::Uuid::new_v4().to_string();
+    let (human_id, agent_pub_key, profile) =
+        if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
+            // Generate UUID for human_id
+            let generated_human_id = uuid::Uuid::new_v4().to_string();
 
-        // Try to call imagodei zome (only if conductor is connected)
-        let zome_result = call_create_human(
-            &state,
-            CreateHumanInput {
-                id: generated_human_id.clone(),
-                display_name: display_name.clone(),
-                bio: body.bio.clone(),
-                affinities: body.affinities.clone(),
-                profile_reach: body.profile_reach.clone(),
-                location: body.location.clone(),
-            },
-        ).await;
+            // Try to call imagodei zome (only if conductor is connected)
+            let zome_result = call_create_human(
+                &state,
+                CreateHumanInput {
+                    id: generated_human_id.clone(),
+                    display_name: display_name.clone(),
+                    bio: body.bio.clone(),
+                    affinities: body.affinities.clone(),
+                    profile_reach: body.profile_reach.clone(),
+                    location: body.location.clone(),
+                },
+            )
+            .await;
 
-        match zome_result {
-            Ok(human_output) => {
-                // Get agent_pub_key from discovered zome config
-                let agent_key = match get_agent_pub_key(&state) {
-                    Ok(k) => k,
-                    Err(e) => {
-                        warn!("Failed to get agent_pub_key: {}", e);
+            match zome_result {
+                Ok(human_output) => {
+                    // Get agent_pub_key from discovered zome config
+                    let agent_key = match get_agent_pub_key(&state) {
+                        Ok(k) => k,
+                        Err(e) => {
+                            warn!("Failed to get agent_pub_key: {}", e);
+                            return json_response(
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                &ErrorResponse {
+                                    error: "Failed to get agent identity".into(),
+                                    code: Some("AGENT_KEY_ERROR".into()),
+                                },
+                            );
+                        }
+                    };
+
+                    info!(
+                        "Created Holochain identity via imagodei zome: {} (display_name={})",
+                        human_output.human.id, display_name
+                    );
+
+                    let profile = HumanProfileResponse {
+                        id: human_output.human.id.clone(),
+                        display_name: human_output.human.display_name,
+                        bio: human_output.human.bio,
+                        affinities: human_output.human.affinities,
+                        profile_reach: human_output.human.profile_reach,
+                        location: human_output.human.location,
+                        created_at: human_output.human.created_at,
+                        updated_at: human_output.human.updated_at,
+                    };
+
+                    (human_output.human.id, agent_key, Some(profile))
+                }
+                Err(e) => {
+                    // Zome call failed - check if we should fall back to placeholder (dev mode)
+                    if state.args.dev_mode {
+                        warn!("Imagodei zome unavailable, using dev fallback: {}", e);
+                        // Generate deterministic IDs for dev mode
+                        use sha2::{Digest, Sha256};
+                        let mut hasher = Sha256::new();
+                        hasher.update(body.identifier.as_bytes());
+                        hasher.update(b"human_id_salt");
+                        let hash = hasher.finalize();
+                        let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
+
+                        let mut hasher2 = Sha256::new();
+                        hasher2.update(body.identifier.as_bytes());
+                        hasher2.update(b"agent_pub_key_salt");
+                        let hash2 = hasher2.finalize();
+                        let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
+
+                        (human_id, agent_pub_key, None)
+                    } else {
+                        // Production mode - fail if zome unavailable
+                        warn!("Failed to create identity via imagodei zome: {}", e);
                         return json_response(
-                            StatusCode::INTERNAL_SERVER_ERROR,
+                            StatusCode::SERVICE_UNAVAILABLE,
                             &ErrorResponse {
-                                error: "Failed to get agent identity".into(),
-                                code: Some("AGENT_KEY_ERROR".into()),
+                                error: format!("Failed to create Holochain identity: {}", e),
+                                code: Some("IDENTITY_CREATION_FAILED".into()),
                             },
                         );
                     }
-                };
-
-                info!(
-                    "Created Holochain identity via imagodei zome: {} (display_name={})",
-                    human_output.human.id, display_name
-                );
-
-                let profile = HumanProfileResponse {
-                    id: human_output.human.id.clone(),
-                    display_name: human_output.human.display_name,
-                    bio: human_output.human.bio,
-                    affinities: human_output.human.affinities,
-                    profile_reach: human_output.human.profile_reach,
-                    location: human_output.human.location,
-                    created_at: human_output.human.created_at,
-                    updated_at: human_output.human.updated_at,
-                };
-
-                (human_output.human.id, agent_key, Some(profile))
-            }
-            Err(e) => {
-                // Zome call failed - check if we should fall back to placeholder (dev mode)
-                if state.args.dev_mode {
-                    warn!(
-                        "Imagodei zome unavailable, using dev fallback: {}",
-                        e
-                    );
-                    // Generate deterministic IDs for dev mode
-                    use sha2::{Digest, Sha256};
-                    let mut hasher = Sha256::new();
-                    hasher.update(body.identifier.as_bytes());
-                    hasher.update(b"human_id_salt");
-                    let hash = hasher.finalize();
-                    let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
-
-                    let mut hasher2 = Sha256::new();
-                    hasher2.update(body.identifier.as_bytes());
-                    hasher2.update(b"agent_pub_key_salt");
-                    let hash2 = hasher2.finalize();
-                    let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
-
-                    (human_id, agent_pub_key, None)
-                } else {
-                    // Production mode - fail if zome unavailable
-                    warn!("Failed to create identity via imagodei zome: {}", e);
-                    return json_response(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        &ErrorResponse {
-                            error: format!("Failed to create Holochain identity: {}", e),
-                            code: Some("IDENTITY_CREATION_FAILED".into()),
-                        },
-                    );
                 }
             }
-        }
-    } else {
-        // human_id and agent_pub_key provided (legacy/external registration)
-        (body.human_id.clone(), body.agent_pub_key.clone(), None)
-    };
+        } else {
+            // human_id and agent_pub_key provided (legacy/external registration)
+            (body.human_id.clone(), body.agent_pub_key.clone(), None)
+        };
 
     // Attempt agent provisioning on a conductor (non-fatal)
-    let provisioned = if state.conductor_registry.is_some() && !state.args.dev_mode {
-        let registry = state.conductor_registry.as_ref().unwrap();
-        let provisioner = AgentProvisioner::new(Arc::clone(registry))
-            .with_app_id(state.args.installed_app_id.clone());
-        match provisioner.provision_agent(&body.identifier).await {
-            Ok(p) => {
-                info!(
-                    conductor = %p.conductor_id,
-                    agent = %p.agent_pub_key,
-                    "Agent provisioned on conductor during registration"
-                );
-                Some(p)
+    let provisioned = if let Some(registry) = &state.conductor_registry {
+        if !state.args.dev_mode {
+            let provisioner = AgentProvisioner::new(Arc::clone(registry))
+                .with_app_id(state.args.installed_app_id.clone());
+            match provisioner.provision_agent(&body.identifier).await {
+                Ok(p) => {
+                    info!(
+                        conductor = %p.conductor_id,
+                        agent = %p.agent_pub_key,
+                        "Agent provisioned on conductor during registration"
+                    );
+                    Some(p)
+                }
+                Err(e) => {
+                    warn!(
+                        "Agent provisioning failed, falling back to local keys: {}",
+                        e
+                    );
+                    None
+                }
             }
-            Err(e) => {
-                warn!("Agent provisioning failed, falling back to local keys: {}", e);
-                None
-            }
+        } else {
+            None
         }
     } else {
         None
@@ -709,10 +723,7 @@ async fn handle_register(
 
     // In dev mode without MongoDB, use simplified flow
     if state.args.dev_mode && state.mongo.is_none() {
-        info!(
-            "Dev mode register (no MongoDB): {}",
-            body.identifier
-        );
+        info!("Dev mode register (no MongoDB): {}", body.identifier);
         return generate_auth_response(
             &jwt,
             &state,
@@ -845,7 +856,7 @@ async fn handle_register(
     }
 
     // Capture permission level before user is moved into insert
-    let user_permission_level = user.permission_level.clone();
+    let user_permission_level = user.permission_level;
 
     // Insert into MongoDB
     if let Err(e) = collection.insert_one(user).await {
@@ -869,7 +880,10 @@ async fn handle_register(
         );
     }
 
-    info!("Registered new user: {} with custodial key", body.identifier);
+    info!(
+        "Registered new user: {} with custodial key",
+        body.identifier
+    );
 
     generate_auth_response(
         &jwt,
@@ -1052,7 +1066,10 @@ async fn handle_login(
         }
     }
 
-    info!("Login successful: {} (permission: {:?})", body.identifier, user.permission_level);
+    info!(
+        "Login successful: {} (permission: {:?})",
+        body.identifier, user.permission_level
+    );
 
     generate_auth_response(
         &jwt,
@@ -1141,10 +1158,7 @@ async fn handle_refresh(
 /// GET /auth/me
 ///
 /// Get current user info from token.
-async fn handle_me(
-    req: Request<hyper::body::Incoming>,
-    state: Arc<AppState>,
-) -> Response<BoxBody> {
+async fn handle_me(req: Request<hyper::body::Incoming>, state: Arc<AppState>) -> Response<BoxBody> {
     let auth_header = get_auth_header(&req);
     let token = match extract_token_from_header(auth_header) {
         Some(t) => t,
@@ -1742,21 +1756,24 @@ async fn handle_confirm_stewardship(
         }
     };
 
-    let verifying_key = match ed25519_dalek::VerifyingKey::from_bytes(
-        pub_key_bytes.as_slice().try_into().unwrap(),
-    ) {
-        Ok(k) => k,
-        Err(e) => {
-            warn!("Invalid Ed25519 verifying key for {}: {}", claims.identifier, e);
-            return json_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &ErrorResponse {
-                    error: "Invalid custodial key".into(),
-                    code: Some("KEY_ERROR".into()),
-                },
-            );
-        }
-    };
+    let verifying_key =
+        match ed25519_dalek::VerifyingKey::from_bytes(pub_key_bytes.as_slice().try_into().unwrap())
+        {
+            Ok(k) => k,
+            Err(e) => {
+                warn!(
+                    "Invalid Ed25519 verifying key for {}: {}",
+                    claims.identifier, e
+                );
+                return json_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &ErrorResponse {
+                        error: "Invalid custodial key".into(),
+                        code: Some("KEY_ERROR".into()),
+                    },
+                );
+            }
+        };
 
     let sig_bytes = match BASE64.decode(&body.signature) {
         Ok(b) if b.len() == 64 => b,
@@ -1976,7 +1993,11 @@ async fn handle_recover_custody(
 
     // TODO: Call imagodei zome to create RecoveryRequest in DHT
     // For now, create a mock response until zome integration is complete
-    let request_id = format!("recovery-{}-{}", user.human_id, chrono::Utc::now().timestamp());
+    let request_id = format!(
+        "recovery-{}-{}",
+        user.human_id,
+        chrono::Utc::now().timestamp()
+    );
     let expires_at = (chrono::Utc::now() + chrono::Duration::hours(48)).to_rfc3339();
     let required_approvals = 2u32; // TODO: Calculate from relationships
 
@@ -2010,7 +2031,7 @@ async fn handle_recover_custody(
 /// Returns current vote count and status. If approved, includes recovery_token.
 async fn handle_check_recovery_status(
     req: Request<hyper::body::Incoming>,
-    state: Arc<AppState>,
+    _state: Arc<AppState>,
 ) -> Response<BoxBody> {
     let body: CheckRecoveryStatusRequest = match parse_json_body(req).await {
         Ok(b) => b,
@@ -2155,7 +2176,7 @@ async fn handle_activate_recovery(
         }
     };
 
-    let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+    let _collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
         Ok(c) => c,
         Err(e) => {
             return json_response(
@@ -2170,7 +2191,10 @@ async fn handle_activate_recovery(
 
     // TODO: Look up user by human_id from recovery request
     // For now, this is a placeholder - in production, we'd validate against DHT
-    warn!("Recovery activation placeholder - would validate request {} in DHT", body.request_id);
+    warn!(
+        "Recovery activation placeholder - would validate request {} in DHT",
+        body.request_id
+    );
 
     // In production:
     // 1. Fetch RecoveryRequest from DHT
@@ -2203,7 +2227,7 @@ async fn handle_elohim_verify_start(
     req: Request<hyper::body::Incoming>,
     _state: Arc<AppState>,
 ) -> Response<BoxBody> {
-    use crate::services::{ElohimVerifier, UserProfileData, PathCompletion, QuizScore};
+    use crate::services::{ElohimVerifier, PathCompletion, QuizScore, UserProfileData};
 
     let body: ElohimVerifyStartRequest = match parse_json_body(req).await {
         Ok(b) => b,
@@ -2234,22 +2258,18 @@ async fn handle_elohim_verify_start(
         human_id: "human-123".to_string(),
         display_name: "Test User".to_string(),
         affinities: vec!["Technology".to_string(), "Philosophy".to_string()],
-        completed_paths: vec![
-            PathCompletion {
-                path_id: "elohim-protocol".to_string(),
-                path_title: "Elohim Protocol Foundations".to_string(),
-                completed_at: "2024-12-01".to_string(),
-            },
-        ],
-        quiz_scores: vec![
-            QuizScore {
-                quiz_id: "quiz-manifesto".to_string(),
-                quiz_title: "Manifesto Foundations".to_string(),
-                score: 8.0,
-                max_score: 10.0,
-                completed_at: "2024-12-05".to_string(),
-            },
-        ],
+        completed_paths: vec![PathCompletion {
+            path_id: "elohim-protocol".to_string(),
+            path_title: "Elohim Protocol Foundations".to_string(),
+            completed_at: "2024-12-01".to_string(),
+        }],
+        quiz_scores: vec![QuizScore {
+            quiz_id: "quiz-manifesto".to_string(),
+            quiz_title: "Manifesto Foundations".to_string(),
+            score: 8.0,
+            max_score: 10.0,
+            completed_at: "2024-12-05".to_string(),
+        }],
         relationship_names: vec!["Alice".to_string(), "Bob".to_string()],
         learning_preferences: None,
         milestones: vec!["First Path Complete".to_string()],
@@ -2279,7 +2299,8 @@ async fn handle_elohim_verify_start(
             time_limit_seconds: 300, // 5 minutes
             instructions: "Answer the following questions about your profile. \
                 These questions are based on your actual usage and only you should \
-                know the answers. You have 5 minutes to complete.".to_string(),
+                know the answers. You have 5 minutes to complete."
+                .to_string(),
         },
     )
 }
@@ -2292,7 +2313,7 @@ async fn handle_elohim_verify_answer(
     req: Request<hyper::body::Incoming>,
     _state: Arc<AppState>,
 ) -> Response<BoxBody> {
-    use crate::services::{ElohimVerifier, UserProfileData, PathCompletion, QuizScore};
+    use crate::services::{ElohimVerifier, PathCompletion, QuizScore, UserProfileData};
 
     let body: ElohimVerifyAnswerRequest = match parse_json_body(req).await {
         Ok(b) => b,
@@ -2333,22 +2354,18 @@ async fn handle_elohim_verify_answer(
         human_id: "human-123".to_string(),
         display_name: "Test User".to_string(),
         affinities: vec!["Technology".to_string(), "Philosophy".to_string()],
-        completed_paths: vec![
-            PathCompletion {
-                path_id: "elohim-protocol".to_string(),
-                path_title: "Elohim Protocol Foundations".to_string(),
-                completed_at: "2024-12-01".to_string(),
-            },
-        ],
-        quiz_scores: vec![
-            QuizScore {
-                quiz_id: "quiz-manifesto".to_string(),
-                quiz_title: "Manifesto Foundations".to_string(),
-                score: 8.0,
-                max_score: 10.0,
-                completed_at: "2024-12-05".to_string(),
-            },
-        ],
+        completed_paths: vec![PathCompletion {
+            path_id: "elohim-protocol".to_string(),
+            path_title: "Elohim Protocol Foundations".to_string(),
+            completed_at: "2024-12-01".to_string(),
+        }],
+        quiz_scores: vec![QuizScore {
+            quiz_id: "quiz-manifesto".to_string(),
+            quiz_title: "Manifesto Foundations".to_string(),
+            score: 8.0,
+            max_score: 10.0,
+            completed_at: "2024-12-05".to_string(),
+        }],
         relationship_names: vec!["Alice".to_string(), "Bob".to_string()],
         learning_preferences: None,
         milestones: vec!["First Path Complete".to_string()],
@@ -2474,7 +2491,9 @@ async fn handle_authorize(
     // Check if this is an AJAX/fetch request (Bearer token = SPA calling us)
     // SPA fetch requests can't follow cross-origin redirects due to CORS,
     // so we return JSON with the redirect URL instead of a 302.
-    let is_ajax = req.headers().get("authorization")
+    let is_ajax = req
+        .headers()
+        .get("authorization")
         .and_then(|v| v.to_str().ok())
         .map(|v| v.starts_with("Bearer "))
         .unwrap_or(false);
@@ -2520,7 +2539,9 @@ async fn handle_authorize(
                             StatusCode::INTERNAL_SERVER_ERROR,
                             &OAuthErrorResponse {
                                 error: "server_error".to_string(),
-                                error_description: Some("Failed to create authorization".to_string()),
+                                error_description: Some(
+                                    "Failed to create authorization".to_string(),
+                                ),
                                 state: Some(params.state),
                             },
                         );
@@ -2532,14 +2553,22 @@ async fn handle_authorize(
             let redirect_url = format!(
                 "{}{}code={}&state={}",
                 params.redirect_uri,
-                if params.redirect_uri.contains('?') { "&" } else { "?" },
+                if params.redirect_uri.contains('?') {
+                    "&"
+                } else {
+                    "?"
+                },
                 urlencoding::encode(&code),
                 urlencoding::encode(&params.state)
             );
 
             info!(
                 "OAuth authorize: {} {} to client with code",
-                if is_ajax { "returning redirect_uri to" } else { "redirecting" },
+                if is_ajax {
+                    "returning redirect_uri to"
+                } else {
+                    "redirecting"
+                },
                 claims.identifier
             );
 
@@ -2666,7 +2695,9 @@ async fn handle_token(
             StatusCode::BAD_REQUEST,
             &OAuthErrorResponse {
                 error: "unsupported_grant_type".to_string(),
-                error_description: Some("Only 'authorization_code' grant type is supported".to_string()),
+                error_description: Some(
+                    "Only 'authorization_code' grant type is supported".to_string(),
+                ),
                 state: None,
             },
         );
@@ -2735,10 +2766,7 @@ async fn handle_token(
     };
 
     // Find the session by code
-    let session = match collection
-        .find_one(doc! { "code": &token_req.code })
-        .await
-    {
+    let session = match collection.find_one(doc! { "code": &token_req.code }).await {
         Ok(Some(s)) => s,
         Ok(None) => {
             warn!("OAuth token exchange: code not found");
@@ -2897,13 +2925,14 @@ fn generate_oauth_token_response(
 // Helper Functions
 // =============================================================================
 
+#[allow(clippy::result_large_err)]
 fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>> {
     if state.args.dev_mode {
         Ok(JwtValidator::new_dev())
     } else {
         match &state.args.jwt_secret {
-            Some(secret) => {
-                JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).map_err(|e| {
+            Some(secret) => JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds)
+                .map_err(|e| {
                     json_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         &ErrorResponse {
@@ -2911,8 +2940,7 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>
                             code: Some("CONFIG_ERROR".into()),
                         },
                     )
-                })
-            }
+                }),
             None => Err(json_response(
                 StatusCode::NOT_IMPLEMENTED,
                 &ErrorResponse {
@@ -2925,6 +2953,7 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>
 }
 
 /// Generate a successful auth response with JWT token
+#[allow(clippy::too_many_arguments)]
 fn generate_auth_response(
     jwt: &JwtValidator,
     state: &AppState,
@@ -3024,16 +3053,24 @@ pub async fn handle_auth_request(
         // Stewardship migration endpoints
         (&Method::GET, "/auth/export-key") => handle_export_key(req, state).await,
         (&Method::POST, "/auth/confirm-stewardship")
-        | (&Method::POST, "/auth/confirm-sovereignty") => handle_confirm_stewardship(req, state).await,
+        | (&Method::POST, "/auth/confirm-sovereignty") => {
+            handle_confirm_stewardship(req, state).await
+        }
 
         // Disaster recovery endpoints
         (&Method::POST, "/auth/recover-custody") => handle_recover_custody(req, state).await,
-        (&Method::POST, "/auth/check-recovery-status") => handle_check_recovery_status(req, state).await,
+        (&Method::POST, "/auth/check-recovery-status") => {
+            handle_check_recovery_status(req, state).await
+        }
         (&Method::POST, "/auth/activate-recovery") => handle_activate_recovery(req, state).await,
 
         // Elohim verification endpoints
-        (&Method::POST, "/auth/elohim-verify/start") => handle_elohim_verify_start(req, state).await,
-        (&Method::POST, "/auth/elohim-verify/answer") => handle_elohim_verify_answer(req, state).await,
+        (&Method::POST, "/auth/elohim-verify/start") => {
+            handle_elohim_verify_start(req, state).await
+        }
+        (&Method::POST, "/auth/elohim-verify/answer") => {
+            handle_elohim_verify_answer(req, state).await
+        }
 
         // Method not allowed
         (_, "/auth/register")

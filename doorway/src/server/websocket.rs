@@ -16,9 +16,7 @@ use hyper::{Request, Response, StatusCode};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-use crate::auth::{
-    extract_token_from_header, ApiKeyValidator, JwtValidator, PermissionLevel,
-};
+use crate::auth::{extract_token_from_header, ApiKeyValidator, JwtValidator, PermissionLevel};
 use crate::proxy;
 use crate::server::http::AppState;
 
@@ -121,7 +119,7 @@ pub async fn handle_admin_upgrade(
 
 /// Handle WebSocket upgrade for app interface
 pub async fn handle_app_upgrade(
-    state: Arc<AppState>,
+    _state: Arc<AppState>,
     req: Request<Incoming>,
     port: u16,
 ) -> Response<Full<Bytes>> {
@@ -204,10 +202,7 @@ fn extract_permission(
     }
 
     // Try API key from X-API-Key header
-    let api_key = req
-        .headers()
-        .get("x-api-key")
-        .and_then(|v| v.to_str().ok());
+    let api_key = req.headers().get("x-api-key").and_then(|v| v.to_str().ok());
 
     let api_validator = ApiKeyValidator::new(
         state.args.api_key_authenticated.clone(),

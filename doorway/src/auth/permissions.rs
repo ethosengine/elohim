@@ -9,8 +9,10 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 #[repr(u8)]
+#[derive(Default)]
 pub enum PermissionLevel {
     /// No authentication - read-only operations
+    #[default]
     Public = 0,
     /// Authenticated user - normal dev workflow operations
     Authenticated = 1,
@@ -28,32 +30,39 @@ impl fmt::Display for PermissionLevel {
     }
 }
 
-impl Default for PermissionLevel {
-    fn default() -> Self {
-        PermissionLevel::Public
-    }
-}
-
 /// Get the required permission level for a Holochain admin operation.
 /// Returns None for unknown operations (which should be blocked).
 pub fn get_required_permission(operation: &str) -> Option<PermissionLevel> {
     match operation {
         // Public - read only status queries
-        "list_apps" | "list_app_interfaces" | "agent_info" | "storage_info"
+        "list_apps"
+        | "list_app_interfaces"
+        | "agent_info"
+        | "storage_info"
         | "dump_network_stats" => Some(PermissionLevel::Public),
 
         // Authenticated - normal dev workflow
-        "generate_agent_pub_key" | "grant_zome_call_capability"
-        | "revoke_zome_call_capability" | "authorize_signing_credentials"
-        | "attach_app_interface" | "issue_app_authentication_token"
-        | "list_capability_grants" | "list_dnas" | "list_cell_ids"
-        | "get_dna_definition" | "dump_state" | "dump_full_state" => {
-            Some(PermissionLevel::Authenticated)
-        }
+        "generate_agent_pub_key"
+        | "grant_zome_call_capability"
+        | "revoke_zome_call_capability"
+        | "authorize_signing_credentials"
+        | "attach_app_interface"
+        | "issue_app_authentication_token"
+        | "list_capability_grants"
+        | "list_dnas"
+        | "list_cell_ids"
+        | "get_dna_definition"
+        | "dump_state"
+        | "dump_full_state" => Some(PermissionLevel::Authenticated),
 
         // Admin - dangerous/destructive operations
-        "install_app" | "enable_app" | "disable_app" | "uninstall_app"
-        | "update_coordinators" | "delete_clone_cell" | "add_agent_info"
+        "install_app"
+        | "enable_app"
+        | "disable_app"
+        | "uninstall_app"
+        | "update_coordinators"
+        | "delete_clone_cell"
+        | "add_agent_info"
         | "revoke_agent_key" => Some(PermissionLevel::Admin),
 
         // Unknown operations are blocked
@@ -114,7 +123,10 @@ mod tests {
     #[test]
     fn test_public_operations() {
         assert!(is_operation_allowed("list_apps", PermissionLevel::Public));
-        assert!(is_operation_allowed("list_apps", PermissionLevel::Authenticated));
+        assert!(is_operation_allowed(
+            "list_apps",
+            PermissionLevel::Authenticated
+        ));
         assert!(is_operation_allowed("list_apps", PermissionLevel::Admin));
     }
 
@@ -136,7 +148,10 @@ mod tests {
 
     #[test]
     fn test_admin_operations() {
-        assert!(!is_operation_allowed("install_app", PermissionLevel::Public));
+        assert!(!is_operation_allowed(
+            "install_app",
+            PermissionLevel::Public
+        ));
         assert!(!is_operation_allowed(
             "install_app",
             PermissionLevel::Authenticated
@@ -150,7 +165,10 @@ mod tests {
             "unknown_operation",
             PermissionLevel::Admin
         ));
-        assert!(!is_operation_allowed("hack_the_planet", PermissionLevel::Admin));
+        assert!(!is_operation_allowed(
+            "hack_the_planet",
+            PermissionLevel::Admin
+        ));
     }
 
     #[test]

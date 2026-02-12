@@ -72,10 +72,7 @@ impl AgentProvisioner {
     /// 4. `admin.install_app(app_id, agent_key, bundle_path)` — if fails, no cleanup needed
     /// 5. `admin.enable_app(app_id)` — if fails, attempt `uninstall_app` cleanup
     /// 6. `registry.register_agent(...)` — persist to DashMap + MongoDB
-    pub async fn provision_agent(
-        &self,
-        user_identifier: &str,
-    ) -> Result<ProvisionedAgent, String> {
+    pub async fn provision_agent(&self, user_identifier: &str) -> Result<ProvisionedAgent, String> {
         // 1. Find least loaded conductor
         let conductor = self
             .registry
@@ -90,7 +87,8 @@ impl AgentProvisioner {
             ));
         }
 
-        let installed_app_id = generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
+        let installed_app_id =
+            generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
 
         info!(
             conductor = %conductor.conductor_id,
@@ -111,10 +109,8 @@ impl AgentProvisioner {
             )
         })?;
 
-        let agent_pub_key_b64 = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            &agent_key,
-        );
+        let agent_pub_key_b64 =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &agent_key);
 
         // 4. Install app
         if let Err(e) = admin
@@ -147,7 +143,11 @@ impl AgentProvisioner {
         // 6. Register agent→conductor mapping
         if let Err(e) = self
             .registry
-            .register_agent(&agent_pub_key_b64, &conductor.conductor_id, &installed_app_id)
+            .register_agent(
+                &agent_pub_key_b64,
+                &conductor.conductor_id,
+                &installed_app_id,
+            )
             .await
         {
             // Registration failed — attempt uninstall cleanup
@@ -189,12 +189,7 @@ impl AgentProvisioner {
         let conductor = conductors
             .iter()
             .find(|c| c.conductor_id == entry.conductor_id)
-            .ok_or_else(|| {
-                format!(
-                    "Conductor {} not found in pool",
-                    entry.conductor_id
-                )
-            })?;
+            .ok_or_else(|| format!("Conductor {} not found in pool", entry.conductor_id))?;
 
         info!(
             conductor = %entry.conductor_id,

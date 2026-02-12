@@ -55,13 +55,7 @@ impl CacheKey {
     }
 
     /// Create a cache key with reach level (for reach-aware caching)
-    pub fn with_reach(
-        dna_hash: &str,
-        zome: &str,
-        fn_name: &str,
-        args: &str,
-        reach: &str,
-    ) -> Self {
+    pub fn with_reach(dna_hash: &str, zome: &str, fn_name: &str, args: &str, reach: &str) -> Self {
         let mut key = Self::new(dna_hash, zome, fn_name, args);
         key.reach = Some(reach.to_string());
         key
@@ -155,7 +149,13 @@ mod tests {
 
     #[test]
     fn test_cache_key_with_reach() {
-        let key = CacheKey::with_reach("dna123", "content_store", "get_content", r#"{"id":"abc"}"#, "commons");
+        let key = CacheKey::with_reach(
+            "dna123",
+            "content_store",
+            "get_content",
+            r#"{"id":"abc"}"#,
+            "commons",
+        );
         assert_eq!(key.reach, Some("commons".to_string()));
         assert!(key.to_storage_key().ends_with(":commons"));
     }

@@ -214,10 +214,7 @@ impl DIDResolver {
     }
 
     /// Extract a specific service endpoint from a DID document
-    pub fn extract_service_endpoint(
-        document: &DIDDocument,
-        service_type: &str,
-    ) -> Option<String> {
+    pub fn extract_service_endpoint(document: &DIDDocument, service_type: &str) -> Option<String> {
         document
             .service
             .iter()
@@ -314,7 +311,10 @@ pub struct DIDDocument {
     pub service: Vec<Service>,
 
     /// Elohim-specific capabilities
-    #[serde(rename = "elohim:capabilities", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "elohim:capabilities",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub elohim_capabilities: Option<Vec<String>>,
 
     /// Elohim-specific region

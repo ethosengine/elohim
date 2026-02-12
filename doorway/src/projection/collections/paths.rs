@@ -8,8 +8,8 @@ use mongodb::options::IndexOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use crate::db::schemas::Metadata;
 use crate::db::mongo::{IntoIndexes, MutMetadata};
+use crate::db::schemas::Metadata;
 
 /// Projected chapter structure (denormalized from metadata)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -139,40 +139,52 @@ impl PathProjection {
         let now = DateTime::now();
 
         // Extract fields from JSON
-        let version = data.get("version")
+        let version = data
+            .get("version")
             .and_then(|v| v.as_str())
             .unwrap_or("1.0.0")
             .to_string();
 
-        let title = data.get("title")
+        let title = data
+            .get("title")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
 
-        let description = data.get("description")
+        let description = data
+            .get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
 
-        let purpose = data.get("purpose")
+        let purpose = data
+            .get("purpose")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let difficulty = data.get("difficulty")
+        let difficulty = data
+            .get("difficulty")
             .and_then(|v| v.as_str())
             .unwrap_or("beginner")
             .to_string();
 
-        let estimated_duration = data.get("estimated_duration")
+        let estimated_duration = data
+            .get("estimated_duration")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let tags: Vec<String> = data.get("tags")
+        let tags: Vec<String> = data
+            .get("tags")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let visibility = data.get("visibility")
+        let visibility = data
+            .get("visibility")
             .and_then(|v| v.as_str())
             .unwrap_or("private")
             .to_string();
@@ -218,27 +230,30 @@ impl PathProjection {
     /// Extract chapter structure from metadata_json
     fn extract_chapters(data: &JsonValue) -> (Vec<ChapterOverview>, usize) {
         // Try to parse metadata_json if present
-        let metadata_json = data.get("metadata_json")
+        let metadata_json = data
+            .get("metadata_json")
             .and_then(|v| v.as_str())
             .unwrap_or("{}");
 
         let metadata: JsonValue = serde_json::from_str(metadata_json).unwrap_or(JsonValue::Null);
 
-        let chapters_array = metadata.get("chapters")
-            .and_then(|v| v.as_array());
+        let chapters_array = metadata.get("chapters").and_then(|v| v.as_array());
 
         match chapters_array {
             Some(arr) => {
-                let chapters: Vec<ChapterOverview> = arr.iter()
+                let chapters: Vec<ChapterOverview> = arr
+                    .iter()
                     .filter_map(|ch| {
                         let id = ch.get("id")?.as_str()?.to_string();
                         let title = ch.get("title")?.as_str()?.to_string();
-                        let description = ch.get("description")
+                        let description = ch
+                            .get("description")
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
 
                         // Count modules/sections in this chapter
-                        let modules = ch.get("modules")
+                        let modules = ch
+                            .get("modules")
                             .and_then(|v| v.as_array())
                             .map(|m| m.len())
                             .unwrap_or(0);
@@ -263,7 +278,12 @@ impl PathProjection {
     fn tokenize(text: &str) -> Vec<String> {
         text.split_whitespace()
             .filter(|word| word.len() >= 3)
-            .map(|word| word.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect())
+            .map(|word| {
+                word.to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect()
+            })
             .filter(|word: &String| !word.is_empty())
             .collect()
     }
@@ -286,7 +306,10 @@ impl IntoIndexes for PathProjection {
             // Index by author
             (doc! { "author": 1 }, None),
             // Compound index for common queries
-            (doc! { "visibility": 1, "difficulty": 1, "projected_at": -1 }, None),
+            (
+                doc! { "visibility": 1, "difficulty": 1, "projected_at": -1 },
+                None,
+            ),
             // Search tokens index
             (doc! { "search_tokens": 1 }, None),
         ]
@@ -448,9 +471,7 @@ mod tests {
 
     #[test]
     fn test_path_query_filter() {
-        let query = PathQuery::public()
-            .with_search("governance")
-            .with_limit(10);
+        let query = PathQuery::public().with_search("governance").with_limit(10);
 
         let filter = query.to_filter();
         assert!(filter.contains_key("visibility"));

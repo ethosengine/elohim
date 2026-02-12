@@ -114,7 +114,10 @@ impl ProjectionStore {
     }
 
     /// Ensure MongoDB indexes exist
-    async fn ensure_indexes(mongo: &MongoClient, collection_name: &str) -> Result<(), DoorwayError> {
+    async fn ensure_indexes(
+        mongo: &MongoClient,
+        collection_name: &str,
+    ) -> Result<(), DoorwayError> {
         let db = mongo.inner().database(mongo.db_name());
         let collection = db.collection::<ProjectedDocument>(collection_name);
 
@@ -159,7 +162,8 @@ impl ProjectionStore {
             match self.get_from_mongo(mongo, &cache_key).await {
                 Ok(Some(doc)) => {
                     // Populate hot cache
-                    self.hot_cache.insert(cache_key, HotCacheEntry::new(doc.clone()));
+                    self.hot_cache
+                        .insert(cache_key, HotCacheEntry::new(doc.clone()));
                     self.evict_if_needed();
                     return Some(doc);
                 }
@@ -193,9 +197,10 @@ impl ProjectionStore {
     ///
     /// Writes to both hot cache and MongoDB.
     pub async fn set(&self, doc: ProjectedDocument) -> Result<(), DoorwayError> {
-        let cache_key = doc.mongo_id.clone().unwrap_or_else(|| {
-            format!("{}:{}", doc.doc_type, doc.doc_id)
-        });
+        let cache_key = doc
+            .mongo_id
+            .clone()
+            .unwrap_or_else(|| format!("{}:{}", doc.doc_type, doc.doc_id));
 
         // Write to MongoDB first (if available)
         if let Some(ref mongo) = self.mongo {
@@ -203,7 +208,8 @@ impl ProjectionStore {
         }
 
         // Update hot cache
-        self.hot_cache.insert(cache_key, HotCacheEntry::new(doc.clone()));
+        self.hot_cache
+            .insert(cache_key, HotCacheEntry::new(doc.clone()));
         self.evict_if_needed();
 
         // Broadcast update
@@ -221,9 +227,10 @@ impl ProjectionStore {
         let db = mongo.inner().database(mongo.db_name());
         let collection = db.collection::<ProjectedDocument>(&self.config.collection_name);
 
-        let mongo_id = doc.mongo_id.clone().unwrap_or_else(|| {
-            format!("{}:{}", doc.doc_type, doc.doc_id)
-        });
+        let mongo_id = doc
+            .mongo_id
+            .clone()
+            .unwrap_or_else(|| format!("{}:{}", doc.doc_type, doc.doc_id));
 
         // Use replace with upsert
         let options = mongodb::options::ReplaceOptions::builder()
@@ -243,7 +250,10 @@ impl ProjectionStore {
     /// Query projected documents
     ///
     /// Always queries MongoDB (hot cache is for single-document lookups).
-    pub async fn query(&self, query: ProjectionQuery) -> Result<Vec<ProjectedDocument>, DoorwayError> {
+    pub async fn query(
+        &self,
+        query: ProjectionQuery,
+    ) -> Result<Vec<ProjectedDocument>, DoorwayError> {
         let Some(ref mongo) = self.mongo else {
             // Memory-only mode: scan hot cache (inefficient but functional)
             return Ok(self.query_hot_cache(&query));
@@ -356,10 +366,8 @@ impl ProjectionStore {
                 self.hot_cache.remove(&key);
                 count += 1;
             }
-        } else {
-            if self.hot_cache.remove(pattern).is_some() {
-                count += 1;
-            }
+        } else if self.hot_cache.remove(pattern).is_some() {
+            count += 1;
         }
 
         // Soft-delete in MongoDB
@@ -391,7 +399,10 @@ impl ProjectionStore {
             }
         }
 
-        debug!("Invalidated {} projections matching pattern '{}'", count, pattern);
+        debug!(
+            "Invalidated {} projections matching pattern '{}'",
+            count, pattern
+        );
         Ok(count)
     }
 
@@ -439,7 +450,9 @@ impl ProjectionStore {
                     if count > 0 {
                         debug!(
                             "Updated {} documents with blob_hash {} with {} new endpoints",
-                            count, blob_hash, endpoints.len()
+                            count,
+                            blob_hash,
+                            endpoints.len()
                         );
                     }
                 }
@@ -467,10 +480,10 @@ impl ProjectionStore {
     pub async fn get_blob_endpoints(&self, blob_hash: &str) -> Option<Vec<String>> {
         // Check hot cache first
         for entry in self.hot_cache.iter() {
-            if entry.doc.blob_hash.as_deref() == Some(blob_hash) {
-                if !entry.doc.blob_endpoints.is_empty() {
-                    return Some(entry.doc.blob_endpoints.clone());
-                }
+            if entry.doc.blob_hash.as_deref() == Some(blob_hash)
+                && !entry.doc.blob_endpoints.is_empty()
+            {
+                return Some(entry.doc.blob_endpoints.clone());
             }
         }
 

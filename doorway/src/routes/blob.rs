@@ -134,9 +134,9 @@ fn parse_range_header(range_header: &str, total_size: usize) -> Option<(usize, u
     // Expected format: "bytes=start-end" or "bytes=start-" or "bytes=-suffix"
     let range_str = range_header.strip_prefix("bytes=")?;
 
-    if range_str.starts_with('-') {
+    if let Some(suffix_str) = range_str.strip_prefix('-') {
         // Suffix range: bytes=-500 means last 500 bytes
-        let suffix: usize = range_str[1..].parse().ok()?;
+        let suffix: usize = suffix_str.parse().ok()?;
         let start = total_size.saturating_sub(suffix);
         return Some((start, total_size));
     }
@@ -190,9 +190,7 @@ pub async fn handle_blob_request(
 ) -> Result<Response<Full<Bytes>>, BlobError> {
     // Extract address from path: /store/{address}
     let path = req.uri().path();
-    let raw_address = path
-        .strip_prefix("/store/")
-        .ok_or(BlobError::NotFound)?;
+    let raw_address = path.strip_prefix("/store/").ok_or(BlobError::NotFound)?;
 
     if raw_address.is_empty() {
         return Err(BlobError::NotFound);
@@ -343,9 +341,7 @@ pub fn error_response(err: BlobError) -> Response<Full<Bytes>> {
         BlobError::InvalidRange => (StatusCode::RANGE_NOT_SATISFIABLE, "Invalid range"),
         BlobError::InvalidAddress(_) => (StatusCode::BAD_REQUEST, "Invalid content address"),
         BlobError::MethodNotAllowed => (StatusCode::METHOD_NOT_ALLOWED, "Method not allowed"),
-        BlobError::InternalError(_) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
-        }
+        BlobError::InternalError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"),
     };
 
     Response::builder()
@@ -370,9 +366,7 @@ pub async fn handle_blob_request_with_storage_proxy(
 ) -> Result<Response<Full<Bytes>>, BlobError> {
     // Extract address from path: /store/{address}
     let path = req.uri().path();
-    let raw_address = path
-        .strip_prefix("/store/")
-        .ok_or(BlobError::NotFound)?;
+    let raw_address = path.strip_prefix("/store/").ok_or(BlobError::NotFound)?;
 
     if raw_address.is_empty() {
         return Err(BlobError::NotFound);
@@ -510,9 +504,7 @@ pub async fn handle_blob_request_with_fallback(
 ) -> Result<Response<Full<Bytes>>, BlobError> {
     // Extract address from path: /store/{address}
     let path = req.uri().path();
-    let raw_address = path
-        .strip_prefix("/store/")
-        .ok_or(BlobError::NotFound)?;
+    let raw_address = path.strip_prefix("/store/").ok_or(BlobError::NotFound)?;
 
     if raw_address.is_empty() {
         return Err(BlobError::NotFound);
@@ -571,7 +563,8 @@ async fn handle_get_blob_with_fallback(
                 if let Some(size) = ctx.cache.blob_size(hash) {
                     if let Some(range_header) = req.headers().get(header::RANGE) {
                         if let Ok(range_str) = range_header.to_str() {
-                            return handle_range_request(ctx.cache.clone(), hash, range_str, size).await;
+                            return handle_range_request(ctx.cache.clone(), hash, range_str, size)
+                                .await;
                         }
                     }
                     return handle_full_content(ctx.cache.clone(), hash).await;
@@ -638,7 +631,8 @@ async fn try_resolve_from_shards(
         .ok_or_else(|| "Manifest not found in projection".to_string())?;
 
     // Get shard locations from projection
-    let shard_locations = get_shard_locations_from_projection(&manifest.shard_hashes, projection).await;
+    let shard_locations =
+        get_shard_locations_from_projection(&manifest.shard_hashes, projection).await;
 
     // Build BlobResolution
     let resolution = BlobResolution {
@@ -706,7 +700,10 @@ mod tests {
 
         // Standard range
         assert_eq!(parse_range_header("bytes=0-499", total), Some((0, 500)));
-        assert_eq!(parse_range_header("bytes=500-999", total), Some((500, 1000)));
+        assert_eq!(
+            parse_range_header("bytes=500-999", total),
+            Some((500, 1000))
+        );
 
         // Open-ended range
         assert_eq!(parse_range_header("bytes=500-", total), Some((500, 1000)));
@@ -781,7 +778,10 @@ mod tests {
         assert!(parse_content_address("abc123").is_err());
 
         // Invalid characters
-        assert!(parse_content_address("sha256-gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg").is_err());
+        assert!(parse_content_address(
+            "sha256-gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+        )
+        .is_err());
 
         // Wrong length
         assert!(parse_content_address("sha256-abc123").is_err());

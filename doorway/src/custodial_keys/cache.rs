@@ -37,9 +37,9 @@ pub struct SigningKeyCacheConfig {
 impl Default for SigningKeyCacheConfig {
     fn default() -> Self {
         Self {
-            default_ttl: Duration::from_secs(3600),       // 1 hour
-            max_entries: 10_000,                          // 10k concurrent sessions
-            cleanup_interval: Duration::from_secs(60),   // Every minute
+            default_ttl: Duration::from_secs(3600),    // 1 hour
+            max_entries: 10_000,                       // 10k concurrent sessions
+            cleanup_interval: Duration::from_secs(60), // Every minute
         }
     }
 }

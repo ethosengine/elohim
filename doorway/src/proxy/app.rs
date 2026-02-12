@@ -106,7 +106,7 @@ pub async fn run_proxy(
         while let Some(msg) = conductor_stream.next().await {
             match msg {
                 Ok(Message::Binary(data)) => {
-                    if let Err(e) = client_sink.send(Message::Binary(data.into())).await {
+                    if let Err(e) = client_sink.send(Message::Binary(data)).await {
                         error!("Failed to send to app client: {}", e);
                         break;
                     }
@@ -118,10 +118,10 @@ pub async fn run_proxy(
                     }
                 }
                 Ok(Message::Ping(data)) => {
-                    let _ = client_sink.send(Message::Ping(data.into())).await;
+                    let _ = client_sink.send(Message::Ping(data)).await;
                 }
                 Ok(Message::Pong(data)) => {
-                    let _ = client_sink.send(Message::Pong(data.into())).await;
+                    let _ = client_sink.send(Message::Pong(data)).await;
                 }
                 Ok(Message::Close(frame)) => {
                     info!("App interface closed connection: {:?}", frame);

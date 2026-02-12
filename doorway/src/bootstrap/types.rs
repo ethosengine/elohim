@@ -35,8 +35,8 @@ pub struct AgentInfo {
 impl AgentInfo {
     /// Parse AgentInfo from MessagePack bytes
     pub fn from_msgpack(data: &[u8]) -> Result<Self, String> {
-        let value: rmpv::Value = rmpv::decode::read_value(&mut &data[..])
-            .map_err(|e| format!("Decode error: {}", e))?;
+        let value: rmpv::Value =
+            rmpv::decode::read_value(&mut &data[..]).map_err(|e| format!("Decode error: {}", e))?;
 
         let map = value
             .as_map()
@@ -292,9 +292,10 @@ mod tests {
 
     #[test]
     fn test_extract_int() {
-        let map = vec![
-            (rmpv::Value::String("limit".into()), rmpv::Value::Integer(10.into())),
-        ];
+        let map = vec![(
+            rmpv::Value::String("limit".into()),
+            rmpv::Value::Integer(10.into()),
+        )];
         assert_eq!(extract_int(&map, "limit").unwrap(), 10);
     }
 }

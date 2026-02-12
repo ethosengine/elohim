@@ -181,7 +181,6 @@ pub struct UserDoc {
     // =========================================================================
     // Custodial Key Fields
     // =========================================================================
-
     /// Encrypted custodial key material.
     /// Contains the user's Ed25519 keypair encrypted with their password.
     #[serde(skip_serializing_if = "Option::is_none")]

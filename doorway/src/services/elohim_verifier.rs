@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Maximum confidence score from Elohim verification (0-60%)
 pub const MAX_ELOHIM_CONFIDENCE: f64 = 60.0;
@@ -179,10 +179,7 @@ impl ElohimVerifier {
                 id: format!("q_{}", question_id),
                 question: "What was the most recent learning path you completed?".to_string(),
                 category: QuestionCategory::ContentMastery,
-                expected_answers: vec![
-                    path.path_title.clone(),
-                    path.path_id.clone(),
-                ],
+                expected_answers: vec![path.path_title.clone(), path.path_id.clone()],
                 is_multiple_choice: false,
                 options: None,
                 weight: 1.0,
@@ -190,7 +187,9 @@ impl ElohimVerifier {
             question_id += 1;
 
             if profile.completed_paths.len() > 1 {
-                let titles: Vec<String> = profile.completed_paths.iter()
+                let titles: Vec<String> = profile
+                    .completed_paths
+                    .iter()
                     .take(3)
                     .map(|p| p.path_title.clone())
                     .collect();
@@ -407,11 +406,7 @@ impl ElohimVerifier {
         let answer = match user_answer {
             Some(a) if !a.trim().is_empty() => a.trim().to_lowercase(),
             _ => {
-                return (
-                    false,
-                    0.0,
-                    "No answer provided".to_string(),
-                );
+                return (false, 0.0, "No answer provided".to_string());
             }
         };
 

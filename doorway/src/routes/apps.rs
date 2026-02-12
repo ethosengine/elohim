@@ -43,7 +43,7 @@ pub async fn handle_app_request(
                 .header("Content-Type", "application/json")
                 .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(
-                    r#"{"error": "Storage service not configured. Set STORAGE_URL env var."}"#
+                    r#"{"error": "Storage service not configured. Set STORAGE_URL env var."}"#,
                 )))
                 .unwrap();
         }
@@ -54,10 +54,7 @@ pub async fn handle_app_request(
 }
 
 /// Forward a /apps/* request to elohim-storage
-async fn forward_app_request(
-    storage_url: &str,
-    path: &str,
-) -> Response<Full<Bytes>> {
+async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Bytes>> {
     // Build the storage endpoint URL
     // path is /apps/... - forward as-is to storage
     let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
@@ -118,9 +115,7 @@ async fn forward_app_request(
                         builder = builder.header("ETag", et);
                     }
 
-                    builder
-                        .body(Full::new(Bytes::from(body.to_vec())))
-                        .unwrap()
+                    builder.body(Full::new(Bytes::from(body.to_vec()))).unwrap()
                 }
                 Err(e) => {
                     warn!(error = %e, "Failed to read storage response body");

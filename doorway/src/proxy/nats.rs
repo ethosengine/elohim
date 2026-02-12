@@ -17,7 +17,8 @@ use crate::nats::GatewayPublisher;
 use crate::proxy::holochain::{encode_error, parse_message};
 use crate::types::Result;
 
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 /// Run the NATS-based admin proxy
 ///
@@ -44,14 +45,19 @@ pub async fn run_admin_proxy(
                     match parse_message(&data) {
                         Ok(parsed) => {
                             if !is_operation_allowed(&parsed.operation, permission_level) {
-                                warn!("Blocked admin call '{}' due to insufficient permissions", parsed.operation);
+                                warn!(
+                                    "Blocked admin call '{}' due to insufficient permissions",
+                                    parsed.operation
+                                );
 
                                 // Send error response
                                 let error_response = encode_error(&format!(
                                     "Operation '{}' requires higher permission level (current: {})",
                                     parsed.operation, permission_level
                                 ));
-                                if let Err(e) = client_sink.send(Message::Binary(error_response)).await {
+                                if let Err(e) =
+                                    client_sink.send(Message::Binary(error_response)).await
+                                {
                                     error!("Failed to send error response: {}", e);
                                     break;
                                 }
@@ -61,7 +67,8 @@ pub async fn run_admin_proxy(
                         Err(e) => {
                             warn!("Blocking unparseable message in production mode: {}", e);
                             let error_response = encode_error("Invalid message format");
-                            if let Err(e) = client_sink.send(Message::Binary(error_response)).await {
+                            if let Err(e) = client_sink.send(Message::Binary(error_response)).await
+                            {
                                 error!("Failed to send error response: {}", e);
                                 break;
                             }

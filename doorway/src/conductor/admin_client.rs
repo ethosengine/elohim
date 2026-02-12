@@ -14,7 +14,6 @@ use tokio_tungstenite::{
     connect_async_with_config,
     tungstenite::{http::Request, Message},
 };
-use tracing::warn;
 
 /// Default timeout for admin WebSocket operations
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -385,10 +384,7 @@ mod tests {
         assert!(matches!(decoded, Value::Map(_)));
 
         if let Value::Map(map) = decoded {
-            assert_eq!(
-                get_string_field(&map, "type"),
-                Some("request".to_string())
-            );
+            assert_eq!(get_string_field(&map, "type"), Some("request".to_string()));
         }
     }
 
@@ -400,10 +396,7 @@ mod tests {
                 Value::String("type".into()),
                 Value::String("agent_pub_key_generated".into()),
             ),
-            (
-                Value::String("data".into()),
-                Value::Binary(vec![0u8; 39]),
-            ),
+            (Value::String("data".into()), Value::Binary(vec![0u8; 39])),
         ]);
         let inner_bytes = encode_msgpack(&inner).unwrap();
 
@@ -413,10 +406,7 @@ mod tests {
                 Value::String("type".into()),
                 Value::String("response".into()),
             ),
-            (
-                Value::String("data".into()),
-                Value::Binary(inner_bytes),
-            ),
+            (Value::String("data".into()), Value::Binary(inner_bytes)),
         ]);
         let envelope_bytes = encode_msgpack(&envelope).unwrap();
 
@@ -440,10 +430,7 @@ mod tests {
 
         let envelope = Value::Map(vec![
             (Value::String("id".into()), Value::Integer(1.into())),
-            (
-                Value::String("type".into()),
-                Value::String("error".into()),
-            ),
+            (Value::String("type".into()), Value::String("error".into())),
             (Value::String("data".into()), err_data),
         ]);
         let envelope_bytes = encode_msgpack(&envelope).unwrap();
@@ -469,10 +456,7 @@ mod tests {
 
         // Error response should return Err
         let err_response = Value::Map(vec![
-            (
-                Value::String("type".into()),
-                Value::String("error".into()),
-            ),
+            (Value::String("type".into()), Value::String("error".into())),
             (
                 Value::String("data".into()),
                 Value::Map(vec![(

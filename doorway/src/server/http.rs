@@ -17,21 +17,21 @@ use tracing::{debug, error, info, warn};
 
 use crate::bootstrap::{self, BootstrapStore};
 use crate::cache::{
-    self, CacheConfig, CacheRuleStore, ContentCache, TieredBlobCache, TieredCacheConfig,
-    spawn_tiered_cleanup_task, DoorwayResolver, DeliveryRelay,
+    self, spawn_tiered_cleanup_task, CacheConfig, CacheRuleStore, ContentCache, DeliveryRelay,
+    DoorwayResolver, TieredBlobCache, TieredCacheConfig,
 };
 use crate::conductor::{ConductorRegistry, ConductorRouter};
-use crate::orchestrator::OrchestratorState;
-use crate::services::{
-    CustodianService, CustodianServiceConfig, VerificationService, VerifyBlobRequest,
-    spawn_health_probe_task,
-};
 use crate::config::Args;
 use crate::db::MongoClient;
 use crate::nats::{HostRouter, NatsClient};
+use crate::orchestrator::OrchestratorState;
 use crate::projection::{ProjectionConfig, ProjectionStore};
 use crate::routes;
 use crate::server::websocket;
+use crate::services::{
+    spawn_health_probe_task, CustodianService, CustodianServiceConfig, VerificationService,
+    VerifyBlobRequest,
+};
 use crate::signal::{self, SignalStore, DEFAULT_MAX_CLIENTS};
 use crate::signing::{SigningConfig, SigningService};
 use crate::types::DoorwayError;
@@ -116,7 +116,9 @@ impl AppState {
         let cache = Arc::new(ContentCache::new(CacheConfig::from_env()));
         let cache_rules = Arc::new(CacheRuleStore::new());
         // Projection store in memory-only mode (no MongoDB)
-        let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
+        let projection = Some(Arc::new(ProjectionStore::memory_only(
+            ProjectionConfig::default(),
+        )));
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
         let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
         let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
@@ -163,11 +165,7 @@ impl AppState {
     ///
     /// Projection store is initialized in memory-only mode. Use `init_projection()`
     /// to upgrade to MongoDB-backed projection after async initialization.
-    pub fn with_services(
-        args: Args,
-        mongo: Option<MongoClient>,
-        nats: Option<NatsClient>,
-    ) -> Self {
+    pub fn with_services(args: Args, mongo: Option<MongoClient>, nats: Option<NatsClient>) -> Self {
         let router = HostRouter::new(nats.clone());
         let bootstrap = if args.bootstrap_enabled {
             Some(Arc::new(BootstrapStore::new()))
@@ -183,7 +181,9 @@ impl AppState {
         let cache = Arc::new(ContentCache::new(CacheConfig::from_env()));
         let cache_rules = Arc::new(CacheRuleStore::new());
         // Start with memory-only projection; upgrade to MongoDB via init_projection()
-        let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
+        let projection = Some(Arc::new(ProjectionStore::memory_only(
+            ProjectionConfig::default(),
+        )));
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
         let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
         let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
@@ -255,7 +255,9 @@ impl AppState {
         let cache = Arc::new(ContentCache::new(CacheConfig::from_env()));
         let cache_rules = Arc::new(CacheRuleStore::new());
         // Start with memory-only projection; upgrade to MongoDB via init_projection()
-        let projection = Some(Arc::new(ProjectionStore::memory_only(ProjectionConfig::default())));
+        let projection = Some(Arc::new(ProjectionStore::memory_only(
+            ProjectionConfig::default(),
+        )));
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
         let tiered_cache = Arc::new(TieredBlobCache::new(TieredCacheConfig::from_env()));
         let custodian = Arc::new(CustodianService::new(CustodianServiceConfig::default()));
@@ -263,7 +265,11 @@ impl AppState {
 
         // Create resolver with both projection and conductor fallback
         // Note: zome_config is discovered at runtime when conductor connection is established
-        let resolver = Arc::new(DoorwayResolver::new(projection.clone(), Some(Arc::clone(&app_pool)), None));
+        let resolver = Arc::new(DoorwayResolver::new(
+            projection.clone(),
+            Some(Arc::clone(&app_pool)),
+            None,
+        ));
 
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
         // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
@@ -326,10 +332,8 @@ impl AppState {
         let cache_rules = Arc::new(CacheRuleStore::new());
 
         // Initialize projection store with MongoDB
-        let projection_store = ProjectionStore::new(
-            mongo.clone(),
-            ProjectionConfig::default(),
-        ).await?;
+        let projection_store =
+            ProjectionStore::new(mongo.clone(), ProjectionConfig::default()).await?;
         let projection = Some(Arc::new(projection_store));
 
         let signing = Arc::new(SigningService::new(SigningConfig::default()));
@@ -404,16 +408,25 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     // Log signal service status
     if let Some(ref signal_store) = state.signal {
         let max = state.args.signal_max_clients.unwrap_or(DEFAULT_MAX_CLIENTS);
-        info!("Signal service enabled at /signal/{{pubkey}} (max {} clients)", max);
+        info!(
+            "Signal service enabled at /signal/{{pubkey}} (max {} clients)",
+            max
+        );
         let _ = signal_store; // suppress unused warning
     }
 
     // Start cache cleanup task
     cache::store::spawn_cleanup_task(Arc::clone(&state.cache));
-    info!("Cache service enabled (max {} entries)", state.cache.config().max_entries);
+    info!(
+        "Cache service enabled (max {} entries)",
+        state.cache.config().max_entries
+    );
 
     // Start tiered blob cache cleanup task (every 60 seconds)
-    spawn_tiered_cleanup_task(Arc::clone(&state.tiered_cache), std::time::Duration::from_secs(60));
+    spawn_tiered_cleanup_task(
+        Arc::clone(&state.tiered_cache),
+        std::time::Duration::from_secs(60),
+    );
     info!(
         "Tiered blob cache enabled (blob max: {} MB, chunk max: {} GB)",
         state.tiered_cache.config().blob_max_bytes / (1024 * 1024),
@@ -421,7 +434,10 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     );
 
     // Start custodian health probe task (every 60 seconds)
-    spawn_health_probe_task(Arc::clone(&state.custodian), std::time::Duration::from_secs(60));
+    spawn_health_probe_task(
+        Arc::clone(&state.custodian),
+        std::time::Duration::from_secs(60),
+    );
     info!("Custodian service enabled for P2P blob distribution");
 
     loop {
@@ -481,7 +497,9 @@ async fn handle_request(
             if hyper_tungstenite::is_upgrade_request(&req) {
                 return Ok(handle_signal_request(state, req, &path, addr).await);
             } else {
-                return Ok(to_boxed(bad_request_response("Signal endpoint requires WebSocket upgrade")));
+                return Ok(to_boxed(bad_request_response(
+                    "Signal endpoint requires WebSocket upgrade",
+                )));
             }
         }
     }
@@ -509,14 +527,10 @@ async fn handle_request(
         }
 
         // Version info for deployment verification
-        (Method::GET, "/version") => {
-            to_boxed(routes::version_info())
-        }
+        (Method::GET, "/version") => to_boxed(routes::version_info()),
 
         // Comprehensive status (runtime stats, cluster health, storage diagnostics)
-        (Method::GET, "/status") => {
-            to_boxed(routes::status_check(Arc::clone(&state)).await)
-        }
+        (Method::GET, "/status") => to_boxed(routes::status_check(Arc::clone(&state)).await),
 
         // Debug stream WebSocket for real-time debugging
         (Method::GET, "/debug/stream") if hyper_tungstenite::is_upgrade_request(&req) => {
@@ -525,7 +539,8 @@ async fn handle_request(
                     req,
                     Arc::clone(&state.debug_hub),
                     state.args.storage_url.clone(),
-                ).await
+                )
+                .await,
             ));
         }
 
@@ -570,7 +585,9 @@ async fn handle_request(
             if hyper_tungstenite::is_upgrade_request(&req) {
                 to_boxed(websocket::handle_admin_upgrade(state, req).await)
             } else {
-                to_boxed(bad_request_response("WebSocket upgrade required for /hc/admin"))
+                to_boxed(bad_request_response(
+                    "WebSocket upgrade required for /hc/admin",
+                ))
             }
         }
 
@@ -586,7 +603,9 @@ async fn handle_request(
                     _ => to_boxed(bad_request_response("Invalid app port")),
                 }
             } else {
-                to_boxed(bad_request_response("WebSocket upgrade required for /hc/app/{port}"))
+                to_boxed(bad_request_response(
+                    "WebSocket upgrade required for /hc/app/{port}",
+                ))
             }
         }
 
@@ -637,12 +656,16 @@ async fn handle_request(
 
         // Manual agent→conductor assignment
         (Method::POST, "/admin/conductors/assign") => {
-            return Ok(to_boxed(routes::handle_assign_agent(req, Arc::clone(&state)).await));
+            return Ok(to_boxed(
+                routes::handle_assign_agent(req, Arc::clone(&state)).await,
+            ));
         }
 
         // Hosted users — manual provisioning
         (Method::POST, "/admin/hosted-users") => {
-            return Ok(to_boxed(routes::handle_provision_user(req, Arc::clone(&state)).await));
+            return Ok(to_boxed(
+                routes::handle_provision_user(req, Arc::clone(&state)).await,
+            ));
         }
 
         // Hosted users — list users with conductor assignments
@@ -678,9 +701,7 @@ async fn handle_request(
         }
 
         // List all nodes with detailed resource and social metrics
-        (Method::GET, "/admin/nodes") => {
-            to_boxed(routes::handle_nodes(Arc::clone(&state)).await)
-        }
+        (Method::GET, "/admin/nodes") => to_boxed(routes::handle_nodes(Arc::clone(&state)).await),
 
         // Get specific node details
         (Method::GET, p) if p.starts_with("/admin/nodes/") => {
@@ -708,7 +729,9 @@ async fn handle_request(
             if hyper_tungstenite::is_upgrade_request(&req) {
                 to_boxed(routes::handle_dashboard_ws(Arc::clone(&state), req).await)
             } else {
-                to_boxed(bad_request_response("WebSocket upgrade required for /admin/ws"))
+                to_boxed(bad_request_response(
+                    "WebSocket upgrade required for /admin/ws",
+                ))
             }
         }
 
@@ -738,22 +761,22 @@ async fn handle_request(
         }
 
         // Bootstrap ping (GET for health check)
-        (Method::GET, "/bootstrap") => {
-            to_boxed(
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header("Content-Type", "text/plain")
-                    .body(Full::new(Bytes::from("OK")))
-                    .unwrap(),
-            )
-        }
+        (Method::GET, "/bootstrap") => to_boxed(
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "text/plain")
+                .body(Full::new(Bytes::from("OK")))
+                .unwrap(),
+        ),
 
         // Signal service WebSocket (SBD protocol)
         (Method::GET, p) if p.starts_with("/signal/") => {
             if hyper_tungstenite::is_upgrade_request(&req) {
                 handle_signal_request(state, req, &path, addr).await
             } else {
-                to_boxed(bad_request_response("Signal endpoint requires WebSocket upgrade"))
+                to_boxed(bad_request_response(
+                    "Signal endpoint requires WebSocket upgrade",
+                ))
             }
         }
 
@@ -775,9 +798,7 @@ async fn handle_request(
         }
 
         // Blob verification endpoint
-        (Method::POST, "/api/blob/verify") => {
-            handle_blob_verify(state, req).await
-        }
+        (Method::POST, "/api/blob/verify") => handle_blob_verify(state, req).await,
 
         // Content store streaming with Range support (HTTP 206)
         // GET /store/{hash} - Stream entire content or byte range
@@ -788,7 +809,9 @@ async fn handle_request(
                 req,
                 Arc::clone(&state.cache),
                 state.args.storage_url.clone(),
-            ).await {
+            )
+            .await
+            {
                 Ok(resp) => to_boxed(resp),
                 Err(err) => to_boxed(routes::blob::error_response(err)),
             }
@@ -798,7 +821,9 @@ async fn handle_request(
                 req,
                 Arc::clone(&state.cache),
                 state.args.storage_url.clone(),
-            ).await {
+            )
+            .await
+            {
                 Ok(resp) => to_boxed(resp),
                 Err(err) => to_boxed(routes::blob::error_response(err)),
             }
@@ -819,7 +844,9 @@ async fn handle_request(
                 req,
                 Arc::clone(&state.cache),
                 state.args.storage_url.clone(),
-            ).await {
+            )
+            .await
+            {
                 Ok(resp) => to_boxed(resp),
                 Err(err) => to_boxed(routes::blob::error_response(err)),
             }
@@ -834,7 +861,9 @@ async fn handle_request(
                 req,
                 Arc::clone(&state.cache),
                 state.args.storage_url.clone(),
-            ).await {
+            )
+            .await
+            {
                 Ok(resp) => to_boxed(resp),
                 Err(err) => to_boxed(routes::blob::error_response(err)),
             }
@@ -850,7 +879,9 @@ async fn handle_request(
                 .and_then(|h| h.to_str().ok())
                 .map(|s| s.to_string());
             let remote_ip = addr.ip();
-            to_boxed(routes::handle_api_request(state, p, query, Some(remote_ip), auth_header).await)
+            to_boxed(
+                routes::handle_api_request(state, p, query, Some(remote_ip), auth_header).await,
+            )
         }
 
         // WebSocket import progress (proxy to elohim-storage)
@@ -858,14 +889,16 @@ async fn handle_request(
         (Method::GET, "/import/progress") if hyper_tungstenite::is_upgrade_request(&req) => {
             info!("WebSocket upgrade request for /import/progress");
             return Ok(to_boxed(
-                routes::handle_import_progress_ws(req, state.args.storage_url.clone()).await
+                routes::handle_import_progress_ws(req, state.args.storage_url.clone()).await,
             ));
         }
 
         // Dynamic import routes (forwarded to elohim-storage)
         // POST /import/{batch_type} - queue import → forward to storage
         // GET /import/{batch_type}/{batch_id} - get status → forward to storage
-        (method, p) if matches!(method, Method::POST | Method::GET) && p.starts_with("/import/") => {
+        (method, p)
+            if matches!(method, Method::POST | Method::GET) && p.starts_with("/import/") =>
+        {
             // Parse import path: /import/{batch_type} or /import/{batch_type}/{batch_id}
             let remainder = p.strip_prefix("/import/").unwrap_or("");
             if remainder.is_empty() {
@@ -873,7 +906,9 @@ async fn handle_request(
                     Response::builder()
                         .status(StatusCode::BAD_REQUEST)
                         .header("Content-Type", "application/json")
-                        .body(Full::new(Bytes::from(r#"{"error": "Missing batch_type in path"}"#)))
+                        .body(Full::new(Bytes::from(
+                            r#"{"error": "Missing batch_type in path"}"#,
+                        )))
                         .unwrap(),
                 ));
             }
@@ -895,7 +930,8 @@ async fn handle_request(
                     state.args.storage_url.clone(),
                     batch_type,
                     batch_id,
-                ).await
+                )
+                .await,
             ));
         }
 
@@ -905,11 +941,7 @@ async fn handle_request(
         (_, p) if p.starts_with("/db/") => {
             debug!(path = %p, "Forwarding database request to elohim-storage");
             return Ok(to_boxed(
-                routes::handle_db_request(
-                    req,
-                    state.args.storage_url.clone(),
-                    p,
-                ).await
+                routes::handle_db_request(req, state.args.storage_url.clone(), p).await,
             ));
         }
 
@@ -918,11 +950,7 @@ async fn handle_request(
         (Method::GET, p) if p.starts_with("/apps/") => {
             debug!(path = %p, "Forwarding app request to elohim-storage");
             return Ok(to_boxed(
-                routes::handle_app_request(
-                    req,
-                    state.args.storage_url.clone(),
-                    p,
-                ).await
+                routes::handle_app_request(req, state.args.storage_url.clone(), p).await,
             ));
         }
 
@@ -982,7 +1010,10 @@ async fn handle_bootstrap_request(
         path.strip_prefix("/bootstrap/").unwrap_or("")
     };
 
-    debug!("Bootstrap request: op={}, network={}, x_op={:?}", op, network, x_op);
+    debug!(
+        "Bootstrap request: op={}, network={}, x_op={:?}",
+        op, network, x_op
+    );
 
     // Read request body
     let body = match req.collect().await {
@@ -1070,10 +1101,7 @@ async fn handle_signal_request(
 /// This endpoint provides server-side SHA256 verification as part of defense-in-depth:
 /// - Primary: Client uses WASM or SubtleCrypto for local verification
 /// - Fallback: Client sends blob to server for authoritative verification
-async fn handle_blob_verify(
-    state: Arc<AppState>,
-    req: Request<Incoming>,
-) -> Response<BoxBody> {
+async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Response<BoxBody> {
     // Read request body
     let body = match req.collect().await {
         Ok(collected) => collected.to_bytes(),
@@ -1195,4 +1223,3 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
 }
-

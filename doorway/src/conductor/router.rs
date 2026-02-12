@@ -27,10 +27,7 @@ pub struct ConductorRouter {
 
 impl ConductorRouter {
     /// Create a new router
-    pub fn new(
-        registry: Arc<ConductorRegistry>,
-        pools: Arc<ConductorPoolMap>,
-    ) -> Self {
+    pub fn new(registry: Arc<ConductorRegistry>, pools: Arc<ConductorPoolMap>) -> Self {
         Self {
             registry,
             pools,

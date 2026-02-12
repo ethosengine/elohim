@@ -32,16 +32,16 @@
 //! let custom = resolver.resolve("MyCustomType", "my-id").await?;
 //! ```
 
-use std::sync::Arc;
-use std::time::Instant;
 use holochain_cache_core::{ContentResolver, SourceTier};
 use serde::Serialize;
+use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::projection::ProjectionStore;
-use crate::worker::{WorkerPool, ZomeCallBuilder, ZomeCallConfig, RequesterIdentity};
 use crate::types::{DoorwayError, Result};
+use crate::worker::{RequesterIdentity, WorkerPool, ZomeCallBuilder, ZomeCallConfig};
 
 // =============================================================================
 // Resolution Result Types
@@ -115,7 +115,7 @@ impl DoorwayResolver {
         resolver.register_source(
             "projection".to_string(),
             SourceTier::Projection,
-            90, // High priority within tier
+            90,         // High priority within tier
             r#"["*"]"#, // Wildcard - projection can cache any type
             None,
         );
@@ -207,10 +207,8 @@ impl DoorwayResolver {
             let mut resolver = self.resolver.write().await;
             resolver.resolve(content_type, id)
         };
-        let parsed: holochain_cache_core::ResolutionResult =
-            serde_json::from_str(&resolution).map_err(|_| {
-                DoorwayError::Internal("Failed to parse resolution result".into())
-            })?;
+        let parsed: holochain_cache_core::ResolutionResult = serde_json::from_str(&resolution)
+            .map_err(|_| DoorwayError::Internal("Failed to parse resolution result".into()))?;
 
         // Try sources in order, passing identity for access control
         let result = self.try_resolve(content_type, id, &parsed, requester).await;
@@ -220,15 +218,13 @@ impl DoorwayResolver {
         self.update_stats(&result, duration_ms);
 
         match result {
-            Ok((data, source_id, tier, cached)) => {
-                Ok(ResolutionResult {
-                    data,
-                    source_id,
-                    tier,
-                    duration_ms,
-                    cached,
-                })
-            }
+            Ok((data, source_id, tier, cached)) => Ok(ResolutionResult {
+                data,
+                source_id,
+                tier,
+                duration_ms,
+                cached,
+            }),
             Err(e) => Err(e),
         }
     }
@@ -256,7 +252,12 @@ impl DoorwayResolver {
                 debug!(content_type = content_type, id = id, "Trying projection");
                 if let Some(doc) = projection.get(content_type, id).await {
                     debug!(content_type = content_type, id = id, "Projection hit");
-                    return Ok((doc.data, "projection".to_string(), SourceTier::Projection, initial.cached));
+                    return Ok((
+                        doc.data,
+                        "projection".to_string(),
+                        SourceTier::Projection,
+                        initial.cached,
+                    ));
                 }
             }
         }
@@ -285,10 +286,19 @@ impl DoorwayResolver {
                                 id = id,
                                 "Conductor fallback succeeded"
                             );
-                            return Ok((data, "conductor".to_string(), SourceTier::Authoritative, false));
+                            return Ok((
+                                data,
+                                "conductor".to_string(),
+                                SourceTier::Authoritative,
+                                false,
+                            ));
                         }
                         Ok(None) => {
-                            debug!(content_type = content_type, id = id, "Not found in conductor");
+                            debug!(
+                                content_type = content_type,
+                                id = id,
+                                "Not found in conductor"
+                            );
                         }
                         Err(e) => {
                             warn!(
@@ -327,7 +337,7 @@ impl DoorwayResolver {
             stats.resolution_count += 1;
 
             match result {
-                Ok((_, source, tier, _)) => {
+                Ok((_, _source, tier, _)) => {
                     match tier {
                         SourceTier::Projection => stats.projection_hits += 1,
                         SourceTier::Authoritative => stats.conductor_fallbacks += 1,
@@ -340,8 +350,7 @@ impl DoorwayResolver {
 
             // Update rolling average
             let n = stats.resolution_count as f64;
-            stats.avg_resolution_ms =
-                stats.avg_resolution_ms * ((n - 1.0) / n) + duration_ms / n;
+            stats.avg_resolution_ms = stats.avg_resolution_ms * ((n - 1.0) / n) + duration_ms / n;
         }
     }
 
@@ -367,7 +376,11 @@ impl DoorwayResolver {
     pub async fn set_source_available(&self, source_id: &str, available: bool) {
         let mut resolver = self.resolver.write().await;
         resolver.set_source_available(source_id, available);
-        info!(source_id = source_id, available = available, "Source availability updated");
+        info!(
+            source_id = source_id,
+            available = available,
+            "Source availability updated"
+        );
     }
 
     /// Check if a source is available.

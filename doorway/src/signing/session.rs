@@ -2,12 +2,11 @@
 //!
 //! Tracks authenticated human sessions and their associated agent pubkeys.
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Represents an authenticated human session
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,7 +108,7 @@ pub struct SessionStore {
     default_ttl: Duration,
 
     /// Maximum sessions per human
-    max_sessions_per_human: usize,
+    _max_sessions_per_human: usize,
 
     /// Last cleanup timestamp
     last_cleanup: std::sync::atomic::AtomicU64,
@@ -122,7 +121,7 @@ impl SessionStore {
             sessions: DashMap::new(),
             by_human: DashMap::new(),
             default_ttl: Duration::from_secs(default_ttl_seconds),
-            max_sessions_per_human,
+            _max_sessions_per_human: max_sessions_per_human,
             last_cleanup: std::sync::atomic::AtomicU64::new(0),
         }
     }
@@ -240,12 +239,16 @@ impl SessionStore {
             return;
         }
 
-        if self.last_cleanup.compare_exchange(
-            last,
-            now,
-            std::sync::atomic::Ordering::SeqCst,
-            std::sync::atomic::Ordering::Relaxed,
-        ).is_ok() {
+        if self
+            .last_cleanup
+            .compare_exchange(
+                last,
+                now,
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::Relaxed,
+            )
+            .is_ok()
+        {
             self.cleanup();
         }
     }

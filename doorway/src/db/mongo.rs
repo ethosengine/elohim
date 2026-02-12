@@ -39,9 +39,15 @@ impl MongoClient {
 
         // Use serverSelectionTimeoutMS to avoid hanging on unreachable MongoDB
         let timeout_uri = if uri.contains('?') {
-            format!("{}&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000", uri)
+            format!(
+                "{}&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000",
+                uri
+            )
         } else {
-            format!("{}?serverSelectionTimeoutMS=3000&connectTimeoutMS=3000", uri)
+            format!(
+                "{}?serverSelectionTimeoutMS=3000&connectTimeoutMS=3000",
+                uri
+            )
         };
 
         let client = Client::with_uri_str(&timeout_uri)
@@ -120,12 +126,7 @@ where
 
         let indices: Vec<IndexModel> = schema_indices
             .into_iter()
-            .map(|(keys, opts)| {
-                IndexModel::builder()
-                    .keys(keys)
-                    .options(opts)
-                    .build()
-            })
+            .map(|(keys, opts)| IndexModel::builder().keys(keys).options(opts).build())
             .collect();
 
         self.inner

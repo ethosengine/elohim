@@ -43,7 +43,10 @@ pub struct GatewayPublisher {
 impl GatewayPublisher {
     /// Create a new gateway publisher
     pub async fn new(nats_url: &str, config: GatewayConfig) -> Result<Self> {
-        info!("Gateway {} connecting to NATS at {}", config.gateway_id, nats_url);
+        info!(
+            "Gateway {} connecting to NATS at {}",
+            config.gateway_id, nats_url
+        );
 
         let nats_client = async_nats::connect(nats_url)
             .await
@@ -122,10 +125,7 @@ impl GatewayPublisher {
                         if let Some(sender) = sender {
                             let _ = sender.send(response);
                         } else {
-                            warn!(
-                                "No pending request for response {}",
-                                response.request_id
-                            );
+                            warn!("No pending request for response {}", response.request_id);
                         }
                     }
                     Err(e) => {
@@ -199,7 +199,9 @@ impl GatewayPublisher {
                     Ok(response.payload)
                 } else {
                     Err(DoorwayError::Holochain(
-                        response.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        response
+                            .error
+                            .unwrap_or_else(|| "Unknown error".to_string()),
                     ))
                 }
             }
@@ -220,7 +222,12 @@ impl GatewayPublisher {
     }
 
     /// Send a request and return immediately (fire-and-forget)
-    pub async fn publish_only(&self, payload: Vec<u8>, interface: &str, app_port: Option<u16>) -> Result<String> {
+    pub async fn publish_only(
+        &self,
+        payload: Vec<u8>,
+        interface: &str,
+        app_port: Option<u16>,
+    ) -> Result<String> {
         let request_id = uuid::Uuid::new_v4().to_string();
 
         let request = WorkerRequest {
@@ -265,11 +272,7 @@ pub struct SessionGateway {
 
 impl SessionGateway {
     /// Create a new session gateway
-    pub fn new(
-        publisher: Arc<GatewayPublisher>,
-        interface: &str,
-        app_port: Option<u16>,
-    ) -> Self {
+    pub fn new(publisher: Arc<GatewayPublisher>, interface: &str, app_port: Option<u16>) -> Self {
         Self {
             publisher,
             session_id: uuid::Uuid::new_v4().to_string(),

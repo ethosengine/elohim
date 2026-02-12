@@ -82,7 +82,7 @@ impl PubKey {
     /// Encode as base64 URL-safe string
     pub fn to_base64(&self) -> String {
         use base64::prelude::*;
-        BASE64_URL_SAFE_NO_PAD.encode(&*self.0)
+        BASE64_URL_SAFE_NO_PAD.encode(*self.0)
     }
 }
 
@@ -122,7 +122,9 @@ pub async fn handle_signal_upgrade(
             return Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Invalid public key format"}"#)))
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "Invalid public key format"}"#,
+                )))
                 .unwrap();
         }
     };
@@ -164,8 +166,12 @@ pub async fn handle_signal_upgrade(
     };
 
     let calc_ip = to_canonical_ip(addr.ip());
-    let idle_timeout_ms = args.signal_idle_timeout_ms.unwrap_or(DEFAULT_IDLE_TIMEOUT_MS);
-    let rate_limit_kbps = args.signal_rate_limit_kbps.unwrap_or(DEFAULT_RATE_LIMIT_KBPS);
+    let idle_timeout_ms = args
+        .signal_idle_timeout_ms
+        .unwrap_or(DEFAULT_IDLE_TIMEOUT_MS);
+    let rate_limit_kbps = args
+        .signal_rate_limit_kbps
+        .unwrap_or(DEFAULT_RATE_LIMIT_KBPS);
 
     // Spawn handler task
     tokio::spawn(async move {
@@ -355,8 +361,5 @@ where
     S: futures_util::Sink<Message> + Unpin,
 {
     let mut guard = write.lock().await;
-    guard
-        .send(Message::Binary(data))
-        .await
-        .map_err(|_| ())
+    guard.send(Message::Binary(data)).await.map_err(|_| ())
 }
