@@ -119,7 +119,7 @@ pub async fn handle_admin_upgrade(
 
 /// Handle WebSocket upgrade for app interface
 pub async fn handle_app_upgrade(
-    _state: Arc<AppState>,
+    state: Arc<AppState>,
     req: Request<Incoming>,
     port: u16,
 ) -> Response<Full<Bytes>> {
@@ -132,9 +132,12 @@ pub async fn handle_app_upgrade(
     // Preserve query parameters (like auth token)
     let query = req.uri().query().map(|q| q.to_string());
 
+    // Extract conductor host from CONDUCTOR_URL (e.g. "ws://edgenode:4445" -> "edgenode")
+    let conductor_host = extract_conductor_host(&state.args.conductor_url);
+
     info!(
-        "App WebSocket upgrade request for port {} (origin: {:?})",
-        port, origin
+        "App WebSocket upgrade request for port {} (origin: {:?}, conductor: {})",
+        port, origin, conductor_host
     );
 
     match hyper_tungstenite::upgrade(req, None) {
@@ -144,7 +147,9 @@ pub async fn handle_app_upgrade(
             tokio::spawn(async move {
                 match websocket.await {
                     Ok(ws) => {
-                        if let Err(e) = proxy::app::run_proxy(ws, port, origin, query).await {
+                        if let Err(e) =
+                            proxy::app::run_proxy(ws, port, origin, query, &conductor_host).await
+                        {
                             error!("App proxy error (port {}): {:?}", port, e);
                         }
                     }
@@ -169,6 +174,21 @@ pub async fn handle_app_upgrade(
                 .unwrap()
         }
     }
+}
+
+/// Extract the host portion from a conductor URL.
+///
+/// e.g. "ws://elohim-edgenode-alpha:4445" -> "elohim-edgenode-alpha"
+///      "ws://localhost:4445"             -> "localhost"
+fn extract_conductor_host(conductor_url: &str) -> String {
+    if let Some(after_scheme) = conductor_url.split("://").nth(1) {
+        // Strip port if present
+        if let Some(colon) = after_scheme.rfind(':') {
+            return after_scheme[..colon].to_string();
+        }
+        return after_scheme.to_string();
+    }
+    "localhost".to_string()
 }
 
 /// Extract permission level from request

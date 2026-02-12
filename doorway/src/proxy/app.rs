@@ -15,18 +15,20 @@ use crate::types::{DoorwayError, Result};
 type HyperWebSocket =
     hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
-/// Run the app proxy between client and conductor app interface
+/// Run the app proxy between client and conductor app interface.
+///
+/// `conductor_host` is the hostname of the conductor (e.g. "elohim-edgenode-alpha")
+/// extracted from CONDUCTOR_URL. Falls back to "localhost" for local dev.
 pub async fn run_proxy(
     client_ws: HyperWebSocket,
     port: u16,
     origin: Option<String>,
     query: Option<String>,
+    conductor_host: &str,
 ) -> Result<()> {
-    // Build app interface URL
-    // Strip Doorway-specific params (apiKey) but KEEP conductor params (token)
-    // The token= param is the Holochain app authentication token issued by the conductor
-    // via issueAppAuthenticationToken() - the conductor needs it to authorize the connection
-    let mut app_url = format!("ws://localhost:{}", port);
+    // Build app interface URL using the conductor host (not hardcoded localhost)
+    // Strip Doorway-specific params (apiKey) but keep conductor params
+    let mut app_url = format!("ws://{}:{}", conductor_host, port);
     if let Some(q) = query {
         let filtered: Vec<&str> = q
             .split('&')
@@ -42,7 +44,7 @@ pub async fn run_proxy(
     // Connect to conductor app interface with proper headers
     let request = Request::builder()
         .uri(&app_url)
-        .header("Host", format!("localhost:{}", port))
+        .header("Host", format!("{}:{}", conductor_host, port))
         .header("Origin", "http://localhost")
         .header("Connection", "Upgrade")
         .header("Upgrade", "websocket")
