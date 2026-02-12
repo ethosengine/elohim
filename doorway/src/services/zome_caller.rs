@@ -84,18 +84,9 @@ impl ZomeCaller {
         )
         .await?;
 
-        // Connect to app interface
-        // ConductorConnection.connect handles the auth handshake internally
-        // We need to pass the token as part of the URL or via the connection
-        // Following the pattern from projection/subscriber.rs which connects with auth
-        let app_url_with_token = format!(
-            "{}?token={}",
-            self.app_url,
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &token.token)
-        );
-
+        // Connect to app interface with post-connection authentication
         info!("ZomeCaller connecting to app interface at {}", self.app_url);
-        let conn = ConductorConnection::connect(&app_url_with_token)
+        let conn = ConductorConnection::connect_with_auth(&self.app_url, Some(token.token.clone()))
             .await
             .map_err(|e| format!("ZomeCaller connection failed: {}", e))?;
 
