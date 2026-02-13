@@ -246,8 +246,9 @@ fn setup_deep_link_handler(app: &tauri::App) -> Result<(), Box<dyn std::error::E
     // Register handler for URLs received while app is running (warm start)
     let handle = app.handle().clone();
     app.deep_link().on_open_url(move |event| {
-        log::info!("Deep link received: {:?}", event.urls());
-        for url in event.urls() {
+        let urls = event.urls();
+        log::info!("Deep link received: {:?}", urls);
+        for url in urls {
             handle_deep_link_url(&handle, &url);
         }
     });
