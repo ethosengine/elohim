@@ -248,7 +248,7 @@ fn setup_deep_link_handler(app: &tauri::App) -> Result<(), Box<dyn std::error::E
     app.deep_link().on_open_url(move |event| {
         log::info!("Deep link received: {:?}", event.urls());
         for url in event.urls() {
-            handle_deep_link_url(&handle, url);
+            handle_deep_link_url(&handle, &url);
         }
     });
 
