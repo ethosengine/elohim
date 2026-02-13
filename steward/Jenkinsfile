@@ -476,17 +476,17 @@ spec:
                                     for var in NIX_LDFLAGS NIX_LDFLAGS_FOR_TARGET NIX_CFLAGS_COMPILE NIX_CFLAGS_COMPILE_FOR_TARGET; do
                                         val="${!var:-}"
                                         if [ -n "$val" ]; then
-                                            before=$(printf '%s' "$val" | wc -c)
-                                            deduped=$(printf '%s' "$val" | tr ' ' '\n' | awk '!seen[$0]++' | tr '\n' ' ' | sed 's/ $//')
-                                            after=$(printf '%s' "$deduped" | wc -c)
+                                            before=$(printf "%s" "$val" | wc -c)
+                                            deduped=$(printf "%s" "$val" | tr " " "\n" | awk "!seen[\$0]++" | tr "\n" " " | sed "s/ \$//")
+                                            after=$(printf "%s" "$deduped" | wc -c)
                                             echo "${var}: ${before} -> ${after} bytes"
                                             export "$var=$deduped"
                                         fi
                                     done
                                     # Deduplicate PATH (colon-separated)
-                                    before=$(printf '%s' "$PATH" | wc -c)
-                                    export PATH=$(printf '%s' "$PATH" | tr ':' '\n' | awk '!seen[$0]++' | tr '\n' ':' | sed 's/:$//')
-                                    after=$(printf '%s' "$PATH" | wc -c)
+                                    before=$(printf "%s" "$PATH" | wc -c)
+                                    export PATH=$(printf "%s" "$PATH" | tr ":" "\n" | awk "!seen[\$0]++" | tr "\n" ":" | sed "s/:\$//")
+                                    after=$(printf "%s" "$PATH" | wc -c)
                                     echo "PATH: ${before} -> ${after} bytes"
 
                                     echo "Env size after cleanup: $(env | wc -c) bytes ($(env | wc -l) vars)"
