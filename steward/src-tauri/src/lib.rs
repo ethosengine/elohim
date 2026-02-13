@@ -269,30 +269,14 @@ fn setup_deep_link_handler(app: &tauri::App) -> Result<(), Box<dyn std::error::E
 ///
 /// Parses OAuth callback URLs (elohim://auth/callback?code=...&state=...)
 /// and emits the appropriate event to the frontend.
-fn handle_deep_link_url(handle: &AppHandle, url: &url2::Url2) {
+fn handle_deep_link_url(handle: &AppHandle, url: &url::Url) {
     let url_str = url.to_string();
     log::info!("Processing deep link: {}", url_str);
 
-    // Parse as standard URL for query parameter extraction
-    let parsed = match url::Url::parse(&url_str) {
-        Ok(u) => u,
-        Err(e) => {
-            log::error!("Failed to parse deep link URL: {}", e);
-            let _ = handle.emit(
-                "deep-link-error",
-                DeepLinkError {
-                    message: format!("Invalid URL: {}", e),
-                    url: url_str,
-                },
-            );
-            return;
-        }
-    };
-
     // Only handle auth callbacks
-    if parsed.host_str() == Some("auth") && parsed.path() == "/callback" {
+    if url.host_str() == Some("auth") && url.path() == "/callback" {
         // Extract query parameters
-        let params: std::collections::HashMap<_, _> = parsed.query_pairs().collect();
+        let params: std::collections::HashMap<_, _> = url.query_pairs().collect();
 
         if let Some(code) = params.get("code") {
             let payload = OAuthCallbackPayload {
@@ -419,7 +403,7 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
         if needs_reinstall {
             // Uninstall old app and reinstall with new identity
             admin_ws
-                .uninstall_app(&String::from(APP_ID))
+                .uninstall_app(String::from(APP_ID), false)
                 .await
                 .map_err(|err| tauri_plugin_holochain::Error::ConductorApiError(err))?;
 

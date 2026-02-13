@@ -65,7 +65,7 @@ pub struct NativeHandoffResponse {
 }
 
 /// Response from POST /auth/confirm-stewardship
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StewardshipConfirmedResponse {
     pub success: bool,
