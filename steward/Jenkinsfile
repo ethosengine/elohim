@@ -272,6 +272,7 @@ spec:
                                     echo "Building hApp from source (this will take 20-40 minutes)..."
                                     nix develop --accept-flake-config --command bash -c '
                                         set -euo pipefail
+                                        export PATH=$(echo "$PATH" | tr ":" "\n" | awk "!seen[\$0]++" | tr "\n" ":" | sed "s/:$//")
                                         cargo build --release --target wasm32-unknown-unknown
                                         hc dna pack . -o workdir/lamad.dna
                                         hc app pack workdir -o elohim.happ
@@ -411,6 +412,10 @@ spec:
                                 # Pass ELOHIM_ENV to nix shell for Rust compile-time config
                                 ELOHIM_ENV="$ELOHIM_ENV" nix develop --accept-flake-config --command bash -c '
                                     set -euo pipefail
+
+                                    # Deduplicate PATH - Nix shells accumulate duplicate store paths
+                                    # which can exceed ARG_MAX when cc spawns collect2
+                                    export PATH=$(echo "$PATH" | tr ":" "\n" | awk "!seen[\$0]++" | tr "\n" ":" | sed "s/:$//")
 
                                     echo "=== Installing npm dependencies ==="
                                     npm install
