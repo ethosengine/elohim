@@ -340,8 +340,14 @@ spec:
                                 sh '''
                                     cd ..
                                     git submodule update --init sophia
-                                    cd sophia && pnpm install && pnpm build && pnpm build:umd && cd ..
-                                    cd elohim-app
+                                    cd sophia
+                                    if ! command -v pnpm > /dev/null 2>&1; then
+                                        npm install -g pnpm
+                                    fi
+                                    pnpm install --frozen-lockfile
+                                    pnpm build
+                                    pnpm --filter @ethosengine/sophia-element build:umd
+                                    cd ../elohim-app
                                     npm ci
                                     npm run build
                                     cp -r dist/elohim-app/browser/* ../steward/ui/
