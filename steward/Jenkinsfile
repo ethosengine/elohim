@@ -443,14 +443,18 @@ spec:
 
                                     echo ""
                                     echo "=== Building Tauri app (compile only) ==="
-                                    # Workaround: Nix dev shells (holonix + holochainTauriDev)
-                                    # accumulate env vars (buildInputs, nativeBuildInputs,
-                                    # shellHook, deps*, *Phase, etc.) that can total 200KB+.
-                                    # Combined with gcc linker args, this exceeds the ~2MB
-                                    # ARG_MAX when gcc spawns collect2 via posix_spawn.
-                                    # Clean ALL nix mkShell internal vars; cargo/gcc only need
-                                    # PATH, NIX_CC/LDFLAGS/CFLAGS, and standard build vars.
+                                    # Workaround: Nix stacked devShells (holonix + holochainTauriDev)
+                                    # cause two problems that exceed posix_spawn limits:
+                                    #
+                                    # 1. Small vars accumulate (deps*, *Phase, shellHook, etc.)
+                                    # 2. Large vars DUPLICATE (NIX_LDFLAGS, NIX_CFLAGS_COMPILE, PATH)
+                                    #    because each inputsFrom shell concatenates its full -L/-I paths.
+                                    #    A single var >128KB hits Linux MAX_ARG_STRLEN, causing E2BIG.
+                                    #
+                                    # Fix: unset small nix internals + deduplicate the large vars.
                                     echo "Env size before cleanup: $(env | wc -c) bytes ($(env | wc -l) vars)"
+
+                                    # Step 1: Unset nix mkShell internal vars not needed by cargo/gcc
                                     for var in $(env | cut -d= -f1); do
                                         case "$var" in
                                             deps*|propagated*|buildInputs|nativeBuildInputs|\
@@ -466,6 +470,25 @@ spec:
                                                 unset "$var" 2>/dev/null ;;
                                         esac
                                     done
+
+                                    # Step 2: Deduplicate large vars from stacked nix shells
+                                    # These can exceed the 128KB per-string MAX_ARG_STRLEN limit
+                                    for var in NIX_LDFLAGS NIX_LDFLAGS_FOR_TARGET NIX_CFLAGS_COMPILE NIX_CFLAGS_COMPILE_FOR_TARGET; do
+                                        val="${!var:-}"
+                                        if [ -n "$val" ]; then
+                                            before=$(printf '%s' "$val" | wc -c)
+                                            deduped=$(printf '%s' "$val" | tr ' ' '\n' | awk '!seen[$0]++' | tr '\n' ' ' | sed 's/ $//')
+                                            after=$(printf '%s' "$deduped" | wc -c)
+                                            echo "${var}: ${before} -> ${after} bytes"
+                                            export "$var=$deduped"
+                                        fi
+                                    done
+                                    # Deduplicate PATH (colon-separated)
+                                    before=$(printf '%s' "$PATH" | wc -c)
+                                    export PATH=$(printf '%s' "$PATH" | tr ':' '\n' | awk '!seen[$0]++' | tr '\n' ':' | sed 's/:$//')
+                                    after=$(printf '%s' "$PATH" | wc -c)
+                                    echo "PATH: ${before} -> ${after} bytes"
+
                                     echo "Env size after cleanup: $(env | wc -c) bytes ($(env | wc -l) vars)"
 
                                     # Build without bundling first
