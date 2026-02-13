@@ -443,15 +443,30 @@ spec:
 
                                     echo ""
                                     echo "=== Building Tauri app (compile only) ==="
-                                    # Workaround: Nix dev shells accumulate env vars that exceed
-                                    # the kernel ARG_MAX limit when gcc spawns collect2.
-                                    # Clear Nix-internal build vars not needed by cargo/gcc.
-                                    unset configureFlags mesonFlags cmakeFlags 2>/dev/null || true
-                                    unset depsBuildBuild depsBuildBuildPropagated 2>/dev/null || true
-                                    unset depsHostHost depsHostHostPropagated 2>/dev/null || true
-                                    unset depsTargetTarget depsTargetTargetPropagated 2>/dev/null || true
-                                    unset stdenv builder phases outputs 2>/dev/null || true
-                                    unset __structuredAttrs preferLocalBuild allowSubstitutes 2>/dev/null || true
+                                    # Workaround: Nix dev shells (holonix + holochainTauriDev)
+                                    # accumulate env vars (buildInputs, nativeBuildInputs,
+                                    # shellHook, deps*, *Phase, etc.) that can total 200KB+.
+                                    # Combined with gcc linker args, this exceeds the ~2MB
+                                    # ARG_MAX when gcc spawns collect2 via posix_spawn.
+                                    # Clean ALL nix mkShell internal vars; cargo/gcc only need
+                                    # PATH, NIX_CC/LDFLAGS/CFLAGS, and standard build vars.
+                                    echo "Env size before cleanup: $(env | wc -c) bytes ($(env | wc -l) vars)"
+                                    for var in $(env | cut -d= -f1); do
+                                        case "$var" in
+                                            deps*|propagated*|buildInputs|nativeBuildInputs|\
+                                            configureFlags|mesonFlags|cmakeFlags|\
+                                            *Phase|*Phases|phases|\
+                                            stdenv|builder|outputs|out|system|\
+                                            __structuredAttrs|preferLocalBuild|allowSubstitutes|\
+                                            dontAddDisableDepTrack|initialPath|shellHook|\
+                                            IN_NIX_SHELL|NIX_BUILD_TOP|NIX_STORE|NIX_LOG_FD|\
+                                            NIX_BUILD_CORES|NIX_ENFORCE_PURITY|SOURCE_DATE_EPOCH|\
+                                            strictDeps|dontPatch*|dontStrip|dontMove*|\
+                                            forceShare|wrapPrefixVariables|NIX_HARDENING_ENABLE)
+                                                unset "$var" 2>/dev/null ;;
+                                        esac
+                                    done
+                                    echo "Env size after cleanup: $(env | wc -c) bytes ($(env | wc -l) vars)"
 
                                     # Build without bundling first
                                     npx tauri build --no-bundle --verbose
