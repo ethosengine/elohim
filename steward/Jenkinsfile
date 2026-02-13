@@ -407,6 +407,35 @@ spec:
                                 fi
                                 echo "ELOHIM_ENV=$ELOHIM_ENV"
 
+                                # Write env cleanup script to temp file (avoids single-quote
+                                # nesting issues inside bash -c '...' block)
+                                cat > /tmp/dedup-env.sh << 'DEDUP_SCRIPT'
+#!/usr/bin/env bash
+# Deduplicate large nix env vars from stacked devShells
+# Uses ' -' boundary split to preserve multi-word flags (-isystem /path)
+for var in NIX_LDFLAGS NIX_LDFLAGS_FOR_TARGET NIX_CFLAGS_COMPILE NIX_CFLAGS_COMPILE_FOR_TARGET; do
+    val="${!var:-}"
+    if [ -n "$val" ]; then
+        before=${#val}
+        deduped=$(printf '%s\n' "$val" | sed 's/ -/\n-/g' | awk '!seen[$0]++' | tr '\n' ' ' | sed 's/ $//')
+        after=${#deduped}
+        echo "${var}: ${before} -> ${after} chars"
+        export "$var=$deduped"
+    fi
+done
+# Deduplicate PATH (colon-separated) with safety check
+ORIG_PATH="$PATH"
+before=${#PATH}
+NEW_PATH=$(printf '%s' "$PATH" | tr ':' '\n' | awk '!seen[$0]++' | tr '\n' ':' | sed 's/:$//')
+after=${#NEW_PATH}
+echo "PATH: ${before} -> ${after} chars"
+if PATH="$NEW_PATH" command -v wc > /dev/null 2>&1; then
+    export PATH="$NEW_PATH"
+else
+    echo "WARNING: deduped PATH broken, keeping original"
+fi
+DEDUP_SCRIPT
+
                                 echo "=== Entering Nix development shell ==="
                                 # Pass ELOHIM_ENV to nix shell for Rust compile-time config
                                 ELOHIM_ENV="$ELOHIM_ENV" nix develop --accept-flake-config --command bash -c '
@@ -472,22 +501,8 @@ spec:
                                     done
 
                                     # Step 2: Deduplicate large vars from stacked nix shells
-                                    # These can exceed the 128KB per-string MAX_ARG_STRLEN limit
-                                    for var in NIX_LDFLAGS NIX_LDFLAGS_FOR_TARGET NIX_CFLAGS_COMPILE NIX_CFLAGS_COMPILE_FOR_TARGET; do
-                                        val="${!var:-}"
-                                        if [ -n "$val" ]; then
-                                            before=$(printf "%s" "$val" | wc -c)
-                                            deduped=$(printf "%s" "$val" | tr " " "\n" | awk "!seen[\$0]++" | tr "\n" " " | sed "s/ \$//")
-                                            after=$(printf "%s" "$deduped" | wc -c)
-                                            echo "${var}: ${before} -> ${after} bytes"
-                                            export "$var=$deduped"
-                                        fi
-                                    done
-                                    # Deduplicate PATH (colon-separated)
-                                    before=$(printf "%s" "$PATH" | wc -c)
-                                    export PATH=$(printf "%s" "$PATH" | tr ":" "\n" | awk "!seen[\$0]++" | tr "\n" ":" | sed "s/:\$//")
-                                    after=$(printf "%s" "$PATH" | wc -c)
-                                    echo "PATH: ${before} -> ${after} bytes"
+                                    # Script written before nix develop to avoid bash -c quoting issues
+                                    source /tmp/dedup-env.sh
 
                                     echo "Env size after cleanup: $(env | wc -c) bytes ($(env | wc -l) vars)"
 
