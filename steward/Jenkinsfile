@@ -339,6 +339,8 @@ spec:
                                 echo "⚠️ Could not fetch UI from pipeline - building locally"
                                 sh '''
                                     cd ..
+
+                                    # 1. Init and build sophia (UMD bundle for prebuild check)
                                     git submodule update --init sophia
                                     cd sophia
                                     if ! command -v pnpm > /dev/null 2>&1; then
@@ -347,7 +349,16 @@ spec:
                                     pnpm install --frozen-lockfile
                                     pnpm build
                                     pnpm --filter @ethosengine/sophia-element build:umd
-                                    cd ../elohim-app
+                                    cd ..
+
+                                    # 2. Install elohim-library deps (provides @angular/core for elohim-service)
+                                    cd elohim-library && npm ci && cd ..
+
+                                    # 3. Build storage-client-ts (provides @elohim/storage-client/generated)
+                                    cd holochain/sdk/storage-client-ts && npm ci && npm run build && cd ../../..
+
+                                    # 4. Build elohim-app
+                                    cd elohim-app
                                     npm ci
                                     npm run build
                                     cp -r dist/elohim-app/browser/* ../steward/ui/

@@ -183,25 +183,64 @@ def analyzeChangeset() {
 
 /**
  * Determine which pipelines need to run based on changed files.
- * Returns a detailed map with reasoning.
+ * Uses per-pipeline baselines when available to avoid re-triggering
+ * pipelines that already built successfully for intermediate changes.
  */
-def analyzePipelineRequirements(changedFiles) {
+def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
     // CI config files that shouldn't trigger source builds
-    def ciOnlyPatterns = ['Jenkinsfile', 'orchestrator/', '.claude', '.github/']
+    def ciOnlyPatterns = ['orchestrator/', '.claude', '.github/', '.husky/']
+    def ciOnlyFiles = ['CLAUDE.md', 'ROADMAP.md']
     def analysis = [:]
+
+    // Cache git diffs per unique baseline commit to avoid redundant calls
+    def cachedDiffs = [:]
 
     PIPELINES.each { name, config ->
         def matchedPatterns = []
         def matchedFiles = []
+        def baselineUsed = 'global'
 
-        changedFiles.each { file ->
-            // Skip CI-only files (Jenkinsfiles, orchestrator config, etc.)
-            if (file.endsWith('Jenkinsfile') || ciOnlyPatterns.any { file.startsWith(it) }) {
+        // Use per-pipeline baseline if available, otherwise fall back to global changeset
+        def filesToCheck = changedFiles
+        def baseline = pipelineBaselines[name]
+
+        if (baseline) {
+            if (!cachedDiffs.containsKey(baseline)) {
+                try {
+                    def commitExists = sh(
+                        script: "git cat-file -t ${baseline} 2>/dev/null || echo 'missing'",
+                        returnStdout: true
+                    ).trim()
+                    if (commitExists == 'commit') {
+                        cachedDiffs[baseline] = sh(
+                            script: "git diff --name-only ${baseline}..HEAD",
+                            returnStdout: true
+                        ).trim().split('\n').findAll { it }
+                    } else {
+                        cachedDiffs[baseline] = null
+                    }
+                } catch (Exception e) {
+                    echo "WARNING: Could not diff from baseline ${baseline.take(8)}: ${e.message}"
+                    cachedDiffs[baseline] = null
+                }
+            }
+            if (cachedDiffs[baseline] != null) {
+                filesToCheck = cachedDiffs[baseline]
+                baselineUsed = baseline.take(8)
+            }
+        }
+
+        filesToCheck.each { file ->
+            // Skip CI-only files (Jenkinsfiles, orchestrator config, hooks, docs)
+            if (file.endsWith('Jenkinsfile') ||
+                ciOnlyPatterns.any { pattern -> file.startsWith(pattern) } ||
+                ciOnlyFiles.contains(file)) {
                 return  // skip this file
             }
 
             config.changePatterns.each { pattern ->
-                if (file.startsWith(pattern)) {
+                // Match files within directory OR submodule pointer (e.g. 'sophia' matches 'sophia/')
+                if (file.startsWith(pattern) || file == pattern.replaceAll('/$', '')) {
                     if (!matchedPatterns.contains(pattern)) {
                         matchedPatterns.add(pattern)
                     }
@@ -217,7 +256,8 @@ def analyzePipelineRequirements(changedFiles) {
             matchedFileCount: matchedFiles.size(),
             sampleFiles: matchedFiles.take(5),
             dependsOn: config.dependsOn ?: [],
-            triggersGenesis: config.triggersGenesis ?: false
+            triggersGenesis: config.triggersGenesis ?: false,
+            baselineUsed: baselineUsed
         ]
     }
 
@@ -337,6 +377,37 @@ def propagateDependencies(pipelines, analysis) {
 }
 
 /**
+ * Load per-pipeline baseline commits from the previous orchestrator build.
+ * Each baseline records the commit at which that pipeline last built successfully.
+ * This prevents re-triggering pipelines for changes they already built.
+ */
+def loadPipelineBaselines() {
+    def baselines = [:]
+    try {
+        copyArtifacts(
+            projectName: env.JOB_NAME,
+            filter: 'pipeline-baselines.json',
+            selector: lastCompleted(),
+            optional: true,
+            flatten: true
+        )
+        if (fileExists('pipeline-baselines.json')) {
+            baselines = readJSON(file: 'pipeline-baselines.json')
+            echo "Loaded per-pipeline baselines from previous build"
+            baselines.each { name, commit ->
+                echo "   ${name}: ${commit.take(8)}"
+            }
+        } else {
+            echo "No previous pipeline baselines found (first run)"
+        }
+    } catch (Exception e) {
+        echo "WARNING: Could not load pipeline baselines: ${e.message}"
+        echo "   Using global baseline (GIT_PREVIOUS_SUCCESSFUL_COMMIT)"
+    }
+    return baselines
+}
+
+/**
  * Trigger a pipeline and wait for result
  */
 def triggerPipeline(String name, String branch, boolean wait = true) {
@@ -383,7 +454,9 @@ def printDecisionMatrix(analysis, pipelines) {
         def icon = willRun ? '🔨' : (info.manualOnly ? '🔒' : '⏭️')
         def status = willRun ? 'BUILD' : (info.manualOnly ? 'MANUAL' : 'SKIP')
 
-        echo "║ ${icon} ${name.padRight(20)} │ ${status.padRight(8)} │ ${info.matchedPatterns.join(', ') ?: 'no changes'}"
+        def reason = info.matchedPatterns.join(', ') ?: 'no changes'
+        def baselineInfo = info.baselineUsed && info.baselineUsed != 'global' ? " (since ${info.baselineUsed})" : ''
+        echo "║ ${icon} ${name.padRight(20)} │ ${status.padRight(8)} │ ${reason}${baselineInfo}"
 
         if (info.sampleFiles && info.sampleFiles.size() > 0) {
             info.sampleFiles.each { file ->
@@ -599,7 +672,14 @@ spec:
                             // Automatic changeset analysis
                             echo "🔍 Analyzing changesets since last successful build..."
                             changedFiles = analyzeChangeset()
-                            analysis = analyzePipelineRequirements(changedFiles)
+
+                            // Load per-pipeline baselines for accurate change detection
+                            def pipelineBaselines = [:]
+                            if (!(params.FORCE_COMMIT?.trim())) {
+                                pipelineBaselines = loadPipelineBaselines()
+                            }
+                            analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
+                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
                             env.CHANGED_FILES_COUNT = changedFiles.size().toString()
                             env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
@@ -665,7 +745,8 @@ spec:
                                     matchedFileCount: 0,
                                     sampleFiles: [],
                                     dependsOn: config.dependsOn ?: [],
-                                    triggersGenesis: config.triggersGenesis ?: false
+                                    triggersGenesis: config.triggersGenesis ?: false,
+                                    baselineUsed: 'global'
                                 ]
                             }
                             env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
@@ -703,6 +784,7 @@ spec:
                     script {
                         def pipelines = (env.PIPELINES_TO_RUN ?: '').split(',').findAll { it }
                         def results = [:]
+                        def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
 
                         if (pipelines.isEmpty()) {
                             echo 'ℹ️  No pipelines to execute'
@@ -737,6 +819,7 @@ spec:
                                 results[name] = result
                                 if (result.success) {
                                     echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                    pipelineBaselines[name] = env.GIT_COMMIT_FULL
                                 } else {
                                     echo "❌ ${name}: ${result.result}"
                                     if (result.error) echo "   Error: ${result.error}"
@@ -750,6 +833,7 @@ spec:
                                         results[name] = result
                                         if (result.success) {
                                             echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                            pipelineBaselines[name] = env.GIT_COMMIT_FULL
                                         } else {
                                             echo "❌ ${name}: ${result.result}"
                                             if (result.error) echo "   Error: ${result.error}"
@@ -767,6 +851,7 @@ spec:
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+                        env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
                         // Run genesis if requested
                         if (pipelines.contains('elohim-genesis')) {
@@ -780,12 +865,14 @@ spec:
 
                             if (genesisResult.success) {
                                 echo '✅ elohim-genesis: SUCCESS'
+                                pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
                             } else {
                                 echo "❌ elohim-genesis: ${genesisResult.result}"
                                 unstable('Genesis failed - seeding or tests may have issues')
                             }
 
                             env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                         }
                     }
                 }
@@ -951,7 +1038,12 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                     ]
 
                     writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
-                    archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: false
+
+                    // Archive per-pipeline baselines for next run's change detection
+                    def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+                    writeJSON file: 'pipeline-baselines.json', json: pipelineBaselines, pretty: 2
+
+                    archiveArtifacts artifacts: 'ci-summary.json,pipeline-baselines.json', allowEmptyArchive: true
                     echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
                 }
             }
