@@ -685,6 +685,21 @@ spec:
                             // Automatic changeset analysis (uses stored global baseline if available)
                             echo "🔍 Analyzing changesets since last build..."
                             changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
+
+                            // Bootstrap safeguard: if no per-pipeline baselines exist and the
+                            // changeset is very large, the global baseline is stale (e.g. first
+                            // run after adding baselines, or after repeated failures). Fall back
+                            // to HEAD~1 to avoid rebuilding the entire history.
+                            if (!pipelineBaselines && changedFiles.size() > 50) {
+                                echo "⚠️ Stale baseline detected (${changedFiles.size()} files, no per-pipeline baselines)"
+                                echo "   Falling back to HEAD~1 to avoid unnecessary rebuilds"
+                                changedFiles = sh(
+                                    script: 'git diff --name-only HEAD~1 2>/dev/null || git diff --name-only HEAD',
+                                    returnStdout: true
+                                ).trim().split('\n').findAll { it }
+                                echo "   Narrowed changeset to ${changedFiles.size()} files"
+                            }
+
                             analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
                             env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
