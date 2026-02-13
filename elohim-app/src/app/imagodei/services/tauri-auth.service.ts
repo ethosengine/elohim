@@ -51,6 +51,7 @@ interface DeepLinkError {
 interface NativeHandoffResponse {
   humanId: string;
   identifier: string;
+  agentPubKey: string;
   doorwayId: string;
   doorwayUrl: string;
   displayName?: string;
@@ -137,8 +138,9 @@ export class TauriAuthService {
     this.status.set('checking');
 
     try {
-      // Check for existing local session
-      const session = await this.getActiveSession();
+      // Check for existing local session, retrying on network errors
+      // (sidecar may still be starting up)
+      const session = await this.getActiveSessionWithRetry();
 
       if (session) {
         this.currentSession.set(session);
@@ -156,6 +158,32 @@ export class TauriAuthService {
       this.status.set('error');
       this.errorMessage.set(err instanceof Error ? err.message : 'Initialization failed');
     }
+  }
+
+  /**
+   * Retry getActiveSession with exponential backoff for network errors.
+   * Sidecar may take 1-3s to start; 404 (no session) returns null immediately.
+   */
+  private async getActiveSessionWithRetry(): Promise<LocalSession | null> {
+    const backoffMs = [1000, 2000, 4000];
+
+    for (let attempt = 0; attempt <= backoffMs.length; attempt++) {
+      try {
+        return await this.getActiveSession();
+      } catch (err) {
+        // Only retry network errors (TypeError from fetch)
+        if (!(err instanceof TypeError) || attempt === backoffMs.length) {
+          throw err;
+        }
+        console.warn(
+          `[TauriAuthService] Sidecar not ready (attempt ${attempt + 1}/${backoffMs.length + 1}), retrying in ${backoffMs[attempt]}ms`
+        );
+        await new Promise(resolve => setTimeout(resolve, backoffMs[attempt]));
+      }
+    }
+
+    // Unreachable, but satisfies TypeScript
+    return null;
   }
 
   /**
@@ -184,6 +212,23 @@ export class TauriAuthService {
       this.status.set('error');
       this.errorMessage.set(event.payload.message);
     });
+
+    // Drain any OAuth callbacks that arrived before Angular was ready (cold-start)
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (window.__TAURI__?.core) {
+      try {
+        const pending =
+          // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+          await window.__TAURI__.core.invoke<OAuthCallbackPayload[]>('get_pending_deep_links');
+        for (const payload of pending) {
+          await this.handleOAuthCallback(payload);
+        }
+      } catch (err) {
+        if (err instanceof Error) {
+          console.warn('[TauriAuthService] Failed to drain pending deep links:', err.message);
+        }
+      }
+    }
   }
 
   /**
@@ -213,8 +258,12 @@ export class TauriAuthService {
 
       return (await response.json()) as LocalSession;
     } catch (err) {
-      // Session retrieval failure is non-critical - returns null to allow app to continue
-      // This can happen if sidecar is not running or network is unavailable
+      // Network errors (sidecar not ready) should propagate for retry logic.
+      // TypeError from fetch = network-level failure (connection refused, DNS, etc.)
+      if (err instanceof TypeError) {
+        throw err;
+      }
+      // Non-network errors (e.g. JSON parse) are non-critical
       if (err instanceof Error) {
         console.warn('[TauriAuthService] Failed to retrieve session:', err.message);
       }
@@ -270,15 +319,10 @@ export class TauriAuthService {
 
       const handoff: NativeHandoffResponse = await handoffResponse.json();
 
-      // Step 3: Generate local agent public key
-      // In a real implementation, this would come from the Holochain conductor
-      // For now, use a placeholder that will be updated when Holochain connects
-      const agentPubKey = 'pending-' + crypto.randomUUID();
-
-      // Step 4: Create local session
+      // Step 3: Create local session with doorway-provisioned agent key
       const session = await this.createSession({
         humanId: handoff.humanId,
-        agentPubKey,
+        agentPubKey: handoff.agentPubKey,
         doorwayUrl: handoff.doorwayUrl,
         doorwayId: handoff.doorwayId,
         identifier: handoff.identifier,
@@ -393,6 +437,19 @@ export class TauriAuthService {
       // This can happen if sidecar is not running or network is unavailable
       if (err instanceof Error) {
         console.warn('[TauriAuthService] Failed to delete session:', err.message);
+      }
+    }
+
+    // Clear Rust doorway.json credentials (bootstrap URLs, agent key, etc.)
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (window.__TAURI__?.core) {
+      try {
+        // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+        await window.__TAURI__.core.invoke('doorway_logout');
+      } catch (err) {
+        if (err instanceof Error) {
+          console.warn('[TauriAuthService] Failed to clear doorway store:', err.message);
+        }
       }
     }
 

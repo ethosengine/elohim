@@ -26,6 +26,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 
 // @coverage: 93.6% (2026-02-05)
 
+import { SIGNING_CREDENTIALS_KEY } from '../../elohim/models/holochain-connection.model';
 import {
   type AuthState,
   type AuthProvider,
@@ -43,6 +44,7 @@ import {
   parseExpiryDate,
   isTokenExpiringSoon,
 } from '../models/auth.model';
+import { DOORWAY_CACHE_KEY } from '../models/doorway.model';
 
 import { DoorwayRegistryService } from './doorway-registry.service';
 
@@ -459,6 +461,8 @@ export class AuthService {
     localStorage.removeItem(AUTH_IDENTIFIER_KEY);
     localStorage.removeItem(AUTH_HUMAN_ID_KEY);
     localStorage.removeItem(AUTH_AGENT_PUB_KEY_KEY);
+    localStorage.removeItem(SIGNING_CREDENTIALS_KEY);
+    localStorage.removeItem(DOORWAY_CACHE_KEY);
   }
 
   /**

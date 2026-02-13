@@ -4,10 +4,11 @@ mod identity;
 use serde::Serialize;
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_holochain::{
-    vec_to_locked, AppBundle, HolochainExt, HolochainPluginConfig, NetworkConfig,
+    vec_to_locked, AgentPubKey, AppBundle, HolochainExt, HolochainPluginConfig, NetworkConfig,
 };
 use tauri_plugin_store::StoreExt;
 
@@ -43,6 +44,14 @@ pub struct DeepLinkError {
     pub url: String,
 }
 
+/// Buffered deep link callbacks for cold-start OAuth.
+///
+/// When the app is launched via deep link (e.g. `elohim://auth/callback?code=...`),
+/// the main window doesn't exist yet. Callbacks are buffered here and drained
+/// by the frontend via `get_pending_deep_links` after Angular initializes.
+#[derive(Default)]
+struct PendingDeepLinks(Vec<OAuthCallbackPayload>);
+
 /// Load the Elohim hApp bundle from embedded bytes
 pub fn elohim_happ() -> AppBundle {
     let bytes = include_bytes!("../../workdir/elohim.happ");
@@ -66,10 +75,14 @@ fn network_config() -> NetworkConfig {
     let mut network_config = NetworkConfig::default();
 
     // Check for saved doorway handoff data (runtime override)
+    // Validate that the store isn't stale: bootstrap/signal URLs are only valid
+    // if doorwayUrl is also present (a complete handoff). Partial data (e.g.
+    // bootstrap URL without doorwayUrl) indicates a corrupted or partially-cleared store.
+    let doorway_url = read_doorway_store_value("doorwayUrl");
     let doorway_bootstrap = read_doorway_store_value("bootstrapUrl");
     let doorway_signal = read_doorway_store_value("signalUrl");
 
-    if doorway_bootstrap.is_some() || doorway_signal.is_some() {
+    if doorway_url.is_some() && (doorway_bootstrap.is_some() || doorway_signal.is_some()) {
         // Use doorway-provided URLs (takes priority over compile-time defaults)
         if let Some(ref url) = doorway_bootstrap {
             log::info!("Using doorway bootstrap URL: {}", url);
@@ -79,6 +92,8 @@ fn network_config() -> NetworkConfig {
             log::info!("Using doorway signal URL: {}", url);
             network_config.signal_url = url2::Url2::parse(url);
         }
+    } else if doorway_bootstrap.is_some() || doorway_signal.is_some() {
+        log::warn!("Stale network config detected (URLs without doorwayUrl), using defaults");
     } else if tauri::is_dev() {
         // Local development mode (cargo tauri dev): use localhost
         network_config.bootstrap_url = url2::Url2::parse("http://localhost:8888/bootstrap");
@@ -170,11 +185,13 @@ pub fn run() {
         )
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_deep_link::init())
+        .manage(Mutex::new(PendingDeepLinks::default()))
         .invoke_handler(tauri::generate_handler![
             doorway_login,
             doorway_confirm_stewardship,
             doorway_status,
             doorway_logout,
+            get_pending_deep_links,
         ])
         .plugin(tauri_plugin_holochain::async_init(
             vec_to_locked(vec![]),
@@ -289,6 +306,15 @@ fn handle_deep_link_url(handle: &AppHandle, url: &url2::Url2) {
                 code.len()
             );
 
+            // If main window doesn't exist yet (cold start), buffer for later retrieval
+            if handle.get_webview_window("main").is_none() {
+                log::info!("Main window not ready, buffering OAuth callback");
+                if let Ok(mut pending) = handle.state::<Mutex<PendingDeepLinks>>().lock() {
+                    pending.0.push(payload);
+                }
+                return;
+            }
+
             if let Err(e) = handle.emit("oauth-callback", payload) {
                 log::error!("Failed to emit oauth-callback event: {}", e);
             }
@@ -326,14 +352,28 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
         .is_none()
     {
         // First run: check for saved doorway identity
-        let agent_key = read_doorway_store_value("agentPubKey");
+        let agent_key_str = read_doorway_store_value("agentPubKey");
+        let agent_key: Option<AgentPubKey> =
+            agent_key_str
+                .as_deref()
+                .and_then(|key_str| match AgentPubKey::try_from(key_str) {
+                    Ok(key) => {
+                        log::info!(
+                            "Installing Elohim hApp with doorway agent key: {}...",
+                            &key_str[..key_str.len().min(12)]
+                        );
+                        Some(key)
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to parse doorway agent key, using fresh identity: {}",
+                            e
+                        );
+                        None
+                    }
+                });
 
-        if let Some(ref key_str) = agent_key {
-            log::info!(
-                "Installing Elohim hApp with doorway agent key: {}...",
-                &key_str[..key_str.len().min(12)]
-            );
-        } else {
+        if agent_key.is_none() {
             log::info!("Installing Elohim hApp with fresh identity (standalone)...");
         }
 
@@ -345,20 +385,67 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
             .install_app(
                 String::from(APP_ID),
                 elohim_happ(),
-                None, // agent_key: handled by conductor (we pass identity via network)
-                None, // membrane_proofs
+                None,      // roles_settings
+                agent_key, // doorway-provisioned agent identity (or None for fresh)
                 network_seed,
             )
             .await?;
 
         Ok(())
     } else {
-        // Subsequent runs: update coordinators if necessary
-        log::info!("Checking for coordinator updates...");
-        handle
-            .holochain()?
-            .update_app_if_necessary(String::from(APP_ID), elohim_happ())
-            .await?;
+        // Subsequent runs: check for identity mismatch (doorway switch)
+        let saved_key_str = read_doorway_store_value("agentPubKey");
+        let installed_app = installed_apps
+            .iter()
+            .find(|app| app.installed_app_id.as_str().eq(APP_ID));
+
+        let needs_reinstall = match (&saved_key_str, installed_app) {
+            (Some(saved), Some(app)) => {
+                let installed_key_str = app.agent_pub_key.to_string();
+                if *saved != installed_key_str {
+                    log::warn!(
+                        "Doorway identity mismatch: saved={}... installed={}... — reinstalling",
+                        &saved[..saved.len().min(12)],
+                        &installed_key_str[..installed_key_str.len().min(12)]
+                    );
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+
+        if needs_reinstall {
+            // Uninstall old app and reinstall with new identity
+            admin_ws
+                .uninstall_app(&String::from(APP_ID))
+                .await
+                .map_err(|err| tauri_plugin_holochain::Error::ConductorApiError(err))?;
+
+            let agent_key: Option<AgentPubKey> = saved_key_str
+                .as_deref()
+                .and_then(|key_str| AgentPubKey::try_from(key_str).ok());
+            let network_seed = read_doorway_store_value("networkSeed");
+
+            handle
+                .holochain()?
+                .install_app(
+                    String::from(APP_ID),
+                    elohim_happ(),
+                    None,      // roles_settings
+                    agent_key, // new doorway identity
+                    network_seed,
+                )
+                .await?;
+        } else {
+            // Same identity — update coordinators if necessary
+            log::info!("Checking for coordinator updates...");
+            handle
+                .holochain()?
+                .update_app_if_necessary(String::from(APP_ID), elohim_happ())
+                .await?;
+        }
 
         Ok(())
     }
@@ -597,6 +684,20 @@ async fn doorway_status(app: AppHandle) -> Result<DoorwayStatus, String> {
         agent_pub_key,
         has_identity,
     })
+}
+
+/// Drain buffered deep link callbacks (cold-start OAuth).
+///
+/// Called by Angular after event listeners are registered.
+/// Returns any OAuth callbacks that arrived before the main window existed.
+#[tauri::command]
+fn get_pending_deep_links(
+    state: tauri::State<'_, Mutex<PendingDeepLinks>>,
+) -> Vec<OAuthCallbackPayload> {
+    match state.lock() {
+        Ok(mut pending) => std::mem::take(&mut pending.0),
+        Err(_) => vec![],
+    }
 }
 
 /// Clear doorway credentials and saved identity

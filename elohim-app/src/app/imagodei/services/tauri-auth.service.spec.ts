@@ -369,6 +369,12 @@ describe('TauriAuthService', () => {
     it('should handle missing doorway selection', async () => {
       (mockDoorwayRegistry.selected as jasmine.Spy).and.returnValue(null);
 
+      // Mock 404 for initial session check during initialize()
+      fetchSpy.and.returnValue(Promise.resolve({
+        ok: false,
+        status: 404,
+      } as Response));
+
       let oauthCallbackHandler: any;
       mockTauriWindow.__TAURI__.event.listen.and.callFake((event: string, handler: any) => {
         if (event === 'oauth-callback') {
