@@ -417,7 +417,7 @@ for var in NIX_LDFLAGS NIX_LDFLAGS_FOR_TARGET NIX_CFLAGS_COMPILE NIX_CFLAGS_COMP
     val="${!var:-}"
     if [ -n "$val" ]; then
         before=${#val}
-        deduped=$(printf '%s\n' "$val" | awk '{gsub(/ -/, "\n-"); print}' | awk '!seen[$0]++' | tr '\n' ' ' | sed 's/ $//')
+        deduped=$(printf '%s\n' "$val" | awk -v 'nl=\n' '{gsub(/ -/, nl"-"); print}' | awk '!seen[$0]++' | tr '\n' ' ' | sed 's/ $//')
         after=${#deduped}
         echo "${var}: ${before} -> ${after} chars"
         export "$var=$deduped"
