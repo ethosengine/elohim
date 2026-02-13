@@ -135,18 +135,25 @@ def getGitCommitHashFull() {
 }
 
 /**
- * Analyze all changes since the last successful orchestrator build.
+ * Analyze all changes since the last orchestrator build.
  *
  * Priority order:
  *   1. FORCE_COMMIT parameter (manual override)
- *   2. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin)
- *   3. HEAD~1 fallback (only diffs the latest push)
+ *   2. Stored global baseline (advances on every completed build, even UNSTABLE)
+ *   3. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin - only advances on SUCCESS)
+ *   4. HEAD~1 fallback (only diffs the latest push)
  */
-def analyzeChangeset() {
+def analyzeChangeset(storedGlobalBaseline = null) {
     // 1. Manual override via FORCE_COMMIT parameter
     def baseCommit = params.FORCE_COMMIT?.trim() ?: null
 
-    // 2. Jenkins Git plugin automatic tracking
+    // 2. Stored global baseline from previous completed build
+    if (!baseCommit && storedGlobalBaseline) {
+        baseCommit = storedGlobalBaseline
+        echo "Using stored global baseline: ${baseCommit.take(8)}"
+    }
+
+    // 3. Jenkins Git plugin automatic tracking (only updates on SUCCESS)
     if (!baseCommit) {
         baseCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
     }
@@ -170,7 +177,7 @@ def analyzeChangeset() {
         echo "WARNING: Commit ${baseCommit} not found in repo"
     }
 
-    // 3. Fallback: diff against previous commit only
+    // 4. Fallback: diff against previous commit only
     // This is conservative - only looks at what changed in the latest push.
     // Once this build succeeds, GIT_PREVIOUS_SUCCESSFUL_COMMIT will be set
     // and future builds will diff correctly.
@@ -239,8 +246,7 @@ def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
             }
 
             config.changePatterns.each { pattern ->
-                // Match files within directory OR submodule pointer (e.g. 'sophia' matches 'sophia/')
-                if (file.startsWith(pattern) || file == pattern.replaceAll('/$', '')) {
+                if (file.startsWith(pattern)) {
                     if (!matchedPatterns.contains(pattern)) {
                         matchedPatterns.add(pattern)
                     }
@@ -670,15 +676,15 @@ spec:
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
                         if (mode in ['auto', 'status']) {
-                            // Automatic changeset analysis
-                            echo "🔍 Analyzing changesets since last successful build..."
-                            changedFiles = analyzeChangeset()
-
                             // Load per-pipeline baselines for accurate change detection
                             def pipelineBaselines = [:]
                             if (!(params.FORCE_COMMIT?.trim())) {
                                 pipelineBaselines = loadPipelineBaselines()
                             }
+
+                            // Automatic changeset analysis (uses stored global baseline if available)
+                            echo "🔍 Analyzing changesets since last build..."
+                            changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
                             analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
                             env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
@@ -1064,7 +1070,12 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                     writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
 
                     // Archive per-pipeline baselines for next run's change detection
+                    // __global__ advances on every completed build (even UNSTABLE),
+                    // preventing stale GIT_PREVIOUS_SUCCESSFUL_COMMIT from re-triggering everything
                     def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+                    if (env.GIT_COMMIT_FULL) {
+                        pipelineBaselines['__global__'] = env.GIT_COMMIT_FULL
+                    }
                     writeJSON file: 'pipeline-baselines.json', json: pipelineBaselines, pretty: 2
 
                     archiveArtifacts artifacts: 'ci-summary.json,pipeline-baselines.json', allowEmptyArchive: true
