@@ -425,7 +425,8 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
         )
 
         return [
-            success: result.result == 'SUCCESS',
+            success: result.result in ['SUCCESS', 'UNSTABLE'],
+            unstable: result.result == 'UNSTABLE',
             result: result.result,
             duration: result.duration,
             url: result.absoluteUrl
@@ -818,7 +819,11 @@ spec:
                                 def result = triggerPipeline(name, env.BRANCH_NAME, true)
                                 results[name] = result
                                 if (result.success) {
-                                    echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                    if (result.unstable) {
+                                        echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
+                                    } else {
+                                        echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                    }
                                     pipelineBaselines[name] = env.GIT_COMMIT_FULL
                                 } else {
                                     echo "❌ ${name}: ${result.result}"
@@ -832,7 +837,11 @@ spec:
                                         def result = triggerPipeline(name, env.BRANCH_NAME, true)
                                         results[name] = result
                                         if (result.success) {
-                                            echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                            if (result.unstable) {
+                                                echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
+                                            } else {
+                                                echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                            }
                                             pipelineBaselines[name] = env.GIT_COMMIT_FULL
                                         } else {
                                             echo "❌ ${name}: ${result.result}"
@@ -958,7 +967,8 @@ spec:
                     def postflight = readJSON(text: env.POSTFLIGHT_HEALTH ?: '{}')
                     def verification = readJSON(text: env.VERIFICATION_RESULTS ?: '{}')
 
-                    def successCount = results.count { k, v -> v?.success }
+                    def successCount = results.count { k, v -> v?.success && !v?.unstable }
+                    def unstableCount = results.count { k, v -> v?.unstable }
                     def failCount = results.count { k, v -> !v?.success }
                     def healthyCount = postflight.count { k, v -> v?.healthy }
                     def verifiedCount = verification.count { k, v -> v?.match }
@@ -972,11 +982,11 @@ spec:
   Branch:       ${env.BRANCH_NAME}
   Mode:         ${params.MODE}
 
-  BUILDS:       ✅ ${successCount} succeeded │ ❌ ${failCount} failed
+  BUILDS:       ✅ ${successCount} succeeded │ ⚠️ ${unstableCount} unstable │ ❌ ${failCount} failed
   SERVICES:     ${healthyCount}/${postflight.size()} healthy
   VERIFIED:     ${verifiedCount}/${verification.size()} deployments match commit
 
-${failCount > 0 ? '  ⚠️  ATTENTION: Build failures detected!' : '  ✅ All builds completed successfully'}
+${failCount > 0 ? '  ❌ ATTENTION: Build failures detected!' : unstableCount > 0 ? '  ⚠️  Some builds unstable (quality gate warnings)' : '  ✅ All builds completed successfully'}
 ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealthy!' : ''}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -989,6 +999,19 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                             if (result?.url) echo "     ${result.url}"
                     }
                 }
+
+                    if (unstableCount > 0) {
+                        echo 'Unstable pipelines:'
+                        results.findAll { k, v -> v?.unstable }.each { name, result ->
+                            echo "  ⚠️ ${name}: UNSTABLE"
+                            if (result?.url) echo "     ${result.url}"
+                        }
+                    }
+
+                    // Propagate unstable status to orchestrator build
+                    if (failCount == 0 && unstableCount > 0) {
+                        currentBuild.result = 'UNSTABLE'
+                    }
 
                     // Generate machine-readable CI summary for Claude consumption
                     def unhealthyCount = postflight.count { k, v -> !v?.healthy }
@@ -1006,7 +1029,7 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                         pipelines: results.collect { name, r ->
                             [
                                 name: name,
-                                status: r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE'),
+                                status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
                                 url: r?.url,
                                 duration_ms: r?.duration,
                                 category: r?.success ? null : categorizeFailure(name),
@@ -1024,8 +1047,9 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                             mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
                         ],
                         summary: [
-                            overall_status: failCount > 0 ? 'FAILURE' : (unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
+                            overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
                             builds_succeeded: successCount,
+                            builds_unstable: unstableCount,
                             builds_failed: failCount,
                             services_healthy: healthyCount,
                             services_total: postflight.size(),
