@@ -424,12 +424,41 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
                 )
                 .await?;
         } else {
-            // Same identity — update coordinators if necessary
+            // Same identity — try coordinator update, reinstall if hApp structure changed
             log::info!("Checking for coordinator updates...");
-            handle
+            let update_result = handle
                 .holochain()?
                 .update_app_if_necessary(String::from(APP_ID), elohim_happ())
-                .await?;
+                .await;
+
+            if let Err(e) = update_result {
+                // Update fails when hApp roles changed (e.g. new DNA added).
+                // Coordinator updates can't add roles — must reinstall.
+                log::warn!(
+                    "Coordinator update failed ({}), reinstalling hApp with new structure...",
+                    e
+                );
+                admin_ws
+                    .uninstall_app(String::from(APP_ID), false)
+                    .await
+                    .map_err(|err| tauri_plugin_holochain::Error::ConductorApiError(err))?;
+
+                let agent_key: Option<AgentPubKey> = saved_key_str
+                    .as_deref()
+                    .and_then(|key_str| AgentPubKey::try_from(key_str).ok());
+                let network_seed = read_doorway_store_value("networkSeed");
+
+                handle
+                    .holochain()?
+                    .install_app(
+                        String::from(APP_ID),
+                        elohim_happ(),
+                        None,
+                        agent_key,
+                        network_seed,
+                    )
+                    .await?;
+            }
         }
 
         Ok(())
