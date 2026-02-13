@@ -338,7 +338,10 @@ spec:
                             } else {
                                 echo "⚠️ Could not fetch UI from pipeline - building locally"
                                 sh '''
-                                    cd ../elohim-app
+                                    cd ..
+                                    git submodule update --init sophia
+                                    cd sophia && pnpm install && pnpm build && pnpm build:umd && cd ..
+                                    cd elohim-app
                                     npm ci
                                     npm run build
                                     cp -r dist/elohim-app/browser/* ../steward/ui/
