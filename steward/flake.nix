@@ -8,7 +8,6 @@
     flake-parts.follows = "holonix/flake-parts";
 
     tauri-plugin-holochain.url = "github:darksoil-studio/tauri-plugin-holochain/main-0.6";
-    tauri-plugin-holochain.inputs.holonix.follows = "holonix";
   };
 
   nixConfig = {
@@ -31,6 +30,33 @@
             inputs'.tauri-plugin-holochain.devShells.holochainTauriDev
             inputs'.holonix.devShells.default
           ];
+          # Deduplicate NIX_CFLAGS_COMPILE to avoid "Argument list too long"
+          # The combined devshells repeat -isystem paths hundreds of times
+          shellHook = ''
+            dedup_flags() {
+              local seen=""
+              local result=""
+              local prev=""
+              for arg in $1; do
+                if [ "$prev" = "-isystem" ] || [ "$prev" = "-idirafter" ] || [ "$prev" = "-L" ]; then
+                  local pair="$prev $arg"
+                  if [[ ! " $seen " =~ " $pair " ]]; then
+                    seen="$seen $pair"
+                    result="$result $pair"
+                  fi
+                  prev=""
+                elif [ "$arg" = "-isystem" ] || [ "$arg" = "-idirafter" ] || [ "$arg" = "-L" ]; then
+                  prev="$arg"
+                else
+                  result="$result $arg"
+                  prev=""
+                fi
+              done
+              echo "$result"
+            }
+            export NIX_CFLAGS_COMPILE="$(dedup_flags "$NIX_CFLAGS_COMPILE")"
+            export NIX_LDFLAGS="$(dedup_flags "$NIX_LDFLAGS")"
+          '';
           packages = [
             pkgs.nodejs_22
             pkgs.pnpm
