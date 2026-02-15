@@ -79,6 +79,8 @@ describe('LoginComponent', () => {
 
     mockTauriAuth = {
       isTauri: signal(false),
+      needsUnlock: jasmine.createSpy('needsUnlock').and.returnValue(false),
+      getDoorwayStatus: jasmine.createSpy('getDoorwayStatus').and.returnValue(Promise.resolve(null)),
     } as any;
 
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
@@ -356,19 +358,20 @@ describe('LoginComponent', () => {
     });
 
     // Context routing: Tauri with no doorway -> doorway picker
-    it('should show doorway picker for Tauri with no doorway selected', () => {
+    it('should show doorway picker for Tauri with no doorway selected', async () => {
       (mockTauriAuth as any).isTauri = signal(true);
 
       const newFixture = TestBed.createComponent(LoginComponent);
       const newComponent = newFixture.componentInstance;
       newComponent.ngOnInit();
+      await newFixture.whenStable();
 
       expect(newComponent.currentStep()).toBe('doorway');
       expect(newComponent.isLauncher()).toBe(true);
     });
 
     // Context routing: Tauri with doorway selected -> credentials
-    it('should show credentials for Tauri with doorway selected', () => {
+    it('should show credentials for Tauri with doorway selected', async () => {
       (mockTauriAuth as any).isTauri = signal(true);
       Object.defineProperty(mockDoorwayRegistry, 'hasSelection', {
         value: signal(true),
@@ -379,6 +382,7 @@ describe('LoginComponent', () => {
       const newFixture = TestBed.createComponent(LoginComponent);
       const newComponent = newFixture.componentInstance;
       newComponent.ngOnInit();
+      await newFixture.whenStable();
 
       expect(newComponent.currentStep()).toBe('credentials');
     });

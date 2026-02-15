@@ -1,4 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, NavigationEnd } from '@angular/router';
 
@@ -33,8 +34,11 @@ describe('AppComponent', () => {
       'isTauriEnvironment',
       'initialize',
       'needsLogin',
+      'needsUnlock',
       'destroy',
-    ]);
+    ], {
+      status: signal('idle'),
+    });
     mockBlobBootstrap = jasmine.createSpyObj('BlobBootstrapService', ['startBootstrap']);
 
     // Default mock behavior
@@ -44,6 +48,7 @@ describe('AppComponent', () => {
     mockTauriAuth.isTauriEnvironment.and.returnValue(false);
     mockTauriAuth.initialize.and.returnValue(Promise.resolve());
     mockTauriAuth.needsLogin.and.returnValue(false);
+    mockTauriAuth.needsUnlock.and.returnValue(false);
     // startBootstrap returns void, no need to set return value
 
     await TestBed.configureTestingModule({
