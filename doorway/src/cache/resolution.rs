@@ -321,7 +321,7 @@ impl DoorwayResolver {
             }
         }
 
-        Err(DoorwayError::NotFound(format!("{}/{}", content_type, id)))
+        Err(DoorwayError::NotFound(format!("{content_type}/{id}")))
     }
 
     // =========================================================================

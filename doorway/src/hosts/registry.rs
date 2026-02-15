@@ -228,7 +228,7 @@ impl HostRegistry {
                 },
             )
             .await
-            .map_err(|e| DoorwayError::Database(format!("Failed to mark stale hosts: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Failed to mark stale hosts: {e}")))?;
 
         if result.modified_count > 0 {
             info!("Marked {} stale hosts as offline", result.modified_count);

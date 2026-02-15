@@ -133,12 +133,12 @@ pub enum ImportError {
 impl std::fmt::Display for ImportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ImportError::ParseError(msg) => write!(f, "Parse error: {}", msg),
-            ImportError::BlobWriteError(msg) => write!(f, "Blob write error: {}", msg),
-            ImportError::ZomeCallError(msg) => write!(f, "Zome call error: {}", msg),
-            ImportError::BatchNotFound(id) => write!(f, "Batch not found: {}", id),
+            ImportError::ParseError(msg) => write!(f, "Parse error: {msg}"),
+            ImportError::BlobWriteError(msg) => write!(f, "Blob write error: {msg}"),
+            ImportError::ZomeCallError(msg) => write!(f, "Zome call error: {msg}"),
+            ImportError::BatchNotFound(id) => write!(f, "Batch not found: {id}"),
             ImportError::TooManyBatches => write!(f, "Too many concurrent batches"),
-            ImportError::InternalError(msg) => write!(f, "Internal error: {}", msg),
+            ImportError::InternalError(msg) => write!(f, "Internal error: {msg}"),
         }
     }
 }
@@ -268,7 +268,7 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
 
         // Parse items to get count
         let items: Vec<serde_json::Value> = serde_json::from_str(&input.items_json)
-            .map_err(|e| ImportError::ParseError(format!("Failed to parse items: {}", e)))?;
+            .map_err(|e| ImportError::ParseError(format!("Failed to parse items: {e}")))?;
 
         let total_items = items.len() as u32;
         if total_items == 0 {
@@ -539,7 +539,7 @@ impl BlobStore for InMemoryBlobStore {
             .await
             .get(hash)
             .cloned()
-            .ok_or_else(|| ImportError::BlobWriteError(format!("Blob not found: {}", hash)))
+            .ok_or_else(|| ImportError::BlobWriteError(format!("Blob not found: {hash}")))
     }
 
     async fn blob_exists(&self, hash: &str) -> bool {

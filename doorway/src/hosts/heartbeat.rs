@@ -106,7 +106,7 @@ impl HeartbeatService {
         let heartbeat = self.create_heartbeat();
         let payload = heartbeat
             .to_bytes()
-            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize heartbeat: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize heartbeat: {e}")))?;
 
         nats.publish(HostHeartbeat::subject(), payload).await?;
         debug!(

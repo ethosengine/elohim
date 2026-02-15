@@ -126,15 +126,15 @@ impl std::fmt::Display for ShardResolverError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ShardResolverError::NotFound => write!(f, "Blob not found"),
-            ShardResolverError::DnaError(e) => write!(f, "DNA error: {}", e),
+            ShardResolverError::DnaError(e) => write!(f, "DNA error: {e}"),
             ShardResolverError::FetchError { shard_hash, error } => {
-                write!(f, "Failed to fetch shard {}: {}", shard_hash, error)
+                write!(f, "Failed to fetch shard {shard_hash}: {error}")
             }
             ShardResolverError::InsufficientShards { needed, available } => {
-                write!(f, "Need {} shards but only {} available", needed, available)
+                write!(f, "Need {needed} shards but only {available} available")
             }
-            ShardResolverError::ReassemblyError(e) => write!(f, "Reassembly failed: {}", e),
-            ShardResolverError::Internal(e) => write!(f, "Internal error: {}", e),
+            ShardResolverError::ReassemblyError(e) => write!(f, "Reassembly failed: {e}"),
+            ShardResolverError::Internal(e) => write!(f, "Internal error: {e}"),
         }
     }
 }
@@ -503,7 +503,7 @@ impl ShardResolver {
                                 .await
                                 .map_err(|e| ShardResolverError::FetchError {
                                     shard_hash: shard_hash.to_string(),
-                                    error: format!("Failed to read response body: {}", e),
+                                    error: format!("Failed to read response body: {e}"),
                                 })?;
 
                         debug!(
@@ -672,14 +672,14 @@ mod tests {
     #[test]
     fn test_error_display() {
         let err = ShardResolverError::NotFound;
-        assert_eq!(format!("{}", err), "Blob not found");
+        assert_eq!(format!("{err}"), "Blob not found");
 
         let err = ShardResolverError::InsufficientShards {
             needed: 4,
             available: 2,
         };
-        assert!(format!("{}", err).contains("4"));
-        assert!(format!("{}", err).contains("2"));
+        assert!(format!("{err}").contains("4"));
+        assert!(format!("{err}").contains("2"));
     }
 
     #[test]

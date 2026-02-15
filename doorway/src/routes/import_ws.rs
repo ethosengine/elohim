@@ -110,7 +110,7 @@ async fn handle_proxy_connection(
 
     // Convert storage HTTP URL to WebSocket URL
     let ws_url = storage_url_to_ws(&storage_url);
-    let upstream_url = format!("{}/import/progress", ws_url);
+    let upstream_url = format!("{ws_url}/import/progress");
 
     // Connect to elohim-storage WebSocket
     let upstream_ws = match connect_upstream(&upstream_url).await {
@@ -272,7 +272,7 @@ async fn connect_upstream(
 
     match connect_result {
         Ok(Ok((ws, _response))) => Ok(ws),
-        Ok(Err(e)) => Err(format!("WebSocket connect error: {}", e)),
+        Ok(Err(e)) => Err(format!("WebSocket connect error: {e}")),
         Err(_) => Err("Connection timeout (10s)".to_string()),
     }
 }
@@ -288,7 +288,7 @@ fn storage_url_to_ws(url: &str) -> String {
         url.replacen("http://", "ws://", 1)
     } else {
         // Assume ws:// if no scheme
-        format!("ws://{}", url)
+        format!("ws://{url}")
     }
 }
 

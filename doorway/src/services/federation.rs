@@ -136,10 +136,10 @@ pub enum FederationError {
 impl std::fmt::Display for FederationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FederationError::ZomeCallFailed(e) => write!(f, "Zome call failed: {}", e),
-            FederationError::DIDResolutionFailed(e) => write!(f, "DID resolution failed: {}", e),
-            FederationError::NoPublishers(h) => write!(f, "No publishers for content: {}", h),
-            FederationError::RemoteFetchFailed(e) => write!(f, "Remote fetch failed: {}", e),
+            FederationError::ZomeCallFailed(e) => write!(f, "Zome call failed: {e}"),
+            FederationError::DIDResolutionFailed(e) => write!(f, "DID resolution failed: {e}"),
+            FederationError::NoPublishers(h) => write!(f, "No publishers for content: {h}"),
+            FederationError::RemoteFetchFailed(e) => write!(f, "Remote fetch failed: {e}"),
         }
     }
 }
@@ -158,7 +158,7 @@ pub async fn register_doorway_in_dht(
     capabilities: Vec<String>,
 ) -> Result<(), String> {
     let caps_json = serde_json::to_string(&capabilities)
-        .map_err(|e| format!("Failed to serialize capabilities: {}", e))?;
+        .map_err(|e| format!("Failed to serialize capabilities: {e}"))?;
 
     let input = RegisterDoorwayInput {
         id: config.doorway_id.clone(),
@@ -376,9 +376,8 @@ pub async fn fetch_from_remote_doorway(
         protocol: String,
     }
 
-    let output: FindPublishersOutput = rmp_serde::from_slice(&publishers_result).map_err(|e| {
-        FederationError::ZomeCallFailed(format!("Failed to parse publishers: {}", e))
-    })?;
+    let output: FindPublishersOutput = rmp_serde::from_slice(&publishers_result)
+        .map_err(|e| FederationError::ZomeCallFailed(format!("Failed to parse publishers: {e}")))?;
 
     if output.publishers.is_empty() {
         return Err(FederationError::NoPublishers(content_hash.to_string()));
@@ -444,7 +443,7 @@ pub async fn fetch_from_remote_doorway(
         // Extract domain from the first endpoint URL to construct a DID
         if let Some(endpoint) = publisher.server.endpoints.first() {
             if let Some(domain) = extract_domain_from_url(&endpoint.url) {
-                let did = format!("did:web:{}", domain);
+                let did = format!("did:web:{domain}");
                 match did_resolver.resolve(&did).await {
                     Ok(doc) => {
                         // Find ElohimBlobStore service endpoint

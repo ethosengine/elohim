@@ -203,7 +203,7 @@ impl PathProjection {
         search_tokens.dedup();
 
         Self {
-            mongo_id: Some(format!("path-{}", id)),
+            mongo_id: Some(format!("path-{id}")),
             id,
             version,
             action_hash,

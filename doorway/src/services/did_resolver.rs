@@ -200,7 +200,7 @@ impl DIDResolver {
             ],
             id: did.to_string(),
             verification_method: vec![VerificationMethod {
-                id: format!("{}#{}", did, key_part),
+                id: format!("{did}#{key_part}"),
                 method_type: "Ed25519VerificationKey2020".to_string(),
                 controller: did.to_string(),
                 public_key_multibase: Some(key_part.to_string()),
@@ -281,7 +281,7 @@ fn did_web_to_url(did: &str) -> Result<String, DIDResolverError> {
         "/.well-known/did.json".to_string()
     };
 
-    Ok(format!("https://{}{}", domain, path))
+    Ok(format!("https://{domain}{path}"))
 }
 
 /// DID Document structure (simplified for resolution)

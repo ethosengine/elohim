@@ -64,7 +64,7 @@ impl AdminClient {
                 if err_type == "error" {
                     if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
                         if let Some(msg) = get_string_field(err_data, "message") {
-                            return Err(format!("Admin error: {}", msg));
+                            return Err(format!("Admin error: {msg}"));
                         }
                     }
                     return Err("Unknown admin error during key generation".to_string());
@@ -78,8 +78,7 @@ impl AdminClient {
         }
 
         Err(format!(
-            "Unexpected generate_agent_pub_key response: {:?}",
-            response
+            "Unexpected generate_agent_pub_key response: {response:?}"
         ))
     }
 
@@ -199,7 +198,7 @@ impl AdminClient {
             )
             .header("Origin", "http://localhost:8080")
             .body(())
-            .map_err(|e| format!("Failed to build request: {}", e))?;
+            .map_err(|e| format!("Failed to build request: {e}"))?;
 
         let (ws_stream, _) = tokio::time::timeout(
             self.timeout,
@@ -207,7 +206,7 @@ impl AdminClient {
         )
         .await
         .map_err(|_| "Timeout connecting to admin interface".to_string())?
-        .map_err(|e| format!("Admin WebSocket connect failed: {}", e))?;
+        .map_err(|e| format!("Admin WebSocket connect failed: {e}"))?;
 
         let (mut write, mut read) = ws_stream.split();
 
@@ -215,7 +214,7 @@ impl AdminClient {
         write
             .send(Message::Binary(envelope))
             .await
-            .map_err(|e| format!("Failed to send admin request: {}", e))?;
+            .map_err(|e| format!("Failed to send admin request: {e}"))?;
 
         // Read response with timeout
         let response_bytes = tokio::time::timeout(self.timeout, async {
@@ -225,7 +224,7 @@ impl AdminClient {
                     Ok(Message::Close(_)) => {
                         return Err("Admin connection closed".to_string());
                     }
-                    Err(e) => return Err(format!("WebSocket error: {}", e)),
+                    Err(e) => return Err(format!("WebSocket error: {e}")),
                     _ => continue,
                 }
             }
@@ -248,10 +247,10 @@ impl AdminClient {
                 if resp_type == "error" {
                     if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
                         if let Some(msg) = get_string_field(err_data, "message") {
-                            return Err(format!("Admin error ({}): {}", operation, msg));
+                            return Err(format!("Admin error ({operation}): {msg}"));
                         }
                     }
-                    return Err(format!("Unknown admin error during {}", operation));
+                    return Err(format!("Unknown admin error during {operation}"));
                 }
             }
         }
@@ -267,7 +266,7 @@ impl AdminClient {
 fn encode_msgpack(value: &Value) -> Result<Vec<u8>, String> {
     let mut buf = Vec::new();
     rmpv::encode::write_value(&mut buf, value)
-        .map_err(|e| format!("Failed to encode MessagePack: {}", e))?;
+        .map_err(|e| format!("Failed to encode MessagePack: {e}"))?;
     Ok(buf)
 }
 
@@ -299,7 +298,7 @@ fn build_request_envelope(id: u64, inner_data: &[u8]) -> Vec<u8> {
 fn parse_response_envelope(data: &[u8]) -> Result<Value, String> {
     let mut cursor = Cursor::new(data);
     let value = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| format!("Failed to decode response: {}", e))?;
+        .map_err(|e| format!("Failed to decode response: {e}"))?;
 
     if let Value::Map(ref map) = value {
         // Check for error at envelope level
@@ -308,10 +307,10 @@ fn parse_response_envelope(data: &[u8]) -> Result<Value, String> {
             if resp_type == "error" {
                 if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
                     if let Some(msg) = get_string_field(err_data, "value") {
-                        return Err(format!("Admin error: {}", msg));
+                        return Err(format!("Admin error: {msg}"));
                     }
                     if let Some(msg) = get_string_field(err_data, "message") {
-                        return Err(format!("Admin error: {}", msg));
+                        return Err(format!("Admin error: {msg}"));
                     }
                 }
                 return Err("Unknown admin error".to_string());
@@ -322,12 +321,12 @@ fn parse_response_envelope(data: &[u8]) -> Result<Value, String> {
         if let Some(Value::Binary(inner_bytes)) = get_field(map, "data") {
             let mut inner_cursor = Cursor::new(inner_bytes.as_slice());
             let inner = rmpv::decode::read_value(&mut inner_cursor)
-                .map_err(|e| format!("Failed to decode inner response: {}", e))?;
+                .map_err(|e| format!("Failed to decode inner response: {e}"))?;
             return Ok(inner);
         }
     }
 
-    Err(format!("Unexpected response format: {:?}", value))
+    Err(format!("Unexpected response format: {value:?}"))
 }
 
 /// Get a string field from a MessagePack map.

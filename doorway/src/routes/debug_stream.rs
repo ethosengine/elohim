@@ -123,7 +123,7 @@ impl DebugHub {
         self.emit(DebugEvent::info(
             "doorway",
             "zome_call_start",
-            &format!("→ {}::{} (role: {})", zome, fn_name, cell_role),
+            &format!("→ {zome}::{fn_name} (role: {cell_role})"),
         ));
     }
 
@@ -131,7 +131,7 @@ impl DebugHub {
         self.emit(DebugEvent::info(
             "doorway",
             "zome_call_complete",
-            &format!("← {}::{} completed in {}ms", zome, fn_name, duration_ms),
+            &format!("← {zome}::{fn_name} completed in {duration_ms}ms"),
         ));
     }
 
@@ -139,7 +139,7 @@ impl DebugHub {
         self.emit(DebugEvent::error(
             "doorway",
             "zome_call_error",
-            &format!("✗ {}::{} failed: {}", zome, fn_name, error),
+            &format!("✗ {zome}::{fn_name} failed: {error}"),
         ));
     }
 
@@ -147,7 +147,7 @@ impl DebugHub {
         self.emit(DebugEvent::info(
             "doorway",
             "import_forward",
-            &format!("→ Forwarding {} import: {}", batch_type, batch_id),
+            &format!("→ Forwarding {batch_type} import: {batch_id}"),
         ));
     }
 
@@ -204,8 +204,7 @@ pub async fn handle_debug_stream(
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "WebSocket upgrade failed: {}"}}"#,
-                    e
+                    r#"{{"error": "WebSocket upgrade failed: {e}"}}"#
                 ))))
                 .unwrap()
         }
@@ -261,7 +260,7 @@ async fn handle_debug_client(
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
                         let lag_event = DebugEvent::warn("doorway", "lag",
-                            &format!("Dropped {} events due to slow client", n));
+                            &format!("Dropped {n} events due to slow client"));
                         if let Ok(json) = serde_json::to_string(&lag_event) {
                             let _ = ws_write.send(Message::Text(json)).await;
                         }

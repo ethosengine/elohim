@@ -52,11 +52,11 @@ pub async fn run_proxy(
             tokio_tungstenite::tungstenite::handshake::client::generate_key(),
         )
         .body(())
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {e}")))?;
 
     let (conductor_ws, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to conductor: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to conductor: {e}")))?;
 
     info!("Connected to conductor at {}", conductor_url);
 
@@ -239,8 +239,7 @@ fn filter_message(data: &[u8], permission_level: PermissionLevel) -> FilterResul
                 FilterResult::Allow
             } else {
                 FilterResult::Deny(format!(
-                    "Operation '{}' requires higher permission level (current: {})",
-                    operation, permission_level
+                    "Operation '{operation}' requires higher permission level (current: {permission_level})"
                 ))
             }
         }

@@ -372,7 +372,7 @@ mod tests {
         // Add multiple sessions for same human
         for i in 0..3 {
             let (key, _) = generate_keypair();
-            cache.insert(format!("session-{}", i), key, "human-1".to_string());
+            cache.insert(format!("session-{i}"), key, "human-1".to_string());
         }
 
         // Add session for different human
@@ -420,7 +420,7 @@ mod tests {
         // Insert 3 keys
         for i in 0..3 {
             let (key, _) = generate_keypair();
-            cache.insert(format!("session-{}", i), key, format!("human-{}", i));
+            cache.insert(format!("session-{i}"), key, format!("human-{i}"));
             std::thread::sleep(Duration::from_millis(10)); // Ensure different timestamps
         }
 

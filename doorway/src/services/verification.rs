@@ -161,7 +161,7 @@ impl VerificationService {
             Err(e) => {
                 return VerifyBlobResponse::error(
                     expected_hash.to_string(),
-                    format!("Base64 decode failed: {}", e),
+                    format!("Base64 decode failed: {e}"),
                 );
             }
         };
@@ -240,7 +240,7 @@ impl VerificationService {
                 warn!("Failed to fetch blob from {}: {}", url, e);
                 return VerifyBlobResponse::error(
                     expected_hash.to_string(),
-                    format!("Failed to fetch blob: {}", e),
+                    format!("Failed to fetch blob: {e}"),
                 );
             }
         };
@@ -273,7 +273,7 @@ impl VerificationService {
                 warn!("Failed to read blob body from {}: {}", url, e);
                 return VerifyBlobResponse::error(
                     expected_hash.to_string(),
-                    format!("Failed to read blob body: {}", e),
+                    format!("Failed to read blob body: {e}"),
                 );
             }
         };

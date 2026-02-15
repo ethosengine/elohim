@@ -50,12 +50,12 @@ pub async fn issue_app_token(
             tokio_tungstenite::tungstenite::handshake::client::generate_key(),
         )
         .body(())
-        .map_err(|e| format!("Failed to build request: {}", e))?;
+        .map_err(|e| format!("Failed to build request: {e}"))?;
 
     // Connect to admin interface
     let (ws_stream, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| format!("Admin WebSocket connect failed: {}", e))?;
+        .map_err(|e| format!("Admin WebSocket connect failed: {e}"))?;
 
     let (mut write, mut read) = ws_stream.split();
 
@@ -71,7 +71,7 @@ pub async fn issue_app_token(
     write
         .send(Message::Binary(envelope))
         .await
-        .map_err(|e| format!("Failed to send token request: {}", e))?;
+        .map_err(|e| format!("Failed to send token request: {e}"))?;
 
     // Wait for response with timeout
     let response = tokio::time::timeout(Duration::from_secs(10), async {
@@ -84,7 +84,7 @@ pub async fn issue_app_token(
                     return Err("Admin connection closed".to_string());
                 }
                 Err(e) => {
-                    return Err(format!("WebSocket error: {}", e));
+                    return Err(format!("WebSocket error: {e}"));
                 }
                 _ => continue,
             }
@@ -175,7 +175,7 @@ fn build_app_auth_request(token: &[u8]) -> Vec<u8> {
 fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
     let mut cursor = Cursor::new(data);
     let value = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| format!("Failed to decode response: {}", e))?;
+        .map_err(|e| format!("Failed to decode response: {e}"))?;
 
     if let Value::Map(ref map) = value {
         // Check for error response
@@ -184,10 +184,10 @@ fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
             if response_type == "error" {
                 if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
                     if let Some(msg) = get_string_field(err_data, "value") {
-                        return Err(format!("Admin error: {}", msg));
+                        return Err(format!("Admin error: {msg}"));
                     }
                     if let Some(msg) = get_string_field(err_data, "message") {
-                        return Err(format!("Admin error: {}", msg));
+                        return Err(format!("Admin error: {msg}"));
                     }
                 }
                 return Err("Unknown admin error".to_string());
@@ -247,7 +247,7 @@ fn extract_token_from_map(value: &Value) -> Option<AppAuthToken> {
 fn parse_auth_response(data: &[u8]) -> Result<(), String> {
     let mut cursor = Cursor::new(data);
     let value = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| format!("Failed to decode auth response: {}", e))?;
+        .map_err(|e| format!("Failed to decode auth response: {e}"))?;
 
     // Check for error
     if let Value::Map(ref map) = value {
@@ -255,7 +255,7 @@ fn parse_auth_response(data: &[u8]) -> Result<(), String> {
             if response_type == "error" {
                 if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
                     if let Some(msg) = get_string_field(err_data, "message") {
-                        return Err(format!("Auth error: {}", msg));
+                        return Err(format!("Auth error: {msg}"));
                     }
                 }
                 return Err("Authentication failed".to_string());

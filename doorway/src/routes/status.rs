@@ -202,8 +202,7 @@ pub async fn status_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
             },
             Err(e) => {
                 recommendations.push(format!(
-                    "Cannot reach elohim-storage: {} - imports will fail",
-                    e
+                    "Cannot reach elohim-storage: {e} - imports will fail"
                 ));
                 StorageStats {
                     configured: true,
@@ -437,15 +436,15 @@ async fn fetch_storage_status(storage_url: &str) -> Result<StorageStatusInfo, St
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
-        .map_err(|e| format!("HTTP client error: {}", e))?;
+        .map_err(|e| format!("HTTP client error: {e}"))?;
 
     // Fetch health
-    let health_url = format!("{}/health", base_url);
+    let health_url = format!("{base_url}/health");
     let health_resp = client
         .get(&health_url)
         .send()
         .await
-        .map_err(|e| format!("Connection failed: {}", e))?;
+        .map_err(|e| format!("Connection failed: {e}"))?;
 
     if !health_resp.status().is_success() {
         return Err(format!(
@@ -457,7 +456,7 @@ async fn fetch_storage_status(storage_url: &str) -> Result<StorageStatusInfo, St
     let health: StorageHealthResponse = health_resp
         .json()
         .await
-        .map_err(|e| format!("Invalid health response: {}", e))?;
+        .map_err(|e| format!("Invalid health response: {e}"))?;
 
     // Derive healthy from status field (elohim-storage returns status: "ok")
     let healthy = health.status == "ok";
@@ -480,12 +479,12 @@ async fn fetch_import_batches(
     client: &reqwest::Client,
     base_url: &str,
 ) -> Result<Vec<ImportBatchSummary>, String> {
-    let url = format!("{}/import/batches", base_url);
+    let url = format!("{base_url}/import/batches");
     let resp = client
         .get(&url)
         .send()
         .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+        .map_err(|e| format!("Request failed: {e}"))?;
 
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
@@ -494,7 +493,7 @@ async fn fetch_import_batches(
     let data: StorageBatchesResponse = resp
         .json()
         .await
-        .map_err(|e| format!("Invalid response: {}", e))?;
+        .map_err(|e| format!("Invalid response: {e}"))?;
 
     // Take only last 5 batches
     let batches: Vec<ImportBatchSummary> = data

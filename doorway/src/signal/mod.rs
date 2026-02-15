@@ -158,8 +158,7 @@ pub async fn handle_signal_upgrade(
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "WebSocket upgrade failed: {}"}}"#,
-                    e
+                    r#"{{"error": "WebSocket upgrade failed: {e}"}}"#
                 ))))
                 .unwrap();
         }

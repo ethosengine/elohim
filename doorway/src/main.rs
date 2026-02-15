@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("doorway={},info", log_level).into()),
+                .unwrap_or_else(|_| format!("doorway={log_level},info").into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -234,7 +234,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Register all conductors from config
     for (i, url) in conductor_urls.iter().enumerate() {
-        let conductor_id = format!("conductor-{}", i);
+        let conductor_id = format!("conductor-{i}");
         // Derive admin URL: same host, port - 1 (socat convention: 8444=admin, 8445=app)
         let admin_url = derive_admin_url_from_app(url);
         registry.register_conductor(ConductorInfo {
@@ -262,7 +262,7 @@ async fn main() -> anyhow::Result<()> {
 
         let mut pools_created = 0usize;
         for (i, url) in conductor_urls.iter().enumerate() {
-            let conductor_id = format!("conductor-{}", i);
+            let conductor_id = format!("conductor-{i}");
             // Use URL as-is from CONDUCTOR_URLS — it already contains the correct port.
             // derive_app_url would replace the port with app_port_min (4445), which breaks
             // headless k8s services where the socat proxy listens on a different port (e.g. 8445).
@@ -567,5 +567,5 @@ fn derive_app_url(conductor_url: &str, app_port: u16) -> String {
         }
     }
     // Fallback: just use the default
-    format!("ws://localhost:{}", app_port)
+    format!("ws://localhost:{app_port}")
 }

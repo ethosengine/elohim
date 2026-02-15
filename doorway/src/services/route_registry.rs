@@ -505,7 +505,7 @@ impl RouteRegistry {
                         // Generic content proxy
                         compiled.push(CompiledRoute {
                             method: HttpMethod::Get,
-                            path: format!("{}/api/*path", base_path),
+                            path: format!("{base_path}/api/*path"),
                             source: RouteSource::ExternalAgent {
                                 agent_pubkey: entry.registration.agent_pubkey.clone(),
                                 registration_id: entry.registration_id.clone(),
@@ -523,7 +523,7 @@ impl RouteRegistry {
                     AgentCapability::Blobs => {
                         compiled.push(CompiledRoute {
                             method: HttpMethod::Get,
-                            path: format!("{}/store/:hash", base_path),
+                            path: format!("{base_path}/store/:hash"),
                             source: RouteSource::ExternalAgent {
                                 agent_pubkey: entry.registration.agent_pubkey.clone(),
                                 registration_id: entry.registration_id.clone(),
@@ -541,7 +541,7 @@ impl RouteRegistry {
                     AgentCapability::Streaming => {
                         compiled.push(CompiledRoute {
                             method: HttpMethod::Get,
-                            path: format!("{}/stream/*path", base_path),
+                            path: format!("{base_path}/stream/*path"),
                             source: RouteSource::ExternalAgent {
                                 agent_pubkey: entry.registration.agent_pubkey.clone(),
                                 registration_id: entry.registration_id.clone(),
@@ -559,7 +559,7 @@ impl RouteRegistry {
                     AgentCapability::Import => {
                         compiled.push(CompiledRoute {
                             method: HttpMethod::Post,
-                            path: format!("{}/import/*path", base_path),
+                            path: format!("{base_path}/import/*path"),
                             source: RouteSource::ExternalAgent {
                                 agent_pubkey: entry.registration.agent_pubkey.clone(),
                                 registration_id: entry.registration_id.clone(),
@@ -577,7 +577,7 @@ impl RouteRegistry {
                     AgentCapability::Custom(name) => {
                         compiled.push(CompiledRoute {
                             method: HttpMethod::Get,
-                            path: format!("{}/{}/*path", base_path, name),
+                            path: format!("{base_path}/{name}/*path"),
                             source: RouteSource::ExternalAgent {
                                 agent_pubkey: entry.registration.agent_pubkey.clone(),
                                 registration_id: entry.registration_id.clone(),
@@ -585,7 +585,7 @@ impl RouteRegistry {
                             target: RouteTarget::AgentProxy {
                                 agent_pubkey: entry.registration.agent_pubkey.clone(),
                                 endpoint: entry.registration.endpoint.clone(),
-                                path_suffix: Some(format!("/{}", name)),
+                                path_suffix: Some(format!("/{name}")),
                             },
                             auth_required: true,
                             cache_ttl_secs: 300,

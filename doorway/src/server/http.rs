@@ -793,7 +793,7 @@ async fn handle_request(
             } else {
                 "https"
             };
-            let base_url = format!("{}://{}", scheme, host);
+            let base_url = format!("{scheme}://{host}");
             to_boxed(routes::handle_stream_request(state, p, &base_url).await)
         }
 
@@ -836,7 +836,7 @@ async fn handle_request(
         (Method::GET, p) if p.starts_with("/api/blob/") => {
             // Rewrite path from /api/blob/{hash} to /store/{hash} for blob handler
             let hash = p.strip_prefix("/api/blob/").unwrap_or("");
-            let new_uri = format!("/store/{}", hash);
+            let new_uri = format!("/store/{hash}");
             let (mut parts, body) = req.into_parts();
             parts.uri = new_uri.parse().unwrap_or(parts.uri);
             let req = Request::from_parts(parts, body);
@@ -853,7 +853,7 @@ async fn handle_request(
         }
         (Method::HEAD, p) if p.starts_with("/api/blob/") => {
             let hash = p.strip_prefix("/api/blob/").unwrap_or("");
-            let new_uri = format!("/store/{}", hash);
+            let new_uri = format!("/store/{hash}");
             let (mut parts, body) = req.into_parts();
             parts.uri = new_uri.parse().unwrap_or(parts.uri);
             let req = Request::from_parts(parts, body);
@@ -1051,8 +1051,7 @@ async fn handle_bootstrap_request(
             .status(StatusCode::NOT_FOUND)
             .header("Content-Type", "application/json")
             .body(Full::new(Bytes::from(format!(
-                r#"{{"error": "Unknown bootstrap operation: {}"}}"#,
-                op
+                r#"{{"error": "Unknown bootstrap operation: {op}"}}"#
             ))))
             .unwrap(),
     };
@@ -1131,8 +1130,7 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
                     .header("Content-Type", "application/json")
                     .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "Invalid JSON: {}"}}"#,
-                        e
+                        r#"{{"error": "Invalid JSON: {e}"}}"#
                     ))))
                     .unwrap(),
             );

@@ -85,7 +85,7 @@ impl NatsProvisioner {
         let creds = NatsCredentials {
             creds_content: format!(
                 "-----BEGIN NATS USER JWT-----\n\
-                placeholder_jwt_for_{}\n\
+                placeholder_jwt_for_{node_id}\n\
                 ------END NATS USER JWT------\n\n\
                 ************************* IMPORTANT *************************\n\
                 NKEY Seed printed below can be used to sign and prove identity.\n\
@@ -93,8 +93,7 @@ impl NatsProvisioner {
                 -----BEGIN USER NKEY SEED-----\n\
                 SUAIBDPBAUTWCWBKIO6XHQNINK5FWJW4OHLXC3HQ2KFE4PEJUA44CNHTAM\n\
                 ------END USER NKEY SEED------\n\n\
-                *************************************************************\n",
-                node_id
+                *************************************************************\n"
             ),
             user_pub_key: format!("U{}", generate_placeholder_key()),
             account: "HPOS".to_string(),
@@ -143,7 +142,7 @@ fn generate_placeholder_key() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("{:040X}", timestamp)
+    format!("{timestamp:040X}")
 }
 
 /// NATS permission template for workload role
@@ -204,7 +203,7 @@ pub struct OrchestratorSubjects;
 impl OrchestratorSubjects {
     /// Workload commands from orchestrator to node
     pub fn workload_to_node(node_pubkey: &str) -> String {
-        format!("WORKLOAD.{}.>", node_pubkey)
+        format!("WORKLOAD.{node_pubkey}.>")
     }
 
     /// Workload responses from node to orchestrator
@@ -214,12 +213,12 @@ impl OrchestratorSubjects {
 
     /// Inventory updates from node
     pub fn inventory_update(node_pubkey: &str) -> String {
-        format!("INVENTORY.*.{}.update.>", node_pubkey)
+        format!("INVENTORY.*.{node_pubkey}.update.>")
     }
 
     /// Node's inbox for receiving credentials and commands
     pub fn node_inbox(node_pubkey: &str) -> String {
-        format!("_HPOS_INBOX.{}.>", node_pubkey)
+        format!("_HPOS_INBOX.{node_pubkey}.>")
     }
 
     /// Orchestrator's inbox for responses

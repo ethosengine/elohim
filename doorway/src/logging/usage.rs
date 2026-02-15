@@ -174,7 +174,7 @@ impl UsageLogger {
         let mut inner = self.inner.lock().await;
 
         if let Some(ref mut writer) = inner.writer {
-            if let Err(e) = writeln!(writer, "{}", jsonl) {
+            if let Err(e) = writeln!(writer, "{jsonl}") {
                 error!("Failed to write usage event: {}", e);
             }
             // Flush periodically for durability

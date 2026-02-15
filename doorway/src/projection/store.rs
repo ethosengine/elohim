@@ -143,7 +143,7 @@ impl ProjectionStore {
     ///
     /// Checks hot cache first, then MongoDB.
     pub async fn get(&self, doc_type: &str, doc_id: &str) -> Option<ProjectedDocument> {
-        let cache_key = format!("{}:{}", doc_type, doc_id);
+        let cache_key = format!("{doc_type}:{doc_id}");
 
         // Check hot cache first
         if let Some(entry) = self.hot_cache.get(&cache_key) {
@@ -190,7 +190,7 @@ impl ProjectionStore {
         collection
             .find_one(doc! { "_id": mongo_id, "metadata.is_deleted": { "$ne": true } })
             .await
-            .map_err(|e| DoorwayError::Database(format!("Find failed: {}", e)))
+            .map_err(|e| DoorwayError::Database(format!("Find failed: {e}")))
     }
 
     /// Store a projected document
@@ -241,7 +241,7 @@ impl ProjectionStore {
             .replace_one(doc! { "_id": &mongo_id }, doc)
             .with_options(options)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Upsert failed: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Upsert failed: {e}")))?;
 
         debug!("Projected document upserted: {}", mongo_id);
         Ok(())
@@ -283,7 +283,7 @@ impl ProjectionStore {
             .find(filter)
             .with_options(options)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Query failed: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Query failed: {e}")))?;
 
         let results: Vec<ProjectedDocument> = cursor
             .filter_map(|doc| async {

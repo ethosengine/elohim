@@ -158,7 +158,7 @@ impl AgentProvisioner {
             if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
                 warn!("Cleanup uninstall also failed: {}", cleanup_err);
             }
-            return Err(format!("Failed to register agent mapping: {}", e));
+            return Err(format!("Failed to register agent mapping: {e}"));
         }
 
         info!(
@@ -182,7 +182,7 @@ impl AgentProvisioner {
         let entry = self
             .registry
             .get_conductor_for_agent(agent_pub_key)
-            .ok_or_else(|| format!("Agent {} not found in registry", agent_pub_key))?;
+            .ok_or_else(|| format!("Agent {agent_pub_key} not found in registry"))?;
 
         // Get conductor info for admin URL
         let conductors = self.registry.list_conductors();
@@ -230,7 +230,7 @@ fn generate_app_id(app_id: &str, conductor_id: &str, user_identifier: &str) -> S
     let hash = hasher.finalize();
     let short_hash = hex::encode(&hash[..3]); // 6 hex chars from 3 bytes
 
-    format!("{}-{}-{}", app_id, conductor_id, short_hash)
+    format!("{app_id}-{conductor_id}-{short_hash}")
 }
 
 #[cfg(test)]

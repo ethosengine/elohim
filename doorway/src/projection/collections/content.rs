@@ -196,7 +196,7 @@ impl ContentProjection {
         search_tokens.dedup();
 
         Self {
-            mongo_id: Some(format!("content-{}", id)),
+            mongo_id: Some(format!("content-{id}")),
             id,
             action_hash,
             entry_hash: None,

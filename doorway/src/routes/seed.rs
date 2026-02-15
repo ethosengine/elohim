@@ -144,10 +144,7 @@ pub async fn handle_seed_blob(
             computed = %computed_hash,
             "Blob hash mismatch"
         );
-        let error_msg = format!(
-            "Hash mismatch: expected {}, got {}",
-            expected_hash, computed_hash
-        );
+        let error_msg = format!("Hash mismatch: expected {expected_hash}, got {computed_hash}");
         return json_response(
             StatusCode::CONFLICT,
             &BlobUploadResponse {
@@ -278,7 +275,7 @@ fn compute_sha256(data: &[u8]) -> String {
     hasher.update(data);
     let result = hasher.finalize();
     // Use hex encoding to match seeder (blob-manager.ts) convention
-    format!("sha256-{:x}", result)
+    format!("sha256-{result:x}")
 }
 
 /// Create JSON response

@@ -28,7 +28,7 @@ pub async fn run_proxy(
 ) -> Result<()> {
     // Build app interface URL using the conductor host (not hardcoded localhost)
     // Strip Doorway-specific params (apiKey) but keep conductor params
-    let mut app_url = format!("ws://{}:{}", conductor_host, port);
+    let mut app_url = format!("ws://{conductor_host}:{port}");
     if let Some(q) = query {
         let filtered: Vec<&str> = q
             .split('&')
@@ -44,7 +44,7 @@ pub async fn run_proxy(
     // Connect to conductor app interface with proper headers
     let request = Request::builder()
         .uri(&app_url)
-        .header("Host", format!("{}:{}", conductor_host, port))
+        .header("Host", format!("{conductor_host}:{port}"))
         .header("Origin", "http://localhost")
         .header("Connection", "Upgrade")
         .header("Upgrade", "websocket")
@@ -54,13 +54,11 @@ pub async fn run_proxy(
             tokio_tungstenite::tungstenite::handshake::client::generate_key(),
         )
         .body(())
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {e}")))?;
 
     let (conductor_ws, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| {
-            DoorwayError::Holochain(format!("Failed to connect to app interface: {}", e))
-        })?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to app interface: {e}")))?;
 
     info!("Connected to app interface on port {}", port);
 

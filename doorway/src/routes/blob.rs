@@ -63,9 +63,9 @@ impl std::fmt::Display for BlobError {
         match self {
             BlobError::NotFound => write!(f, "Blob not found"),
             BlobError::InvalidRange => write!(f, "Invalid range"),
-            BlobError::InvalidAddress(addr) => write!(f, "Invalid content address: {}", addr),
+            BlobError::InvalidAddress(addr) => write!(f, "Invalid content address: {addr}"),
             BlobError::MethodNotAllowed => write!(f, "Method not allowed"),
-            BlobError::InternalError(msg) => write!(f, "Internal error: {}", msg),
+            BlobError::InternalError(msg) => write!(f, "Internal error: {msg}"),
         }
     }
 }
@@ -96,8 +96,7 @@ fn parse_content_address(addr: &str) -> Result<String, BlobError> {
             }
             Err(e) => {
                 return Err(BlobError::InvalidAddress(format!(
-                    "Invalid CID format: {}",
-                    e
+                    "Invalid CID format: {e}"
                 )));
             }
         }
@@ -117,12 +116,11 @@ fn parse_content_address(addr: &str) -> Result<String, BlobError> {
 
     // Try raw hex (64 chars)
     if addr.len() == 64 && addr.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Ok(format!("sha256-{}", addr));
+        return Ok(format!("sha256-{addr}"));
     }
 
     Err(BlobError::InvalidAddress(format!(
-        "Unrecognized address format: {}",
-        addr
+        "Unrecognized address format: {addr}"
     )))
 }
 
@@ -424,7 +422,7 @@ async fn fetch_from_storage(storage_url: &str, hash: &str) -> Result<(Bytes, Str
         .timeout(std::time::Duration::from_secs(30))
         .send()
         .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+        .map_err(|e| format!("Request failed: {e}"))?;
 
     if !response.status().is_success() {
         return Err(format!("Storage returned {}", response.status()));
@@ -440,7 +438,7 @@ async fn fetch_from_storage(storage_url: &str, hash: &str) -> Result<(Bytes, Str
     let data = response
         .bytes()
         .await
-        .map_err(|e| format!("Failed to read body: {}", e))?;
+        .map_err(|e| format!("Failed to read body: {e}"))?;
 
     Ok((data, content_type))
 }
@@ -769,7 +767,7 @@ mod tests {
 
         // Verify the hash matches what we computed directly
         let expected_hash = hex::encode(hash.digest());
-        assert_eq!(result, format!("sha256-{}", expected_hash));
+        assert_eq!(result, format!("sha256-{expected_hash}"));
     }
 
     #[test]

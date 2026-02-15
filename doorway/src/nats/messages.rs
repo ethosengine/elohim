@@ -86,11 +86,11 @@ impl HcWsRequest {
     /// Get the NATS subject for this request
     pub fn subject(&self) -> String {
         if let Some(ref host) = self.target_host {
-            format!("{}.{}", HC_WS_SUBJECT_PREFIX, host)
+            format!("{HC_WS_SUBJECT_PREFIX}.{host}")
         } else if let Some(ref region) = self.preferred_region {
-            format!("{}.REGION.{}", HC_WS_SUBJECT_PREFIX, region)
+            format!("{HC_WS_SUBJECT_PREFIX}.REGION.{region}")
         } else {
-            format!("{}.ANY", HC_WS_SUBJECT_PREFIX)
+            format!("{HC_WS_SUBJECT_PREFIX}.ANY")
         }
     }
 

@@ -130,8 +130,7 @@ pub async fn handle_federation_doorways(state: Arc<AppState>) -> Response<Full<B
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .header("Content-Type", "application/json")
             .body(Full::new(Bytes::from(format!(
-                r#"{{"error": "Serialization failed: {}"}}"#,
-                e
+                r#"{{"error": "Serialization failed: {e}"}}"#
             ))))
             .unwrap(),
     }
@@ -171,8 +170,7 @@ pub fn handle_doorway_keys(state: Arc<AppState>) -> Response<Full<Bytes>> {
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .header("Content-Type", "application/json")
             .body(Full::new(Bytes::from(format!(
-                r#"{{"error": "Serialization failed: {}"}}"#,
-                e
+                r#"{{"error": "Serialization failed: {e}"}}"#
             ))))
             .unwrap(),
     }

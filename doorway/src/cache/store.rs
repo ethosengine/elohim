@@ -257,12 +257,12 @@ impl ContentCache {
 
     /// Invalidate all entries for a specific DNA
     pub fn invalidate_dna(&self, dna_hash: &str) -> usize {
-        self.invalidate_pattern(&format!("{}:", dna_hash))
+        self.invalidate_pattern(&format!("{dna_hash}:"))
     }
 
     /// Invalidate all entries for a specific zome function
     pub fn invalidate_function(&self, dna_hash: &str, zome: &str, fn_name: &str) -> usize {
-        self.invalidate_pattern(&format!("{}:{}:{}:", dna_hash, zome, fn_name))
+        self.invalidate_pattern(&format!("{dna_hash}:{zome}:{fn_name}:"))
     }
 
     /// Clear all entries

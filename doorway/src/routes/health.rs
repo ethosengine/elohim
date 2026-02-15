@@ -143,13 +143,11 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     // Include conductor status info in error field if not connected (but not blocking in dev mode)
     let error = if !actual_conductor_connected && !args.dev_mode {
         Some(format!(
-            "No workers connected to conductor ({}/{} workers) - seeding will fail",
-            connected_workers, total_workers
+            "No workers connected to conductor ({connected_workers}/{total_workers} workers) - seeding will fail"
         ))
     } else if !actual_conductor_connected && args.dev_mode {
         Some(format!(
-            "Dev mode: conductor not connected ({}/{} workers) - using elohim-storage path",
-            connected_workers, total_workers
+            "Dev mode: conductor not connected ({connected_workers}/{total_workers} workers) - using elohim-storage path"
         ))
     } else {
         None

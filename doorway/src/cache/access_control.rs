@@ -180,7 +180,7 @@ pub fn invalidation_pattern_for_reach(
     reach: &str,
 ) -> String {
     // Pattern: dna:zome:fn:*:reach
-    format!("{}:{}:{}:*:{}", dna_hash, zome, fn_name, reach)
+    format!("{dna_hash}:{zome}:{fn_name}:*:{reach}")
 }
 
 #[cfg(test)]

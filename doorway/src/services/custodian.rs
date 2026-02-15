@@ -721,7 +721,7 @@ impl CustodianService {
         content_id: &str,
         blob_hash: &str,
     ) -> Vec<CustodianBlobCommitment> {
-        let key = format!("{}:{}", content_id, blob_hash);
+        let key = format!("{content_id}:{blob_hash}");
         self.commitments
             .get(&key)
             .map(|c| c.clone())
@@ -745,7 +745,7 @@ impl CustodianService {
         custodian_id: &str,
         status: CommitmentStatus,
     ) -> bool {
-        let key = format!("{}:{}", content_id, blob_hash);
+        let key = format!("{content_id}:{blob_hash}");
 
         if let Some(mut commitments) = self.commitments.get_mut(&key) {
             if let Some(commitment) = commitments
@@ -769,7 +769,7 @@ impl CustodianService {
         progress: u8,
         bandwidth: f32,
     ) -> bool {
-        let key = format!("{}:{}", content_id, blob_hash);
+        let key = format!("{content_id}:{blob_hash}");
 
         if let Some(mut commitments) = self.commitments.get_mut(&key) {
             if let Some(commitment) = commitments
@@ -1015,7 +1015,7 @@ mod tests {
     fn test_custodian(agent_id: &str) -> CustodianCapability {
         CustodianCapability {
             agent_id: agent_id.to_string(),
-            display_name: Some(format!("Custodian {}", agent_id)),
+            display_name: Some(format!("Custodian {agent_id}")),
             bandwidth_mbps: 100.0,
             latency_ms: 50,
             uptime_ratio: 0.99,
@@ -1023,7 +1023,7 @@ mod tests {
             max_blob_size_gb: 10.0,
             current_blob_count: 5,
             reach_level: ReachLevel::Commons,
-            base_url: format!("https://custodian-{}.example.com", agent_id),
+            base_url: format!("https://custodian-{agent_id}.example.com"),
             last_health_check_ms: None,
             health_check_successes: 10,
             health_check_failures: 0,
@@ -1095,7 +1095,7 @@ mod tests {
         // - Region: matched = 10
         // - Health: 1.0 * 5 = 5
         // Total ~90
-        assert!(score > 80.0, "Score should be high: {}", score);
+        assert!(score > 80.0, "Score should be high: {score}");
     }
 
     #[test]

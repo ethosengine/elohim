@@ -96,8 +96,7 @@ pub async fn handle_admin_upgrade(
                     Response::builder()
                         .status(StatusCode::BAD_REQUEST)
                         .body(Full::new(Bytes::from(format!(
-                            "WebSocket upgrade failed: {}",
-                            e
+                            "WebSocket upgrade failed: {e}"
                         ))))
                         .unwrap()
                 }
@@ -109,8 +108,7 @@ pub async fn handle_admin_upgrade(
                 .status(StatusCode::UNAUTHORIZED)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error":"{}"}}"#,
-                    err_msg
+                    r#"{{"error":"{err_msg}"}}"#
                 ))))
                 .unwrap()
         }
@@ -168,8 +166,7 @@ pub async fn handle_app_upgrade(
             Response::builder()
                 .status(hyper::StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from(format!(
-                    "WebSocket upgrade failed: {}",
-                    e
+                    "WebSocket upgrade failed: {e}"
                 ))))
                 .unwrap()
         }

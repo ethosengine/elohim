@@ -50,7 +50,7 @@ impl NatsClient {
         let client = options
             .connect(&args.nats_url)
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to connect: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to connect: {e}")))?;
 
         info!("Connected to NATS at {}", args.nats_url);
 
@@ -77,7 +77,7 @@ impl NatsClient {
         self.client
             .publish(subject.to_string(), payload)
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Publish failed: {}", e)))
+            .map_err(|e| DoorwayError::Nats(format!("Publish failed: {e}")))
     }
 
     /// Publish a message with headers
@@ -90,7 +90,7 @@ impl NatsClient {
         self.client
             .publish_with_headers(subject.to_string(), headers, payload)
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Publish failed: {}", e)))
+            .map_err(|e| DoorwayError::Nats(format!("Publish failed: {e}")))
     }
 
     /// Request/response pattern with timeout
@@ -104,8 +104,8 @@ impl NatsClient {
             self.client.request(subject.to_string(), payload),
         )
         .await
-        .map_err(|_| DoorwayError::Nats(format!("Request to {} timed out", subject)))?
-        .map_err(|e| DoorwayError::Nats(format!("Request failed: {}", e)))
+        .map_err(|_| DoorwayError::Nats(format!("Request to {subject} timed out")))?
+        .map_err(|e| DoorwayError::Nats(format!("Request failed: {e}")))
     }
 
     /// Request with custom headers
@@ -123,14 +123,14 @@ impl NatsClient {
             .client
             .subscribe(inbox.clone())
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Subscribe failed: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Subscribe failed: {e}")))?;
 
         // Add reply header
         let mut headers = headers;
         headers.insert(
             "Nats-Reply-To",
             HeaderValue::from_str(&inbox)
-                .map_err(|e| DoorwayError::Nats(format!("Invalid header: {}", e)))?,
+                .map_err(|e| DoorwayError::Nats(format!("Invalid header: {e}")))?,
         );
 
         // Publish the request
@@ -139,7 +139,7 @@ impl NatsClient {
         // Wait for response with timeout
         tokio::time::timeout(self.request_timeout, subscription.next())
             .await
-            .map_err(|_| DoorwayError::Nats(format!("Request to {} timed out", subject)))?
+            .map_err(|_| DoorwayError::Nats(format!("Request to {subject} timed out")))?
             .ok_or_else(|| DoorwayError::Nats("No response received".into()))
     }
 
@@ -148,7 +148,7 @@ impl NatsClient {
         self.client
             .subscribe(subject.to_string())
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Subscribe failed: {}", e)))
+            .map_err(|e| DoorwayError::Nats(format!("Subscribe failed: {e}")))
     }
 
     /// Flush pending messages
@@ -156,7 +156,7 @@ impl NatsClient {
         self.client
             .flush()
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Flush failed: {}", e)))
+            .map_err(|e| DoorwayError::Nats(format!("Flush failed: {e}")))
     }
 
     /// Get the client name

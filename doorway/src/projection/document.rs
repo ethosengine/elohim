@@ -117,7 +117,7 @@ impl ProjectedDocument {
         let now = DateTime::now();
 
         Self {
-            mongo_id: Some(format!("{}:{}", doc_type, doc_id)),
+            mongo_id: Some(format!("{doc_type}:{doc_id}")),
             doc_type,
             doc_id,
             action_hash: action_hash.into(),

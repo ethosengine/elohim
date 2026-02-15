@@ -213,7 +213,7 @@ mod tests {
         let mut host = HostDoc::new(
             node_id.to_string(),
             node_id.to_string(),
-            format!("{}.example.com", node_id),
+            format!("{node_id}.example.com"),
             "ws://localhost:4444".to_string(),
             4445,
             65535,

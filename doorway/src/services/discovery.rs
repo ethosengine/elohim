@@ -173,8 +173,7 @@ impl DiscoveryService {
                     .set_config(&fallback_dna_hash, default_import_config);
 
                 result.errors.push(format!(
-                    "Admin connection failed ({}), using fallback config",
-                    e
+                    "Admin connection failed ({e}), using fallback config"
                 ));
                 result.import_configs_found = 1;
 
@@ -289,7 +288,7 @@ impl DiscoveryService {
             // Add Origin header to pass conductor's allowed_origins check
             .header("Origin", "http://localhost:8080")
             .body(())
-            .map_err(|e| format!("Failed to build request: {}", e))?;
+            .map_err(|e| format!("Failed to build request: {e}"))?;
 
         let (ws_stream, _) = tokio::time::timeout(
             self.config.timeout,
@@ -297,7 +296,7 @@ impl DiscoveryService {
         )
         .await
         .map_err(|_| "Timeout connecting to admin interface")?
-        .map_err(|e| format!("WebSocket connect failed: {}", e))?;
+        .map_err(|e| format!("WebSocket connect failed: {e}"))?;
 
         let (mut write, mut read) = ws_stream.split();
 
@@ -312,19 +311,19 @@ impl DiscoveryService {
 
         let mut buf = Vec::new();
         rmpv::encode::write_value(&mut buf, &list_apps)
-            .map_err(|e| format!("Failed to encode: {}", e))?;
+            .map_err(|e| format!("Failed to encode: {e}"))?;
 
         write
             .send(Message::Binary(buf))
             .await
-            .map_err(|e| format!("Failed to send: {}", e))?;
+            .map_err(|e| format!("Failed to send: {e}"))?;
 
         // Read response
         let response = tokio::time::timeout(self.config.timeout, read.next())
             .await
             .map_err(|_| "Timeout waiting for response")?
             .ok_or("Connection closed")?
-            .map_err(|e| format!("Read error: {}", e))?;
+            .map_err(|e| format!("Read error: {e}"))?;
 
         let response_bytes = match response {
             Message::Binary(b) => b,
@@ -338,7 +337,7 @@ impl DiscoveryService {
     /// Parse list_apps response to extract cell info
     fn parse_list_apps_response(&self, response: &[u8]) -> Result<Vec<CellInfo>, String> {
         let value: Value = rmpv::decode::read_value(&mut &response[..])
-            .map_err(|e| format!("Failed to decode response: {}", e))?;
+            .map_err(|e| format!("Failed to decode response: {e}"))?;
 
         // Response format: { type: "list_apps", data: [{ installed_app_id, cell_info: [...] }] }
         let data = value

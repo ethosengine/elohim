@@ -217,48 +217,6 @@ fn matches_uri_pattern(pattern: &str, uri: &str) -> bool {
     true
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_uri_pattern_matching() {
-        assert!(matches_uri_pattern(
-            "http://localhost:*",
-            "http://localhost:4200"
-        ));
-        assert!(matches_uri_pattern(
-            "http://localhost:*",
-            "http://localhost:4200/callback"
-        ));
-        assert!(matches_uri_pattern(
-            "https://*.elohim.host/*",
-            "https://app.elohim.host/callback"
-        ));
-        assert!(matches_uri_pattern("/threshold/*", "/threshold/callback"));
-        assert!(!matches_uri_pattern(
-            "http://localhost:*",
-            "http://example.com:4200"
-        ));
-    }
-
-    #[test]
-    fn test_session_validity() {
-        let session = OAuthSessionDoc::new(
-            "code123".to_string(),
-            "elohim-app".to_string(),
-            "http://localhost:4200/callback".to_string(),
-            "state123".to_string(),
-            None,
-            "human-123".to_string(),
-            "uhCAk-123".to_string(),
-            "user@example.com".to_string(),
-        );
-
-        assert!(session.is_valid());
-    }
-}
-
 impl IntoIndexes for OAuthSessionDoc {
     fn into_indices() -> Vec<(Document, Option<IndexOptions>)> {
         vec![
@@ -298,5 +256,47 @@ impl IntoIndexes for OAuthSessionDoc {
 impl MutMetadata for OAuthSessionDoc {
     fn mut_metadata(&mut self) -> &mut Metadata {
         &mut self.metadata
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_uri_pattern_matching() {
+        assert!(matches_uri_pattern(
+            "http://localhost:*",
+            "http://localhost:4200"
+        ));
+        assert!(matches_uri_pattern(
+            "http://localhost:*",
+            "http://localhost:4200/callback"
+        ));
+        assert!(matches_uri_pattern(
+            "https://*.elohim.host/*",
+            "https://app.elohim.host/callback"
+        ));
+        assert!(matches_uri_pattern("/threshold/*", "/threshold/callback"));
+        assert!(!matches_uri_pattern(
+            "http://localhost:*",
+            "http://example.com:4200"
+        ));
+    }
+
+    #[test]
+    fn test_session_validity() {
+        let session = OAuthSessionDoc::new(
+            "code123".to_string(),
+            "elohim-app".to_string(),
+            "http://localhost:4200/callback".to_string(),
+            "state123".to_string(),
+            None,
+            "human-123".to_string(),
+            "uhCAk-123".to_string(),
+            "user@example.com".to_string(),
+        );
+
+        assert!(session.is_valid());
     }
 }

@@ -176,7 +176,7 @@ impl ElohimVerifier {
         if !profile.completed_paths.is_empty() {
             let path = &profile.completed_paths[0];
             questions.push(VerificationQuestion {
-                id: format!("q_{}", question_id),
+                id: format!("q_{question_id}"),
                 question: "What was the most recent learning path you completed?".to_string(),
                 category: QuestionCategory::ContentMastery,
                 expected_answers: vec![path.path_title.clone(), path.path_id.clone()],
@@ -194,7 +194,7 @@ impl ElohimVerifier {
                     .map(|p| p.path_title.clone())
                     .collect();
                 questions.push(VerificationQuestion {
-                    id: format!("q_{}", question_id),
+                    id: format!("q_{question_id}"),
                     question: "Name one of the learning paths you have completed.".to_string(),
                     category: QuestionCategory::ContentMastery,
                     expected_answers: titles,
@@ -211,7 +211,7 @@ impl ElohimVerifier {
             let quiz = &profile.quiz_scores[0];
             let percentage = (quiz.score / quiz.max_score * 100.0).round() as i32;
             questions.push(VerificationQuestion {
-                id: format!("q_{}", question_id),
+                id: format!("q_{question_id}"),
                 question: format!(
                     "What was your approximate score on the '{}' quiz?",
                     quiz.quiz_title
@@ -237,7 +237,7 @@ impl ElohimVerifier {
         // 3. Relationship questions
         if profile.relationship_names.len() >= 2 {
             questions.push(VerificationQuestion {
-                id: format!("q_{}", question_id),
+                id: format!("q_{question_id}"),
                 question: "Name one of your trusted contacts in the network.".to_string(),
                 category: QuestionCategory::Relationships,
                 expected_answers: profile.relationship_names.clone(),
@@ -251,7 +251,7 @@ impl ElohimVerifier {
         // 4. Affinity questions
         if !profile.affinities.is_empty() {
             questions.push(VerificationQuestion {
-                id: format!("q_{}", question_id),
+                id: format!("q_{question_id}"),
                 question: "What is one of your listed interests/affinities?".to_string(),
                 category: QuestionCategory::Preferences,
                 expected_answers: profile.affinities.clone(),
@@ -266,7 +266,7 @@ impl ElohimVerifier {
         if let Some(prefs) = &profile.learning_preferences {
             if let Some(style) = &prefs.preferred_style {
                 questions.push(VerificationQuestion {
-                    id: format!("q_{}", question_id),
+                    id: format!("q_{question_id}"),
                     question: "What is your preferred learning style?".to_string(),
                     category: QuestionCategory::Preferences,
                     expected_answers: vec![style.clone()],
@@ -288,7 +288,7 @@ impl ElohimVerifier {
             // Extract year from created_at
             let year = profile.created_at.split('-').next().unwrap_or("2024");
             questions.push(VerificationQuestion {
-                id: format!("q_{}", question_id),
+                id: format!("q_{question_id}"),
                 question: "What year did you create your account?".to_string(),
                 category: QuestionCategory::AccountHistory,
                 expected_answers: vec![year.to_string()],
@@ -307,7 +307,7 @@ impl ElohimVerifier {
         // 7. Milestone questions
         if !profile.milestones.is_empty() {
             questions.push(VerificationQuestion {
-                id: format!("q_{}", question_id),
+                id: format!("q_{question_id}"),
                 question: "Name one milestone you have achieved.".to_string(),
                 category: QuestionCategory::AccountHistory,
                 expected_answers: profile.milestones.clone(),

@@ -30,7 +30,7 @@ pub fn parse_message(data: &[u8]) -> Result<ParsedMessage, DoorwayError> {
 
     // Decode outer envelope
     let envelope = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to decode envelope: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to decode envelope: {e}")))?;
 
     // Try client envelope format first
     if let Value::Map(ref map) = envelope {
@@ -62,7 +62,7 @@ fn try_parse_client_envelope(
             // Decode the inner AdminRequest
             let mut inner_cursor = Cursor::new(inner_bytes.as_slice());
             let inner = rmpv::decode::read_value(&mut inner_cursor).map_err(|e| {
-                DoorwayError::Holochain(format!("Failed to decode inner request: {}", e))
+                DoorwayError::Holochain(format!("Failed to decode inner request: {e}"))
             })?;
 
             if let Value::Map(ref inner_map) = inner {

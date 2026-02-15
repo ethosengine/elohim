@@ -39,27 +39,21 @@ impl MongoClient {
 
         // Use serverSelectionTimeoutMS to avoid hanging on unreachable MongoDB
         let timeout_uri = if uri.contains('?') {
-            format!(
-                "{}&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000",
-                uri
-            )
+            format!("{uri}&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000")
         } else {
-            format!(
-                "{}?serverSelectionTimeoutMS=3000&connectTimeoutMS=3000",
-                uri
-            )
+            format!("{uri}?serverSelectionTimeoutMS=3000&connectTimeoutMS=3000")
         };
 
         let client = Client::with_uri_str(&timeout_uri)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Failed to connect to MongoDB: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Failed to connect to MongoDB: {e}")))?;
 
         // Verify connection with timeout
         client
             .database(db_name)
             .run_command(doc! { "ping": 1 })
             .await
-            .map_err(|e| DoorwayError::Database(format!("MongoDB ping failed: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("MongoDB ping failed: {e}")))?;
 
         info!("Connected to MongoDB database '{}'", db_name);
 
@@ -132,7 +126,7 @@ where
         self.inner
             .create_indexes(indices)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Failed to create indexes: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Failed to create indexes: {e}")))?;
 
         Ok(())
     }
@@ -148,7 +142,7 @@ where
             .inner
             .insert_one(item)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Insert failed: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Insert failed: {e}")))?;
 
         result
             .inserted_id
@@ -165,7 +159,7 @@ where
         self.inner
             .find_one(full_filter)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Find failed: {}", e)))
+            .map_err(|e| DoorwayError::Database(format!("Find failed: {e}")))
     }
 
     /// Find many documents by filter
@@ -180,7 +174,7 @@ where
             .inner
             .find(full_filter)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Find failed: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Find failed: {e}")))?;
 
         let results: Vec<T> = cursor
             .filter_map(|doc| async {
@@ -210,7 +204,7 @@ where
         self.inner
             .update_one(filter, modifications)
             .await
-            .map_err(|e| DoorwayError::Database(format!("Update failed: {}", e)))
+            .map_err(|e| DoorwayError::Database(format!("Update failed: {e}")))
     }
 
     /// Soft delete a document

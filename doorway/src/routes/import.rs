@@ -207,7 +207,7 @@ async fn forward_queue_import(
         Ok(r) => r,
         Err(e) => {
             warn!("Import request JSON parse error: {}", e);
-            return import_error_response(StatusCode::BAD_REQUEST, &format!("Invalid JSON: {}", e));
+            return import_error_response(StatusCode::BAD_REQUEST, &format!("Invalid JSON: {e}"));
         }
     };
 
@@ -251,7 +251,7 @@ async fn forward_queue_import(
         Err(e) => {
             return import_error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to create HTTP client: {}", e),
+                &format!("Failed to create HTTP client: {e}"),
             );
         }
     };
@@ -289,7 +289,7 @@ async fn forward_queue_import(
                 }
                 Err(e) => import_error_response(
                     StatusCode::BAD_GATEWAY,
-                    &format!("Failed to read storage response: {}", e),
+                    &format!("Failed to read storage response: {e}"),
                 ),
             }
         }
@@ -297,7 +297,7 @@ async fn forward_queue_import(
             warn!(error = %e, "Failed to reach elohim-storage");
             import_error_response(
                 StatusCode::BAD_GATEWAY,
-                &format!("Failed to reach elohim-storage: {}", e),
+                &format!("Failed to reach elohim-storage: {e}"),
             )
         }
     }
@@ -324,7 +324,7 @@ async fn forward_get_status(storage_url: &str, batch_id: &str) -> Response<Full<
         Err(e) => {
             return import_error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to create HTTP client: {}", e),
+                &format!("Failed to create HTTP client: {e}"),
             );
         }
     };
@@ -341,13 +341,13 @@ async fn forward_get_status(storage_url: &str, batch_id: &str) -> Response<Full<
                     .unwrap(),
                 Err(e) => import_error_response(
                     StatusCode::BAD_GATEWAY,
-                    &format!("Failed to read storage response: {}", e),
+                    &format!("Failed to read storage response: {e}"),
                 ),
             }
         }
         Err(e) => import_error_response(
             StatusCode::BAD_GATEWAY,
-            &format!("Failed to reach elohim-storage: {}", e),
+            &format!("Failed to reach elohim-storage: {e}"),
         ),
     }
 }

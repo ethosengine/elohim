@@ -103,8 +103,7 @@ async fn forward_threshold_request(threshold_url: &str, path: &str) -> Response<
                         .status(StatusCode::BAD_GATEWAY)
                         .header("Content-Type", "application/json")
                         .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "Failed to read doorway-app response: {}"}}"#,
-                            e
+                            r#"{{"error": "Failed to read doorway-app response: {e}"}}"#
                         ))))
                         .unwrap()
                 }
@@ -116,8 +115,7 @@ async fn forward_threshold_request(threshold_url: &str, path: &str) -> Response<
                 .status(StatusCode::BAD_GATEWAY)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to connect to doorway-app: {}"}}"#,
-                    e
+                    r#"{{"error": "Failed to connect to doorway-app: {e}"}}"#
                 ))))
                 .unwrap()
         }

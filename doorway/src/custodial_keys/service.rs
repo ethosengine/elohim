@@ -173,15 +173,15 @@ impl CustodialKeyService {
         // 1. Decode stored values
         let salt = BASE64
             .decode(&key_material.key_derivation_salt)
-            .map_err(|e| DoorwayError::Internal(format!("Invalid salt encoding: {}", e)))?;
+            .map_err(|e| DoorwayError::Internal(format!("Invalid salt encoding: {e}")))?;
 
         let nonce = BASE64
             .decode(&key_material.encryption_nonce)
-            .map_err(|e| DoorwayError::Internal(format!("Invalid nonce encoding: {}", e)))?;
+            .map_err(|e| DoorwayError::Internal(format!("Invalid nonce encoding: {e}")))?;
 
         let encrypted = BASE64
             .decode(&key_material.encrypted_private_key)
-            .map_err(|e| DoorwayError::Internal(format!("Invalid ciphertext encoding: {}", e)))?;
+            .map_err(|e| DoorwayError::Internal(format!("Invalid ciphertext encoding: {e}")))?;
 
         // 2. Derive encryption key from password
         let encryption_key = derive_key_encryption_key(password.as_bytes(), &salt)?;

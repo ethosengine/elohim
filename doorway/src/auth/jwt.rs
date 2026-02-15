@@ -128,7 +128,7 @@ impl JwtValidator {
     pub fn generate_token(&self, input: TokenInput) -> Result<String, DoorwayError> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|e| DoorwayError::Auth(format!("System time error: {}", e)))?
+            .map_err(|e| DoorwayError::Auth(format!("System time error: {e}")))?
             .as_secs();
 
         let claims = Claims {
@@ -149,7 +149,7 @@ impl JwtValidator {
             &claims,
             &EncodingKey::from_secret(self.secret.as_bytes()),
         )
-        .map_err(|e| DoorwayError::Auth(format!("Failed to generate token: {}", e)))?;
+        .map_err(|e| DoorwayError::Auth(format!("Failed to generate token: {e}")))?;
 
         Ok(token)
     }
@@ -158,7 +158,7 @@ impl JwtValidator {
     pub fn generate_refresh_token(&self, input: TokenInput) -> Result<String, DoorwayError> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|e| DoorwayError::Auth(format!("System time error: {}", e)))?
+            .map_err(|e| DoorwayError::Auth(format!("System time error: {e}")))?
             .as_secs();
 
         // Refresh tokens last 7 days
@@ -182,7 +182,7 @@ impl JwtValidator {
             &claims,
             &EncodingKey::from_secret(self.secret.as_bytes()),
         )
-        .map_err(|e| DoorwayError::Auth(format!("Failed to generate refresh token: {}", e)))?;
+        .map_err(|e| DoorwayError::Auth(format!("Failed to generate refresh token: {e}")))?;
 
         Ok(token)
     }

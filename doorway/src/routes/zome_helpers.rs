@@ -88,7 +88,7 @@ pub async fn call_create_human(state: &AppState, input: CreateHumanInput) -> Res
     let response = pool
         .request(payload)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("Zome call failed: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Zome call failed: {e}")))?;
 
     // Parse response
     let result: HumanOutput = builder
@@ -156,8 +156,7 @@ fn get_zome_config_by_role(state: &AppState, role_name: &str) -> Result<ZomeCall
     );
 
     Err(DoorwayError::Internal(format!(
-        "No zome config found for role '{}'. Available: {:?}",
-        role_name, available
+        "No zome config found for role '{role_name}'. Available: {available:?}"
     )))
 }
 

@@ -167,7 +167,7 @@ async fn send_authenticate(
 
     let mut inner_buf = Vec::new();
     rmpv::encode::write_value(&mut inner_buf, &inner)
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth: {e}")))?;
 
     let envelope = rmpv::Value::Map(vec![
         (
@@ -182,12 +182,12 @@ async fn send_authenticate(
 
     let mut buf = Vec::new();
     rmpv::encode::write_value(&mut buf, &envelope)
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth envelope: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth envelope: {e}")))?;
 
     ws_sink
         .send(Message::Binary(buf))
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to send auth: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to send auth: {e}")))?;
 
     // Brief pause — if conductor rejects, it closes the connection
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -223,11 +223,11 @@ async fn connect_to_conductor(
             tokio_tungstenite::tungstenite::handshake::client::generate_key(),
         )
         .body(())
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {e}")))?;
 
     let (ws, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("WebSocket connect failed: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("WebSocket connect failed: {e}")))?;
 
     Ok(ws.split())
 }

@@ -551,7 +551,7 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<FullBody
                 .map_err(|e| {
                     error_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        &format!("JWT config error: {}", e),
+                        &format!("JWT config error: {e}"),
                         Some("JWT_CONFIG_ERROR"),
                     )
                 }),
@@ -969,7 +969,7 @@ async fn handle_update_status(
                 StatusCode::OK,
                 &SuccessResponse {
                     success: true,
-                    message: format!("User {}", action),
+                    message: format!("User {action}"),
                 },
             )
         }
@@ -1354,7 +1354,7 @@ async fn handle_update_permission(
                 StatusCode::OK,
                 &SuccessResponse {
                     success: true,
-                    message: format!("Permission level updated to {}", perm_level),
+                    message: format!("Permission level updated to {perm_level}"),
                 },
             )
         }

@@ -123,7 +123,7 @@ fn msgpack_response(value: &rmpv::Value) -> Response<Full<Bytes>> {
     if let Err(e) = rmpv::encode::write_value(&mut buf, value) {
         return error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("MessagePack encode error: {}", e),
+            &format!("MessagePack encode error: {e}"),
         );
     }
 

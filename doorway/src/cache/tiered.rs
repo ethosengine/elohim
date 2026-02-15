@@ -567,7 +567,7 @@ impl TieredBlobCache {
             .get(url)
             .send()
             .await
-            .map_err(|e| CacheError::FetchFailed(format!("Request failed: {}", e)))?;
+            .map_err(|e| CacheError::FetchFailed(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CacheError::FetchFailed(format!(
@@ -580,7 +580,7 @@ impl TieredBlobCache {
         let data = response
             .bytes()
             .await
-            .map_err(|e| CacheError::FetchFailed(format!("Body read failed: {}", e)))?;
+            .map_err(|e| CacheError::FetchFailed(format!("Body read failed: {e}")))?;
 
         Ok(data.to_vec())
     }
@@ -591,7 +591,7 @@ impl TieredBlobCache {
 
     /// Make chunk key from hash and index
     fn chunk_key(hash: &str, index: usize) -> String {
-        format!("{}:{}", hash, index)
+        format!("{hash}:{index}")
     }
 
     /// Get chunk by hash and index. O(1).
@@ -666,7 +666,7 @@ impl TieredBlobCache {
     /// Get all chunks for a blob (for reassembly). O(n) where n = chunk count.
     pub fn get_all_chunks(&self, hash: &str) -> Option<Vec<Vec<u8>>> {
         // First, find all chunk indices for this hash
-        let prefix = format!("{}:", hash);
+        let prefix = format!("{hash}:");
         let mut chunks: Vec<(usize, Vec<u8>)> = Vec::new();
 
         for entry in self.chunks.iter() {
@@ -691,7 +691,7 @@ impl TieredBlobCache {
 
     /// Remove all chunks for a blob. O(n).
     pub fn remove_all_chunks(&self, hash: &str) -> usize {
-        let prefix = format!("{}:", hash);
+        let prefix = format!("{hash}:");
         let keys_to_remove: Vec<String> = self
             .chunks
             .iter()

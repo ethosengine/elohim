@@ -78,7 +78,7 @@ impl CacheKey {
 
     /// Create a pattern for invalidating all calls to a function
     pub fn invalidation_pattern(dna_hash: &str, zome: &str, fn_name: &str) -> String {
-        format!("{}:{}:{}:", dna_hash, zome, fn_name)
+        format!("{dna_hash}:{zome}:{fn_name}:")
     }
 }
 
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_display() {
         let key = CacheKey::new("dna_hash_very_long", "zome", "get_thing", "{}");
-        let display = format!("{}", key);
+        let display = format!("{key}");
         assert!(display.contains("zome"));
         assert!(display.contains("get_thing"));
     }

@@ -395,11 +395,11 @@ impl SignalSubscriber {
                 tokio_tungstenite::tungstenite::handshake::client::generate_key(),
             )
             .body(())
-            .map_err(|e| format!("Failed to build request: {}", e))?;
+            .map_err(|e| format!("Failed to build request: {e}"))?;
 
         let (ws_stream, _) = connect_async_with_config(request, None, false)
             .await
-            .map_err(|e| format!("WebSocket connect failed: {}", e))?;
+            .map_err(|e| format!("WebSocket connect failed: {e}"))?;
 
         debug!("WebSocket connected, sending authentication...");
 
@@ -429,7 +429,7 @@ impl SignalSubscriber {
                 // Send periodic ping
                 _ = ping_interval.tick() => {
                     if let Err(e) = write.send(Message::Ping(vec![])).await {
-                        return Err(format!("Ping failed: {}", e));
+                        return Err(format!("Ping failed: {e}"));
                     }
                 }
 
@@ -451,7 +451,7 @@ impl SignalSubscriber {
                             return Ok(());
                         }
                         Some(Err(e)) => {
-                            return Err(format!("WebSocket error: {}", e));
+                            return Err(format!("WebSocket error: {e}"));
                         }
                         None => {
                             return Err("WebSocket stream ended".to_string());
@@ -482,7 +482,7 @@ impl SignalSubscriber {
 
         let mut inner_buf = Vec::new();
         rmpv::encode::write_value(&mut inner_buf, &inner)
-            .map_err(|e| format!("Failed to encode auth request: {}", e))?;
+            .map_err(|e| format!("Failed to encode auth request: {e}"))?;
 
         // Wrap in authenticate envelope (Holochain 0.6 format: { type: "authenticate", data: <binary> })
         let envelope = rmpv::Value::Map(vec![
@@ -498,12 +498,12 @@ impl SignalSubscriber {
 
         let mut buf = Vec::new();
         rmpv::encode::write_value(&mut buf, &envelope)
-            .map_err(|e| format!("Failed to encode envelope: {}", e))?;
+            .map_err(|e| format!("Failed to encode envelope: {e}"))?;
 
         write
             .send(Message::Binary(buf))
             .await
-            .map_err(|e| format!("Failed to send auth request: {}", e))?;
+            .map_err(|e| format!("Failed to send auth request: {e}"))?;
 
         debug!("Sent AppAuthenticationRequest");
         Ok(())
@@ -546,7 +546,7 @@ impl SignalSubscriber {
                         return Err("Connection closed during auth".to_string());
                     }
                     Err(e) => {
-                        return Err(format!("WebSocket error: {}", e));
+                        return Err(format!("WebSocket error: {e}"));
                     }
                     _ => continue,
                 }

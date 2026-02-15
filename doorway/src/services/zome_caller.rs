@@ -88,7 +88,7 @@ impl ZomeCaller {
         info!("ZomeCaller connecting to app interface at {}", self.app_url);
         let conn = ConductorConnection::connect_with_auth(&self.app_url, Some(token.token.clone()))
             .await
-            .map_err(|e| format!("ZomeCaller connection failed: {}", e))?;
+            .map_err(|e| format!("ZomeCaller connection failed: {e}"))?;
 
         let conn = Arc::new(conn);
 
@@ -136,7 +136,7 @@ impl ZomeCaller {
                 // Clear connection so next call reconnects
                 let mut write_conn = self.connection.write().await;
                 *write_conn = None;
-                Err(format!("Zome call failed: {}", e))
+                Err(format!("Zome call failed: {e}"))
             }
         }
     }
@@ -150,14 +150,14 @@ impl ZomeCaller {
         input: &I,
     ) -> Result<O, String> {
         let payload =
-            rmp_serde::to_vec(input).map_err(|e| format!("Failed to serialize input: {}", e))?;
+            rmp_serde::to_vec(input).map_err(|e| format!("Failed to serialize input: {e}"))?;
 
         let response_bytes = self
             .call_zome(role_name, zome_name, fn_name, payload)
             .await?;
 
         rmp_serde::from_slice(&response_bytes)
-            .map_err(|e| format!("Failed to deserialize response: {}", e))
+            .map_err(|e| format!("Failed to deserialize response: {e}"))
     }
 
     /// Check if currently connected
@@ -230,7 +230,7 @@ fn build_request_envelope(id: u64, inner_data: &[u8]) -> Vec<u8> {
 fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
     let mut cursor = Cursor::new(data);
     let value = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| format!("Failed to decode response: {}", e))?;
+        .map_err(|e| format!("Failed to decode response: {e}"))?;
 
     if let Value::Map(ref map) = value {
         // Check for error response
@@ -239,10 +239,10 @@ fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
             if response_type == "error" {
                 if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
                     if let Some(msg) = get_string_field(err_data, "value") {
-                        return Err(format!("Zome call error: {}", msg));
+                        return Err(format!("Zome call error: {msg}"));
                     }
                     if let Some(msg) = get_string_field(err_data, "message") {
-                        return Err(format!("Zome call error: {}", msg));
+                        return Err(format!("Zome call error: {msg}"));
                     }
                 }
                 return Err("Unknown zome call error".to_string());
@@ -255,7 +255,7 @@ fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
             // Inner response is the zome call result (also MessagePack)
             let mut inner_cursor = Cursor::new(inner_bytes.as_slice());
             let inner = rmpv::decode::read_value(&mut inner_cursor)
-                .map_err(|e| format!("Failed to decode inner response: {}", e))?;
+                .map_err(|e| format!("Failed to decode inner response: {e}"))?;
 
             // The zome call result is wrapped in { type: "...", value: <result bytes> }
             if let Value::Map(ref inner_map) = inner {
@@ -266,7 +266,7 @@ fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
                 if let Some(Value::Map(ref result_map)) = get_field(inner_map, "value") {
                     let mut buf = Vec::new();
                     rmpv::encode::write_value(&mut buf, &Value::Map(result_map.clone()))
-                        .map_err(|e| format!("Failed to re-encode result: {}", e))?;
+                        .map_err(|e| format!("Failed to re-encode result: {e}"))?;
                     return Ok(buf);
                 }
             }

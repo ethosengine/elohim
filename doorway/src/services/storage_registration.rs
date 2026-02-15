@@ -190,7 +190,7 @@ pub async fn register_local_storage(
             }
             Err(e) => {
                 warn!(capability = %capability, error = %e, "Failed to register storage");
-                errors.push(format!("{}: {}", capability, e));
+                errors.push(format!("{capability}: {e}"));
             }
         }
     }

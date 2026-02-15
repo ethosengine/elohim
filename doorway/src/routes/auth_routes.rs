@@ -515,14 +515,14 @@ async fn parse_json_body<T: for<'de> Deserialize<'de>>(
     let body = req
         .collect()
         .await
-        .map_err(|e| DoorwayError::Http(format!("Failed to read body: {}", e)))?;
+        .map_err(|e| DoorwayError::Http(format!("Failed to read body: {e}")))?;
 
     let bytes = body.to_bytes();
     if bytes.len() > 10240 {
         return Err(DoorwayError::Http("Request body too large".into()));
     }
 
-    serde_json::from_slice(&bytes).map_err(|e| DoorwayError::Http(format!("Invalid JSON: {}", e)))
+    serde_json::from_slice(&bytes).map_err(|e| DoorwayError::Http(format!("Invalid JSON: {e}")))
 }
 
 fn get_auth_header(req: &Request<hyper::body::Incoming>) -> Option<&str> {
@@ -556,7 +556,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -665,7 +665,7 @@ async fn handle_register(
                         return json_response(
                             StatusCode::SERVICE_UNAVAILABLE,
                             &ErrorResponse {
-                                error: format!("Failed to create Holochain identity: {}", e),
+                                error: format!("Failed to create Holochain identity: {e}"),
                                 code: Some("IDENTITY_CREATION_FAILED".into()),
                             },
                         );
@@ -760,7 +760,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -786,7 +786,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -800,7 +800,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Failed to hash password: {}", e),
+                    error: format!("Failed to hash password: {e}"),
                     code: Some("HASH_ERROR".into()),
                 },
             )
@@ -876,7 +876,7 @@ async fn handle_register(
         return json_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &ErrorResponse {
-                error: format!("Failed to create user: {}", e),
+                error: format!("Failed to create user: {e}"),
                 code: Some("DB_ERROR".into()),
             },
         );
@@ -918,7 +918,7 @@ async fn handle_login(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -978,7 +978,7 @@ async fn handle_login(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1006,7 +1006,7 @@ async fn handle_login(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1474,7 +1474,7 @@ async fn handle_export_key(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1499,7 +1499,7 @@ async fn handle_export_key(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1515,7 +1515,7 @@ async fn handle_export_key(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Cannot export key: {}", e),
+                    error: format!("Cannot export key: {e}"),
                     code: Some("EXPORT_ERROR".into()),
                 },
             );
@@ -1591,7 +1591,7 @@ async fn handle_confirm_stewardship(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -1661,7 +1661,7 @@ async fn handle_confirm_stewardship(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1686,7 +1686,7 @@ async fn handle_confirm_stewardship(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1795,7 +1795,7 @@ async fn handle_confirm_stewardship(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid signature encoding: {}", e),
+                    error: format!("Invalid signature encoding: {e}"),
                     code: Some("INVALID_SIGNATURE".into()),
                 },
             )
@@ -1838,7 +1838,7 @@ async fn handle_confirm_stewardship(
         return json_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &ErrorResponse {
-                error: format!("Failed to update user: {}", e),
+                error: format!("Failed to update user: {e}"),
                 code: Some("DB_ERROR".into()),
             },
         );
@@ -1907,7 +1907,7 @@ async fn handle_recover_custody(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -1951,7 +1951,7 @@ async fn handle_recover_custody(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1978,7 +1978,7 @@ async fn handle_recover_custody(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -2021,10 +2021,9 @@ async fn handle_recover_custody(
             expires_at,
             status: "pending".to_string(),
             instructions: format!(
-                "Your recovery request has been submitted to doorway '{}'. \
+                "Your recovery request has been submitted to doorway '{doorway_id}'. \
                  Contact your emergency contacts to approve your recovery. \
-                 You need {} approvals to regain access.",
-                doorway_id, required_approvals
+                 You need {required_approvals} approvals to regain access."
             ),
         },
     )
@@ -2044,7 +2043,7 @@ async fn handle_check_recovery_status(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -2123,7 +2122,7 @@ async fn handle_activate_recovery(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -2187,7 +2186,7 @@ async fn handle_activate_recovery(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -2240,7 +2239,7 @@ async fn handle_elohim_verify_start(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -2326,7 +2325,7 @@ async fn handle_elohim_verify_answer(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -2446,7 +2445,7 @@ async fn handle_authorize(
                 StatusCode::BAD_REQUEST,
                 &OAuthErrorResponse {
                     error: "invalid_request".to_string(),
-                    error_description: Some(format!("Invalid query parameters: {}", e)),
+                    error_description: Some(format!("Invalid query parameters: {e}")),
                     state: None,
                 },
             )
@@ -2656,7 +2655,7 @@ async fn handle_token(
                 StatusCode::BAD_REQUEST,
                 &OAuthErrorResponse {
                     error: "invalid_request".to_string(),
-                    error_description: Some(format!("Failed to read body: {}", e)),
+                    error_description: Some(format!("Failed to read body: {e}")),
                     state: None,
                 },
             )
@@ -2671,7 +2670,7 @@ async fn handle_token(
                     StatusCode::BAD_REQUEST,
                     &OAuthErrorResponse {
                         error: "invalid_request".to_string(),
-                        error_description: Some(format!("Invalid JSON: {}", e)),
+                        error_description: Some(format!("Invalid JSON: {e}")),
                         state: None,
                     },
                 )
@@ -2686,7 +2685,7 @@ async fn handle_token(
                     StatusCode::BAD_REQUEST,
                     &OAuthErrorResponse {
                         error: "invalid_request".to_string(),
-                        error_description: Some(format!("Invalid form data: {}", e)),
+                        error_description: Some(format!("Invalid form data: {e}")),
                         state: None,
                     },
                 )
@@ -2763,7 +2762,7 @@ async fn handle_token(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &OAuthErrorResponse {
                     error: "server_error".to_string(),
-                    error_description: Some(format!("Database error: {}", e)),
+                    error_description: Some(format!("Database error: {e}")),
                     state: None,
                 },
             )
@@ -2789,7 +2788,7 @@ async fn handle_token(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &OAuthErrorResponse {
                     error: "server_error".to_string(),
-                    error_description: Some(format!("Database error: {}", e)),
+                    error_description: Some(format!("Database error: {e}")),
                     state: None,
                 },
             )
@@ -2919,7 +2918,7 @@ fn generate_oauth_token_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &OAuthErrorResponse {
                 error: "server_error".to_string(),
-                error_description: Some(format!("Failed to generate token: {}", e)),
+                error_description: Some(format!("Failed to generate token: {e}")),
                 state: None,
             },
         ),
@@ -2941,7 +2940,7 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>
                     json_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         &ErrorResponse {
-                            error: format!("JWT configuration error: {}", e),
+                            error: format!("JWT configuration error: {e}"),
                             code: Some("CONFIG_ERROR".into()),
                         },
                     )
@@ -3006,7 +3005,7 @@ fn generate_auth_response(
         Err(e) => json_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &ErrorResponse {
-                error: format!("Failed to generate token: {}", e),
+                error: format!("Failed to generate token: {e}"),
                 code: Some("TOKEN_ERROR".into()),
             },
         ),

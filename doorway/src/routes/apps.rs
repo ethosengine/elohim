@@ -124,8 +124,7 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
                         .header("Content-Type", "application/json")
                         .header("Access-Control-Allow-Origin", "*")
                         .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "Failed to read storage response: {}"}}"#,
-                            e
+                            r#"{{"error": "Failed to read storage response: {e}"}}"#
                         ))))
                         .unwrap()
                 }
@@ -138,8 +137,7 @@ async fn forward_app_request(storage_url: &str, path: &str) -> Response<Full<Byt
                 .header("Content-Type", "application/json")
                 .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to connect to storage: {}"}}"#,
-                    e
+                    r#"{{"error": "Failed to connect to storage: {e}"}}"#
                 ))))
                 .unwrap()
         }
