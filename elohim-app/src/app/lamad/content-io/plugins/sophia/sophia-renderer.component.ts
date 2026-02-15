@@ -34,6 +34,7 @@ import { RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 
 import { ContentNode } from '../../../models/content-node.model';
+import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import {
   ContentRenderer,
   InteractiveRenderer,
@@ -109,30 +110,43 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
               </div>
             </div>
 
-            <!-- Coming Soon placeholder for mastery rewards -->
-            <div class="mastery-preview">
-              <div class="preview-item">
-                <span class="preview-icon">⭐</span>
-                <div class="preview-content">
-                  <strong>Points</strong>
-                  <span class="coming-soon">Coming Soon</span>
+            <!-- Mastery rewards summary -->
+            @if (learnerProfile$ | async; as profile) {
+              <div class="mastery-preview">
+                <div class="preview-item">
+                  <span
+                    class="preview-icon material-icons"
+                    [style.color]="profile.learnerLevel.color"
+                  >
+                    {{ profile.learnerLevel.icon }}
+                  </span>
+                  <div class="preview-content">
+                    <strong>{{ profile.learnerLevel.label }}</strong>
+                    <span class="preview-detail">{{ profile.totalXP | number }} XP</span>
+                  </div>
+                </div>
+                <div class="preview-item">
+                  <span
+                    class="preview-icon material-icons streak-fire"
+                    [class.streak-active]="profile.streak.todayActive"
+                  >
+                    local_fire_department
+                  </span>
+                  <div class="preview-content">
+                    <strong>{{ profile.streak.currentStreak }} Day Streak</strong>
+                    <span class="preview-detail">Best: {{ profile.streak.bestStreak }} days</span>
+                  </div>
+                </div>
+                <div class="preview-item">
+                  <span class="preview-icon material-icons">emoji_events</span>
+                  <div class="preview-content">
+                    <strong>{{ profile.totalMasteredNodes }} Mastered</strong>
+                    <span class="preview-detail">{{ profile.nodesAboveGate }} above gate</span>
+                  </div>
                 </div>
               </div>
-              <div class="preview-item">
-                <span class="preview-icon">🏆</span>
-                <div class="preview-content">
-                  <strong>Attestations</strong>
-                  <span class="coming-soon">Coming Soon</span>
-                </div>
-              </div>
-              <div class="preview-item">
-                <span class="preview-icon">📈</span>
-                <div class="preview-content">
-                  <strong>Mastery Level</strong>
-                  <span class="coming-soon">Coming Soon</span>
-                </div>
-              </div>
-            </div>
+              <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
+            }
           } @else {
             <!-- Discovery/Reflection Mode Results -->
             <div class="result-card">
@@ -141,15 +155,30 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
               <p class="result-description">Thank you for completing this reflection.</p>
             </div>
 
-            <!-- Coming Soon placeholder -->
-            <div class="imagodei-preview">
-              <p class="preview-text">
-                <strong>Coming Soon:</strong>
-                Your responses will be saved to your ImagoDei profile, helping you create meaning
-                from your reflections.
-              </p>
-              <a class="profile-link" routerLink="/identity/profile">View your ImagoDei →</a>
-            </div>
+            <!-- Profile summary + dashboard link -->
+            @if (learnerProfile$ | async; as profile) {
+              <div class="imagodei-preview">
+                <p class="preview-text">Your responses contribute to your learning profile.</p>
+                <div class="preview-item">
+                  <span
+                    class="preview-icon material-icons"
+                    [style.color]="profile.learnerLevel.color"
+                  >
+                    {{ profile.learnerLevel.icon }}
+                  </span>
+                  <div class="preview-content">
+                    <strong>{{ profile.learnerLevel.label }}</strong>
+                    <span class="preview-detail">{{ profile.totalXP | number }} XP</span>
+                  </div>
+                </div>
+                <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
+              </div>
+            } @else {
+              <div class="imagodei-preview">
+                <p class="preview-text">Your responses will be saved to your learning profile.</p>
+                <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
+              </div>
+            }
           }
 
           <!-- Continue navigation -->
@@ -519,6 +548,19 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
         font-style: italic;
       }
 
+      .preview-detail {
+        font-size: 0.75rem;
+        color: #777;
+      }
+
+      .streak-fire {
+        color: #9ca3af;
+      }
+
+      .streak-fire.streak-active {
+        color: #f97316;
+      }
+
       /* Dark theme overrides */
       :host-context(body[data-theme='dark']) .result-card,
       :host-context(body:not([data-theme])) .result-card {
@@ -559,6 +601,11 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
         color: #888;
       }
 
+      :host-context(body[data-theme='dark']) .preview-detail,
+      :host-context(body:not([data-theme])) .preview-detail {
+        color: #999;
+      }
+
       :host-context(body[data-theme='dark']) .score-label,
       :host-context(body:not([data-theme])) .score-label {
         color: #aaa;
@@ -586,6 +633,7 @@ export class SophiaRendererComponent
   implements ContentRenderer, InteractiveRenderer, OnInit, OnChanges, OnDestroy
 {
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly masteryStats = inject(MasteryStatsService);
   private readonly destroy$ = new Subject<void>();
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -629,6 +677,9 @@ export class SophiaRendererComponent
   // Scoring
   recognitions: Recognition[] = [];
   demonstratedCount = 0;
+
+  // Gamified profile snapshot (for results view)
+  readonly learnerProfile$ = this.masteryStats.learnerProfile$;
 
   // Assessment mode
   assessmentMode: AssessmentMode = 'mastery';

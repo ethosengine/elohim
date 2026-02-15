@@ -3,6 +3,9 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
+import { BehaviorSubject } from 'rxjs';
+
+import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import { SophiaRendererComponent } from './sophia-renderer.component';
 import { SophiaWrapperComponent } from './sophia-wrapper.component';
 import { ContentNode } from '../../../models/content-node.model';
@@ -78,8 +81,13 @@ describe('SophiaRendererComponent', () => {
   });
 
   beforeEach(async () => {
+    const mockMasteryStats = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
+      learnerProfile$: new BehaviorSubject(null),
+    });
+
     await TestBed.configureTestingModule({
       imports: [SophiaRendererComponent, RouterModule.forRoot([]), NoopAnimationsModule],
+      providers: [{ provide: MasteryStatsService, useValue: mockMasteryStats }],
     })
       .overrideComponent(SophiaRendererComponent, {
         remove: { imports: [SophiaWrapperComponent] },
