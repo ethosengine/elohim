@@ -34,7 +34,7 @@ import { TauriAuthService } from '../../services/tauri-auth.service';
 import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 
 /** Login step type */
-type LoginStep = 'doorway' | 'credentials' | 'federated' | 'redirecting';
+type LoginStep = 'doorway' | 'credentials' | 'federated' | 'redirecting' | 'unlock' | 'restarting';
 
 @Component({
   selector: 'app-login',
@@ -79,6 +79,15 @@ export class LoginComponent implements OnInit {
 
   /** Whether this is a first-launch Tauri launcher experience */
   readonly isLauncher = signal(false);
+
+  /** Whether the user is a confirmed steward (set after login/unlock) */
+  readonly isStewardResult = signal(false);
+
+  /** Unlock password (separate from login form password) */
+  unlockPassword = '';
+
+  /** Doorway name shown during restarting step */
+  readonly restartingDoorwayName = signal('');
 
   /** Return URL after successful login */
   returnUrl = '/';
@@ -125,12 +134,9 @@ export class LoginComponent implements OnInit {
 
     // === Context routing ===
 
-    // Tauri -> existing behavior (doorway picker for bootstrap)
+    // Tauri: returning user with key bundle -> unlock; first-time -> doorway picker
     if (this.tauriAuth.isTauri()) {
-      if (!this.doorwayRegistry.hasSelection()) {
-        this.isLauncher.set(true);
-      }
-      this.currentStep.set(this.hasDoorwaySelected() ? 'credentials' : 'doorway');
+      void this.initTauriStep();
       return;
     }
 
@@ -167,6 +173,9 @@ export class LoginComponent implements OnInit {
 
   /**
    * Submit login form.
+   *
+   * In Tauri mode, uses loginWithPassword IPC which handles the full
+   * doorway handoff flow. In browser mode, uses the auth service.
    */
   async onLogin(): Promise<void> {
     // Validate form
@@ -184,6 +193,43 @@ export class LoginComponent implements OnInit {
     this.error.set(null);
 
     try {
+      // Tauri: use IPC-based login flow
+      if (this.tauriAuth.isTauri()) {
+        const doorwayUrl = this.doorwayRegistry.selectedUrl();
+        if (!doorwayUrl) {
+          this.error.set('No doorway selected.');
+          return;
+        }
+
+        const result = await this.tauriAuth.loginWithPassword(
+          doorwayUrl,
+          this.form.identifier.trim(),
+          this.form.password
+        );
+
+        if (result.success) {
+          this.form.password = '';
+          if (this.form.rememberMe) {
+            localStorage.setItem(AUTH_IDENTIFIER_KEY, this.form.identifier.trim());
+          }
+
+          this.isStewardResult.set(result.isSteward);
+          this.restartingDoorwayName.set(
+            this.selectedDoorway()?.doorway?.name ?? 'your doorway'
+          );
+
+          if (result.needsRestart) {
+            this.currentStep.set('restarting');
+          } else {
+            void this.router.navigate([this.returnUrl]);
+          }
+        } else {
+          this.error.set(result.error ?? 'Login failed');
+        }
+        return;
+      }
+
+      // Browser: standard auth service login
       const credentials: PasswordCredentials = {
         type: 'password',
         identifier: this.form.identifier.trim(),
@@ -217,6 +263,56 @@ export class LoginComponent implements OnInit {
       this.error.set(errorMessage);
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  /**
+   * Submit unlock form (returning Tauri user).
+   */
+  async onUnlock(): Promise<void> {
+    if (!this.unlockPassword) {
+      this.error.set('Please enter your password.');
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.error.set(null);
+
+    try {
+      const result = await this.tauriAuth.unlockWithPassword(this.unlockPassword);
+
+      if (result.success) {
+        this.unlockPassword = '';
+        this.isStewardResult.set(result.isSteward);
+
+        // Navigate to main app — conductor is already running with the right identity
+        void this.router.navigate([this.returnUrl]);
+      } else {
+        this.error.set(result.error ?? 'Invalid password');
+      }
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Unlock failed');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  /**
+   * Trigger app exit (Tauri only).
+   *
+   * Exits the app so the user can reopen it. On restart, the conductor
+   * reinitializes with the newly saved doorway identity.
+   */
+  restartApp(): void {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (window.__TAURI__?.core) {
+      // Exit the process via Tauri's built-in exit command
+      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      void window.__TAURI__.core.invoke('plugin:process|exit', { code: 0 })
+        .catch(() => {
+          // Fallback: close the webview window
+          globalThis.close();
+        });
     }
   }
 
@@ -296,5 +392,31 @@ export class LoginComponent implements OnInit {
    */
   showDoorwayBrowser(): void {
     this.currentStep.set('doorway');
+  }
+
+  // ==========================================================================
+  // Tauri Initialization
+  // ==========================================================================
+
+  /**
+   * Determine the correct login step for Tauri users.
+   *
+   * Returning user (has key bundle in doorway.json) -> unlock screen.
+   * First-time user -> doorway picker or credentials.
+   */
+  private async initTauriStep(): Promise<void> {
+    const status = await this.tauriAuth.getDoorwayStatus();
+
+    if (status?.hasKeyBundle && status.hasIdentity) {
+      // Returning user: has encrypted key bundle, needs password to unlock
+      this.currentStep.set('unlock');
+      return;
+    }
+
+    // First-time user: doorway picker for bootstrap
+    if (!this.doorwayRegistry.hasSelection()) {
+      this.isLauncher.set(true);
+    }
+    this.currentStep.set(this.hasDoorwaySelected() ? 'credentials' : 'doorway');
   }
 }

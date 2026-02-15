@@ -252,6 +252,8 @@ pub struct NativeHandoffResponse {
     /// Encrypted key bundle for identity import (inline, non-destructive)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_bundle: Option<KeyExportFormat>,
+    /// Whether the user has confirmed stewardship (graduated from custodial)
+    pub is_steward: bool,
 }
 
 // =============================================================================
@@ -1293,8 +1295,8 @@ async fn handle_native_handoff(
     let bootstrap_url = state.args.bootstrap_url.clone();
     let signal_url = state.args.signal_url.clone();
 
-    // Look up UserDoc from MongoDB for agent_pub_key, conductor_id, custodial key
-    let (agent_pub_key, conductor_id, display_name, profile_image_hash, key_bundle) =
+    // Look up UserDoc from MongoDB for agent_pub_key, conductor_id, custodial key, is_steward
+    let (agent_pub_key, conductor_id, display_name, profile_image_hash, key_bundle, is_steward) =
         if let Some(ref mongo) = state.mongo {
             match mongo.collection::<UserDoc>(USER_COLLECTION).await {
                 Ok(collection) => {
@@ -1327,6 +1329,7 @@ async fn handle_native_handoff(
                                 None::<String>, // TODO: display_name from profile
                                 None::<String>, // TODO: profile_image_hash from profile
                                 bundle,
+                                user.is_steward,
                             )
                         }
                         Ok(None) => {
@@ -1334,21 +1337,21 @@ async fn handle_native_handoff(
                                 identifier = %claims.identifier,
                                 "User not found in MongoDB during native handoff"
                             );
-                            (claims.human_id.clone(), None, None, None, None)
+                            (claims.human_id.clone(), None, None, None, None, false)
                         }
                         Err(e) => {
                             warn!(error = %e, "MongoDB lookup failed during native handoff");
-                            (claims.human_id.clone(), None, None, None, None)
+                            (claims.human_id.clone(), None, None, None, None, false)
                         }
                     }
                 }
                 Err(e) => {
                     warn!(error = %e, "Failed to get collection during native handoff");
-                    (claims.human_id.clone(), None, None, None, None)
+                    (claims.human_id.clone(), None, None, None, None, false)
                 }
             }
         } else {
-            (claims.human_id.clone(), None, None, None, None)
+            (claims.human_id.clone(), None, None, None, None, false)
         };
 
     // Look up installed_app_id from conductor registry
@@ -1367,6 +1370,7 @@ async fn handle_native_handoff(
         agent_pub_key = %agent_pub_key,
         conductor_id = ?conductor_id,
         has_key_bundle = key_bundle.is_some(),
+        is_steward = is_steward,
         "Native handoff: identity + network context provided"
     );
 
@@ -1386,6 +1390,7 @@ async fn handle_native_handoff(
             installed_app_id,
             conductor_id,
             key_bundle,
+            is_steward,
         },
     )
 }

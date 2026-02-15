@@ -62,6 +62,10 @@ pub struct NativeHandoffResponse {
     pub conductor_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_bundle: Option<KeyExportFormat>,
+    /// Whether the user has confirmed stewardship (graduated from custodial).
+    /// Option for backwards compat — old doorways won't send this field.
+    #[serde(default)]
+    pub is_steward: Option<bool>,
 }
 
 /// Response from POST /auth/confirm-stewardship
@@ -256,5 +260,22 @@ mod tests {
             Some("http://localhost:8888/bootstrap".to_string())
         );
         assert!(resp.key_bundle.is_none());
+        // is_steward defaults to None when not present (backwards compat)
+        assert_eq!(resp.is_steward, None);
+    }
+
+    #[test]
+    fn test_handoff_response_with_is_steward() {
+        let json = r#"{
+            "humanId": "uhCAk_test",
+            "identifier": "test@example.com",
+            "agentPubKey": "uhCAk_agent",
+            "doorwayId": "doorway-alpha",
+            "doorwayUrl": "https://doorway.test.local",
+            "isSteward": true
+        }"#;
+
+        let resp: NativeHandoffResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.is_steward, Some(true));
     }
 }

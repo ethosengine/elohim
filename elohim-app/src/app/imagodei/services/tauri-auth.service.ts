@@ -76,6 +76,35 @@ interface LocalSession {
   bootstrapUrl?: string;
 }
 
+/** Result from doorway_login IPC command */
+interface DoorwayLoginResult {
+  humanId: string;
+  identifier: string;
+  agentPubKey: string;
+  doorwayId: string;
+  conductorId?: string;
+  hasKeyBundle: boolean;
+  needsRestart: boolean;
+  isSteward: boolean;
+}
+
+/** Result from doorway_unlock IPC command */
+interface DoorwayUnlockResult {
+  identifier: string;
+  isSteward: boolean;
+}
+
+/** Result from doorway_status IPC command */
+interface DoorwayStatus {
+  connected: boolean;
+  doorwayUrl?: string;
+  identifier?: string;
+  agentPubKey?: string;
+  hasIdentity: boolean;
+  isSteward: boolean;
+  hasKeyBundle: boolean;
+}
+
 export type TauriAuthStatus = 'idle' | 'checking' | 'needs_login' | 'authenticated' | 'error';
 export type GraduationStatus = 'idle' | 'confirming' | 'confirmed' | 'error';
 
@@ -91,6 +120,9 @@ export class TauriAuthService {
   readonly status = signal<TauriAuthStatus>('idle');
   readonly errorMessage = signal<string>('');
   readonly currentSession = signal<LocalSession | null>(null);
+
+  // Stewardship signal — driven by doorway.json via doorway_status IPC
+  readonly isSteward = signal(false);
 
   // Graduation signals
   readonly graduationStatus = signal<GraduationStatus>('idle');
@@ -148,6 +180,9 @@ export class TauriAuthService {
 
         // Update auth service with session info
         this.authService.setTauriSession(session);
+
+        // Check stewardship status from doorway.json
+        await this.refreshStewardshipStatus();
       } else {
         this.status.set('needs_login');
       }
@@ -421,6 +456,130 @@ export class TauriAuthService {
       this.graduationStatus.set('error');
       this.graduationError.set(err instanceof Error ? err.message : String(err));
       return false;
+    }
+  }
+
+  /**
+   * Login with password via Tauri IPC (doorway_login).
+   *
+   * Used by first-time users who selected a doorway and are entering credentials.
+   * The Rust side handles: login -> handoff -> key decryption -> store save -> session creation.
+   */
+  async loginWithPassword(
+    doorwayUrl: string,
+    identifier: string,
+    password: string
+  ): Promise<{
+    success: boolean;
+    needsRestart: boolean;
+    isSteward: boolean;
+    error?: string;
+  }> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) {
+      return { success: false, needsRestart: false, isSteward: false, error: 'Tauri IPC not available' };
+    }
+
+    try {
+      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      const result = await window.__TAURI__.core.invoke<DoorwayLoginResult>('doorway_login', {
+        url: doorwayUrl,
+        identifier,
+        password,
+      });
+
+      this.isSteward.set(result.isSteward);
+
+      // Session was already created by Rust side — refresh our local state
+      const session = await this.getActiveSession();
+      if (session) {
+        this.currentSession.set(session);
+        this.status.set('authenticated');
+        this.authService.setTauriSession(session);
+      }
+
+      return {
+        success: true,
+        needsRestart: result.needsRestart,
+        isSteward: result.isSteward,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        needsRestart: false,
+        isSteward: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  /**
+   * Unlock local identity with password (no network required).
+   *
+   * Used by returning users who already have doorway.json with an encrypted key bundle.
+   * Decrypts the key bundle locally to prove identity.
+   */
+  async unlockWithPassword(password: string): Promise<{
+    success: boolean;
+    isSteward: boolean;
+    error?: string;
+  }> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) {
+      return { success: false, isSteward: false, error: 'Tauri IPC not available' };
+    }
+
+    try {
+      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      const result = await window.__TAURI__.core.invoke<DoorwayUnlockResult>(
+        'doorway_unlock',
+        { password }
+      );
+
+      this.isSteward.set(result.isSteward);
+
+      // Ensure session exists (auto-created from doorway.json by setup())
+      const session = await this.getActiveSessionWithRetry();
+      if (session) {
+        this.currentSession.set(session);
+        this.status.set('authenticated');
+        this.authService.setTauriSession(session);
+      }
+
+      return { success: true, isSteward: result.isSteward };
+    } catch (err) {
+      return {
+        success: false,
+        isSteward: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  /**
+   * Get doorway status from Tauri (reads doorway.json store).
+   */
+  async getDoorwayStatus(): Promise<DoorwayStatus | null> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) {
+      return null;
+    }
+
+    try {
+      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      return await window.__TAURI__.core.invoke<DoorwayStatus>('doorway_status');
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Refresh stewardship status from doorway.json via IPC.
+   */
+  private async refreshStewardshipStatus(): Promise<void> {
+    const status = await this.getDoorwayStatus();
+    if (status) {
+      this.isSteward.set(status.isSteward);
     }
   }
 

@@ -84,6 +84,92 @@
     </div>
   }
 
+  <!-- Unlock (returning Tauri user) -->
+  @if (currentStep() === 'unlock') {
+    <div class="login-card">
+      <div class="login-header">
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Enter your password to unlock</p>
+      </div>
+
+      @if (error()) {
+        <div class="error-banner" role="alert">
+          <span class="error-icon" aria-hidden="true">&#x2715;</span>
+          <span>{{ error() }}</span>
+          <button
+            type="button"
+            class="error-dismiss"
+            aria-label="Dismiss error"
+            (click)="clearError()"
+          >
+            Dismiss
+          </button>
+        </div>
+      }
+
+      <form class="login-form" (ngSubmit)="onUnlock()">
+        <div class="form-group">
+          <label for="unlockPassword">Password</label>
+          <div class="password-input-wrapper">
+            <input
+              id="unlockPassword"
+              [type]="showPassword() ? 'text' : 'password'"
+              [(ngModel)]="unlockPassword"
+              name="unlockPassword"
+              placeholder="Enter your password"
+              required
+              autocomplete="current-password"
+              [disabled]="isLoading()"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+            >
+              {{ showPassword() ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="isLoading() || !unlockPassword"
+          >
+            @if (isLoading()) {
+              <span class="spinner"></span>
+              Unlocking...
+            } @else {
+              Unlock
+            }
+          </button>
+        </div>
+      </form>
+
+      <div class="login-footer">
+        <button type="button" class="link-button" (click)="goBackToDoorway()">
+          Use a different doorway
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Restarting (after Tauri login, conductor needs reinit) -->
+  @if (currentStep() === 'restarting') {
+    <div class="restarting">
+      @if (isStewardResult()) {
+        <div class="stewardship-badge">Steward</div>
+      }
+      <h2>Connected to {{ restartingDoorwayName() }}</h2>
+      <p>Identity saved. Close and reopen to join the network as a peer.</p>
+      <button type="button" class="btn btn-primary restart-btn" (click)="restartApp()">
+        Close App
+      </button>
+    </div>
+  }
+
   <!-- Redirecting to doorway OAuth -->
   @if (currentStep() === 'redirecting') {
     <div class="redirecting">

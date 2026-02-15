@@ -190,6 +190,7 @@ pub fn run() {
             doorway_login,
             doorway_confirm_stewardship,
             doorway_status,
+            doorway_unlock,
             doorway_logout,
             get_pending_deep_links,
         ])
@@ -406,8 +407,6 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
                 network_seed,
             )
             .await?;
-
-        Ok(())
     } else {
         // Subsequent runs: check for identity mismatch (doorway switch)
         let saved_key_str = read_doorway_store_value("agentPubKey");
@@ -491,8 +490,81 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
                     .await?;
             }
         }
+    }
 
-        Ok(())
+    // After hApp install/update, ensure local session exists in elohim-storage.
+    // Handles the restart-after-login case where doorway_login saved identity
+    // to doorway.json but the session may not have persisted across restart.
+    ensure_local_session().await;
+
+    Ok(())
+}
+
+/// Ensure a local session exists in elohim-storage from saved doorway.json data.
+///
+/// Called after setup() completes (both first-run and restart cases) to handle
+/// the restart-after-login scenario where the previous session may have been
+/// in a temp directory or the storage sidecar wasn't running yet.
+async fn ensure_local_session() {
+    let human_id = read_doorway_store_value("humanId");
+    let agent_key = read_doorway_store_value("agentPubKey");
+    let doorway_url = read_doorway_store_value("doorwayUrl");
+    let identifier = read_doorway_store_value("identifier");
+
+    // Only attempt if we have the minimum required identity data
+    let (human_id, agent_key, doorway_url, identifier) =
+        match (human_id, agent_key, doorway_url, identifier) {
+            (Some(h), Some(a), Some(d), Some(i)) => (h, a, d, i),
+            _ => return, // No saved identity, nothing to do
+        };
+
+    let storage_url = "http://localhost:8090";
+    let http = reqwest::Client::new();
+
+    // Check if a session already exists
+    match http.get(format!("{}/session", storage_url)).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            log::info!("Local session already exists, skipping creation");
+            return;
+        }
+        Ok(_) => {} // 404 or other — create session
+        Err(e) => {
+            log::warn!("Cannot reach elohim-storage to check session: {}", e);
+            return;
+        }
+    }
+
+    // Create session from doorway.json data
+    let doorway_id = read_doorway_store_value("doorwayId");
+    let bootstrap_url = read_doorway_store_value("bootstrapUrl");
+
+    let session_body = serde_json::json!({
+        "humanId": human_id,
+        "agentPubKey": agent_key,
+        "doorwayUrl": doorway_url,
+        "doorwayId": doorway_id,
+        "identifier": identifier,
+        "bootstrapUrl": bootstrap_url,
+    });
+
+    match http
+        .post(format!("{}/session", storage_url))
+        .json(&session_body)
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            log::info!("Local session created from doorway.json on restart");
+        }
+        Ok(resp) => {
+            log::warn!(
+                "Failed to create local session on restart (status {})",
+                resp.status()
+            );
+        }
+        Err(e) => {
+            log::warn!("Failed to create local session on restart: {}", e);
+        }
     }
 }
 
@@ -511,6 +583,8 @@ pub struct DoorwayLoginResult {
     pub conductor_id: Option<String>,
     pub has_key_bundle: bool,
     pub needs_restart: bool,
+    /// Doorway says user has already confirmed stewardship
+    pub is_steward: bool,
 }
 
 /// Response from doorway_status command
@@ -522,6 +596,10 @@ pub struct DoorwayStatus {
     pub identifier: Option<String>,
     pub agent_pub_key: Option<String>,
     pub has_identity: bool,
+    /// Whether user has confirmed stewardship (from doorway.json)
+    pub is_steward: bool,
+    /// Whether an encrypted key bundle is saved (enables local unlock)
+    pub has_key_bundle: bool,
 }
 
 /// Login to doorway, retrieve identity + network context, decrypt key, save to store.
@@ -599,14 +677,57 @@ async fn doorway_login(
         );
     }
 
+    // Save stewardship status from doorway
+    let is_steward = handoff.is_steward.unwrap_or(false);
+    store.set("isSteward", serde_json::json!(is_steward));
+
     store
         .save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
 
     log::info!(
-        "Doorway handoff saved for {} (restart needed for identity)",
-        identifier
+        "Doorway handoff saved for {} (restart needed for identity, is_steward={})",
+        identifier,
+        is_steward
     );
+
+    // Step 4b: Create local session in elohim-storage (sidecar)
+    // This ensures the session exists before restart so TauriAuthService finds it.
+    let storage_url = "http://localhost:8090";
+    let session_body = serde_json::json!({
+        "humanId": handoff.human_id,
+        "agentPubKey": handoff.agent_pub_key,
+        "doorwayUrl": url,
+        "doorwayId": handoff.doorway_id,
+        "identifier": handoff.identifier,
+        "displayName": handoff.display_name,
+        "profileImageHash": handoff.profile_image_hash,
+        "bootstrapUrl": handoff.bootstrap_url,
+    });
+
+    let http = reqwest::Client::new();
+    match http
+        .post(format!("{}/session", storage_url))
+        .json(&session_body)
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            log::info!("Local session created in elohim-storage");
+        }
+        Ok(resp) => {
+            log::warn!(
+                "Failed to create local session (status {}): storage may not be ready",
+                resp.status()
+            );
+        }
+        Err(e) => {
+            log::warn!(
+                "Failed to create local session (storage may not be running): {}",
+                e
+            );
+        }
+    }
 
     // Step 5: Return summary
     Ok(DoorwayLoginResult {
@@ -617,6 +738,7 @@ async fn doorway_login(
         conductor_id: handoff.conductor_id,
         has_key_bundle,
         needs_restart: true, // Always true — conductor must reinit with new network config
+        is_steward,
     })
 }
 
@@ -721,6 +843,11 @@ async fn doorway_status(app: AppHandle) -> Result<DoorwayStatus, String> {
 
     let connected = doorway_url.is_some() && identifier.is_some();
     let has_identity = agent_pub_key.is_some();
+    let is_steward = store
+        .get("isSteward")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let has_key_bundle = store.get("keyBundle").is_some();
 
     Ok(DoorwayStatus {
         connected,
@@ -728,6 +855,8 @@ async fn doorway_status(app: AppHandle) -> Result<DoorwayStatus, String> {
         identifier,
         agent_pub_key,
         has_identity,
+        is_steward,
+        has_key_bundle,
     })
 }
 
@@ -743,6 +872,56 @@ fn get_pending_deep_links(
         Ok(mut pending) => std::mem::take(&mut pending.0),
         Err(_) => vec![],
     }
+}
+
+/// Response from doorway_unlock command
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DoorwayUnlockResult {
+    pub identifier: String,
+    pub is_steward: bool,
+}
+
+/// Unlock local identity by decrypting stored key bundle with password.
+///
+/// P2P-native auth: proves the user holds the secret without any network calls.
+/// The encrypted key bundle in doorway.json is the auth layer — if you can
+/// decrypt it, you own the identity.
+///
+/// Used by returning users who already have doorway.json from a previous login.
+#[tauri::command]
+async fn doorway_unlock(app: AppHandle, password: String) -> Result<DoorwayUnlockResult, String> {
+    let store = app
+        .store(DOORWAY_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    // Read key bundle from doorway.json store
+    let key_bundle_value = store
+        .get("keyBundle")
+        .ok_or("No key bundle saved — login required")?;
+    let key_bundle: doorway::KeyExportFormat = serde_json::from_value(key_bundle_value.clone())
+        .map_err(|e| format!("Invalid key bundle: {}", e))?;
+
+    // Decrypt locally — proves identity without network
+    identity::decrypt_key_bundle(&key_bundle, &password)
+        .map_err(|_| "Invalid password".to_string())?;
+
+    // Read identity info from store
+    let is_steward = store
+        .get("isSteward")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let identifier = store
+        .get("identifier")
+        .and_then(|v| v.as_str().map(String::from))
+        .unwrap_or_default();
+
+    log::info!("Local unlock successful for {} (is_steward={})", identifier, is_steward);
+
+    Ok(DoorwayUnlockResult {
+        identifier,
+        is_steward,
+    })
 }
 
 /// Clear doorway credentials and saved identity
