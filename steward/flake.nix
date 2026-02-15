@@ -34,27 +34,20 @@
           # The combined devshells repeat -isystem paths hundreds of times.
           # Must also dedup _FOR_BUILD variants — proc-macro crates (serde_derive,
           # thiserror-impl, etc.) link as native code and use these flags.
+          # Uses awk instead of bash [[ =~ ]] for reliable dedup in both
+          # interactive shells and `nix develop --command`.
           shellHook = ''
             dedup_flags() {
-              local seen=""
-              local result=""
-              local prev=""
-              for arg in $1; do
-                if [ "$prev" = "-isystem" ] || [ "$prev" = "-idirafter" ] || [ "$prev" = "-L" ]; then
-                  local pair="$prev $arg"
-                  if [[ ! " $seen " =~ " $pair " ]]; then
-                    seen="$seen $pair"
-                    result="$result $pair"
-                  fi
-                  prev=""
-                elif [ "$arg" = "-isystem" ] || [ "$arg" = "-idirafter" ] || [ "$arg" = "-L" ]; then
-                  prev="$arg"
-                else
-                  result="$result $arg"
-                  prev=""
-                fi
-              done
-              echo "$result"
+              echo "$1" | tr ' ' '\n' | awk '
+                /^-(isystem|idirafter|L)$/ { prefix=$0; next }
+                prefix {
+                  pair=prefix " " $0
+                  if (!seen[pair]++) print pair
+                  prefix=""
+                  next
+                }
+                !seen[$0]++ { print }
+              ' | tr '\n' ' '
             }
             export NIX_CFLAGS_COMPILE="$(dedup_flags "$NIX_CFLAGS_COMPILE")"
             export NIX_LDFLAGS="$(dedup_flags "$NIX_LDFLAGS")"

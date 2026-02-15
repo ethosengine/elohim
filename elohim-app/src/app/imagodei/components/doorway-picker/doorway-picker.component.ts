@@ -168,7 +168,7 @@ export class DoorwayPickerComponent implements OnInit {
   readonly selectedId = computed(() => this.selected()?.doorway.id ?? null);
 
   /** Title text based on mode */
-  readonly titleText = computed(() => 'Choose Your Gateway');
+  readonly titleText = computed(() => 'Choose Your Doorway');
 
   /** Subtitle text based on mode */
   readonly subtitleText = computed(() =>
