@@ -95,9 +95,9 @@ fn network_config() -> NetworkConfig {
     } else if doorway_bootstrap.is_some() || doorway_signal.is_some() {
         log::warn!("Stale network config detected (URLs without doorwayUrl), using defaults");
     } else if tauri::is_dev() {
-        // Local development mode (cargo tauri dev): use localhost
-        network_config.bootstrap_url = url2::Url2::parse("http://localhost:8888/bootstrap");
-        network_config.signal_url = url2::Url2::parse("ws://localhost:8888");
+        // Development mode: use alpha environment for p2p discovery
+        network_config.bootstrap_url = url2::Url2::parse(ALPHA_BOOTSTRAP_URL);
+        network_config.signal_url = url2::Url2::parse(ALPHA_SIGNAL_URL);
     } else {
         // Built app: use compile-time configured endpoints
         let bootstrap_url = option_env!("ELOHIM_BOOTSTRAP_URL")
@@ -195,7 +195,9 @@ pub fn run() {
         ])
         .plugin(tauri_plugin_holochain::async_init(
             vec_to_locked(vec![]),
-            HolochainPluginConfig::new(holochain_dir(), network_config()),
+            HolochainPluginConfig::new(holochain_dir(), network_config())
+                .admin_port(4444)
+                .enable_mdns_discovery(),
         ))
         .setup(|app| {
             // Set up deep link handler for OAuth callbacks
@@ -219,6 +221,35 @@ pub fn run() {
                             )
                             .await
                             .expect("Failed to build window")
+                            .initialization_script(
+                                r#"
+                                // Redirect doorway WebSocket connections to local conductor
+                                // and strip Node.js-only options from @holochain/client
+                                (function() {
+                                    const _WS = window.WebSocket;
+                                    window.WebSocket = function(url, protocols) {
+                                        let actual = (typeof url === 'string') ? url : url.toString();
+                                        if (actual.includes('doorway') || actual.includes('elohim.host')) {
+                                            console.log('[STEWARD] Redirecting WS:', actual, '-> ws://localhost:4444');
+                                            actual = 'ws://localhost:4444';
+                                        }
+                                        // Only pass protocols if valid (string or array).
+                                        // @holochain/client passes { origin: '...' } which is
+                                        // a Node.js ws option, not a browser WebSocket protocol.
+                                        if (typeof protocols === 'string' || Array.isArray(protocols)) {
+                                            return new _WS(actual, protocols);
+                                        }
+                                        return new _WS(actual);
+                                    };
+                                    window.WebSocket.prototype = _WS.prototype;
+                                    window.WebSocket.CONNECTING = _WS.CONNECTING;
+                                    window.WebSocket.OPEN = _WS.OPEN;
+                                    window.WebSocket.CLOSING = _WS.CLOSING;
+                                    window.WebSocket.CLOSED = _WS.CLOSED;
+                                    console.log('[STEWARD] WebSocket interceptor installed');
+                                })();
+                                "#,
+                            )
                             .build()
                             .expect("Failed to open main window");
                     });

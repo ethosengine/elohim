@@ -55,10 +55,12 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
+use elohim_storage::db::init_pool_from_dir;
+
 #[cfg(feature = "p2p")]
 use elohim_storage::p2p::{P2PConfig, P2PNode};
 #[cfg(feature = "p2p")]
-use elohim_storage::db::{init_pool_from_dir, local_sessions};
+use elohim_storage::db::local_sessions;
 #[cfg(feature = "p2p")]
 use elohim_storage::identity::NodeIdentity;
 
@@ -435,6 +437,22 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         info!("  GET  /db/paths/{{id}}      - Get path with steps");
         info!("  POST /db/paths           - Create path");
         info!("  POST /db/paths/bulk      - Bulk create paths");
+    }
+
+    // Initialize Diesel connection pool for session management
+    // (Separate from ContentDb — Diesel uses its own pool for session CRUD)
+    match init_pool_from_dir(&config.storage_dir) {
+        Ok(pool) => {
+            http_server = http_server.with_db_pool(pool);
+            info!("Session API:");
+            info!("  GET    /session       - Get active session");
+            info!("  POST   /session       - Create session");
+            info!("  DELETE /session       - Delete session");
+            info!("  GET    /session/all   - List all sessions");
+        }
+        Err(e) => {
+            warn!("Failed to initialize session pool: {} (session API disabled)", e);
+        }
     }
 
     // Wire P2P services into HTTP server

@@ -410,10 +410,20 @@ impl HttpServer {
         };
 
         match result {
-            Ok(response) => Ok(response),
+            Ok(mut response) => {
+                // Add CORS headers to ALL responses (not just preflight)
+                let headers = response.headers_mut();
+                headers.insert("Access-Control-Allow-Origin",
+                    hyper::header::HeaderValue::from_static("*"));
+                headers.insert("Access-Control-Allow-Methods",
+                    hyper::header::HeaderValue::from_static("GET, PUT, POST, DELETE, HEAD, OPTIONS"));
+                headers.insert("Access-Control-Allow-Headers",
+                    hyper::header::HeaderValue::from_static("Content-Type, Authorization, X-Agent-Id, X-Schema-Version"));
+                Ok(response)
+            }
             Err(e) => {
                 error!(error = %e, "Request error");
-                Ok(Response::builder()
+                Ok(Self::with_cors_headers(Response::builder())
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(Full::new(Bytes::from(format!("Error: {}", e))))
                     .unwrap())
@@ -4236,7 +4246,7 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         match db::local_sessions::get_active_session(&mut conn)? {
-            Some(session) => Ok(response::ok(&session)),
+            Some(session) => Ok(response::ok(&LocalSessionView::from(session))),
             None => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -4272,11 +4282,7 @@ impl HttpServer {
             "Created local session"
         );
 
-        Ok(Response::builder()
-            .status(StatusCode::CREATED)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Full::new(Bytes::from(serde_json::to_string(&session).unwrap())))
-            .unwrap())
+        Ok(response::created(&LocalSessionView::from(session)))
     }
 
     /// DELETE /session - Delete active session (logout)
@@ -4318,7 +4324,8 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         let sessions = db::local_sessions::list_all_sessions(&mut conn)?;
-        Ok(response::ok(&sessions))
+        let views: Vec<LocalSessionView> = sessions.into_iter().map(LocalSessionView::from).collect();
+        Ok(response::ok(&views))
     }
 
     // =========================================================================
