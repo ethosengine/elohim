@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, effect } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 
 import { filter } from 'rxjs/operators';
@@ -50,8 +50,18 @@ export class AppComponent implements OnInit, OnDestroy {
   private connectionAttempt = 0;
   private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private isDestroyed = false;
+  private holochainInitialized = false;
 
-  constructor(private readonly router: Router) {}
+  constructor(private readonly router: Router) {
+    // Post-unlock trigger: when status transitions to 'authenticated' after needs_unlock,
+    // initialize Holochain connection (which was deferred during lock gate)
+    effect(() => {
+      if (this.tauriAuth.status() === 'authenticated' && !this.holochainInitialized) {
+        this.holochainInitialized = true;
+        void this.initializeHolochainConnection();
+      }
+    });
+  }
 
   ngOnInit(): void {
     // Track route changes to show floating toggle only on root landing page
@@ -74,20 +84,23 @@ export class AppComponent implements OnInit, OnDestroy {
   private async initializeApp(): Promise<void> {
     // In Tauri environment, check for existing session first
     if (this.tauriAuth.isTauriEnvironment()) {
-      // Tauri environment detected, checking for local session
       await this.tauriAuth.initialize();
 
-      // If no session, TauriAuthService will set status to 'needs_login'
-      // The user should be routed to doorway picker
       if (this.tauriAuth.needsLogin()) {
-        // No Tauri session found - routing to identity setup with launcher mode
         void this.router.navigate(['/identity/login'], {
           queryParams: { launcher: 'true' },
         });
         return;
       }
 
-      // Tauri session restored, continuing initialization
+      if (this.tauriAuth.needsUnlock()) {
+        // Route to lock screen — don't init Holochain yet (deferred until unlock)
+        void this.router.navigate(['/identity/login']);
+        return;
+      }
+
+      // Authenticated (standalone mode) — mark as initialized so effect doesn't double-fire
+      this.holochainInitialized = true;
     }
 
     // Auto-connect to Edge Node if holochain config is available

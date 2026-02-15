@@ -105,7 +105,7 @@ interface DoorwayStatus {
   hasKeyBundle: boolean;
 }
 
-export type TauriAuthStatus = 'idle' | 'checking' | 'needs_login' | 'authenticated' | 'error';
+export type TauriAuthStatus = 'idle' | 'checking' | 'needs_login' | 'needs_unlock' | 'authenticated' | 'error';
 export type GraduationStatus = 'idle' | 'confirming' | 'confirmed' | 'error';
 
 @Injectable({
@@ -121,6 +121,9 @@ export class TauriAuthService {
   readonly errorMessage = signal<string>('');
   readonly currentSession = signal<LocalSession | null>(null);
 
+  /** Session data held before unlock — not yet promoted to currentSession */
+  readonly pendingSession = signal<LocalSession | null>(null);
+
   // Stewardship signal — driven by doorway.json via doorway_status IPC
   readonly isSteward = signal(false);
 
@@ -131,6 +134,7 @@ export class TauriAuthService {
   // Computed state
   readonly isAuthenticated = computed(() => this.status() === 'authenticated');
   readonly needsLogin = computed(() => this.status() === 'needs_login');
+  readonly needsUnlock = computed(() => this.status() === 'needs_unlock');
   readonly isTauri = computed(() => this.isTauriEnvironment());
 
   /** Whether this user is eligible to graduate (Tauri + authenticated) */
@@ -175,14 +179,19 @@ export class TauriAuthService {
       const session = await this.getActiveSessionWithRetry();
 
       if (session) {
-        this.currentSession.set(session);
-        this.status.set('authenticated');
-
-        // Update auth service with session info
-        this.authService.setTauriSession(session);
-
-        // Check stewardship status from doorway.json
-        await this.refreshStewardshipStatus();
+        // Session exists — check if user must prove identity first
+        const doorwayStatus = await this.getDoorwayStatus();
+        if (doorwayStatus?.hasKeyBundle) {
+          // Key bundle present: gate on password unlock before granting access
+          this.pendingSession.set(session);
+          this.status.set('needs_unlock');
+        } else {
+          // Standalone mode (no key bundle): auto-authenticate as before
+          this.currentSession.set(session);
+          this.status.set('authenticated');
+          this.authService.setTauriSession(session);
+          await this.refreshStewardshipStatus();
+        }
       } else {
         this.status.set('needs_login');
       }
@@ -538,13 +547,21 @@ export class TauriAuthService {
 
       this.isSteward.set(result.isSteward);
 
-      // Ensure session exists (auto-created from doorway.json by setup())
-      const session = await this.getActiveSessionWithRetry();
-      if (session) {
-        this.currentSession.set(session);
-        this.status.set('authenticated');
-        this.authService.setTauriSession(session);
+      // Promote pending session if available (set during initialize lock gate)
+      const pending = this.pendingSession();
+      if (pending) {
+        this.currentSession.set(pending);
+        this.pendingSession.set(null);
+        this.authService.setTauriSession(pending);
+      } else {
+        // Fallback: fetch session from storage
+        const session = await this.getActiveSessionWithRetry();
+        if (session) {
+          this.currentSession.set(session);
+          this.authService.setTauriSession(session);
+        }
       }
+      this.status.set('authenticated');
 
       return { success: true, isSteward: result.isSteward };
     } catch (err) {
@@ -624,4 +641,138 @@ export class TauriAuthService {
   navigateToLogin(): void {
     void this.router.navigate(['/identity']);
   }
+
+  // ==========================================================================
+  // Multi-Account Management
+  // ==========================================================================
+
+  /**
+   * List all saved accounts from doorway.json.
+   */
+  async listAccounts(): Promise<AccountSummary[]> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) {
+      return [];
+    }
+
+    try {
+      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      return await window.__TAURI__.core.invoke<AccountSummary[]>('doorway_list_accounts');
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Switch active account by humanId. Requires app restart.
+   */
+  async switchAccount(humanId: string): Promise<{ needsRestart: boolean }> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) {
+      return { needsRestart: false };
+    }
+
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    return await window.__TAURI__.core.invoke<{ needsRestart: boolean }>(
+      'doorway_switch_account',
+      { humanId }
+    );
+  }
+
+  // ==========================================================================
+  // Account Lifecycle
+  // ==========================================================================
+
+  /**
+   * Soft lock — delete session, return to lock screen.
+   * Does NOT clear identity data. User can unlock with password.
+   */
+  async lock(): Promise<void> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (window.__TAURI__?.core) {
+      try {
+        // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+        await window.__TAURI__.core.invoke('doorway_lock');
+      } catch (err) {
+        if (err instanceof Error) {
+          console.warn('[TauriAuthService] Lock failed:', err.message);
+        }
+      }
+    }
+
+    this.currentSession.set(null);
+    this.pendingSession.set(null);
+    this.status.set('needs_unlock');
+    void this.router.navigate(['/identity/login']);
+  }
+
+  /**
+   * Remove a specific account by humanId.
+   */
+  async removeAccount(humanId: string): Promise<void> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) return;
+
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    await window.__TAURI__.core.invoke('doorway_remove_account', { humanId });
+  }
+
+  /**
+   * Reset all accounts — clears all identity data.
+   */
+  async resetAll(): Promise<void> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) return;
+
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    await window.__TAURI__.core.invoke('doorway_reset');
+
+    this.currentSession.set(null);
+    this.pendingSession.set(null);
+    this.status.set('needs_login');
+    void this.authService.logout();
+    void this.router.navigate(['/identity']);
+  }
+
+  /**
+   * Deregister identity from doorway (revoke + remove locally).
+   */
+  async deregister(password: string): Promise<{ success: boolean; error?: string }> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) {
+      return { success: false, error: 'Tauri IPC not available' };
+    }
+
+    try {
+      // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+      await window.__TAURI__.core.invoke('doorway_deregister', { password });
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  /**
+   * Emergency wipe — delete all local data and exit app.
+   */
+  async emergencyWipe(): Promise<void> {
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    if (!window.__TAURI__?.core) return;
+
+    // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
+    await window.__TAURI__.core.invoke('doorway_emergency_wipe');
+  }
+}
+
+/** Summary of a saved account (from Rust IPC) */
+export interface AccountSummary {
+  humanId: string;
+  identifier: string;
+  doorwayUrl: string;
+  displayName?: string;
+  isSteward: boolean;
+  isActive: boolean;
 }

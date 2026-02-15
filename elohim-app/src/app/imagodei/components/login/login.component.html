@@ -149,10 +149,24 @@
       </form>
 
       <div class="login-footer">
+        <button type="button" class="link-button" (click)="showAccountSwitcher()">
+          Switch account
+        </button>
         <button type="button" class="link-button" (click)="goBackToDoorway()">
           Use a different doorway
         </button>
       </div>
+    </div>
+  }
+
+  <!-- Account Switcher -->
+  @if (currentStep() === 'switch-account') {
+    <div class="login-card">
+      <app-account-switcher
+        (needsRestart)="onAccountSwitchRestart()"
+        (addAccount)="onAccountSwitcherAddAccount()"
+        (cancelled)="onAccountSwitcherCancelled()"
+      />
     </div>
   }
 

@@ -1,11 +1,13 @@
 mod doorway;
 mod identity;
+mod storage;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager};
+use tokio::sync::Mutex as TokioMutex;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_holochain::{
     vec_to_locked, AgentPubKey, AppBundle, HolochainExt, HolochainPluginConfig, NetworkConfig,
@@ -78,9 +80,9 @@ fn network_config() -> NetworkConfig {
     // Validate that the store isn't stale: bootstrap/signal URLs are only valid
     // if doorwayUrl is also present (a complete handoff). Partial data (e.g.
     // bootstrap URL without doorwayUrl) indicates a corrupted or partially-cleared store.
-    let doorway_url = read_doorway_store_value("doorwayUrl");
-    let doorway_bootstrap = read_doorway_store_value("bootstrapUrl");
-    let doorway_signal = read_doorway_store_value("signalUrl");
+    let doorway_url = read_active_account_value("doorwayUrl");
+    let doorway_bootstrap = read_active_account_value("bootstrapUrl");
+    let doorway_signal = read_active_account_value("signalUrl");
 
     if doorway_url.is_some() && (doorway_bootstrap.is_some() || doorway_signal.is_some()) {
         // Use doorway-provided URLs (takes priority over compile-time defaults)
@@ -132,11 +134,11 @@ fn network_config() -> NetworkConfig {
     network_config
 }
 
-/// Read a string value from the doorway store file (pre-Tauri init)
+/// Read a string value from the active account in doorway.json (pre-Tauri init).
 ///
-/// This reads the store file directly since network_config() is called
-/// before the Tauri app is initialized.
-fn read_doorway_store_value(key: &str) -> Option<String> {
+/// Supports both v1 (flat) and v2 (multi-account) store formats.
+/// In v2, reads `accounts[activeHumanId][key]`.
+fn read_active_account_value(key: &str) -> Option<String> {
     let app_dir = app_dirs2::app_root(
         app_dirs2::AppDataType::UserData,
         &app_dirs2::AppInfo {
@@ -149,7 +151,79 @@ fn read_doorway_store_value(key: &str) -> Option<String> {
     let store_path = app_dir.join(DOORWAY_STORE);
     let content = std::fs::read_to_string(store_path).ok()?;
     let data: serde_json::Value = serde_json::from_str(&content).ok()?;
+
+    // v2: multi-account structure
+    if data.get("version").and_then(|v| v.as_u64()) == Some(2) {
+        let active_id = data.get("activeHumanId")?.as_str()?;
+        return data
+            .get("accounts")?
+            .get(active_id)?
+            .get(key)?
+            .as_str()
+            .map(|s| s.to_string());
+    }
+
+    // v1: flat structure (fallback)
     data.get(key)?.as_str().map(|s| s.to_string())
+}
+
+/// Migrate doorway.json from v1 (flat) to v2 (multi-account) format.
+///
+/// Called at filesystem level before Tauri init. If the store has no `version` key,
+/// wraps existing flat data into `accounts[humanId]` structure. Backs up original.
+fn migrate_doorway_store() {
+    let app_dir = match app_dirs2::app_root(
+        app_dirs2::AppDataType::UserData,
+        &app_dirs2::AppInfo {
+            name: "elohim-steward",
+            author: "Ethos Engine",
+        },
+    ) {
+        Ok(dir) => dir,
+        Err(_) => return,
+    };
+
+    let store_path = app_dir.join(DOORWAY_STORE);
+    let content = match std::fs::read_to_string(&store_path) {
+        Ok(c) => c,
+        Err(_) => return, // No store file yet
+    };
+
+    let data: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+
+    // Already v2 or empty
+    if data.get("version").is_some() {
+        return;
+    }
+
+    // Need humanId to create account entry
+    let human_id = match data.get("humanId").and_then(|v| v.as_str()) {
+        Some(id) => id.to_string(),
+        None => return, // No identity saved, nothing to migrate
+    };
+
+    // Backup original
+    let backup_path = app_dir.join("doorway.json.bak");
+    let _ = std::fs::copy(&store_path, &backup_path);
+
+    // Build v2 structure
+    let mut accounts = serde_json::Map::new();
+    accounts.insert(human_id.clone(), data);
+
+    let v2 = serde_json::json!({
+        "version": 2,
+        "activeHumanId": human_id,
+        "requireUnlock": true,
+        "accounts": accounts,
+    });
+
+    if let Ok(v2_str) = serde_json::to_string_pretty(&v2) {
+        let _ = std::fs::write(&store_path, v2_str);
+        log::info!("Migrated doorway.json from v1 to v2 (multi-account)");
+    }
 }
 
 /// Get the Holochain data directory
@@ -173,8 +247,92 @@ fn holochain_dir() -> PathBuf {
     }
 }
 
+const STORAGE_PORT: u16 = 8090;
+
+/// Spawn elohim-storage as a managed sidecar process.
+///
+/// - Skips if port is already healthy (dev guard — supports `just storage-start`)
+/// - Non-fatal: logs warning on failure, app continues in degraded mode
+/// - Stores handle in managed state so the child lives as long as the app
+async fn spawn_storage_sidecar(handle: &AppHandle) {
+    // Dev guard: check if storage is already running (e.g. manual `just storage-start`)
+    let health_url = format!("http://localhost:{}/health", STORAGE_PORT);
+    if let Ok(client) = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(1))
+        .build()
+    {
+        if let Ok(resp) = client.get(&health_url).send().await {
+            if resp.status().is_success() {
+                log::info!(
+                    "elohim-storage already running on port {}, using existing instance",
+                    STORAGE_PORT
+                );
+                return;
+            }
+        }
+    }
+
+    // Find binary
+    let binary_path = match storage::find_binary() {
+        Ok(path) => {
+            log::info!("Found elohim-storage binary: {}", path.display());
+            path
+        }
+        Err(e) => {
+            log::warn!("elohim-storage binary not found: {} (app will run without local storage)", e);
+            return;
+        }
+    };
+
+    // Determine storage directory
+    let storage_dir = if tauri::is_dev() {
+        PathBuf::from("/tmp/elohim-storage")
+    } else {
+        app_dirs2::app_root(
+            app_dirs2::AppDataType::UserData,
+            &app_dirs2::AppInfo {
+                name: "elohim-steward",
+                author: "Ethos Engine",
+            },
+        )
+        .expect("Could not get app root")
+        .join("storage")
+    };
+
+    log::info!(
+        "Starting elohim-storage on port {} (storage_dir: {})",
+        STORAGE_PORT,
+        storage_dir.display()
+    );
+
+    let config = storage::StorageConfig {
+        binary_path,
+        port: STORAGE_PORT,
+        storage_dir,
+        enable_content_db: true,
+    };
+
+    match storage::StorageProcess::spawn(config).await {
+        Ok(process) => {
+            log::info!("elohim-storage sidecar ready on port {}", process.port);
+            // Store handle in managed state — keeps child alive until app exits
+            let state = handle.state::<TokioMutex<Option<storage::StorageProcess>>>();
+            *state.lock().await = Some(process);
+        }
+        Err(e) => {
+            log::warn!(
+                "Failed to start elohim-storage sidecar: {} (app will run without local storage)",
+                e
+            );
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Migrate doorway.json v1 → v2 before Tauri plugin-store loads it
+    migrate_doorway_store();
+
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -186,12 +344,20 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_deep_link::init())
         .manage(Mutex::new(PendingDeepLinks::default()))
+        .manage(TokioMutex::new(Option::<storage::StorageProcess>::None))
         .invoke_handler(tauri::generate_handler![
             doorway_login,
             doorway_confirm_stewardship,
             doorway_status,
             doorway_unlock,
             doorway_logout,
+            doorway_list_accounts,
+            doorway_switch_account,
+            doorway_lock,
+            doorway_remove_account,
+            doorway_reset,
+            doorway_deregister,
+            doorway_emergency_wipe,
             get_pending_deep_links,
         ])
         .plugin(tauri_plugin_holochain::async_init(
@@ -209,6 +375,7 @@ pub fn run() {
                 .listen("holochain://setup-completed", move |_event| {
                     let handle = handle.clone();
                     tauri::async_runtime::spawn(async move {
+                        spawn_storage_sidecar(&handle).await;
                         setup(handle.clone()).await.expect("Failed to setup");
 
                         handle
@@ -369,7 +536,7 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
         .is_none()
     {
         // First run: check for saved doorway identity
-        let agent_key_str = read_doorway_store_value("agentPubKey");
+        let agent_key_str = read_active_account_value("agentPubKey");
         let agent_key: Option<AgentPubKey> =
             agent_key_str
                 .as_deref()
@@ -395,7 +562,7 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
         }
 
         // Network seed from doorway (if any)
-        let network_seed = read_doorway_store_value("networkSeed");
+        let network_seed = read_active_account_value("networkSeed");
 
         handle
             .holochain()?
@@ -409,7 +576,7 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
             .await?;
     } else {
         // Subsequent runs: check for identity mismatch (doorway switch)
-        let saved_key_str = read_doorway_store_value("agentPubKey");
+        let saved_key_str = read_active_account_value("agentPubKey");
         let installed_app = installed_apps
             .iter()
             .find(|app| app.installed_app_id.as_str().eq(APP_ID));
@@ -441,7 +608,7 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
             let agent_key: Option<AgentPubKey> = saved_key_str
                 .as_deref()
                 .and_then(|key_str| AgentPubKey::try_from(key_str).ok());
-            let network_seed = read_doorway_store_value("networkSeed");
+            let network_seed = read_active_account_value("networkSeed");
 
             handle
                 .holochain()?
@@ -476,7 +643,7 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
                 let agent_key: Option<AgentPubKey> = saved_key_str
                     .as_deref()
                     .and_then(|key_str| AgentPubKey::try_from(key_str).ok());
-                let network_seed = read_doorway_store_value("networkSeed");
+                let network_seed = read_active_account_value("networkSeed");
 
                 handle
                     .holochain()?
@@ -506,10 +673,10 @@ async fn setup(handle: AppHandle) -> anyhow::Result<()> {
 /// the restart-after-login scenario where the previous session may have been
 /// in a temp directory or the storage sidecar wasn't running yet.
 async fn ensure_local_session() {
-    let human_id = read_doorway_store_value("humanId");
-    let agent_key = read_doorway_store_value("agentPubKey");
-    let doorway_url = read_doorway_store_value("doorwayUrl");
-    let identifier = read_doorway_store_value("identifier");
+    let human_id = read_active_account_value("humanId");
+    let agent_key = read_active_account_value("agentPubKey");
+    let doorway_url = read_active_account_value("doorwayUrl");
+    let identifier = read_active_account_value("identifier");
 
     // Only attempt if we have the minimum required identity data
     let (human_id, agent_key, doorway_url, identifier) =
@@ -535,8 +702,8 @@ async fn ensure_local_session() {
     }
 
     // Create session from doorway.json data
-    let doorway_id = read_doorway_store_value("doorwayId");
-    let bootstrap_url = read_doorway_store_value("bootstrapUrl");
+    let doorway_id = read_active_account_value("doorwayId");
+    let bootstrap_url = read_active_account_value("bootstrapUrl");
 
     let session_body = serde_json::json!({
         "humanId": human_id,
@@ -566,6 +733,67 @@ async fn ensure_local_session() {
             log::warn!("Failed to create local session on restart: {}", e);
         }
     }
+}
+
+// =============================================================================
+// Store Helpers — v2 multi-account access via Tauri plugin-store
+// =============================================================================
+
+/// Read a value from the active account in the Tauri plugin-store.
+///
+/// Supports both v2 (multi-account) and v1 (flat, legacy) formats.
+fn store_get_active_account_value(
+    store: &tauri_plugin_store::Store<tauri::Wry>,
+    key: &str,
+) -> Option<serde_json::Value> {
+    if store.get("version").and_then(|v| v.as_u64()) == Some(2) {
+        let active_id = store
+            .get("activeHumanId")
+            .and_then(|v| v.as_str().map(String::from))?;
+        store
+            .get("accounts")
+            .and_then(|v| v.get(&active_id)?.get(key).cloned())
+    } else {
+        store.get(key)
+    }
+}
+
+/// Read a string value from the active account.
+fn store_get_active_str(
+    store: &tauri_plugin_store::Store<tauri::Wry>,
+    key: &str,
+) -> Option<String> {
+    store_get_active_account_value(store, key).and_then(|v| v.as_str().map(String::from))
+}
+
+/// Set a value on the active account in the Tauri plugin-store (v2 format).
+fn store_set_active_account_value(
+    store: &tauri_plugin_store::Store<tauri::Wry>,
+    key: &str,
+    value: serde_json::Value,
+) {
+    if store.get("version").and_then(|v| v.as_u64()) == Some(2) {
+        if let Some(active_id) = store
+            .get("activeHumanId")
+            .and_then(|v| v.as_str().map(String::from))
+        {
+            if let Some(mut accounts) = store
+                .get("accounts")
+                .and_then(|v| v.as_object().cloned())
+            {
+                if let Some(account) = accounts
+                    .get_mut(&active_id)
+                    .and_then(|v| v.as_object_mut())
+                {
+                    account.insert(key.to_string(), value);
+                    store.set("accounts", serde_json::json!(accounts));
+                    return;
+                }
+            }
+        }
+    }
+    // Fallback: flat write
+    store.set(key, value);
 }
 
 // =============================================================================
@@ -642,44 +870,61 @@ async fn doorway_login(
         false
     };
 
-    // Step 4: Save to store
+    // Step 4: Save to v2 multi-account store
     let store = app
         .store(DOORWAY_STORE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
 
-    store.set("doorwayUrl", serde_json::json!(url));
-    store.set("identifier", serde_json::json!(handoff.identifier));
-    store.set("humanId", serde_json::json!(handoff.human_id));
-    store.set("agentPubKey", serde_json::json!(handoff.agent_pub_key));
-    store.set("doorwayId", serde_json::json!(handoff.doorway_id));
+    let is_steward = handoff.is_steward.unwrap_or(false);
+
+    // Build account data object
+    let mut account = serde_json::json!({
+        "doorwayUrl": url,
+        "identifier": handoff.identifier,
+        "humanId": handoff.human_id,
+        "agentPubKey": handoff.agent_pub_key,
+        "doorwayId": handoff.doorway_id,
+        "isSteward": is_steward,
+        "addedAt": std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs().to_string())
+            .unwrap_or_default(),
+    });
 
     if let Some(ref bootstrap) = handoff.bootstrap_url {
-        store.set("bootstrapUrl", serde_json::json!(bootstrap));
+        account["bootstrapUrl"] = serde_json::json!(bootstrap);
     }
     if let Some(ref signal) = handoff.signal_url {
-        store.set("signalUrl", serde_json::json!(signal));
+        account["signalUrl"] = serde_json::json!(signal);
     }
     if let Some(ref conductor_id) = handoff.conductor_id {
-        store.set("conductorId", serde_json::json!(conductor_id));
+        account["conductorId"] = serde_json::json!(conductor_id);
     }
     if let Some(ref app_id) = handoff.installed_app_id {
-        store.set("installedAppId", serde_json::json!(app_id));
+        account["installedAppId"] = serde_json::json!(app_id);
     }
     if let Some(ref seed) = handoff.network_seed {
-        store.set("networkSeed", serde_json::json!(seed));
+        account["networkSeed"] = serde_json::json!(seed);
     }
-
-    // Save key bundle for future decryption (still encrypted)
     if let Some(ref bundle) = handoff.key_bundle {
-        store.set(
-            "keyBundle",
-            serde_json::to_value(bundle).unwrap_or(serde_json::Value::Null),
-        );
+        account["keyBundle"] = serde_json::to_value(bundle).unwrap_or(serde_json::Value::Null);
+    }
+    if let Some(ref name) = handoff.display_name {
+        account["displayName"] = serde_json::json!(name);
     }
 
-    // Save stewardship status from doorway
-    let is_steward = handoff.is_steward.unwrap_or(false);
-    store.set("isSteward", serde_json::json!(is_steward));
+    // Load or init v2 accounts map
+    let mut accounts: serde_json::Map<String, serde_json::Value> = store
+        .get("accounts")
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+
+    accounts.insert(handoff.human_id.clone(), account);
+
+    store.set("version", serde_json::json!(2));
+    store.set("activeHumanId", serde_json::json!(handoff.human_id));
+    store.set("requireUnlock", serde_json::json!(true));
+    store.set("accounts", serde_json::json!(accounts));
 
     store
         .save()
@@ -765,23 +1010,16 @@ async fn doorway_confirm_stewardship(
         .store(DOORWAY_STORE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
 
-    // Read saved handoff data
-    let doorway_url = store
-        .get("doorwayUrl")
-        .and_then(|v| v.as_str().map(String::from))
+    // Read saved handoff data from active account
+    let doorway_url = store_get_active_str(&store, "doorwayUrl")
         .ok_or("No doorway URL saved — run doorway_login first")?;
-    let identifier = store
-        .get("identifier")
-        .and_then(|v| v.as_str().map(String::from))
+    let identifier = store_get_active_str(&store, "identifier")
         .ok_or("No identifier saved — run doorway_login first")?;
-    let human_id = store
-        .get("humanId")
-        .and_then(|v| v.as_str().map(String::from))
+    let human_id = store_get_active_str(&store, "humanId")
         .ok_or("No human ID saved — run doorway_login first")?;
 
-    // Read key bundle
-    let key_bundle_value = store
-        .get("keyBundle")
+    // Read key bundle from active account
+    let key_bundle_value = store_get_active_account_value(&store, "keyBundle")
         .ok_or("No key bundle saved — run doorway_login first")?;
     let key_bundle: doorway::KeyExportFormat = serde_json::from_value(key_bundle_value.clone())
         .map_err(|e| format!("Invalid key bundle in store: {}", e))?;
@@ -809,9 +1047,9 @@ async fn doorway_confirm_stewardship(
         .confirm_stewardship(&login_resp.token, &signature_base64)
         .await?;
 
-    // Step 5: Update store
-    store.set("isSteward", serde_json::json!(true));
-    store.set("stewardshipAt", serde_json::json!(resp.stewardship_at));
+    // Step 5: Update active account in store
+    store_set_active_account_value(&store, "isSteward", serde_json::json!(true));
+    store_set_active_account_value(&store, "stewardshipAt", serde_json::json!(resp.stewardship_at));
     store
         .save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
@@ -824,30 +1062,23 @@ async fn doorway_confirm_stewardship(
     Ok(resp)
 }
 
-/// Check doorway connection status
+/// Check doorway connection status (reads from active account)
 #[tauri::command]
 async fn doorway_status(app: AppHandle) -> Result<DoorwayStatus, String> {
     let store = app
         .store(DOORWAY_STORE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
 
-    let doorway_url = store
-        .get("doorwayUrl")
-        .and_then(|v| v.as_str().map(String::from));
-    let identifier = store
-        .get("identifier")
-        .and_then(|v| v.as_str().map(String::from));
-    let agent_pub_key = store
-        .get("agentPubKey")
-        .and_then(|v| v.as_str().map(String::from));
+    let doorway_url = store_get_active_str(&store, "doorwayUrl");
+    let identifier = store_get_active_str(&store, "identifier");
+    let agent_pub_key = store_get_active_str(&store, "agentPubKey");
 
     let connected = doorway_url.is_some() && identifier.is_some();
     let has_identity = agent_pub_key.is_some();
-    let is_steward = store
-        .get("isSteward")
+    let is_steward = store_get_active_account_value(&store, "isSteward")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let has_key_bundle = store.get("keyBundle").is_some();
+    let has_key_bundle = store_get_active_account_value(&store, "keyBundle").is_some();
 
     Ok(DoorwayStatus {
         connected,
@@ -895,9 +1126,8 @@ async fn doorway_unlock(app: AppHandle, password: String) -> Result<DoorwayUnloc
         .store(DOORWAY_STORE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
 
-    // Read key bundle from doorway.json store
-    let key_bundle_value = store
-        .get("keyBundle")
+    // Read key bundle from active account
+    let key_bundle_value = store_get_active_account_value(&store, "keyBundle")
         .ok_or("No key bundle saved — login required")?;
     let key_bundle: doorway::KeyExportFormat = serde_json::from_value(key_bundle_value.clone())
         .map_err(|e| format!("Invalid key bundle: {}", e))?;
@@ -906,15 +1136,11 @@ async fn doorway_unlock(app: AppHandle, password: String) -> Result<DoorwayUnloc
     identity::decrypt_key_bundle(&key_bundle, &password)
         .map_err(|_| "Invalid password".to_string())?;
 
-    // Read identity info from store
-    let is_steward = store
-        .get("isSteward")
+    // Read identity info from active account
+    let is_steward = store_get_active_account_value(&store, "isSteward")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let identifier = store
-        .get("identifier")
-        .and_then(|v| v.as_str().map(String::from))
-        .unwrap_or_default();
+    let identifier = store_get_active_str(&store, "identifier").unwrap_or_default();
 
     log::info!("Local unlock successful for {} (is_steward={})", identifier, is_steward);
 
@@ -924,9 +1150,252 @@ async fn doorway_unlock(app: AppHandle, password: String) -> Result<DoorwayUnloc
     })
 }
 
-/// Clear doorway credentials and saved identity
+/// Remove the active account from the store (or clear all if last account).
 #[tauri::command]
 async fn doorway_logout(app: AppHandle) -> Result<(), String> {
+    let store = app
+        .store(DOORWAY_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    if store.get("version").and_then(|v| v.as_u64()) == Some(2) {
+        if let Some(active_id) = store
+            .get("activeHumanId")
+            .and_then(|v| v.as_str().map(String::from))
+        {
+            let mut accounts = store
+                .get("accounts")
+                .and_then(|v| v.as_object().cloned())
+                .unwrap_or_default();
+
+            accounts.remove(&active_id);
+
+            if accounts.is_empty() {
+                store.clear();
+            } else {
+                // Switch to next available account
+                let next_id = accounts.keys().next().cloned().unwrap_or_default();
+                store.set("activeHumanId", serde_json::json!(next_id));
+                store.set("accounts", serde_json::json!(accounts));
+            }
+        }
+    } else {
+        store.clear();
+    }
+
+    store
+        .save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
+
+    log::info!("Doorway credentials cleared");
+    Ok(())
+}
+
+// =============================================================================
+// Multi-Account Management
+// =============================================================================
+
+/// Summary of a saved account (returned to frontend)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountSummary {
+    pub human_id: String,
+    pub identifier: String,
+    pub doorway_url: String,
+    pub display_name: Option<String>,
+    pub is_steward: bool,
+    pub is_active: bool,
+}
+
+/// List all saved accounts in the multi-account store.
+#[tauri::command]
+async fn doorway_list_accounts(app: AppHandle) -> Result<Vec<AccountSummary>, String> {
+    let store = app
+        .store(DOORWAY_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    // v1 stores have at most one account
+    if store.get("version").and_then(|v| v.as_u64()) != Some(2) {
+        let human_id = store
+            .get("humanId")
+            .and_then(|v| v.as_str().map(String::from));
+        if let Some(human_id) = human_id {
+            return Ok(vec![AccountSummary {
+                identifier: store
+                    .get("identifier")
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_default(),
+                doorway_url: store
+                    .get("doorwayUrl")
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_default(),
+                display_name: store
+                    .get("displayName")
+                    .and_then(|v| v.as_str().map(String::from)),
+                is_steward: store
+                    .get("isSteward")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                is_active: true,
+                human_id,
+            }]);
+        }
+        return Ok(vec![]);
+    }
+
+    let active_id = store
+        .get("activeHumanId")
+        .and_then(|v| v.as_str().map(String::from))
+        .unwrap_or_default();
+
+    let accounts = store
+        .get("accounts")
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+
+    let mut result: Vec<AccountSummary> = accounts
+        .iter()
+        .map(|(id, acct)| AccountSummary {
+            human_id: id.clone(),
+            identifier: acct
+                .get("identifier")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            doorway_url: acct
+                .get("doorwayUrl")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            display_name: acct
+                .get("displayName")
+                .and_then(|v| v.as_str().map(String::from)),
+            is_steward: acct
+                .get("isSteward")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            is_active: *id == active_id,
+        })
+        .collect();
+
+    // Active account first
+    result.sort_by(|a, b| b.is_active.cmp(&a.is_active));
+
+    Ok(result)
+}
+
+/// Switch active account by humanId. Requires app restart.
+#[tauri::command]
+async fn doorway_switch_account(
+    app: AppHandle,
+    human_id: String,
+) -> Result<serde_json::Value, String> {
+    let store = app
+        .store(DOORWAY_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    // Verify account exists
+    let accounts = store
+        .get("accounts")
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+
+    if !accounts.contains_key(&human_id) {
+        return Err(format!("Account {} not found", human_id));
+    }
+
+    store.set("activeHumanId", serde_json::json!(human_id));
+    store
+        .save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
+
+    log::info!("Switched active account to {}", human_id);
+
+    // Conductor must reinit with new agent key
+    Ok(serde_json::json!({ "needsRestart": true }))
+}
+
+// =============================================================================
+// Account Lifecycle
+// =============================================================================
+
+/// Soft lock — delete session from storage, return to lock screen.
+/// Does NOT clear doorway.json. User can unlock again with password.
+#[tauri::command]
+async fn doorway_lock(_app: AppHandle) -> Result<(), String> {
+    let storage_url = "http://localhost:8090";
+    let http = reqwest::Client::new();
+
+    match http
+        .delete(format!("{}/session", storage_url))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() || resp.status() == 404 => {
+            log::info!("Session deleted (lock)");
+        }
+        Ok(resp) => {
+            log::warn!("Failed to delete session on lock (status {})", resp.status());
+        }
+        Err(e) => {
+            log::warn!("Failed to delete session on lock: {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+/// Remove a specific account from the multi-account store.
+#[tauri::command]
+async fn doorway_remove_account(app: AppHandle, human_id: String) -> Result<(), String> {
+    let store = app
+        .store(DOORWAY_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    let mut accounts = store
+        .get("accounts")
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+
+    if !accounts.contains_key(&human_id) {
+        return Err(format!("Account {} not found", human_id));
+    }
+
+    accounts.remove(&human_id);
+
+    if accounts.is_empty() {
+        store.clear();
+    } else {
+        store.set("accounts", serde_json::json!(accounts));
+
+        // If we removed the active account, switch to next
+        let active_id = store
+            .get("activeHumanId")
+            .and_then(|v| v.as_str().map(String::from));
+        if active_id.as_deref() == Some(&human_id) {
+            let next_id = accounts.keys().next().cloned().unwrap_or_default();
+            store.set("activeHumanId", serde_json::json!(next_id));
+        }
+    }
+
+    store
+        .save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
+
+    // Delete session if it belongs to the removed account
+    let storage_url = "http://localhost:8090";
+    let http = reqwest::Client::new();
+    let _ = http
+        .delete(format!("{}/session", storage_url))
+        .send()
+        .await;
+
+    log::info!("Account {} removed", human_id);
+    Ok(())
+}
+
+/// Reset all accounts — clears store completely.
+#[tauri::command]
+async fn doorway_reset(app: AppHandle) -> Result<(), String> {
     let store = app
         .store(DOORWAY_STORE)
         .map_err(|e| format!("Failed to open store: {}", e))?;
@@ -936,6 +1405,109 @@ async fn doorway_logout(app: AppHandle) -> Result<(), String> {
         .save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
 
-    log::info!("Doorway credentials cleared");
+    // Delete session
+    let storage_url = "http://localhost:8090";
+    let http = reqwest::Client::new();
+    let _ = http
+        .delete(format!("{}/session", storage_url))
+        .send()
+        .await;
+
+    log::info!("All accounts reset");
+    Ok(())
+}
+
+/// Deregister identity from doorway (revoke). Stub if endpoint doesn't exist.
+#[tauri::command]
+async fn doorway_deregister(app: AppHandle, password: String) -> Result<(), String> {
+    let store = app
+        .store(DOORWAY_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    let doorway_url = store_get_active_str(&store, "doorwayUrl")
+        .ok_or("No doorway URL saved")?;
+    let identifier = store_get_active_str(&store, "identifier")
+        .ok_or("No identifier saved")?;
+    let human_id = store_get_active_str(&store, "humanId")
+        .ok_or("No human ID saved")?;
+
+    // Re-login to get fresh JWT
+    let client = doorway::DoorwayClient::new(doorway_url.clone());
+    let login_resp = client.login(&identifier, &password).await?;
+
+    // Attempt deregister (may not exist yet on doorway)
+    let http = reqwest::Client::new();
+    let deregister_url = format!("{}/auth/deregister", doorway_url);
+    match http
+        .post(&deregister_url)
+        .bearer_auth(&login_resp.token)
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            log::info!("Identity deregistered from doorway for {}", identifier);
+        }
+        Ok(resp) if resp.status() == 404 => {
+            log::warn!("Deregister endpoint not found (stub) — removing locally only");
+        }
+        Ok(resp) => {
+            log::warn!("Deregister returned status {}", resp.status());
+        }
+        Err(e) => {
+            log::warn!("Deregister failed (removing locally): {}", e);
+        }
+    }
+
+    // Remove account locally
+    doorway_remove_account(app, human_id).await?;
+
+    Ok(())
+}
+
+/// Emergency wipe — delete all local data and exit.
+#[tauri::command]
+async fn doorway_emergency_wipe(app: AppHandle) -> Result<(), String> {
+    // 1. Clear store
+    let store = app
+        .store(DOORWAY_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+    store.clear();
+    let _ = store.save();
+
+    // 2. Delete session
+    let storage_url = "http://localhost:8090";
+    let http = reqwest::Client::new();
+    let _ = http
+        .delete(format!("{}/session", storage_url))
+        .send()
+        .await;
+
+    // 3. Delete storage data directory
+    let app_dir = app_dirs2::app_root(
+        app_dirs2::AppDataType::UserData,
+        &app_dirs2::AppInfo {
+            name: "elohim-steward",
+            author: "Ethos Engine",
+        },
+    );
+    if let Ok(dir) = app_dir {
+        let storage_dir = dir.join("storage");
+        if storage_dir.exists() {
+            let _ = std::fs::remove_dir_all(&storage_dir);
+            log::info!("Deleted storage directory: {}", storage_dir.display());
+        }
+
+        let holochain_dir = dir.join("holochain");
+        if holochain_dir.exists() {
+            let _ = std::fs::remove_dir_all(&holochain_dir);
+            log::info!("Deleted holochain directory: {}", holochain_dir.display());
+        }
+    }
+
+    log::info!("Emergency wipe complete — app should exit");
+
+    // 4. Exit app
+    app.exit(0);
+
     Ok(())
 }

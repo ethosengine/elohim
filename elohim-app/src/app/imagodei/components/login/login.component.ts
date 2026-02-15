@@ -31,15 +31,16 @@ import { IdentityService } from '../../services/identity.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { TauriAuthService } from '../../services/tauri-auth.service';
+import { AccountSwitcherComponent } from '../account-switcher/account-switcher.component';
 import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 
 /** Login step type */
-type LoginStep = 'doorway' | 'credentials' | 'federated' | 'redirecting' | 'unlock' | 'restarting';
+type LoginStep = 'doorway' | 'credentials' | 'federated' | 'redirecting' | 'unlock' | 'restarting' | 'switch-account';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, DoorwayPickerComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AccountSwitcherComponent, DoorwayPickerComponent],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css'],
 })
@@ -395,6 +396,40 @@ export class LoginComponent implements OnInit {
   }
 
   // ==========================================================================
+  // Account Switching
+  // ==========================================================================
+
+  /**
+   * Show the account switcher overlay.
+   */
+  showAccountSwitcher(): void {
+    this.currentStep.set('switch-account');
+  }
+
+  /**
+   * Handle account switch that requires restart.
+   */
+  onAccountSwitchRestart(): void {
+    this.restartingDoorwayName.set('the selected account');
+    this.currentStep.set('restarting');
+  }
+
+  /**
+   * Handle "Add Account" from the switcher — go to doorway picker.
+   */
+  onAccountSwitcherAddAccount(): void {
+    this.isLauncher.set(false);
+    this.currentStep.set('doorway');
+  }
+
+  /**
+   * Cancel account switcher — return to unlock.
+   */
+  onAccountSwitcherCancelled(): void {
+    this.currentStep.set('unlock');
+  }
+
+  // ==========================================================================
   // Tauri Initialization
   // ==========================================================================
 
@@ -405,6 +440,12 @@ export class LoginComponent implements OnInit {
    * First-time user -> doorway picker or credentials.
    */
   private async initTauriStep(): Promise<void> {
+    // If initialize() already determined needs_unlock, skip redundant IPC
+    if (this.tauriAuth.needsUnlock()) {
+      this.currentStep.set('unlock');
+      return;
+    }
+
     const status = await this.tauriAuth.getDoorwayStatus();
 
     if (status?.hasKeyBundle && status.hasIdentity) {
