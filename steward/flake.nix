@@ -31,7 +31,9 @@
             inputs'.holonix.devShells.default
           ];
           # Deduplicate NIX_CFLAGS_COMPILE to avoid "Argument list too long"
-          # The combined devshells repeat -isystem paths hundreds of times
+          # The combined devshells repeat -isystem paths hundreds of times.
+          # Must also dedup _FOR_BUILD variants — proc-macro crates (serde_derive,
+          # thiserror-impl, etc.) link as native code and use these flags.
           shellHook = ''
             dedup_flags() {
               local seen=""
@@ -56,12 +58,15 @@
             }
             export NIX_CFLAGS_COMPILE="$(dedup_flags "$NIX_CFLAGS_COMPILE")"
             export NIX_LDFLAGS="$(dedup_flags "$NIX_LDFLAGS")"
+            export NIX_CFLAGS_COMPILE_FOR_BUILD="$(dedup_flags "$NIX_CFLAGS_COMPILE_FOR_BUILD")"
+            export NIX_LDFLAGS_FOR_BUILD="$(dedup_flags "$NIX_LDFLAGS_FOR_BUILD")"
           '';
           packages = [
             pkgs.nodejs_22
             pkgs.pnpm
             pkgs.imagemagick  # For making icon square
             pkgs.patchelf     # For fixing interpreter in built binaries
+            pkgs.just         # Task runner for root-level justfile
           ];
         };
 
