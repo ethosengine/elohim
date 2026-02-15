@@ -142,7 +142,7 @@ describe('PresenceListComponent', () => {
 
   describe('Formatters', () => {
     it('should format date', () => {
-      const formatted = component.formatDate('2024-01-01T00:00:00Z');
+      const formatted = component.formatDate('2024-06-15T12:00:00Z');
 
       expect(formatted).toContain('2024');
     });
