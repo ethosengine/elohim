@@ -7,6 +7,7 @@ import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { AgencyService } from '@app/imagodei/services/agency.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
+import { MasteryStatsService } from '../../services/mastery-stats.service';
 import { signal } from '@angular/core';
 import { of, BehaviorSubject } from 'rxjs';
 
@@ -20,6 +21,7 @@ describe('ProfilePageComponent', () => {
   let sessionHumanSpy: jasmine.SpyObj<SessionHumanService>;
   let agencySpy: jasmine.SpyObj<AgencyService>;
   let masteryServiceSpy: jasmine.SpyObj<ContentMasteryService>;
+  let masteryStatsSpy: jasmine.SpyObj<MasteryStatsService>;
 
   beforeEach(async () => {
     // Mock session observable
@@ -144,6 +146,10 @@ describe('ProfilePageComponent', () => {
       })
     );
 
+    masteryStatsSpy = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
+      learnerProfile$: new BehaviorSubject(null),
+    });
+
     await TestBed.configureTestingModule({
       imports: [ProfilePageComponent],
       providers: [
@@ -154,6 +160,7 @@ describe('ProfilePageComponent', () => {
         { provide: SessionHumanService, useValue: sessionHumanSpy },
         { provide: AgencyService, useValue: agencySpy },
         { provide: ContentMasteryService, useValue: masteryServiceSpy },
+        { provide: MasteryStatsService, useValue: masteryStatsSpy },
       ],
     }).compileComponents();
 

@@ -45,6 +45,16 @@ export const SHEFA_ROUTES: Routes = [
           },
         },
       },
+      {
+        path: 'devices',
+        loadComponent: async () =>
+          import('./components/device-stewardship/device-stewardship.component').then(
+            m => m.DeviceStewardshipComponent
+          ),
+        data: {
+          title: 'Shefa - Your Stewardship',
+        },
+      },
     ],
   },
 ];

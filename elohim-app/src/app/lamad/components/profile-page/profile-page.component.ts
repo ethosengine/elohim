@@ -24,6 +24,9 @@ import { SessionHumanService } from '@app/imagodei/services/session-human.servic
 
 import { MasteryStats, MasteryLevel } from '../../models';
 import { ContentMasteryService } from '../../services/content-mastery.service';
+import { MasteryStatsService } from '../../services/mastery-stats.service';
+
+import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile.model';
 
 /**
  * ProfilePageComponent - Session Human profile management.
@@ -156,11 +159,15 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     }
   });
 
+  // Mastery stats aggregation (gamified profile)
+  private readonly masteryStatsService = inject(MasteryStatsService);
+
   // Session data
   session: SessionHuman | null = null;
 
   // Stats
   masteryStats: MasteryStats | null = null;
+  learnerProfile: LearnerMasteryProfile | null = null;
   pathProgressList: SessionPathProgress[] = [];
   activityHistory: SessionActivity[] = [];
 
@@ -255,6 +262,11 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
         this.computeMasteryBreakdown(stats);
         this.isLoading = false;
       });
+
+    // Subscribe to gamified learner profile
+    this.masteryStatsService.learnerProfile$.pipe(takeUntil(this.destroy$)).subscribe(profile => {
+      this.learnerProfile = profile;
+    });
 
     // Load resume point from ProfileService
     this.profileService

@@ -67,12 +67,15 @@ const DOORWAY_STORE: &str = "doorway.json";
 ///
 /// Network endpoints are determined by priority:
 /// 1. Saved doorway handoff data (runtime — from doorway login)
-/// 2. ELOHIM_BOOTSTRAP_URL / ELOHIM_SIGNAL_URL env vars (compile time)
-/// 3. ELOHIM_ENV=dev uses dev endpoints
-/// 4. Default to production endpoints
+/// 2. Local dev mode (cargo tauri dev) — localhost
+/// 3. Fresh instance (no agent key) — standalone, no network
+/// 4. ELOHIM_BOOTSTRAP_URL / ELOHIM_SIGNAL_URL env vars (compile time)
+/// 5. ELOHIM_ENV=dev uses dev endpoints
+/// 6. Default to production endpoints
 ///
-/// First launch is always standalone (no doorway data yet).
-/// After doorway_login + app restart, saved URLs take effect.
+/// Fresh instances start standalone so the doorway picker can run
+/// before any network activity. After doorway_login + restart,
+/// saved URLs take effect.
 fn network_config() -> NetworkConfig {
     let mut network_config = NetworkConfig::default();
 
@@ -83,6 +86,7 @@ fn network_config() -> NetworkConfig {
     let doorway_url = read_active_account_value("doorwayUrl");
     let doorway_bootstrap = read_active_account_value("bootstrapUrl");
     let doorway_signal = read_active_account_value("signalUrl");
+    let agent_key = read_active_account_value("agentPubKey");
 
     if doorway_url.is_some() && (doorway_bootstrap.is_some() || doorway_signal.is_some()) {
         // Use doorway-provided URLs (takes priority over compile-time defaults)
@@ -100,8 +104,13 @@ fn network_config() -> NetworkConfig {
         // Development mode: use alpha environment for p2p discovery
         network_config.bootstrap_url = url2::Url2::parse(ALPHA_BOOTSTRAP_URL);
         network_config.signal_url = url2::Url2::parse(ALPHA_SIGNAL_URL);
+    } else if agent_key.is_none() {
+        // Fresh instance: no credentials yet. Start in standalone mode (no network).
+        // Angular will show the doorway picker. After login + restart,
+        // saved doorway URLs will take effect.
+        log::info!("No doorway credentials — starting in standalone mode (doorway picker will show)");
     } else {
-        // Built app: use compile-time configured endpoints
+        // Has agent key but no custom doorway URLs — use compile-time defaults
         let bootstrap_url = option_env!("ELOHIM_BOOTSTRAP_URL")
             .or_else(|| {
                 if option_env!("ELOHIM_ENV") == Some("dev") {
@@ -370,13 +379,53 @@ pub fn run() {
             // Set up deep link handler for OAuth callbacks
             setup_deep_link_handler(app)?;
 
+            // Fresh instance: no agent key and no doorway URL saved yet.
+            // Show the window early so the doorway picker is visible before
+            // the Holochain conductor finishes initializing.
+            let is_fresh = read_doorway_store_value("agentPubKey").is_none()
+                && read_doorway_store_value("doorwayUrl").is_none();
+
             let handle = app.handle().clone();
+
+            if is_fresh {
+                log::info!("Fresh instance detected — will show doorway picker early");
+                let fresh_handle = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    // Try to open the window before setup-completed fires.
+                    // If the holochain plugin isn't ready yet, this fails
+                    // gracefully and the setup-completed handler creates
+                    // the window instead.
+                    if let Ok(hc) = fresh_handle.holochain() {
+                        if let Ok(builder) = hc
+                            .main_window_builder(
+                                String::from("main"),
+                                false,
+                                Some(APP_ID.into()),
+                                None,
+                            )
+                            .await
+                        {
+                            match builder.build() {
+                                Ok(_) => log::info!("Early window opened for doorway picker"),
+                                Err(e) => log::warn!("Early window build failed (setup-completed will retry): {e}"),
+                            }
+                        }
+                    }
+                });
+            }
+
             app.handle()
                 .listen("holochain://setup-completed", move |_event| {
                     let handle = handle.clone();
                     tauri::async_runtime::spawn(async move {
                         spawn_storage_sidecar(&handle).await;
                         setup(handle.clone()).await.expect("Failed to setup");
+
+                        // Skip window creation if already open (fresh-instance early window)
+                        if handle.get_webview_window("main").is_some() {
+                            log::info!("Main window already open, skipping creation");
+                            return;
+                        }
 
                         handle
                             .holochain()

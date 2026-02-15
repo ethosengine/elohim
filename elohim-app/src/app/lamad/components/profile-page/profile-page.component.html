@@ -181,6 +181,44 @@
           </div>
         </section>
 
+        <!-- Learning Economy -->
+        @if (learnerProfile) {
+          <section class="gamification-section">
+            <h2 class="section-title">Learning Economy</h2>
+            <div class="stats-grid">
+              <div class="stat-card stat-card--xp">
+                <span class="material-icons stat-card-icon">school</span>
+                <span class="stat-value">{{ learnerProfile.totalXP | number }}</span>
+                <span class="stat-label">Total XP</span>
+              </div>
+              <div class="stat-card stat-card--streak">
+                <span
+                  class="material-icons stat-card-icon"
+                  [class.streak-active]="learnerProfile.streak.todayActive"
+                >
+                  local_fire_department
+                </span>
+                <span class="stat-value">{{ learnerProfile.streak.currentStreak }}</span>
+                <span class="stat-label">Day Streak</span>
+              </div>
+              <div class="stat-card stat-card--tier">
+                <span
+                  class="material-icons stat-card-icon"
+                  [style.color]="learnerProfile.learnerLevel.color"
+                >
+                  {{ learnerProfile.learnerLevel.icon }}
+                </span>
+                <span class="stat-value">{{ learnerProfile.learnerLevel.label }}</span>
+                <span class="stat-label">Learner Level</span>
+              </div>
+            </div>
+            <a routerLink="/lamad/me" class="dashboard-link">
+              View Full Dashboard
+              <span class="material-icons">arrow_forward</span>
+            </a>
+          </section>
+        }
+
         <!-- Mastery Overview -->
         @if (masteryStats && masteryStats.totalMasteredNodes > 0) {
           <section class="mastery-section">

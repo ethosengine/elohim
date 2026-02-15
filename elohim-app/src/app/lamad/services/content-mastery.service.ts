@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 
 // @coverage: 58.2% (2026-02-05)
 
-import { BehaviorSubject, Observable, catchError, map, from, of } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, catchError, map, from, of } from 'rxjs';
 
 import { isAboveGate, compareMasteryLevels } from '@app/elohim/models/agent.model';
 import { MasteryRecordContent, SourceChainEntry } from '@app/elohim/models/source-chain.model';
@@ -25,6 +25,9 @@ import {
   MasteryLevel,
   PathMasteryOverview,
 } from '../models';
+import { LAMAD_POINT_AMOUNTS } from '../models/learning-points.model';
+
+import type { LevelUpEvent } from '../models/learner-mastery-profile.model';
 
 /** Result of migration from local to backend */
 export interface MigrationResult {
@@ -58,9 +61,13 @@ const ENTRY_TYPE_MASTERY_RECORD = 'mastery-record';
 export class ContentMasteryService {
   private readonly masteryCache = new Map<string, ContentMastery>();
   private readonly masterySubject = new BehaviorSubject<Map<string, ContentMastery>>(new Map());
+  private readonly levelUpSubject = new Subject<LevelUpEvent>();
 
   public readonly mastery$: Observable<Map<string, ContentMastery>> =
     this.masterySubject.asObservable();
+
+  /** Emits when a content node's mastery level increases. */
+  public readonly levelUp$: Observable<LevelUpEvent> = this.levelUpSubject.asObservable();
 
   constructor(
     private readonly sourceChain: LocalSourceChainService,
@@ -329,6 +336,19 @@ export class ContentMasteryService {
 
     this.masteryCache.set(contentId, mastery);
     this.masterySubject.next(new Map(this.masteryCache));
+
+    // Emit level-up event if level increased
+    if (compareMasteryLevels(level, current?.level ?? 'not_started') > 0) {
+      this.levelUpSubject.next({
+        id: entry.entryHash,
+        contentId,
+        fromLevel: current?.level ?? 'not_started',
+        toLevel: level,
+        timestamp: now,
+        pointsEarned: LAMAD_POINT_AMOUNTS.level_up,
+        isGateLevel: isAboveGate(level) && !isAboveGate(current?.level ?? 'not_started'),
+      });
+    }
 
     // Record activity in session
     this.sessionHuman.recordContentView(contentId);

@@ -12,3 +12,6 @@
 export * from '@app/elohim/models/rea-bridge.model';
 export * from '@app/elohim/models/economic-event.model';
 export * from '@app/elohim/models/contributor-presence.model';
+
+// Device stewardship
+export * from './device-stewardship.model';

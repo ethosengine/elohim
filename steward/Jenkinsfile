@@ -270,7 +270,7 @@ spec:
                                     cd ../holochain/dna/elohim
 
                                     echo "Building hApp from source (this will take 20-40 minutes)..."
-                                    nix develop --accept-flake-config --command bash -c '
+                                    nix develop --impure --accept-flake-config --command bash -c '
                                         set -euo pipefail
                                         cargo build --release --target wasm32-unknown-unknown
                                         hc dna pack . -o workdir/lamad.dna
@@ -438,7 +438,7 @@ DEDUP_SCRIPT
 
                                 echo "=== Entering Nix development shell ==="
                                 # Pass ELOHIM_ENV to nix shell for Rust compile-time config
-                                ELOHIM_ENV="$ELOHIM_ENV" nix develop --accept-flake-config --command bash -c '
+                                ELOHIM_ENV="$ELOHIM_ENV" nix develop --impure --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
                                     echo "=== Installing npm dependencies ==="

@@ -1,0 +1,442 @@
+.learner-dashboard {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Loading */
+.dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e5e7eb);
+  border-top-color: var(--primary-color, #3b82f6);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Header */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  margin-bottom: 2rem;
+}
+
+.level-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.level-icon {
+  font-size: 24px;
+}
+
+.level-number {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.level-info {
+  flex: 1;
+}
+
+.level-info h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  margin: 0 0 0.5rem;
+}
+
+.xp-bar-container {
+  height: 8px;
+  background: var(--bg-tertiary, #e5e7eb);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.xp-bar {
+  height: 100%;
+  background: var(--primary-color, #3b82f6);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.xp-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* Grid layout */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Cards */
+.card {
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0 0 1rem;
+}
+
+/* Streak */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.card-header h2 {
+  margin: 0;
+}
+
+.streak-icon {
+  font-size: 24px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.streak-icon.streak-active {
+  color: #f97316;
+}
+
+.streak-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.streak-number {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.big-number {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+}
+
+.streak-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.streak-best {
+  font-size: 0.875rem;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.activity-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.activity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--bg-tertiary, #e5e7eb);
+}
+
+.activity-dot.active {
+  background: #4caf50;
+}
+
+/* Mastery Bars */
+.mastery-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mastery-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mastery-bar-row.gate-level {
+  border-top: 1px dashed var(--border-color, #e5e7eb);
+  padding-top: 0.5rem;
+}
+
+.mastery-bar-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+}
+
+.mastery-bar-label {
+  font-size: 0.75rem;
+  width: 70px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.mastery-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-tertiary, #e5e7eb);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mastery-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  min-width: 2px;
+}
+
+.mastery-bar-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: 24px;
+  text-align: right;
+  color: var(--text-primary, #111827);
+}
+
+.mastery-summary {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0.75rem 0 0;
+  text-align: center;
+}
+
+.mastery-card {
+  grid-column: 1 / -1;
+}
+
+/* Paths */
+.paths-card {
+  grid-column: 1 / -1;
+}
+
+.path-entry {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.path-entry:last-child {
+  border-bottom: none;
+}
+
+.path-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.path-title {
+  display: block;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path-steps {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.path-progress-track {
+  width: 100px;
+  height: 6px;
+  background: var(--bg-tertiary, #e5e7eb);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.path-progress-fill {
+  height: 100%;
+  background: var(--primary-color, #3b82f6);
+  border-radius: 3px;
+}
+
+/* Level-Ups */
+.levelups-card {
+  grid-column: 1 / -1;
+}
+
+.levelup-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.levelup-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.levelup-entry.gate-crossing {
+  background: rgba(76, 175, 80, 0.08);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin: 0 -0.5rem;
+}
+
+.levelup-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.level-from,
+.level-to {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.levelup-badges .arrow {
+  font-size: 14px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.levelup-points {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary-color, #3b82f6);
+}
+
+.gate-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #4caf50;
+  border: 1px solid #4caf50;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+/* Practice */
+.practice-grid {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.practice-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.empty-state p {
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-empty {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.dashboard-empty h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-empty p {
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 1.5rem;
+}
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.btn-primary {
+  background: var(--primary-color, #3b82f6);
+  color: white;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  background: var(--bg-tertiary, #e5e7eb);
+  color: var(--text-primary, #111827);
+}

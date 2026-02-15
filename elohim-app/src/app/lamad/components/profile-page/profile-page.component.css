@@ -287,6 +287,47 @@
   color: #666;
 }
 
+/* Gamification Section */
+.gamification-section {
+  margin-bottom: 2rem;
+}
+
+.stat-card-icon {
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.stat-card--xp .stat-card-icon {
+  color: #667eea;
+}
+
+.stat-card--streak .stat-card-icon {
+  color: #9ca3af;
+}
+
+.stat-card--streak .stat-card-icon.streak-active {
+  color: #f97316;
+}
+
+.dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #667eea;
+  text-decoration: none;
+}
+
+.dashboard-link:hover {
+  text-decoration: underline;
+}
+
+.dashboard-link .material-icons {
+  font-size: 1rem;
+}
+
 /* Mastery Section */
 .mastery-section {
   margin-bottom: 2rem;

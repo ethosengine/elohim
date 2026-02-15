@@ -29,3 +29,6 @@ export type { AppreciationDisplay, CreateAppreciationInput } from './appreciatio
 // Event service (elohim-storage backend)
 export { EventService, LamadEventTypes, REAActions } from './event.service';
 export type { LamadEventType, REAAction } from './event.service';
+
+// Device stewardship (unified device view)
+export { DeviceStewardshipService } from './device-stewardship.service';
