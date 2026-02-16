@@ -307,11 +307,17 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Navigate to profile page (context-specific)
+   * Navigate to profile page.
+   * Authenticated users go to their network identity profile.
+   * Session users go to the lamad session profile (the only pillar with one).
    */
   goToProfile(): void {
     this.showProfileTray = false;
-    void this.router.navigate([`/${this.context}/human`]);
+    if (this.isAuthenticated()) {
+      void this.router.navigate(['/identity/profile']);
+    } else {
+      void this.router.navigate(['/lamad/human']);
+    }
   }
 
   // =========================================================================

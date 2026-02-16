@@ -115,4 +115,35 @@ describe('ElohimNavigatorComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  // ==========================================================================
+  // goToProfile
+  // ==========================================================================
+
+  describe('goToProfile', () => {
+    it('should navigate to /identity/profile when authenticated', () => {
+      // Override identity service to return hosted mode
+      (mockIdentityService.mode as unknown as ReturnType<typeof signal<string>>).set('hosted');
+      mockAuthService.isAuthenticated.and.returnValue(true);
+
+      component.goToProfile();
+
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/profile']);
+    });
+
+    it('should navigate to /lamad/human when not authenticated', () => {
+      // Default setup is session mode, not authenticated
+      component.goToProfile();
+
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/human']);
+    });
+
+    it('should close profile tray when navigating', () => {
+      component.showProfileTray = true;
+
+      component.goToProfile();
+
+      expect(component.showProfileTray).toBe(false);
+    });
+  });
 });

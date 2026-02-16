@@ -17,6 +17,7 @@
 
 import { Routes } from '@angular/router';
 
+import { identityDefaultRedirectGuard } from './guards/identity-redirect.guard';
 import { identityGuard } from './guards/identity.guard';
 
 export const IMAGODEI_ROUTES: Routes = [
@@ -109,7 +110,8 @@ export const IMAGODEI_ROUTES: Routes = [
   },
   {
     path: '',
-    redirectTo: 'register',
     pathMatch: 'full',
+    canActivate: [identityDefaultRedirectGuard],
+    children: [],
   },
 ];

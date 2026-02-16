@@ -53,7 +53,7 @@ describe('LoginComponent', () => {
 
     mockPasswordProvider = jasmine.createSpyObj('PasswordAuthProvider', ['login', 'logout']);
 
-    mockOAuthProvider = jasmine.createSpyObj('OAuthAuthProvider', ['initiateLogin'], {
+    mockOAuthProvider = jasmine.createSpyObj('OAuthAuthProvider', ['initiateLogin', 'storeReturnUrl'], {
       isFlowInProgress: signal(false),
     });
 

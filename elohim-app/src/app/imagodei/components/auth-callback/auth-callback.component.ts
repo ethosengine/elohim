@@ -47,7 +47,7 @@ type CallbackStatus = 'processing' | 'success' | 'error';
               </svg>
             </div>
             <h2>Welcome back!</h2>
-            <p>Redirecting you to Lamad...</p>
+            <p>Redirecting...</p>
           </div>
         }
 
@@ -247,9 +247,10 @@ export class AuthCallbackComponent implements OnInit {
         this.status.set('success');
         this.seoService.setTitle('Welcome');
 
-        // Redirect to lamad after brief delay for UX
+        // Redirect to intended destination (or /lamad as default) after brief delay for UX
+        const returnUrl = this.oauthProvider.consumeReturnUrl() ?? '/lamad';
         setTimeout(() => {
-          void this.router.navigate(['/lamad']);
+          void this.router.navigate([returnUrl]);
         }, 1500);
       } else {
         this.status.set('error');
@@ -262,8 +263,8 @@ export class AuthCallbackComponent implements OnInit {
   }
 
   retry(): void {
-    // Navigate back to identity page (with doorway picker)
-    void this.router.navigate(['/identity']);
+    // Navigate to login page to restart auth flow
+    void this.router.navigate(['/identity/login']);
   }
 
   goHome(): void {

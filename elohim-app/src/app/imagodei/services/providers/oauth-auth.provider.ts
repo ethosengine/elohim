@@ -66,6 +66,9 @@ interface OAuthErrorResponse {
 // Storage key for OAuth state
 const OAUTH_STATE_KEY = 'elohim-oauth-state';
 
+// Storage key for return URL (separate from CSRF state)
+const OAUTH_RETURN_URL_KEY = 'elohim-oauth-return-url';
+
 // =============================================================================
 // Provider Implementation
 // =============================================================================
@@ -249,11 +252,34 @@ export class OAuthAuthProvider implements AuthProvider {
   }
 
   /**
+   * Store the intended return URL before an OAuth redirect.
+   * Uses a dedicated sessionStorage key separate from the CSRF state.
+   */
+  storeReturnUrl(url: string): void {
+    if (url && url !== '/') {
+      sessionStorage.setItem(OAUTH_RETURN_URL_KEY, url);
+    }
+  }
+
+  /**
+   * Consume the stored return URL (reads and removes in one call).
+   * Returns null if no return URL was stored.
+   */
+  consumeReturnUrl(): string | null {
+    const url = sessionStorage.getItem(OAUTH_RETURN_URL_KEY);
+    if (url) {
+      sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
+    }
+    return url;
+  }
+
+  /**
    * Logout - clear any OAuth state.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- Interface requires Promise<void> but no async work needed
   async logout(): Promise<void> {
     sessionStorage.removeItem(OAUTH_STATE_KEY);
+    sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
     this.isFlowInProgress.set(false);
   }
 

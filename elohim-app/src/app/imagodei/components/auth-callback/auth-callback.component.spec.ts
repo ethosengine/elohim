@@ -32,7 +32,9 @@ describe('AuthCallbackComponent', () => {
       'getCallbackParams',
       'handleCallback',
       'clearCallbackParams',
+      'consumeReturnUrl',
     ]);
+    mockOAuthProvider.consumeReturnUrl.and.returnValue(null);
 
     mockSeoService = jasmine.createSpyObj('SeoService', ['setTitle']);
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
@@ -133,9 +135,9 @@ describe('AuthCallbackComponent', () => {
   // Retry Navigation
   // ==========================================================================
 
-  it('should navigate to identity page when retry is called', () => {
+  it('should navigate to login page when retry is called', () => {
     component.retry();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity']);
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/login']);
   });
 
   // ==========================================================================
@@ -205,13 +207,25 @@ describe('AuthCallbackComponent', () => {
       expect(mockOAuthProvider.clearCallbackParams).toHaveBeenCalled();
     });
 
-    it('should redirect to lamad after delay', async () => {
+    it('should redirect to lamad by default after delay', async () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
       jasmine.clock().tick(1500);
 
+      expect(mockOAuthProvider.consumeReturnUrl).toHaveBeenCalled();
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad']);
+    });
+
+    it('should redirect to stored returnUrl after delay', async () => {
+      mockOAuthProvider.consumeReturnUrl.and.returnValue('/community/governance');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      jasmine.clock().tick(1500);
+
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/community/governance']);
     });
   });
 
@@ -448,7 +462,7 @@ describe('AuthCallbackComponent', () => {
       const retryButton = fixture.nativeElement.querySelector('.btn-primary');
       retryButton.click();
 
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity']);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/login']);
     });
 
     it('should trigger goHome when home button clicked', async () => {

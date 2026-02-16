@@ -329,17 +329,61 @@ describe('OAuthAuthProvider', () => {
   });
 
   // ==========================================================================
+  // Return URL Storage
+  // ==========================================================================
+
+  describe('storeReturnUrl / consumeReturnUrl', () => {
+    const RETURN_URL_KEY = 'elohim-oauth-return-url';
+
+    it('should store and consume a return URL', () => {
+      provider.storeReturnUrl('/community/governance');
+
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBe('/community/governance');
+
+      const url = provider.consumeReturnUrl();
+      expect(url).toBe('/community/governance');
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBeNull();
+    });
+
+    it('should return null when no return URL is stored', () => {
+      expect(provider.consumeReturnUrl()).toBeNull();
+    });
+
+    it('should not store empty string', () => {
+      provider.storeReturnUrl('');
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBeNull();
+    });
+
+    it('should not store root path', () => {
+      provider.storeReturnUrl('/');
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBeNull();
+    });
+
+    it('should remove URL on consume (one-time read)', () => {
+      provider.storeReturnUrl('/lamad/path/123');
+
+      const first = provider.consumeReturnUrl();
+      const second = provider.consumeReturnUrl();
+
+      expect(first).toBe('/lamad/path/123');
+      expect(second).toBeNull();
+    });
+  });
+
+  // ==========================================================================
   // Logout
   // ==========================================================================
 
   describe('logout', () => {
-    it('should clear OAuth state from sessionStorage', async () => {
+    it('should clear OAuth state and return URL from sessionStorage', async () => {
       sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify({ state: 'test' }));
+      sessionStorage.setItem('elohim-oauth-return-url', '/some/page');
       provider.isFlowInProgress.set(true);
 
       await provider.logout();
 
       expect(sessionStorage.getItem(OAUTH_STATE_KEY)).toBeNull();
+      expect(sessionStorage.getItem('elohim-oauth-return-url')).toBeNull();
       expect(provider.isFlowInProgress()).toBe(false);
     });
   });

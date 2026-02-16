@@ -151,6 +151,7 @@ export class LoginComponent implements OnInit {
       // Production: environment doorwayUrl always wins (app is deployed FOR this doorway)
       this.currentStep.set('redirecting');
       this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
+      this.oauthProvider.storeReturnUrl(this.returnUrl);
       const callbackUrl = `${globalThis.location.origin}/auth/callback`;
       this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl);
       return;
@@ -159,6 +160,7 @@ export class LoginComponent implements OnInit {
     if (hasSavedDoorway) {
       // Returning dev user: use their saved doorway
       this.currentStep.set('redirecting');
+      this.oauthProvider.storeReturnUrl(this.returnUrl);
       const callbackUrl = `${globalThis.location.origin}/auth/callback`;
       this.oauthProvider.initiateLogin(this.doorwayRegistry.selectedUrl()!, callbackUrl);
       return;
@@ -384,6 +386,7 @@ export class LoginComponent implements OnInit {
     this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
 
     this.currentStep.set('redirecting');
+    this.oauthProvider.storeReturnUrl(this.returnUrl);
     const callbackUrl = `${globalThis.location.origin}/auth/callback`;
     this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl, parsed.username);
   }
