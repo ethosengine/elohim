@@ -194,6 +194,8 @@ export class TauriAuthService {
         }
       } else {
         this.status.set('needs_login');
+        // Clear stale doorway selection — IPC (doorway.json) is source of truth in Tauri
+        this.doorwayRegistry.clearSelection();
       }
 
       // Set up event listeners for OAuth callback

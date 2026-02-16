@@ -3,8 +3,13 @@
   @if (currentStep() === 'federated') {
     <div class="federated-login">
       <div class="login-header">
-        <h1>Sign In</h1>
-        <p class="subtitle">Enter your Elohim identity to sign in via your doorway</p>
+        @if (isTauri()) {
+          <h1>Connect to Your Community</h1>
+          <p class="subtitle">Enter your identity to import it from your doorway</p>
+        } @else {
+          <h1>Sign In</h1>
+          <p class="subtitle">Enter your Elohim identity to sign in via your doorway</p>
+        }
       </div>
 
       @if (error()) {
@@ -184,7 +189,11 @@
           <span class="material-icons">arrow_back</span>
         </button>
         <div class="step-info">
-          <span class="step-label">Signing in via</span>
+          @if (isTauri()) {
+            <span class="step-label">Importing identity from</span>
+          } @else {
+            <span class="step-label">Signing in via</span>
+          }
           <span class="step-doorway">
             {{ selectedDoorway()?.doorway?.name ?? 'Unknown Doorway' }}
           </span>
@@ -193,8 +202,13 @@
 
       <!-- Header -->
       <div class="login-header">
-        <h1>Welcome Back</h1>
-        <p class="subtitle">Sign in to your hosted identity</p>
+        @if (isTauri()) {
+          <h1>Import Identity</h1>
+          <p class="subtitle">Enter your doorway credentials to become a peer</p>
+        } @else {
+          <h1>Welcome Back</h1>
+          <p class="subtitle">Sign in to your hosted identity</p>
+        }
       </div>
 
       <!-- Error Display -->

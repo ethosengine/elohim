@@ -101,6 +101,9 @@ export class LoginComponent implements OnInit {
   /** Whether a doorway has been selected */
   readonly hasDoorwaySelected = this.doorwayRegistry.hasSelection;
 
+  /** Whether running inside Tauri desktop shell */
+  readonly isTauri = this.tauriAuth.isTauri;
+
   // ==========================================================================
   // Lifecycle
   // ==========================================================================
@@ -380,8 +383,9 @@ export class LoginComponent implements OnInit {
       return;
     }
 
-    // First-time user: federated identifier input or credentials if doorway already known
-    this.currentStep.set(this.hasDoorwaySelected() ? 'credentials' : 'federated');
+    // First-time steward: always show federated input (identity import)
+    // Don't trust localStorage doorway selection — doorway.json IPC is authoritative
+    this.currentStep.set('federated');
   }
 
   // ==========================================================================
