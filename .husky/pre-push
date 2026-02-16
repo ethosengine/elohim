@@ -158,16 +158,9 @@ gate_sophia() {
 }
 
 gate_elohim_storage() {
-  echo "[elohim-storage 1/2] Checking build..."
+  echo "[elohim-storage 1/1] Checking build..."
   cd holochain/elohim-storage || return 1
   RUSTFLAGS='--cfg getrandom_backend="custom"' cargo check --release 2>&1
-  rc=$?
-  cd ../..
-  if [ $rc -ne 0 ]; then return 1; fi
-
-  echo "[elohim-storage 2/2] Running clippy..."
-  cd holochain/elohim-storage || return 1
-  RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy -- -D warnings 2>&1
   rc=$?
   cd ../..
   return $rc

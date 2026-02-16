@@ -1,7 +1,7 @@
 //! Sled-backed Kademlia record store.
 //!
-//! Persists Kademlia routing records across restarts so that desktop stewards
-//! whose laptops sleep/wake frequently don't lose their routing table.
+//! Persists Kademlia DHT routing records across restarts so that desktop
+//! stewards whose laptops sleep/wake frequently don't lose their routing table.
 //! Uses the existing `sync.sled` database (shared with CRDT doc store).
 
 use libp2p::kad::store::{Error as StoreError, RecordStore, Result as StoreResult};
