@@ -1089,6 +1089,10 @@ export class IdentityService {
 
       if (result.success && result.data) {
         this.updateAuthenticatedIdentityState(result.data);
+      } else {
+        // Holochain connected but no profile found (DHT not synced yet or new agent)
+        // Show authenticated state with minimal info from the auth token
+        this.setMinimalAuthenticatedState(humanId, agentPubKey);
       }
     } catch (error) {
       if (isRestore) {

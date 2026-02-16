@@ -6,16 +6,16 @@
 
 import { TestBed } from '@angular/core/testing';
 import { Router, ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@angular/router';
-import { signal } from '@angular/core';
 
 import { identityGuard, sessionOrAuthGuard, attestationGuard } from './identity.guard';
+import { AuthService } from '../services/auth.service';
 import { IdentityService } from '../services/identity.service';
 import { SessionHumanService } from '../services/session-human.service';
-import type { IdentityMode } from '../models/identity.model';
 
 describe('Identity Guards', () => {
   let mockRouter: jasmine.SpyObj<Router>;
   let mockIdentityService: jasmine.SpyObj<IdentityService>;
+  let mockAuthService: jasmine.SpyObj<AuthService>;
   let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
   let mockRoute: ActivatedRouteSnapshot;
   let mockState: RouterStateSnapshot;
@@ -24,10 +24,16 @@ describe('Identity Guards', () => {
     // Create mocks
     mockRouter = jasmine.createSpyObj('Router', ['createUrlTree']);
 
-    mockIdentityService = jasmine.createSpyObj('IdentityService', ['isAuthenticated'], {
-      mode: jasmine.createSpy('mode'),
-      attestations: jasmine.createSpy('attestations'),
-    });
+    mockIdentityService = jasmine.createSpyObj(
+      'IdentityService',
+      ['isAuthenticated', 'waitForAuthenticatedState'],
+      {
+        mode: jasmine.createSpy('mode'),
+        attestations: jasmine.createSpy('attestations'),
+      }
+    );
+
+    mockAuthService = jasmine.createSpyObj('AuthService', ['isAuthenticated']);
 
     mockSessionHumanService = jasmine.createSpyObj('SessionHumanService', ['hasSession']);
 
@@ -36,6 +42,7 @@ describe('Identity Guards', () => {
       providers: [
         { provide: Router, useValue: mockRouter },
         { provide: IdentityService, useValue: mockIdentityService },
+        { provide: AuthService, useValue: mockAuthService },
         { provide: SessionHumanService, useValue: mockSessionHumanService },
       ],
     });
@@ -52,36 +59,37 @@ describe('Identity Guards', () => {
   // ==========================================================================
 
   describe('identityGuard', () => {
-    it('should allow access when authenticated via network (hosted mode)', () => {
+    it('should allow access when authenticated via network (hosted mode)', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
       mockIdentityService.isAuthenticated.and.returnValue(true);
 
-      const result = TestBed.runInInjectionContext(() =>
+      const result = await TestBed.runInInjectionContext(() =>
         identityGuard(mockRoute, mockState)
       );
 
       expect(result).toBe(true);
     });
 
-    it('should allow access when authenticated via network (steward mode)', () => {
+    it('should allow access when authenticated via network (steward mode)', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('steward');
       mockIdentityService.isAuthenticated.and.returnValue(true);
 
-      const result = TestBed.runInInjectionContext(() =>
+      const result = await TestBed.runInInjectionContext(() =>
         identityGuard(mockRoute, mockState)
       );
 
       expect(result).toBe(true);
     });
 
-    it('should redirect to register when not authenticated', () => {
+    it('should redirect when not authenticated at all', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
       mockIdentityService.isAuthenticated.and.returnValue(false);
+      mockAuthService.isAuthenticated.and.returnValue(false);
 
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.and.returnValue(mockUrlTree);
 
-      const result = TestBed.runInInjectionContext(() =>
+      const result = await TestBed.runInInjectionContext(() =>
         identityGuard(mockRoute, mockState)
       );
 
@@ -91,42 +99,58 @@ describe('Identity Guards', () => {
       });
     });
 
-    it('should redirect when in session mode even if authenticated', () => {
+    it('should wait for identity to settle when auth is valid but mode is session', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockIdentityService.isAuthenticated.and.returnValue(true);
+      mockIdentityService.isAuthenticated.and.returnValue(false);
+      mockAuthService.isAuthenticated.and.returnValue(true);
+      mockIdentityService.waitForAuthenticatedState.and.resolveTo(true);
+
+      const result = await TestBed.runInInjectionContext(() =>
+        identityGuard(mockRoute, mockState)
+      );
+
+      expect(result).toBe(true);
+      expect(mockIdentityService.waitForAuthenticatedState).toHaveBeenCalledWith(5000);
+    });
+
+    it('should redirect when auth is valid but identity fails to settle', async () => {
+      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
+      mockIdentityService.isAuthenticated.and.returnValue(false);
+      mockAuthService.isAuthenticated.and.returnValue(true);
+      mockIdentityService.waitForAuthenticatedState.and.resolveTo(false);
 
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.and.returnValue(mockUrlTree);
 
-      const result = TestBed.runInInjectionContext(() =>
+      const result = await TestBed.runInInjectionContext(() =>
         identityGuard(mockRoute, mockState)
       );
 
       expect(result).toBe(mockUrlTree);
+      expect(mockIdentityService.waitForAuthenticatedState).toHaveBeenCalledWith(5000);
+      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login'], {
+        queryParams: { returnUrl: '/protected/resource' },
+      });
     });
 
-    it('should redirect when in visitor mode', () => {
+    it('should not call waitForAuthenticatedState when already in network mode', async () => {
+      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
+      mockIdentityService.isAuthenticated.and.returnValue(true);
+
+      await TestBed.runInInjectionContext(() => identityGuard(mockRoute, mockState));
+
+      expect(mockIdentityService.waitForAuthenticatedState).not.toHaveBeenCalled();
+    });
+
+    it('should redirect when in visitor mode and not authenticated', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('visitor');
       mockIdentityService.isAuthenticated.and.returnValue(false);
+      mockAuthService.isAuthenticated.and.returnValue(false);
 
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.and.returnValue(mockUrlTree);
 
-      const result = TestBed.runInInjectionContext(() =>
-        identityGuard(mockRoute, mockState)
-      );
-
-      expect(result).toBe(mockUrlTree);
-    });
-
-    it('should redirect when authenticated but not in network mode', () => {
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockIdentityService.isAuthenticated.and.returnValue(true);
-
-      const mockUrlTree = {} as UrlTree;
-      mockRouter.createUrlTree.and.returnValue(mockUrlTree);
-
-      const result = TestBed.runInInjectionContext(() =>
+      const result = await TestBed.runInInjectionContext(() =>
         identityGuard(mockRoute, mockState)
       );
 
@@ -214,7 +238,7 @@ describe('Identity Guards', () => {
       expect(result).toBe(true);
     });
 
-    it('should redirect to register when not authenticated', () => {
+    it('should redirect to login when not authenticated', () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('visitor');
       mockIdentityService.isAuthenticated.and.returnValue(false);
 
@@ -232,7 +256,7 @@ describe('Identity Guards', () => {
       });
     });
 
-    it('should redirect to register when in session mode', () => {
+    it('should redirect to login when in session mode', () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
       mockIdentityService.isAuthenticated.and.returnValue(true);
 
@@ -330,14 +354,15 @@ describe('Identity Guards', () => {
   // ==========================================================================
 
   describe('edge cases', () => {
-    it('should handle null mode gracefully', () => {
+    it('should handle null mode gracefully', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue(null);
       mockIdentityService.isAuthenticated.and.returnValue(false);
+      mockAuthService.isAuthenticated.and.returnValue(false);
 
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.and.returnValue(mockUrlTree);
 
-      const result = TestBed.runInInjectionContext(() =>
+      const result = await TestBed.runInInjectionContext(() =>
         identityGuard(mockRoute, mockState)
       );
 
@@ -361,9 +386,10 @@ describe('Identity Guards', () => {
       expect(result).toBe(mockUrlTree);
     });
 
-    it('should preserve returnUrl query parameter', () => {
+    it('should preserve returnUrl query parameter', async () => {
       (mockIdentityService.mode as jasmine.Spy).and.returnValue('visitor');
       mockIdentityService.isAuthenticated.and.returnValue(false);
+      mockAuthService.isAuthenticated.and.returnValue(false);
 
       const mockState2: RouterStateSnapshot = {
         url: '/deeply/nested/protected/resource?foo=bar',
@@ -372,7 +398,7 @@ describe('Identity Guards', () => {
       const mockUrlTree = {} as UrlTree;
       mockRouter.createUrlTree.and.returnValue(mockUrlTree);
 
-      const result = TestBed.runInInjectionContext(() =>
+      const result = await TestBed.runInInjectionContext(() =>
         identityGuard(mockRoute, mockState2)
       );
 
