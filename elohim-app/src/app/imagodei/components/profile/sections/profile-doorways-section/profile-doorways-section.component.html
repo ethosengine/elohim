@@ -37,6 +37,28 @@
             </button>
           }
         </div>
+        @if (doorway.id === activeDoorwayId() && registrationContext(); as reg) {
+          <div class="doorway-registration">
+            @if (reg.identifier) {
+              <div class="registration-row">
+                <span class="registration-label">Registered as</span>
+                <span class="registration-value">{{ reg.identifier }}</span>
+              </div>
+            }
+            @if (reg.registeredSince) {
+              <div class="registration-row">
+                <span class="registration-label">Member since</span>
+                <span class="registration-value">{{ formatDate(reg.registeredSince) }}</span>
+              </div>
+            }
+            @if (reg.credentialStorage) {
+              <div class="registration-row">
+                <span class="registration-label">Credentials</span>
+                <span class="registration-value">Stored in {{ reg.credentialStorage }}</span>
+              </div>
+            }
+          </div>
+        }
       </div>
     }
   </div>

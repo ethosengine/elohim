@@ -28,6 +28,7 @@ import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/dis
 
 import { AGENCY_STAGES, type AgencyStageInfo } from '../../models/agency.model';
 import { AgencyService } from '../../services/agency.service';
+import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
 import { SessionHumanService } from '../../services/session-human.service';
@@ -65,6 +66,7 @@ export type ProfileTab = 'identity' | 'network' | 'data';
 })
 export class ProfileComponent implements OnInit, OnDestroy {
   private readonly identityService = inject(IdentityService);
+  private readonly authService = inject(AuthService);
   private readonly agencyService = inject(AgencyService);
   private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
@@ -142,6 +144,16 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   readonly registeredDoorways = this.doorwayRegistry.doorwaysWithHealth;
   readonly activeDoorway = computed(() => this.doorwayRegistry.selected()?.doorway ?? null);
+
+  readonly doorwayRegistrationContext = computed(() => {
+    if (!this.isAuthenticated()) return null;
+    const profile = this.profile();
+    return {
+      identifier: this.authService.identifier(),
+      registeredSince: profile?.createdAt ?? null,
+      credentialStorage: this.edgeNodeInfo().hasStoredCredentials ? ('browser' as const) : null,
+    };
+  });
 
   // ==========================================================================
   // Computed

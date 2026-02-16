@@ -3,6 +3,12 @@ import { Component, input, output, signal } from '@angular/core';
 
 import { type DoorwayWithHealth } from '../../../../models/doorway.model';
 
+export interface DoorwayRegistrationContext {
+  identifier: string | null;
+  registeredSince: string | null;
+  credentialStorage: 'browser' | 'device' | null;
+}
+
 @Component({
   selector: 'app-profile-doorways-section',
   standalone: true,
@@ -13,6 +19,7 @@ import { type DoorwayWithHealth } from '../../../../models/doorway.model';
 export class ProfileDoorwaysSectionComponent {
   readonly doorways = input.required<DoorwayWithHealth[]>();
   readonly activeDoorwayId = input<string | null>(null);
+  readonly registrationContext = input<DoorwayRegistrationContext | null>(null);
 
   readonly setAsPrimary = output<string>();
   readonly validateDoorway = output<string>();
@@ -48,6 +55,18 @@ export class ProfileDoorwaysSectionComponent {
     if (result) {
       this.addDoorway.emit(result.url);
       this.toggleAddDoorway();
+    }
+  }
+
+  formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return iso;
     }
   }
 }

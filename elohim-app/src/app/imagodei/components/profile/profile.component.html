@@ -155,6 +155,7 @@
               <app-profile-doorways-section
                 [doorways]="registeredDoorways()"
                 [activeDoorwayId]="activeDoorway()?.id ?? null"
+                [registrationContext]="doorwayRegistrationContext()"
                 (setAsPrimary)="setDoorwayAsPrimary($event)"
                 (validateDoorway)="validateDoorway($event)"
                 (addDoorway)="addDoorway($event)"

@@ -133,6 +133,38 @@
   background: var(--primary-50, #eff6ff);
 }
 
+/* Registration Context */
+.doorway-registration {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--primary-200, #bfdbfe);
+}
+
+.registration-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.registration-label {
+  color: var(--text-color-secondary, #6c757d);
+  flex-shrink: 0;
+}
+
+.registration-value {
+  color: var(--text-color, #1a1a2e);
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Add Doorway Form */
 .add-doorway-form {
   display: flex;
