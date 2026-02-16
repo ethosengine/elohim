@@ -382,8 +382,8 @@ pub fn run() {
             // Fresh instance: no agent key and no doorway URL saved yet.
             // Show the window early so the doorway picker is visible before
             // the Holochain conductor finishes initializing.
-            let is_fresh = read_doorway_store_value("agentPubKey").is_none()
-                && read_doorway_store_value("doorwayUrl").is_none();
+            let is_fresh = read_active_account_value("agentPubKey").is_none()
+                && read_active_account_value("doorwayUrl").is_none();
 
             let handle = app.handle().clone();
 
