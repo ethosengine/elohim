@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+
+import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { HolochainClientService } from './holochain-client.service';
 
 /**
@@ -15,10 +17,25 @@ describe('HolochainClientService', () => {
   let service: HolochainClientService;
   let httpMock: HttpTestingController;
 
+  const mockStrategy = {
+    name: 'mock',
+    mode: 'doorway' as const,
+    isSupported: () => true,
+    resolveAdminUrl: () => 'ws://mock:4444',
+    resolveAppUrl: () => 'ws://mock:4445',
+    getBlobStorageUrl: () => 'http://mock/blob',
+    getStorageBaseUrl: () => 'http://mock',
+    getContentSources: () => [],
+    connect: () => Promise.reject(new Error('No conductor in test environment')),
+    disconnect: () => Promise.resolve(),
+    isConnected: () => false,
+    getSigningCredentials: () => null,
+  };
+
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [HolochainClientService],
+      providers: [HolochainClientService, { provide: CONNECTION_STRATEGY, useValue: mockStrategy }],
     });
     service = TestBed.inject(HolochainClientService);
     httpMock = TestBed.inject(HttpTestingController);
