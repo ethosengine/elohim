@@ -114,8 +114,14 @@
 
         <!-- Profile Tray Dropdown -->
         <div class="profile-tray" *ngIf="showProfileTray" role="menu">
-          <!-- Identity Header -->
-          <div class="profile-header">
+          <!-- Identity Header - links to Imago Dei profile -->
+          <button
+            type="button"
+            class="profile-header profile-header-link"
+            (click)="goToIdentityProfile()"
+            role="menuitem"
+            title="Manage your identity"
+          >
             <div class="profile-avatar-large">{{ getInitials() }}</div>
             <div class="profile-info">
               <span class="profile-name">{{ authenticatedDisplayName() }}</span>
@@ -126,7 +132,18 @@
                 {{ identityMode() === 'hosted' ? 'Hosted Identity' : 'Steward' }}
               </span>
             </div>
-          </div>
+            <svg
+              class="profile-header-arrow"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
 
           <div class="scrollable-content-wrapper">
             <!-- Connection Details -->
@@ -145,20 +162,14 @@
 
             <!-- Actions -->
             <div class="profile-actions">
-              <button type="button" class="profile-action" (click)="goToProfile()" role="menuitem">
-                <svg
-                  class="action-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span class="action-label">View Profile</span>
+              <button
+                type="button"
+                class="profile-action"
+                (click)="goToContextProfile()"
+                role="menuitem"
+              >
+                <span class="action-icon-emoji">{{ currentApp.icon }}</span>
+                <span class="action-label">{{ contextProfileLabel }}</span>
               </button>
               <button
                 type="button"

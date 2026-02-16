@@ -26,23 +26,15 @@ describe('ElohimNavigatorComponent', () => {
   beforeEach(async () => {
     routerEventsSubject = new Subject();
 
-    mockSessionHumanService = jasmine.createSpyObj(
-      'SessionHumanService',
-      [],
-      {
-        session$: new Subject(),
-        upgradePrompts$: new Subject(),
-      }
-    );
+    mockSessionHumanService = jasmine.createSpyObj('SessionHumanService', [], {
+      session$: new Subject(),
+      upgradePrompts$: new Subject(),
+    });
 
-    mockRouter = jasmine.createSpyObj(
-      'Router',
-      ['navigate', 'createUrlTree', 'serializeUrl'],
-      {
-        events: routerEventsSubject.asObservable(),
-        url: '/lamad',
-      }
-    );
+    mockRouter = jasmine.createSpyObj('Router', ['navigate', 'createUrlTree', 'serializeUrl'], {
+      events: routerEventsSubject.asObservable(),
+      url: '/lamad',
+    });
     mockRouter.createUrlTree.and.returnValue({
       root: {},
       queryParams: {},
@@ -73,14 +65,10 @@ describe('ElohimNavigatorComponent', () => {
       error: null,
     });
 
-    mockIdentityService = jasmine.createSpyObj(
-      'IdentityService',
-      ['logout'],
-      {
-        mode: signal('session'),
-        displayName: signal('Test User'),
-      }
-    );
+    mockIdentityService = jasmine.createSpyObj('IdentityService', ['logout'], {
+      mode: signal('session'),
+      displayName: signal('Test User'),
+    });
 
     mockAuthService = jasmine.createSpyObj('AuthService', ['isAuthenticated']);
     mockAuthService.isAuthenticated.and.returnValue(false);
@@ -114,36 +102,5 @@ describe('ElohimNavigatorComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
-  });
-
-  // ==========================================================================
-  // goToProfile
-  // ==========================================================================
-
-  describe('goToProfile', () => {
-    it('should navigate to /identity/profile when authenticated', () => {
-      // Override identity service to return hosted mode
-      (mockIdentityService.mode as unknown as ReturnType<typeof signal<string>>).set('hosted');
-      mockAuthService.isAuthenticated.and.returnValue(true);
-
-      component.goToProfile();
-
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/profile']);
-    });
-
-    it('should navigate to /lamad/human when not authenticated', () => {
-      // Default setup is session mode, not authenticated
-      component.goToProfile();
-
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/human']);
-    });
-
-    it('should close profile tray when navigating', () => {
-      component.showProfileTray = true;
-
-      component.goToProfile();
-
-      expect(component.showProfileTray).toBe(false);
-    });
   });
 });

@@ -1,19 +1,17 @@
 /**
- * ProfileComponent - View and edit user profile.
+ * ProfileComponent - Tabbed profile view with sub-component sections.
  *
  * Features:
- * - Display current profile information
- * - Edit mode for updating profile
- * - Profile reach selection
- * - Agency stage indicator
+ * - 3-tab layout: Identity, Network, Data & Privacy
+ * - Sub-component decomposition for each section
+ * - Agency-stage conditional rendering
+ * - Fragment navigation (#network, #data)
  */
 
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
-
-// @coverage: 92.5% (2026-02-05)
 
 import { takeUntil } from 'rxjs/operators';
 
@@ -25,13 +23,7 @@ import {
   type ProfileReach,
   getReachLabel,
   getReachDescription,
-  getInitials,
 } from '@app/imagodei/models/identity.model';
-import {
-  type DiscoveryResult,
-  getFrameworkDisplayName,
-  getCategoryIcon,
-} from '@app/lamad/quiz-engine/models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
 import { AGENCY_STAGES, type AgencyStageInfo } from '../../models/agency.model';
@@ -41,10 +33,33 @@ import { IdentityService } from '../../services/identity.service';
 import { SessionHumanService } from '../../services/session-human.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
 
+import { ProfileAgencySectionComponent } from './sections/profile-agency-section/profile-agency-section.component';
+import { ProfileAttestationsSectionComponent } from './sections/profile-attestations-section/profile-attestations-section.component';
+import { ProfileDataSectionComponent } from './sections/profile-data-section/profile-data-section.component';
+import { ProfileDiscoverySectionComponent } from './sections/profile-discovery-section/profile-discovery-section.component';
+import { ProfileDoorwaysSectionComponent } from './sections/profile-doorways-section/profile-doorways-section.component';
+import { ProfileHeaderComponent } from './sections/profile-header/profile-header.component';
+import { ProfileIdentitySectionComponent } from './sections/profile-identity-section/profile-identity-section.component';
+import { ProfileNetworkSectionComponent } from './sections/profile-network-section/profile-network-section.component';
+
+export type ProfileTab = 'identity' | 'network' | 'data';
+
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    ProfileHeaderComponent,
+    ProfileIdentitySectionComponent,
+    ProfileDiscoverySectionComponent,
+    ProfileAttestationsSectionComponent,
+    ProfileAgencySectionComponent,
+    ProfileDoorwaysSectionComponent,
+    ProfileNetworkSectionComponent,
+    ProfileDataSectionComponent,
+  ],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css'],
 })
@@ -61,6 +76,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   // ==========================================================================
+  // Tab State
+  // ==========================================================================
+
+  readonly activeTab = signal<ProfileTab>('identity');
+
+  // ==========================================================================
   // Component State
   // ==========================================================================
 
@@ -69,7 +90,6 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly error = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
 
-  /** Form state for editing */
   form = {
     displayName: '',
     bio: '',
@@ -88,6 +108,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly isAuthenticated = this.identityService.isAuthenticated;
   readonly attestations = this.identityService.attestations;
   readonly isLoading = this.identityService.isLoading;
+  readonly did = this.identityService.did;
+  readonly identityState = this.identityService.identity;
 
   // ==========================================================================
   // Agency Signals
@@ -96,6 +118,8 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly agencyStage = this.agencyService.currentStage;
   readonly agencyInfo = this.agencyService.stageInfo;
   readonly canUpgrade = this.agencyService.canUpgrade;
+  readonly agencyState = this.agencyService.agencyState;
+  readonly connectionStatus = this.agencyService.connectionStatus;
 
   // ==========================================================================
   // Graduation Signals
@@ -106,61 +130,56 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly graduationError = this.tauriAuth.graduationError;
   readonly isGraduationEligible = this.tauriAuth.isGraduationEligible;
 
-  /** Password for graduation form */
-  graduationPassword = '';
-
-  /** Info about the next agency stage */
-  readonly nextStageInfo = computed<AgencyStageInfo | null>(() => {
-    const nextStage = this.agencyService.agencyState().migrationTarget;
-    if (!nextStage) return null;
-    return AGENCY_STAGES[nextStage];
-  });
-
-  /** Label for the next stage */
-  readonly nextStageLabel = computed(() => this.nextStageInfo()?.label ?? 'Next Stage');
-
   // ==========================================================================
   // Discovery Signals
   // ==========================================================================
 
-  /** Featured discovery results for profile display */
-  readonly discoveryResults = this.discoveryService.featuredResults;
-
-  /** All discovery results */
   readonly allDiscoveryResults = this.discoveryService.results;
 
   // ==========================================================================
   // Doorway Signals
   // ==========================================================================
 
-  /** Registered doorways with health status */
   readonly registeredDoorways = this.doorwayRegistry.doorwaysWithHealth;
-
-  /** Currently active doorway */
   readonly activeDoorway = computed(() => this.doorwayRegistry.selected()?.doorway ?? null);
 
   // ==========================================================================
   // Computed
   // ==========================================================================
 
-  /** Initials for avatar placeholder */
-  readonly initials = computed(() => getInitials(this.displayName()));
-
-  /** Whether profile can be edited (requires network authentication) */
   readonly canEdit = computed(() => {
     const mode = this.mode();
     const isNetworkMode = mode === 'hosted' || mode === 'steward';
     return isNetworkMode && this.isAuthenticated();
   });
 
-  /** Profile reach options */
+  readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());
+
+  readonly nextStageInfo = computed<AgencyStageInfo | null>(() => {
+    const nextStage = this.agencyService.agencyState().migrationTarget;
+    if (!nextStage) return null;
+    return AGENCY_STAGES[nextStage];
+  });
+
+  readonly nextStageLabel = computed(() => this.nextStageInfo()?.label ?? 'Next Stage');
+
+  /** Whether the user is in a non-visitor mode (has at least a session) */
+  readonly isNetworkUser = computed(() => {
+    const mode = this.mode();
+    return mode === 'hosted' || mode === 'steward';
+  });
+
   readonly reachOptions: { value: ProfileReach; label: string; description: string }[] = [
     {
       value: 'community',
       label: getReachLabel('community'),
       description: getReachDescription('community'),
     },
-    { value: 'public', label: getReachLabel('public'), description: getReachDescription('public') },
+    {
+      value: 'public',
+      label: getReachLabel('public'),
+      description: getReachDescription('public'),
+    },
     {
       value: 'trusted',
       label: getReachLabel('trusted'),
@@ -174,62 +193,17 @@ export class ProfileComponent implements OnInit, OnDestroy {
   ];
 
   // ==========================================================================
-  // Network / Agency Signals
-  // ==========================================================================
-
-  readonly agencyState = this.agencyService.agencyState;
-  readonly connectionStatus = this.agencyService.connectionStatus;
-  readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());
-
-  // ==========================================================================
-  // Doorway Management
-  // ==========================================================================
-
-  /** Whether the add-doorway inline form is visible */
-  readonly showAddDoorway = signal(false);
-
-  /** URL being validated */
-  readonly newDoorwayUrl = signal('');
-
-  /** Validation state */
-  readonly doorwayValidating = signal(false);
-  readonly doorwayValidationError = signal<string | null>(null);
-  readonly doorwayValidationResult = signal<{ name: string; url: string } | null>(null);
-
-  // ==========================================================================
-  // Data Management
-  // ==========================================================================
-
-  /** Export session data as JSON file */
-  exportData(): void {
-    const migration = this.sessionHumanService.prepareMigration();
-    if (migration) {
-      const blob = new Blob([JSON.stringify(migration, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `elohim-identity-export.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  // ==========================================================================
   // Lifecycle
   // ==========================================================================
 
   ngOnInit(): void {
-    // Load fresh profile data
     void this.loadProfile();
 
-    // Handle fragment navigation (e.g., #network from agency badge)
     this.route.fragment.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
       if (fragment === 'network' || fragment === 'upgrade') {
-        // Scroll to the section after a short delay to let the DOM render
-        setTimeout(() => {
-          const el = document.getElementById(fragment);
-          el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
+        this.activeTab.set('network');
+      } else if (fragment === 'data') {
+        this.activeTab.set('data');
       }
     });
   }
@@ -240,24 +214,25 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   // ==========================================================================
+  // Tab Navigation
+  // ==========================================================================
+
+  selectTab(tab: ProfileTab): void {
+    this.activeTab.set(tab);
+  }
+
+  // ==========================================================================
   // Actions
   // ==========================================================================
 
-  /**
-   * Load profile from network.
-   */
   async loadProfile(): Promise<void> {
     try {
       await this.identityService.getCurrentHuman();
     } catch (error) {
-      // Intentionally silent - profile load failure is non-critical, uses cached data
       console.warn('[Profile] Non-critical profile refresh failed:', error);
     }
   }
 
-  /**
-   * Enter edit mode.
-   */
   startEditing(): void {
     const profile = this.profile();
     if (profile) {
@@ -274,17 +249,11 @@ export class ProfileComponent implements OnInit, OnDestroy {
     this.successMessage.set(null);
   }
 
-  /**
-   * Cancel editing.
-   */
   cancelEditing(): void {
     this.isEditing.set(false);
     this.error.set(null);
   }
 
-  /**
-   * Save profile changes.
-   */
   async saveProfile(): Promise<void> {
     if (!this.form.displayName.trim()) {
       this.error.set('Display name is required.');
@@ -307,8 +276,6 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
       this.isEditing.set(false);
       this.successMessage.set('Profile updated successfully!');
-
-      // Clear success message after delay
       setTimeout(() => this.successMessage.set(null), 3000);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
@@ -318,235 +285,74 @@ export class ProfileComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Confirm graduation — call Tauri IPC to sign stewardship.
-   */
-  async confirmGraduation(): Promise<void> {
-    if (!this.graduationPassword.trim()) {
-      return;
-    }
-
-    const success = await this.tauriAuth.confirmStewardship(this.graduationPassword);
-
+  async confirmGraduation(password: string): Promise<void> {
+    const success = await this.tauriAuth.confirmStewardship(password);
     if (success) {
-      this.graduationPassword = '';
       this.successMessage.set('Stewardship confirmed! Your keys are now on your device.');
       setTimeout(() => this.successMessage.set(null), 5000);
     }
   }
 
-  /**
-   * Clear messages.
-   */
   clearMessages(): void {
     this.error.set(null);
     this.successMessage.set(null);
   }
 
-  /**
-   * Navigate back.
-   */
   goBack(): void {
     void this.router.navigate(['/']);
+  }
+
+  // ==========================================================================
+  // Event Handlers (from sub-components)
+  // ==========================================================================
+
+  navigateToDiscovery(): void {
+    void this.router.navigate(['/lamad/discovery']);
+  }
+
+  setDoorwayAsPrimary(doorwayUrl: string): void {
+    this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
+  }
+
+  async validateDoorway(url: string): Promise<void> {
+    // Delegated to doorway-registry for validation
+    await this.doorwayRegistry.validateDoorway(url);
+  }
+
+  addDoorway(url: string): void {
+    this.doorwayRegistry.selectDoorwayByUrl(url);
+  }
+
+  async reconnect(): Promise<void> {
+    await this.holochainService.disconnect();
+    await this.holochainService.connect();
+  }
+
+  exportData(): void {
+    const migration = this.sessionHumanService.prepareMigration();
+    if (migration) {
+      const blob = new Blob([JSON.stringify(migration, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `elohim-identity-export.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   }
 
   // ==========================================================================
   // Helpers
   // ==========================================================================
 
-  /**
-   * Parse comma-separated affinities string to array.
-   */
+  getReachLabel(reach: ProfileReach | undefined): string {
+    return reach ? getReachLabel(reach) : 'Not set';
+  }
+
   private parseAffinities(input: string): string[] {
     return input
       .split(',')
       .map(s => s.trim().toLowerCase())
       .filter(s => s.length > 0);
-  }
-
-  /**
-   * Get reach label for display.
-   */
-  getReachLabel(reach: ProfileReach | undefined): string {
-    return reach ? getReachLabel(reach) : 'Not set';
-  }
-
-  /**
-   * Format date for display.
-   */
-  formatDate(dateString: string | undefined): string {
-    if (!dateString) return 'Unknown';
-    try {
-      return new Date(dateString).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    } catch {
-      return dateString;
-    }
-  }
-
-  // ==========================================================================
-  // Discovery Helpers
-  // ==========================================================================
-
-  /**
-   * Get framework display name.
-   */
-  getFrameworkName(result: DiscoveryResult): string {
-    return getFrameworkDisplayName(result.framework);
-  }
-
-  /**
-   * Get category icon for a discovery result.
-   */
-  getCategoryIcon(result: DiscoveryResult): string {
-    return getCategoryIcon(result.category);
-  }
-
-  /**
-   * Toggle featured status for a discovery result.
-   */
-  toggleDiscoveryFeatured(resultId: string): void {
-    this.discoveryService.toggleFeatured(resultId);
-  }
-
-  /**
-   * Navigate to discovery assessment.
-   */
-  navigateToDiscovery(): void {
-    void this.router.navigate(['/lamad/discovery']);
-  }
-
-  // ==========================================================================
-  // Network / Agency Helpers
-  // ==========================================================================
-
-  /**
-   * Get CSS class for agency stage badge.
-   */
-  getStageBadgeClass(): string {
-    const stage = this.agencyState().currentStage;
-    return `stage-badge--${stage}`;
-  }
-
-  /**
-   * Get CSS class for connection status dot.
-   */
-  getStatusDotClass(): string {
-    const status = this.connectionStatus().state;
-    return `status-dot--${status}`;
-  }
-
-  /**
-   * Get icon for data location.
-   */
-  getLocationIcon(location: string): string {
-    const icons: Record<string, string> = {
-      'browser-memory': 'memory',
-      'browser-storage': 'storage',
-      'hosted-server': 'cloud',
-      'local-holochain': 'smartphone',
-      dht: 'lan',
-      'encrypted-backup': 'lock',
-    };
-    return icons[location] ?? 'folder';
-  }
-
-  /**
-   * Truncate hash for display.
-   */
-  truncateHash(hash: string | null): string {
-    if (!hash) return 'N/A';
-    if (hash.length <= 16) return hash;
-    return `${hash.substring(0, 8)}...${hash.substring(hash.length - 4)}`;
-  }
-
-  /**
-   * Copy value to clipboard.
-   */
-  async copyToClipboard(value: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      // Clipboard write failed silently - not all browsers support this API
-    }
-  }
-
-  /**
-   * Reconnect to network.
-   */
-  async reconnect(): Promise<void> {
-    await this.holochainService.disconnect();
-    await this.holochainService.connect();
-  }
-
-  /**
-   * Check if connected to network.
-   */
-  isConnected(): boolean {
-    return this.connectionStatus().state === 'connected';
-  }
-
-  // ==========================================================================
-  // Doorway Management
-  // ==========================================================================
-
-  /**
-   * Handle input event for doorway URL field.
-   */
-  onDoorwayUrlInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.newDoorwayUrl.set(input.value);
-  }
-
-  /**
-   * Toggle inline add-doorway form.
-   */
-  toggleAddDoorway(): void {
-    this.showAddDoorway.update(v => !v);
-    this.doorwayValidationError.set(null);
-    this.doorwayValidationResult.set(null);
-    this.newDoorwayUrl.set('');
-  }
-
-  /**
-   * Validate a doorway URL.
-   */
-  async validateNewDoorway(): Promise<void> {
-    const url = this.newDoorwayUrl().trim();
-    if (!url) return;
-
-    this.doorwayValidating.set(true);
-    this.doorwayValidationError.set(null);
-    this.doorwayValidationResult.set(null);
-
-    const result = await this.doorwayRegistry.validateDoorway(url);
-
-    this.doorwayValidating.set(false);
-    if (result.isValid && result.doorway) {
-      this.doorwayValidationResult.set({ name: result.doorway.name, url: result.doorway.url });
-    } else {
-      this.doorwayValidationError.set(result.error ?? 'Could not reach doorway');
-    }
-  }
-
-  /**
-   * Add the validated doorway and select it.
-   */
-  addValidatedDoorway(): void {
-    const result = this.doorwayValidationResult();
-    if (result) {
-      this.doorwayRegistry.selectDoorwayByUrl(result.url);
-      this.toggleAddDoorway();
-    }
-  }
-
-  /**
-   * Set a doorway as the primary/active one.
-   */
-  setDoorwayAsPrimary(doorwayUrl: string): void {
-    this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
   }
 }

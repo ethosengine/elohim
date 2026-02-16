@@ -1,0 +1,32 @@
+@if (results().length > 0) {
+  <div class="discovery-section">
+    <span class="section-title">Self-Discovery</span>
+    <div class="discovery-results">
+      @for (result of results(); track result.id) {
+        <div class="discovery-card">
+          <div class="discovery-icon">{{ getCategoryIcon(result) }}</div>
+          <div class="discovery-content">
+            <span class="discovery-framework">{{ getFrameworkName(result) }}</span>
+            <span class="discovery-result">{{ result.displayString }}</span>
+          </div>
+          <span class="discovery-short" [title]="result.displayString">
+            {{ result.shortDisplay }}
+          </span>
+        </div>
+      }
+    </div>
+    <button type="button" class="discovery-add-btn" (click)="navigateToDiscovery.emit()">
+      + Take a Discovery Assessment
+    </button>
+  </div>
+} @else {
+  <div class="discovery-section discovery-empty">
+    <span class="section-title">Self-Discovery</span>
+    <p class="discovery-empty-text">
+      Learn about yourself through personality, strengths, and values assessments.
+    </p>
+    <button type="button" class="btn btn-secondary" (click)="navigateToDiscovery.emit()">
+      Start a Discovery Assessment
+    </button>
+  </div>
+}

@@ -361,6 +361,32 @@
   flex-shrink: 0; /* Prevent header from shrinking */
 }
 
+/* Clickable profile header - links to identity profile */
+.profile-header-link {
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.profile-header-link:hover {
+  background: rgb(99 102 241 / 12%);
+}
+
+.profile-header-arrow {
+  width: 16px;
+  height: 16px;
+  color: var(--lamad-text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: color 0.2s;
+}
+
+.profile-header-link:hover .profile-header-arrow {
+  color: var(--lamad-accent-primary);
+}
+
 .profile-avatar-large {
   width: 3rem;
   height: 3rem;
@@ -462,6 +488,12 @@
   width: 18px;
   height: 18px;
   opacity: 70%;
+}
+
+.action-icon-emoji {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .action-label {

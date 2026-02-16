@@ -36,596 +36,163 @@
     @if (!isLoading()) {
       <!-- View Mode -->
       @if (!isEditing()) {
-        <div class="profile-view">
-          <!-- Avatar & Name -->
-          <div class="profile-identity">
-            <div class="avatar">{{ initials() }}</div>
-            <div class="identity-info">
-              <h2 class="display-name">{{ displayName() }}</h2>
-              <span class="mode-badge" [ngClass]="mode()">{{ mode() }}</span>
-            </div>
-          </div>
+        <!-- Profile Header (always visible) -->
+        <app-profile-header
+          [displayName]="displayName()"
+          [mode]="mode()"
+          [profile]="profile()"
+          [did]="did()"
+          [canEdit]="canEdit()"
+          (editProfile)="startEditing()"
+        />
 
-          <!-- Agency Stage -->
-          <div class="agency-section">
-            <span class="agency-label">Agency Stage</span>
-            <span class="agency-value">{{ agencyInfo().label }}</span>
-          </div>
-
-          <!-- Upgrade / Graduation Section -->
-          @if (canUpgrade()) {
-            <div class="upgrade-section" id="upgrade">
-              <span class="section-title">Upgrade to {{ nextStageLabel() }}</span>
-              @if (nextStageInfo(); as info) {
-                <p class="section-description">{{ info.description }}</p>
-                <ul class="upgrade-benefits">
-                  @for (benefit of info.benefits; track benefit) {
-                    <li>{{ benefit }}</li>
-                  }
-                </ul>
-              }
-
-              <!-- Graduation form (Tauri only) -->
-              @if (isGraduationEligible()) {
-                @if (graduationStatus() === 'confirmed') {
-                  <div class="graduation-success">
-                    <span class="material-icons">verified</span>
-                    <div>
-                      <strong>Stewardship confirmed!</strong>
-                      <p>
-                        Your keys are now on your device. The doorway conductor has been retired.
-                      </p>
-                    </div>
-                  </div>
-                } @else {
-                  <div class="graduation-form">
-                    <p class="graduation-prompt">
-                      Enter your password to sign the stewardship confirmation. This moves your
-                      identity to your device and frees doorway capacity.
-                    </p>
-                    <div class="form-group">
-                      <label for="graduationPassword">Password</label>
-                      <input
-                        id="graduationPassword"
-                        type="password"
-                        [(ngModel)]="graduationPassword"
-                        [disabled]="graduationStatus() === 'confirming'"
-                        placeholder="Your doorway password"
-                      />
-                    </div>
-                    @if (graduationError()) {
-                      <div class="error-banner" role="alert">
-                        <span class="error-icon">&#x2715;</span>
-                        <span>{{ graduationError() }}</span>
-                      </div>
-                    }
-                    <button
-                      type="button"
-                      class="btn btn-primary"
-                      (click)="confirmGraduation()"
-                      [disabled]="graduationStatus() === 'confirming' || !graduationPassword"
-                    >
-                      @if (graduationStatus() === 'confirming') {
-                        <span class="spinner"></span>
-                        Confirming...
-                      } @else {
-                        Confirm Stewardship
-                      }
-                    </button>
-                  </div>
-                }
-              }
-
-              <!-- Browser path (not Tauri) -->
-              @if (!isTauriApp()) {
-                <div class="upgrade-browser-info">
-                  <p>To upgrade to App Steward, download the Elohim desktop app:</p>
-                  <ol class="upgrade-steps">
-                    <li>Download and install the Elohim app</li>
-                    <li>Login to your doorway from the app</li>
-                    <li>Confirm stewardship to take control of your keys</li>
-                  </ol>
-                  <a
-                    href="https://elohim.host/download"
-                    target="_blank"
-                    rel="noopener"
-                    class="btn btn-secondary"
-                  >
-                    Download Elohim App
-                  </a>
-                </div>
-              }
-            </div>
-          }
-
-          <!-- Profile Details -->
-          @if (profile(); as p) {
-            <div class="profile-details">
-              <!-- Bio -->
-              @if (p.bio) {
-                <div class="detail-group">
-                  <span class="detail-label">Bio</span>
-                  <p class="detail-value bio">{{ p.bio }}</p>
-                </div>
-              }
-
-              <!-- Affinities -->
-              @if (p.affinities && p.affinities.length > 0) {
-                <div class="detail-group">
-                  <span class="detail-label">Interests</span>
-                  <div class="affinities">
-                    @for (affinity of p.affinities; track affinity) {
-                      <span class="affinity-tag">{{ affinity }}</span>
-                    }
-                  </div>
-                </div>
-              }
-
-              <!-- Location -->
-              @if (p.location) {
-                <div class="detail-group">
-                  <span class="detail-label">Location</span>
-                  <span class="detail-value">{{ p.location }}</span>
-                </div>
-              }
-
-              <!-- Profile Reach -->
-              <div class="detail-group">
-                <span class="detail-label">Visibility</span>
-                <span class="detail-value">{{ getReachLabel(p.profileReach) }}</span>
-              </div>
-
-              <!-- Member Since -->
-              <div class="detail-group">
-                <span class="detail-label">Member Since</span>
-                <span class="detail-value">{{ formatDate(p.createdAt) }}</span>
-              </div>
-            </div>
-          }
-
-          <!-- Discovery Results (Personality, Strengths, etc.) -->
-          @if (discoveryResults().length > 0 || allDiscoveryResults().length > 0) {
-            <div class="discovery-section">
-              <span class="section-title">Self-Discovery</span>
-              <div class="discovery-results">
-                @for (result of allDiscoveryResults(); track result.id) {
-                  <div class="discovery-card">
-                    <div class="discovery-icon">{{ getCategoryIcon(result) }}</div>
-                    <div class="discovery-content">
-                      <span class="discovery-framework">{{ getFrameworkName(result) }}</span>
-                      <span class="discovery-result">{{ result.displayString }}</span>
-                    </div>
-                    <span class="discovery-short" [title]="result.displayString">
-                      {{ result.shortDisplay }}
-                    </span>
-                  </div>
-                }
-              </div>
-              <button type="button" class="discovery-add-btn" (click)="navigateToDiscovery()">
-                + Take a Discovery Assessment
-              </button>
-            </div>
-          } @else {
-            <div class="discovery-section discovery-empty">
-              <span class="section-title">Self-Discovery</span>
-              <p class="discovery-empty-text">
-                Learn about yourself through personality, strengths, and values assessments.
-              </p>
-              <button type="button" class="btn btn-secondary" (click)="navigateToDiscovery()">
-                Start a Discovery Assessment
-              </button>
-            </div>
-          }
-
-          <!-- Other Attestations -->
-          @if (attestations().length > 0) {
-            <div class="attestations-section">
-              <span class="section-title">Attestations</span>
-              <div class="attestations">
-                @for (attestation of attestations(); track attestation) {
-                  <span class="attestation-badge">{{ attestation }}</span>
-                }
-              </div>
-            </div>
-          }
-
-          <!-- My Doorways -->
-          <div class="doorways-section">
-            <span class="section-title">My Doorways</span>
-            <p class="section-description">
-              Doorways are your connections to the Elohim network. Multiple doorways provide
-              redundancy for identity recovery.
-            </p>
-            <div class="doorway-cards">
-              @for (doorway of registeredDoorways(); track doorway.id) {
-                <div class="doorway-card" [class.active]="doorway.id === activeDoorway()?.id">
-                  <div class="doorway-header">
-                    <span
-                      class="doorway-status-dot"
-                      [class.online]="doorway.isReachable"
-                      [class.offline]="!doorway.isReachable"
-                    ></span>
-                    <strong>{{ doorway.name || doorway.id }}</strong>
-                    @if (doorway.id === activeDoorway()?.id) {
-                      <span class="doorway-active-badge">Active</span>
-                    }
-                  </div>
-                  <span class="doorway-url">{{ doorway.url }}</span>
-                  <div class="doorway-card-actions">
-                    @if (doorway.latencyMs) {
-                      <span class="doorway-latency">{{ doorway.latencyMs }}ms</span>
-                    }
-                    <a
-                      [href]="doorway.url"
-                      target="_blank"
-                      rel="noopener"
-                      class="doorway-visit-link"
-                    >
-                      Visit
-                      <span class="material-icons">open_in_new</span>
-                    </a>
-                    @if (doorway.id !== activeDoorway()?.id) {
-                      <button
-                        type="button"
-                        class="doorway-set-primary-btn"
-                        (click)="setDoorwayAsPrimary(doorway.url)"
-                      >
-                        Set as Primary
-                      </button>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
-
-            <!-- Add Doorway: inline form -->
-            @if (showAddDoorway()) {
-              <div class="add-doorway-form">
-                <div class="add-doorway-input-row">
-                  <input
-                    type="url"
-                    [value]="newDoorwayUrl()"
-                    (input)="onDoorwayUrlInput($event)"
-                    placeholder="https://doorway.example.com"
-                    [disabled]="doorwayValidating()"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-primary"
-                    (click)="validateNewDoorway()"
-                    [disabled]="doorwayValidating() || !newDoorwayUrl().trim()"
-                  >
-                    @if (doorwayValidating()) {
-                      <span class="spinner"></span>
-                    } @else {
-                      Validate
-                    }
-                  </button>
-                </div>
-                @if (doorwayValidationError()) {
-                  <div class="add-doorway-error">{{ doorwayValidationError() }}</div>
-                }
-                @if (doorwayValidationResult(); as validated) {
-                  <div class="add-doorway-success">
-                    <span>{{ validated.name }} ({{ validated.url }})</span>
-                    <button type="button" class="btn btn-primary" (click)="addValidatedDoorway()">
-                      Add
-                    </button>
-                  </div>
-                }
-                <button type="button" class="btn btn-secondary" (click)="toggleAddDoorway()">
-                  Cancel
-                </button>
-              </div>
-            } @else {
-              <button type="button" class="btn btn-secondary" (click)="toggleAddDoorway()">
-                + Add Doorway
-              </button>
-            }
-          </div>
-
-          <!-- Network & Agency Section -->
-          <div class="network-section" id="network">
-            <span class="section-title">
-              <span class="material-icons section-title-icon">lan</span>
-              Network & Agency
-            </span>
-
-            <!-- Agency Stage Card -->
-            <div class="agency-stage-card">
-              <div class="stage-header">
-                <span class="material-icons stage-icon">{{ agencyInfo().icon }}</span>
-                <div class="stage-info">
-                  <span class="stage-badge" [ngClass]="getStageBadgeClass()">
-                    {{ agencyInfo().label }}
-                  </span>
-                  <span class="stage-tagline">{{ agencyInfo().tagline }}</span>
-                </div>
-                <div class="connection-status">
-                  <span class="status-dot" [ngClass]="getStatusDotClass()"></span>
-                  <span class="status-label">{{ connectionStatus().label }}</span>
-                </div>
-              </div>
-              <p class="stage-description">{{ agencyInfo().description }}</p>
-
-              <!-- Stage Benefits & Limitations -->
-              <div class="stage-details">
-                <div class="benefits">
-                  <h4>Benefits</h4>
-                  <ul>
-                    @for (benefit of agencyInfo().benefits; track benefit) {
-                      <li>
-                        <span class="material-icons benefit-icon">check_circle</span>
-                        {{ benefit }}
-                      </li>
-                    }
-                  </ul>
-                </div>
-                <div class="limitations">
-                  <h4>Current Limitations</h4>
-                  <ul>
-                    @for (limitation of agencyInfo().limitations; track limitation) {
-                      <li>
-                        <span class="material-icons limitation-icon">info</span>
-                        {{ limitation }}
-                      </li>
-                    }
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <!-- Data Residency -->
-            <div class="data-residency-section">
-              <h3 class="subsection-title">
-                <span class="material-icons">storage</span>
-                Where Your Data Lives
-              </h3>
-              <p class="section-description">
-                Understanding where your data is stored helps you make informed decisions about your
-                digital sovereignty.
-              </p>
-
-              <div class="residency-grid">
-                @for (item of agencyState().dataResidency; track item.category) {
-                  <div class="residency-card">
-                    <div class="residency-header">
-                      <span class="material-icons residency-icon">{{ item.icon }}</span>
-                      <div class="residency-info">
-                        <span class="residency-label">{{ item.label }}</span>
-                        <span class="residency-location">{{ item.locationLabel }}</span>
-                      </div>
-                      <span class="material-icons location-icon">
-                        {{ getLocationIcon(item.location) }}
-                      </span>
-                    </div>
-                    <p class="residency-description">{{ item.description }}</p>
-                    <div class="residency-meta">
-                      <span class="meta-item" [class.exportable]="item.exportable">
-                        <span class="material-icons">
-                          {{ item.exportable ? 'download' : 'block' }}
-                        </span>
-                        {{ item.exportable ? 'Exportable' : 'Not Exportable' }}
-                      </span>
-                      <span class="meta-item" [class.deletable]="item.deletable">
-                        <span class="material-icons">
-                          {{ item.deletable ? 'delete' : 'lock' }}
-                        </span>
-                        {{ item.deletable ? 'Deletable' : 'Permanent' }}
-                      </span>
-                      <span class="meta-item controller">
-                        Controlled by: {{ item.controlledBy }}
-                      </span>
-                    </div>
-                  </div>
-                }
-              </div>
-            </div>
-
-            <!-- Connection Details (when connected) -->
-            @if (isConnected()) {
-              <div class="connection-section">
-                <h3 class="subsection-title">
-                  <span class="material-icons">cable</span>
-                  Connection Details
-                </h3>
-
-                <div class="connection-grid">
-                  <div class="connection-row">
-                    <span class="connection-label">Admin URL</span>
-                    <span class="connection-value monospace">{{ edgeNodeInfo().adminUrl }}</span>
-                  </div>
-
-                  @if (edgeNodeInfo().agentPubKey) {
-                    <div class="connection-row">
-                      <span class="connection-label">Agent Public Key</span>
-                      <div class="connection-value-with-copy">
-                        <code class="truncated" [title]="edgeNodeInfo().agentPubKey">
-                          {{ truncateHash(edgeNodeInfo().agentPubKey) }}
-                        </code>
-                        <button
-                          type="button"
-                          class="copy-btn"
-                          (click)="copyToClipboard(edgeNodeInfo().agentPubKey!)"
-                          title="Copy full key"
-                        >
-                          <span class="material-icons">content_copy</span>
-                        </button>
-                      </div>
-                    </div>
-                  }
-
-                  @if (edgeNodeInfo().dnaHash) {
-                    <div class="connection-row">
-                      <span class="connection-label">DNA Hash</span>
-                      <div class="connection-value-with-copy">
-                        <code class="truncated" [title]="edgeNodeInfo().dnaHash">
-                          {{ truncateHash(edgeNodeInfo().dnaHash) }}
-                        </code>
-                        <button
-                          type="button"
-                          class="copy-btn"
-                          (click)="copyToClipboard(edgeNodeInfo().dnaHash!)"
-                          title="Copy full hash"
-                        >
-                          <span class="material-icons">content_copy</span>
-                        </button>
-                      </div>
-                    </div>
-                  }
-
-                  @if (edgeNodeInfo().connectedAt) {
-                    <div class="connection-row">
-                      <span class="connection-label">Connected Since</span>
-                      <span class="connection-value">
-                        {{ edgeNodeInfo().connectedAt?.toLocaleString() }}
-                      </span>
-                    </div>
-                  }
-
-                  <div class="connection-row">
-                    <span class="connection-label">Credentials</span>
-                    <span
-                      class="connection-value"
-                      [class.stored]="edgeNodeInfo().hasStoredCredentials"
-                    >
-                      {{ edgeNodeInfo().hasStoredCredentials ? 'Stored in browser' : 'Not stored' }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="connection-actions">
-                  <button type="button" class="btn btn-secondary" (click)="reconnect()">
-                    <span class="material-icons">refresh</span>
-                    Reconnect
-                  </button>
-                </div>
-              </div>
-            }
-
-            <!-- Keys Section -->
-            @if (agencyState().keys.length > 0) {
-              <div class="keys-section">
-                <h3 class="subsection-title">
-                  <span class="material-icons">vpn_key</span>
-                  Your Keys
-                </h3>
-
-                <div class="keys-grid">
-                  @for (key of agencyState().keys; track key.type) {
-                    <div class="key-card">
-                      <div class="key-header">
-                        <span class="key-label">{{ key.label }}</span>
-                        <span class="key-type">{{ key.type }}</span>
-                      </div>
-                      <div class="key-value">
-                        <code [title]="key.value">{{ key.truncated }}</code>
-                        @if (key.canExport) {
-                          <button
-                            type="button"
-                            class="copy-btn"
-                            (click)="copyToClipboard(key.value)"
-                            title="Copy"
-                          >
-                            <span class="material-icons">content_copy</span>
-                          </button>
-                        }
-                      </div>
-                      <div class="key-actions">
-                        @if (key.canExport) {
-                          <span class="key-action exportable">
-                            <span class="material-icons">download</span>
-                            Exportable
-                          </span>
-                        }
-                        @if (key.canRevoke) {
-                          <span class="key-action revokable">
-                            <span class="material-icons">cancel</span>
-                            Revokable
-                          </span>
-                        }
-                      </div>
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-
-            <!-- Not Connected State -->
-            @if (!isConnected() && connectionStatus().state !== 'connecting') {
-              <div class="not-connected-section">
-                <div class="not-connected-card">
-                  <span class="material-icons not-connected-icon">cloud_off</span>
-                  <h3>Not Connected to Network</h3>
-                  <p>{{ connectionStatus().description }}</p>
-                  <button type="button" class="btn btn-primary" (click)="reconnect()">
-                    <span class="material-icons">wifi</span>
-                    Connect to Network
-                  </button>
-                </div>
-              </div>
-            }
-          </div>
-
-          <!-- Data Management Section -->
-          <div class="data-management-section">
-            <span class="section-title">
-              <span class="material-icons section-title-icon">download</span>
-              Data Management
-            </span>
-            <p class="section-description">
-              Export your identity and session data. You have full control over your data.
-            </p>
-            <button type="button" class="btn btn-secondary" (click)="exportData()">
-              <span class="material-icons">download</span>
-              Export Data
-            </button>
-          </div>
-
-          <!-- Contextual Settings Links -->
-          <div class="context-links-section">
-            <span class="section-title">Manage in Context</span>
-            <p class="section-description">
-              Your identity extends across different contexts. Manage specific aspects in each.
-            </p>
-            <div class="context-links">
-              <a routerLink="/shefa" class="context-link">
-                <span class="context-icon material-icons">memory</span>
-                <div class="context-info">
-                  <strong>Compute & Nodes</strong>
-                  <span>
-                    Manage your stewarded compute resources, node topology, and infrastructure
-                    tokens
-                  </span>
-                </div>
-                <span class="material-icons">chevron_right</span>
-              </a>
-              <a routerLink="/lamad/human" class="context-link">
-                <span class="context-icon material-icons">school</span>
-                <div class="context-info">
-                  <strong>Learning Profile</strong>
-                  <span>View your learning paths, progress, and achievements</span>
-                </div>
-                <span class="material-icons">chevron_right</span>
-              </a>
-            </div>
-          </div>
-
-          <!-- Edit Button -->
-          @if (canEdit()) {
-            <div class="profile-actions">
-              <button type="button" class="btn btn-primary" (click)="startEditing()">
-                Edit Profile
-              </button>
-            </div>
-          }
+        <!-- Tab Navigation -->
+        <div class="tab-bar" role="tablist" aria-label="Profile sections">
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.active]="activeTab() === 'identity'"
+            [attr.aria-selected]="activeTab() === 'identity'"
+            (click)="selectTab('identity')"
+          >
+            <span class="material-icons tab-icon">person</span>
+            Identity
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.active]="activeTab() === 'network'"
+            [attr.aria-selected]="activeTab() === 'network'"
+            (click)="selectTab('network')"
+          >
+            <span class="material-icons tab-icon">lan</span>
+            Network
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.active]="activeTab() === 'data'"
+            [attr.aria-selected]="activeTab() === 'data'"
+            (click)="selectTab('data')"
+          >
+            <span class="material-icons tab-icon">shield</span>
+            Data & Privacy
+          </button>
         </div>
+
+        <!-- Tab Panels -->
+
+        <!-- Identity Tab -->
+        @if (activeTab() === 'identity') {
+          <div class="tab-panel" role="tabpanel" aria-label="Identity">
+            @if (profile(); as p) {
+              <app-profile-identity-section [profile]="p" />
+            }
+
+            <app-profile-discovery-section
+              [results]="allDiscoveryResults()"
+              (navigateToDiscovery)="navigateToDiscovery()"
+            />
+
+            @if (isNetworkUser()) {
+              <app-profile-attestations-section [attestations]="attestations()" />
+            } @else {
+              @if (attestations().length === 0) {
+                <div class="empty-state-card">
+                  <span class="material-icons empty-state-icon">verified</span>
+                  <p>Join the network to earn attestations and build your reputation.</p>
+                  <a routerLink="/identity/register" class="btn btn-secondary">Join Network</a>
+                </div>
+              }
+            }
+
+            <!-- Contextual Links -->
+            <div class="context-links-section">
+              <span class="section-title">Manage in Context</span>
+              <div class="context-links">
+                <a routerLink="/shefa" class="context-link">
+                  <span class="context-icon material-icons">memory</span>
+                  <div class="context-info">
+                    <strong>Compute & Nodes</strong>
+                    <span>Manage your stewarded compute resources and infrastructure tokens</span>
+                  </div>
+                  <span class="material-icons">chevron_right</span>
+                </a>
+                <a routerLink="/lamad/human" class="context-link">
+                  <span class="context-icon material-icons">school</span>
+                  <div class="context-info">
+                    <strong>Learning Profile</strong>
+                    <span>View your learning paths, progress, and achievements</span>
+                  </div>
+                  <span class="material-icons">chevron_right</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Network Tab -->
+        @if (activeTab() === 'network') {
+          <div class="tab-panel" role="tabpanel" aria-label="Network">
+            <app-profile-agency-section
+              [agencyInfo]="agencyInfo()"
+              [agencyState]="agencyState()"
+              [connectionStatus]="connectionStatus()"
+              [canUpgrade]="canUpgrade()"
+              [nextStageInfo]="nextStageInfo()"
+              [nextStageLabel]="nextStageLabel()"
+              [isTauriApp]="isTauriApp()"
+              [graduationStatus]="graduationStatus()"
+              [graduationError]="graduationError()"
+              [isGraduationEligible]="isGraduationEligible()"
+              (confirmGraduation)="confirmGraduation($event)"
+            />
+
+            @if (isNetworkUser()) {
+              <app-profile-doorways-section
+                [doorways]="registeredDoorways()"
+                [activeDoorwayId]="activeDoorway()?.id ?? null"
+                (setAsPrimary)="setDoorwayAsPrimary($event)"
+                (validateDoorway)="validateDoorway($event)"
+                (addDoorway)="addDoorway($event)"
+              />
+
+              <app-profile-network-section
+                [agencyState]="agencyState()"
+                [connectionStatus]="connectionStatus()"
+                [edgeNodeInfo]="edgeNodeInfo()"
+                (reconnect)="reconnect()"
+              />
+            } @else {
+              <div class="empty-state-card">
+                <span class="material-icons empty-state-icon">cloud_off</span>
+                <p>Connect to a doorway to view your network details and manage connections.</p>
+                <a routerLink="/identity/register" class="btn btn-secondary">Join Network</a>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Data & Privacy Tab -->
+        @if (activeTab() === 'data') {
+          <div class="tab-panel" role="tabpanel" aria-label="Data and Privacy">
+            <app-profile-data-section
+              [isAuthenticated]="isAuthenticated()"
+              [hostingCost]="identityState().hostingCost"
+              [nodeOperatorIncome]="identityState().nodeOperatorIncome"
+              [keyBackup]="identityState().keyBackup"
+              (exportData)="exportData()"
+            />
+          </div>
+        }
       }
 
       <!-- Edit Mode -->
       @if (isEditing()) {
         <form class="profile-edit" (ngSubmit)="saveProfile()">
-          <!-- Display Name -->
           <div class="form-group">
             <label for="displayName">Display Name *</label>
             <input
@@ -639,7 +206,6 @@
             />
           </div>
 
-          <!-- Bio -->
           <div class="form-group">
             <label for="bio">Bio</label>
             <textarea
@@ -652,7 +218,6 @@
             ></textarea>
           </div>
 
-          <!-- Affinities -->
           <div class="form-group">
             <label for="affinities">Interests</label>
             <input
@@ -666,7 +231,6 @@
             <span class="hint">Comma-separated</span>
           </div>
 
-          <!-- Location -->
           <div class="form-group">
             <label for="location">Location</label>
             <input
@@ -679,7 +243,6 @@
             />
           </div>
 
-          <!-- Profile Reach -->
           <div class="form-group">
             <fieldset class="reach-options">
               <legend class="form-label">Visibility</legend>
@@ -701,7 +264,6 @@
             </fieldset>
           </div>
 
-          <!-- Form Actions -->
           <div class="form-actions">
             <button
               type="button"

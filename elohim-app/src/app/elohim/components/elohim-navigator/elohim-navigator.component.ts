@@ -307,16 +307,57 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Navigate to profile page.
-   * Authenticated users go to their network identity profile.
-   * Session users go to the lamad session profile (the only pillar with one).
+   * Navigate to the Imago Dei identity profile.
+   * Called from the profile-header section of the tray.
    */
-  goToProfile(): void {
+  goToIdentityProfile(): void {
     this.showProfileTray = false;
-    if (this.isAuthenticated()) {
-      void this.router.navigate(['/identity/profile']);
-    } else {
-      void this.router.navigate(['/lamad/human']);
+    void this.router.navigate(['/identity/profile']);
+  }
+
+  /**
+   * Navigate to the current app-context's profile/dashboard.
+   * Each pillar has its own relevant landing: lamad has a learning profile,
+   * shefa has a dashboard, etc.
+   */
+  goToContextProfile(): void {
+    this.showProfileTray = false;
+    void this.router.navigate([this.contextProfileRoute]);
+  }
+
+  /**
+   * Get the route for the current context's profile page.
+   */
+  get contextProfileRoute(): string {
+    switch (this.context) {
+      case 'lamad':
+        return '/lamad/human';
+      case 'shefa':
+        return '/shefa/dashboard';
+      case 'community':
+        return '/community';
+      case 'doorway':
+        return '/doorway';
+      default:
+        return '/lamad/human';
+    }
+  }
+
+  /**
+   * Get the label for the context profile action button.
+   */
+  get contextProfileLabel(): string {
+    switch (this.context) {
+      case 'lamad':
+        return 'Learning Profile';
+      case 'shefa':
+        return 'Shefa Dashboard';
+      case 'community':
+        return 'Community Home';
+      case 'doorway':
+        return 'Doorway Console';
+      default:
+        return 'View Profile';
     }
   }
 

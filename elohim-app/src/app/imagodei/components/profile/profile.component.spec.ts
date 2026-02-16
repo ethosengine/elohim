@@ -45,29 +45,75 @@ describe('ProfileComponent', () => {
         isAuthenticated: signal(true),
         attestations: signal([]),
         isLoading: signal(false),
+        did: signal('did:web:hosted.elohim.host:humans:human-123'),
+        identity: signal({
+          mode: 'hosted',
+          isAuthenticated: true,
+          humanId: 'human-123',
+          displayName: 'Test User',
+          agentPubKey: null,
+          did: 'did:web:hosted.elohim.host:humans:human-123',
+          profile: mockProfile,
+          attestations: [],
+          agencyStage: 'hosted',
+          keyLocation: 'custodial',
+          canExportKeys: false,
+          keyBackup: null,
+          isLocalConductor: false,
+          conductorUrl: null,
+          linkedSessionId: null,
+          hasPendingMigration: false,
+          hostingCost: null,
+          nodeOperatorIncome: null,
+          isLoading: false,
+          error: null,
+        }),
       }
     );
 
-    mockAgencyService = jasmine.createSpyObj(
-      'AgencyService',
-      [],
-      {
-        currentStage: signal('discovery'),
-        stageInfo: signal({ stage: 'discovery', description: 'Test', label: 'Discovery', icon: 'explore', tagline: 'Exploring', benefits: [], limitations: [] }),
-        canUpgrade: signal(false),
-        agencyState: signal({ currentStage: 'discovery', keys: [], dataResidency: [], migrationTarget: null }),
-        connectionStatus: signal({ state: 'offline', label: 'Offline', description: 'Not connected' }),
-      }
-    );
+    mockAgencyService = jasmine.createSpyObj('AgencyService', [], {
+      currentStage: signal('hosted'),
+      stageInfo: signal({
+        stage: 'hosted',
+        description: 'Test',
+        label: 'Hosted User',
+        icon: 'cloud',
+        tagline: 'Keys held by Elohim',
+        benefits: [],
+        limitations: [],
+        order: 2,
+      }),
+      canUpgrade: signal(false),
+      agencyState: signal({
+        currentStage: 'hosted',
+        keys: [],
+        dataResidency: [],
+        migrationTarget: null,
+        connectionStatus: { state: 'offline', label: 'Offline' },
+        stageInfo: {
+          stage: 'hosted',
+          label: 'Hosted User',
+          tagline: 'Keys held by Elohim',
+          description: 'Test',
+          icon: 'cloud',
+          benefits: [],
+          limitations: [],
+          order: 2,
+        },
+        hasStoredCredentials: false,
+        migrationAvailable: false,
+      }),
+      connectionStatus: signal({
+        state: 'offline',
+        label: 'Offline',
+        description: 'Not connected',
+      }),
+    });
 
-    mockDiscoveryService = jasmine.createSpyObj(
-      'DiscoveryAttestationService',
-      ['toggleFeatured'],
-      {
-        featuredResults: signal([]),
-        results: signal([]),
-      }
-    );
+    mockDiscoveryService = jasmine.createSpyObj('DiscoveryAttestationService', ['toggleFeatured'], {
+      featuredResults: signal([]),
+      results: signal([]),
+    });
 
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
 
@@ -87,6 +133,10 @@ describe('ProfileComponent', () => {
             selected: signal(null),
             selectedUrl: signal(null),
             hasSelection: signal(false),
+            selectDoorwayByUrl: jasmine.createSpy('selectDoorwayByUrl'),
+            validateDoorway: jasmine
+              .createSpy('validateDoorway')
+              .and.returnValue(Promise.resolve({ isValid: false })),
           },
         },
         {
@@ -96,7 +146,9 @@ describe('ProfileComponent', () => {
             graduationStatus: signal('idle'),
             graduationError: signal(''),
             isGraduationEligible: signal(false),
-            confirmStewardship: jasmine.createSpy('confirmStewardship').and.returnValue(Promise.resolve(false)),
+            confirmStewardship: jasmine
+              .createSpy('confirmStewardship')
+              .and.returnValue(Promise.resolve(false)),
           },
         },
         {
@@ -149,11 +201,30 @@ describe('ProfileComponent', () => {
     });
 
     it('should handle profile load failure silently', async () => {
-      mockIdentityService.getCurrentHuman.and.returnValue(Promise.reject(new Error('Network error')));
+      mockIdentityService.getCurrentHuman.and.returnValue(
+        Promise.reject(new Error('Network error'))
+      );
 
       await component.loadProfile();
 
       // Should not throw, just log warning
+    });
+  });
+
+  describe('Tab Navigation', () => {
+    it('should default to identity tab', () => {
+      expect(component.activeTab()).toBe('identity');
+    });
+
+    it('should switch tabs', () => {
+      component.selectTab('network');
+      expect(component.activeTab()).toBe('network');
+
+      component.selectTab('data');
+      expect(component.activeTab()).toBe('data');
+
+      component.selectTab('identity');
+      expect(component.activeTab()).toBe('identity');
     });
   });
 
@@ -210,32 +281,12 @@ describe('ProfileComponent', () => {
   });
 
   describe('Computed Properties', () => {
-    it('should compute initials from display name', () => {
-      expect(component.initials()).toBeTruthy();
-    });
-
-    it('should allow editing in network mode', () => {
+    it('should compute canEdit for network mode', () => {
       expect(component.canEdit()).toBe(true);
     });
-  });
 
-  describe('Formatters', () => {
-    it('should format date', () => {
-      const formatted = component.formatDate('2024-06-15T12:00:00Z');
-
-      expect(formatted).toContain('2024');
-    });
-
-    it('should handle missing date', () => {
-      const formatted = component.formatDate(undefined);
-
-      expect(formatted).toBe('Unknown');
-    });
-
-    it('should get reach label', () => {
-      const label = component.getReachLabel('community');
-
-      expect(label).toBeTruthy();
+    it('should compute isNetworkUser for hosted mode', () => {
+      expect(component.isNetworkUser()).toBe(true);
     });
   });
 
@@ -262,6 +313,20 @@ describe('ProfileComponent', () => {
       component.navigateToDiscovery();
 
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/discovery']);
+    });
+  });
+
+  describe('Helpers', () => {
+    it('should get reach label', () => {
+      const label = component.getReachLabel('community');
+
+      expect(label).toBeTruthy();
+    });
+
+    it('should return Not set for undefined reach', () => {
+      const label = component.getReachLabel(undefined);
+
+      expect(label).toBe('Not set');
     });
   });
 });
