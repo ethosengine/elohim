@@ -202,7 +202,10 @@ pub struct P2PPeersResponse {
 /// Queries local elohim-storage's /p2p/status endpoint and transforms the result.
 /// For StatefulSet pods (replicas > 1), iterates headless DNS names.
 pub async fn handle_federation_p2p_peers(state: Arc<AppState>) -> Response<Full<Bytes>> {
-    let storage_url = state.args.storage_url.clone()
+    let storage_url = state
+        .args
+        .storage_url
+        .clone()
         .unwrap_or_else(|| "http://localhost:8090".to_string());
 
     let mut peers = Vec::new();
@@ -272,23 +275,33 @@ async fn query_storage_p2p_status(
     base_url: &str,
 ) -> Result<P2PPeerInfo, String> {
     let url = format!("{}/p2p/status", base_url.trim_end_matches('/'));
-    let resp = client.get(&url).send().await
+    let resp = client
+        .get(&url)
+        .send()
+        .await
         .map_err(|e| format!("HTTP error: {}", e))?;
 
     if !resp.status().is_success() {
         return Err(format!("Non-200 status: {}", resp.status()));
     }
 
-    let body: serde_json::Value = resp.json().await
+    let body: serde_json::Value = resp
+        .json()
+        .await
         .map_err(|e| format!("JSON parse error: {}", e))?;
 
-    let peer_id = body["peer_id"].as_str()
+    let peer_id = body["peer_id"]
+        .as_str()
         .ok_or("Missing peer_id")?
         .to_string();
 
     let multiaddrs: Vec<String> = body["listen_addresses"]
         .as_array()
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     let nat_status = body["nat_status"].as_str().map(String::from);

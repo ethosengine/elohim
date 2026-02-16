@@ -10,9 +10,12 @@
 #
 # This prevents pushing broken code that wastes CI time.
 
-# ── Load nvm (git hooks run in minimal shell without it) ────────
+# ── Load toolchains (git hooks run in minimal shell) ────────────
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use default --silent
+
+# Rustup (cargo fmt, clippy, tests for doorway)
+[ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH"
 
 ZERO_SHA="0000000000000000000000000000000000000000"
 

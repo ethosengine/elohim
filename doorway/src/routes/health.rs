@@ -188,7 +188,11 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         .unwrap_or(0);
 
     // Read cached P2P health (non-blocking — uses try_read to avoid stalling health checks)
-    let p2p = state.p2p_health.try_read().ok().and_then(|guard| guard.clone());
+    let p2p = state
+        .p2p_health
+        .try_read()
+        .ok()
+        .and_then(|guard| guard.clone());
 
     HealthResponse {
         healthy: true, // Service is running
