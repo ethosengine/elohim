@@ -1,0 +1,88 @@
+# NATS for Doorway Alpha — host heartbeats, discovery, request routing
+#
+# NATS 2.10 with JetStream enabled for durable streams.
+# Used for:
+#   - Host heartbeat publishing (HC.HOST.HEARTBEAT)
+#   - Cross-doorway request routing (HC.WS.*)
+#   - Node bootstrap credential provisioning
+#
+# No auth — cluster-internal only (ClusterIP).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats
+  namespace: elohim-alpha
+  labels:
+    app: nats
+    environment: alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+      environment: alpha
+  template:
+    metadata:
+      labels:
+        app: nats
+        environment: alpha
+    spec:
+      nodeSelector:
+        node-type: operations
+      containers:
+        - name: nats
+          image: nats:2.10-alpine
+          args:
+            - "-js"
+            - "-m"
+            - "8222"
+          ports:
+            - name: client
+              containerPort: 4222
+              protocol: TCP
+            - name: monitoring
+              containerPort: 8222
+              protocol: TCP
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8222
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8222
+            initialDelaySeconds: 5
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: elohim-alpha
+  labels:
+    app: nats
+    environment: alpha
+spec:
+  type: ClusterIP
+  ports:
+    - name: client
+      port: 4222
+      targetPort: 4222
+      protocol: TCP
+    - name: monitoring
+      port: 8222
+      targetPort: 8222
+      protocol: TCP
+  selector:
+    app: nats
+    environment: alpha

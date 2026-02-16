@@ -85,13 +85,13 @@ impl From<std::io::Error> for DoorwayError {
 
 impl From<serde_json::Error> for DoorwayError {
     fn from(err: serde_json::Error) -> Self {
-        Self::BadRequest(format!("JSON error: {}", err))
+        Self::BadRequest(format!("JSON error: {err}"))
     }
 }
 
 impl From<hyper::Error> for DoorwayError {
     fn from(err: hyper::Error) -> Self {
-        Self::Internal(format!("HTTP error: {}", err))
+        Self::Internal(format!("HTTP error: {err}"))
     }
 }
 
@@ -115,7 +115,7 @@ impl From<mongodb::error::Error> for DoorwayError {
 
 impl From<jsonwebtoken::errors::Error> for DoorwayError {
     fn from(err: jsonwebtoken::errors::Error) -> Self {
-        Self::Unauthorized(format!("JWT error: {}", err))
+        Self::Unauthorized(format!("JWT error: {err}"))
     }
 }
 

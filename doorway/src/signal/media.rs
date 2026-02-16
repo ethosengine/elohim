@@ -58,10 +58,12 @@ impl MediaType {
 /// Quality preference for media streams
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum MediaQuality {
     /// Low bandwidth (audio: 32kbps, video: 240p)
     Low,
     /// Standard (audio: 64kbps, video: 480p)
+    #[default]
     Standard,
     /// High (audio: 128kbps, video: 720p)
     High,
@@ -87,12 +89,6 @@ impl MediaQuality {
             (MediaQuality::Max, MediaType::Screen) => 5000,
             (_, MediaType::Data) => 100, // Minimal for data channels
         }
-    }
-}
-
-impl Default for MediaQuality {
-    fn default() -> Self {
-        MediaQuality::Standard
     }
 }
 

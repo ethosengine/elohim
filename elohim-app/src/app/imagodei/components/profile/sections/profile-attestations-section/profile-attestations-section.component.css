@@ -1,0 +1,29 @@
+.attestations-section {
+  padding-top: 1rem;
+  border-top: 1px solid var(--surface-border, #dee2e6);
+}
+
+.section-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-color-secondary, #6c757d);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.attestations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.attestation-badge {
+  padding: 0.375rem 0.75rem;
+  background: var(--purple-100, #f3e8ff);
+  color: var(--purple-700, #7c3aed);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}

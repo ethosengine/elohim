@@ -35,11 +35,7 @@ pub struct HeartbeatService {
 
 impl HeartbeatService {
     /// Create a new heartbeat service
-    pub fn new(
-        node_id: String,
-        nats: Option<NatsClient>,
-        max_connections: i32,
-    ) -> Self {
+    pub fn new(node_id: String, nats: Option<NatsClient>, max_connections: i32) -> Self {
         Self {
             node_id,
             nats,
@@ -110,7 +106,7 @@ impl HeartbeatService {
         let heartbeat = self.create_heartbeat();
         let payload = heartbeat
             .to_bytes()
-            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize heartbeat: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize heartbeat: {e}")))?;
 
         nats.publish(HostHeartbeat::subject(), payload).await?;
         debug!(

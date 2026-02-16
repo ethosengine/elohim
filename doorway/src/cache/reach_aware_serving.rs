@@ -2,8 +2,8 @@
 //!
 //! Integrates reach-level access control with cache key generation and serving decisions.
 
-use crate::cache::{CacheKey, RequesterContext, can_serve_at_reach};
-use serde_json::{json, Value};
+use crate::cache::{can_serve_at_reach, CacheKey, RequesterContext};
+use serde_json::Value;
 use std::net::IpAddr;
 
 /// Extract reach level from API response data
@@ -29,10 +29,7 @@ pub fn extract_reach_from_response(response_data: &[u8]) -> Option<String> {
 }
 
 /// Create cache key with reach level for reach-aware caching
-pub fn create_reach_aware_cache_key(
-    cache_key: &CacheKey,
-    response_data: &[u8],
-) -> CacheKey {
+pub fn create_reach_aware_cache_key(cache_key: &CacheKey, response_data: &[u8]) -> CacheKey {
     if let Some(reach) = extract_reach_from_response(response_data) {
         // Create a copy with reach
         let mut key = cache_key.clone();
@@ -72,7 +69,7 @@ pub fn extract_requester_context(
 ) -> RequesterContext {
     // Simplified: extract agent ID from auth header (JWT, agent pubkey, etc.)
     let agent_id = auth_header
-        .and_then(|h| parse_agent_from_auth(h))
+        .and_then(parse_agent_from_auth)
         .unwrap_or_else(|| "anonymous".to_string());
 
     // Extract location from IP (simplified, would use GeoIP in production)
@@ -99,6 +96,7 @@ fn parse_agent_from_auth(auth_header: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_extract_reach_from_single_object() {

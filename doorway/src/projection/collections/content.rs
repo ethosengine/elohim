@@ -8,8 +8,8 @@ use mongodb::options::IndexOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use crate::db::schemas::Metadata;
 use crate::db::mongo::{IntoIndexes, MutMetadata};
+use crate::db::schemas::Metadata;
 
 /// Projected content document
 ///
@@ -121,58 +121,67 @@ impl Default for ContentProjection {
 
 impl ContentProjection {
     /// Create from raw content entry data
-    pub fn from_entry(
-        id: String,
-        action_hash: String,
-        author: String,
-        data: &JsonValue,
-    ) -> Self {
+    pub fn from_entry(id: String, action_hash: String, author: String, data: &JsonValue) -> Self {
         let now = DateTime::now();
 
         // Extract fields from JSON
-        let content_type = data.get("content_type")
+        let content_type = data
+            .get("content_type")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown")
             .to_string();
 
-        let title = data.get("title")
+        let title = data
+            .get("title")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
 
-        let description = data.get("description")
+        let description = data
+            .get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
 
-        let summary = data.get("summary")
+        let summary = data
+            .get("summary")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let content_format = data.get("content_format")
+        let content_format = data
+            .get("content_format")
             .and_then(|v| v.as_str())
             .unwrap_or("markdown")
             .to_string();
 
-        let tags: Vec<String> = data.get("tags")
+        let tags: Vec<String> = data
+            .get("tags")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let reach = data.get("reach")
+        let reach = data
+            .get("reach")
             .and_then(|v| v.as_str())
             .unwrap_or("private")
             .to_string();
 
-        let trust_score = data.get("trust_score")
+        let trust_score = data
+            .get("trust_score")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        let estimated_minutes = data.get("estimated_minutes")
+        let estimated_minutes = data
+            .get("estimated_minutes")
             .and_then(|v| v.as_u64())
             .map(|v| v as u32);
 
-        let content = data.get("content")
+        let content = data
+            .get("content")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
@@ -187,7 +196,7 @@ impl ContentProjection {
         search_tokens.dedup();
 
         Self {
-            mongo_id: Some(format!("content-{}", id)),
+            mongo_id: Some(format!("content-{id}")),
             id,
             action_hash,
             entry_hash: None,
@@ -215,7 +224,12 @@ impl ContentProjection {
     fn tokenize(text: &str) -> Vec<String> {
         text.split_whitespace()
             .filter(|word| word.len() >= 3)
-            .map(|word| word.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect())
+            .map(|word| {
+                word.to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect()
+            })
             .filter(|word: &String| !word.is_empty())
             .collect()
     }
@@ -238,7 +252,10 @@ impl IntoIndexes for ContentProjection {
             // Index by author
             (doc! { "author": 1 }, None),
             // Compound index for common queries
-            (doc! { "content_type": 1, "reach": 1, "projected_at": -1 }, None),
+            (
+                doc! { "content_type": 1, "reach": 1, "projected_at": -1 },
+                None,
+            ),
             // Search tokens index
             (doc! { "search_tokens": 1 }, None),
         ]

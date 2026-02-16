@@ -19,6 +19,7 @@ use crate::error::StorageError;
 
 /// Input for creating a local session (from native handoff)
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateLocalSessionInput {
     /// Session ID (optional, will be generated if not provided)
     #[serde(default)]

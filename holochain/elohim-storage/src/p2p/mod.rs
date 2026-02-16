@@ -29,17 +29,21 @@
 //! ```
 
 pub mod behaviour;
+pub mod kad_store;
 pub mod shard_protocol;
 pub mod sync_protocol;
 
 use futures::StreamExt;
 use libp2p::{
+    autonat, dcutr, identify,
     kad,
     mdns, noise,
-    request_response,
+    multiaddr::Protocol,
+    relay, request_response,
     swarm::{Swarm, SwarmEvent},
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
+use serde::Serialize;
 use sha2::{Sha256, Digest};
 use std::sync::Arc;
 use std::time::Duration;
@@ -51,7 +55,7 @@ use crate::error::StorageError;
 use crate::identity::NodeIdentity;
 use crate::sync::{DocStore, DocStoreConfig, SyncManager, StreamTracker};
 
-pub use behaviour::ElohimStorageBehaviour;
+pub use behaviour::{ElohimStorageBehaviour, RelayMode};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{SyncCodec, SyncProtocol, SyncRequest, SyncResponse, DocumentInfo};
 
@@ -70,6 +74,10 @@ pub struct P2PConfig {
     pub request_timeout: Duration,
     /// Storage directory for sync databases
     pub storage_dir: std::path::PathBuf,
+    /// Relay mode: Client (desktop steward), Server (K8s pod), Both (doorway host)
+    pub relay_mode: RelayMode,
+    /// Addresses to announce to the network (e.g., public IP/DNS multiaddrs)
+    pub announce_addresses: Vec<String>,
 }
 
 impl Default for P2PConfig {
@@ -83,6 +91,8 @@ impl Default for P2PConfig {
             storage_dir: dirs::data_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join("elohim-storage"),
+            relay_mode: RelayMode::default(),
+            announce_addresses: Vec::new(),
         }
     }
 }
@@ -101,6 +111,44 @@ pub struct P2PNode {
     sync_manager: Arc<SyncManager>,
     /// Shutdown signal
     shutdown_tx: broadcast::Sender<()>,
+    /// Status broadcast for HttpServer handle
+    status_tx: tokio::sync::watch::Sender<P2PStatusInfo>,
+    /// Current NAT status (updated by autonat events)
+    nat_status: Arc<RwLock<String>>,
+    /// Active relay reservation count
+    relay_reservations: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+/// P2P node status for observability
+#[derive(Debug, Clone, Serialize)]
+pub struct P2PStatusInfo {
+    pub peer_id: String,
+    pub listen_addresses: Vec<String>,
+    pub connected_peers: usize,
+    pub bootstrap_nodes: Vec<String>,
+    pub sync_documents: usize,
+    /// NAT status detected by autonat: "Unknown", "Public", "Private"
+    pub nat_status: String,
+    /// Number of active relay reservations
+    pub relay_reservations: usize,
+    /// Addresses announced to the network
+    pub announce_addresses: Vec<String>,
+    /// Relay mode this node is running in
+    pub relay_mode: String,
+}
+
+/// Send+Sync handle for querying P2P status from HttpServer.
+/// Separated from P2PNode because libp2p Swarm types are not Send.
+#[derive(Clone)]
+pub struct P2PHandle {
+    status_rx: tokio::sync::watch::Receiver<P2PStatusInfo>,
+}
+
+impl P2PHandle {
+    /// Get the latest P2P status snapshot
+    pub fn status(&self) -> P2PStatusInfo {
+        self.status_rx.borrow().clone()
+    }
 }
 
 impl P2PNode {
@@ -113,7 +161,7 @@ impl P2PNode {
         let keypair = identity.keypair().clone();
         let peer_id = *identity.peer_id();
 
-        // Build swarm
+        // Build swarm with relay client transport for NAT traversal
         let swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
             .with_tcp(
@@ -122,8 +170,10 @@ impl P2PNode {
                 yamux::Config::default,
             )
             .map_err(|e| StorageError::P2PNetwork(format!("Transport error: {}", e)))?
-            .with_behaviour(|key| {
-                ElohimStorageBehaviour::new(key.clone(), config.clone())
+            .with_relay_client(noise::Config::new, yamux::Config::default)
+            .map_err(|e| StorageError::P2PNetwork(format!("Relay client error: {}", e)))?
+            .with_behaviour(|key, relay_client| {
+                ElohimStorageBehaviour::new(key.clone(), config.clone(), relay_client)
             })
             .map_err(|e| StorageError::P2PNetwork(format!("Behaviour error: {}", e)))?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
@@ -140,7 +190,20 @@ impl P2PNode {
 
         let (shutdown_tx, _) = broadcast::channel(1);
 
-        info!(peer_id = %peer_id, "Created P2P node with sync support");
+        let initial_status = P2PStatusInfo {
+            peer_id: peer_id.to_string(),
+            listen_addresses: vec![],
+            connected_peers: 0,
+            bootstrap_nodes: config.bootstrap_nodes.clone(),
+            sync_documents: 0,
+            nat_status: "Unknown".to_string(),
+            relay_reservations: 0,
+            announce_addresses: config.announce_addresses.clone(),
+            relay_mode: config.relay_mode.to_string(),
+        };
+        let (status_tx, _) = tokio::sync::watch::channel(initial_status);
+
+        info!(peer_id = %peer_id, relay_mode = %config.relay_mode, "Created P2P node with NAT traversal");
 
         Ok(Self {
             identity,
@@ -149,6 +212,9 @@ impl P2PNode {
             blob_store,
             sync_manager,
             shutdown_tx,
+            status_tx,
+            nat_status: Arc::new(RwLock::new("Unknown".to_string())),
+            relay_reservations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         })
     }
 
@@ -172,18 +238,78 @@ impl P2PNode {
                 .map_err(|e| StorageError::P2PNetwork(format!("Listen error: {}", e)))?;
         }
 
+        // Add external addresses for announcement (e.g., public IP, DNS names)
+        for addr_str in &self.config.announce_addresses {
+            match addr_str.parse::<Multiaddr>() {
+                Ok(addr) => {
+                    swarm.add_external_address(addr.clone());
+                    info!(address = %addr, "Added external announce address");
+                }
+                Err(e) => {
+                    warn!("Invalid announce address '{}': {}", addr_str, e);
+                }
+            }
+        }
+
+        // Dial bootstrap nodes
+        for addr_str in &self.config.bootstrap_nodes {
+            let addr: Multiaddr = match addr_str.parse() {
+                Ok(a) => a,
+                Err(e) => {
+                    warn!("Invalid bootstrap multiaddr '{}': {}", addr_str, e);
+                    continue;
+                }
+            };
+
+            // Extract PeerId from multiaddr if present
+            let peer_id = addr.iter().find_map(|p| {
+                if let Protocol::P2p(peer_id) = p {
+                    Some(peer_id)
+                } else {
+                    None
+                }
+            });
+
+            match swarm.dial(addr.clone()) {
+                Ok(_) => {
+                    info!("Dialing bootstrap node: {}", addr);
+                    if let Some(peer_id) = peer_id {
+                        swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to dial bootstrap node {}: {}", addr, e);
+                }
+            }
+        }
+
         info!("P2P node started");
         Ok(())
     }
 
     /// Run the event loop (call in background task)
     pub async fn run(&self, mut shutdown: broadcast::Receiver<()>) {
+        // Initial status snapshot after start
+        self.refresh_status().await;
+
+        let mut status_interval = tokio::time::interval(Duration::from_secs(30));
+        let mut sync_interval = tokio::time::interval(Duration::from_secs(60));
+
         loop {
             let mut swarm = self.swarm.write().await;
 
             tokio::select! {
                 event = swarm.select_next_some() => {
+                    drop(swarm); // Release write lock before handling
                     self.handle_event(event).await;
+                }
+                _ = status_interval.tick() => {
+                    drop(swarm);
+                    self.refresh_status().await;
+                }
+                _ = sync_interval.tick() => {
+                    drop(swarm);
+                    self.initiate_sync_round().await;
                 }
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
@@ -199,11 +325,23 @@ impl P2PNode {
             SwarmEvent::NewListenAddr { address, .. } => {
                 info!(address = %address, "Listening on");
             }
-            SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+            SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 debug!(peer = %peer_id, "Connected to peer");
+                // In K8s (mDNS disabled), add connected peers to Kademlia for DHT routing.
+                // With mDNS enabled, discovery handles this (line 362-368). Without mDNS,
+                // peers dialed via DNS bootstrap connect but aren't added to Kademlia
+                // because DNS multiaddrs lack PeerIDs at deploy time.
+                if !self.config.enable_mdns {
+                    let addr = endpoint.get_remote_address().clone();
+                    let mut swarm = self.swarm.write().await;
+                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr.clone());
+                    info!(peer = %peer_id, addr = %addr, "Added peer to Kademlia (bootstrap connection)");
+                }
+                self.refresh_status().await;
             }
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");
+                self.refresh_status().await;
             }
             SwarmEvent::Behaviour(event) => {
                 self.handle_behaviour_event(event).await;
@@ -311,8 +449,7 @@ impl P2PNode {
                         request_id,
                         response,
                     } => {
-                        debug!(request_id = ?request_id, response = ?response, "Received sync response");
-                        // Response handling for outbound requests would go here
+                        self.handle_sync_response(peer, request_id, response).await;
                     }
                 }
             }
@@ -338,6 +475,80 @@ impl P2PNode {
                 request_response::Event::ResponseSent { peer, request_id },
             ) => {
                 debug!(peer = %peer, request_id = ?request_id, "Sync response sent");
+            }
+
+            // === NAT traversal events ===
+
+            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
+                peer_id,
+                info,
+            }) => {
+                info!(
+                    peer = %peer_id,
+                    agent = %info.agent_version,
+                    protocols = ?info.protocols.len(),
+                    "Identify: received peer info"
+                );
+                // Add observed addresses to Kademlia for better routing
+                let mut swarm = self.swarm.write().await;
+                for addr in info.listen_addrs {
+                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Sent { peer_id }) => {
+                debug!(peer = %peer_id, "Identify: sent our info to peer");
+            }
+            behaviour::ElohimStorageBehaviourEvent::Identify(event) => {
+                debug!(event = ?event, "Identify event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::AutoNat(autonat::Event::StatusChanged {
+                old,
+                new,
+            }) => {
+                let status_str = match &new {
+                    autonat::NatStatus::Public(_addr) => "Public",
+                    autonat::NatStatus::Private => "Private",
+                    autonat::NatStatus::Unknown => "Unknown",
+                };
+                info!(
+                    old = ?old,
+                    new = ?new,
+                    "AutoNAT: NAT status changed to {}",
+                    status_str
+                );
+                *self.nat_status.write().await = status_str.to_string();
+            }
+            behaviour::ElohimStorageBehaviourEvent::AutoNat(event) => {
+                debug!(event = ?event, "AutoNAT event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::RelayClient(
+                relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, .. },
+            ) => {
+                if renewal {
+                    debug!(relay = %relay_peer_id, "Relay: reservation renewed");
+                } else {
+                    info!(relay = %relay_peer_id, "Relay: reservation accepted");
+                    self.relay_reservations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::RelayClient(event) => {
+                debug!(event = ?event, "Relay client event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::RelayServer(event) => {
+                debug!(event = ?event, "Relay server event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::Dcutr(dcutr::Event {
+                remote_peer_id,
+                result,
+            }) => {
+                match result {
+                    Ok(_) => info!(peer = %remote_peer_id, "DCUtR: direct connection upgraded"),
+                    Err(ref e) => debug!(peer = %remote_peer_id, error = %e, "DCUtR: upgrade failed"),
+                }
             }
         }
     }
@@ -543,6 +754,114 @@ impl P2PNode {
         }
     }
 
+    /// Handle an outbound sync response from a peer.
+    /// Called when we receive responses to our sync requests (e.g., from initiate_sync_round).
+    async fn handle_sync_response(
+        &self,
+        peer: PeerId,
+        request_id: request_response::OutboundRequestId,
+        response: SyncResponse,
+    ) {
+        match response {
+            SyncResponse::DocumentList { app_id, documents, total, .. } => {
+                debug!(
+                    peer = %peer, app_id = %app_id, doc_count = documents.len(),
+                    total = total, "Received document list from peer"
+                );
+
+                // Compare with local documents and request changes for diverged ones
+                for remote_doc in &documents {
+                    match self.sync_manager.get_heads(&app_id, &remote_doc.doc_id).await {
+                        Ok(local_heads) => {
+                            if local_heads != remote_doc.heads {
+                                // Heads differ — request changes from this peer
+                                let sync_request = SyncRequest::SyncChanges {
+                                    app_id: app_id.clone(),
+                                    doc_id: remote_doc.doc_id.clone(),
+                                    have_heads: local_heads,
+                                    bloom_filter: None,
+                                };
+                                let mut swarm = self.swarm.write().await;
+                                let req_id = swarm
+                                    .behaviour_mut()
+                                    .sync_protocol
+                                    .send_request(&peer, sync_request);
+                                debug!(
+                                    peer = %peer, doc_id = %remote_doc.doc_id,
+                                    request_id = ?req_id, "Requested changes for diverged document"
+                                );
+                            }
+                        }
+                        Err(_) => {
+                            // Document doesn't exist locally — request full sync
+                            let sync_request = SyncRequest::SyncChanges {
+                                app_id: app_id.clone(),
+                                doc_id: remote_doc.doc_id.clone(),
+                                have_heads: vec![],
+                                bloom_filter: None,
+                            };
+                            let mut swarm = self.swarm.write().await;
+                            let req_id = swarm
+                                .behaviour_mut()
+                                .sync_protocol
+                                .send_request(&peer, sync_request);
+                            debug!(
+                                peer = %peer, doc_id = %remote_doc.doc_id,
+                                request_id = ?req_id, "Requested full sync for new document"
+                            );
+                        }
+                    }
+                }
+            }
+            SyncResponse::Changes { app_id, doc_id, changes, new_heads, .. } => {
+                if changes.is_empty() {
+                    debug!(peer = %peer, app_id = %app_id, doc_id = %doc_id, "No new changes from peer");
+                    return;
+                }
+                info!(
+                    peer = %peer, app_id = %app_id, doc_id = %doc_id,
+                    change_count = changes.len(), "Applying changes from peer"
+                );
+                if let Err(e) = self.sync_manager.apply_changes(&app_id, &doc_id, changes).await {
+                    warn!(
+                        peer = %peer, app_id = %app_id, doc_id = %doc_id,
+                        error = %e, "Failed to apply sync changes"
+                    );
+                } else {
+                    debug!(
+                        peer = %peer, doc_id = %doc_id,
+                        new_heads = ?new_heads, "Changes applied successfully"
+                    );
+                }
+            }
+            SyncResponse::Heads { app_id, doc_id, heads, .. } => {
+                // Compare with local heads and request changes if different
+                match self.sync_manager.get_heads(&app_id, &doc_id).await {
+                    Ok(local_heads) if local_heads != heads => {
+                        let sync_request = SyncRequest::SyncChanges {
+                            app_id: app_id.clone(),
+                            doc_id: doc_id.clone(),
+                            have_heads: local_heads,
+                            bloom_filter: None,
+                        };
+                        let mut swarm = self.swarm.write().await;
+                        swarm.behaviour_mut().sync_protocol.send_request(&peer, sync_request);
+                        debug!(peer = %peer, doc_id = %doc_id, "Heads differ, requesting changes");
+                    }
+                    _ => {
+                        debug!(peer = %peer, doc_id = %doc_id, "Heads match, in sync");
+                    }
+                }
+            }
+            SyncResponse::Error { message } => {
+                warn!(peer = %peer, request_id = ?request_id, error = %message, "Sync error from peer");
+            }
+            _ => {
+                debug!(peer = %peer, request_id = ?request_id, "Unhandled sync response type");
+            }
+        }
+    }
+
     /// Get shutdown sender for graceful shutdown
     pub fn shutdown_sender(&self) -> broadcast::Sender<()> {
         self.shutdown_tx.clone()
@@ -551,5 +870,70 @@ impl P2PNode {
     /// Get reference to sync manager for external use
     pub fn sync_manager(&self) -> &Arc<SyncManager> {
         &self.sync_manager
+    }
+
+    /// Create a Send+Sync handle for HttpServer to query P2P status
+    pub fn handle(&self) -> P2PHandle {
+        P2PHandle {
+            status_rx: self.status_tx.subscribe(),
+        }
+    }
+
+    /// Initiate a sync round with all connected peers.
+    /// Sends ListDocuments requests; responses arrive as SyncProtocol events
+    /// and are handled in `handle_behaviour_event`.
+    async fn initiate_sync_round(&self) {
+        let swarm = self.swarm.read().await;
+        let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+        drop(swarm);
+
+        if peers.is_empty() {
+            debug!("Sync round: no connected peers, skipping");
+            return;
+        }
+
+        info!(peer_count = peers.len(), "Initiating sync round");
+
+        for peer_id in peers {
+            let request = SyncRequest::ListDocuments {
+                app_id: "elohim".to_string(),
+                prefix: None,
+                offset: 0,
+                limit: 1000,
+            };
+
+            let mut swarm = self.swarm.write().await;
+            let request_id = swarm
+                .behaviour_mut()
+                .sync_protocol
+                .send_request(&peer_id, request);
+            debug!(peer = %peer_id, request_id = ?request_id, "Sent ListDocuments sync request");
+        }
+    }
+
+    /// Refresh the status snapshot (called from event loop)
+    async fn refresh_status(&self) {
+        let swarm = self.swarm.read().await;
+        let connected_peers = swarm.connected_peers().count();
+        let listen_addresses: Vec<String> = swarm.listeners()
+            .map(|a| a.to_string())
+            .collect();
+        let bootstrap_nodes: Vec<String> = self.config.bootstrap_nodes.clone();
+        let sync_documents = self.sync_manager.count_documents("_all").await.unwrap_or(0) as usize;
+        let nat_status = self.nat_status.read().await.clone();
+        let relay_reservations = self.relay_reservations.load(std::sync::atomic::Ordering::Relaxed);
+
+        let status = P2PStatusInfo {
+            peer_id: self.peer_id().to_string(),
+            listen_addresses,
+            connected_peers,
+            bootstrap_nodes,
+            sync_documents,
+            nat_status,
+            relay_reservations,
+            announce_addresses: self.config.announce_addresses.clone(),
+            relay_mode: self.config.relay_mode.to_string(),
+        };
+        let _ = self.status_tx.send(status);
     }
 }

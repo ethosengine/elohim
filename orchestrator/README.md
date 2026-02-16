@@ -65,7 +65,7 @@ The orchestrator monitors these endpoints after deployments:
 
 | Endpoint | URL |
 |----------|-----|
-| doorway-dev | https://doorway-dev.elohim.host/health |
+| doorway-dev | https://doorway-alpha.elohim.host/health |
 | doorway-prod | https://doorway.elohim.host/health |
 | alpha | https://alpha.elohim.host |
 | staging | https://staging.elohim.host |

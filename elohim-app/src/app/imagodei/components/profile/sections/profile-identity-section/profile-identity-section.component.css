@@ -1,0 +1,42 @@
+.profile-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-color-secondary, #6c757d);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detail-value {
+  color: var(--text-color, #1a1a2e);
+}
+
+.detail-value.bio {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.affinities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.affinity-tag {
+  padding: 0.25rem 0.75rem;
+  background: var(--primary-50, #eff6ff);
+  color: var(--primary-700, #1d4ed8);
+  border-radius: 16px;
+  font-size: 0.85rem;
+}

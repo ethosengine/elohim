@@ -3,7 +3,6 @@
 //! Provides helper functions for calling specific zome functions from the
 //! doorway's HTTP handlers, particularly for identity management operations.
 
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -66,13 +65,11 @@ pub struct Human {
 /// # Returns
 /// * `Ok(HumanOutput)` - Created human with action_hash
 /// * `Err(DoorwayError)` - If worker pool unavailable, zome config not found, or zome call fails
-pub async fn call_create_human(
-    state: &AppState,
-    input: CreateHumanInput,
-) -> Result<HumanOutput> {
+pub async fn call_create_human(state: &AppState, input: CreateHumanInput) -> Result<HumanOutput> {
     // Get worker pool for APP interface
-    let pool = state.pool.as_ref()
-        .ok_or_else(|| DoorwayError::Internal("Worker pool not available - conductor not connected?".into()))?;
+    let pool = state.pool.as_ref().ok_or_else(|| {
+        DoorwayError::Internal("Worker pool not available - conductor not connected?".into())
+    })?;
 
     // Get imagodei zome config
     let zome_config = get_zome_config_by_role(state, "imagodei")?;
@@ -88,11 +85,14 @@ pub async fn call_create_human(
     let payload = builder.build_zome_call("create_human", &input)?;
 
     // Send via worker pool
-    let response = pool.request(payload).await
-        .map_err(|e| DoorwayError::Holochain(format!("Zome call failed: {}", e)))?;
+    let response = pool
+        .request(payload)
+        .await
+        .map_err(|e| DoorwayError::Holochain(format!("Zome call failed: {e}")))?;
 
     // Parse response
-    let result: HumanOutput = builder.parse_response(&response)?
+    let result: HumanOutput = builder
+        .parse_response(&response)?
         .ok_or_else(|| DoorwayError::Holochain("Empty response from create_human".into()))?;
 
     debug!(
@@ -114,11 +114,13 @@ pub fn get_agent_pub_key(state: &AppState) -> Result<String> {
     }
 
     // Fall back to first available config
-    for entry in state.zome_configs.iter() {
+    if let Some(entry) = state.zome_configs.iter().next() {
         return Ok(entry.value().agent_pub_key.clone());
     }
 
-    Err(DoorwayError::Internal("No zome configs discovered - conductor not ready?".into()))
+    Err(DoorwayError::Internal(
+        "No zome configs discovered - conductor not ready?".into(),
+    ))
 }
 
 // =============================================================================
@@ -142,7 +144,9 @@ fn get_zome_config_by_role(state: &AppState, role_name: &str) -> Result<ZomeCall
     }
 
     // Log available configs for debugging
-    let available: Vec<String> = state.zome_configs.iter()
+    let available: Vec<String> = state
+        .zome_configs
+        .iter()
         .map(|e| e.value().role_name.clone())
         .collect();
     warn!(
@@ -152,8 +156,7 @@ fn get_zome_config_by_role(state: &AppState, role_name: &str) -> Result<ZomeCall
     );
 
     Err(DoorwayError::Internal(format!(
-        "No zome config found for role '{}'. Available: {:?}",
-        role_name, available
+        "No zome config found for role '{role_name}'. Available: {available:?}"
     )))
 }
 

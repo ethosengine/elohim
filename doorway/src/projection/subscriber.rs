@@ -149,10 +149,7 @@ pub enum HolochainMessage {
         signal: JsonValue,
     },
     /// Response to a request
-    Response {
-        id: u64,
-        data: JsonValue,
-    },
+    Response { id: u64, data: JsonValue },
 }
 
 /// Signal from Holochain conductor (app interface format)
@@ -398,11 +395,11 @@ impl SignalSubscriber {
                 tokio_tungstenite::tungstenite::handshake::client::generate_key(),
             )
             .body(())
-            .map_err(|e| format!("Failed to build request: {}", e))?;
+            .map_err(|e| format!("Failed to build request: {e}"))?;
 
         let (ws_stream, _) = connect_async_with_config(request, None, false)
             .await
-            .map_err(|e| format!("WebSocket connect failed: {}", e))?;
+            .map_err(|e| format!("WebSocket connect failed: {e}"))?;
 
         debug!("WebSocket connected, sending authentication...");
 
@@ -432,7 +429,7 @@ impl SignalSubscriber {
                 // Send periodic ping
                 _ = ping_interval.tick() => {
                     if let Err(e) = write.send(Message::Ping(vec![])).await {
-                        return Err(format!("Ping failed: {}", e));
+                        return Err(format!("Ping failed: {e}"));
                     }
                 }
 
@@ -454,7 +451,7 @@ impl SignalSubscriber {
                             return Ok(());
                         }
                         Some(Err(e)) => {
-                            return Err(format!("WebSocket error: {}", e));
+                            return Err(format!("WebSocket error: {e}"));
                         }
                         None => {
                             return Err("WebSocket stream ended".to_string());
@@ -485,17 +482,13 @@ impl SignalSubscriber {
 
         let mut inner_buf = Vec::new();
         rmpv::encode::write_value(&mut inner_buf, &inner)
-            .map_err(|e| format!("Failed to encode auth request: {}", e))?;
+            .map_err(|e| format!("Failed to encode auth request: {e}"))?;
 
-        // Wrap in request envelope with id=0
+        // Wrap in authenticate envelope (Holochain 0.6 format: { type: "authenticate", data: <binary> })
         let envelope = rmpv::Value::Map(vec![
             (
-                rmpv::Value::String("id".into()),
-                rmpv::Value::Integer(0.into()),
-            ),
-            (
                 rmpv::Value::String("type".into()),
-                rmpv::Value::String("request".into()),
+                rmpv::Value::String("authenticate".into()),
             ),
             (
                 rmpv::Value::String("data".into()),
@@ -505,12 +498,12 @@ impl SignalSubscriber {
 
         let mut buf = Vec::new();
         rmpv::encode::write_value(&mut buf, &envelope)
-            .map_err(|e| format!("Failed to encode envelope: {}", e))?;
+            .map_err(|e| format!("Failed to encode envelope: {e}"))?;
 
         write
             .send(Message::Binary(buf))
             .await
-            .map_err(|e| format!("Failed to send auth request: {}", e))?;
+            .map_err(|e| format!("Failed to send auth request: {e}"))?;
 
         debug!("Sent AppAuthenticationRequest");
         Ok(())
@@ -525,22 +518,21 @@ impl SignalSubscriber {
         S: futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
             + Unpin,
     {
-        let response = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::time::timeout(Duration::from_secs(5), async {
             while let Some(msg) = read.next().await {
                 match msg {
                     Ok(Message::Binary(data)) => {
                         // Parse response to check for errors
-                        if let Ok(value) = rmpv::decode::read_value(&mut std::io::Cursor::new(&data))
+                        if let Ok(rmpv::Value::Map(ref map)) =
+                            rmpv::decode::read_value(&mut std::io::Cursor::new(&data))
                         {
-                            if let rmpv::Value::Map(ref map) = value {
-                                // Check for error response
-                                for (k, v) in map {
-                                    if let rmpv::Value::String(key) = k {
-                                        if key.as_str() == Some("type") {
-                                            if let rmpv::Value::String(val) = v {
-                                                if val.as_str() == Some("error") {
-                                                    return Err("Authentication rejected".to_string());
-                                                }
+                            // Check for error response
+                            for (k, v) in map {
+                                if let rmpv::Value::String(key) = k {
+                                    if key.as_str() == Some("type") {
+                                        if let rmpv::Value::String(val) = v {
+                                            if val.as_str() == Some("error") {
+                                                return Err("Authentication rejected".to_string());
                                             }
                                         }
                                     }
@@ -554,7 +546,7 @@ impl SignalSubscriber {
                         return Err("Connection closed during auth".to_string());
                     }
                     Err(e) => {
-                        return Err(format!("WebSocket error: {}", e));
+                        return Err(format!("WebSocket error: {e}"));
                     }
                     _ => continue,
                 }
@@ -564,7 +556,7 @@ impl SignalSubscriber {
         .await
         .map_err(|_| "Timeout waiting for auth response".to_string())??;
 
-        Ok(response)
+        Ok(())
     }
 
     /// Handle a text message from conductor
@@ -661,7 +653,12 @@ impl SignalSubscriber {
     /// of truth for blob metadata, TieredBlobCache is bytes-only).
     fn process_infrastructure_signal(&self, signal: InfrastructureSignal) {
         match signal {
-            InfrastructureSignal::ContentServerCommitted { server, author, action_hash, .. } => {
+            InfrastructureSignal::ContentServerCommitted {
+                server,
+                author,
+                action_hash,
+                ..
+            } => {
                 // Build endpoint URLs from endpoints list (preferred) or serve_url (deprecated)
                 let mut endpoint_urls: Vec<String> = server
                     .endpoints
@@ -695,7 +692,7 @@ impl SignalSubscriber {
                     let signal = ProjectionSignal {
                         doc_type: "BlobEndpoint".to_string(), // Metadata only, not stored as doc
                         action: "update_endpoints".to_string(),
-                        id: content_hash.clone(),             // blob_hash
+                        id: content_hash.clone(),           // blob_hash
                         data: json!(endpoint_urls.clone()), // Array of endpoint URLs
                         action_hash,
                         entry_hash: None,
@@ -706,7 +703,10 @@ impl SignalSubscriber {
                     };
 
                     if let Err(e) = self.signal_tx.send(signal) {
-                        warn!("Failed to send endpoint update signal (no receivers?): {}", e);
+                        warn!(
+                            "Failed to send endpoint update signal (no receivers?): {}",
+                            e
+                        );
                     }
 
                     // Also send to blob_registry_tx for backwards compatibility
@@ -980,7 +980,10 @@ mod tests {
                 assert!(signal.data.as_array().is_some());
                 let endpoints = signal.data.as_array().unwrap();
                 assert_eq!(endpoints.len(), 1);
-                assert_eq!(endpoints[0].as_str().unwrap(), "http://localhost:8080/store");
+                assert_eq!(
+                    endpoints[0].as_str().unwrap(),
+                    "http://localhost:8080/store"
+                );
             }
             Err(_) => panic!("Expected ProjectionSignal to be emitted for update_endpoints"),
         }

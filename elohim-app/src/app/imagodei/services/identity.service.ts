@@ -275,6 +275,9 @@ export class IdentityService {
   /** Track if we've already tried checking Holochain identity (avoid retrying on error) */
   private hasCheckedHolochainIdentity = false;
 
+  /** Gate for auth effect - prevents processing restored auth during init */
+  private readonly initCompleted = signal(false);
+
   // ==========================================================================
   // Public Signals (read-only)
   // ==========================================================================
@@ -355,6 +358,13 @@ export class IdentityService {
       if (isConnected && currentMode === 'session') {
         // Holochain just connected - check if we have an identity there
         void this.checkHolochainIdentity();
+      } else if (
+        isConnected &&
+        currentMode === 'hosted' &&
+        !untracked(() => this.identitySignal().profile)
+      ) {
+        // Holochain connected late - re-fetch profile from DHT
+        void this.retryHolochainProfileFetch();
       } else if (!isConnected && isNetworkMode(currentMode)) {
         // Holochain disconnected - fall back to session
         this.fallbackToSession();
@@ -363,8 +373,12 @@ export class IdentityService {
 
     // Watch for auth state changes (login/logout)
     // Use untracked() to read identity mode without creating a dependency
+    // Gated by initCompleted to prevent processing restored auth during init
     effect(() => {
       const auth = this.authService.auth();
+      const ready = this.initCompleted();
+
+      if (!ready) return; // Don't process restored auth during init
 
       if (auth.isAuthenticated && auth.humanId && auth.agentPubKey) {
         // Read mode without tracking - only react to auth changes
@@ -442,6 +456,9 @@ export class IdentityService {
     // This handles the case where AuthService restored a token from localStorage
     // but doesn't have humanId/agentPubKey (they weren't persisted)
     await this.fetchRestoredSessionIdentity();
+
+    // Signal that init is complete - auth effect can now process new logins
+    this.initCompleted.set(true);
   }
 
   /**
@@ -465,18 +482,17 @@ export class IdentityService {
     try {
       const identity = await provider.getCurrentUser(auth.token);
       if (identity) {
-        // Now connect as the authenticated user
-        await this.connectAsAuthenticatedUser(identity.humanId, identity.agentPubKey);
+        // Now connect as the authenticated user (this is a restore, not a fresh login)
+        await this.connectAsAuthenticatedUser(identity.humanId, identity.agentPubKey, true);
       }
     } catch (error) {
-      // Expected error during app initialization when session restoration fails
-      // This can happen when: 1) token is expired, 2) server session invalidated, 3) network unavailable
-      // We intentionally handle this by allowing app to start in visitor mode
+      // Token is unvalidated - clear it to prevent partial login state
+      // This handles: 1) expired token, 2) server session invalidated, 3) network unavailable
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes('NetworkError') || message.includes('timeout')) {
         console.warn('[IdentityService] Session restoration failed due to network:', message);
       }
-      // Other errors (expired token, invalid session) are expected - no logging needed
+      await this.authService.logout();
     }
   }
 
@@ -1047,14 +1063,23 @@ export class IdentityService {
   }
 
   /**
-   * Connect to Holochain as an authenticated user (after login).
-   * This is called by the auth state effect when login succeeds.
+   * Connect to Holochain as an authenticated user (after login or session restore).
+   * This is called by the auth state effect when login succeeds, or by
+   * fetchRestoredSessionIdentity when restoring a persisted session.
+   *
+   * @param humanId - The authenticated human ID
+   * @param agentPubKey - The agent public key
+   * @param isRestore - Whether this is a restored session (vs fresh login)
    */
-  private async connectAsAuthenticatedUser(humanId: string, agentPubKey: string): Promise<void> {
+  private async connectAsAuthenticatedUser(
+    humanId: string,
+    agentPubKey: string,
+    isRestore = false
+  ): Promise<void> {
     // For hosted mode, the edge node holds the keys
     // We need to verify the identity and load the profile
 
-    const isConnected = await this.ensureHolochainConnection(humanId, agentPubKey);
+    const isConnected = await this.ensureHolochainConnection(humanId, agentPubKey, isRestore);
     if (!isConnected) {
       return;
     }
@@ -1064,29 +1089,56 @@ export class IdentityService {
 
       if (result.success && result.data) {
         this.updateAuthenticatedIdentityState(result.data);
+      } else {
+        // Holochain connected but no profile found (DHT not synced yet or new agent)
+        // Show authenticated state with minimal info from the auth token
+        this.setMinimalAuthenticatedState(humanId, agentPubKey);
       }
     } catch (error) {
-      // Error loading full profile - fall back to minimal authenticated state
-      // This can happen if the zome call fails or the network is unstable
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn('[IdentityService] Failed to load full profile, using minimal state:', message);
-      this.setMinimalAuthenticatedState(humanId, agentPubKey);
+      if (isRestore) {
+        // Restored session can't load profile - clear auth and fall back
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn('[IdentityService] Restored session failed to load profile:', message);
+        await this.authService.logout();
+        this.fallbackToSession();
+      } else {
+        // Fresh login - show minimal state (token is valid from doorway response)
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(
+          '[IdentityService] Failed to load full profile, using minimal state:',
+          message
+        );
+        this.setMinimalAuthenticatedState(humanId, agentPubKey);
+      }
     }
   }
 
   /**
    * Ensure Holochain is connected, waiting if necessary.
-   * Sets minimal state if connection cannot be established.
+   * On timeout: restored sessions clear auth and fallback; fresh logins set minimal state.
    *
+   * @param humanId - The authenticated human ID
+   * @param agentPubKey - The agent public key
+   * @param isRestore - Whether this is a restored session (vs fresh login)
    * @returns True if connected, false if fallback state was set
    */
-  private async ensureHolochainConnection(humanId: string, agentPubKey: string): Promise<boolean> {
+  private async ensureHolochainConnection(
+    humanId: string,
+    agentPubKey: string,
+    isRestore = false
+  ): Promise<boolean> {
     if (!this.holochainClient.isConnected()) {
       // Wait up to 10 seconds for connection
       const connected = await this.waitForHolochainConnection(10000);
       if (!connected) {
-        // Still update state to show logged-in UI, just without full profile
-        this.setMinimalAuthenticatedState(humanId, agentPubKey);
+        if (isRestore) {
+          // Restored session can't reach Holochain - clear auth, fall back to session
+          await this.authService.logout();
+          this.fallbackToSession();
+        } else {
+          // Fresh login - show minimal state (token is valid from doorway response)
+          this.setMinimalAuthenticatedState(humanId, agentPubKey);
+        }
         return false;
       }
     }
@@ -1154,13 +1206,17 @@ export class IdentityService {
     // Generate DID for hosted identity
     const did = generateDID('hosted', humanId, agentPubKey, null);
 
+    // Use identifier (email) as display name, not humanId (UUID/pub key)
+    const identifier = this.authService.identifier();
+    const displayName = identifier ?? humanId;
+
     this.updateState({
       mode: 'hosted',
       isAuthenticated: true,
       humanId,
       agentPubKey,
       did,
-      displayName: humanId, // Use humanId as fallback display name
+      displayName,
       agencyStage: 'hosted',
       keyLocation: 'custodial',
       canExportKeys: true,
@@ -1170,6 +1226,28 @@ export class IdentityService {
       isLoading: false,
       error: null,
     });
+  }
+
+  /**
+   * Retry fetching the Holochain profile after late connection.
+   * Called when Holochain connects after setMinimalAuthenticatedState was used.
+   */
+  private async retryHolochainProfileFetch(): Promise<void> {
+    if (this.isCheckingIdentity) return;
+    this.isCheckingIdentity = true;
+    try {
+      const result = await this.fetchHolochainIdentity();
+      if (result.success && result.data) {
+        this.updateAuthenticatedIdentityState(result.data);
+      }
+    } catch (error) {
+      console.warn(
+        '[IdentityService] Retry profile fetch failed:',
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      this.isCheckingIdentity = false;
+    }
   }
 
   // ==========================================================================

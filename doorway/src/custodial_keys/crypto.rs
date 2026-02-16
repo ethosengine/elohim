@@ -106,14 +106,14 @@ pub fn derive_key_encryption_key(password: &[u8], salt: &[u8]) -> Result<[u8; 32
         ARGON2_PARALLELISM,
         Some(32),
     )
-    .map_err(|e| DoorwayError::Internal(format!("Invalid Argon2 params: {}", e)))?;
+    .map_err(|e| DoorwayError::Internal(format!("Invalid Argon2 params: {e}")))?;
 
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
     let mut key = [0u8; 32];
     argon2
         .hash_password_into(password, salt, &mut key)
-        .map_err(|e| DoorwayError::Internal(format!("Key derivation failed: {}", e)))?;
+        .map_err(|e| DoorwayError::Internal(format!("Key derivation failed: {e}")))?;
 
     Ok(key)
 }
@@ -147,7 +147,7 @@ pub fn encrypt_private_key(
     let cipher = ChaCha20Poly1305::new(Key::from_slice(encryption_key));
     let ciphertext = cipher
         .encrypt(Nonce::from_slice(nonce), private_key.as_slice())
-        .map_err(|e| DoorwayError::Internal(format!("Encryption failed: {}", e)))?;
+        .map_err(|e| DoorwayError::Internal(format!("Encryption failed: {e}")))?;
 
     Ok(ciphertext)
 }

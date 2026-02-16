@@ -21,8 +21,8 @@
  * // Connect to Holochain
  * const result = await strategy.connect({
  *   mode: 'doorway',
- *   adminUrl: 'wss://doorway-dev.elohim.host',
- *   appUrl: 'wss://doorway-dev.elohim.host',
+ *   adminUrl: 'wss://doorway-alpha.elohim.host',
+ *   appUrl: 'wss://doorway-alpha.elohim.host',
  *   appId: 'elohim',
  * });
  * ```

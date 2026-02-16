@@ -107,7 +107,7 @@ interface TauriMode {
 │       ↓                                                          │
 │  ElohimClient.get('content', id)                                 │
 │       ↓                                                          │
-│  HTTP GET https://doorway-dev.elohim.host/api/v1/content/{id}    │
+│  HTTP GET https://doorway-alpha.elohim.host/api/v1/content/{id}    │
 │       ↓                                                          │
 │  Doorway Projection Store (MongoDB cache of SQLite)              │
 │       ↓                                                          │

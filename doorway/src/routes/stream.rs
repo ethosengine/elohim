@@ -25,7 +25,7 @@ use http_body_util::Full;
 use hyper::{Response, StatusCode};
 use std::sync::Arc;
 
-use crate::cache::{BlobMetadata, VariantMetadata};
+use crate::cache::BlobMetadata;
 use crate::server::AppState;
 use crate::services::CustodianSelectionCriteria;
 
@@ -189,7 +189,11 @@ pub async fn handle_chunk(
 
     // For now, return a redirect to the first custodian URL
     // In production, we would fetch and cache the chunk
-    let chunk_url = format!("{}/chunk/{}", urls[0].trim_end_matches(&format!("/{}", blob_hash)), chunk_index);
+    let chunk_url = format!(
+        "{}/chunk/{}",
+        urls[0].trim_end_matches(&format!("/{blob_hash}")),
+        chunk_index
+    );
 
     Response::builder()
         .status(StatusCode::TEMPORARY_REDIRECT)
@@ -209,8 +213,16 @@ pub async fn handle_blob_range(
     range_end: usize,
 ) -> Response<Full<Bytes>> {
     // Try to get range from tiered cache
-    if let Some(data) = state.tiered_cache.get_blob_range(blob_hash, range_start, range_end) {
-        let content_range = format!("bytes {}-{}/{}", range_start, range_end - 1, range_end - range_start);
+    if let Some(data) = state
+        .tiered_cache
+        .get_blob_range(blob_hash, range_start, range_end)
+    {
+        let content_range = format!(
+            "bytes {}-{}/{}",
+            range_start,
+            range_end - 1,
+            range_end - range_start
+        );
         return Response::builder()
             .status(StatusCode::PARTIAL_CONTENT)
             .header("Content-Type", "application/octet-stream")
@@ -245,13 +257,12 @@ pub fn generate_hls_master(metadata: &BlobMetadata, content_id: &str, base_url: 
     for variant in &metadata.variants {
         let bandwidth = (variant.bitrate_mbps * 1_000_000.0) as u64;
         let resolution = match (variant.width, variant.height) {
-            (Some(w), Some(h)) => format!(",RESOLUTION={}x{}", w, h),
+            (Some(w), Some(h)) => format!(",RESOLUTION={w}x{h}"),
             _ => String::new(),
         };
 
         playlist.push_str(&format!(
-            "#EXT-X-STREAM-INF:BANDWIDTH={}{}\n",
-            bandwidth, resolution
+            "#EXT-X-STREAM-INF:BANDWIDTH={bandwidth}{resolution}\n"
         ));
         playlist.push_str(&format!(
             "{}/api/stream/hls/{}/{}.m3u8\n",
@@ -262,10 +273,9 @@ pub fn generate_hls_master(metadata: &BlobMetadata, content_id: &str, base_url: 
     // If no variants, add a single stream for the main blob
     if metadata.variants.is_empty() {
         let bandwidth = ((metadata.bitrate_mbps.unwrap_or(5.0)) * 1_000_000.0) as u64;
-        playlist.push_str(&format!("#EXT-X-STREAM-INF:BANDWIDTH={}\n", bandwidth));
+        playlist.push_str(&format!("#EXT-X-STREAM-INF:BANDWIDTH={bandwidth}\n"));
         playlist.push_str(&format!(
-            "{}/api/stream/hls/{}/default.m3u8\n",
-            base_url, content_id
+            "{base_url}/api/stream/hls/{content_id}/default.m3u8\n"
         ));
     }
 
@@ -285,19 +295,21 @@ pub fn generate_hls_variant(
     duration_secs: u32,
     segment_duration: u32,
     base_url: &str,
-    chunk_size: usize,
+    _chunk_size: usize,
 ) -> String {
     let mut playlist = String::new();
 
     // Header
     playlist.push_str("#EXTM3U\n");
     playlist.push_str("#EXT-X-VERSION:3\n");
-    playlist.push_str(&format!("#EXT-X-TARGETDURATION:{}\n", DEFAULT_TARGET_DURATION));
+    playlist.push_str(&format!(
+        "#EXT-X-TARGETDURATION:{DEFAULT_TARGET_DURATION}\n"
+    ));
     playlist.push_str("#EXT-X-MEDIA-SEQUENCE:0\n");
 
     // Calculate number of segments
     let num_segments = if duration_secs > 0 {
-        (duration_secs + segment_duration - 1) / segment_duration
+        duration_secs.div_ceil(segment_duration)
     } else {
         1
     };
@@ -316,11 +328,8 @@ pub fn generate_hls_variant(
             segment_duration as f32
         };
 
-        playlist.push_str(&format!("#EXTINF:{:.3},\n", seg_duration));
-        playlist.push_str(&format!(
-            "{}/api/stream/chunk/{}/{}\n",
-            base_url, blob_hash, i
-        ));
+        playlist.push_str(&format!("#EXTINF:{seg_duration:.3},\n"));
+        playlist.push_str(&format!("{base_url}/api/stream/chunk/{blob_hash}/{i}\n"));
     }
 
     // End marker
@@ -338,7 +347,7 @@ pub fn generate_hls_variant(
 /// * `base_url` - Base URL for segment endpoints
 pub fn generate_dash_mpd(
     metadata: &BlobMetadata,
-    content_id: &str,
+    _content_id: &str,
     duration_secs: u32,
     base_url: &str,
 ) -> String {
@@ -352,13 +361,12 @@ pub fn generate_dash_mpd(
 
     // MPD element
     mpd.push_str(&format!(
-        r#"<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="{}" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-on-demand:2011">"#,
-        duration_iso
+        r#"<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="{duration_iso}" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-on-demand:2011">"#
     ));
     mpd.push('\n');
 
     // Period
-    mpd.push_str(&format!(r#"  <Period duration="{}">"#, duration_iso));
+    mpd.push_str(&format!(r#"  <Period duration="{duration_iso}">"#));
     mpd.push('\n');
 
     // Video AdaptationSet
@@ -372,8 +380,7 @@ pub fn generate_dash_mpd(
         let height = variant.height.unwrap_or(1080);
 
         mpd.push_str(&format!(
-            r#"      <Representation id="{}" bandwidth="{}" width="{}" height="{}" codecs="avc1.640028">"#,
-            i, bandwidth, width, height
+            r#"      <Representation id="{i}" bandwidth="{bandwidth}" width="{width}" height="{height}" codecs="avc1.640028">"#
         ));
         mpd.push('\n');
 
@@ -384,8 +391,7 @@ pub fn generate_dash_mpd(
         ));
         mpd.push('\n');
         mpd.push_str(&format!(
-            r#"        <SegmentTemplate media="$Number$" startNumber="0" duration="{}" timescale="1"/>"#,
-            DEFAULT_SEGMENT_DURATION
+            r#"        <SegmentTemplate media="$Number$" startNumber="0" duration="{DEFAULT_SEGMENT_DURATION}" timescale="1"/>"#
         ));
         mpd.push('\n');
 
@@ -397,8 +403,7 @@ pub fn generate_dash_mpd(
         let bandwidth = ((metadata.bitrate_mbps.unwrap_or(5.0)) * 1_000_000.0) as u64;
 
         mpd.push_str(&format!(
-            r#"      <Representation id="0" bandwidth="{}" codecs="avc1.640028">"#,
-            bandwidth
+            r#"      <Representation id="0" bandwidth="{bandwidth}" codecs="avc1.640028">"#
         ));
         mpd.push('\n');
         mpd.push_str(&format!(
@@ -407,8 +412,7 @@ pub fn generate_dash_mpd(
         ));
         mpd.push('\n');
         mpd.push_str(&format!(
-            r#"        <SegmentTemplate media="$Number$" startNumber="0" duration="{}" timescale="1"/>"#,
-            DEFAULT_SEGMENT_DURATION
+            r#"        <SegmentTemplate media="$Number$" startNumber="0" duration="{DEFAULT_SEGMENT_DURATION}" timescale="1"/>"#
         ));
         mpd.push('\n');
         mpd.push_str("      </Representation>\n");
@@ -429,12 +433,12 @@ fn format_iso_duration(seconds: u32) -> String {
 
     let mut duration = String::from("PT");
     if hours > 0 {
-        duration.push_str(&format!("{}H", hours));
+        duration.push_str(&format!("{hours}H"));
     }
     if minutes > 0 {
-        duration.push_str(&format!("{}M", minutes));
+        duration.push_str(&format!("{minutes}M"));
     }
-    duration.push_str(&format!("{}S", secs));
+    duration.push_str(&format!("{secs}S"));
 
     duration
 }
@@ -472,9 +476,7 @@ pub async fn handle_stream_request(
 
     match parts.as_slice() {
         // HLS master playlist: /api/stream/hls/{content_id}
-        ["hls", content_id] => {
-            handle_hls_master(state, content_id, base_url).await
-        }
+        ["hls", content_id] => handle_hls_master(state, content_id, base_url).await,
 
         // HLS variant playlist: /api/stream/hls/{content_id}/{variant}.m3u8
         ["hls", content_id, variant] => {
@@ -483,17 +485,13 @@ pub async fn handle_stream_request(
         }
 
         // DASH manifest: /api/stream/dash/{content_id}
-        ["dash", content_id] => {
-            handle_dash_mpd(state, content_id, base_url).await
-        }
+        ["dash", content_id] => handle_dash_mpd(state, content_id, base_url).await,
 
         // Chunk: /api/stream/chunk/{hash}/{index}
-        ["chunk", hash, index] => {
-            match index.parse::<usize>() {
-                Ok(idx) => handle_chunk(state, hash, idx).await,
-                Err(_) => error_response(StatusCode::BAD_REQUEST, "Invalid chunk index"),
-            }
-        }
+        ["chunk", hash, index] => match index.parse::<usize>() {
+            Ok(idx) => handle_chunk(state, hash, idx).await,
+            Err(_) => error_response(StatusCode::BAD_REQUEST, "Invalid chunk index"),
+        },
 
         _ => error_response(StatusCode::NOT_FOUND, "Unknown streaming endpoint"),
     }
@@ -506,6 +504,7 @@ pub async fn handle_stream_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::VariantMetadata;
 
     fn test_metadata() -> BlobMetadata {
         BlobMetadata {

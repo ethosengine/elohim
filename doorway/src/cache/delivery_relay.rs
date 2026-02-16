@@ -161,14 +161,20 @@ impl DeliveryRelay {
     /// Check if a request for this hash is already in flight.
     /// If so, return a receiver to wait for the result.
     /// If not, return None (caller should make the request).
-    pub async fn try_coalesce(&self, hash: &str) -> Option<broadcast::Receiver<Result<Vec<u8>, String>>> {
+    pub async fn try_coalesce(
+        &self,
+        hash: &str,
+    ) -> Option<broadcast::Receiver<Result<Vec<u8>, String>>> {
         let in_flight = self.in_flight.read().await;
         in_flight.get(hash).map(|req| req.sender.subscribe())
     }
 
     /// Register a new in-flight request for coalescing.
     /// Returns a sender to broadcast the result when complete.
-    pub async fn register_in_flight(&self, hash: &str) -> Option<broadcast::Sender<Result<Vec<u8>, String>>> {
+    pub async fn register_in_flight(
+        &self,
+        hash: &str,
+    ) -> Option<broadcast::Sender<Result<Vec<u8>, String>>> {
         let mut in_flight = self.in_flight.write().await;
 
         // Check if already registered (race condition)
@@ -183,10 +189,13 @@ impl DeliveryRelay {
         }
 
         let (sender, _) = broadcast::channel(1);
-        in_flight.insert(hash.to_string(), InFlightRequest {
-            sender: sender.clone(),
-            started_at: Instant::now(),
-        });
+        in_flight.insert(
+            hash.to_string(),
+            InFlightRequest {
+                sender: sender.clone(),
+                started_at: Instant::now(),
+            },
+        );
 
         Some(sender)
     }
@@ -262,7 +271,12 @@ impl DeliveryRelay {
         cache.insert(hash.to_string(), (data, Instant::now()));
         *bytes += size;
 
-        debug!(hash = hash, size = size, total_cached = *bytes, "Shard cached");
+        debug!(
+            hash = hash,
+            size = size,
+            total_cached = *bytes,
+            "Shard cached"
+        );
     }
 
     /// Get shard cache statistics
@@ -290,7 +304,11 @@ impl DeliveryRelay {
     /// - Requester IP geolocation
     /// - Known elohim-storage node locations
     /// - Network latency measurements
-    pub async fn get_routing_hints(&self, _hash: &str, _requester_ip: Option<&str>) -> Vec<RoutingHint> {
+    pub async fn get_routing_hints(
+        &self,
+        _hash: &str,
+        _requester_ip: Option<&str>,
+    ) -> Vec<RoutingHint> {
         if !self.config.enable_geo_routing {
             return vec![];
         }
@@ -324,7 +342,11 @@ impl DeliveryRelay {
 
         let evicted = before - cache.len();
         if evicted > 0 {
-            info!(evicted = evicted, remaining = cache.len(), "Shard cache cleanup");
+            info!(
+                evicted = evicted,
+                remaining = cache.len(),
+                "Shard cache cleanup"
+            );
         }
 
         // Clean timed-out in-flight requests

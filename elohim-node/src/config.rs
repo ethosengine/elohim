@@ -100,6 +100,10 @@ pub struct P2PConfig {
     /// Bootstrap nodes for peer discovery
     #[serde(default)]
     pub bootstrap_nodes: Vec<String>,
+
+    /// Doorway bootstrap URL for peer discovery via doorway
+    #[serde(default)]
+    pub doorway_bootstrap_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,6 +162,7 @@ impl Default for Config {
             p2p: P2PConfig {
                 listen_addrs: default_listen_addrs(),
                 bootstrap_nodes: vec![],
+                doorway_bootstrap_url: None,
             },
             storage: StorageConfig {
                 max_capacity: default_max_capacity(),

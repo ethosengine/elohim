@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating a contributor presence - camelCase API boundary type
  */
-export type CreateContributorPresenceInputView = { id: string | null, displayName: string, 
+export type CreateContributorPresenceInputView = { id: string | null, schemaVersion: number, displayName: string, 
 /**
  * Parsed external identifiers (serialized to JSON string for DB)
  */

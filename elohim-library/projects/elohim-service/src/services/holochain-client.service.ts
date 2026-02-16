@@ -281,11 +281,11 @@ export class HolochainClientService {
 /**
  * Create a pre-configured client for the elohim app
  *
- * @param adminUrl - Admin WebSocket URL (default: wss://doorway-dev.elohim.host)
+ * @param adminUrl - Admin WebSocket URL (default: wss://doorway-alpha.elohim.host)
  * @param happPath - Optional path to .happ file for installation
  */
 export function createElohimClient(
-  adminUrl = 'wss://doorway-dev.elohim.host',
+  adminUrl = 'wss://doorway-alpha.elohim.host',
   happPath?: string
 ): HolochainClientService {
   return new HolochainClientService({

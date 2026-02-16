@@ -12,7 +12,7 @@
  *
  * Usage:
  *   DOORWAY_URL=http://localhost:8888 npx tsx src/seed-stewardship.ts
- *   DOORWAY_URL=https://doorway-dev.elohim.host DOORWAY_API_KEY=xxx npx tsx src/seed-stewardship.ts
+ *   DOORWAY_URL=https://doorway-alpha.elohim.host DOORWAY_API_KEY=xxx npx tsx src/seed-stewardship.ts
  */
 
 import { DoorwayClient } from './doorway-client.js';

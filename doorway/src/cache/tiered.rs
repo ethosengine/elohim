@@ -58,7 +58,7 @@ use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use thiserror::Error;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 // ============================================================================
 // Errors
@@ -109,13 +109,13 @@ pub struct TieredCacheConfig {
 impl Default for TieredCacheConfig {
     fn default() -> Self {
         Self {
-            blob_max_bytes: 1024 * 1024 * 1024, // 1 GB
-            blob_commons_ttl: Duration::from_secs(24 * 60 * 60), // 24 hours
+            blob_max_bytes: 1024 * 1024 * 1024,                      // 1 GB
+            blob_commons_ttl: Duration::from_secs(24 * 60 * 60),     // 24 hours
             blob_private_ttl: Duration::from_secs(7 * 24 * 60 * 60), // 7 days
 
             chunk_max_bytes: 10 * 1024 * 1024 * 1024, // 10 GB
             chunk_ttl: Duration::from_secs(7 * 24 * 60 * 60), // 7 days
-            default_chunk_size: 5 * 1024 * 1024, // 5 MB
+            default_chunk_size: 5 * 1024 * 1024,      // 5 MB
         }
     }
 }
@@ -202,7 +202,7 @@ impl BlobMetadata {
 
     /// Number of chunks needed at given chunk size
     pub fn chunk_count(&self, chunk_size: usize) -> usize {
-        ((self.size_bytes as usize) + chunk_size - 1) / chunk_size
+        (self.size_bytes as usize).div_ceil(chunk_size)
     }
 
     /// Get variant by label (e.g., "1080p", "720p")
@@ -252,7 +252,7 @@ pub struct CaptionMetadata {
 /// Blob entry with reach-aware TTL
 struct BlobEntry {
     data: Vec<u8>,
-    reach: String,
+    _reach: String,
     cached_at: Instant,
     expires_at: Instant,
 }
@@ -420,7 +420,7 @@ impl TieredBlobCache {
         let ttl = BlobMetadata::ttl_for_reach(reach, &self.config);
         let entry = BlobEntry {
             data,
-            reach: reach.to_string(),
+            _reach: reach.to_string(),
             cached_at: now,
             expires_at: now + ttl,
         };
@@ -458,11 +458,13 @@ impl TieredBlobCache {
     /// Get byte range from blob. O(1).
     pub fn get_blob_range(&self, hash: &str, start: usize, end: usize) -> Option<Bytes> {
         if let Some(entry) = self.blobs.get(hash) {
-            if Instant::now() < entry.expires_at {
-                if start < entry.data.len() && end <= entry.data.len() && start < end {
-                    self.blob_hits.fetch_add(1, Ordering::Relaxed);
-                    return Some(Bytes::copy_from_slice(&entry.data[start..end]));
-                }
+            if Instant::now() < entry.expires_at
+                && start < entry.data.len()
+                && end <= entry.data.len()
+                && start < end
+            {
+                self.blob_hits.fetch_add(1, Ordering::Relaxed);
+                return Some(Bytes::copy_from_slice(&entry.data[start..end]));
             }
         }
         self.blob_misses.fetch_add(1, Ordering::Relaxed);
@@ -565,7 +567,7 @@ impl TieredBlobCache {
             .get(url)
             .send()
             .await
-            .map_err(|e| CacheError::FetchFailed(format!("Request failed: {}", e)))?;
+            .map_err(|e| CacheError::FetchFailed(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CacheError::FetchFailed(format!(
@@ -578,7 +580,7 @@ impl TieredBlobCache {
         let data = response
             .bytes()
             .await
-            .map_err(|e| CacheError::FetchFailed(format!("Body read failed: {}", e)))?;
+            .map_err(|e| CacheError::FetchFailed(format!("Body read failed: {e}")))?;
 
         Ok(data.to_vec())
     }
@@ -589,7 +591,7 @@ impl TieredBlobCache {
 
     /// Make chunk key from hash and index
     fn chunk_key(hash: &str, index: usize) -> String {
-        format!("{}:{}", hash, index)
+        format!("{hash}:{index}")
     }
 
     /// Get chunk by hash and index. O(1).
@@ -664,17 +666,15 @@ impl TieredBlobCache {
     /// Get all chunks for a blob (for reassembly). O(n) where n = chunk count.
     pub fn get_all_chunks(&self, hash: &str) -> Option<Vec<Vec<u8>>> {
         // First, find all chunk indices for this hash
-        let prefix = format!("{}:", hash);
+        let prefix = format!("{hash}:");
         let mut chunks: Vec<(usize, Vec<u8>)> = Vec::new();
 
         for entry in self.chunks.iter() {
-            if entry.key().starts_with(&prefix) {
-                if Instant::now() < entry.expires_at {
-                    // Parse index from key
-                    if let Some(idx_str) = entry.key().strip_prefix(&prefix) {
-                        if let Ok(idx) = idx_str.parse::<usize>() {
-                            chunks.push((idx, entry.data.clone()));
-                        }
+            if entry.key().starts_with(&prefix) && Instant::now() < entry.expires_at {
+                // Parse index from key
+                if let Some(idx_str) = entry.key().strip_prefix(&prefix) {
+                    if let Ok(idx) = idx_str.parse::<usize>() {
+                        chunks.push((idx, entry.data.clone()));
                     }
                 }
             }
@@ -691,7 +691,7 @@ impl TieredBlobCache {
 
     /// Remove all chunks for a blob. O(n).
     pub fn remove_all_chunks(&self, hash: &str) -> usize {
-        let prefix = format!("{}:", hash);
+        let prefix = format!("{hash}:");
         let keys_to_remove: Vec<String> = self
             .chunks
             .iter()
@@ -706,7 +706,8 @@ impl TieredBlobCache {
             }
         }
 
-        self.chunk_total_bytes.fetch_sub(total_size, Ordering::Relaxed);
+        self.chunk_total_bytes
+            .fetch_sub(total_size, Ordering::Relaxed);
         keys_to_remove.len()
     }
 
@@ -803,7 +804,8 @@ impl TieredBlobCache {
                 blob_freed += size;
             }
         }
-        self.blob_total_bytes.fetch_sub(blob_freed, Ordering::Relaxed);
+        self.blob_total_bytes
+            .fetch_sub(blob_freed, Ordering::Relaxed);
 
         // Chunks
         let expired_chunks: Vec<(String, u64)> = self
@@ -910,7 +912,10 @@ pub fn spawn_tiered_cleanup_task(cache: Arc<TieredBlobCache>, interval: Duration
         }
     });
 
-    info!(interval_secs = interval.as_secs(), "Tiered cache cleanup task started");
+    info!(
+        interval_secs = interval.as_secs(),
+        "Tiered cache cleanup task started"
+    );
 }
 
 // ============================================================================
@@ -999,7 +1004,9 @@ mod tests {
         cache.set_blob(hash, data, "commons");
 
         // Get range
-        let range = cache.get_blob_range(hash, 10, 20).expect("Should get range");
+        let range = cache
+            .get_blob_range(hash, 10, 20)
+            .expect("Should get range");
         assert_eq!(range.len(), 10);
         assert_eq!(range[0], 10);
         assert_eq!(range[9], 19);

@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating a stewardship allocation - camelCase API boundary type
  */
-export type CreateAllocationInputView = { contentId: string, stewardPresenceId: string, allocationRatio: number | null, allocationMethod: string | null, contributionType: string | null, 
+export type CreateAllocationInputView = { schemaVersion: number, contentId: string, stewardPresenceId: string, allocationRatio: number | null, allocationMethod: string | null, contributionType: string | null, 
 /**
  * Parsed contribution evidence (serialized to JSON string for DB)
  */

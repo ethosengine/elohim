@@ -50,12 +50,12 @@ pub async fn issue_app_token(
             tokio_tungstenite::tungstenite::handshake::client::generate_key(),
         )
         .body(())
-        .map_err(|e| format!("Failed to build request: {}", e))?;
+        .map_err(|e| format!("Failed to build request: {e}"))?;
 
     // Connect to admin interface
     let (ws_stream, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| format!("Admin WebSocket connect failed: {}", e))?;
+        .map_err(|e| format!("Admin WebSocket connect failed: {e}"))?;
 
     let (mut write, mut read) = ws_stream.split();
 
@@ -71,7 +71,7 @@ pub async fn issue_app_token(
     write
         .send(Message::Binary(envelope))
         .await
-        .map_err(|e| format!("Failed to send token request: {}", e))?;
+        .map_err(|e| format!("Failed to send token request: {e}"))?;
 
     // Wait for response with timeout
     let response = tokio::time::timeout(Duration::from_secs(10), async {
@@ -84,7 +84,7 @@ pub async fn issue_app_token(
                     return Err("Admin connection closed".to_string());
                 }
                 Err(e) => {
-                    return Err(format!("WebSocket error: {}", e));
+                    return Err(format!("WebSocket error: {e}"));
                 }
                 _ => continue,
             }
@@ -127,7 +127,7 @@ fn build_issue_token_request(installed_app_id: &str, expiry_seconds: u64) -> Vec
             Value::String("type".into()),
             Value::String("issue_app_authentication_token".into()),
         ),
-        (Value::String("data".into()), data),
+        (Value::String("value".into()), data),
     ]);
 
     let mut buf = Vec::new();
@@ -175,38 +175,38 @@ fn build_app_auth_request(token: &[u8]) -> Vec<u8> {
 fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
     let mut cursor = Cursor::new(data);
     let value = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| format!("Failed to decode response: {}", e))?;
+        .map_err(|e| format!("Failed to decode response: {e}"))?;
 
-    // Response format: { id, type: "response", data: <bytes> }
     if let Value::Map(ref map) = value {
         // Check for error response
+        // Error format: { type: "error", value: { type: "...", value: "..." } }
         if let Some(response_type) = get_string_field(map, "type") {
             if response_type == "error" {
-                if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
+                if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
+                    if let Some(msg) = get_string_field(err_data, "value") {
+                        return Err(format!("Admin error: {msg}"));
+                    }
                     if let Some(msg) = get_string_field(err_data, "message") {
-                        return Err(format!("Admin error: {}", msg));
+                        return Err(format!("Admin error: {msg}"));
                     }
                 }
                 return Err("Unknown admin error".to_string());
             }
         }
 
-        // Parse success response
+        // Try envelope format first: { id, type: "response", data: <binary inner> }
         if let Some(Value::Binary(inner_bytes)) = get_field(map, "data") {
             let mut inner_cursor = Cursor::new(inner_bytes.as_slice());
-            let inner = rmpv::decode::read_value(&mut inner_cursor)
-                .map_err(|e| format!("Failed to decode inner response: {}", e))?;
-
-            // Inner: { type: "app_authentication_token_issued", data: { token: <bytes> } }
-            if let Value::Map(ref inner_map) = inner {
-                if let Some(Value::Map(ref token_data)) = get_field(inner_map, "data") {
-                    if let Some(Value::Binary(token_bytes)) = get_field(token_data, "token") {
-                        return Ok(AppAuthToken {
-                            token: token_bytes.clone(),
-                        });
-                    }
+            if let Ok(inner) = rmpv::decode::read_value(&mut inner_cursor) {
+                if let Some(token) = extract_token_from_map(&inner) {
+                    return Ok(token);
                 }
             }
+        }
+
+        // Try unwrapped format: { type: "app_authentication_token_issued", value: { token, expires_at } }
+        if let Some(token) = extract_token_from_map(&value) {
+            return Ok(token);
         }
     }
 
@@ -214,12 +214,40 @@ fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
     Err("Unexpected token response format".to_string())
 }
 
+/// Extract token from a response map (either inner or unwrapped).
+/// Handles: { type: "app_authentication_token_issued", value: { token: <bytes or array> } }
+fn extract_token_from_map(value: &Value) -> Option<AppAuthToken> {
+    if let Value::Map(ref map) = value {
+        if let Some(Value::Map(ref token_data)) = get_field(map, "value") {
+            if let Some(token_value) = get_field(token_data, "token") {
+                let token_bytes = match token_value {
+                    Value::Binary(bytes) => Some(bytes.clone()),
+                    Value::Array(arr) => {
+                        // Token may be an array of integers (Holochain 0.6 msgpack variant)
+                        arr.iter()
+                            .map(|v| match v {
+                                Value::Integer(i) => i.as_u64().map(|n| n as u8),
+                                _ => None,
+                            })
+                            .collect::<Option<Vec<u8>>>()
+                    }
+                    _ => None,
+                };
+                if let Some(bytes) = token_bytes {
+                    return Some(AppAuthToken { token: bytes });
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Parse the authentication response
 #[allow(dead_code)]
 fn parse_auth_response(data: &[u8]) -> Result<(), String> {
     let mut cursor = Cursor::new(data);
     let value = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| format!("Failed to decode auth response: {}", e))?;
+        .map_err(|e| format!("Failed to decode auth response: {e}"))?;
 
     // Check for error
     if let Value::Map(ref map) = value {
@@ -227,7 +255,7 @@ fn parse_auth_response(data: &[u8]) -> Result<(), String> {
             if response_type == "error" {
                 if let Some(Value::Map(ref err_data)) = get_field(map, "data") {
                     if let Some(msg) = get_string_field(err_data, "message") {
-                        return Err(format!("Auth error: {}", msg));
+                        return Err(format!("Auth error: {msg}"));
                     }
                 }
                 return Err("Authentication failed".to_string());

@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating an economic event - camelCase API boundary type
  */
-export type CreateEconomicEventInputView = { id: string | null, action: string, provider: string, receiver: string, resourceConformsTo: string | null, resourceInventoriedAs: string | null, resourceClassifiedAs: Array<string>, resourceQuantityValue: number | null, resourceQuantityUnit: string | null, effortQuantityValue: number | null, effortQuantityUnit: string | null, hasPointInTime: string | null, hasDuration: string | null, inputOf: string | null, outputOf: string | null, lamadEventType: string | null, contentId: string | null, contributorPresenceId: string | null, pathId: string | null, triggeredBy: string | null, note: string | null, 
+export type CreateEconomicEventInputView = { id: string | null, schemaVersion: number, action: string, provider: string, receiver: string, resourceConformsTo: string | null, resourceInventoriedAs: string | null, resourceClassifiedAs: Array<string>, resourceQuantityValue: number | null, resourceQuantityUnit: string | null, effortQuantityValue: number | null, effortQuantityUnit: string | null, hasPointInTime: string | null, hasDuration: string | null, inputOf: string | null, outputOf: string | null, lamadEventType: string | null, contentId: string | null, contributorPresenceId: string | null, pathId: string | null, triggeredBy: string | null, note: string | null, 
 /**
  * Parsed metadata object (serialized to JSON string for DB)
  */

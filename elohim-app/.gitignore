@@ -51,3 +51,4 @@ Thumbs.db
 # Build artifacts (generated during CI)
 /src/assets/sophia-plugin/
 /src/assets/react/
+/src/assets/fonts/

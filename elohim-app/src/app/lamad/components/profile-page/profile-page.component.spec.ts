@@ -1,25 +1,26 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
-import { ProfilePageComponent } from './profile-page.component';
+import { Router, provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
+
+import { of, BehaviorSubject } from 'rxjs';
+
 import { ProfileService } from '@app/elohim/services/profile.service';
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { AgencyService } from '@app/imagodei/services/agency.service';
+
 import { ContentMasteryService } from '../../services/content-mastery.service';
-import { signal } from '@angular/core';
-import { of, BehaviorSubject } from 'rxjs';
+import { MasteryStatsService } from '../../services/mastery-stats.service';
+import { ProfilePageComponent } from './profile-page.component';
 
 describe('ProfilePageComponent', () => {
   let component: ProfilePageComponent;
   let fixture: ComponentFixture<ProfilePageComponent>;
-  let routerSpy: jasmine.SpyObj<ActivatedRoute>;
   let profileServiceSpy: jasmine.SpyObj<ProfileService>;
-  let holochainSpy: jasmine.SpyObj<HolochainClientService>;
   let identityServiceSpy: jasmine.SpyObj<IdentityService>;
   let sessionHumanSpy: jasmine.SpyObj<SessionHumanService>;
-  let agencySpy: jasmine.SpyObj<AgencyService>;
   let masteryServiceSpy: jasmine.SpyObj<ContentMasteryService>;
+  let masteryStatsSpy: jasmine.SpyObj<MasteryStatsService>;
+  let router: Router;
 
   beforeEach(async () => {
     // Mock session observable
@@ -33,9 +34,6 @@ describe('ProfilePageComponent', () => {
       createdAt: new Date().toISOString(),
     });
 
-    routerSpy = jasmine.createSpyObj('ActivatedRoute', [], {
-      fragment: of('overview'),
-    });
     profileServiceSpy = jasmine.createSpyObj('ProfileService', [
       'getResumePoint',
       'getPathsOverview',
@@ -47,26 +45,6 @@ describe('ProfilePageComponent', () => {
       of({ inProgress: [], completed: [], suggested: [] })
     );
     profileServiceSpy.getTimeline.and.returnValue(of([]));
-
-    holochainSpy = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['getDisplayInfo', 'connect', 'disconnect'],
-      { isConnected: signal(true) }
-    );
-    holochainSpy.getDisplayInfo.and.returnValue({
-      state: 'disconnected',
-      mode: 'doorway',
-      adminUrl: 'ws://localhost:8888',
-      appUrl: 'ws://localhost:8889',
-      agentPubKey: null,
-      cellId: null,
-      appId: 'elohim',
-      dnaHash: null,
-      connectedAt: null,
-      hasStoredCredentials: false,
-      networkSeed: null,
-      error: null,
-    });
 
     identityServiceSpy = jasmine.createSpyObj(
       'IdentityService',
@@ -81,17 +59,7 @@ describe('ProfilePageComponent', () => {
 
     sessionHumanSpy = jasmine.createSpyObj(
       'SessionHumanService',
-      [
-        'getAllPathProgress',
-        'getActivityHistory',
-        'setDisplayName',
-        'setAvatarUrl',
-        'setBio',
-        'setLocale',
-        'setInterests',
-        'prepareMigration',
-        'resetSession',
-      ],
+      ['getAllPathProgress', 'getActivityHistory'],
       {
         session$: mockSession$,
       }
@@ -99,23 +67,6 @@ describe('ProfilePageComponent', () => {
     // Mock SessionHumanService methods
     sessionHumanSpy.getAllPathProgress.and.returnValue([]);
     sessionHumanSpy.getActivityHistory.and.returnValue([]);
-
-    agencySpy = jasmine.createSpyObj('AgencyService', [], {
-      agencyState: signal({
-        currentStage: 'session-visitor',
-        canUpgrade: false,
-      }),
-      stageInfo: signal({
-        stage: 'session-visitor',
-        title: 'Session Visitor',
-        description: 'Local browser storage',
-      }),
-      connectionStatus: signal({
-        state: 'disconnected',
-        message: 'Not connected',
-      }),
-      canUpgrade: signal(false),
-    });
 
     masteryServiceSpy = jasmine.createSpyObj('ContentMasteryService', [
       'getMasteryStats',
@@ -144,18 +95,24 @@ describe('ProfilePageComponent', () => {
       })
     );
 
+    masteryStatsSpy = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
+      learnerProfile$: new BehaviorSubject(null),
+    });
+
     await TestBed.configureTestingModule({
       imports: [ProfilePageComponent],
       providers: [
-        { provide: ActivatedRoute, useValue: routerSpy },
         { provide: ProfileService, useValue: profileServiceSpy },
-        { provide: HolochainClientService, useValue: holochainSpy },
         { provide: IdentityService, useValue: identityServiceSpy },
         { provide: SessionHumanService, useValue: sessionHumanSpy },
-        { provide: AgencyService, useValue: agencySpy },
         { provide: ContentMasteryService, useValue: masteryServiceSpy },
+        { provide: MasteryStatsService, useValue: masteryStatsSpy },
+        provideRouter([]),
       ],
     }).compileComponents();
+
+    router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
 
     fixture = TestBed.createComponent(ProfilePageComponent);
     component = fixture.componentInstance;
@@ -173,13 +130,6 @@ describe('ProfilePageComponent', () => {
 
     it('should initialize with overview tab', () => {
       expect(component.activeTab).toBe('overview');
-    });
-
-    it('should have reactive state signals', () => {
-      expect(component.agencyState).toBeDefined();
-      expect(component.stageInfo).toBeDefined();
-      expect(component.connectionStatus).toBeDefined();
-      expect(component.canUpgrade).toBeDefined();
     });
   });
 
@@ -206,6 +156,54 @@ describe('ProfilePageComponent', () => {
     it('should implement OnDestroy', () => {
       expect(component.ngOnDestroy).toBeDefined();
       expect(typeof component.ngOnDestroy).toBe('function');
+    });
+  });
+
+  describe('Tab Navigation', () => {
+    it('should switch to paths tab', () => {
+      component.setActiveTab('paths');
+      expect(component.activeTab).toBe('paths');
+    });
+
+    it('should switch to timeline tab', () => {
+      component.setActiveTab('timeline');
+      expect(component.activeTab).toBe('timeline');
+    });
+
+    it('should refresh activity history when switching to timeline', () => {
+      component.setActiveTab('timeline');
+      expect(sessionHumanSpy.getActivityHistory).toHaveBeenCalled();
+    });
+
+    it('should refresh path progress when switching to paths', () => {
+      component.setActiveTab('paths');
+      expect(sessionHumanSpy.getAllPathProgress).toHaveBeenCalled();
+    });
+  });
+
+  describe('Navigation', () => {
+    it('should navigate to identity profile', () => {
+      component.goToIdentityProfile();
+      expect(router.navigate).toHaveBeenCalledWith(['/identity/profile']);
+    });
+
+    it('should navigate to registration', () => {
+      component.onJoinNetwork();
+      expect(router.navigate).toHaveBeenCalledWith(['/identity/register']);
+    });
+  });
+
+  describe('Computed Signals', () => {
+    it('should compute display name from session', () => {
+      expect(component.displayName()).toBe('Test User');
+    });
+
+    it('should compute mode badge text', () => {
+      expect(component.modeBadgeText()).toBe('Session Visitor');
+    });
+
+    it('should compute mode badge icon', () => {
+      expect(component.modeBadgeIcon()).toBe('local_activity');
     });
   });
 });

@@ -63,7 +63,9 @@ pub struct ImportQueueRequest {
     pub chunk_delay_ms: Option<u64>,
 }
 
-fn default_schema_version() -> u32 { 1 }
+fn default_schema_version() -> u32 {
+    1
+}
 
 /// Import queue response
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,12 +180,10 @@ pub async fn handle_import_request(
             // GET /import/{batch_type}/{batch_id} → forward to storage /import/status/{batch_id}
             forward_get_status(&storage_url, batch_id.as_ref().unwrap()).await
         }
-        _ => {
-            import_error_response(
-                StatusCode::METHOD_NOT_ALLOWED,
-                "Use POST to queue imports, GET with batch_id to check status",
-            )
-        }
+        _ => import_error_response(
+            StatusCode::METHOD_NOT_ALLOWED,
+            "Use POST to queue imports, GET with batch_id to check status",
+        ),
     }
 }
 
@@ -198,10 +198,7 @@ async fn forward_queue_import(
         Ok(collected) => collected.to_bytes(),
         Err(e) => {
             warn!("Import request body error: {}", e);
-            return import_error_response(
-                StatusCode::BAD_REQUEST,
-                "Failed to read request body",
-            );
+            return import_error_response(StatusCode::BAD_REQUEST, "Failed to read request body");
         }
     };
 
@@ -210,10 +207,7 @@ async fn forward_queue_import(
         Ok(r) => r,
         Err(e) => {
             warn!("Import request JSON parse error: {}", e);
-            return import_error_response(
-                StatusCode::BAD_REQUEST,
-                &format!("Invalid JSON: {}", e),
-            );
+            return import_error_response(StatusCode::BAD_REQUEST, &format!("Invalid JSON: {e}"));
         }
     };
 
@@ -257,12 +251,13 @@ async fn forward_queue_import(
         Err(e) => {
             return import_error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to create HTTP client: {}", e),
+                &format!("Failed to create HTTP client: {e}"),
             );
         }
     };
 
-    match client.post(&storage_endpoint)
+    match client
+        .post(&storage_endpoint)
         .json(&storage_req)
         .send()
         .await
@@ -292,32 +287,34 @@ async fn forward_queue_import(
                         .body(Full::new(Bytes::from(body)))
                         .unwrap()
                 }
-                Err(e) => {
-                    import_error_response(
-                        StatusCode::BAD_GATEWAY,
-                        &format!("Failed to read storage response: {}", e),
-                    )
-                }
+                Err(e) => import_error_response(
+                    StatusCode::BAD_GATEWAY,
+                    &format!("Failed to read storage response: {e}"),
+                ),
             }
         }
         Err(e) => {
             warn!(error = %e, "Failed to reach elohim-storage");
             import_error_response(
                 StatusCode::BAD_GATEWAY,
-                &format!("Failed to reach elohim-storage: {}", e),
+                &format!("Failed to reach elohim-storage: {e}"),
             )
         }
     }
 }
 
 /// Forward GET status request to elohim-storage
-async fn forward_get_status(
-    storage_url: &str,
-    batch_id: &str,
-) -> Response<Full<Bytes>> {
-    debug!(batch_id = batch_id, "Forwarding status request to elohim-storage");
+async fn forward_get_status(storage_url: &str, batch_id: &str) -> Response<Full<Bytes>> {
+    debug!(
+        batch_id = batch_id,
+        "Forwarding status request to elohim-storage"
+    );
 
-    let storage_endpoint = format!("{}/import/status/{}", storage_url.trim_end_matches('/'), batch_id);
+    let storage_endpoint = format!(
+        "{}/import/status/{}",
+        storage_url.trim_end_matches('/'),
+        batch_id
+    );
 
     let client = match reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -327,7 +324,7 @@ async fn forward_get_status(
         Err(e) => {
             return import_error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to create HTTP client: {}", e),
+                &format!("Failed to create HTTP client: {e}"),
             );
         }
     };
@@ -336,28 +333,22 @@ async fn forward_get_status(
         Ok(resp) => {
             let status = resp.status();
             match resp.text().await {
-                Ok(body) => {
-                    Response::builder()
-                        .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
-                        .header("Content-Type", "application/json")
-                        .header("Access-Control-Allow-Origin", "*")
-                        .body(Full::new(Bytes::from(body)))
-                        .unwrap()
-                }
-                Err(e) => {
-                    import_error_response(
-                        StatusCode::BAD_GATEWAY,
-                        &format!("Failed to read storage response: {}", e),
-                    )
-                }
+                Ok(body) => Response::builder()
+                    .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(Full::new(Bytes::from(body)))
+                    .unwrap(),
+                Err(e) => import_error_response(
+                    StatusCode::BAD_GATEWAY,
+                    &format!("Failed to read storage response: {e}"),
+                ),
             }
         }
-        Err(e) => {
-            import_error_response(
-                StatusCode::BAD_GATEWAY,
-                &format!("Failed to reach elohim-storage: {}", e),
-            )
-        }
+        Err(e) => import_error_response(
+            StatusCode::BAD_GATEWAY,
+            &format!("Failed to reach elohim-storage: {e}"),
+        ),
     }
 }
 
@@ -382,27 +373,38 @@ fn import_error_response(status: StatusCode, message: &str) -> Response<Full<Byt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use doorway_client::ImportBatchTypeBuilder;
+    use doorway_client::ImportBatchType;
+    use std::sync::Arc;
+
+    fn make_batch_type(name: &str, queue_fn: &str, status_fn: &str) -> ImportBatchType {
+        ImportBatchType {
+            batch_type: name.to_string(),
+            queue_fn: queue_fn.to_string(),
+            process_fn: "process_import_chunk".to_string(),
+            status_fn: status_fn.to_string(),
+            max_items: 5000,
+            chunk_size: 50,
+            chunk_interval_ms: 100,
+            schema_version: 1,
+        }
+    }
 
     fn setup_test_store() -> Arc<ImportConfigStore> {
         let store = ImportConfigStore::new();
 
-        store.set_config("test_dna", doorway_client::ImportConfig {
-            enabled: true,
-            base_route: "/import".to_string(),
-            batch_types: vec![
-                ImportBatchTypeBuilder::new("content")
-                    .queue_fn("queue_import")
-                    .status_fn("get_import_status")
-                    .build(),
-                ImportBatchTypeBuilder::new("paths")
-                    .queue_fn("queue_path_import")
-                    .status_fn("get_path_import_status")
-                    .build(),
-            ],
-            require_auth: false,
-            allowed_agents: None,
-        });
+        store.set_config(
+            "test_dna",
+            doorway_client::ImportConfig {
+                enabled: true,
+                base_route: "/import".to_string(),
+                batch_types: vec![
+                    make_batch_type("content", "queue_import", "get_import_status"),
+                    make_batch_type("paths", "queue_path_import", "get_path_import_status"),
+                ],
+                require_auth: false,
+                allowed_agents: None,
+            },
+        );
 
         Arc::new(store)
     }

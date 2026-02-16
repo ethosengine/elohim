@@ -1,0 +1,179 @@
+<!-- Data Residency -->
+<div class="data-residency-section">
+  <h3 class="subsection-title">
+    <span class="material-icons">storage</span>
+    Where Your Data Lives
+  </h3>
+  <p class="section-description">
+    Understanding where your data is stored helps you make informed decisions about your digital
+    sovereignty.
+  </p>
+
+  <div class="residency-grid">
+    @for (item of agencyState().dataResidency; track item.category) {
+      <div class="residency-card">
+        <div class="residency-header">
+          <span class="material-icons residency-icon">{{ item.icon }}</span>
+          <div class="residency-info">
+            <span class="residency-label">{{ item.label }}</span>
+            <span class="residency-location">{{ item.locationLabel }}</span>
+          </div>
+          <span class="material-icons location-icon">{{ getLocationIcon(item.location) }}</span>
+        </div>
+        <p class="residency-description">{{ item.description }}</p>
+        <div class="residency-meta">
+          <span class="meta-item" [class.exportable]="item.exportable">
+            <span class="material-icons">{{ item.exportable ? 'download' : 'block' }}</span>
+            {{ item.exportable ? 'Exportable' : 'Not Exportable' }}
+          </span>
+          <span class="meta-item" [class.deletable]="item.deletable">
+            <span class="material-icons">{{ item.deletable ? 'delete' : 'lock' }}</span>
+            {{ item.deletable ? 'Deletable' : 'Permanent' }}
+          </span>
+          <span class="meta-item controller">Controlled by: {{ item.controlledBy }}</span>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Connection Details (when connected) -->
+@if (isConnected()) {
+  <div class="connection-section">
+    <h3 class="subsection-title">
+      <span class="material-icons">cable</span>
+      Connection Details
+    </h3>
+
+    <div class="connection-grid">
+      <div class="connection-row">
+        <span class="connection-label">Admin URL</span>
+        <span class="connection-value monospace">{{ edgeNodeInfo().adminUrl }}</span>
+      </div>
+
+      @if (edgeNodeInfo().agentPubKey) {
+        <div class="connection-row">
+          <span class="connection-label">Agent Public Key</span>
+          <div class="connection-value-with-copy">
+            <code class="truncated" [title]="edgeNodeInfo().agentPubKey!">
+              {{ truncateHash(edgeNodeInfo().agentPubKey) }}
+            </code>
+            <button
+              type="button"
+              class="copy-btn"
+              (click)="copyToClipboard(edgeNodeInfo().agentPubKey!)"
+              aria-label="Copy agent public key"
+            >
+              <span class="material-icons">content_copy</span>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (edgeNodeInfo().dnaHash) {
+        <div class="connection-row">
+          <span class="connection-label">DNA Hash</span>
+          <div class="connection-value-with-copy">
+            <code class="truncated" [title]="edgeNodeInfo().dnaHash!">
+              {{ truncateHash(edgeNodeInfo().dnaHash) }}
+            </code>
+            <button
+              type="button"
+              class="copy-btn"
+              (click)="copyToClipboard(edgeNodeInfo().dnaHash!)"
+              aria-label="Copy DNA hash"
+            >
+              <span class="material-icons">content_copy</span>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (edgeNodeInfo().connectedAt) {
+        <div class="connection-row">
+          <span class="connection-label">Connected Since</span>
+          <span class="connection-value">
+            {{ edgeNodeInfo().connectedAt?.toLocaleString() }}
+          </span>
+        </div>
+      }
+
+      <div class="connection-row">
+        <span class="connection-label">Credentials</span>
+        <span class="connection-value" [class.stored]="edgeNodeInfo().hasStoredCredentials">
+          {{ edgeNodeInfo().hasStoredCredentials ? 'Stored in browser' : 'Not stored' }}
+        </span>
+      </div>
+    </div>
+
+    <div class="connection-actions">
+      <button type="button" class="btn btn-secondary" (click)="reconnect.emit()">
+        <span class="material-icons">refresh</span>
+        Reconnect
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Keys Section -->
+@if (agencyState().keys.length > 0) {
+  <div class="keys-section">
+    <h3 class="subsection-title">
+      <span class="material-icons">vpn_key</span>
+      Your Keys
+    </h3>
+
+    <div class="keys-grid">
+      @for (key of agencyState().keys; track key.type) {
+        <div class="key-card">
+          <div class="key-header">
+            <span class="key-label">{{ key.label }}</span>
+            <span class="key-type">{{ key.type }}</span>
+          </div>
+          <div class="key-value">
+            <code [title]="key.value">{{ key.truncated }}</code>
+            @if (key.canExport) {
+              <button
+                type="button"
+                class="copy-btn"
+                (click)="copyToClipboard(key.value)"
+                aria-label="Copy key"
+              >
+                <span class="material-icons">content_copy</span>
+              </button>
+            }
+          </div>
+          <div class="key-actions">
+            @if (key.canExport) {
+              <span class="key-action exportable">
+                <span class="material-icons">download</span>
+                Exportable
+              </span>
+            }
+            @if (key.canRevoke) {
+              <span class="key-action revokable">
+                <span class="material-icons">cancel</span>
+                Revokable
+              </span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<!-- Not Connected State -->
+@if (!isConnected() && connectionStatus().state !== 'connecting') {
+  <div class="not-connected-section">
+    <div class="not-connected-card">
+      <span class="material-icons not-connected-icon">cloud_off</span>
+      <h3>Not Connected to Network</h3>
+      <p>{{ connectionStatus().description }}</p>
+      <button type="button" class="btn btn-primary" (click)="reconnect.emit()">
+        <span class="material-icons">wifi</span>
+        Connect to Network
+      </button>
+    </div>
+  </div>
+}

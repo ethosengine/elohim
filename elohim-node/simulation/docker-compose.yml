@@ -65,6 +65,38 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # elohim-storage sidecar for cluster A node 1
+  storage-a-1:
+    build:
+      context: ../../holochain/elohim-storage
+      dockerfile: Dockerfile
+    container_name: storage-a-1
+    hostname: storage-a-1
+    environment:
+      - RUST_LOG=info,elohim_storage=debug
+      - ENABLE_P2P=true
+      - P2P_PORT=9876
+      - RELAY_MODE=server
+      # LAN nodes use mDNS for local discovery
+    volumes:
+      - storage-a-1-data:/data
+    networks:
+      cluster-a-lan:
+        ipv4_address: 172.20.1.21
+      wan-bridge:
+        ipv4_address: 172.20.0.31
+    ports:
+      - "8091:8090"   # Storage HTTP API
+      - "9871:9876"   # P2P libp2p
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - family-a-node-1
+    restart: unless-stopped
+
   family-a-node-2:
     build:
       context: ..
@@ -85,6 +117,32 @@ services:
         ipv4_address: 172.20.1.12
     depends_on:
       - family-a-node-1
+    restart: unless-stopped
+
+  # elohim-storage sidecar for cluster A node 2
+  storage-a-2:
+    build:
+      context: ../../holochain/elohim-storage
+      dockerfile: Dockerfile
+    container_name: storage-a-2
+    hostname: storage-a-2
+    environment:
+      - RUST_LOG=info,elohim_storage=debug
+      - ENABLE_P2P=true
+      - P2P_PORT=9876
+      - RELAY_MODE=client
+    volumes:
+      - storage-a-2-data:/data
+    networks:
+      cluster-a-lan:
+        ipv4_address: 172.20.1.22
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - family-a-node-2
     restart: unless-stopped
 
   # ===========================================================================
@@ -122,6 +180,39 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # elohim-storage sidecar for cluster B node 1
+  storage-b-1:
+    build:
+      context: ../../holochain/elohim-storage
+      dockerfile: Dockerfile
+    container_name: storage-b-1
+    hostname: storage-b-1
+    environment:
+      - RUST_LOG=info,elohim_storage=debug
+      - ENABLE_P2P=true
+      - P2P_PORT=9876
+      - RELAY_MODE=server
+      # WAN node bootstraps from cluster A's storage
+      - P2P_BOOTSTRAP_NODES=/ip4/172.20.0.31/tcp/9876
+    volumes:
+      - storage-b-1-data:/data
+    networks:
+      cluster-b-lan:
+        ipv4_address: 172.20.2.21
+      wan-bridge:
+        ipv4_address: 172.20.0.41
+    ports:
+      - "8092:8090"   # Storage HTTP API
+      - "9872:9876"   # P2P libp2p
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - family-b-node-1
+    restart: unless-stopped
+
   family-b-node-2:
     build:
       context: ..
@@ -142,6 +233,32 @@ services:
         ipv4_address: 172.20.2.12
     depends_on:
       - family-b-node-1
+    restart: unless-stopped
+
+  # elohim-storage sidecar for cluster B node 2
+  storage-b-2:
+    build:
+      context: ../../holochain/elohim-storage
+      dockerfile: Dockerfile
+    container_name: storage-b-2
+    hostname: storage-b-2
+    environment:
+      - RUST_LOG=info,elohim_storage=debug
+      - ENABLE_P2P=true
+      - P2P_PORT=9876
+      - RELAY_MODE=client
+    volumes:
+      - storage-b-2-data:/data
+    networks:
+      cluster-b-lan:
+        ipv4_address: 172.20.2.22
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - family-b-node-2
     restart: unless-stopped
 
   # ===========================================================================
@@ -214,3 +331,7 @@ volumes:
   family-a-node-2-data:
   family-b-node-1-data:
   family-b-node-2-data:
+  storage-a-1-data:
+  storage-a-2-data:
+  storage-b-1-data:
+  storage-b-2-data:

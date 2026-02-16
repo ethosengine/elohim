@@ -8,7 +8,7 @@
 //!
 //! ```bash
 //! # Connect via websocat
-//! websocat 'wss://doorway-dev.elohim.host/debug/stream?apiKey=...'
+//! websocat 'wss://doorway-alpha.elohim.host/debug/stream?apiKey=...'
 //!
 //! # Or use the seeder debug command
 //! npm run debug:stream
@@ -26,11 +26,10 @@
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use http_body_util::Full;
-use hyper::{Request, Response, StatusCode};
 use hyper::body::Incoming;
+use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
@@ -121,23 +120,35 @@ impl DebugHub {
     // Convenience methods for common events
 
     pub fn zome_call_start(&self, zome: &str, fn_name: &str, cell_role: &str) {
-        self.emit(DebugEvent::info("doorway", "zome_call_start",
-            &format!("→ {}::{} (role: {})", zome, fn_name, cell_role)));
+        self.emit(DebugEvent::info(
+            "doorway",
+            "zome_call_start",
+            &format!("→ {zome}::{fn_name} (role: {cell_role})"),
+        ));
     }
 
     pub fn zome_call_complete(&self, zome: &str, fn_name: &str, duration_ms: u64) {
-        self.emit(DebugEvent::info("doorway", "zome_call_complete",
-            &format!("← {}::{} completed in {}ms", zome, fn_name, duration_ms)));
+        self.emit(DebugEvent::info(
+            "doorway",
+            "zome_call_complete",
+            &format!("← {zome}::{fn_name} completed in {duration_ms}ms"),
+        ));
     }
 
     pub fn zome_call_error(&self, zome: &str, fn_name: &str, error: &str) {
-        self.emit(DebugEvent::error("doorway", "zome_call_error",
-            &format!("✗ {}::{} failed: {}", zome, fn_name, error)));
+        self.emit(DebugEvent::error(
+            "doorway",
+            "zome_call_error",
+            &format!("✗ {zome}::{fn_name} failed: {error}"),
+        ));
     }
 
     pub fn import_forwarded(&self, batch_type: &str, batch_id: &str) {
-        self.emit(DebugEvent::info("doorway", "import_forward",
-            &format!("→ Forwarding {} import: {}", batch_type, batch_id)));
+        self.emit(DebugEvent::info(
+            "doorway",
+            "import_forward",
+            &format!("→ Forwarding {batch_type} import: {batch_id}"),
+        ));
     }
 
     pub fn storage_event(&self, event_type: &str, message: &str) {
@@ -162,7 +173,9 @@ pub async fn handle_debug_stream(
         return Response::builder()
             .status(StatusCode::SERVICE_UNAVAILABLE)
             .header("Content-Type", "application/json")
-            .body(Full::new(Bytes::from(r#"{"error": "Debug streaming not enabled"}"#)))
+            .body(Full::new(Bytes::from(
+                r#"{"error": "Debug streaming not enabled"}"#,
+            )))
             .unwrap();
     }
 
@@ -190,7 +203,9 @@ pub async fn handle_debug_stream(
             Response::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(format!(r#"{{"error": "WebSocket upgrade failed: {}"}}"#, e))))
+                .body(Full::new(Bytes::from(format!(
+                    r#"{{"error": "WebSocket upgrade failed: {e}"}}"#
+                ))))
                 .unwrap()
         }
     }
@@ -198,7 +213,9 @@ pub async fn handle_debug_stream(
 
 /// Handle a connected debug client
 async fn handle_debug_client(
-    ws_stream: hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>,
+    ws_stream: hyper_tungstenite::WebSocketStream<
+        hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>,
+    >,
     debug_hub: Arc<DebugHub>,
     storage_url: Option<String>,
 ) {
@@ -208,14 +225,15 @@ async fn handle_debug_client(
     let mut local_rx = debug_hub.subscribe();
 
     // Send welcome message
-    let welcome = DebugEvent::info("doorway", "connected", "Debug stream connected")
-        .with_data(serde_json::json!({
+    let welcome = DebugEvent::info("doorway", "connected", "Debug stream connected").with_data(
+        serde_json::json!({
             "storage_url": storage_url,
             "features": ["doorway_events", "storage_proxy"]
-        }));
+        }),
+    );
 
     if let Ok(json) = serde_json::to_string(&welcome) {
-        let _ = ws_write.send(Message::Text(json.into())).await;
+        let _ = ws_write.send(Message::Text(json)).await;
     }
 
     // Optionally connect to storage debug stream
@@ -235,16 +253,16 @@ async fn handle_debug_client(
                 match event {
                     Ok(evt) => {
                         if let Ok(json) = serde_json::to_string(&evt) {
-                            if ws_write.send(Message::Text(json.into())).await.is_err() {
+                            if ws_write.send(Message::Text(json)).await.is_err() {
                                 break;
                             }
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
                         let lag_event = DebugEvent::warn("doorway", "lag",
-                            &format!("Dropped {} events due to slow client", n));
+                            &format!("Dropped {n} events due to slow client"));
                         if let Ok(json) = serde_json::to_string(&lag_event) {
-                            let _ = ws_write.send(Message::Text(json.into())).await;
+                            let _ = ws_write.send(Message::Text(json)).await;
                         }
                     }
                     Err(_) => break,
@@ -265,7 +283,7 @@ async fn handle_debug_client(
                     if let Ok(mut evt) = serde_json::from_str::<DebugEvent>(&text) {
                         evt.source = "storage".to_string();
                         if let Ok(json) = serde_json::to_string(&evt) {
-                            if ws_write.send(Message::Text(json.into())).await.is_err() {
+                            if ws_write.send(Message::Text(json)).await.is_err() {
                                 break;
                             }
                         }
@@ -287,7 +305,7 @@ async fn handle_debug_client(
                             if cmd.get("command").and_then(|c| c.as_str()) == Some("ping") {
                                 let pong = DebugEvent::debug("doorway", "pong", "pong");
                                 if let Ok(json) = serde_json::to_string(&pong) {
-                                    let _ = ws_write.send(Message::Text(json.into())).await;
+                                    let _ = ws_write.send(Message::Text(json)).await;
                                 }
                             }
                         }
@@ -305,8 +323,16 @@ async fn handle_debug_client(
 /// Connect to elohim-storage debug stream
 async fn connect_storage_debug_stream(
     storage_url: &str,
-) -> Option<((), tokio::sync::mpsc::Receiver<Option<Result<Message, tokio_tungstenite::tungstenite::Error>>>)> {
-    let ws_url = format!("{}/debug/stream", storage_url.replace("http://", "ws://").replace("https://", "wss://"));
+) -> Option<(
+    (),
+    tokio::sync::mpsc::Receiver<Option<Result<Message, tokio_tungstenite::tungstenite::Error>>>,
+)> {
+    let ws_url = format!(
+        "{}/debug/stream",
+        storage_url
+            .replace("http://", "ws://")
+            .replace("https://", "wss://")
+    );
 
     info!(url = %ws_url, "Connecting to storage debug stream");
 

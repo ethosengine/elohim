@@ -43,17 +43,17 @@ interface OAuthState {
   timestamp: number;
 }
 
-/** Response from POST /auth/token */
+/** Response from POST /auth/token (snake_case per OAuth 2.0 + doorway extensions) */
 interface OAuthTokenResponse {
-  accessToken: string;
-  tokenType: string;
-  expiresIn: number;
-  refreshToken?: string;
-  humanId: string;
-  agentPubKey: string;
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token?: string;
+  human_id: string;
+  agent_pub_key: string;
   identifier: string;
-  doorwayId?: string;
-  doorwayUrl?: string;
+  doorway_id?: string;
+  doorway_url?: string;
 }
 
 /** Error response from OAuth endpoints */
@@ -65,6 +65,9 @@ interface OAuthErrorResponse {
 
 // Storage key for OAuth state
 const OAUTH_STATE_KEY = 'elohim-oauth-state';
+
+// Storage key for return URL (separate from CSRF state)
+const OAUTH_RETURN_URL_KEY = 'elohim-oauth-return-url';
 
 // =============================================================================
 // Provider Implementation
@@ -106,7 +109,7 @@ export class OAuthAuthProvider implements AuthProvider {
    * @param doorwayUrl - URL of the doorway to authenticate with
    * @param returnUrl - URL to redirect back to after auth (default: current page)
    */
-  initiateLogin(doorwayUrl: string, returnUrl?: string): void {
+  initiateLogin(doorwayUrl: string, returnUrl?: string, loginHint?: string): void {
     const state = this.generateState();
     const redirectUri = returnUrl ?? `${globalThis.location.origin}/auth/callback`;
 
@@ -119,13 +122,17 @@ export class OAuthAuthProvider implements AuthProvider {
     };
     sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(oauthState));
 
-    // Build authorization URL
+    // Build authorization URL (snake_case per OAuth 2.0 RFC 6749)
     const params = new URLSearchParams({
-      clientId: 'elohim-app',
-      redirectUri: redirectUri,
-      responseType: 'code',
+      client_id: 'elohim-app',
+      redirect_uri: redirectUri,
+      response_type: 'code',
       state,
     });
+
+    if (loginHint) {
+      params.set('login_hint', loginHint);
+    }
 
     const authorizeUrl = `${doorwayUrl}/auth/authorize?${params.toString()}`;
 
@@ -215,10 +222,10 @@ export class OAuthAuthProvider implements AuthProvider {
     const tokenUrl = `${doorwayUrl}/auth/token`;
 
     const body = {
-      grantType: 'authorization_code',
+      grant_type: 'authorization_code',
       code,
-      redirectUri: redirectUri ?? `${globalThis.location.origin}/auth/callback`,
-      clientId: 'elohim-app',
+      redirect_uri: redirectUri ?? `${globalThis.location.origin}/auth/callback`,
+      client_id: 'elohim-app',
     };
 
     try {
@@ -229,13 +236,13 @@ export class OAuthAuthProvider implements AuthProvider {
       );
 
       // Calculate expiry time
-      const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
+      const expiresAt = new Date(Date.now() + response.expires_in * 1000);
 
       return {
         success: true,
-        token: response.accessToken,
-        humanId: response.humanId,
-        agentPubKey: response.agentPubKey,
+        token: response.access_token,
+        humanId: response.human_id,
+        agentPubKey: response.agent_pub_key,
         expiresAt: expiresAt.toISOString(),
         identifier: response.identifier,
       };
@@ -245,11 +252,34 @@ export class OAuthAuthProvider implements AuthProvider {
   }
 
   /**
+   * Store the intended return URL before an OAuth redirect.
+   * Uses a dedicated sessionStorage key separate from the CSRF state.
+   */
+  storeReturnUrl(url: string): void {
+    if (url && url !== '/') {
+      sessionStorage.setItem(OAUTH_RETURN_URL_KEY, url);
+    }
+  }
+
+  /**
+   * Consume the stored return URL (reads and removes in one call).
+   * Returns null if no return URL was stored.
+   */
+  consumeReturnUrl(): string | null {
+    const url = sessionStorage.getItem(OAUTH_RETURN_URL_KEY);
+    if (url) {
+      sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
+    }
+    return url;
+  }
+
+  /**
    * Logout - clear any OAuth state.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- Interface requires Promise<void> but no async work needed
   async logout(): Promise<void> {
     sessionStorage.removeItem(OAUTH_STATE_KEY);
+    sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
     this.isFlowInProgress.set(false);
   }
 
@@ -285,13 +315,13 @@ export class OAuthAuthProvider implements AuthProvider {
         )
       );
 
-      const expiresAt = new Date(Date.now() + response.expiresIn * 1000);
+      const expiresAt = new Date(Date.now() + response.expires_in * 1000);
 
       return {
         success: true,
-        token: response.accessToken,
-        humanId: response.humanId,
-        agentPubKey: response.agentPubKey,
+        token: response.access_token,
+        humanId: response.human_id,
+        agentPubKey: response.agent_pub_key,
         expiresAt: expiresAt.toISOString(),
         identifier: response.identifier,
       };

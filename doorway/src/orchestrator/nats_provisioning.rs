@@ -61,11 +61,7 @@ impl NatsProvisioner {
     }
 
     /// Configure signing key paths
-    pub fn with_signing_keys(
-        mut self,
-        operator_sk_path: String,
-        hpos_sk_path: String,
-    ) -> Self {
+    pub fn with_signing_keys(mut self, operator_sk_path: String, hpos_sk_path: String) -> Self {
         self.operator_sk_path = Some(operator_sk_path);
         self.hpos_sk_path = Some(hpos_sk_path);
         self
@@ -89,7 +85,7 @@ impl NatsProvisioner {
         let creds = NatsCredentials {
             creds_content: format!(
                 "-----BEGIN NATS USER JWT-----\n\
-                placeholder_jwt_for_{}\n\
+                placeholder_jwt_for_{node_id}\n\
                 ------END NATS USER JWT------\n\n\
                 ************************* IMPORTANT *************************\n\
                 NKEY Seed printed below can be used to sign and prove identity.\n\
@@ -97,16 +93,13 @@ impl NatsProvisioner {
                 -----BEGIN USER NKEY SEED-----\n\
                 SUAIBDPBAUTWCWBKIO6XHQNINK5FWJW4OHLXC3HQ2KFE4PEJUA44CNHTAM\n\
                 ------END USER NKEY SEED------\n\n\
-                *************************************************************\n",
-                node_id
+                *************************************************************\n"
             ),
             user_pub_key: format!("U{}", generate_placeholder_key()),
             account: "HPOS".to_string(),
             role: "workload_role".to_string(),
             server_urls: vec![self.nats_url.clone()],
-            expires_at: Some(
-                (chrono::Utc::now() + chrono::Duration::days(365)).to_rfc3339()
-            ),
+            expires_at: Some((chrono::Utc::now() + chrono::Duration::days(365)).to_rfc3339()),
         };
 
         debug!(
@@ -149,7 +142,7 @@ fn generate_placeholder_key() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("{:X}", timestamp)[..40].to_string()
+    format!("{timestamp:040X}")
 }
 
 /// NATS permission template for workload role
@@ -210,7 +203,7 @@ pub struct OrchestratorSubjects;
 impl OrchestratorSubjects {
     /// Workload commands from orchestrator to node
     pub fn workload_to_node(node_pubkey: &str) -> String {
-        format!("WORKLOAD.{}.>", node_pubkey)
+        format!("WORKLOAD.{node_pubkey}.>")
     }
 
     /// Workload responses from node to orchestrator
@@ -220,12 +213,12 @@ impl OrchestratorSubjects {
 
     /// Inventory updates from node
     pub fn inventory_update(node_pubkey: &str) -> String {
-        format!("INVENTORY.*.{}.update.>", node_pubkey)
+        format!("INVENTORY.*.{node_pubkey}.update.>")
     }
 
     /// Node's inbox for receiving credentials and commands
     pub fn node_inbox(node_pubkey: &str) -> String {
-        format!("_HPOS_INBOX.{}.>", node_pubkey)
+        format!("_HPOS_INBOX.{node_pubkey}.>")
     }
 
     /// Orchestrator's inbox for responses
@@ -253,9 +246,18 @@ mod tests {
     fn test_workload_permissions() {
         let perms = WorkloadPermissions::default();
 
-        assert!(perms.publish.allow.contains(&"WORKLOAD.orchestrator.>".to_string()));
-        assert!(perms.publish.allow.contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
-        assert!(perms.subscribe.allow.contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
+        assert!(perms
+            .publish
+            .allow
+            .contains(&"WORKLOAD.orchestrator.>".to_string()));
+        assert!(perms
+            .publish
+            .allow
+            .contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
+        assert!(perms
+            .subscribe
+            .allow
+            .contains(&"WORKLOAD.{{tag(pubkey)}}.>".to_string()));
     }
 
     #[test]

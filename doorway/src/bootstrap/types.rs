@@ -35,8 +35,8 @@ pub struct AgentInfo {
 impl AgentInfo {
     /// Parse AgentInfo from MessagePack bytes
     pub fn from_msgpack(data: &[u8]) -> Result<Self, String> {
-        let value: rmpv::Value = rmpv::decode::read_value(&mut &data[..])
-            .map_err(|e| format!("Decode error: {}", e))?;
+        let value: rmpv::Value =
+            rmpv::decode::read_value(&mut &data[..]).map_err(|e| format!("Decode error: {e}"))?;
 
         let map = value
             .as_map()
@@ -82,7 +82,7 @@ impl SignedAgentInfo {
     pub fn decode_and_verify(data: &[u8]) -> Result<Self, String> {
         // Decode the outer envelope
         let value: rmpv::Value =
-            rmpv::decode::read_value(&mut &data[..]).map_err(|e| format!("Decode error: {}", e))?;
+            rmpv::decode::read_value(&mut &data[..]).map_err(|e| format!("Decode error: {e}"))?;
 
         let map = value
             .as_map()
@@ -107,7 +107,7 @@ impl SignedAgentInfo {
             .map_err(|_| "Invalid pubkey length")?;
 
         let verifying_key = VerifyingKey::from_bytes(&pubkey_bytes)
-            .map_err(|e| format!("Invalid public key: {}", e))?;
+            .map_err(|e| format!("Invalid public key: {e}"))?;
 
         let signature = Signature::from_bytes(&sig_arr);
 
@@ -125,20 +125,20 @@ impl SignedAgentInfo {
 
         // Validate URLs
         if agent_info.urls.len() > MAX_URLS {
-            return Err(format!("Too many URLs (max {})", MAX_URLS));
+            return Err(format!("Too many URLs (max {MAX_URLS})"));
         }
         for url in &agent_info.urls {
             if url.len() > MAX_URL_SIZE {
-                return Err(format!("URL too long (max {} bytes)", MAX_URL_SIZE));
+                return Err(format!("URL too long (max {MAX_URL_SIZE} bytes)"));
             }
         }
 
         // Validate expiry times
         if agent_info.expires_after_ms < MIN_EXPIRES_MS as i64 {
-            return Err(format!("Expires too short (min {} ms)", MIN_EXPIRES_MS));
+            return Err(format!("Expires too short (min {MIN_EXPIRES_MS} ms)"));
         }
         if agent_info.expires_after_ms > MAX_EXPIRES_MS as i64 {
-            return Err(format!("Expires too long (max {} ms)", MAX_EXPIRES_MS));
+            return Err(format!("Expires too long (max {MAX_EXPIRES_MS} ms)"));
         }
 
         Ok(Self {
@@ -185,7 +185,7 @@ impl RandomQuery {
     /// Decode from MessagePack bytes
     pub fn decode(data: &[u8]) -> Result<Self, String> {
         let value: rmpv::Value =
-            rmpv::decode::read_value(&mut &data[..]).map_err(|e| format!("Decode error: {}", e))?;
+            rmpv::decode::read_value(&mut &data[..]).map_err(|e| format!("Decode error: {e}"))?;
 
         let map = value
             .as_map()
@@ -227,7 +227,7 @@ fn extract_bytes(
             }
         }
     }
-    Err(format!("Missing field: {}", key))
+    Err(format!("Missing field: {key}"))
 }
 
 /// Extract raw bytes field from MessagePack map (any length)
@@ -241,7 +241,7 @@ fn extract_raw_bytes(map: &[(rmpv::Value, rmpv::Value)], key: &str) -> Result<Ve
             }
         }
     }
-    Err(format!("Missing field: {}", key))
+    Err(format!("Missing field: {key}"))
 }
 
 /// Extract integer field from MessagePack map
@@ -258,7 +258,7 @@ fn extract_int(map: &[(rmpv::Value, rmpv::Value)], key: &str) -> Result<i64, Str
             }
         }
     }
-    Err(format!("Missing or invalid field: {}", key))
+    Err(format!("Missing or invalid field: {key}"))
 }
 
 /// Extract string array field from MessagePack map
@@ -275,7 +275,7 @@ fn extract_string_array(
                         if let Some(s) = item.as_str() {
                             result.push(s.to_string());
                         } else {
-                            return Err(format!("Array item in '{}' is not a string", key));
+                            return Err(format!("Array item in '{key}' is not a string"));
                         }
                     }
                     return Ok(result);
@@ -283,7 +283,7 @@ fn extract_string_array(
             }
         }
     }
-    Err(format!("Missing field: {}", key))
+    Err(format!("Missing field: {key}"))
 }
 
 #[cfg(test)]
@@ -292,9 +292,10 @@ mod tests {
 
     #[test]
     fn test_extract_int() {
-        let map = vec![
-            (rmpv::Value::String("limit".into()), rmpv::Value::Integer(10.into())),
-        ];
+        let map = vec![(
+            rmpv::Value::String("limit".into()),
+            rmpv::Value::Integer(10.into()),
+        )];
         assert_eq!(extract_int(&map, "limit").unwrap(), 10);
     }
 }

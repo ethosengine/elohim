@@ -29,6 +29,14 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test export_bindings --releas
     RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --release 2>&1 || true
 }
 
+# Fix ts-rs import paths: ts-rs 10.1 generates imports pointing to
+# elohim-storage/bindings/serde_json/JsonValue which is outside the SDK package.
+# Rewrite to use the local ./JsonValue copy that ts-rs also generates.
+echo ""
+echo "Fixing JsonValue import paths..."
+find "$GENERATED_DIR" -name '*.ts' -exec sed -i \
+    's|from "../../../../elohim-storage/bindings/serde_json/JsonValue"|from "./JsonValue"|g' {} +
+
 # Check what was generated
 echo ""
 echo "Generated TypeScript files:"

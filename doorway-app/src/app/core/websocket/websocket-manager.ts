@@ -47,7 +47,6 @@ export class WebSocketManager<TMessage = unknown> {
    */
   connect(): void {
     if (this.currentState !== ConnectionState.DISCONNECTED) {
-      console.warn('[WebSocketManager] Already connected or connecting');
       return;
     }
 
@@ -113,13 +112,10 @@ export class WebSocketManager<TMessage = unknown> {
    * Create WebSocket connection
    */
   private createConnection(): void {
-    console.log('[WebSocketManager] Connecting to:', this.url);
-
     this.ws$ = webSocket<TMessage>({
       url: this.url,
       openObserver: {
         next: () => {
-          console.log('[WebSocketManager] Connected');
           this.reconnectAttempts = 0;
           this.setState(ConnectionState.CONNECTED);
           this.startHeartbeat();
@@ -127,7 +123,6 @@ export class WebSocketManager<TMessage = unknown> {
       },
       closeObserver: {
         next: () => {
-          console.log('[WebSocketManager] Disconnected');
           this.handleDisconnect();
         },
       },
@@ -206,12 +201,6 @@ export class WebSocketManager<TMessage = unknown> {
           this.reconnectAttempts
         ),
       this.config.reconnection.maxDelayMs
-    );
-
-    console.log(
-      `[WebSocketManager] Reconnecting in ${delay}ms (attempt ${
-        this.reconnectAttempts + 1
-      })`
     );
 
     this.reconnectTimer = timer(delay).subscribe(() => {

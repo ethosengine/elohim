@@ -2,8 +2,8 @@
  * RegisterComponent - Network identity registration.
  *
  * Features:
- * - Step 1: Doorway selection (fediverse-style gateway choice)
- * - Step 2: Profile info + credentials
+ * - Auto-selects doorway from environment or saved state
+ * - Profile info + credentials
  * - Migration from session (if session exists)
  * - Post-registration redirect to return URL
  */
@@ -17,7 +17,7 @@ import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
-import { type DoorwayInfo } from '../../models/doorway.model';
+import { environment } from '../../../../environments/environment';
 import {
   type RegisterHumanRequest,
   type ProfileReach,
@@ -30,15 +30,11 @@ import { IdentityService } from '../../services/identity.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { SessionHumanService } from '../../services/session-human.service';
 import { SessionMigrationService } from '../../services/session-migration.service';
-import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
-
-/** Registration step type */
-type RegistrationStep = 'doorway' | 'credentials';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, DoorwayPickerComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './register.component.html',
   styleUrls: ['./register.component.css'],
 })
@@ -80,9 +76,6 @@ export class RegisterComponent implements OnInit {
   readonly isMigrating = signal(false);
   readonly error = signal<string | null>(null);
   readonly showPassword = signal(false);
-
-  /** Current registration step */
-  readonly currentStep = signal<RegistrationStep>('doorway');
 
   /** Return URL after successful registration */
   private returnUrl = '/';
@@ -161,9 +154,18 @@ export class RegisterComponent implements OnInit {
       this.returnUrl = returnUrlParam ?? '/';
     });
 
-    // Skip doorway selection if already chosen
-    if (this.hasDoorwaySelected()) {
-      this.currentStep.set('credentials');
+    // Auto-select doorway from environment if none selected
+    if (!this.hasDoorwaySelected()) {
+      const doorwayUrl = environment.client?.doorwayUrl;
+      if (doorwayUrl) {
+        this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
+      } else {
+        // No doorway available — redirect to login for doorway discovery
+        void this.router.navigate(['/identity/login'], {
+          queryParams: { returnUrl: '/identity/register' },
+        });
+        return;
+      }
     }
 
     // Pre-fill from session if available
@@ -308,31 +310,6 @@ export class RegisterComponent implements OnInit {
     void this.router.navigate(['/identity/login'], {
       queryParams: { returnUrl: this.returnUrl },
     });
-  }
-
-  // ==========================================================================
-  // Step Navigation
-  // ==========================================================================
-
-  /**
-   * Handle doorway selection from picker.
-   */
-  onDoorwaySelected(_doorway: DoorwayInfo): void {
-    this.currentStep.set('credentials');
-  }
-
-  /**
-   * Handle doorway picker cancellation.
-   */
-  onDoorwayPickerCancelled(): void {
-    void this.router.navigate(['/']);
-  }
-
-  /**
-   * Go back to doorway selection.
-   */
-  goBackToDoorway(): void {
-    this.currentStep.set('doorway');
   }
 
   // ==========================================================================

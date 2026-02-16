@@ -32,7 +32,7 @@ pub mod nats_provisioning;
 pub mod node_bootstrap;
 
 pub use disaster_recovery::DisasterRecoveryCoordinator;
-pub use heartbeat::{HeartbeatConfig, HeartbeatLoop, SocialMetrics, HeartbeatMessage};
+pub use heartbeat::{HeartbeatConfig, HeartbeatLoop, HeartbeatMessage, SocialMetrics};
 pub use inventory::{NodeCapacity, NodeInventory};
 pub use nats_provisioning::{NatsCredentials, NatsProvisioner};
 pub use node_bootstrap::{NodeBootstrap, NodeBootstrapConfig};

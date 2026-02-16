@@ -26,7 +26,7 @@
       "pipelines": ["elohim-genesis"],
       "search": "PREFLIGHT|ETIMEDOUT|Cell not found",
       "ctx": 10, "max": 5,
-      "fix": "Check doorway-dev.elohim.host/health, verify edge healthy",
+      "fix": "Check doorway-alpha.elohim.host/health, verify edge healthy",
       "blocks": []
     },
     "DEPLOYMENT": {

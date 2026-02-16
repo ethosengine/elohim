@@ -20,8 +20,8 @@ import {
 
 const createTestConfig = (overrides?: Partial<ConnectionConfig>): ConnectionConfig => ({
   mode: 'doorway',
-  adminUrl: 'wss://doorway-dev.elohim.host',
-  appUrl: 'wss://doorway-dev.elohim.host/app',
+  adminUrl: 'wss://doorway-alpha.elohim.host',
+  appUrl: 'wss://doorway-alpha.elohim.host/app',
   proxyApiKey: 'test-api-key',
   appId: 'elohim',
   origin: 'elohim-app',
@@ -109,14 +109,14 @@ describe('DoorwayConnectionStrategy', () => {
     it('should resolve admin URL with API key', () => {
       const config = createTestConfig();
       const url = strategy.resolveAdminUrl(config);
-      expect(url).toContain('doorway-dev.elohim.host');
+      expect(url).toContain('doorway-alpha.elohim.host');
       expect(url).toContain('apiKey=test-api-key');
     });
 
     it('should resolve admin URL without API key', () => {
       const config = createTestConfig({ proxyApiKey: undefined });
       const url = strategy.resolveAdminUrl(config);
-      expect(url).toBe('wss://doorway-dev.elohim.host');
+      expect(url).toBe('wss://doorway-alpha.elohim.host');
     });
 
     it('should resolve app URL with port through proxy', () => {
@@ -140,7 +140,7 @@ describe('DoorwayConnectionStrategy', () => {
     it('should construct HTTPS blob URL', () => {
       const config = createTestConfig();
       const url = strategy.getBlobStorageUrl(config, 'abc123hash');
-      expect(url).toContain('https://doorway-dev.elohim.host');
+      expect(url).toContain('https://doorway-alpha.elohim.host');
       expect(url).toContain('/api/blob/abc123hash');
       expect(url).toContain('apiKey=test-api-key');
     });

@@ -86,11 +86,11 @@ impl HcWsRequest {
     /// Get the NATS subject for this request
     pub fn subject(&self) -> String {
         if let Some(ref host) = self.target_host {
-            format!("{}.{}", HC_WS_SUBJECT_PREFIX, host)
+            format!("{HC_WS_SUBJECT_PREFIX}.{host}")
         } else if let Some(ref region) = self.preferred_region {
-            format!("{}.REGION.{}", HC_WS_SUBJECT_PREFIX, region)
+            format!("{HC_WS_SUBJECT_PREFIX}.REGION.{region}")
         } else {
-            format!("{}.ANY", HC_WS_SUBJECT_PREFIX)
+            format!("{HC_WS_SUBJECT_PREFIX}.ANY")
         }
     }
 
@@ -267,11 +267,8 @@ mod tests {
 
     #[test]
     fn test_response_success() {
-        let resp = HcWsResponse::success(
-            "req-123".to_string(),
-            "host-456".to_string(),
-            vec![1, 2, 3],
-        );
+        let resp =
+            HcWsResponse::success("req-123".to_string(), "host-456".to_string(), vec![1, 2, 3]);
 
         assert!(resp.success);
         assert!(resp.error.is_none());
@@ -280,8 +277,11 @@ mod tests {
 
     #[test]
     fn test_response_error() {
-        let resp =
-            HcWsResponse::error("req-123".to_string(), "host-456".to_string(), "oops".to_string());
+        let resp = HcWsResponse::error(
+            "req-123".to_string(),
+            "host-456".to_string(),
+            "oops".to_string(),
+        );
 
         assert!(!resp.success);
         assert_eq!(resp.error, Some("oops".to_string()));

@@ -330,8 +330,8 @@ Environment:
 
 Examples:
   # Full diagnostics on dev
-  HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' \\
-  DOORWAY_URL='https://doorway-dev.elohim.host' \\
+  HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024' \\
+  DOORWAY_URL='https://doorway-alpha.elohim.host' \\
   npx tsx src/diagnose.ts
 
   # Quick app/cell check

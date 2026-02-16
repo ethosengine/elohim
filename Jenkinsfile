@@ -121,9 +121,7 @@ def buildSophiaPlugin() {
     echo 'Building sophia monorepo packages...'
 
     // Initialize and update submodule if needed
-    sh '''
-        git submodule update --init --recursive sophia || true
-    '''
+    sh 'git submodule update --init --recursive sophia'
 
     dir('sophia') {
         sh '''
@@ -951,7 +949,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         // Check if holochain edge node is running
                         def holochainStatus = sh(
                             script: '''
-                                kubectl get deployment elohim-edgenode-dev -n ethosengine -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0"
+                                kubectl get deployment elohim-edgenode-alpha -n elohim-alpha -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0"
                             ''',
                             returnStdout: true
                         ).trim()

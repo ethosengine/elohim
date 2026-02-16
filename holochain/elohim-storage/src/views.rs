@@ -33,6 +33,25 @@ fn parse_json(json_str: &str) -> Value {
     serde_json::from_str(json_str).unwrap_or(Value::Object(serde_json::Map::new()))
 }
 
+/// Default schema version for InputView types.
+/// Clients that omit schemaVersion are implicitly version 1.
+fn default_schema_version() -> u32 { 1 }
+
+/// Supported schema versions. Reject anything not in this set.
+/// Extend this array when introducing a new schema version.
+pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1];
+
+/// Validate that all schema versions in a batch are supported.
+pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
+    if let Some(&bad) = versions.iter().find(|v| !SUPPORTED_SCHEMA_VERSIONS.contains(v)) {
+        return Err(format!(
+            "Unsupported schema version: {}. Supported: {:?}",
+            bad, SUPPORTED_SCHEMA_VERSIONS
+        ));
+    }
+    Ok(())
+}
+
 use crate::db::models::{
     App, Chapter, ChapterWithSteps, Content, ContentMastery, ContentStewardship, ContentWithTags,
     ContributorPresence, EconomicEvent, HumanRelationship, LocalSession, Path, PathAttestation,
@@ -988,6 +1007,8 @@ use crate::db::content::CreateContentInput;
 pub struct CreateContentInputView {
     pub id: String,
     pub title: String,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
@@ -1046,6 +1067,8 @@ use crate::db::paths::{CreatePathInput, CreateChapterInput, CreateStepInput};
 pub struct CreateStepInputView {
     pub id: String,
     pub path_id: String,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub chapter_id: Option<String>,
     pub title: String,
@@ -1091,6 +1114,8 @@ impl From<CreateStepInputView> for CreateStepInput {
 pub struct CreateChapterInputView {
     pub id: String,
     pub title: String,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
@@ -1121,6 +1146,8 @@ impl From<CreateChapterInputView> for CreateChapterInput {
 pub struct CreatePathInputView {
     pub id: String,
     pub title: String,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
@@ -1179,6 +1206,8 @@ use crate::db::relationships::CreateRelationshipInput;
 pub struct CreateRelationshipInputView {
     #[serde(default)]
     pub id: Option<String>,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub source_id: String,
     pub target_id: String,
     pub relationship_type: String,
@@ -1218,6 +1247,8 @@ use crate::db::human_relationships::CreateHumanRelationshipInput;
 pub struct CreateHumanRelationshipInputView {
     #[serde(default)]
     pub id: Option<String>,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub party_a_id: String,
     pub party_b_id: String,
     pub relationship_type: String,
@@ -1274,6 +1305,8 @@ use crate::db::contributor_presences::{CreateContributorPresenceInput, InitiateC
 pub struct CreateContributorPresenceInputView {
     #[serde(default)]
     pub id: Option<String>,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub display_name: String,
     /// Parsed external identifiers (serialized to JSON string for DB)
     #[serde(default)]
@@ -1307,6 +1340,8 @@ impl From<CreateContributorPresenceInputView> for CreateContributorPresenceInput
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct InitiateClaimInputView {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub claiming_agent_id: String,
     pub verification_method: String,
     /// Parsed evidence object (serialized to JSON string for DB)
@@ -1340,6 +1375,8 @@ use crate::db::economic_events::CreateEconomicEventInput;
 pub struct CreateEconomicEventInputView {
     #[serde(default)]
     pub id: Option<String>,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub action: String,
     pub provider: String,
     pub receiver: String,
@@ -1422,6 +1459,8 @@ use crate::db::stewardship_allocations::{CreateAllocationInput, UpdateAllocation
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct CreateAllocationInputView {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub content_id: String,
     pub steward_presence_id: String,
     #[serde(default)]
@@ -1460,6 +1499,8 @@ impl From<CreateAllocationInputView> for CreateAllocationInput {
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct UpdateAllocationInputView {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub allocation_ratio: Option<f32>,
     #[serde(default)]
@@ -1497,5 +1538,174 @@ impl From<UpdateAllocationInputView> for UpdateAllocationInput {
             elohim_ratifier_id: v.elohim_ratifier_id,
             note: v.note,
         }
+    }
+}
+
+// ============================================================================
+// Content Mastery Input View
+// ============================================================================
+
+use crate::db::content_mastery::CreateMasteryInput;
+
+/// Input for creating/updating content mastery - camelCase API boundary type
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateMasteryInputView {
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    pub human_id: String,
+    pub content_id: String,
+    #[serde(default)]
+    pub mastery_level: Option<String>,
+    #[serde(default)]
+    pub content_version_at_mastery: Option<String>,
+}
+
+impl From<CreateMasteryInputView> for CreateMasteryInput {
+    fn from(v: CreateMasteryInputView) -> Self {
+        Self {
+            id: v.id,
+            human_id: v.human_id,
+            content_id: v.content_id,
+            mastery_level: v.mastery_level.unwrap_or_else(|| "not_started".to_string()),
+            content_version_at_mastery: v.content_version_at_mastery,
+        }
+    }
+}
+
+// ============================================================================
+// Schema Version Tests
+// ============================================================================
+
+#[cfg(test)]
+mod schema_version_tests {
+    use super::*;
+
+    #[test]
+    fn default_schema_version_is_one() {
+        // Missing schemaVersion field defaults to 1
+        let json = r#"{"id":"test","title":"Test"}"#;
+        let view: CreateContentInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.schema_version, 1);
+    }
+
+    #[test]
+    fn explicit_schema_version_is_preserved() {
+        let json = r#"{"id":"test","title":"Test","schemaVersion":2}"#;
+        let view: CreateContentInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.schema_version, 2);
+    }
+
+    #[test]
+    fn unknown_fields_are_silently_ignored() {
+        // Tolerant reader: future fields don't break deserialization
+        let json = r#"{"id":"test","title":"Test","futureField":"ignored","anotherNew":42}"#;
+        let view: CreateContentInputView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.id, "test");
+        assert_eq!(view.schema_version, 1);
+    }
+
+    #[test]
+    fn all_input_views_accept_schema_version() {
+        // Verify schema_version works across representative InputView types
+        let content: CreateContentInputView = serde_json::from_str(
+            r#"{"id":"c","title":"T","schemaVersion":3}"#
+        ).unwrap();
+        assert_eq!(content.schema_version, 3);
+
+        let rel: CreateRelationshipInputView = serde_json::from_str(
+            r#"{"sourceId":"a","targetId":"b","relationshipType":"relates","schemaVersion":2}"#
+        ).unwrap();
+        assert_eq!(rel.schema_version, 2);
+
+        let event: CreateEconomicEventInputView = serde_json::from_str(
+            r#"{"action":"use","provider":"p","receiver":"r","schemaVersion":5}"#
+        ).unwrap();
+        assert_eq!(event.schema_version, 5);
+    }
+
+    /// Compile-time lint: every InputView MUST have schema_version.
+    /// If you add a new InputView struct without schema_version, this test
+    /// will fail to compile. Add the field following the existing pattern:
+    ///   #[serde(default = "default_schema_version")]
+    ///   pub schema_version: u32,
+    #[test]
+    fn all_input_views_have_schema_version_field() {
+        // Every InputView type must appear here. If you add a new one, add it below.
+        let content: CreateContentInputView = serde_json::from_value(
+            serde_json::json!({"id":"x","title":"x"})
+        ).unwrap();
+        let step: CreateStepInputView = serde_json::from_value(
+            serde_json::json!({"id":"x","pathId":"p","title":"x"})
+        ).unwrap();
+        let chapter: CreateChapterInputView = serde_json::from_value(
+            serde_json::json!({"id":"x","title":"x"})
+        ).unwrap();
+        let path: CreatePathInputView = serde_json::from_value(
+            serde_json::json!({"id":"x","title":"x"})
+        ).unwrap();
+        let rel: CreateRelationshipInputView = serde_json::from_value(
+            serde_json::json!({"sourceId":"a","targetId":"b","relationshipType":"r"})
+        ).unwrap();
+        let human_rel: CreateHumanRelationshipInputView = serde_json::from_value(
+            serde_json::json!({"partyAId":"a","partyBId":"b","relationshipType":"r","initiatedBy":"a"})
+        ).unwrap();
+        let presence: CreateContributorPresenceInputView = serde_json::from_value(
+            serde_json::json!({"displayName":"x","establishingContentIds":[]})
+        ).unwrap();
+        let claim: InitiateClaimInputView = serde_json::from_value(
+            serde_json::json!({"claimingAgentId":"a","verificationMethod":"m"})
+        ).unwrap();
+        let event: CreateEconomicEventInputView = serde_json::from_value(
+            serde_json::json!({"action":"use","provider":"p","receiver":"r"})
+        ).unwrap();
+        let alloc: CreateAllocationInputView = serde_json::from_value(
+            serde_json::json!({"contentId":"c","stewardPresenceId":"s"})
+        ).unwrap();
+        let update_alloc: UpdateAllocationInputView = serde_json::from_value(
+            serde_json::json!({})
+        ).unwrap();
+        let mastery: CreateMasteryInputView = serde_json::from_value(
+            serde_json::json!({"humanId":"h","contentId":"c"})
+        ).unwrap();
+
+        // The lint: accessing .schema_version on each. Fails to compile if missing.
+        assert_eq!(content.schema_version, 1);
+        assert_eq!(step.schema_version, 1);
+        assert_eq!(chapter.schema_version, 1);
+        assert_eq!(path.schema_version, 1);
+        assert_eq!(rel.schema_version, 1);
+        assert_eq!(human_rel.schema_version, 1);
+        assert_eq!(presence.schema_version, 1);
+        assert_eq!(claim.schema_version, 1);
+        assert_eq!(event.schema_version, 1);
+        assert_eq!(alloc.schema_version, 1);
+        assert_eq!(update_alloc.schema_version, 1);
+        assert_eq!(mastery.schema_version, 1);
+    }
+
+    #[test]
+    fn validate_supported_version_accepted() {
+        assert!(super::validate_schema_versions(&[1]).is_ok());
+    }
+
+    #[test]
+    fn validate_unsupported_version_rejected() {
+        let err = super::validate_schema_versions(&[99]).unwrap_err();
+        assert!(err.contains("Unsupported schema version: 99"));
+        assert!(err.contains("Supported:"));
+    }
+
+    #[test]
+    fn validate_empty_batch_ok() {
+        assert!(super::validate_schema_versions(&[]).is_ok());
+    }
+
+    #[test]
+    fn supported_versions_includes_default() {
+        assert!(super::SUPPORTED_SCHEMA_VERSIONS.contains(&super::default_schema_version()));
     }
 }

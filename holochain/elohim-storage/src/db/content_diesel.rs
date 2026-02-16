@@ -435,6 +435,7 @@ mod tests {
                 description TEXT,
                 content_type TEXT NOT NULL DEFAULT 'concept',
                 content_format TEXT NOT NULL DEFAULT 'markdown',
+                content_body TEXT,
                 blob_hash TEXT,
                 blob_cid TEXT,
                 content_size_bytes INTEGER,

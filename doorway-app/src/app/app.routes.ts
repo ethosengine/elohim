@@ -26,6 +26,14 @@ export const routes: Routes = [
     title: 'Create Account',
   },
   {
+    path: 'doorways',
+    loadComponent: () =>
+      import('./components/doorway-browser/doorway-browser.component').then(
+        m => m.DoorwayBrowserComponent
+      ),
+    title: 'Select Doorway',
+  },
+  {
     path: '**',
     redirectTo: '',
   },

@@ -1,0 +1,119 @@
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--primary-100, #dbeafe);
+  color: var(--primary-600, #2563eb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.identity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.display-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-color, #1a1a2e);
+}
+
+.mode-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.mode-badge.hosted,
+.mode-badge.steward {
+  background: var(--green-100, #dcfce7);
+  color: var(--green-700, #15803d);
+}
+
+.mode-badge.session {
+  background: var(--yellow-100, #fef3c7);
+  color: var(--yellow-700, #b45309);
+}
+
+.mode-badge.anonymous {
+  background: var(--surface-ground, #f8f9fa);
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.did-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.125rem;
+}
+
+.did-value {
+  font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+  font-size: 0.7rem;
+  color: var(--text-color-secondary, #6c757d);
+  background: var(--surface-ground, #f8f9fa);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 4px;
+  color: var(--text-color-secondary, #6c757d);
+  display: flex;
+  align-items: center;
+}
+
+.copy-btn:hover {
+  background: var(--surface-hover, #e9ecef);
+  color: var(--text-color, #1a1a2e);
+}
+
+.copy-btn .material-icons {
+  font-size: 0.85rem;
+}
+
+.edit-btn {
+  background: none;
+  border: 1px solid var(--surface-border, #dee2e6);
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: var(--text-color-secondary, #6c757d);
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.edit-btn:hover {
+  border-color: var(--primary-400, #60a5fa);
+  color: var(--primary-600, #2563eb);
+  background: var(--primary-50, #eff6ff);
+}
+
+.edit-btn .material-icons {
+  font-size: 1.15rem;
+}

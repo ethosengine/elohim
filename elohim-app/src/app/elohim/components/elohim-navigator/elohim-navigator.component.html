@@ -114,34 +114,62 @@
 
         <!-- Profile Tray Dropdown -->
         <div class="profile-tray" *ngIf="showProfileTray" role="menu">
-          <!-- Identity Header -->
-          <div class="profile-header">
+          <!-- Identity Header - links to Imago Dei profile -->
+          <button
+            type="button"
+            class="profile-header profile-header-link"
+            (click)="goToIdentityProfile()"
+            role="menuitem"
+            title="Manage your identity"
+          >
             <div class="profile-avatar-large">{{ getInitials() }}</div>
             <div class="profile-info">
               <span class="profile-name">{{ authenticatedDisplayName() }}</span>
+              <span class="profile-identifier" *ngIf="authenticatedIdentifier()">
+                {{ authenticatedIdentifier() }}
+              </span>
               <span class="profile-stats">
                 {{ identityMode() === 'hosted' ? 'Hosted Identity' : 'Steward' }}
               </span>
             </div>
-          </div>
+            <svg
+              class="profile-header-arrow"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
 
           <div class="scrollable-content-wrapper">
+            <!-- Connection Details -->
+            <div class="profile-connection-details" *ngIf="doorwayUrl() || authenticatedHumanId()">
+              <div class="connection-detail" *ngIf="doorwayUrl()">
+                <span class="detail-label">Doorway</span>
+                <span class="detail-value">{{ shortenDoorwayUrl(doorwayUrl()!) }}</span>
+              </div>
+              <div class="connection-detail" *ngIf="authenticatedHumanId()">
+                <span class="detail-label">Human ID</span>
+                <span class="detail-value monospace">
+                  {{ truncateHash(authenticatedHumanId()) }}
+                </span>
+              </div>
+            </div>
+
             <!-- Actions -->
             <div class="profile-actions">
-              <button type="button" class="profile-action" (click)="goToProfile()" role="menuitem">
-                <svg
-                  class="action-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span class="action-label">View Profile</span>
+              <button
+                type="button"
+                class="profile-action"
+                (click)="goToContextProfile()"
+                role="menuitem"
+              >
+                <span class="action-icon-emoji">{{ currentApp.icon }}</span>
+                <span class="action-label">{{ contextProfileLabel }}</span>
               </button>
               <button
                 type="button"
@@ -212,51 +240,14 @@
   aria-label="Close menu"
 ></button>
 
-<!-- Upgrade Prompt Banner -->
-<div *ngIf="activeUpgradePrompt && !showUpgradeModal" class="upgrade-banner">
-  <div class="upgrade-banner-content">
-    <svg
-      class="upgrade-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <polygon
-        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
-      ></polygon>
-    </svg>
-    <div class="upgrade-text">
-      <strong>{{ activeUpgradePrompt.title }}</strong>
-      <span>{{ activeUpgradePrompt.message }}</span>
-    </div>
-    <div class="upgrade-actions">
-      <button type="button" class="btn-upgrade" (click)="onJoinNetwork()">Learn More</button>
-      <button
-        type="button"
-        class="btn-dismiss"
-        (click)="dismissUpgradePrompt()"
-        aria-label="Dismiss"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-    </div>
-  </div>
-</div>
+<!-- Banner Notifications (aggregated from providers) -->
+<app-alert-banner
+  *ngIf="bannerAlerts.length > 0 && !showUpgradeModal"
+  [alerts]="bannerAlerts"
+  [displayMode]="'banner'"
+  (dismissed)="onBannerDismissed($event)"
+  (actionClicked)="onBannerAction($event)"
+></app-alert-banner>
 
 <!-- Main Content Area -->
 <main class="elohim-main" id="main-content">
@@ -264,199 +255,8 @@
 </main>
 
 <!-- Upgrade Modal -->
-<dialog
-  *ngIf="showUpgradeModal"
-  class="modal-overlay"
-  (click)="closeUpgradeModal()"
-  (keydown.escape)="closeUpgradeModal()"
-  open
-  aria-labelledby="upgrade-modal-title"
-  tabindex="-1"
->
-  <section
-    class="upgrade-modal"
-    (click)="$event.stopPropagation()"
-    (keydown)="$event.stopPropagation()"
-    tabindex="-1"
-  >
-    <button type="button" class="modal-close" (click)="closeUpgradeModal()" aria-label="Close">
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </button>
-
-    <div class="modal-header">
-      <h2 id="upgrade-modal-title">Join the Elohim Network</h2>
-      <p class="modal-subtitle">Save your progress permanently and connect with other learners</p>
-    </div>
-
-    <div class="modal-body">
-      <div class="upgrade-benefits">
-        <h3>What you'll get:</h3>
-        <ul>
-          <li>
-            <span class="benefit-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                <polyline points="7 3 7 8 15 8"></polyline>
-              </svg>
-            </span>
-            <div>
-              <strong>Permanent Progress</strong>
-              <p>Your learning journey is stored securely, never lost</p>
-            </div>
-          </li>
-          <li>
-            <span class="benefit-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M23 4v6h-6"></path>
-                <path d="M1 20v-6h6"></path>
-                <path
-                  d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                ></path>
-              </svg>
-            </span>
-            <div>
-              <strong>Sync Across Devices</strong>
-              <p>Continue learning from any device</p>
-            </div>
-          </li>
-          <li>
-            <span class="benefit-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </span>
-            <div>
-              <strong>Join the Community</strong>
-              <p>Connect with fellow humans on the same paths</p>
-            </div>
-          </li>
-          <li>
-            <span class="benefit-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="8" r="7"></circle>
-                <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-              </svg>
-            </span>
-            <div>
-              <strong>Earn Attestations</strong>
-              <p>Verifiable credentials for your achievements</p>
-            </div>
-          </li>
-          <li>
-            <span class="benefit-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path
-                  d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-                ></path>
-              </svg>
-            </span>
-            <div>
-              <strong>Decentralized Network</strong>
-              <p>Own your data on a peer-to-peer network</p>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <div class="upgrade-how">
-        <h3>How it works:</h3>
-        <ol>
-          <li>Install the Elohim app (available soon)</li>
-          <li>Your session progress migrates automatically</li>
-          <li>You join the p2p network and receive updates</li>
-        </ol>
-      </div>
-
-      <div class="session-summary" *ngIf="session">
-        <h3>Your Current Session:</h3>
-        <div class="summary-stats">
-          <div class="stat">
-            <span class="stat-value">{{ session.stats.nodesViewed }}</span>
-            <span class="stat-label">Content Explored</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ session.stats.pathsStarted }}</span>
-            <span class="stat-label">Paths Started</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ session.stats.stepsCompleted }}</span>
-            <span class="stat-label">Steps Completed</span>
-          </div>
-        </div>
-        <p class="summary-note">This progress will migrate when you join.</p>
-      </div>
-    </div>
-
-    <div class="modal-footer">
-      <button type="button" class="btn-secondary" (click)="closeUpgradeModal()">
-        Continue as Visitor
-      </button>
-      <button type="button" class="btn-primary" disabled title="Coming soon!">
-        Get Notified When Available
-      </button>
-    </div>
-  </section>
-</dialog>
+<app-upgrade-modal
+  [session]="session"
+  [open]="showUpgradeModal"
+  (closed)="closeUpgradeModal()"
+></app-upgrade-modal>

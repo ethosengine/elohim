@@ -325,7 +325,7 @@ async fn emit_progress(progress: ReplicationProgress) -> Result<()> {
 /// Calculate recovery summary for a failed node
 pub async fn calculate_recovery_summary(
     failed_node_id: &str,
-    state: &OrchestratorState,
+    _state: &OrchestratorState,
 ) -> RecoverySummary {
     // In production, query DNA for assignment status
     // let assignments = get_assignments_for_node(failed_node_id).await;

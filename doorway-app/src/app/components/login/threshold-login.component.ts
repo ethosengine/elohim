@@ -25,6 +25,7 @@ interface OAuthParams {
   responseType: string;
   state: string;
   scope?: string;
+  loginHint?: string;
 }
 
 /** Login form state */
@@ -54,7 +55,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
       <div class="login-card">
         <!-- Doorway branding -->
         <div class="branding">
-          <img src="/assets/elohim-logo.svg" alt="Elohim" class="logo" />
+          <img src="/threshold/images/elohim_logo_light.png" alt="Elohim" class="logo" />
           <h1>Sign In</h1>
           <p class="doorway-name">{{ doorwayName() }}</p>
         </div>
@@ -79,16 +80,21 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
         @if (state() === 'form') {
           <form (ngSubmit)="onSubmit()" #loginForm="ngForm">
             <div class="form-group">
-              <label for="identifier">Email or Username</label>
-              <input
-                type="text"
-                id="identifier"
-                name="identifier"
-                [(ngModel)]="form.identifier"
-                required
-                autocomplete="username"
-                placeholder="you@example.com"
-              />
+              <label for="identifier">Username</label>
+              <div class="identifier-wrapper">
+                <input
+                  type="text"
+                  id="identifier"
+                  name="identifier"
+                  [(ngModel)]="form.identifier"
+                  required
+                  autocomplete="username"
+                  placeholder="username"
+                  class="identifier-input"
+                />
+                <span class="domain-suffix">&#64;{{ gatewayDomain() }}</span>
+              </div>
+              <p class="input-hint">Or use your full email address</p>
             </div>
 
             <div class="form-group">
@@ -107,6 +113,15 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
             <button type="submit" class="btn-primary" [disabled]="!loginForm.valid">
               Sign In
             </button>
+
+            @if (oauthParams()) {
+              <div class="federated-section">
+                <div class="divider"><span>or</span></div>
+                <a [href]="federatedLoginUrl()" class="federated-link">
+                  Login with a different doorway
+                </a>
+              </div>
+            }
           </form>
         }
 
@@ -346,6 +361,88 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
     .footer a:hover {
       text-decoration: underline;
     }
+
+    .identifier-wrapper {
+      display: flex;
+      align-items: center;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.5rem;
+      transition: border-color 0.2s;
+    }
+
+    .identifier-wrapper:focus-within {
+      border-color: #6366f1;
+    }
+
+    .identifier-input {
+      flex: 1;
+      border: none !important;
+      background: transparent !important;
+      border-radius: 0.5rem 0 0 0.5rem;
+      min-width: 0;
+    }
+
+    .identifier-input:focus {
+      border-color: transparent !important;
+    }
+
+    .domain-suffix {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 0.875rem;
+      padding: 0 0.75rem;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .input-hint {
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 0.75rem;
+      margin: 0;
+    }
+
+    .federated-section {
+      margin-top: 1rem;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .divider span {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .federated-link {
+      display: block;
+      text-align: center;
+      color: #818cf8;
+      text-decoration: none;
+      font-size: 0.875rem;
+      padding: 0.625rem 1rem;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 0.5rem;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .federated-link:hover {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: rgba(99, 102, 241, 0.5);
+    }
   `]
 })
 export class ThresholdLoginComponent implements OnInit {
@@ -366,8 +463,13 @@ export class ThresholdLoginComponent implements OnInit {
 
   // Computed values
   readonly doorwayName = computed(() => {
-    // Get doorway name from window location or config
     return window.location.hostname;
+  });
+
+  readonly gatewayDomain = computed(() => {
+    const hostname = window.location.hostname;
+    // doorway-alpha.elohim.host --> alpha.elohim.host
+    return hostname.startsWith('doorway-') ? hostname.replace(/^doorway-/, '') : hostname;
   });
 
   readonly clientDisplayName = computed(() => {
@@ -401,6 +503,23 @@ export class ThresholdLoginComponent implements OnInit {
     return '/threshold/register';
   });
 
+  readonly federatedLoginUrl = computed(() => {
+    const params = this.oauthParams();
+    if (params) {
+      const searchParams = new URLSearchParams({
+        client_id: params.clientId,
+        redirect_uri: params.redirectUri,
+        response_type: params.responseType,
+        state: params.state,
+      });
+      if (params.scope) {
+        searchParams.set('scope', params.scope);
+      }
+      return `/threshold/doorways?${searchParams.toString()}`;
+    }
+    return '/threshold/doorways';
+  });
+
   ngOnInit(): void {
     // Parse OAuth params from URL
     this.parseOAuthParams();
@@ -414,6 +533,7 @@ export class ThresholdLoginComponent implements OnInit {
     const responseType = params['response_type'];
     const state = params['state'];
     const scope = params['scope'];
+    const loginHint = params['login_hint'];
 
     if (clientId && redirectUri && state) {
       this.oauthParams.set({
@@ -422,7 +542,13 @@ export class ThresholdLoginComponent implements OnInit {
         responseType: responseType ?? 'code',
         state,
         scope,
+        loginHint,
       });
+    }
+
+    // Pre-fill identifier from login_hint
+    if (loginHint) {
+      this.form.identifier = loginHint;
     }
   }
 
@@ -483,29 +609,21 @@ export class ThresholdLoginComponent implements OnInit {
       authorizeUrl.searchParams.set('scope', params.scope);
     }
 
-    // Make request with auth token - this should redirect
-    // Use fetch to follow redirect
+    // Request authorization code. Backend returns JSON { redirect_uri }
+    // when it sees a Bearer token (SPA flow), avoiding cross-origin 302.
     const response = await fetch(authorizeUrl.toString(), {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
       },
-      redirect: 'follow',
     });
 
-    // If we get a 3xx redirect, follow it
-    if (response.redirected) {
-      window.location.href = response.url;
-    } else if (response.ok) {
-      // Check if response contains a redirect URL
-      try {
-        const data = await response.json();
-        if (data.redirect_uri) {
-          window.location.href = data.redirect_uri;
-        }
-      } catch {
-        // Not JSON, might be HTML - check for meta refresh or location header
-        this.error.set('Authorization completed but redirect failed');
+    if (response.ok) {
+      const data = await response.json();
+      if (data.redirect_uri) {
+        window.location.href = data.redirect_uri;
+      } else {
+        this.error.set('Authorization completed but no redirect received');
         this.state.set('error');
       }
     } else {

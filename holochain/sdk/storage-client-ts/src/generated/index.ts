@@ -2,143 +2,63 @@
  * AUTO-GENERATED TypeScript types from Rust Diesel models
  *
  * DO NOT EDIT - regenerate with:
- *   cd holochain/elohim-storage && cargo test export_bindings
+ *   cd holochain/elohim-storage && ./scripts/generate-types.sh
  *
- * Source: holochain/elohim-storage/src/db/models.rs (Wire types)
- *         holochain/elohim-storage/src/views.rs (View types)
- *
- * Wire types (snake_case) - match SQLite/Diesel models
- * View types (camelCase) - match HTTP API responses, ready for Angular templates
- *
- * Import as: import type { PathView } from '@elohim/storage-client/generated';
+ * Source: holochain/elohim-storage/src/db/models.rs
  */
 
-// =============================================================================
-// Utility Types
-// =============================================================================
-
-// JSON value type for parsed metadata fields
-export * from './JsonValue';
-
-// =============================================================================
-// Wire Types (snake_case) - Database models
-// =============================================================================
-
-// App registry
 export * from './App';
-
-// Content types
-export * from './Content';
-export * from './ContentTag';
-export * from './ContentWithTags';
-
-// Path types
-export * from './Path';
-export * from './PathTag';
-export * from './PathAttestation';
-export * from './Chapter';
-export * from './Step';
-
-// Composite path types
-export * from './ChapterWithSteps';
-export * from './PathWithDetails';
-export * from './PathWithSteps';
-
-// Relationship types (content graph)
-export * from './Relationship';
-export * from './RelationshipWithContent';
-
-// Human relationship types (social graph)
-export * from './HumanRelationship';
-
-// Contributor presence (stewardship)
-export * from './ContributorPresence';
-
-// Economic events (hREA/ValueFlows)
-export * from './EconomicEvent';
-
-// Content mastery (Bloom's taxonomy)
-export * from './ContentMastery';
-
-// Stewardship allocations
-export * from './StewardshipAllocation';
-export * from './StewardshipAllocationWithPresence';
-export * from './ContentStewardship';
-
-// Local sessions
-export * from './LocalSession';
-
-// =============================================================================
-// View Types (camelCase) - HTTP API responses
-// =============================================================================
-
-// App view
 export * from './AppView';
-
-// Content views
-export * from './ContentView';
-export * from './ContentWithTagsView';
-
-// Path views
-export * from './PathView';
-export * from './PathAttestationView';
+export * from './Chapter';
 export * from './ChapterView';
-export * from './StepView';
-
-// Composite path views
+export * from './ChapterWithSteps';
 export * from './ChapterWithStepsView';
-export * from './PathWithDetailsView';
-export * from './PathWithStepsView';
-
-// Relationship views (content graph)
-export * from './RelationshipView';
-export * from './RelationshipWithContentView';
-
-// Human relationship views (social graph)
-export * from './HumanRelationshipView';
-
-// Contributor presence views (stewardship)
-export * from './ContributorPresenceView';
-
-// Economic event views (hREA/ValueFlows)
-export * from './EconomicEventView';
-
-// Content mastery views (Bloom's taxonomy)
+export * from './Content';
+export * from './ContentMastery';
 export * from './ContentMasteryView';
-
-// Stewardship allocation views
-export * from './StewardshipAllocationView';
-export * from './StewardshipAllocationWithPresenceView';
+export * from './ContentStewardship';
 export * from './ContentStewardshipView';
-
-// Local session views
-export * from './LocalSessionView';
-
-// =============================================================================
-// Input View Types (camelCase) - HTTP API request bodies
-// =============================================================================
-
-// Content input
-export * from './CreateContentInputView';
-
-// Path inputs
-export * from './CreatePathInputView';
-export * from './CreateChapterInputView';
-export * from './CreateStepInputView';
-
-// Relationship inputs (content graph)
-export * from './CreateRelationshipInputView';
-
-// Human relationship inputs (social graph)
-export * from './CreateHumanRelationshipInputView';
-
-// Contributor presence inputs (stewardship)
-export * from './CreateContributorPresenceInputView';
-export * from './InitiateClaimInputView';
-
-// Economic event inputs (hREA/ValueFlows)
-export * from './CreateEconomicEventInputView';
-
-// Stewardship allocation inputs
+export * from './ContentTag';
+export * from './ContentView';
+export * from './ContentWithTags';
+export * from './ContentWithTagsView';
+export * from './ContributorPresence';
+export * from './ContributorPresenceView';
 export * from './CreateAllocationInputView';
+export * from './CreateChapterInputView';
+export * from './CreateContentInputView';
+export * from './CreateContributorPresenceInputView';
+export * from './CreateEconomicEventInputView';
+export * from './CreateHumanRelationshipInputView';
+export * from './CreateMasteryInputView';
+export * from './CreatePathInputView';
+export * from './CreateRelationshipInputView';
+export * from './CreateStepInputView';
+export * from './EconomicEvent';
+export * from './EconomicEventView';
+export * from './HumanRelationship';
+export * from './HumanRelationshipView';
+export * from './InitiateClaimInputView';
+export * from './JsonValue';
+export * from './LocalSession';
+export * from './LocalSessionView';
+export * from './Path';
+export * from './PathAttestation';
+export * from './PathAttestationView';
+export * from './PathTag';
+export * from './PathView';
+export * from './PathWithDetails';
+export * from './PathWithDetailsView';
+export * from './PathWithSteps';
+export * from './PathWithStepsView';
+export * from './Relationship';
+export * from './RelationshipView';
+export * from './RelationshipWithContent';
+export * from './RelationshipWithContentView';
+export * from './Step';
+export * from './StepView';
+export * from './StewardshipAllocation';
+export * from './StewardshipAllocationView';
+export * from './StewardshipAllocationWithPresence';
+export * from './StewardshipAllocationWithPresenceView';
 export * from './UpdateAllocationInputView';

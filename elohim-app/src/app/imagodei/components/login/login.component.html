@@ -1,14 +1,181 @@
 <div class="login-container">
-  <!-- Step 1: Doorway Selection -->
-  @if (currentStep() === 'doorway') {
-    <app-doorway-picker
-      [mode]="'login'"
-      (doorwaySelected)="onDoorwaySelected($event)"
-      (cancelled)="onDoorwayPickerCancelled()"
-    />
+  <!-- Federated Identifier Input (dev browser, first-time) -->
+  @if (currentStep() === 'federated') {
+    <div class="federated-login">
+      <div class="login-header">
+        @if (isTauri()) {
+          <h1>Connect to Your Community</h1>
+          <p class="subtitle">Enter your identity to import it from your doorway</p>
+        } @else {
+          <h1>Sign In</h1>
+          <p class="subtitle">Enter your Elohim identity to sign in via your doorway</p>
+        }
+      </div>
+
+      @if (error()) {
+        <div class="error-banner" role="alert">
+          <span class="error-icon" aria-hidden="true">&#x2715;</span>
+          <span>{{ error() }}</span>
+          <button
+            type="button"
+            class="error-dismiss"
+            aria-label="Dismiss error"
+            (click)="clearError()"
+          >
+            Dismiss
+          </button>
+        </div>
+      }
+
+      <form class="login-form" (ngSubmit)="onFederatedLogin()">
+        <div class="form-group">
+          <label for="federatedId">Your identity</label>
+          <input
+            id="federatedId"
+            type="text"
+            [(ngModel)]="federatedIdentifier"
+            name="federatedId"
+            placeholder="you@your-doorway.host"
+            autocomplete="username"
+            [disabled]="isLoading()"
+          />
+        </div>
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="isLoading() || !federatedIdentifier.trim()"
+          >
+            @if (isLoading()) {
+              <span class="spinner"></span>
+              Connecting...
+            } @else {
+              Continue
+            }
+          </button>
+        </div>
+      </form>
+
+      <div class="login-footer">
+        <p class="register-prompt">
+          Don't have an account?
+          <a
+            routerLink="/identity/register"
+            [queryParams]="{ returnUrl: returnUrl }"
+            class="register-link"
+          >
+            Create one
+          </a>
+        </p>
+      </div>
+    </div>
   }
 
-  <!-- Step 2: Credentials -->
+  <!-- Unlock (returning Tauri user) -->
+  @if (currentStep() === 'unlock') {
+    <div class="login-card">
+      <div class="login-header">
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Enter your password to unlock</p>
+      </div>
+
+      @if (error()) {
+        <div class="error-banner" role="alert">
+          <span class="error-icon" aria-hidden="true">&#x2715;</span>
+          <span>{{ error() }}</span>
+          <button
+            type="button"
+            class="error-dismiss"
+            aria-label="Dismiss error"
+            (click)="clearError()"
+          >
+            Dismiss
+          </button>
+        </div>
+      }
+
+      <form class="login-form" (ngSubmit)="onUnlock()">
+        <div class="form-group">
+          <label for="unlockPassword">Password</label>
+          <div class="password-input-wrapper">
+            <input
+              id="unlockPassword"
+              [type]="showPassword() ? 'text' : 'password'"
+              [(ngModel)]="unlockPassword"
+              name="unlockPassword"
+              placeholder="Enter your password"
+              required
+              autocomplete="current-password"
+              [disabled]="isLoading()"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+            >
+              {{ showPassword() ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="isLoading() || !unlockPassword">
+            @if (isLoading()) {
+              <span class="spinner"></span>
+              Unlocking...
+            } @else {
+              Unlock
+            }
+          </button>
+        </div>
+      </form>
+
+      <div class="login-footer">
+        <button type="button" class="link-button" (click)="showAccountSwitcher()">
+          Switch account
+        </button>
+        <button type="button" class="link-button" (click)="goBackToFederated()">
+          Use a different doorway
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Account Switcher -->
+  @if (currentStep() === 'switch-account') {
+    <div class="login-card">
+      <app-account-switcher
+        (needsRestart)="onAccountSwitchRestart()"
+        (addAccount)="onAccountSwitcherAddAccount()"
+        (cancelled)="onAccountSwitcherCancelled()"
+      />
+    </div>
+  }
+
+  <!-- Restarting (after Tauri login, conductor needs reinit) -->
+  @if (currentStep() === 'restarting') {
+    <div class="restarting">
+      @if (isStewardResult()) {
+        <div class="stewardship-badge">Steward</div>
+      }
+      <h2>Connected to {{ restartingDoorwayName() }}</h2>
+      <p>Identity saved. Close and reopen to join the network as a peer.</p>
+      <button type="button" class="btn btn-primary restart-btn" (click)="restartApp()">
+        Close App
+      </button>
+    </div>
+  }
+
+  <!-- Redirecting to doorway OAuth -->
+  @if (currentStep() === 'redirecting') {
+    <div class="redirecting">
+      <div class="spinner spinner-large"></div>
+      <p>Redirecting to your doorway...</p>
+    </div>
+  }
+
+  <!-- Credentials -->
   @if (currentStep() === 'credentials') {
     <div class="login-card">
       <!-- Step Indicator -->
@@ -16,13 +183,17 @@
         <button
           type="button"
           class="step-back"
-          (click)="goBackToDoorway()"
+          (click)="goBackToFederated()"
           aria-label="Change doorway"
         >
           <span class="material-icons">arrow_back</span>
         </button>
         <div class="step-info">
-          <span class="step-label">Signing in via</span>
+          @if (isTauri()) {
+            <span class="step-label">Importing identity from</span>
+          } @else {
+            <span class="step-label">Signing in via</span>
+          }
           <span class="step-doorway">
             {{ selectedDoorway()?.doorway?.name ?? 'Unknown Doorway' }}
           </span>
@@ -31,14 +202,19 @@
 
       <!-- Header -->
       <div class="login-header">
-        <h1>Welcome Back</h1>
-        <p class="subtitle">Sign in to your hosted identity</p>
+        @if (isTauri()) {
+          <h1>Import Identity</h1>
+          <p class="subtitle">Enter your doorway credentials to become a peer</p>
+        } @else {
+          <h1>Welcome Back</h1>
+          <p class="subtitle">Sign in to your hosted identity</p>
+        }
       </div>
 
       <!-- Error Display -->
       @if (error()) {
         <div class="error-banner" role="alert">
-          <span class="error-icon" aria-hidden="true">✕</span>
+          <span class="error-icon" aria-hidden="true">&#x2715;</span>
           <span>{{ error() }}</span>
           <button
             type="button"
@@ -77,7 +253,7 @@
               [type]="showPassword() ? 'text' : 'password'"
               [(ngModel)]="form.password"
               name="password"
-              placeholder="••••••••"
+              placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;"
               required
               autocomplete="current-password"
               [disabled]="isLoading()"
@@ -129,7 +305,7 @@
           Don't have an account?
           <button type="button" (click)="goToRegister()" class="register-link">Create one</button>
         </p>
-        <a routerLink="/" class="back-link">← Back to Home</a>
+        <a routerLink="/" class="back-link">&#x2190; Back to Home</a>
       </div>
     </div>
   }

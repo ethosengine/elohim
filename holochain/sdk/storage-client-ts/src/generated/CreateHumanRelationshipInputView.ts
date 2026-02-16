@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating a human relationship - camelCase API boundary type
  */
-export type CreateHumanRelationshipInputView = { id: string | null, partyAId: string, partyBId: string, relationshipType: string, intimacyLevel: string | null, isBidirectional: boolean, consentGivenByA: boolean, consentGivenByB: boolean, initiatedBy: string, governanceLayer: string | null, reach: string | null, 
+export type CreateHumanRelationshipInputView = { id: string | null, schemaVersion: number, partyAId: string, partyBId: string, relationshipType: string, intimacyLevel: string | null, isBidirectional: boolean, consentGivenByA: boolean, consentGivenByB: boolean, initiatedBy: string, governanceLayer: string | null, reach: string | null, 
 /**
  * Parsed context object (serialized to JSON string for DB)
  */

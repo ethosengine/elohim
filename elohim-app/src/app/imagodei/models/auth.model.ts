@@ -26,6 +26,12 @@ export const AUTH_EXPIRY_KEY = 'elohim-auth-expiry';
 /** localStorage key for stored identifier */
 export const AUTH_IDENTIFIER_KEY = 'elohim-auth-identifier';
 
+/** localStorage key for human ID (persisted across page refreshes) */
+export const AUTH_HUMAN_ID_KEY = 'elohim-auth-human-id';
+
+/** localStorage key for agent public key (persisted across page refreshes) */
+export const AUTH_AGENT_PUB_KEY_KEY = 'elohim-auth-agent-pub-key';
+
 // =============================================================================
 // Auth Provider Types
 // =============================================================================

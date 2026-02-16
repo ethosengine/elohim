@@ -10,13 +10,13 @@
 //! - Private key is encrypted with their password (Argon2id + ChaCha20-Poly1305)
 //! - Keys are stored in MongoDB, cached in memory during active sessions
 //!
-//! # Migration to Sovereignty
+//! # Migration to Stewardship
 //!
 //! When users are ready to run their own node (Tauri app):
 //! 1. Export encrypted key bundle via `/auth/export-key`
 //! 2. Import to Tauri, decrypt with password
-//! 3. Confirm sovereignty via `/auth/confirm-sovereignty`
-//! 4. Doorway clears custodial key, user is now sovereign
+//! 3. Confirm stewardship via `/auth/confirm-stewardship`
+//! 4. Doorway retires conductor cell, user is now a steward
 
 pub mod cache;
 pub mod crypto;

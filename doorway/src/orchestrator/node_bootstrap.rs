@@ -108,7 +108,10 @@ impl NodeBootstrap {
 }
 
 /// Run the mDNS listener loop
-async fn run_mdns_listener(config: NodeBootstrapConfig, state: Arc<OrchestratorState>) -> Result<()> {
+async fn run_mdns_listener(
+    _config: NodeBootstrapConfig,
+    _state: Arc<OrchestratorState>,
+) -> Result<()> {
     // Note: In production, this would use mdns-sd or similar crate
     // For now, we'll create a placeholder that can be replaced with actual mDNS
 
@@ -207,7 +210,9 @@ async fn process_node_announcement(
 
             // Auto-assign custodian responsibilities if enabled
             if state.config().auto_assign_custodians && announcement.inventory.custodian_opt_in {
-                if let Err(e) = auto_assign_custodian(&announcement.inventory, config.admin_port).await {
+                if let Err(e) =
+                    auto_assign_custodian(&announcement.inventory, config.admin_port).await
+                {
                     warn!(
                         node_id = %node_id,
                         error = %e,
@@ -277,8 +282,8 @@ async fn register_with_dna(inventory: &NodeInventory, _admin_port: u16) -> Resul
 /// Send NATS credentials to node
 async fn send_credentials_to_node(
     node_id: &str,
-    creds: &super::nats_provisioning::NatsCredentials,
-    state: &OrchestratorState,
+    _creds: &super::nats_provisioning::NatsCredentials,
+    _state: &OrchestratorState,
 ) -> Result<()> {
     // In production, publish to node's NATS inbox
     // let nats_client = state.nats_client.as_ref().ok_or("No NATS client")?;

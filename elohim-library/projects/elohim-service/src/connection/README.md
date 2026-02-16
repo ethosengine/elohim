@@ -62,8 +62,8 @@ const strategy = createConnectionStrategy('auto');
 // Configure connection
 const config: ConnectionConfig = {
   mode: strategy.mode,
-  adminUrl: 'wss://doorway-dev.elohim.host',
-  appUrl: 'wss://doorway-dev.elohim.host',
+  adminUrl: 'wss://doorway-alpha.elohim.host',
+  appUrl: 'wss://doorway-alpha.elohim.host',
   appId: 'elohim',
   proxyApiKey: 'your-api-key',
 };
@@ -113,9 +113,9 @@ export class MyComponent {
 For browser/web deployments where WebSocket connections must route through a proxy.
 
 **URL Resolution:**
-- Admin: `wss://doorway-dev.elohim.host?apiKey=...`
-- App: `wss://doorway-dev.elohim.host/app/{port}?apiKey=...`
-- Blob: `https://doorway-dev.elohim.host/api/blob/{hash}?apiKey=...`
+- Admin: `wss://doorway-alpha.elohim.host?apiKey=...`
+- App: `wss://doorway-alpha.elohim.host/app/{port}?apiKey=...`
+- Blob: `https://doorway-alpha.elohim.host/api/blob/{hash}?apiKey=...`
 
 **Content Sources:**
 | Source | Tier | Priority | Description |
@@ -206,8 +206,8 @@ export interface HolochainEnvironmentConfig {
 ```typescript
 export const environment = {
   holochain: {
-    adminUrl: 'wss://doorway-dev.elohim.host',
-    appUrl: 'wss://doorway-dev.elohim.host',
+    adminUrl: 'wss://doorway-alpha.elohim.host',
+    appUrl: 'wss://doorway-alpha.elohim.host',
     connectionMode: 'auto',
     proxyApiKey: 'dev-api-key',
   },
@@ -356,13 +356,13 @@ if (result.success) {
 
 **Before:**
 ```typescript
-const blobUrl = `https://doorway-dev.elohim.host/api/blob/${hash}`;
+const blobUrl = `https://doorway-alpha.elohim.host/api/blob/${hash}`;
 ```
 
 **After:**
 ```typescript
 const blobUrl = this.strategy.getBlobStorageUrl(config, hash);
-// Doorway: https://doorway-dev.elohim.host/api/blob/{hash}
+// Doorway: https://doorway-alpha.elohim.host/api/blob/{hash}
 // Direct:  http://localhost:8090/store/{hash}
 ```
 

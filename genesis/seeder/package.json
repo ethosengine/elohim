@@ -12,9 +12,9 @@
     "genesis:pack:dry": "npx tsx src/genesis-pack.ts --dry",
     "seed:validate": "npx tsx src/seed.ts --validate-only",
     "seed:dry-run": "npx tsx src/seed.ts --dry-run",
-    "seed:dev": "DOORWAY_URL='https://doorway-dev.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' npx tsx src/seed.ts",
+    "seed:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024' npx tsx src/seed.ts",
     "stats": "npx tsx src/stats.ts",
-    "stats:dev": "HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' npx tsx src/stats.ts",
+    "stats:dev": "HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024' npx tsx src/stats.ts",
     "stats:prod": "HOLOCHAIN_ADMIN_URL='wss://doorway.elohim.host?apiKey=$ELOHIM_PROD_API_KEY' npx tsx src/stats.ts",
     "snapshot": "npx tsx src/snapshot.ts",
     "snapshot:save": "npx tsx src/snapshot.ts save",
@@ -25,13 +25,13 @@
     "snapshot:list": "npx tsx src/snapshot.ts list",
     "hc:start:snapshot": "hc sandbox run --root /projects/elohim/holochain/local-dev/conductor-data -p=4445",
     "diagnose": "npx tsx src/diagnose.ts",
-    "diagnose:dev": "HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' DOORWAY_URL='https://doorway-dev.elohim.host' npx tsx src/diagnose.ts",
+    "diagnose:dev": "HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024' DOORWAY_URL='https://doorway-alpha.elohim.host' npx tsx src/diagnose.ts",
     "diagnose:apps": "npx tsx src/diagnose.ts --apps --cells",
     "diagnose:content": "npx tsx src/diagnose.ts --content",
     "debug:stream": "npx tsx src/debug-stream.ts",
-    "debug:stream:dev": "DOORWAY_URL='https://doorway-dev.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' npx tsx src/debug-stream.ts",
+    "debug:stream:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' DOORWAY_API_KEY='dev-elohim-auth-2024' npx tsx src/debug-stream.ts",
     "seed:test-admin": "npx tsx src/seed-test-admin.ts",
-    "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-dev.elohim.host' npx tsx src/seed-test-admin.ts"
+    "seed:test-admin:dev": "ADMIN_PROXY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-test-admin.ts"
   },
   "dependencies": {
     "@elohim/storage-client": "file:../../holochain/sdk/storage-client-ts",

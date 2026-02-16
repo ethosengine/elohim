@@ -58,9 +58,25 @@ pub struct HealthResponse {
     pub node_id: String,
     /// Conductor connection status - IMPORTANT: seeder should check conductor.connected!
     pub conductor: ConductorHealth,
+    /// Projection role (writer or reader)
+    pub projection: ProjectionRole,
+    /// P2P network status (from elohim-storage sidecar)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub p2p: Option<P2PHealth>,
     /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+/// P2P network health from elohim-storage sidecar
+#[derive(Serialize, Clone)]
+pub struct P2PHealth {
+    /// Whether P2P networking is enabled
+    pub enabled: bool,
+    /// Number of connected P2P peers
+    pub peer_count: usize,
+    /// Local peer ID
+    pub peer_id: Option<String>,
 }
 
 /// Cache status for backwards compatibility
@@ -79,6 +95,19 @@ pub struct ConductorHealth {
     pub connected_workers: usize,
     /// Total number of workers
     pub total_workers: usize,
+    /// Number of conductors in the pool
+    pub pool_size: usize,
+    /// Per-conductor pools with at least one connected worker
+    pub pools_healthy: usize,
+    /// Total per-conductor pools (one per conductor in CONDUCTOR_URLS)
+    pub pools_total: usize,
+}
+
+/// Projection role details
+#[derive(Serialize)]
+pub struct ProjectionRole {
+    /// Whether this instance is the projection writer
+    pub writer: bool,
 }
 
 /// Build health response with current state
@@ -98,6 +127,20 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         }
     };
 
+    // Conductor pool size from registry
+    let pool_size = state
+        .conductor_registry
+        .as_ref()
+        .map(|r| r.conductor_count())
+        .unwrap_or(0);
+
+    // Per-conductor pool health from router
+    let (pools_healthy, pools_total) = state
+        .conductor_router
+        .as_ref()
+        .map(|r| (r.pools().healthy_count(), r.pools().total_count()))
+        .unwrap_or((0, 0));
+
     // In dev mode, conductor connection is optional
     // Doorway can operate as pure HTTP bridge to elohim-storage
     let conductor_connected = if args.dev_mode {
@@ -114,13 +157,11 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     // Include conductor status info in error field if not connected (but not blocking in dev mode)
     let error = if !actual_conductor_connected && !args.dev_mode {
         Some(format!(
-            "No workers connected to conductor ({}/{} workers) - seeding will fail",
-            connected_workers, total_workers
+            "No workers connected to conductor ({connected_workers}/{total_workers} workers) - seeding will fail"
         ))
     } else if !actual_conductor_connected && args.dev_mode {
         Some(format!(
-            "Dev mode: conductor not connected ({}/{} workers) - using elohim-storage path",
-            connected_workers, total_workers
+            "Dev mode: conductor not connected ({connected_workers}/{total_workers} workers) - using elohim-storage path"
         ))
     } else {
         None
@@ -131,10 +172,8 @@ fn build_health_response(state: &AppState) -> HealthResponse {
     // - 'degraded': running but conductor not connected (limited functionality)
     // - 'offline': would return early if service truly down
     // - 'maintenance': reserved for planned maintenance
-    let status = if conductor_connected {
+    let status = if conductor_connected || args.dev_mode {
         "online"
-    } else if args.dev_mode {
-        "online" // Dev mode is always "online" for picker purposes
     } else {
         "degraded"
     };
@@ -147,6 +186,9 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
+
+    // Read cached P2P health (non-blocking — uses try_read to avoid stalling health checks)
+    let p2p = state.p2p_health.try_read().ok().and_then(|guard| guard.clone());
 
     HealthResponse {
         healthy: true, // Service is running
@@ -169,7 +211,14 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             connected: conductor_connected,
             connected_workers,
             total_workers,
+            pool_size,
+            pools_healthy,
+            pools_total,
         },
+        projection: ProjectionRole {
+            writer: args.projection_writer,
+        },
+        p2p,
         error,
     }
 }
@@ -203,9 +252,16 @@ pub fn health_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 pub fn readiness_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let response = build_health_response(&state);
 
-    // In dev mode, conductor.connected is always true (set by build_health_response)
-    // so this check will pass even without actual conductor connection
-    let is_ready = response.conductor.connected;
+    // Readiness depends on role:
+    // - Writer instances: need conductor connection (to write projections)
+    // - Reader instances: only need MongoDB (conductor is optional)
+    // - Dev mode: always ready (conductor.connected is forced true)
+    let is_ready = if !state.args.projection_writer {
+        // Read replicas are ready if they have a projection store (MongoDB)
+        state.projection.is_some() || state.args.dev_mode
+    } else {
+        response.conductor.connected
+    };
 
     let body = serde_json::to_string(&response)
         .unwrap_or_else(|_| r#"{"healthy":false,"error":"Serialization failed"}"#.to_string());

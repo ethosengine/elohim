@@ -149,10 +149,7 @@ impl UsageLogger {
 
     /// Initialize file logging to the specified path
     pub async fn init_file(&self, path: PathBuf) -> std::io::Result<()> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
 
         let writer = BufWriter::new(file);
 
@@ -177,7 +174,7 @@ impl UsageLogger {
         let mut inner = self.inner.lock().await;
 
         if let Some(ref mut writer) = inner.writer {
-            if let Err(e) = writeln!(writer, "{}", jsonl) {
+            if let Err(e) = writeln!(writer, "{jsonl}") {
                 error!("Failed to write usage event: {}", e);
             }
             // Flush periodically for durability

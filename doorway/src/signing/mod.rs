@@ -44,5 +44,5 @@
 pub mod service;
 pub mod session;
 
-pub use service::{SigningService, SigningConfig, SignRequest, SignResponse};
+pub use service::{SignRequest, SignResponse, SigningConfig, SigningService};
 pub use session::{HumanSession, SessionStore};

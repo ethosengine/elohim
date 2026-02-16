@@ -53,7 +53,7 @@ impl HostRouter {
         // If specific host requested, try to use it
         if let Some(ref target) = request.target_host {
             if let Some(cached) = hosts.get(target) {
-                if cached.host.is_available() && !self.is_stale(&cached) {
+                if cached.host.is_available() && !self.is_stale(cached) {
                     debug!("Selected requested host: {}", target);
                     return Some(cached.host.clone());
                 }
@@ -82,10 +82,7 @@ impl HostRouter {
 
             if !regional.is_empty() {
                 let host = self.select_least_loaded(&regional);
-                debug!(
-                    "Selected regional host {} in {}",
-                    host.node_id, region
-                );
+                debug!("Selected regional host {} in {}", host.node_id, region);
                 return Some(host);
             }
         }
@@ -159,7 +156,10 @@ impl HostRouter {
             cached.host.active_connections = active_connections;
             cached.host.status = HostStatus::Online;
             cached.last_seen = Instant::now();
-            debug!("Heartbeat from {}: {} connections", node_id, active_connections);
+            debug!(
+                "Heartbeat from {}: {} connections",
+                node_id, active_connections
+            );
         }
     }
 
@@ -213,7 +213,7 @@ mod tests {
         let mut host = HostDoc::new(
             node_id.to_string(),
             node_id.to_string(),
-            format!("{}.example.com", node_id),
+            format!("{node_id}.example.com"),
             "ws://localhost:4444".to_string(),
             4445,
             65535,

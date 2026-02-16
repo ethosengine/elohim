@@ -16,9 +16,7 @@ use hyper::{Request, Response, StatusCode};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-use crate::auth::{
-    extract_token_from_header, ApiKeyValidator, JwtValidator, PermissionLevel,
-};
+use crate::auth::{extract_token_from_header, ApiKeyValidator, JwtValidator, PermissionLevel};
 use crate::proxy;
 use crate::server::http::AppState;
 
@@ -98,8 +96,7 @@ pub async fn handle_admin_upgrade(
                     Response::builder()
                         .status(StatusCode::BAD_REQUEST)
                         .body(Full::new(Bytes::from(format!(
-                            "WebSocket upgrade failed: {}",
-                            e
+                            "WebSocket upgrade failed: {e}"
                         ))))
                         .unwrap()
                 }
@@ -111,8 +108,7 @@ pub async fn handle_admin_upgrade(
                 .status(StatusCode::UNAUTHORIZED)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error":"{}"}}"#,
-                    err_msg
+                    r#"{{"error":"{err_msg}"}}"#
                 ))))
                 .unwrap()
         }
@@ -134,9 +130,12 @@ pub async fn handle_app_upgrade(
     // Preserve query parameters (like auth token)
     let query = req.uri().query().map(|q| q.to_string());
 
+    // Extract conductor host from CONDUCTOR_URL (e.g. "ws://edgenode:4445" -> "edgenode")
+    let conductor_host = extract_conductor_host(&state.args.conductor_url);
+
     info!(
-        "App WebSocket upgrade request for port {} (origin: {:?})",
-        port, origin
+        "App WebSocket upgrade request for port {} (origin: {:?}, conductor: {})",
+        port, origin, conductor_host
     );
 
     match hyper_tungstenite::upgrade(req, None) {
@@ -146,7 +145,9 @@ pub async fn handle_app_upgrade(
             tokio::spawn(async move {
                 match websocket.await {
                     Ok(ws) => {
-                        if let Err(e) = proxy::app::run_proxy(ws, port, origin, query).await {
+                        if let Err(e) =
+                            proxy::app::run_proxy(ws, port, origin, query, &conductor_host).await
+                        {
                             error!("App proxy error (port {}): {:?}", port, e);
                         }
                     }
@@ -165,12 +166,26 @@ pub async fn handle_app_upgrade(
             Response::builder()
                 .status(hyper::StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from(format!(
-                    "WebSocket upgrade failed: {}",
-                    e
+                    "WebSocket upgrade failed: {e}"
                 ))))
                 .unwrap()
         }
     }
+}
+
+/// Extract the host portion from a conductor URL.
+///
+/// e.g. "ws://elohim-edgenode-alpha:4445" -> "elohim-edgenode-alpha"
+///      "ws://localhost:4445"             -> "localhost"
+fn extract_conductor_host(conductor_url: &str) -> String {
+    if let Some(after_scheme) = conductor_url.split("://").nth(1) {
+        // Strip port if present
+        if let Some(colon) = after_scheme.rfind(':') {
+            return after_scheme[..colon].to_string();
+        }
+        return after_scheme.to_string();
+    }
+    "localhost".to_string()
 }
 
 /// Extract permission level from request
@@ -204,10 +219,7 @@ fn extract_permission(
     }
 
     // Try API key from X-API-Key header
-    let api_key = req
-        .headers()
-        .get("x-api-key")
-        .and_then(|v| v.to_str().ok());
+    let api_key = req.headers().get("x-api-key").and_then(|v| v.to_str().ok());
 
     let api_validator = ApiKeyValidator::new(
         state.args.api_key_authenticated.clone(),

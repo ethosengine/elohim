@@ -20,7 +20,7 @@ fn main() {
         .map(|s| s.trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    println!("cargo:rustc-env=GIT_COMMIT_SHORT={}", git_hash);
+    println!("cargo:rustc-env=GIT_COMMIT_SHORT={git_hash}");
 
     // Get full commit hash
     let git_hash_full = Command::new("git")
@@ -37,11 +37,11 @@ fn main() {
         .map(|s| s.trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    println!("cargo:rustc-env=GIT_COMMIT_FULL={}", git_hash_full);
+    println!("cargo:rustc-env=GIT_COMMIT_FULL={git_hash_full}");
 
     // Get build timestamp
     let timestamp = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    println!("cargo:rustc-env=BUILD_TIMESTAMP={}", timestamp);
+    println!("cargo:rustc-env=BUILD_TIMESTAMP={timestamp}");
 
     // Rebuild if git HEAD changes
     println!("cargo:rerun-if-changed=.git/HEAD");

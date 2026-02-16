@@ -63,6 +63,36 @@
         }
       ]
     },
+    "doorway-sync": {
+      "description": "Doorway types must stay in sync with doorway-client crate",
+      "sync_rules": [
+        {
+          "trigger_pattern": "doorway/src/types/*.rs",
+          "notify": [],
+          "message": "Doorway types changed - check holochain/crates/doorway-client/src/ for compatibility"
+        },
+        {
+          "trigger_pattern": "holochain/crates/doorway-client/src/*.rs",
+          "notify": [],
+          "message": "doorway-client crate changed - check doorway/src/types/ for compatibility"
+        }
+      ]
+    },
+    "sophia-sync": {
+      "description": "sophia-element UMD bundle must be rebuilt before elohim-app build",
+      "sync_rules": [
+        {
+          "trigger_pattern": "sophia/packages/sophia-element/src/*.ts",
+          "notify": [],
+          "message": "sophia-element source changed - rebuild UMD bundle before elohim-app build (pnpm --filter @ethosengine/sophia-element build:umd)"
+        },
+        {
+          "trigger_pattern": "sophia/packages/sophia-core/src/*.ts",
+          "notify": [],
+          "message": "sophia-core changed - rebuild sophia-element UMD bundle before elohim-app build"
+        }
+      ]
+    },
     "model-sync": {
       "description": "ContentNode models must stay in sync between service and app",
       "pairs": [

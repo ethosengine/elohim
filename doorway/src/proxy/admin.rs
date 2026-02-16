@@ -7,14 +7,18 @@
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio_tungstenite::{connect_async_with_config, tungstenite::{protocol::Message, http::Request}};
+use tokio_tungstenite::{
+    connect_async_with_config,
+    tungstenite::{http::Request, protocol::Message},
+};
 use tracing::{debug, error, info, warn};
 
 use crate::auth::{is_operation_allowed, PermissionLevel};
 use crate::proxy::holochain::{encode_error, parse_message};
 use crate::types::{DoorwayError, Result};
 
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 /// Run the admin proxy between client and conductor
 pub async fn run_proxy(
@@ -35,18 +39,24 @@ pub async fn run_proxy(
     // Holochain requires an Origin header for WebSocket connections
     let request = Request::builder()
         .uri(conductor_url)
-        .header("Host", conductor_url.split("//").last().unwrap_or("localhost"))
+        .header(
+            "Host",
+            conductor_url.split("//").last().unwrap_or("localhost"),
+        )
         .header("Origin", "http://localhost")
         .header("Connection", "Upgrade")
         .header("Upgrade", "websocket")
         .header("Sec-WebSocket-Version", "13")
-        .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
+        .header(
+            "Sec-WebSocket-Key",
+            tokio_tungstenite::tungstenite::handshake::client::generate_key(),
+        )
         .body(())
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {e}")))?;
 
     let (conductor_ws, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to conductor: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to conductor: {e}")))?;
 
     info!("Connected to conductor at {}", conductor_url);
 
@@ -89,9 +99,7 @@ pub async fn run_proxy(
                                 // Send error response back to client
                                 let error_response = encode_error(&error_msg);
                                 let mut sink = client_sink_for_client.lock().await;
-                                if let Err(e) =
-                                    sink.send(Message::Binary(error_response.into())).await
-                                {
+                                if let Err(e) = sink.send(Message::Binary(error_response)).await {
                                     error!("Failed to send error to client: {}", e);
                                     break;
                                 }
@@ -101,9 +109,7 @@ pub async fn run_proxy(
                                 warn!("Blocking unparseable message in production mode");
                                 let error_response = encode_error("Invalid message format");
                                 let mut sink = client_sink_for_client.lock().await;
-                                if let Err(e) =
-                                    sink.send(Message::Binary(error_response.into())).await
-                                {
+                                if let Err(e) = sink.send(Message::Binary(error_response)).await {
                                     error!("Failed to send error to client: {}", e);
                                     break;
                                 }
@@ -154,7 +160,7 @@ pub async fn run_proxy(
                 Ok(Message::Binary(data)) => {
                     // Forward response back to client (no filtering on responses)
                     let mut sink = client_sink_for_conductor.lock().await;
-                    if let Err(e) = sink.send(Message::Binary(data.into())).await {
+                    if let Err(e) = sink.send(Message::Binary(data)).await {
                         error!("Failed to send to client: {}", e);
                         break;
                     }
@@ -168,13 +174,13 @@ pub async fn run_proxy(
                 }
                 Ok(Message::Ping(data)) => {
                     let mut sink = client_sink_for_conductor.lock().await;
-                    if let Err(e) = sink.send(Message::Ping(data.into())).await {
+                    if let Err(e) = sink.send(Message::Ping(data)).await {
                         debug!("Failed to forward ping to client: {}", e);
                     }
                 }
                 Ok(Message::Pong(data)) => {
                     let mut sink = client_sink_for_conductor.lock().await;
-                    if let Err(e) = sink.send(Message::Pong(data.into())).await {
+                    if let Err(e) = sink.send(Message::Pong(data)).await {
                         debug!("Failed to forward pong to client: {}", e);
                     }
                 }
@@ -233,8 +239,7 @@ fn filter_message(data: &[u8], permission_level: PermissionLevel) -> FilterResul
                 FilterResult::Allow
             } else {
                 FilterResult::Deny(format!(
-                    "Operation '{}' requires higher permission level (current: {})",
-                    operation, permission_level
+                    "Operation '{operation}' requires higher permission level (current: {permission_level})"
                 ))
             }
         }

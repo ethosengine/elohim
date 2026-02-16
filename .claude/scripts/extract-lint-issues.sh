@@ -1,17 +1,29 @@
 #!/bin/bash
-# Extract lint issues from ESLint and Stylelint into a manifest for parallel fixing
+# Extract lint issues into a manifest for parallel fixing
+#
+# Usage:
+#   ./extract-lint-issues.sh                        # elohim-app (default)
+#   ./extract-lint-issues.sh --project doorway      # doorway clippy issues
+#   ./extract-lint-issues.sh --project doorway-app  # doorway-app ESLint
+#   ./extract-lint-issues.sh --project sophia       # sophia ESLint
+#   ./extract-lint-issues.sh --project all          # all projects combined
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-APP_DIR="$PROJECT_DIR/elohim-app"
 OUTPUT_DIR="$PROJECT_DIR/.claude"
+
+# Parse args
+TARGET_PROJECT="elohim-app"
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --project) TARGET_PROJECT="$2"; shift 2 ;;
+    *) echo "Unknown arg: $1. Usage: $0 [--project elohim-app|doorway|doorway-app|sophia|all]"; exit 1 ;;
+  esac
+done
+
 MANIFEST_FILE="$OUTPUT_DIR/lint-manifest.json"
-
-cd "$APP_DIR"
-
-echo "Extracting lint issues from elohim-app..."
 
 # Tier classification for smart dispatch
 TIER_MAP=$(cat <<'TIER_EOF'
@@ -58,7 +70,19 @@ TIER_MAP=$(cat <<'TIER_EOF'
   "unicorn/prefer-code-point": "mechanical",
   "unicorn/prefer-array-index-of": "mechanical",
   "unicorn/no-typeof-undefined": "mechanical",
-  "unicorn/prefer-export-from": "mechanical"
+  "unicorn/prefer-export-from": "mechanical",
+  "clippy::unnecessary_clone": "mechanical",
+  "clippy::needless_return": "mechanical",
+  "clippy::manual_map": "mechanical",
+  "clippy::needless_borrow": "mechanical",
+  "clippy::redundant_closure": "mechanical",
+  "clippy::single_match": "mechanical",
+  "clippy::match_single_binding": "mechanical",
+  "clippy::len_zero": "mechanical",
+  "clippy::cognitive_complexity": "contextual",
+  "clippy::too_many_arguments": "contextual",
+  "clippy::missing_docs": "judgment",
+  "clippy::missing_safety_doc": "judgment"
 }
 TIER_EOF
 )
@@ -101,66 +125,199 @@ FIX_HINTS=$(cat <<'HINTS_EOF'
   "unicorn/prefer-code-point": "Use `String.fromCodePoint()` instead of `String.fromCharCode()`",
   "unicorn/prefer-array-index-of": "Use `.indexOf()` instead of `.findIndex()` for simple values",
   "unicorn/no-typeof-undefined": "Use `=== undefined` instead of `typeof x === 'undefined'`",
-  "unicorn/prefer-export-from": "Use `export { Foo } from './bar'` instead of importing then re-exporting"
+  "unicorn/prefer-export-from": "Use `export { Foo } from './bar'` instead of importing then re-exporting",
+  "clippy::unnecessary_clone": "Remove .clone() when ownership can transfer or use a reference",
+  "clippy::needless_return": "Remove explicit return at end of function",
+  "clippy::manual_map": "Replace manual match with .map()",
+  "clippy::needless_borrow": "Remove & when value is already a reference",
+  "clippy::redundant_closure": "Replace |x| foo(x) with foo",
+  "clippy::cognitive_complexity": "Extract complex logic into smaller helper functions",
+  "clippy::too_many_arguments": "Group parameters into a config struct"
 }
 HINTS_EOF
 )
 
-# Extract ESLint issues
-echo "Running ESLint..."
-ESLINT_OUTPUT=$(npx eslint src --ext .ts,.html -f json 2>/dev/null || true)
+# ============================================================================
+# Extract functions per project
+# ============================================================================
 
-# Extract Stylelint issues
-echo "Running Stylelint..."
-STYLELINT_OUTPUT=$(npx stylelint "src/**/*.{css,scss}" -f json 2>/dev/null || true)
+extract_elohim_app() {
+  local APP_DIR="$PROJECT_DIR/elohim-app"
+  cd "$APP_DIR"
+  echo "Extracting lint issues from elohim-app..."
 
-# Convert ESLint issues
-echo "Building manifest..."
-echo "$ESLINT_OUTPUT" | jq --argjson hints "$FIX_HINTS" --argjson tiers "$TIER_MAP" '
-  [.[] | select(.errorCount > 0 or .warningCount > 0) |
-   .filePath as $file | .messages[] |
-   select(.ruleId != null) |
-   {
-     file: $file,
-     line: .line,
-     column: .column,
-     ruleId: .ruleId,
-     message: .message,
-     severity: (if .severity == 2 then "error" else "warning" end),
-     tier: ($tiers[.ruleId] // "sonnet"),
-     fixHint: ($hints[.ruleId] // "Review the rule documentation and fix accordingly"),
-     status: "pending",
-     source: "eslint"
-   }]
-' > /tmp/eslint-issues.json
+  # ESLint
+  echo "  Running ESLint..."
+  ESLINT_OUTPUT=$(npx eslint src --ext .ts,.html -f json 2>/dev/null || true)
 
-# Convert Stylelint issues
-echo "$STYLELINT_OUTPUT" | jq --argjson hints "$FIX_HINTS" --argjson tiers "$TIER_MAP" '
-  [.[] | select(.warnings | length > 0) |
-   .source as $file | .warnings[] |
-   {
-     file: $file,
-     line: .line,
-     column: .column,
-     ruleId: .rule,
-     message: .text,
-     severity: (if .severity == "error" then "error" else "warning" end),
-     tier: ($tiers[.rule] // "sonnet"),
-     fixHint: ($hints[.rule] // "Review the rule documentation and fix accordingly"),
-     status: "pending",
-     source: "stylelint"
-   }]
-' > /tmp/stylelint-issues.json
+  echo "$ESLINT_OUTPUT" | jq --argjson hints "$FIX_HINTS" --argjson tiers "$TIER_MAP" '
+    [.[] | select(.errorCount > 0 or .warningCount > 0) |
+     .filePath as $file | .messages[] |
+     select(.ruleId != null) |
+     {
+       file: $file,
+       line: .line,
+       column: .column,
+       ruleId: .ruleId,
+       message: .message,
+       severity: (if .severity == 2 then "error" else "warning" end),
+       tier: ($tiers[.ruleId] // "sonnet"),
+       fixHint: ($hints[.ruleId] // "Review the rule documentation and fix accordingly"),
+       status: "pending",
+       source: "eslint",
+       project: "elohim-app"
+     }]
+  ' > /tmp/elohim-app-eslint.json
 
-# Merge and add unique IDs
-jq -s '
-  add | to_entries | map(.value + {id: ("lint-" + (.key + 1 | tostring | ("0" * (4 - length)) + .))})
-' /tmp/eslint-issues.json /tmp/stylelint-issues.json > "$MANIFEST_FILE"
+  # Stylelint
+  echo "  Running Stylelint..."
+  STYLELINT_OUTPUT=$(npx stylelint "src/**/*.{css,scss}" -f json 2>/dev/null || true)
+
+  echo "$STYLELINT_OUTPUT" | jq --argjson hints "$FIX_HINTS" --argjson tiers "$TIER_MAP" '
+    [.[] | select(.warnings | length > 0) |
+     .source as $file | .warnings[] |
+     {
+       file: $file,
+       line: .line,
+       column: .column,
+       ruleId: .rule,
+       message: .text,
+       severity: (if .severity == "error" then "error" else "warning" end),
+       tier: ($tiers[.rule] // "sonnet"),
+       fixHint: ($hints[.rule] // "Review the rule documentation and fix accordingly"),
+       status: "pending",
+       source: "stylelint",
+       project: "elohim-app"
+     }]
+  ' > /tmp/elohim-app-stylelint.json
+
+  jq -s 'add' /tmp/elohim-app-eslint.json /tmp/elohim-app-stylelint.json
+}
+
+extract_doorway() {
+  echo "Extracting clippy issues from doorway..."
+  cd "$PROJECT_DIR/doorway"
+
+  # Run clippy with JSON output
+  CLIPPY_OUTPUT=$(RUSTFLAGS="" cargo clippy --message-format=json 2>/dev/null || true)
+
+  echo "$CLIPPY_OUTPUT" | jq --argjson hints "$FIX_HINTS" --argjson tiers "$TIER_MAP" '
+    [inputs |
+     select(.reason == "compiler-message") |
+     .message |
+     select(.level == "warning" or .level == "error") |
+     select(.code != null) |
+     .spans[0] as $span |
+     select($span != null) |
+     {
+       file: ($span.file_name | if startswith("/") then . else ("'"$PROJECT_DIR/doorway/"'" + .) end),
+       line: $span.line_start,
+       column: $span.column_start,
+       ruleId: ("clippy::" + (.code.code | split("::") | last)),
+       message: .message,
+       severity: .level,
+       tier: ($tiers["clippy::" + (.code.code | split("::") | last)] // "contextual"),
+       fixHint: ($hints["clippy::" + (.code.code | split("::") | last)] // "Review clippy suggestion and fix accordingly"),
+       status: "pending",
+       source: "clippy",
+       project: "doorway"
+     }]
+  ' 2>/dev/null || echo '[]'
+}
+
+extract_doorway_app() {
+  echo "Extracting ESLint issues from doorway-app..."
+  cd "$PROJECT_DIR/doorway-app"
+
+  ESLINT_OUTPUT=$(npx eslint src --ext .ts,.html -f json 2>/dev/null || true)
+
+  echo "$ESLINT_OUTPUT" | jq --argjson hints "$FIX_HINTS" --argjson tiers "$TIER_MAP" '
+    [.[] | select(.errorCount > 0 or .warningCount > 0) |
+     .filePath as $file | .messages[] |
+     select(.ruleId != null) |
+     {
+       file: $file,
+       line: .line,
+       column: .column,
+       ruleId: .ruleId,
+       message: .message,
+       severity: (if .severity == 2 then "error" else "warning" end),
+       tier: ($tiers[.ruleId] // "sonnet"),
+       fixHint: ($hints[.ruleId] // "Review the rule documentation and fix accordingly"),
+       status: "pending",
+       source: "eslint",
+       project: "doorway-app"
+     }]
+  ' 2>/dev/null || echo '[]'
+}
+
+extract_sophia() {
+  echo "Extracting ESLint issues from sophia..."
+  cd "$PROJECT_DIR/sophia"
+
+  ESLINT_OUTPUT=$(pnpm lint -- --format json 2>/dev/null || true)
+
+  echo "$ESLINT_OUTPUT" | jq --argjson hints "$FIX_HINTS" --argjson tiers "$TIER_MAP" '
+    [.[] | select(.errorCount > 0 or .warningCount > 0) |
+     .filePath as $file | .messages[] |
+     select(.ruleId != null) |
+     {
+       file: $file,
+       line: .line,
+       column: .column,
+       ruleId: .ruleId,
+       message: .message,
+       severity: (if .severity == 2 then "error" else "warning" end),
+       tier: ($tiers[.ruleId] // "sonnet"),
+       fixHint: ($hints[.ruleId] // "Review the rule documentation and fix accordingly"),
+       status: "pending",
+       source: "eslint",
+       project: "sophia"
+     }]
+  ' 2>/dev/null || echo '[]'
+}
+
+# ============================================================================
+# Main execution
+# ============================================================================
+
+ALL_ISSUES="[]"
+
+case "$TARGET_PROJECT" in
+  elohim-app)
+    ALL_ISSUES=$(extract_elohim_app)
+    ;;
+  doorway)
+    ALL_ISSUES=$(extract_doorway)
+    ;;
+  doorway-app)
+    ALL_ISSUES=$(extract_doorway_app)
+    ;;
+  sophia)
+    ALL_ISSUES=$(extract_sophia)
+    ;;
+  all)
+    echo "Extracting from all projects..."
+    ELOHIM=$(extract_elohim_app)
+    DOORWAY=$(extract_doorway)
+    DOORWAY_APP=$(extract_doorway_app)
+    SOPHIA=$(extract_sophia)
+    ALL_ISSUES=$(echo "$ELOHIM" "$DOORWAY" "$DOORWAY_APP" "$SOPHIA" | jq -s 'add')
+    ;;
+  *)
+    echo "Unknown project: $TARGET_PROJECT"
+    echo "Valid: elohim-app, doorway, doorway-app, sophia, all"
+    exit 1
+    ;;
+esac
+
+# Add unique IDs and write manifest
+echo "$ALL_ISSUES" | jq '
+  to_entries | map(.value + {id: ("lint-" + (.key + 1 | tostring | if length < 4 then ("0" * (4 - length)) + . else . end))})
+' > "$MANIFEST_FILE"
 
 # Summary
 TOTAL=$(jq 'length' "$MANIFEST_FILE")
-ESLINT_COUNT=$(jq '[.[] | select(.source == "eslint")] | length' "$MANIFEST_FILE")
-STYLELINT_COUNT=$(jq '[.[] | select(.source == "stylelint")] | length' "$MANIFEST_FILE")
 MECHANICAL_COUNT=$(jq '[.[] | select(.tier == "mechanical")] | length' "$MANIFEST_FILE")
 CONTEXTUAL_COUNT=$(jq '[.[] | select(.tier == "contextual")] | length' "$MANIFEST_FILE")
 JUDGMENT_COUNT=$(jq '[.[] | select(.tier == "judgment")] | length' "$MANIFEST_FILE")
@@ -168,15 +325,35 @@ JUDGMENT_COUNT=$(jq '[.[] | select(.tier == "judgment")] | length' "$MANIFEST_FI
 echo ""
 echo "=== Lint Manifest Generated ==="
 echo "Location: $MANIFEST_FILE"
+echo "Project: $TARGET_PROJECT"
 echo "Total issues: $TOTAL"
-echo "  ESLint:    $ESLINT_COUNT"
-echo "  Stylelint: $STYLELINT_COUNT"
+
+# Per-source breakdown
+for src in eslint stylelint clippy; do
+  COUNT=$(jq "[.[] | select(.source == \"$src\")] | length" "$MANIFEST_FILE")
+  if [ "$COUNT" -gt 0 ]; then
+    echo "  ${src}: $COUNT"
+  fi
+done
+
 echo ""
 echo "Tier breakdown:"
 echo "  Mechanical:  $MECHANICAL_COUNT"
 echo "  Contextual:  $CONTEXTUAL_COUNT"
 echo "  Judgment:    $JUDGMENT_COUNT"
 echo "  Other:       $((TOTAL - MECHANICAL_COUNT - CONTEXTUAL_COUNT - JUDGMENT_COUNT))"
+
+if [ "$TARGET_PROJECT" = "all" ]; then
+  echo ""
+  echo "Per-project breakdown:"
+  for proj in elohim-app doorway doorway-app sophia; do
+    COUNT=$(jq "[.[] | select(.project == \"$proj\")] | length" "$MANIFEST_FILE")
+    if [ "$COUNT" -gt 0 ]; then
+      echo "  ${proj}: $COUNT"
+    fi
+  done
+fi
+
 echo ""
 echo "Top rules:"
 jq -r '[.[] | .ruleId] | group_by(.) | map({rule: .[0], count: length}) | sort_by(-.count) | .[0:10] | .[] | "  \(.count)\t\(.rule)"' "$MANIFEST_FILE"

@@ -4,12 +4,10 @@
 //! and submits signed entries to the Holochain conductor.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::debug;
 
 use crate::types::DoorwayError;
 
@@ -228,7 +226,8 @@ impl IdempotencyCache {
             .unwrap_or_default()
             .as_secs();
 
-        self.cache.retain(|_, (_, created_at)| now - *created_at < self.ttl_seconds);
+        self.cache
+            .retain(|_, (_, created_at)| now - *created_at < self.ttl_seconds);
     }
 }
 
@@ -281,7 +280,8 @@ impl SigningService {
         display_name: Option<String>,
         agent_pubkey: &str,
     ) -> HumanSession {
-        self.sessions.get_or_create(human_id, display_name, agent_pubkey)
+        self.sessions
+            .get_or_create(human_id, display_name, agent_pubkey)
     }
 
     /// Validate a session
@@ -305,7 +305,10 @@ impl SigningService {
         };
 
         // Check session entry limit
-        let remaining = self.config.max_entries_per_session.saturating_sub(session.entries_signed);
+        let remaining = self
+            .config
+            .max_entries_per_session
+            .saturating_sub(session.entries_signed);
         if remaining == 0 {
             return Ok(SignResponse::error("Session entry limit reached", 0));
         }
@@ -329,7 +332,10 @@ impl SigningService {
         // Validate entry type
         if !self.is_entry_type_allowed(&request.fn_name) {
             return Ok(SignResponse::error(
-                format!("Entry type '{}' is not allowed for gateway signing", request.fn_name),
+                format!(
+                    "Entry type '{}' is not allowed for gateway signing",
+                    request.fn_name
+                ),
                 remaining,
             ));
         }
@@ -363,7 +369,12 @@ impl SigningService {
     /// Check if an entry type is allowed for gateway signing
     fn is_entry_type_allowed(&self, fn_name: &str) -> bool {
         // Check blocked list first
-        if self.config.blocked_entry_types.iter().any(|t| fn_name.contains(t)) {
+        if self
+            .config
+            .blocked_entry_types
+            .iter()
+            .any(|t| fn_name.contains(t))
+        {
             return false;
         }
 
@@ -373,7 +384,10 @@ impl SigningService {
         }
 
         // Check allowed list
-        self.config.allowed_entry_types.iter().any(|t| fn_name.contains(t))
+        self.config
+            .allowed_entry_types
+            .iter()
+            .any(|t| fn_name.contains(t))
     }
 
     /// Get session store reference
@@ -403,11 +417,7 @@ mod tests {
 
     #[test]
     fn test_sign_response() {
-        let success = SignResponse::success(
-            "uhCkk...".to_string(),
-            "uhCEk...".to_string(),
-            999,
-        );
+        let success = SignResponse::success("uhCkk...".to_string(), "uhCEk...".to_string(), 999);
         assert!(success.success);
         assert!(success.action_hash.is_some());
 
@@ -435,11 +445,8 @@ mod tests {
         let service = SigningService::new(SigningConfig::default());
 
         // Create a session
-        let session = service.get_or_create_session(
-            "human_123",
-            Some("Alice".to_string()),
-            "uhCAk...",
-        );
+        let session =
+            service.get_or_create_session("human_123", Some("Alice".to_string()), "uhCAk...");
 
         // Validate should succeed
         assert!(service.validate_session(&session.session_id).is_some());

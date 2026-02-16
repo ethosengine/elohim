@@ -19,8 +19,8 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
 
-use crate::worker::ConductorConnection;
 use crate::types::Result;
+use crate::worker::ConductorConnection;
 
 /// Configuration for the import client
 #[derive(Debug, Clone)]

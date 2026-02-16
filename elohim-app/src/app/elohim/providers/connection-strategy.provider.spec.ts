@@ -394,8 +394,8 @@ describe('ConnectionStrategyProvider', () => {
       const strategy = TestBed.inject(CONNECTION_STRATEGY);
       const mockConfig = {
         mode: 'doorway' as const,
-        adminUrl: 'wss://doorway-dev.elohim.host',
-        appUrl: 'wss://doorway-dev.elohim.host',
+        adminUrl: 'wss://doorway-alpha.elohim.host',
+        appUrl: 'wss://doorway-alpha.elohim.host',
         appId: 'elohim',
       };
 
@@ -420,8 +420,8 @@ describe('ConnectionStrategyProvider', () => {
       const strategy = TestBed.inject(CONNECTION_STRATEGY);
       const mockConfig = {
         mode: 'doorway' as const,
-        adminUrl: 'wss://doorway-dev.elohim.host',
-        appUrl: 'wss://doorway-dev.elohim.host',
+        adminUrl: 'wss://doorway-alpha.elohim.host',
+        appUrl: 'wss://doorway-alpha.elohim.host',
         appId: 'elohim',
       };
 
@@ -438,8 +438,8 @@ describe('ConnectionStrategyProvider', () => {
       const strategy = TestBed.inject(CONNECTION_STRATEGY);
       const mockConfig = {
         mode: 'doorway' as const,
-        adminUrl: 'wss://doorway-dev.elohim.host',
-        appUrl: 'wss://doorway-dev.elohim.host',
+        adminUrl: 'wss://doorway-alpha.elohim.host',
+        appUrl: 'wss://doorway-alpha.elohim.host',
         appId: 'elohim',
       };
 
@@ -456,8 +456,8 @@ describe('ConnectionStrategyProvider', () => {
       const strategy = TestBed.inject(CONNECTION_STRATEGY);
       const mockConfig = {
         mode: 'doorway' as const,
-        adminUrl: 'wss://doorway-dev.elohim.host',
-        appUrl: 'wss://doorway-dev.elohim.host',
+        adminUrl: 'wss://doorway-alpha.elohim.host',
+        appUrl: 'wss://doorway-alpha.elohim.host',
         appId: 'elohim',
         proxyApiKey: 'test-key',
       };
@@ -475,8 +475,8 @@ describe('ConnectionStrategyProvider', () => {
       const strategy = TestBed.inject(CONNECTION_STRATEGY);
       const mockConfig = {
         mode: 'doorway' as const,
-        adminUrl: 'wss://doorway-dev.elohim.host',
-        appUrl: 'wss://doorway-dev.elohim.host',
+        adminUrl: 'wss://doorway-alpha.elohim.host',
+        appUrl: 'wss://doorway-alpha.elohim.host',
         appId: 'elohim',
       };
 

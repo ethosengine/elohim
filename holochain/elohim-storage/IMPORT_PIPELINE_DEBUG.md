@@ -195,9 +195,9 @@ Look for these log lines in storage container:
 ### 2. Run Diagnostics Locally
 
 ```bash
-# Test cell discovery against dev environment
-HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024' \
-DOORWAY_URL='https://doorway-dev.elohim.host' \
+# Test cell discovery against alpha environment
+HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024' \
+DOORWAY_URL='https://doorway-alpha.elohim.host' \
 npx tsx genesis/seeder/src/diagnose.ts --cells
 ```
 

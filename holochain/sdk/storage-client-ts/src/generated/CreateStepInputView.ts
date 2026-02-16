@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating a step - camelCase API boundary type
  */
-export type CreateStepInputView = { id: string, pathId: string, chapterId: string | null, title: string, description: string | null, stepType: string | null, resourceId: string | null, resourceType: string | null, orderIndex: number, estimatedDuration: string | null, 
+export type CreateStepInputView = { id: string, pathId: string, schemaVersion: number, chapterId: string | null, title: string, description: string | null, stepType: string | null, resourceId: string | null, resourceType: string | null, orderIndex: number, estimatedDuration: string | null, 
 /**
  * Parsed metadata object (serialized to JSON string for DB)
  */

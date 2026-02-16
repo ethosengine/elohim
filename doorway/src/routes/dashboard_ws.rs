@@ -47,8 +47,8 @@
 use futures_util::{SinkExt, StreamExt};
 use http_body_util::Full;
 use hyper::body::Bytes;
-use hyper::{Request, Response, StatusCode};
 use hyper::body::Incoming;
+use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -61,7 +61,8 @@ use crate::orchestrator::{NodeHealthStatus, OrchestratorState};
 use crate::server::AppState;
 
 /// WebSocket type after upgrade
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 // ============================================================================
 // Message Types
@@ -101,9 +102,7 @@ pub enum DashboardMessage {
         cluster: ClusterSnapshot,
     },
     /// Error message
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 /// Snapshot of node state
@@ -185,18 +184,34 @@ impl DashboardHub {
         let orchestrator = self.orchestrator.as_ref()?;
         let nodes = orchestrator.all_nodes().await;
 
-        let online = nodes.iter().filter(|n| n.status == NodeHealthStatus::Online).count();
+        let online = nodes
+            .iter()
+            .filter(|n| n.status == NodeHealthStatus::Online)
+            .count();
         let total = nodes.len();
-        let health_ratio = if total > 0 { online as f64 / total as f64 } else { 0.0 };
+        let health_ratio = if total > 0 {
+            online as f64 / total as f64
+        } else {
+            0.0
+        };
 
-        let (trust_sum, impact_sum, count) = nodes.iter()
+        let (trust_sum, impact_sum, count) = nodes
+            .iter()
             .filter_map(|n| n.social_metrics.as_ref())
             .fold((0.0, 0.0, 0usize), |(t, i, c), m| {
                 (t + m.trust_score, i + m.impact_score(), c + 1)
             });
 
-        let avg_trust = if count > 0 { trust_sum / count as f64 } else { 0.0 };
-        let avg_impact = if count > 0 { impact_sum / count as f64 } else { 0.0 };
+        let avg_trust = if count > 0 {
+            trust_sum / count as f64
+        } else {
+            0.0
+        };
+        let avg_impact = if count > 0 {
+            impact_sum / count as f64
+        } else {
+            0.0
+        };
 
         Some(ClusterSnapshot {
             online_nodes: online,
@@ -214,20 +229,23 @@ impl DashboardHub {
         };
 
         let nodes = orchestrator.all_nodes().await;
-        nodes.iter().map(|n| {
-            let (steward_tier, trust_score) = match &n.social_metrics {
-                Some(m) => (Some(m.steward_tier.clone()), Some(m.trust_score)),
-                None => (None, None),
-            };
-            NodeSnapshot {
-                node_id: n.node_id.clone(),
-                status: status_to_string(&n.status),
-                combined_score: n.combined_score,
-                steward_tier,
-                trust_score,
-                last_heartbeat_secs_ago: n.last_heartbeat.map(|t| t.elapsed().as_secs()),
-            }
-        }).collect()
+        nodes
+            .iter()
+            .map(|n| {
+                let (steward_tier, trust_score) = match &n.social_metrics {
+                    Some(m) => (Some(m.steward_tier.clone()), Some(m.trust_score)),
+                    None => (None, None),
+                };
+                NodeSnapshot {
+                    node_id: n.node_id.clone(),
+                    status: status_to_string(&n.status),
+                    combined_score: n.combined_score,
+                    steward_tier,
+                    trust_score,
+                    last_heartbeat_secs_ago: n.last_heartbeat.map(|t| t.elapsed().as_secs()),
+                }
+            })
+            .collect()
     }
 
     /// Broadcast node update

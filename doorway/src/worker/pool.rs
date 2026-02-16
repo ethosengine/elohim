@@ -102,7 +102,11 @@ impl WorkerPool {
     /// Send a request through the pool and wait for response
     pub async fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>> {
         // Try to acquire semaphore (limits queue depth)
-        let _permit = self.semaphore.clone().acquire_owned().await
+        let _permit = self
+            .semaphore
+            .clone()
+            .acquire_owned()
+            .await
             .map_err(|_| DoorwayError::Internal("Pool semaphore closed".into()))?;
 
         let (response_tx, response_rx) = oneshot::channel();
@@ -155,7 +159,10 @@ async fn worker_task(
     timeout_ms: u64,
     connected_workers: Arc<AtomicUsize>,
 ) {
-    info!("Worker {} starting, connecting to {}", worker_id, conductor_url);
+    info!(
+        "Worker {} starting, connecting to {}",
+        worker_id, conductor_url
+    );
 
     loop {
         // Connect to conductor (with reconnection logic built-in)
@@ -171,7 +178,10 @@ async fn worker_task(
                 c
             }
             Err(e) => {
-                error!("Worker {} failed to connect: {}, retrying in 5s", worker_id, e);
+                error!(
+                    "Worker {} failed to connect: {}, retrying in 5s",
+                    worker_id, e
+                );
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 continue;
             }
@@ -193,7 +203,11 @@ async fn worker_task(
                 }
             };
 
-            debug!("Worker {} processing request ({} bytes)", worker_id, request.payload.len());
+            debug!(
+                "Worker {} processing request ({} bytes)",
+                worker_id,
+                request.payload.len()
+            );
 
             // Send to conductor
             let result = conductor.request(request.payload, timeout_ms).await;

@@ -16,8 +16,8 @@
 //! - `ELOHIM_STORAGE_URL`: Base URL of local storage (default: "http://localhost:8080")
 //! - `ELOHIM_STORAGE_CAPABILITIES`: Comma-separated capabilities (default: "blob,html5_app")
 
-use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use serde::Serialize;
+use tracing::{debug, info, warn};
 
 /// Storage registration configuration
 #[derive(Debug, Clone)]
@@ -181,13 +181,8 @@ pub async fn register_local_storage(
             bandwidth_mbps: None,
         };
 
-        match register_with_conductor(
-            conductor_url,
-            installed_app_id,
-            &config.zome_name,
-            &input,
-        )
-        .await
+        match register_with_conductor(conductor_url, installed_app_id, &config.zome_name, &input)
+            .await
         {
             Ok(()) => {
                 info!(capability = %capability, "Registered storage for capability");
@@ -195,7 +190,7 @@ pub async fn register_local_storage(
             }
             Err(e) => {
                 warn!(capability = %capability, error = %e, "Failed to register storage");
-                errors.push(format!("{}: {}", capability, e));
+                errors.push(format!("{capability}: {e}"));
             }
         }
     }

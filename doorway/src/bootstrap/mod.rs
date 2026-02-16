@@ -97,10 +97,7 @@ pub async fn handle_random(
     debug!("Bootstrap RANDOM returning {} agents", agents.len());
 
     // Return as MessagePack array of raw agent info bytes
-    let values: Vec<rmpv::Value> = agents
-        .into_iter()
-        .map(|bytes| rmpv::Value::Binary(bytes))
-        .collect();
+    let values: Vec<rmpv::Value> = agents.into_iter().map(rmpv::Value::Binary).collect();
 
     msgpack_response(&rmpv::Value::Array(values))
 }
@@ -126,7 +123,7 @@ fn msgpack_response(value: &rmpv::Value) -> Response<Full<Bytes>> {
     if let Err(e) = rmpv::encode::write_value(&mut buf, value) {
         return error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("MessagePack encode error: {}", e),
+            &format!("MessagePack encode error: {e}"),
         );
     }
 

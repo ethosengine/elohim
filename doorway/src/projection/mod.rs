@@ -43,6 +43,8 @@ pub mod subscriber;
 
 // Re-export main types
 pub use document::{ProjectedDocument, ProjectionQuery};
-pub use engine::{EngineConfig, ProjectionEngine, ProjectionSignal, spawn_engine_task};
+pub use engine::{spawn_engine_task, EngineConfig, ProjectionEngine, ProjectionSignal};
 pub use store::{ProjectionConfig, ProjectionStore};
-pub use subscriber::{ContentServerRegistration, SignalSubscriber, SubscriberConfig, spawn_subscriber};
+pub use subscriber::{
+    spawn_subscriber, ContentServerRegistration, SignalSubscriber, SubscriberConfig,
+};

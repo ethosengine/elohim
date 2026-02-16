@@ -160,11 +160,21 @@ def checkEdgeNodeHealth(String url) {
 }
 
 /**
+ * Run P2P simulation test (advisory — failures don't block pipeline).
+ * Requires Docker Compose and the elohim-storage Dockerfile.
+ */
+def runSimulationTest() {
+    dir('elohim-node/simulation') {
+        sh './simulate.sh test'
+    }
+}
+
+/**
  * Deploy edge node using environment manifest for per-component tags.
  * Reads tag values from envFile, substitutes named placeholders in the manifest template,
  * validates no placeholders remain, then applies to Kubernetes.
  */
-def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile) {
+def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile, String resourceName = 'elohim-edgenode') {
     def versions = readProperties(file: envFile)
     def sedArgs = [
         "s/EDGENODE_TAG_PLACEHOLDER/${versions.EDGENODE_TAG}/g",
@@ -186,14 +196,18 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
 
     // Preview what we're deploying
     sh """
-        echo '==== Edge manifest preview ===='
+        echo '==== Manifest preview: ${resourceName}-${env} ===='
         grep 'image:\\|happ-version:' ${outputFile}
         echo '==============================='
     """
 
     sh "kubectl apply -f ${outputFile}"
-    sh "kubectl rollout restart deployment/elohim-edgenode-${env} -n ${namespace}"
-    sh "kubectl rollout status deployment/elohim-edgenode-${env} -n ${namespace} --timeout=300s"
+    def resourceType = sh(
+        script: "grep -q 'kind: StatefulSet' ${manifestTemplate} && echo 'statefulset' || echo 'deployment'",
+        returnStdout: true
+    ).trim()
+    sh "kubectl rollout restart ${resourceType}/${resourceName}-${env} -n ${namespace}"
+    sh "kubectl rollout status ${resourceType}/${resourceName}-${env} -n ${namespace} --timeout=300s"
 }
 
 pipeline {
@@ -433,6 +447,26 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         // NOTE: Build WASM Cache Core and Build DNA stages moved to holochain/dna/Jenkinsfile
         // This pipeline now only builds infrastructure (container images)
 
+        stage('Quality Gate: Doorway') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        try {
+                            dir('doorway') {
+                                sh 'cargo fmt --check'
+                                sh 'RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all'
+                                sh 'RUSTFLAGS="" cargo test --lib --bins'
+                            }
+                        } catch (Exception e) {
+                            echo "Quality Gate: Doorway - issues found (non-blocking): ${e.message}"
+                            unstable('Doorway quality gate has warnings')
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build Doorway') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
@@ -456,6 +490,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} elohim-doorway:${GIT_COMMIT_HASH}
                             """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate: Doorway App') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        try {
+                            dir('doorway-app') {
+                                sh 'npm ci && npx eslint src --ext .ts,.html'
+                            }
+                        } catch (Exception e) {
+                            echo "Quality Gate: Doorway App - issues found (non-blocking): ${e.message}"
+                            unstable('Doorway App quality gate has warnings')
                         }
                     }
                 }
@@ -522,6 +574,28 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('P2P Simulation Test') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        changeset "holochain/elohim-storage/src/p2p/**"
+                        changeset "elohim-node/simulation/**"
+                        expression { return params.FORCE_BUILD == true }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            runSimulationTest()
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Build Edge Node Image') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
@@ -537,6 +611,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             def haveHapp = fetchHappFromHarbor('holochain/edgenode/elohim.happ')
 
                             if (haveHapp) {
+                                // DNA version awareness (Sprint 5)
+                                def versionMap = parseVersionFile()
+                                def expectedHappVersion = versionMap['HAPP_VERSION'] ?: 'unknown'
+                                def happTag = getHappFloatingTag()
+                                echo """
+    ═══════════════════════════════════════════
+    DNA ARTIFACT INFO
+    ═══════════════════════════════════════════
+    Expected HAPP_VERSION: ${expectedHappVersion}
+    Fetched via tag:       ${happTag}
+    ═══════════════════════════════════════════"""
+
                                 env.HAPP_AVAILABLE = 'true'
                                 sh """#!/bin/bash
                                     set -euo pipefail
@@ -831,7 +917,12 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
+                            // Deploy infra (MongoDB + NATS) — idempotent
+                            sh "kubectl apply -f orchestrator/manifests/infra/alpha-mongodb.yaml"
+                            sh "kubectl apply -f orchestrator/manifests/infra/alpha-nats.yaml"
+
                             deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/edgenode/alpha.yaml', envFile)
+                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/doorway/alpha.yaml', envFile, 'elohim-doorway')
 
                             sh 'sleep 15'
 
@@ -877,7 +968,13 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
+                            // Deploy infra (MongoDB + NATS) — idempotent
+                            sh "kubectl apply -f orchestrator/manifests/infra/staging-mongodb.yaml"
+                            sh "kubectl apply -f orchestrator/manifests/infra/staging-nats.yaml"
+
                             deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/edgenode/staging.yaml', envFile)
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/doorway/staging.yaml', envFile, 'elohim-doorway')
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/doorway/staging-read.yaml', envFile, 'elohim-doorway-read')
                             sh 'sleep 15'
                             if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
                                 echo "Edge Node Staging deployed and healthy"

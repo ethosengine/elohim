@@ -7,17 +7,18 @@
  *   npx tsx src/seed-test-admin.ts [options]
  *
  * Environment variables:
- *   ADMIN_PROXY_URL     Doorway URL (default: https://doorway-dev.elohim.host)
+ *   ADMIN_PROXY_URL     Doorway URL (default: https://doorway-alpha.elohim.host)
  *   HOLOCHAIN_APP_URL   Holochain app URL (default: ws://localhost:4445)
  *   TEST_ADMIN_PASSWORD Override default test password
+ *   API_KEY_ADMIN       Admin API key (must match doorway's API_KEY_ADMIN to bootstrap admin)
  *
  * The script will:
  *   1. Register Matthew Dowell human profile in Holochain
- *   2. Create auth credentials (email/password)
+ *   2. Create auth credentials (email/password) with Admin permission (via bootstrap key)
  *   3. Create an Admin-level API key
  *
  * Default credentials (for testing only):
- *   Email: matthew.dowell@elohim.host
+ *   Email: matthew.dowell@alpha.elohim.host
  *   Password: TestAdmin2026!
  */
 
@@ -28,7 +29,7 @@ import { AdminWebsocket, AppWebsocket } from '@holochain/client';
 // =============================================================================
 
 const TEST_USER = {
-  email: 'matthew.dowell@elohim.host',
+  email: 'matthew.dowell@alpha.elohim.host',
   // IMPORTANT: Change in production! This is for dev/alpha testing only.
   password: process.env.TEST_ADMIN_PASSWORD || 'TestAdmin2026!',
   name: 'Matthew Dowell',
@@ -94,7 +95,7 @@ function uint8ArrayToBase64(arr: Uint8Array): string {
 }
 
 function getAdminProxyUrl(): string {
-  return process.env.ADMIN_PROXY_URL || process.env.DOORWAY_URL || 'https://doorway-dev.elohim.host';
+  return process.env.ADMIN_PROXY_URL || process.env.DOORWAY_URL || 'https://doorway-alpha.elohim.host';
 }
 
 function getAdminWsUrl(): string {
@@ -227,7 +228,11 @@ async function registerAuthCredentials(
   email: string,
   password: string
 ): Promise<AuthRegisterResponse> {
-  console.log('Registering auth credentials...');
+  console.log('Registering auth credentials (with admin bootstrap)...');
+
+  // Pass admin bootstrap key to promote user to Admin permission level.
+  // The doorway validates this against its API_KEY_ADMIN env var.
+  const adminBootstrapKey = process.env.API_KEY_ADMIN || '';
 
   const response = await fetch(`${adminProxyUrl}/auth/register`, {
     method: 'POST',
@@ -238,6 +243,7 @@ async function registerAuthCredentials(
       identifier: email.toLowerCase(),
       identifierType: 'email',
       password,
+      admin_bootstrap_key: adminBootstrapKey || undefined,
     }),
   });
 
@@ -383,10 +389,12 @@ async function main(): Promise<void> {
     }
 
     // Output summary
+    const hasBootstrapKey = !!process.env.API_KEY_ADMIN;
     console.log('\n=== Test Admin Seeded Successfully ===\n');
     console.log('Credentials:');
     console.log(`  Email:    ${TEST_USER.email}`);
     console.log(`  Password: ${TEST_USER.password}`);
+    console.log(`  Admin:    ${hasBootstrapKey ? 'Yes (bootstrap key provided)' : 'No (set API_KEY_ADMIN to bootstrap as admin)'}`);
     console.log('');
     console.log('Identity:');
     console.log(`  Human ID:     ${holochainResult.human.id}`);

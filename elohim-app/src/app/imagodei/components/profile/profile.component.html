@@ -36,157 +36,164 @@
     @if (!isLoading()) {
       <!-- View Mode -->
       @if (!isEditing()) {
-        <div class="profile-view">
-          <!-- Avatar & Name -->
-          <div class="profile-identity">
-            <div class="avatar">{{ initials() }}</div>
-            <div class="identity-info">
-              <h2 class="display-name">{{ displayName() }}</h2>
-              <span class="mode-badge" [ngClass]="mode()">{{ mode() }}</span>
-            </div>
-          </div>
+        <!-- Profile Header (always visible) -->
+        <app-profile-header
+          [displayName]="displayName()"
+          [mode]="mode()"
+          [profile]="profile()"
+          [did]="did()"
+          [canEdit]="canEdit()"
+          (editProfile)="startEditing()"
+        />
 
-          <!-- Agency Stage -->
-          <div class="agency-section">
-            <span class="agency-label">Agency Stage</span>
-            <span class="agency-value">{{ agencyInfo().label }}</span>
-          </div>
-
-          <!-- Profile Details -->
-          @if (profile(); as p) {
-            <div class="profile-details">
-              <!-- Bio -->
-              @if (p.bio) {
-                <div class="detail-group">
-                  <span class="detail-label">Bio</span>
-                  <p class="detail-value bio">{{ p.bio }}</p>
-                </div>
-              }
-
-              <!-- Affinities -->
-              @if (p.affinities && p.affinities.length > 0) {
-                <div class="detail-group">
-                  <span class="detail-label">Interests</span>
-                  <div class="affinities">
-                    @for (affinity of p.affinities; track affinity) {
-                      <span class="affinity-tag">{{ affinity }}</span>
-                    }
-                  </div>
-                </div>
-              }
-
-              <!-- Location -->
-              @if (p.location) {
-                <div class="detail-group">
-                  <span class="detail-label">Location</span>
-                  <span class="detail-value">{{ p.location }}</span>
-                </div>
-              }
-
-              <!-- Profile Reach -->
-              <div class="detail-group">
-                <span class="detail-label">Visibility</span>
-                <span class="detail-value">{{ getReachLabel(p.profileReach) }}</span>
-              </div>
-
-              <!-- Member Since -->
-              <div class="detail-group">
-                <span class="detail-label">Member Since</span>
-                <span class="detail-value">{{ formatDate(p.createdAt) }}</span>
-              </div>
-            </div>
-          }
-
-          <!-- Discovery Results (Personality, Strengths, etc.) -->
-          @if (discoveryResults().length > 0 || allDiscoveryResults().length > 0) {
-            <div class="discovery-section">
-              <span class="section-title">Self-Discovery</span>
-              <div class="discovery-results">
-                @for (result of allDiscoveryResults(); track result.id) {
-                  <div class="discovery-card">
-                    <div class="discovery-icon">{{ getCategoryIcon(result) }}</div>
-                    <div class="discovery-content">
-                      <span class="discovery-framework">{{ getFrameworkName(result) }}</span>
-                      <span class="discovery-result">{{ result.displayString }}</span>
-                    </div>
-                    <span class="discovery-short" [title]="result.displayString">
-                      {{ result.shortDisplay }}
-                    </span>
-                  </div>
-                }
-              </div>
-              <button type="button" class="discovery-add-btn" (click)="navigateToDiscovery()">
-                + Take a Discovery Assessment
-              </button>
-            </div>
-          } @else {
-            <div class="discovery-section discovery-empty">
-              <span class="section-title">Self-Discovery</span>
-              <p class="discovery-empty-text">
-                Learn about yourself through personality, strengths, and values assessments.
-              </p>
-              <button type="button" class="btn btn-secondary" (click)="navigateToDiscovery()">
-                Start a Discovery Assessment
-              </button>
-            </div>
-          }
-
-          <!-- Other Attestations -->
-          @if (attestations().length > 0) {
-            <div class="attestations-section">
-              <span class="section-title">Attestations</span>
-              <div class="attestations">
-                @for (attestation of attestations(); track attestation) {
-                  <span class="attestation-badge">{{ attestation }}</span>
-                }
-              </div>
-            </div>
-          }
-
-          <!-- Contextual Settings Links -->
-          <div class="context-links-section">
-            <span class="section-title">Manage in Context</span>
-            <p class="section-description">
-              Your identity extends across different contexts. Manage specific aspects in each.
-            </p>
-            <div class="context-links">
-              <a routerLink="/shefa" class="context-link">
-                <span class="context-icon material-icons">memory</span>
-                <div class="context-info">
-                  <strong>Compute & Nodes</strong>
-                  <span>
-                    Manage your stewarded compute resources, node topology, and infrastructure
-                    tokens
-                  </span>
-                </div>
-                <span class="material-icons">chevron_right</span>
-              </a>
-              <a routerLink="/lamad/profile" class="context-link">
-                <span class="context-icon material-icons">school</span>
-                <div class="context-info">
-                  <strong>Learning Profile</strong>
-                  <span>View your learning paths, progress, and achievements</span>
-                </div>
-                <span class="material-icons">chevron_right</span>
-              </a>
-            </div>
-          </div>
-
-          <!-- Edit Button -->
-          @if (canEdit()) {
-            <div class="profile-actions">
-              <button type="button" class="btn btn-primary" (click)="startEditing()">
-                Edit Profile
-              </button>
-            </div>
-          }
+        <!-- Tab Navigation -->
+        <div class="tab-bar" role="tablist" aria-label="Profile sections">
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.active]="activeTab() === 'identity'"
+            [attr.aria-selected]="activeTab() === 'identity'"
+            (click)="selectTab('identity')"
+          >
+            <span class="material-icons tab-icon">person</span>
+            Identity
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.active]="activeTab() === 'network'"
+            [attr.aria-selected]="activeTab() === 'network'"
+            (click)="selectTab('network')"
+          >
+            <span class="material-icons tab-icon">lan</span>
+            Network
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.active]="activeTab() === 'data'"
+            [attr.aria-selected]="activeTab() === 'data'"
+            (click)="selectTab('data')"
+          >
+            <span class="material-icons tab-icon">shield</span>
+            Data & Privacy
+          </button>
         </div>
+
+        <!-- Tab Panels -->
+
+        <!-- Identity Tab -->
+        @if (activeTab() === 'identity') {
+          <div class="tab-panel" role="tabpanel" aria-label="Identity">
+            @if (profile(); as p) {
+              <app-profile-identity-section [profile]="p" />
+            }
+
+            <app-profile-discovery-section
+              [results]="allDiscoveryResults()"
+              (navigateToDiscovery)="navigateToDiscovery()"
+            />
+
+            @if (isNetworkUser()) {
+              <app-profile-attestations-section [attestations]="attestations()" />
+            } @else {
+              @if (attestations().length === 0) {
+                <div class="empty-state-card">
+                  <span class="material-icons empty-state-icon">verified</span>
+                  <p>Join the network to earn attestations and build your reputation.</p>
+                  <a routerLink="/identity/register" class="btn btn-secondary">Join Network</a>
+                </div>
+              }
+            }
+
+            <!-- Contextual Links -->
+            <div class="context-links-section">
+              <span class="section-title">Manage in Context</span>
+              <div class="context-links">
+                <a routerLink="/shefa" class="context-link">
+                  <span class="context-icon material-icons">memory</span>
+                  <div class="context-info">
+                    <strong>Compute & Nodes</strong>
+                    <span>Manage your stewarded compute resources and infrastructure tokens</span>
+                  </div>
+                  <span class="material-icons">chevron_right</span>
+                </a>
+                <a routerLink="/lamad/human" class="context-link">
+                  <span class="context-icon material-icons">school</span>
+                  <div class="context-info">
+                    <strong>Learning Profile</strong>
+                    <span>View your learning paths, progress, and achievements</span>
+                  </div>
+                  <span class="material-icons">chevron_right</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Network Tab -->
+        @if (activeTab() === 'network') {
+          <div class="tab-panel" role="tabpanel" aria-label="Network">
+            <app-profile-agency-section
+              [agencyInfo]="agencyInfo()"
+              [agencyState]="agencyState()"
+              [connectionStatus]="connectionStatus()"
+              [canUpgrade]="canUpgrade()"
+              [nextStageInfo]="nextStageInfo()"
+              [nextStageLabel]="nextStageLabel()"
+              [isTauriApp]="isTauriApp()"
+              [graduationStatus]="graduationStatus()"
+              [graduationError]="graduationError()"
+              [isGraduationEligible]="isGraduationEligible()"
+              (confirmGraduation)="confirmGraduation($event)"
+            />
+
+            @if (isNetworkUser()) {
+              <app-profile-doorways-section
+                [doorways]="registeredDoorways()"
+                [activeDoorwayId]="activeDoorway()?.id ?? null"
+                [registrationContext]="doorwayRegistrationContext()"
+                (setAsPrimary)="setDoorwayAsPrimary($event)"
+                (validateDoorway)="validateDoorway($event)"
+                (addDoorway)="addDoorway($event)"
+              />
+
+              <app-profile-network-section
+                [agencyState]="agencyState()"
+                [connectionStatus]="connectionStatus()"
+                [edgeNodeInfo]="edgeNodeInfo()"
+                (reconnect)="reconnect()"
+              />
+            } @else {
+              <div class="empty-state-card">
+                <span class="material-icons empty-state-icon">cloud_off</span>
+                <p>Connect to a doorway to view your network details and manage connections.</p>
+                <a routerLink="/identity/register" class="btn btn-secondary">Join Network</a>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Data & Privacy Tab -->
+        @if (activeTab() === 'data') {
+          <div class="tab-panel" role="tabpanel" aria-label="Data and Privacy">
+            <app-profile-data-section
+              [isAuthenticated]="isAuthenticated()"
+              [hostingCost]="identityState().hostingCost"
+              [nodeOperatorIncome]="identityState().nodeOperatorIncome"
+              [keyBackup]="identityState().keyBackup"
+              (exportData)="exportData()"
+            />
+          </div>
+        }
       }
 
       <!-- Edit Mode -->
       @if (isEditing()) {
         <form class="profile-edit" (ngSubmit)="saveProfile()">
-          <!-- Display Name -->
           <div class="form-group">
             <label for="displayName">Display Name *</label>
             <input
@@ -200,7 +207,6 @@
             />
           </div>
 
-          <!-- Bio -->
           <div class="form-group">
             <label for="bio">Bio</label>
             <textarea
@@ -213,7 +219,6 @@
             ></textarea>
           </div>
 
-          <!-- Affinities -->
           <div class="form-group">
             <label for="affinities">Interests</label>
             <input
@@ -227,7 +232,6 @@
             <span class="hint">Comma-separated</span>
           </div>
 
-          <!-- Location -->
           <div class="form-group">
             <label for="location">Location</label>
             <input
@@ -240,7 +244,6 @@
             />
           </div>
 
-          <!-- Profile Reach -->
           <div class="form-group">
             <fieldset class="reach-options">
               <legend class="form-label">Visibility</legend>
@@ -262,7 +265,6 @@
             </fieldset>
           </div>
 
-          <!-- Form Actions -->
           <div class="form-actions">
             <button
               type="button"

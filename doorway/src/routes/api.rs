@@ -194,7 +194,10 @@ pub async fn handle_api_request(
     if let Some(id) = route.doc_id {
         // Generic resolution for any type (tiered: projection → conductor)
         // Identity passed through for DNA-level access control
-        let result = state.resolver.resolve_with_identity(route.doc_type, id, requester).await;
+        let result = state
+            .resolver
+            .resolve_with_identity(route.doc_type, id, requester)
+            .await;
 
         return match result {
             Ok(resolution) => {
@@ -235,14 +238,14 @@ pub async fn handle_api_request(
     };
 
     let params = parse_query_params(query.unwrap_or(""));
-    let limit = params.get("limit")
+    let limit = params
+        .get("limit")
         .and_then(|v| v.parse::<i64>().ok())
         .unwrap_or(100)
         .min(1000);
 
     // TODO: Pass requester identity for access-filtered queries
-    let proj_query = ProjectionQuery::by_type(route.doc_type)
-        .with_limit(limit);
+    let proj_query = ProjectionQuery::by_type(route.doc_type).with_limit(limit);
 
     match projection.query(proj_query).await {
         Ok(docs) => {

@@ -8,13 +8,19 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use doorway::{
+    conductor::{ConductorInfo, ConductorPoolMap, ConductorRegistry, ConductorRouter},
     config::Args,
     db::MongoClient,
     nats::NatsClient,
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
-    projection::{EngineConfig, ProjectionEngine, SubscriberConfig, spawn_engine_task, spawn_subscriber},
+    projection::{
+        spawn_engine_task, spawn_subscriber, EngineConfig, ProjectionEngine, SubscriberConfig,
+    },
     server,
-    services::{self, DiscoveryConfig, StorageRegistrationConfig, register_local_storage, spawn_discovery_task},
+    services::{
+        self, register_local_storage, spawn_discovery_task, DiscoveryConfig,
+        StorageRegistrationConfig,
+    },
     worker::{PoolConfig, WorkerPool},
 };
 
@@ -31,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("doorway={},info", log_level).into()),
+                .unwrap_or_else(|_| format!("doorway={log_level},info").into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -49,10 +55,25 @@ async fn main() -> anyhow::Result<()> {
     info!("======================================");
     info!("Node ID: {}", args.node_id);
     info!("Listen: {}", args.listen);
-    info!("Mode: {}", if args.dev_mode { "DEVELOPMENT" } else { "PRODUCTION" });
-    let startup_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-    info!("Conductor admin: {} (discovery, list_apps)", args.admin_url());
-    info!("Conductor app: {} (zome calls)", startup_app_url);
+    info!(
+        "Mode: {}",
+        if args.dev_mode {
+            "DEVELOPMENT"
+        } else {
+            "PRODUCTION"
+        }
+    );
+    info!("Projection writer: {}", args.projection_writer);
+    let conductor_urls = args.conductor_url_list();
+    let _startup_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+    info!(
+        "Conductor admin: {} (discovery, list_apps)",
+        args.admin_url()
+    );
+    info!("Conductor pool: {} conductor(s)", conductor_urls.len());
+    for (i, url) in conductor_urls.iter().enumerate() {
+        info!("  conductor-{}: {}", i, url);
+    }
     info!("App ports: {}-{}", args.app_port_min, args.app_port_max);
     info!("NATS: {}", args.nats.nats_url);
     info!("MongoDB: {}", args.mongodb_uri);
@@ -67,7 +88,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("MongoDB connection failed (dev mode, continuing without): {}", e);
+                warn!(
+                    "MongoDB connection failed (dev mode, continuing without): {}",
+                    e
+                );
                 None
             } else {
                 error!("MongoDB connection failed: {}", e);
@@ -84,7 +108,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("NATS connection failed (dev mode, continuing without): {}", e);
+                warn!(
+                    "NATS connection failed (dev mode, continuing without): {}",
+                    e
+                );
                 None
             } else {
                 error!("NATS connection failed: {}", e);
@@ -119,7 +146,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("App worker pool failed to start (dev mode, using direct proxy): {}", e);
+                warn!(
+                    "App worker pool failed to start (dev mode, using direct proxy): {}",
+                    e
+                );
                 None
             } else {
                 error!("App worker pool failed to start: {}", e);
@@ -147,7 +177,10 @@ async fn main() -> anyhow::Result<()> {
         }
         Err(e) => {
             if args.dev_mode {
-                warn!("Admin worker pool failed to start (dev mode, using direct proxy): {}", e);
+                warn!(
+                    "Admin worker pool failed to start (dev mode, using direct proxy): {}",
+                    e
+                );
                 None
             } else {
                 error!("Admin worker pool failed to start: {}", e);
@@ -190,42 +223,189 @@ async fn main() -> anyhow::Result<()> {
         import_app_url
     );
 
+    // Initialize Conductor Registry — available on ALL instances (writer + reader)
+    // Tracks which conductor hosts which agent for future per-request routing
+    let registry_collection = state.mongo.as_ref().map(|m| {
+        m.inner()
+            .database(m.db_name())
+            .collection::<bson::Document>("conductor_registry")
+    });
+    let registry = ConductorRegistry::new(registry_collection).await;
+
+    // Register all conductors from config
+    for (i, url) in conductor_urls.iter().enumerate() {
+        let conductor_id = format!("conductor-{i}");
+        // Derive admin URL: same host, port - 1 (socat convention: 8444=admin, 8445=app)
+        let admin_url = derive_admin_url_from_app(url);
+        registry.register_conductor(ConductorInfo {
+            conductor_id,
+            conductor_url: url.clone(),
+            admin_url,
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+    }
+
+    let registry = Arc::new(registry);
+    state.conductor_registry = Some(Arc::clone(&registry));
+    info!(
+        "Conductor registry initialized: {} conductor(s), {} agent mapping(s)",
+        registry.conductor_count(),
+        registry.agent_count()
+    );
+
+    // Create per-conductor WorkerPools for multi-conductor routing
+    // Each conductor in CONDUCTOR_URLS gets its own pool of workers
+    // Requires a default pool (always exists in production; absent only in dev mode without conductor)
+    if let Some(ref default_pool) = state.pool {
+        let pool_map = ConductorPoolMap::new(Arc::clone(default_pool));
+
+        let mut pools_created = 0usize;
+        for (i, url) in conductor_urls.iter().enumerate() {
+            let conductor_id = format!("conductor-{i}");
+            // Use URL as-is from CONDUCTOR_URLS — it already contains the correct port.
+            // derive_app_url would replace the port with app_port_min (4445), which breaks
+            // headless k8s services where the socat proxy listens on a different port (e.g. 8445).
+            let app_url = url.clone();
+            match WorkerPool::new(PoolConfig {
+                worker_count: 2, // Per-conductor pools are smaller than the main pool
+                conductor_url: app_url.clone(),
+                request_timeout_ms: args.request_timeout_ms,
+                max_queue_size: 500,
+            })
+            .await
+            {
+                Ok(pool) => {
+                    pool_map.add_pool(&conductor_id, Arc::new(pool));
+                    pools_created += 1;
+                    info!(
+                        conductor = %conductor_id,
+                        url = %app_url,
+                        "Per-conductor pool created (2 workers)"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        conductor = %conductor_id,
+                        url = %app_url,
+                        error = %e,
+                        "Failed to create per-conductor pool, conductor will use default"
+                    );
+                }
+            }
+        }
+
+        let pool_map = Arc::new(pool_map);
+        let router = ConductorRouter::new(Arc::clone(&registry), pool_map);
+        state.conductor_router = Some(Arc::new(router));
+        info!(
+            "Conductor router initialized: {}/{} per-conductor pools created",
+            pools_created,
+            conductor_urls.len()
+        );
+    }
+
+    // Generate node Ed25519 signing key for federation
+    // This key is used in the DID document and JWKS endpoint
+    {
+        let (_, verifying_key) = doorway::custodial_keys::crypto::generate_keypair();
+        state.node_verifying_key = Some(verifying_key);
+        info!("Node signing key generated for federation");
+    }
+
+    // Create ZomeCaller for federation + service registration
+    {
+        let admin_url = args.admin_url().to_string();
+        let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+        let zome_caller = services::ZomeCaller::new(&admin_url, &app_url, &args.installed_app_id);
+        state.zome_caller = Some(Arc::new(zome_caller));
+        info!(
+            "ZomeCaller created for federation (admin: {}, app: {})",
+            admin_url, app_url
+        );
+    }
+
+    // Set up P2P status polling from elohim-storage (if STORAGE_URL configured)
+    if let Some(ref storage_url) = state.args.storage_url {
+        let (tx, rx) = tokio::sync::watch::channel(None);
+        state.p2p_status = Some(rx);
+        let url = format!("{}/p2p/status", storage_url.trim_end_matches('/'));
+        tokio::spawn(async move {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .unwrap();
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                match client.get(&url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        if let Ok(status) = resp.json::<serde_json::Value>().await {
+                            let health = doorway::routes::health::P2PHealth {
+                                connected_peers: status["connected_peers"].as_u64().unwrap_or(0)
+                                    as usize,
+                                peer_id: status["peer_id"].as_str().unwrap_or("").to_string(),
+                                sync_documents: status["sync_documents"].as_u64().unwrap_or(0)
+                                    as usize,
+                            };
+                            let _ = tx.send(Some(health));
+                        }
+                    }
+                    _ => {
+                        // Storage not reachable or P2P not enabled — clear cached status
+                        let _ = tx.send(None);
+                    }
+                }
+            }
+        });
+        info!("P2P status polling enabled (every 30s from elohim-storage)");
+    }
+
     let state = Arc::new(state);
 
     // Start zome capability discovery (import configs, cache rules)
     // This populates zome_configs and import_config_store for route matching
-    if let Some(ref import_config_store) = state.import_config_store {
-        let admin_url = args.admin_url().to_string();
-        let discovery_config = DiscoveryConfig {
-            admin_url: admin_url.clone(),
-            installed_app_id: args.installed_app_id.clone(),
-            zome_name: "content_store".to_string(), // TODO: make configurable
-            ..DiscoveryConfig::default()
-        };
+    // Only needed on writer instances (readers serve from shared MongoDB)
+    if args.projection_writer {
+        if let Some(ref import_config_store) = state.import_config_store {
+            let admin_url = args.admin_url().to_string();
+            let discovery_config = DiscoveryConfig {
+                admin_url: admin_url.clone(),
+                installed_app_id: args.installed_app_id.clone(),
+                zome_name: "content_store".to_string(), // TODO: make configurable
+                ..DiscoveryConfig::default()
+            };
 
-        let _discovery_handle = spawn_discovery_task(
-            discovery_config,
-            Arc::clone(&state.zome_configs),
-            Arc::clone(import_config_store),
-        );
-        info!(
-            "Zome capability discovery started (admin: {}, import routes will be available after discovery completes)",
-            admin_url
-        );
+            let _discovery_handle = spawn_discovery_task(
+                discovery_config,
+                Arc::clone(&state.zome_configs),
+                Arc::clone(import_config_store),
+            );
+            info!(
+                "Zome capability discovery started (admin: {}, import routes will be available after discovery completes)",
+                admin_url
+            );
+        } else {
+            warn!("Import config store not initialized, skipping zome discovery");
+        }
     } else {
-        warn!("Import config store not initialized, skipping zome discovery");
+        info!("Zome discovery skipped (read replica mode)");
     }
 
     // Start Projection Engine (if projection store is available)
-    // Note: In dev mode, the signal subscriber is disabled because:
-    // 1. Holochain 0.3+ requires app interface authentication (IssueAppAuthenticationToken)
-    // 2. The projection store is memory-only without MongoDB anyway
-    // Production mode uses app_auth module for proper IssueAppAuthenticationToken flow
+    //
+    // Gating logic (projection_writer flag):
+    //   projection_writer=true  → starts signal subscriber (populates MongoDB from DHT signals)
+    //   projection_writer=false → reads from shared MongoDB, no subscriber (read replica mode)
+    //
+    // In dev mode, the signal subscriber is always disabled (app interface requires auth).
     let _projection_handle = if let Some(ref projection_store) = state.projection {
-        if args.dev_mode {
-            // In dev mode, create engine without signal subscriber
-            // The projection store can still be queried, just won't receive real-time signals
-            info!("Projection engine started (dev mode: signal subscriber disabled, app interface requires auth)");
+        if args.dev_mode || !args.projection_writer {
+            if !args.projection_writer {
+                info!("Projection reader: using shared MongoDB (PROJECTION_WRITER=false)");
+            } else {
+                info!("Projection engine started (dev mode: signal subscriber disabled, app interface requires auth)");
+            }
 
             // Create engine without signals (it will still work for manual queries)
             let engine = Arc::new(ProjectionEngine::new(
@@ -240,12 +420,11 @@ async fn main() -> anyhow::Result<()> {
 
             Some((tokio::spawn(async {}), engine_handle))
         } else {
-            // Production mode: require proper app interface authentication
-            // Use conductor URL for admin interface, derive app URL from port
+            // Production mode + projection_writer=true: start signal subscriber
             let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
 
             info!(
-                "Starting projection engine (admin: {}, app: {})",
+                "Starting projection engine with signal subscriber (admin: {}, app: {})",
                 args.conductor_url, app_url
             );
 
@@ -266,7 +445,7 @@ async fn main() -> anyhow::Result<()> {
             let signal_rx = subscriber.subscribe();
             let engine_handle = spawn_engine_task(engine, signal_rx);
 
-            info!("Projection engine started");
+            info!("Projection engine started (writer mode)");
             Some((subscriber_handle, engine_handle))
         }
     } else {
@@ -305,12 +484,8 @@ async fn main() -> anyhow::Result<()> {
     let storage_config = StorageRegistrationConfig::from_env();
     if storage_config.enabled {
         let app_url = derive_app_url(&args.conductor_url, args.app_port_min);
-        let result = register_local_storage(
-            &storage_config,
-            &app_url,
-            &args.installed_app_id,
-        )
-        .await;
+        let result =
+            register_local_storage(&storage_config, &app_url, &args.installed_app_id).await;
 
         if result.success {
             info!(
@@ -325,6 +500,71 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Federation peer discovery (HTTP-based)
+    // Queries FEDERATION_PEERS URLs to discover other doorways in the network
+    if !args.federation_peers.is_empty() {
+        let peer_urls = args.federation_peers.clone();
+        let self_id = args.doorway_id.clone();
+        let cache = state.peer_cache.clone();
+        let peer_count = peer_urls.len();
+
+        services::federation::spawn_peer_discovery_task(
+            peer_urls,
+            self_id,
+            cache,
+            std::time::Duration::from_secs(10), // initial delay (let peers boot)
+            std::time::Duration::from_secs(60), // refresh interval
+        );
+        info!(
+            "Federation peer discovery started: {} peer(s) configured",
+            peer_count
+        );
+    }
+
+    // Federation: register in DHT + start heartbeat task
+    // Requires doorway_id + doorway_url to be configured
+    if let Some(fed_config) = services::FederationConfig::from_args(&args) {
+        let zome_caller = state.zome_caller.clone();
+        let fed_state = Arc::clone(&state);
+        let fed_config_clone = fed_config.clone();
+
+        if let Some(zome_caller) = zome_caller {
+            // Spawn registration with 5s delay (conductor readiness)
+            let zc = Arc::clone(&zome_caller);
+            let fc = fed_config.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                info!(
+                    "Federation: registering doorway '{}' in DHT...",
+                    fc.doorway_id
+                );
+
+                let mut capabilities = vec!["gateway".to_string()];
+                if !fc.doorway_url.is_empty() {
+                    capabilities.push("bootstrap".to_string());
+                    capabilities.push("signal".to_string());
+                }
+
+                if let Err(e) =
+                    services::federation::register_doorway_in_dht(&fc, &zc, capabilities).await
+                {
+                    warn!("Federation registration failed (non-fatal): {}", e);
+                }
+            });
+
+            // Spawn heartbeat task
+            let _heartbeat = services::federation::spawn_heartbeat_task(
+                fed_config_clone,
+                zome_caller,
+                fed_state,
+            );
+            info!(
+                "Federation enabled: doorway_id={}, heartbeat every {}s",
+                fed_config.doorway_id, fed_config.heartbeat_interval_secs,
+            );
+        }
+    }
+
     // Run the server
     if let Err(e) = server::run(state).await {
         error!("Server error: {:?}", e);
@@ -332,6 +572,24 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Derive admin WebSocket URL from app URL by replacing the port
+fn derive_admin_url_from_app(app_url: &str) -> String {
+    if let Some(host_start) = app_url.find("://") {
+        let after_scheme = &app_url[host_start + 3..];
+        if let Some(port_start) = after_scheme.rfind(':') {
+            let host = &after_scheme[..port_start];
+            let port_str = &after_scheme[port_start + 1..];
+            // Admin port = app port - 1 (socat convention: 8444=admin, 8445=app; 4444/4445)
+            let admin_port = port_str
+                .parse::<u16>()
+                .map(|p| p.saturating_sub(1))
+                .unwrap_or(4444);
+            return format!("{}://{}:{}", &app_url[..host_start], host, admin_port);
+        }
+    }
+    "ws://localhost:4444".to_string()
 }
 
 /// Derive app WebSocket URL from conductor admin URL
@@ -345,5 +603,5 @@ fn derive_app_url(conductor_url: &str, app_port: u16) -> String {
         }
     }
     // Fallback: just use the default
-    format!("ws://localhost:{}", app_port)
+    format!("ws://localhost:{app_port}")
 }

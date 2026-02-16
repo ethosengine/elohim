@@ -101,6 +101,13 @@ export interface HealthStatus {
   error?: string;
 }
 
+/** Schema capability information from /db/schema endpoint */
+export interface SchemaInfo {
+  supportedVersions: number[];
+  currentVersion: number;
+  deprecatedVersions: number[];
+}
+
 /** Comprehensive status from /status endpoint */
 export interface DoorwayStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -338,6 +345,26 @@ export class DoorwayClient {
       console.warn(`Status check error: ${error instanceof Error ? error.message : error}`);
       return null;
     }
+  }
+
+  /**
+   * Get schema capability information from storage.
+   *
+   * Returns supported schema versions, current version, and deprecated versions.
+   * Used for pre-flight validation to ensure seeder compatibility.
+   */
+  async getSchemaInfo(): Promise<SchemaInfo> {
+    const response = await this.fetch('/db/schema', {
+      method: 'GET',
+      timeout: 10000,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Schema info request failed: HTTP ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
   }
 
   /**
@@ -755,6 +782,7 @@ export class DoorwayClient {
    */
   async bulkCreateContent(
     items: Array<{
+      schemaVersion?: number;
       id: string;
       title: string;
       contentType?: string;
@@ -775,13 +803,17 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/content/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000, // 2 min for bulk ops
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 400 && errorText.includes('Unsupported schema version')) {
+        const supported = response.headers.get('X-Supported-Schema-Versions');
+        throw new Error(`Schema version mismatch: ${errorText}. Supported: ${supported}`);
+      }
       throw new Error(`Bulk create content failed: HTTP ${response.status}: ${errorText}`);
     }
 
@@ -796,6 +828,7 @@ export class DoorwayClient {
    */
   async bulkCreatePaths(
     items: Array<{
+      schemaVersion?: number;
       id: string;
       title: string;
       description?: string;
@@ -830,13 +863,17 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/paths/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 400 && errorText.includes('Unsupported schema version')) {
+        const supported = response.headers.get('X-Supported-Schema-Versions');
+        throw new Error(`Schema version mismatch: ${errorText}. Supported: ${supported}`);
+      }
       throw new Error(`Bulk create paths failed: HTTP ${response.status}: ${errorText}`);
     }
 
@@ -851,6 +888,7 @@ export class DoorwayClient {
    */
   async bulkCreateRelationships(
     items: Array<{
+      schemaVersion?: number;
       sourceId: string;
       targetId: string;
       relationshipType: string;
@@ -866,13 +904,17 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/relationships/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 400 && errorText.includes('Unsupported schema version')) {
+        const supported = response.headers.get('X-Supported-Schema-Versions');
+        throw new Error(`Schema version mismatch: ${errorText}. Supported: ${supported}`);
+      }
       throw new Error(`Bulk create relationships failed: HTTP ${response.status}: ${errorText}`);
     }
 
@@ -904,13 +946,17 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/presences/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 400 && errorText.includes('Unsupported schema version')) {
+        const supported = response.headers.get('X-Supported-Schema-Versions');
+        throw new Error(`Schema version mismatch: ${errorText}. Supported: ${supported}`);
+      }
       throw new Error(`Bulk create presences failed: HTTP ${response.status}: ${errorText}`);
     }
 
@@ -945,13 +991,17 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/events/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 400 && errorText.includes('Unsupported schema version')) {
+        const supported = response.headers.get('X-Supported-Schema-Versions');
+        throw new Error(`Schema version mismatch: ${errorText}. Supported: ${supported}`);
+      }
       throw new Error(`Bulk record events failed: HTTP ${response.status}: ${errorText}`);
     }
 
@@ -981,13 +1031,17 @@ export class DoorwayClient {
 
     const response = await this.fetch('/db/mastery/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Schema-Version': '1' },
       body: JSON.stringify(items),
       timeout: 120000,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (response.status === 400 && errorText.includes('Unsupported schema version')) {
+        const supported = response.headers.get('X-Supported-Schema-Versions');
+        throw new Error(`Schema version mismatch: ${errorText}. Supported: ${supported}`);
+      }
       throw new Error(`Bulk upsert mastery failed: HTTP ${response.status}: ${errorText}`);
     }
 

@@ -25,8 +25,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use holochain_client::{
-    AdminWebsocket, AppWebsocket, ClientAgentSigner, AuthorizeSigningCredentialsPayload,
-    CellId, ExternIO, ZomeCallTarget,
+    AdminWebsocket, AllowedOrigins, AppWebsocket, ClientAgentSigner,
+    AuthorizeSigningCredentialsPayload, CellId, ExternIO, ZomeCallTarget,
 };
 
 use crate::error::StorageError;
@@ -121,6 +121,25 @@ impl HcClient {
             .map_err(|e| StorageError::Connection(format!("Admin connect failed: {}", e)))?;
 
         info!("Connected to admin interface");
+
+        // Ensure an app interface exists on the expected port.
+        // The embedded conductor (tauri-plugin-holochain) uses random ports,
+        // so we attach one on our expected port via admin API.
+        let app_port: u16 = app_addr
+            .rsplit(':')
+            .next()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(4445);
+        match admin_ws
+            .attach_app_interface(app_port, None, AllowedOrigins::Any, None)
+            .await
+        {
+            Ok(port) => info!(port, "Attached app interface"),
+            Err(e) => {
+                // May already be attached from a previous call — continue
+                warn!("attach_app_interface on port {}: {} (may already exist)", app_port, e);
+            }
+        }
 
         // Get app info to find cell
         let apps = admin_ws

@@ -54,7 +54,7 @@ pub async fn handle_db_request(
                 .header("Content-Type", "application/json")
                 .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(
-                    r#"{"error": "Storage service not configured. Set STORAGE_URL env var."}"#
+                    r#"{"error": "Storage service not configured. Set STORAGE_URL env var."}"#,
                 )))
                 .unwrap();
         }
@@ -77,7 +77,7 @@ async fn forward_db_request(
     // Preserve query string
     let query = req.uri().query();
     let full_url = if let Some(q) = query {
-        format!("{}?{}", storage_endpoint, q)
+        format!("{storage_endpoint}?{q}")
     } else {
         storage_endpoint
     };
@@ -98,9 +98,7 @@ async fn forward_db_request(
                 .status(StatusCode::METHOD_NOT_ALLOWED)
                 .header("Content-Type", "application/json")
                 .header("Access-Control-Allow-Origin", "*")
-                .body(Full::new(Bytes::from(
-                    r#"{"error": "Method not allowed"}"#
-                )))
+                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
                 .unwrap();
         }
     };
@@ -133,8 +131,7 @@ async fn forward_db_request(
                     .header("Content-Type", "application/json")
                     .header("Access-Control-Allow-Origin", "*")
                     .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "Failed to read request body: {}"}}"#,
-                        e
+                        r#"{{"error": "Failed to read request body: {e}"}}"#
                     ))))
                     .unwrap();
             }
@@ -177,8 +174,7 @@ async fn forward_db_request(
                         .header("Content-Type", "application/json")
                         .header("Access-Control-Allow-Origin", "*")
                         .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "Failed to read storage response: {}"}}"#,
-                            e
+                            r#"{{"error": "Failed to read storage response: {e}"}}"#
                         ))))
                         .unwrap()
                 }
@@ -191,8 +187,7 @@ async fn forward_db_request(
                 .header("Content-Type", "application/json")
                 .header("Access-Control-Allow-Origin", "*")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to connect to storage: {}"}}"#,
-                    e
+                    r#"{{"error": "Failed to connect to storage: {e}"}}"#
                 ))))
                 .unwrap()
         }
@@ -204,8 +199,14 @@ fn cors_preflight() -> Response<Full<Bytes>> {
     Response::builder()
         .status(StatusCode::NO_CONTENT)
         .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        .header(
+            "Access-Control-Allow-Methods",
+            "GET, POST, PUT, DELETE, OPTIONS",
+        )
+        .header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        )
         .header("Access-Control-Max-Age", "86400")
         .body(Full::new(Bytes::new()))
         .unwrap()

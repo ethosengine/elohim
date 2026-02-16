@@ -33,7 +33,8 @@ use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tracing::{debug, error, info, warn};
 
 /// WebSocket type after upgrade
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 /// Handle WebSocket upgrade for import progress proxy
 ///
@@ -109,7 +110,7 @@ async fn handle_proxy_connection(
 
     // Convert storage HTTP URL to WebSocket URL
     let ws_url = storage_url_to_ws(&storage_url);
-    let upstream_url = format!("{}/import/progress", ws_url);
+    let upstream_url = format!("{ws_url}/import/progress");
 
     // Connect to elohim-storage WebSocket
     let upstream_ws = match connect_upstream(&upstream_url).await {
@@ -122,7 +123,9 @@ async fn handle_proxy_connection(
                 "type": "error",
                 "message": format!("Failed to connect to import progress service: {}", e)
             });
-            let _ = client_sink.send(WsMessage::Text(error_msg.to_string().into())).await;
+            let _ = client_sink
+                .send(WsMessage::Text(error_msg.to_string()))
+                .await;
             let _ = client_sink.close().await;
             return Err(e.into());
         }
@@ -228,7 +231,7 @@ async fn handle_proxy_connection(
                             "type": "error",
                             "message": format!("Upstream connection error: {}", e)
                         });
-                        let _ = client_sink.send(WsMessage::Text(error_msg.to_string().into())).await;
+                        let _ = client_sink.send(WsMessage::Text(error_msg.to_string())).await;
                         break;
                     }
                     None => {
@@ -239,7 +242,7 @@ async fn handle_proxy_connection(
                             "type": "error",
                             "message": "Upstream connection closed unexpectedly"
                         });
-                        let _ = client_sink.send(WsMessage::Text(error_msg.to_string().into())).await;
+                        let _ = client_sink.send(WsMessage::Text(error_msg.to_string())).await;
                         break;
                     }
                 }
@@ -254,18 +257,22 @@ async fn handle_proxy_connection(
 /// Connect to upstream elohim-storage WebSocket
 async fn connect_upstream(
     url: &str,
-) -> Result<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, String> {
+) -> Result<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    String,
+> {
     debug!(url = url, "Connecting to upstream WebSocket");
 
     // Add timeout for connection
     let connect_result = timeout(
         Duration::from_secs(10),
         tokio_tungstenite::connect_async(url),
-    ).await;
+    )
+    .await;
 
     match connect_result {
         Ok(Ok((ws, _response))) => Ok(ws),
-        Ok(Err(e)) => Err(format!("WebSocket connect error: {}", e)),
+        Ok(Err(e)) => Err(format!("WebSocket connect error: {e}")),
         Err(_) => Err("Connection timeout (10s)".to_string()),
     }
 }
@@ -281,7 +288,7 @@ fn storage_url_to_ws(url: &str) -> String {
         url.replacen("http://", "ws://", 1)
     } else {
         // Assume ws:// if no scheme
-        format!("ws://{}", url)
+        format!("ws://{url}")
     }
 }
 
@@ -299,9 +306,6 @@ mod tests {
             storage_url_to_ws("https://storage.example.com"),
             "wss://storage.example.com"
         );
-        assert_eq!(
-            storage_url_to_ws("localhost:8090"),
-            "ws://localhost:8090"
-        );
+        assert_eq!(storage_url_to_ws("localhost:8090"), "ws://localhost:8090");
     }
 }

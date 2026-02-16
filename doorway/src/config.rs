@@ -136,6 +136,18 @@ pub struct Args {
     #[arg(long, env = "THRESHOLD_URL", default_value = "http://localhost:8081")]
     pub threshold_url: String,
 
+    /// Whether this instance runs the projection signal subscriber
+    /// When true (default): starts signal subscriber to populate projection from DHT signals
+    /// When false: reads projection from shared MongoDB, no subscriber (read replica mode)
+    #[arg(long, env = "PROJECTION_WRITER", default_value = "true")]
+    pub projection_writer: bool,
+
+    /// Comma-separated list of conductor app interface URLs for multi-conductor pool
+    /// e.g. "ws://cond-0:4445,ws://cond-1:4445"
+    /// If set, takes precedence over CONDUCTOR_URL for the conductor pool
+    #[arg(long, env = "CONDUCTOR_URLS")]
+    pub conductor_urls: Option<String>,
+
     /// Holochain installed app ID for projections and signal subscriptions
     #[arg(long, env = "INSTALLED_APP_ID", default_value = "elohim")]
     pub installed_app_id: String,
@@ -144,10 +156,30 @@ pub struct Args {
     #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
     pub orchestrator_admin_port: u16,
 
+    /// Comma-separated list of peer doorway URLs for federation discovery
+    /// Each peer is queried at startup and periodically for cross-doorway awareness
+    /// e.g. "https://doorway-staging.elohim.host,https://doorway.elohim.host"
+    #[arg(long, env = "FEDERATION_PEERS", value_delimiter = ',')]
+    pub federation_peers: Vec<String>,
+
     /// Bootstrap URL for P2P discovery (Holochain kitsune bootstrap)
     /// Returned in native-handoff response for Tauri clients to join network
     #[arg(long, env = "BOOTSTRAP_URL")]
     pub bootstrap_url: Option<String>,
+
+    /// Signal relay URL for WebRTC signaling
+    /// Returned in native-handoff response for Tauri clients
+    #[arg(long, env = "SIGNAL_URL")]
+    pub signal_url: Option<String>,
+
+    /// Headless service base name for StatefulSet peer discovery
+    /// e.g., "elohim-edgenode-staging" → queries elohim-edgenode-staging-{N}.elohim-edgenode-staging-headless:8090
+    #[arg(long, env = "HEADLESS_SERVICE_BASE")]
+    pub headless_service_base: Option<String>,
+
+    /// Number of StatefulSet replicas for P2P peer enumeration
+    #[arg(long, env = "STATEFULSET_REPLICAS")]
+    pub statefulset_replicas: Option<u32>,
 }
 
 /// NATS connection configuration
@@ -169,7 +201,9 @@ pub struct NatsArgs {
 impl Args {
     /// Get effective admin URL (falls back to conductor_url if not set)
     pub fn admin_url(&self) -> &str {
-        self.conductor_admin_url.as_deref().unwrap_or(&self.conductor_url)
+        self.conductor_admin_url
+            .as_deref()
+            .unwrap_or(&self.conductor_url)
     }
 
     /// Get effective JWT secret (uses default in dev mode)
@@ -185,6 +219,19 @@ impl Args {
         }
     }
 
+    /// Get the list of conductor app interface URLs
+    /// Prefers CONDUCTOR_URLS (multi-conductor) over single CONDUCTOR_URL
+    pub fn conductor_url_list(&self) -> Vec<String> {
+        if let Some(ref urls) = self.conductor_urls {
+            urls.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        } else {
+            vec![self.conductor_url.clone()]
+        }
+    }
+
     /// Check if an app port is within the allowed range
     pub fn is_valid_app_port(&self, port: u16) -> bool {
         port >= self.app_port_min && port <= self.app_port_max
@@ -192,10 +239,8 @@ impl Args {
 
     /// Validate configuration
     pub fn validate(&self) -> Result<(), String> {
-        if !self.dev_mode {
-            if self.jwt_secret.is_none() {
-                return Err("JWT_SECRET is required in production mode".to_string());
-            }
+        if !self.dev_mode && self.jwt_secret.is_none() {
+            return Err("JWT_SECRET is required in production mode".to_string());
         }
 
         if self.app_port_min > self.app_port_max {

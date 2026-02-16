@@ -62,6 +62,9 @@ export { PointsService } from './points.service';
 // Progress migration
 export { ProgressMigrationService } from './progress-migration.service';
 
+// Mastery stats aggregation (gamified dashboard)
+export { MasteryStatsService } from './mastery-stats.service';
+
 // ============================================================================
 // LAMAD STEWARD ECONOMY SERVICES
 // ============================================================================

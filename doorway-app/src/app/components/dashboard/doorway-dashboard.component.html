@@ -555,8 +555,8 @@
 
   <!-- User Detail Modal -->
   @if (showUserDetail() && selectedUser()) {
-    <div class="modal-overlay" (click)="closeUserDetail()">
-      <div class="modal-content user-detail-modal" (click)="$event.stopPropagation()">
+    <div class="modal-overlay" (click)="closeUserDetail()" (keydown.enter)="closeUserDetail()" tabindex="0" role="button">
+      <div class="modal-content user-detail-modal" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" tabindex="0" role="button">
         <header class="modal-header">
           <h2>User Details</h2>
           <button class="close-btn" (click)="closeUserDetail()">&times;</button>

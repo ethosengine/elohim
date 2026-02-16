@@ -1,0 +1,10 @@
+@if (attestations().length > 0) {
+  <div class="attestations-section">
+    <span class="section-title">Attestations</span>
+    <div class="attestations">
+      @for (attestation of attestations(); track attestation) {
+        <span class="attestation-badge">{{ attestation }}</span>
+      }
+    </div>
+  </div>
+}
