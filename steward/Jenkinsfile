@@ -511,13 +511,17 @@ DEDUP_SCRIPT
 
                                     echo ""
                                     echo "=== Patching binary for non-Nix systems ==="
-                                    # Fix the interpreter path so binary works on standard Linux
+                                    # Fix interpreter + remove nix RUNPATH so binary uses system libs.
+                                    # Without --remove-rpath, the system ld-linux (glibc 2.35) loads
+                                    # nix libc (glibc 2.40) causing ABI mismatch and stack smashing.
                                     BINARY="src-tauri/target/release/elohim-steward"
                                     echo "Before patching:"
                                     patchelf --print-interpreter "$BINARY" || true
-                                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "$BINARY"
+                                    patchelf --print-rpath "$BINARY" | head -c 200 && echo "..."
+                                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 --remove-rpath "$BINARY"
                                     echo "After patching:"
                                     patchelf --print-interpreter "$BINARY"
+                                    patchelf --print-rpath "$BINARY" || echo "(no rpath)"
 
                                     echo ""
                                     echo "=== Bundling .deb package ==="
