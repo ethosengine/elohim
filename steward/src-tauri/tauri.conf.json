@@ -11,7 +11,7 @@
   },
   "build": {
     "beforeBuildCommand": "",
-    "beforeBundleCommand": "patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 --remove-rpath src-tauri/target/release/elohim-steward || patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 --remove-rpath target/release/elohim-steward",
+    "beforeBundleCommand": "",
     "devUrl": "http://localhost:4200",
     "frontendDist": "../ui"
   },
