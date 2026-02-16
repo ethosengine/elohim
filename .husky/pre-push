@@ -3,10 +3,11 @@
 # Bypass: HUSKY=0 git push  (or: git push --no-verify)
 #
 # Detects which projects changed and runs appropriate gates:
-#   elohim-app/  → build + unit tests
-#   doorway/     → cargo fmt + clippy + tests
-#   doorway-app/ → eslint + build
-#   sophia/      → pnpm lint + typecheck + test
+#   elohim-app/              → build + unit tests
+#   doorway/                 → cargo fmt + clippy + tests
+#   doorway-app/             → eslint + build
+#   sophia/                  → pnpm lint + typecheck + test
+#   holochain/elohim-storage → cargo check + clippy
 #
 # This prevents pushing broken code that wastes CI time.
 
@@ -63,6 +64,9 @@ if echo "$CHANGED" | grep -q "^elohim-app/"; then
 fi
 if echo "$CHANGED" | grep -q "^sophia/"; then
   PROJECTS="$PROJECTS sophia"
+fi
+if echo "$CHANGED" | grep -q "^holochain/elohim-storage/"; then
+  PROJECTS="$PROJECTS elohim-storage"
 fi
 
 # Trim leading space
@@ -153,6 +157,22 @@ gate_sophia() {
   return $rc
 }
 
+gate_elohim_storage() {
+  echo "[elohim-storage 1/2] Checking build..."
+  cd holochain/elohim-storage || return 1
+  RUSTFLAGS='--cfg getrandom_backend="custom"' cargo check --release 2>&1
+  rc=$?
+  cd ../..
+  if [ $rc -ne 0 ]; then return 1; fi
+
+  echo "[elohim-storage 2/2] Running clippy..."
+  cd holochain/elohim-storage || return 1
+  RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy -- -D warnings 2>&1
+  rc=$?
+  cd ../..
+  return $rc
+}
+
 # ── Run Gates ─────────────────────────────────────────────────────
 
 PROJECT_COUNT=$(echo "$PROJECTS" | wc -w | tr -d ' ')
@@ -175,10 +195,11 @@ for PROJECT in $PROJECTS; do
   PROJECT_START=$(date +%s)
 
   case "$PROJECT" in
-    elohim-app)  gate_elohim_app  ;;
-    doorway)     gate_doorway     ;;
-    doorway-app) gate_doorway_app ;;
-    sophia)      gate_sophia      ;;
+    elohim-app)      gate_elohim_app      ;;
+    doorway)         gate_doorway         ;;
+    doorway-app)     gate_doorway_app     ;;
+    sophia)          gate_sophia          ;;
+    elohim-storage)  gate_elohim_storage  ;;
   esac
   GATE_EXIT=$?
 
