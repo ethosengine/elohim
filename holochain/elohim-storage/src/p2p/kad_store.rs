@@ -158,7 +158,7 @@ impl SledRecordStore {
 }
 
 impl RecordStore for SledRecordStore {
-    type RecordsIter<'a> = SledRecordIter;
+    type RecordsIter<'a> = SledRecordIter<'a>;
     type ProvidedIter<'a> = SledProvidedIter<'a>;
 
     fn get(&self, key: &RecordKey) -> Option<Cow<'_, Record>> {
@@ -202,6 +202,7 @@ impl RecordStore for SledRecordStore {
     fn records(&self) -> Self::RecordsIter<'_> {
         SledRecordIter {
             inner: self.records_tree.iter(),
+            _lifetime: std::marker::PhantomData,
         }
     }
 
@@ -261,12 +262,13 @@ impl RecordStore for SledRecordStore {
 }
 
 /// Iterator over sled-stored Kademlia records
-pub struct SledRecordIter {
+pub struct SledRecordIter<'a> {
     inner: sled::Iter,
+    _lifetime: std::marker::PhantomData<&'a ()>,
 }
 
-impl Iterator for SledRecordIter {
-    type Item = Cow<'static, Record>;
+impl<'a> Iterator for SledRecordIter<'a> {
+    type Item = Cow<'a, Record>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
