@@ -5,11 +5,14 @@
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ConnectionIndicatorComponent, type ConnectionStatus } from './connection-indicator.component';
 import { IdentityService } from '../../services/identity.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
 import { signal } from '@angular/core';
 
 describe('ConnectionIndicatorComponent', () => {
@@ -48,9 +51,18 @@ describe('ConnectionIndicatorComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ConnectionIndicatorComponent],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
         { provide: HolochainClientService, useValue: mockHolochainService },
+        {
+          provide: StorageClientService,
+          useValue: {
+            connectionMode: 'doorway',
+            getStorageBaseUrl: () => 'http://localhost:8888',
+          },
+        },
         {
           provide: TauriAuthService,
           useValue: {
@@ -163,9 +175,18 @@ describe('ConnectionIndicatorComponent', () => {
     TestBed.configureTestingModule({
       imports: [ConnectionIndicatorComponent],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
         { provide: HolochainClientService, useValue: mockHolochainService },
+        {
+          provide: StorageClientService,
+          useValue: {
+            connectionMode: 'doorway',
+            getStorageBaseUrl: () => 'http://localhost:8888',
+          },
+        },
         {
           provide: TauriAuthService,
           useValue: {

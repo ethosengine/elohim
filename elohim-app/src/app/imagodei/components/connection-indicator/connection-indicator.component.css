@@ -115,6 +115,17 @@
   }
 }
 
+/* Peer Count Badge */
+.peer-count {
+  font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+  font-size: 0.65rem;
+  color: var(--text-color-secondary, #6c757d);
+  background: var(--surface-hover, rgb(0 0 0 / 5%));
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 /* Doorway URL Badge */
 .doorway-url-badge {
   font-family: 'SF Mono', Monaco, Inconsolata, monospace;

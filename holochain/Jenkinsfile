@@ -160,6 +160,16 @@ def checkEdgeNodeHealth(String url) {
 }
 
 /**
+ * Run P2P simulation test (advisory — failures don't block pipeline).
+ * Requires Docker Compose and the elohim-storage Dockerfile.
+ */
+def runSimulationTest() {
+    dir('elohim-node/simulation') {
+        sh './simulate.sh test'
+    }
+}
+
+/**
  * Deploy edge node using environment manifest for per-component tags.
  * Reads tag values from envFile, substitutes named placeholders in the manifest template,
  * validates no placeholders remain, then applies to Kubernetes.
@@ -558,6 +568,28 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 nerdctl -n k8s.io tag elohim-storage:${IMAGE_TAG} elohim-storage:${GIT_COMMIT_HASH}
                             """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('P2P Simulation Test') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    anyOf {
+                        changeset "holochain/elohim-storage/src/p2p/**"
+                        changeset "elohim-node/simulation/**"
+                        expression { return params.FORCE_BUILD == true }
+                    }
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            runSimulationTest()
                         }
                     }
                 }

@@ -9,11 +9,15 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { catchError, of, switchMap, timer } from 'rxjs';
 
 // @coverage: 76.0% (2026-02-05)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
 import { type IdentityMode } from '../../models/identity.model';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
@@ -30,6 +34,7 @@ export interface ConnectionStatus {
   color: string;
   cssClass: string;
   doorwayName?: string;
+  peerCount?: number;
 }
 
 @Component({
@@ -39,11 +44,17 @@ export interface ConnectionStatus {
   templateUrl: './connection-indicator.component.html',
   styleUrls: ['./connection-indicator.component.css'],
 })
-export class ConnectionIndicatorComponent {
+export class ConnectionIndicatorComponent implements OnInit {
   private readonly identityService = inject(IdentityService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly holochainService = inject(HolochainClientService);
   private readonly tauriAuth = inject(TauriAuthService);
+  private readonly storageClient = inject(StorageClientService);
+  private readonly http = inject(HttpClient);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** P2P peer count from elohim-storage or doorway health */
+  readonly peerCount = signal<number>(0);
 
   /** Current connection status computed from services */
   readonly status = computed<ConnectionStatus>(() => {
@@ -81,6 +92,7 @@ export class ConnectionIndicatorComponent {
         icon: 'shield',
         color: '#22c55e',
         cssClass: 'status-local',
+        peerCount: this.peerCount(),
       };
     }
 
@@ -94,6 +106,7 @@ export class ConnectionIndicatorComponent {
         color: '#3b82f6',
         cssClass: 'status-doorway',
         doorwayName,
+        peerCount: this.peerCount(),
       };
     }
 
@@ -150,5 +163,40 @@ export class ConnectionIndicatorComponent {
   /** Strip protocol and trailing slash from URL for compact display */
   shortenUrl(url: string): string {
     return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  }
+
+  ngOnInit(): void {
+    // Poll P2P status every 30 seconds
+    timer(0, 30_000)
+      .pipe(
+        switchMap(() => {
+          const mode = this.storageClient.connectionMode;
+          if (mode === 'direct') {
+            // Steward mode: poll elohim-storage directly
+            const baseUrl = this.storageClient.getStorageBaseUrl();
+            return this.http
+              .get<{ connected_peers?: number; peer_count?: number }>(`${baseUrl}/p2p/status`)
+              .pipe(catchError(() => of(null)));
+          }
+          // Hosted mode: extract from doorway /health
+          const baseUrl = this.storageClient.getStorageBaseUrl();
+          return this.http
+            .get<{ p2p?: { peer_count?: number } }>(`${baseUrl}/health`)
+            .pipe(catchError(() => of(null)));
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(resp => {
+        if (!resp) {
+          this.peerCount.set(0);
+          return;
+        }
+        // Direct mode returns connected_peers, doorway health returns p2p.peer_count
+        const count =
+          (resp as { connected_peers?: number }).connected_peers ??
+          (resp as { p2p?: { peer_count?: number } }).p2p?.peer_count ??
+          0;
+        this.peerCount.set(count);
+      });
   }
 }

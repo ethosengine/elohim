@@ -217,6 +217,9 @@ spec:
               value: "true"
             - name: P2P_BOOTSTRAP_NODES
               value: "/dns4/elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-edgenode-alpha-1.elohim-edgenode-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
+            # K8s pods act as relay servers for desktop stewards behind NAT
+            - name: RELAY_MODE
+              value: "server"
           ports:
             - name: storage-http
               containerPort: 8090
