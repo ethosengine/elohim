@@ -1,19 +1,4 @@
 <div class="login-container">
-  <!-- Step 1: Doorway Selection -->
-  @if (currentStep() === 'doorway') {
-    @if (isLauncher()) {
-      <div class="launcher-header">
-        <h1>Connect to a Doorway</h1>
-        <p>Enter a doorway URL or discover nearby doorways to get started.</p>
-      </div>
-    }
-    <app-doorway-picker
-      [mode]="'login'"
-      (doorwaySelected)="onDoorwaySelected($event)"
-      (cancelled)="onDoorwayPickerCancelled()"
-    />
-  }
-
   <!-- Federated Identifier Input (dev browser, first-time) -->
   @if (currentStep() === 'federated') {
     <div class="federated-login">
@@ -77,9 +62,6 @@
             Create one
           </a>
         </p>
-        <button type="button" class="link-button" (click)="showDoorwayBrowser()">
-          Browse doorways
-        </button>
       </div>
     </div>
   }
@@ -133,11 +115,7 @@
         </div>
 
         <div class="form-actions">
-          <button
-            type="submit"
-            class="btn btn-primary"
-            [disabled]="isLoading() || !unlockPassword"
-          >
+          <button type="submit" class="btn btn-primary" [disabled]="isLoading() || !unlockPassword">
             @if (isLoading()) {
               <span class="spinner"></span>
               Unlocking...
@@ -152,7 +130,7 @@
         <button type="button" class="link-button" (click)="showAccountSwitcher()">
           Switch account
         </button>
-        <button type="button" class="link-button" (click)="goBackToDoorway()">
+        <button type="button" class="link-button" (click)="goBackToFederated()">
           Use a different doorway
         </button>
       </div>
@@ -192,7 +170,7 @@
     </div>
   }
 
-  <!-- Step 2: Credentials -->
+  <!-- Credentials -->
   @if (currentStep() === 'credentials') {
     <div class="login-card">
       <!-- Step Indicator -->
@@ -200,7 +178,7 @@
         <button
           type="button"
           class="step-back"
-          (click)="goBackToDoorway()"
+          (click)="goBackToFederated()"
           aria-label="Change doorway"
         >
           <span class="material-icons">arrow_back</span>
@@ -222,7 +200,7 @@
       <!-- Error Display -->
       @if (error()) {
         <div class="error-banner" role="alert">
-          <span class="error-icon" aria-hidden="true">✕</span>
+          <span class="error-icon" aria-hidden="true">&#x2715;</span>
           <span>{{ error() }}</span>
           <button
             type="button"
@@ -261,7 +239,7 @@
               [type]="showPassword() ? 'text' : 'password'"
               [(ngModel)]="form.password"
               name="password"
-              placeholder="••••••••"
+              placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;"
               required
               autocomplete="current-password"
               [disabled]="isLoading()"
@@ -313,7 +291,7 @@
           Don't have an account?
           <button type="button" (click)="goToRegister()" class="register-link">Create one</button>
         </p>
-        <a routerLink="/" class="back-link">← Back to Home</a>
+        <a routerLink="/" class="back-link">&#x2190; Back to Home</a>
       </div>
     </div>
   }

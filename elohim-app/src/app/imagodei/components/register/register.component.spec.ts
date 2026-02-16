@@ -15,7 +15,7 @@ import { PasswordAuthProvider } from '../../services/providers/password-auth.pro
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { signal } from '@angular/core';
-import { of } from 'rxjs';
+import { of, EMPTY } from 'rxjs';
 
 describe('RegisterComponent', () => {
   let component: RegisterComponent;
@@ -77,7 +77,7 @@ describe('RegisterComponent', () => {
 
     mockDoorwayRegistry = jasmine.createSpyObj(
       'DoorwayRegistryService',
-      ['selectDoorway', 'validateDoorway'],
+      ['selectDoorway', 'validateDoorway', 'selectDoorwayByUrl'],
       {
         selected: signal(null),
         hasSelection: signal(false),
@@ -97,7 +97,9 @@ describe('RegisterComponent', () => {
       }
     );
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = jasmine.createSpyObj('Router', ['navigate'], {
+      events: EMPTY,
+    });
     mockRouter.navigate.and.returnValue(Promise.resolve(true));
 
     mockActivatedRoute = {
@@ -149,10 +151,6 @@ describe('RegisterComponent', () => {
 
   it('should have showPassword signal', () => {
     expect(component.showPassword).toBeDefined();
-  });
-
-  it('should have currentStep signal', () => {
-    expect(component.currentStep).toBeDefined();
   });
 
   // ==========================================================================
@@ -257,21 +255,6 @@ describe('RegisterComponent', () => {
     expect(typeof component.goToLogin).toBe('function');
   });
 
-  it('should have onDoorwaySelected method', () => {
-    expect(component.onDoorwaySelected).toBeDefined();
-    expect(typeof component.onDoorwaySelected).toBe('function');
-  });
-
-  it('should have onDoorwayPickerCancelled method', () => {
-    expect(component.onDoorwayPickerCancelled).toBeDefined();
-    expect(typeof component.onDoorwayPickerCancelled).toBe('function');
-  });
-
-  it('should have goBackToDoorway method', () => {
-    expect(component.goBackToDoorway).toBeDefined();
-    expect(typeof component.goBackToDoorway).toBe('function');
-  });
-
   it('should have getSessionStatsDisplay method', () => {
     expect(component.getSessionStatsDisplay).toBeDefined();
     expect(typeof component.getSessionStatsDisplay).toBe('function');
@@ -308,27 +291,6 @@ describe('RegisterComponent', () => {
     expect(mockRouter.navigate).toHaveBeenCalledWith(['/identity/login'], {
       queryParams: { returnUrl: '/' },
     });
-  });
-
-  // ==========================================================================
-  // Step Navigation
-  // ==========================================================================
-
-  it('should move to credentials step when doorway selected', () => {
-    component.currentStep.set('doorway');
-    component.onDoorwaySelected({ id: 'test', name: 'Test', url: 'http://test', region: 'us', operator: 'test', description: 'test' } as any);
-    expect(component.currentStep()).toBe('credentials');
-  });
-
-  it('should navigate to home when doorway picker cancelled', () => {
-    component.onDoorwayPickerCancelled();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
-  });
-
-  it('should go back to doorway step', () => {
-    component.currentStep.set('credentials');
-    component.goBackToDoorway();
-    expect(component.currentStep()).toBe('doorway');
   });
 
   // ==========================================================================
@@ -383,28 +345,26 @@ describe('RegisterComponent', () => {
       }, 100);
     });
 
-    it('should skip to credentials step if doorway already selected', () => {
-      // Override the hasSelection property with a signal that returns true
+    it('should auto-select doorway from environment when none selected', () => {
+      // Default mock has hasSelection = signal(false), environment has localhost doorwayUrl
+      component.ngOnInit();
+
+      expect(mockDoorwayRegistry.selectDoorwayByUrl).toHaveBeenCalled();
+    });
+
+    it('should not auto-select if doorway already selected', () => {
       Object.defineProperty(mockDoorwayRegistry, 'hasSelection', {
         value: signal(true),
         writable: true,
         configurable: true,
       });
 
-      // Create a new component instance that will read the updated signal
       const newFixture = TestBed.createComponent(RegisterComponent);
       const newComponent = newFixture.componentInstance;
 
       newComponent.ngOnInit();
 
-      expect(newComponent.currentStep()).toBe('credentials');
-    });
-
-    it('should stay on doorway step if no doorway selected', () => {
-      // The default mock already has hasSelection = signal(false)
-      component.ngOnInit();
-
-      expect(component.currentStep()).toBe('doorway');
+      expect(mockDoorwayRegistry.selectDoorwayByUrl).not.toHaveBeenCalled();
     });
 
     it('should pre-fill form from session data if available', () => {

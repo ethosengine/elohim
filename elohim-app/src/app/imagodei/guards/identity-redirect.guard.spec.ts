@@ -64,48 +64,48 @@ describe('identityDefaultRedirectGuard', () => {
     expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/profile']);
   });
 
-  it('should redirect unauthenticated users to /identity/register', () => {
+  it('should redirect unauthenticated users to /identity/login', () => {
     (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
     mockIdentityService.isAuthenticated.and.returnValue(false);
 
-    const registerTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(registerTree);
+    const loginTree = {} as UrlTree;
+    mockRouter.createUrlTree.and.returnValue(loginTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)
     );
 
-    expect(result).toBe(registerTree);
-    expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/register']);
+    expect(result).toBe(loginTree);
+    expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login']);
   });
 
-  it('should redirect session-mode users to /identity/register', () => {
+  it('should redirect session-mode users to /identity/login', () => {
     (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
     mockIdentityService.isAuthenticated.and.returnValue(true);
 
-    const registerTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(registerTree);
+    const loginTree = {} as UrlTree;
+    mockRouter.createUrlTree.and.returnValue(loginTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)
     );
 
-    expect(result).toBe(registerTree);
-    expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/register']);
+    expect(result).toBe(loginTree);
+    expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login']);
   });
 
-  it('should redirect anonymous users to /identity/register', () => {
+  it('should redirect anonymous users to /identity/login', () => {
     (mockIdentityService.mode as jasmine.Spy).and.returnValue('anonymous');
     mockIdentityService.isAuthenticated.and.returnValue(false);
 
-    const registerTree = {} as UrlTree;
-    mockRouter.createUrlTree.and.returnValue(registerTree);
+    const loginTree = {} as UrlTree;
+    mockRouter.createUrlTree.and.returnValue(loginTree);
 
     const result = TestBed.runInInjectionContext(() =>
       identityDefaultRedirectGuard(mockRoute, mockState)
     );
 
-    expect(result).toBe(registerTree);
-    expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/register']);
+    expect(result).toBe(loginTree);
+    expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/identity/login']);
   });
 });

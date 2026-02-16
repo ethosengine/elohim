@@ -7,34 +7,6 @@
   background: var(--lamad-surface-primary, #0f172a);
 }
 
-/* Doorway picker step uses dark theme */
-.login-container :host-context(app-doorway-picker),
-.login-container app-doorway-picker {
-  width: 100%;
-  max-width: 900px;
-}
-
-/* Launcher Header (Tauri first-launch) */
-.launcher-header {
-  text-align: center;
-  margin-bottom: 2rem;
-  color: white;
-  max-width: 500px;
-}
-
-.launcher-header h1 {
-  margin: 0 0 0.75rem;
-  font-size: 2rem;
-  font-weight: 700;
-}
-
-.launcher-header p {
-  margin: 0;
-  font-size: 1.1rem;
-  opacity: 80%;
-  line-height: 1.5;
-}
-
 .login-card {
   width: 100%;
   max-width: 400px;

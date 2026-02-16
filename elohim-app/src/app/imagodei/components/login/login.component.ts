@@ -2,7 +2,7 @@
  * LoginComponent - Hosted human authentication.
  *
  * Features:
- * - Doorway-aware: Shows selected doorway, allows changing
+ * - Federated identity input (user@gateway.host) for doorway discovery
  * - Email/username + password login
  * - Remember me (stores identifier)
  * - Error display with clear messaging
@@ -20,11 +20,7 @@ import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
 import { environment } from '../../../../environments/environment';
 import { type PasswordCredentials, AUTH_IDENTIFIER_KEY } from '../../models/auth.model';
-import {
-  type DoorwayInfo,
-  parseFederatedIdentifier,
-  resolveGatewayToDoorwayUrl,
-} from '../../models/doorway.model';
+import { parseFederatedIdentifier, resolveGatewayToDoorwayUrl } from '../../models/doorway.model';
 import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
@@ -32,15 +28,20 @@ import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider'
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
 import { TauriAuthService } from '../../services/tauri-auth.service';
 import { AccountSwitcherComponent } from '../account-switcher/account-switcher.component';
-import { DoorwayPickerComponent } from '../doorway-picker/doorway-picker.component';
 
 /** Login step type */
-type LoginStep = 'doorway' | 'credentials' | 'federated' | 'redirecting' | 'unlock' | 'restarting' | 'switch-account';
+type LoginStep =
+  | 'credentials'
+  | 'federated'
+  | 'redirecting'
+  | 'unlock'
+  | 'restarting'
+  | 'switch-account';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, AccountSwitcherComponent, DoorwayPickerComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AccountSwitcherComponent],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css'],
 })
@@ -76,10 +77,7 @@ export class LoginComponent implements OnInit {
   readonly showPassword = signal(false);
 
   /** Current login step */
-  readonly currentStep = signal<LoginStep>('doorway');
-
-  /** Whether this is a first-launch Tauri launcher experience */
-  readonly isLauncher = signal(false);
+  readonly currentStep = signal<LoginStep>('federated');
 
   /** Whether the user is a confirmed steward (set after login/unlock) */
   readonly isStewardResult = signal(false);
@@ -113,12 +111,9 @@ export class LoginComponent implements OnInit {
       this.authService.registerProvider(this.passwordProvider);
     }
 
-    // Get return URL and launcher mode from query params
+    // Get return URL from query params
     this.route.queryParams.subscribe(params => {
       this.returnUrl = (params['returnUrl'] as string) ?? '/';
-      if (params['launcher'] === 'true') {
-        this.isLauncher.set(true);
-      }
     });
 
     // Pre-fill identifier if remembered
@@ -135,7 +130,7 @@ export class LoginComponent implements OnInit {
 
     // === Context routing ===
 
-    // Tauri: returning user with key bundle -> unlock; first-time -> doorway picker
+    // Tauri: returning user with key bundle -> unlock; first-time -> federated
     if (this.tauriAuth.isTauri()) {
       void this.initTauriStep();
       return;
@@ -198,69 +193,12 @@ export class LoginComponent implements OnInit {
     try {
       // Tauri: use IPC-based login flow
       if (this.tauriAuth.isTauri()) {
-        const doorwayUrl = this.doorwayRegistry.selectedUrl();
-        if (!doorwayUrl) {
-          this.error.set('No doorway selected.');
-          return;
-        }
-
-        const result = await this.tauriAuth.loginWithPassword(
-          doorwayUrl,
-          this.form.identifier.trim(),
-          this.form.password
-        );
-
-        if (result.success) {
-          this.form.password = '';
-          if (this.form.rememberMe) {
-            localStorage.setItem(AUTH_IDENTIFIER_KEY, this.form.identifier.trim());
-          }
-
-          this.isStewardResult.set(result.isSteward);
-          this.restartingDoorwayName.set(
-            this.selectedDoorway()?.doorway?.name ?? 'your doorway'
-          );
-
-          if (result.needsRestart) {
-            this.currentStep.set('restarting');
-          } else {
-            void this.router.navigate([this.returnUrl]);
-          }
-        } else {
-          this.error.set(result.error ?? 'Login failed');
-        }
+        await this.performTauriLogin();
         return;
       }
 
       // Browser: standard auth service login
-      const credentials: PasswordCredentials = {
-        type: 'password',
-        identifier: this.form.identifier.trim(),
-        password: this.form.password,
-      };
-
-      const result = await this.authService.login('password', credentials);
-
-      if (result.success) {
-        // Clear password from form
-        this.form.password = '';
-
-        // Store or clear identifier based on remember me
-        if (this.form.rememberMe) {
-          localStorage.setItem(AUTH_IDENTIFIER_KEY, this.form.identifier.trim());
-        } else {
-          localStorage.removeItem(AUTH_IDENTIFIER_KEY);
-        }
-
-        // Wait for identity state to be fully established before navigating
-        // This ensures the UI shows authenticated state immediately after redirect
-        await this.identityService.waitForAuthenticatedState(3000);
-
-        // Navigate to return URL
-        void this.router.navigate([this.returnUrl]);
-      } else {
-        this.error.set(result.error);
-      }
+      await this.performBrowserLogin();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       this.error.set(errorMessage);
@@ -311,11 +249,10 @@ export class LoginComponent implements OnInit {
     if (window.__TAURI__?.core) {
       // Exit the process via Tauri's built-in exit command
       // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
-      void window.__TAURI__.core.invoke('plugin:process|exit', { code: 0 })
-        .catch(() => {
-          // Fallback: close the webview window
-          globalThis.close();
-        });
+      void window.__TAURI__.core.invoke('plugin:process|exit', { code: 0 }).catch(() => {
+        // Fallback: close the webview window
+        globalThis.close();
+      });
     }
   }
 
@@ -347,29 +284,15 @@ export class LoginComponent implements OnInit {
   // ==========================================================================
 
   /**
-   * Handle doorway selection from picker.
+   * Go back to federated identifier input.
    */
-  onDoorwaySelected(_doorway: DoorwayInfo): void {
-    this.currentStep.set('credentials');
-  }
-
-  /**
-   * Handle doorway picker cancellation.
-   */
-  onDoorwayPickerCancelled(): void {
-    void this.router.navigate(['/']);
-  }
-
-  /**
-   * Go back to doorway selection.
-   */
-  goBackToDoorway(): void {
-    this.currentStep.set('doorway');
+  goBackToFederated(): void {
+    this.currentStep.set('federated');
   }
 
   /**
    * Handle federated login (user@gateway.host).
-   * Parses the identifier, resolves the gateway, and initiates OAuth.
+   * Parses the identifier, resolves the gateway, and initiates OAuth or Tauri credentials.
    */
   onFederatedLogin(): void {
     this.error.set(null);
@@ -385,17 +308,18 @@ export class LoginComponent implements OnInit {
     const doorwayUrl = resolveGatewayToDoorwayUrl(parsed.gatewayDomain);
     this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
 
-    this.currentStep.set('redirecting');
-    this.oauthProvider.storeReturnUrl(this.returnUrl);
-    const callbackUrl = `${globalThis.location.origin}/auth/callback`;
-    this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl, parsed.username);
-  }
-
-  /**
-   * Switch to doorway browser/picker view.
-   */
-  showDoorwayBrowser(): void {
-    this.currentStep.set('doorway');
+    if (this.tauriAuth.isTauri()) {
+      // Tauri: pre-fill username and show credentials form
+      this.form.identifier = parsed.username;
+      this.isLoading.set(false);
+      this.currentStep.set('credentials');
+    } else {
+      // Browser: OAuth redirect
+      this.currentStep.set('redirecting');
+      this.oauthProvider.storeReturnUrl(this.returnUrl);
+      const callbackUrl = `${globalThis.location.origin}/auth/callback`;
+      this.oauthProvider.initiateLogin(doorwayUrl, callbackUrl, parsed.username);
+    }
   }
 
   // ==========================================================================
@@ -418,11 +342,10 @@ export class LoginComponent implements OnInit {
   }
 
   /**
-   * Handle "Add Account" from the switcher — go to doorway picker.
+   * Handle "Add Account" from the switcher — go to federated input.
    */
   onAccountSwitcherAddAccount(): void {
-    this.isLauncher.set(false);
-    this.currentStep.set('doorway');
+    this.currentStep.set('federated');
   }
 
   /**
@@ -440,7 +363,7 @@ export class LoginComponent implements OnInit {
    * Determine the correct login step for Tauri users.
    *
    * Returning user (has key bundle in doorway.json) -> unlock screen.
-   * First-time user -> doorway picker or credentials.
+   * First-time user -> federated identifier input or credentials.
    */
   private async initTauriStep(): Promise<void> {
     // If initialize() already determined needs_unlock, skip redundant IPC
@@ -457,10 +380,80 @@ export class LoginComponent implements OnInit {
       return;
     }
 
-    // First-time user: doorway picker for bootstrap
-    if (!this.doorwayRegistry.hasSelection()) {
-      this.isLauncher.set(true);
+    // First-time user: federated identifier input or credentials if doorway already known
+    this.currentStep.set(this.hasDoorwaySelected() ? 'credentials' : 'federated');
+  }
+
+  // ==========================================================================
+  // Login Helpers
+  // ==========================================================================
+
+  /**
+   * Perform Tauri IPC-based login flow.
+   */
+  private async performTauriLogin(): Promise<void> {
+    const doorwayUrl = this.doorwayRegistry.selectedUrl();
+    if (!doorwayUrl) {
+      this.error.set('No doorway selected.');
+      return;
     }
-    this.currentStep.set(this.hasDoorwaySelected() ? 'credentials' : 'doorway');
+
+    const result = await this.tauriAuth.loginWithPassword(
+      doorwayUrl,
+      this.form.identifier.trim(),
+      this.form.password
+    );
+
+    if (result.success) {
+      this.form.password = '';
+      if (this.form.rememberMe) {
+        localStorage.setItem(AUTH_IDENTIFIER_KEY, this.form.identifier.trim());
+      }
+
+      this.isStewardResult.set(result.isSteward);
+      this.restartingDoorwayName.set(this.selectedDoorway()?.doorway?.name ?? 'your doorway');
+
+      if (result.needsRestart) {
+        this.currentStep.set('restarting');
+      } else {
+        void this.router.navigate([this.returnUrl]);
+      }
+    } else {
+      this.error.set(result.error ?? 'Login failed');
+    }
+  }
+
+  /**
+   * Perform browser-based auth service login.
+   */
+  private async performBrowserLogin(): Promise<void> {
+    const credentials: PasswordCredentials = {
+      type: 'password',
+      identifier: this.form.identifier.trim(),
+      password: this.form.password,
+    };
+
+    const result = await this.authService.login('password', credentials);
+
+    if (result.success) {
+      // Clear password from form
+      this.form.password = '';
+
+      // Store or clear identifier based on remember me
+      if (this.form.rememberMe) {
+        localStorage.setItem(AUTH_IDENTIFIER_KEY, this.form.identifier.trim());
+      } else {
+        localStorage.removeItem(AUTH_IDENTIFIER_KEY);
+      }
+
+      // Wait for identity state to be fully established before navigating
+      // This ensures the UI shows authenticated state immediately after redirect
+      await this.identityService.waitForAuthenticatedState(3000);
+
+      // Navigate to return URL
+      void this.router.navigate([this.returnUrl]);
+    } else {
+      this.error.set(result.error);
+    }
   }
 }

@@ -3,7 +3,7 @@
  *
  * Auth-aware redirect for the /identity root path.
  * - Authenticated (network mode) -> /identity/profile
- * - Not authenticated -> /identity/register (doorway picker)
+ * - Not authenticated -> /identity/login (federated identifier input)
  *
  * This guard always returns a UrlTree (never activates the route).
  */
@@ -26,5 +26,5 @@ export const identityDefaultRedirectGuard: CanActivateFn = (): UrlTree => {
     return router.createUrlTree(['/identity/profile']);
   }
 
-  return router.createUrlTree(['/identity/register']);
+  return router.createUrlTree(['/identity/login']);
 };

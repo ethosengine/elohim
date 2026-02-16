@@ -188,29 +188,14 @@ describe('LoginComponent', () => {
     expect(typeof component.goToRegister).toBe('function');
   });
 
-  it('should have onDoorwaySelected method', () => {
-    expect(component.onDoorwaySelected).toBeDefined();
-    expect(typeof component.onDoorwaySelected).toBe('function');
-  });
-
-  it('should have onDoorwayPickerCancelled method', () => {
-    expect(component.onDoorwayPickerCancelled).toBeDefined();
-    expect(typeof component.onDoorwayPickerCancelled).toBe('function');
-  });
-
-  it('should have goBackToDoorway method', () => {
-    expect(component.goBackToDoorway).toBeDefined();
-    expect(typeof component.goBackToDoorway).toBe('function');
+  it('should have goBackToFederated method', () => {
+    expect(component.goBackToFederated).toBeDefined();
+    expect(typeof component.goBackToFederated).toBe('function');
   });
 
   it('should have onFederatedLogin method', () => {
     expect(component.onFederatedLogin).toBeDefined();
     expect(typeof component.onFederatedLogin).toBe('function');
-  });
-
-  it('should have showDoorwayBrowser method', () => {
-    expect(component.showDoorwayBrowser).toBeDefined();
-    expect(typeof component.showDoorwayBrowser).toBe('function');
   });
 
   // ==========================================================================
@@ -239,28 +224,10 @@ describe('LoginComponent', () => {
   // Step Navigation
   // ==========================================================================
 
-  it('should move to credentials step when doorway selected', () => {
-    component.currentStep.set('doorway');
-    component.onDoorwaySelected({
-      id: 'test',
-      name: 'Test',
-      url: 'http://test',
-      region: 'north-america',
-      operator: 'test',
-      description: 'test',
-    } as any);
-    expect(component.currentStep()).toBe('credentials');
-  });
-
-  it('should navigate to home when doorway picker cancelled', () => {
-    component.onDoorwayPickerCancelled();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
-  });
-
-  it('should go back to doorway step', () => {
+  it('should go back to federated step', () => {
     component.currentStep.set('credentials');
-    component.goBackToDoorway();
-    expect(component.currentStep()).toBe('doorway');
+    component.goBackToFederated();
+    expect(component.currentStep()).toBe('federated');
   });
 
   // ==========================================================================
@@ -278,8 +245,8 @@ describe('LoginComponent', () => {
   // Initial State
   // ==========================================================================
 
-  it('should start with doorway step', () => {
-    expect(component.currentStep()).toBe('doorway');
+  it('should start with federated step', () => {
+    expect(component.currentStep()).toBe('federated');
   });
 
   it('should initialize with no error', () => {
@@ -357,8 +324,8 @@ describe('LoginComponent', () => {
       expect(component.currentStep()).toBe('federated');
     });
 
-    // Context routing: Tauri with no doorway -> doorway picker
-    it('should show doorway picker for Tauri with no doorway selected', async () => {
+    // Context routing: Tauri with no doorway -> federated step
+    it('should show federated step for Tauri with no doorway selected', async () => {
       (mockTauriAuth as any).isTauri = signal(true);
 
       const newFixture = TestBed.createComponent(LoginComponent);
@@ -366,8 +333,7 @@ describe('LoginComponent', () => {
       newComponent.ngOnInit();
       await newFixture.whenStable();
 
-      expect(newComponent.currentStep()).toBe('doorway');
-      expect(newComponent.isLauncher()).toBe(true);
+      expect(newComponent.currentStep()).toBe('federated');
     });
 
     // Context routing: Tauri with doorway selected -> credentials
@@ -412,7 +378,7 @@ describe('LoginComponent', () => {
       expect(component.error()).toBeTruthy();
     });
 
-    it('should initiate OAuth for valid federated identifier', () => {
+    it('should initiate OAuth for valid federated identifier in browser', () => {
       component.federatedIdentifier = 'matthew@alpha.elohim.host';
 
       component.onFederatedLogin();
@@ -440,19 +406,19 @@ describe('LoginComponent', () => {
       // Error should be null (cleared) since the identifier is valid
       expect(component.error()).toBeNull();
     });
-  });
 
-  // ==========================================================================
-  // Show Doorway Browser
-  // ==========================================================================
+    it('should show credentials step for Tauri with valid federated identifier', () => {
+      (mockTauriAuth as any).isTauri = signal(true);
 
-  describe('showDoorwayBrowser', () => {
-    it('should switch to doorway step', () => {
-      component.currentStep.set('federated');
+      const newFixture = TestBed.createComponent(LoginComponent);
+      const newComponent = newFixture.componentInstance;
+      newComponent.federatedIdentifier = 'matthew@alpha.elohim.host';
 
-      component.showDoorwayBrowser();
+      newComponent.onFederatedLogin();
 
-      expect(component.currentStep()).toBe('doorway');
+      expect(newComponent.currentStep()).toBe('credentials');
+      expect(newComponent.form.identifier).toBe('matthew');
+      expect(newComponent.isLoading()).toBe(false);
     });
   });
 
