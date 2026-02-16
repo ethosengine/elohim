@@ -1,51 +1,55 @@
-import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-
-// @coverage: 100.0% (2026-02-05)
+import { Component, signal } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
 import { ElohimNavigatorComponent } from '@app/elohim/components/elohim-navigator/elohim-navigator.component';
 
-/**
- * ShefaLayoutComponent - Layout wrapper for the Shefa economy context app
- *
- * Uses the unified ElohimNavigator for consistent navigation across all contexts.
- */
+import { ShefaSidenavComponent } from '../shefa-sidenav/shefa-sidenav.component';
+
 @Component({
   selector: 'app-shefa-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, ElohimNavigatorComponent],
+  imports: [RouterOutlet, ElohimNavigatorComponent, ShefaSidenavComponent],
   template: `
     <div class="shefa-container">
-      <!-- Elohim Navigator (unified header) -->
       <app-elohim-navigator [context]="'shefa'" [showSearch]="false">
-        <!-- Main Content -->
-        <div class="shefa-main">
-          <nav class="shefa-tab-bar" aria-label="Shefa sections">
-            <a
-              class="shefa-tab"
-              routerLink="/shefa"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: true }"
-            >
-              Overview
-            </a>
-            <a class="shefa-tab" routerLink="/shefa/dashboard" routerLinkActive="active">
-              Dashboard
-            </a>
-            <a class="shefa-tab" routerLink="/shefa/devices" routerLinkActive="active">Devices</a>
-          </nav>
-          <router-outlet></router-outlet>
+        <div class="shefa-workspace" [class.sidebar-collapsed]="!sidebarOpen()">
+          <!-- Mobile toggle -->
+          <button
+            type="button"
+            class="sidebar-toggle"
+            (click)="toggleSidebar()"
+            aria-label="Toggle navigation menu"
+          >
+            <span class="material-icons">menu</span>
+          </button>
+
+          <!-- Mobile backdrop -->
+          <div class="sidebar-backdrop" (click)="toggleSidebar()" role="presentation"></div>
+
+          <!-- Sidebar -->
+          <app-shefa-sidenav
+            (collapseClicked)="toggleSidebar()"
+            (navItemClicked)="onNavItemClicked()"
+          />
+
+          <!-- Desktop expand button -->
+          <button
+            type="button"
+            class="sidebar-expand-btn"
+            (click)="toggleSidebar()"
+            aria-label="Expand sidebar"
+          >
+            <span class="material-icons">chevron_right</span>
+          </button>
+
+          <!-- Main content -->
+          <main class="shefa-content">
+            <div class="content-scroll-container">
+              <router-outlet></router-outlet>
+            </div>
+          </main>
         </div>
       </app-elohim-navigator>
-
-      <!-- Footer -->
-      <footer class="shefa-footer">
-        <p>
-          Shefa - Economics of Human Flourishing |
-          <a routerLink="/" class="footer-link">Powered by Elohim Protocol</a>
-        </p>
-      </footer>
     </div>
   `,
   styles: [
@@ -62,92 +66,159 @@ import { ElohimNavigatorComponent } from '@app/elohim/components/elohim-navigato
         color: var(--lamad-text-secondary, #e2e8f0);
       }
 
-      .shefa-main {
+      .shefa-workspace {
+        display: flex;
+        height: calc(100dvh - 64px);
+        position: relative;
+      }
+
+      /* Main content area */
+      .shefa-content {
         flex: 1;
-        max-width: 1400px;
-        width: 100%;
-        margin: 0 auto;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
+        min-width: 0;
       }
 
-      .shefa-tab-bar {
-        display: flex;
-        gap: 0;
-        border-bottom: 2px solid var(--lamad-border, rgba(99, 102, 241, 0.15));
-        padding: 0 2rem;
-        background: var(--lamad-surface, rgba(30, 30, 46, 0.4));
+      .content-scroll-container {
+        flex: 1;
+        overflow-y: auto;
       }
 
-      .shefa-tab {
-        display: inline-flex;
+      /* ---- Elements always in DOM, visibility via CSS ---- */
+
+      /* Mobile toggle: hidden on desktop */
+      .sidebar-toggle {
+        display: none;
+        position: absolute;
+        top: 0.75rem;
+        left: 0.75rem;
+        z-index: 90;
+        width: 40px;
+        height: 40px;
         align-items: center;
-        padding: 0.75rem 1.25rem;
-        background: none;
-        border: none;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -2px;
-        color: var(--lamad-text-muted, #64748b);
-        font-size: 0.9375rem;
-        font-weight: 500;
-        text-decoration: none;
+        justify-content: center;
+        background: var(--lamad-surface, rgba(30, 30, 46, 0.9));
+        border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.15));
+        border-radius: 0.5rem;
         cursor: pointer;
-        transition:
-          color 0.2s,
-          border-color 0.2s;
-      }
-
-      .shefa-tab:hover {
         color: var(--lamad-text-secondary, #e2e8f0);
       }
 
-      .shefa-tab.active {
-        color: var(--lamad-accent-primary, #6366f1);
-        border-bottom-color: var(--lamad-accent-primary, #6366f1);
+      .sidebar-toggle:hover {
+        background: rgba(99, 102, 241, 0.12);
       }
 
-      .shefa-footer {
-        background: var(--lamad-surface, rgba(30, 30, 46, 0.8));
-        border-top: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.1));
-        padding: 1.5rem 2rem;
-        text-align: center;
+      /* Backdrop: hidden by default */
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        top: 64px;
+        background: rgb(0 0 0 / 40%);
+        z-index: 50;
+        cursor: pointer;
+      }
+
+      /* Expand button: hidden by default */
+      .sidebar-expand-btn {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 25;
+        padding: 1rem 0.375rem;
+        background: var(--lamad-bg-secondary, #1a1a2e);
+        border: 1px solid var(--lamad-border, rgba(99, 102, 241, 0.15));
+        border-left: none;
+        border-radius: 0 0.375rem 0.375rem 0;
+        cursor: pointer;
         color: var(--lamad-text-muted, #64748b);
-        font-size: 0.875rem;
+        transition:
+          background-color 0.2s,
+          color 0.2s;
       }
 
-      .footer-link {
+      .sidebar-expand-btn:hover {
+        background: rgba(99, 102, 241, 0.12);
         color: var(--lamad-text-secondary, #e2e8f0);
-        text-decoration: none;
-        transition: color 0.2s;
       }
 
-      .footer-link:hover {
-        color: var(--lamad-accent-primary, #6366f1);
+      /* ---- Desktop collapsed state ---- */
+
+      .shefa-workspace.sidebar-collapsed app-shefa-sidenav {
+        width: 0;
+        overflow: hidden;
+        border-right: none;
       }
 
-      @media (max-width: 768px) {
-        .shefa-tab-bar {
-          padding: 0 1rem;
-          overflow-x: auto;
-          scrollbar-width: none;
+      .shefa-workspace.sidebar-collapsed .sidebar-expand-btn {
+        display: flex;
+      }
+
+      /* ---- Tablet & Mobile ---- */
+
+      @media (width <= 1024px) {
+        .sidebar-toggle {
+          display: flex;
         }
 
-        .shefa-tab-bar::-webkit-scrollbar {
+        /* Never show desktop expand on mobile */
+        .sidebar-expand-btn {
+          display: none !important;
+        }
+
+        /* Sidebar becomes fixed overlay */
+        app-shefa-sidenav {
+          position: fixed;
+          top: 64px;
+          left: 0;
+          bottom: 0;
+          z-index: 100;
+        }
+
+        .shefa-workspace.sidebar-collapsed app-shefa-sidenav {
+          transform: translateX(-100%);
+          width: 260px;
+        }
+
+        /* Show backdrop when sidebar is open */
+        .shefa-workspace:not(.sidebar-collapsed) .sidebar-backdrop {
+          display: block;
+        }
+
+        /* Hide collapse button on mobile — use backdrop/toggle instead */
+        .shefa-workspace:not(.sidebar-collapsed) .sidebar-collapse-btn {
           display: none;
         }
+      }
 
-        .shefa-tab {
-          white-space: nowrap;
-          padding: 0.625rem 1rem;
-          font-size: 0.875rem;
+      @media (width <= 768px) {
+        app-shefa-sidenav {
+          width: 100%;
         }
 
-        .shefa-footer {
-          padding: 1rem;
-          font-size: 0.75rem;
+        .shefa-workspace.sidebar-collapsed app-shefa-sidenav {
+          width: 100%;
         }
       }
     `,
   ],
 })
-export class ShefaLayoutComponent {}
+export class ShefaLayoutComponent {
+  readonly sidebarOpen = signal(true);
+
+  toggleSidebar(): void {
+    this.sidebarOpen.update(v => !v);
+  }
+
+  onNavItemClicked(): void {
+    if (window.innerWidth <= 1024) {
+      this.sidebarOpen.set(false);
+    }
+  }
+}
