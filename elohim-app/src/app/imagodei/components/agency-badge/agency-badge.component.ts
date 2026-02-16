@@ -9,8 +9,6 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal, output, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-05)
-
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AgencyService } from '@app/imagodei/services/agency.service';
 
@@ -73,7 +71,7 @@ export class AgencyBadgeComponent {
    */
   onViewDetails(): void {
     this.viewDetails.emit();
-    void this.router.navigate(['/lamad/human'], { fragment: 'network' });
+    void this.router.navigate(['/identity/profile'], { fragment: 'network' });
   }
 
   /**

@@ -172,9 +172,9 @@ describe('AgencyBadgeComponent', () => {
       component.onViewDetails();
     });
 
-    it('should navigate to profile network section', () => {
+    it('should navigate to identity profile network section', () => {
       component.onViewDetails();
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/human'], {
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/identity/profile'], {
         fragment: 'network',
       });
     });

@@ -55,7 +55,7 @@ describe('TauriAuthService', () => {
     mockAuthService = jasmine.createSpyObj('AuthService', ['setTauriSession', 'logout']);
 
     // Mock DoorwayRegistryService
-    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', [], {
+    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', ['clearSelection'], {
       selected: jasmine.createSpy().and.returnValue(mockDoorway),
     });
 

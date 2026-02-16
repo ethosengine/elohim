@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 
 // @coverage: 45.5% (2026-02-05)
 
@@ -9,7 +8,6 @@ import { takeUntil, catchError } from 'rxjs/operators';
 
 import { Subject, of } from 'rxjs';
 
-import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { ProfileService } from '@app/elohim/services/profile.service';
 import { isNetworkMode } from '@app/imagodei/models/identity.model';
 import { ResumePoint, PathsOverview, TimelineEvent } from '@app/imagodei/models/profile.model';
@@ -18,7 +16,6 @@ import {
   SessionActivity,
   SessionPathProgress,
 } from '@app/imagodei/models/session-human.model';
-import { AgencyService } from '@app/imagodei/services/agency.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
@@ -29,45 +26,29 @@ import { MasteryStatsService } from '../../services/mastery-stats.service';
 import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile.model';
 
 /**
- * ProfilePageComponent - Session Human profile management.
+ * ProfilePageComponent - Learning profile for the lamad pillar.
+ *
+ * Shows learning-only content: stats, paths, mastery, timeline.
+ * Identity management (profile editing, network, agency) lives in imagodei.
  *
  * Tabs:
  * 1. Overview - Resume point, current focus, capabilities, journey stats
  * 2. Paths - In progress, completed, suggested
  * 3. Timeline - Chronological events with type filter
- * 4. Network - Agency status, data residency, connection details
- * 5. Settings - Profile editing, export, reset
- *
- * Features:
- * - Editable display name, bio, interests
- * - Session badge with "Upgrade to save permanently" prompt
- * - Quick stats summary
- * - Avatar support (URL-based for MVP)
- * - Agency/data residency visualization
  */
 @Component({
   selector: 'app-profile-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './profile-page.component.html',
   styleUrls: ['./profile-page.component.css'],
 })
 export class ProfilePageComponent implements OnInit, OnDestroy {
-  // Injected services for agency/network tab
-  private readonly agencyService = inject(AgencyService);
-  private readonly holochainService = inject(HolochainClientService);
   readonly identityService = inject(IdentityService); // Public for template access
-  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   // Tab management
-  activeTab: 'overview' | 'paths' | 'timeline' | 'network' | 'settings' = 'overview';
-
-  // Agency state (reactive)
-  readonly agencyState = this.agencyService.agencyState;
-  readonly stageInfo = this.agencyService.stageInfo;
-  readonly connectionStatus = this.agencyService.connectionStatus;
-  readonly canUpgrade = this.agencyService.canUpgrade;
-  readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());
+  activeTab: 'overview' | 'paths' | 'timeline' = 'overview';
 
   // ==========================================================================
   // Identity State (from IdentityService - unified source of truth)
@@ -82,45 +63,12 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   /** Current identity mode */
   readonly identityMode = this.identityService.mode;
 
-  /** Holochain profile (when authenticated) */
-  readonly holochainProfile = this.identityService.profile;
-
   /** Display name from identity (prefers Holochain, falls back to session) */
   readonly displayName = computed(() => {
     if (this.isNetworkAuthenticated()) {
       return this.identityService.displayName();
     }
     return this.session?.displayName ?? 'Traveler';
-  });
-
-  /** Bio from identity (prefers Holochain, falls back to session) */
-  readonly bio = computed(() => {
-    if (this.isNetworkAuthenticated()) {
-      return this.holochainProfile()?.bio ?? null;
-    }
-    return this.session?.bio ?? null;
-  });
-
-  /** Interests/affinities (prefers Holochain, falls back to session) */
-  readonly interests = computed(() => {
-    if (this.isNetworkAuthenticated()) {
-      return this.holochainProfile()?.affinities ?? [];
-    }
-    return this.session?.interests ?? [];
-  });
-
-  /** Location from Holochain profile */
-  readonly location = computed(() => this.holochainProfile()?.location ?? null);
-
-  /** Profile reach from Holochain profile */
-  readonly profileReach = computed(() => this.holochainProfile()?.profileReach ?? null);
-
-  /** Member since date */
-  readonly memberSince = computed(() => {
-    if (this.isNetworkAuthenticated()) {
-      return this.holochainProfile()?.createdAt ?? null;
-    }
-    return this.session?.createdAt ?? null;
   });
 
   /** Badge text based on identity mode */
@@ -184,16 +132,6 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     'all';
   filteredActivities: SessionActivity[] = [];
 
-  // Edit mode for settings
-  isEditing = false;
-  editForm = {
-    displayName: '',
-    avatarUrl: '',
-    bio: '',
-    locale: '',
-    interests: '',
-  };
-
   // Loading states
   isLoading = true;
 
@@ -219,13 +157,6 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadData();
-
-    // Handle fragment navigation (e.g., #network from agency badge)
-    this.route.fragment.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
-      if (fragment === 'network') {
-        this.activeTab = 'network';
-      }
-    });
   }
 
   ngOnDestroy(): void {
@@ -243,7 +174,6 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     // Subscribe to session changes
     this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
       this.session = session;
-      this.initEditForm();
     });
 
     // Load path progress
@@ -302,28 +232,6 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       });
   }
 
-  private initEditForm(): void {
-    // Use Holochain profile data if authenticated, otherwise use session
-    if (this.isNetworkAuthenticated()) {
-      const profile = this.holochainProfile();
-      this.editForm = {
-        displayName: profile?.displayName ?? '',
-        avatarUrl: '', // Holochain profile doesn't have avatarUrl in current schema
-        bio: profile?.bio ?? '',
-        locale: '', // Not in Holochain schema yet
-        interests: profile?.affinities?.join(', ') ?? '',
-      };
-    } else if (this.session) {
-      this.editForm = {
-        displayName: this.session.displayName,
-        avatarUrl: this.session.avatarUrl ?? '',
-        bio: this.session.bio ?? '',
-        locale: this.session.locale ?? '',
-        interests: this.session.interests?.join(', ') ?? '',
-      };
-    }
-  }
-
   private computeMasteryBreakdown(stats: MasteryStats): void {
     const levels: MasteryLevel[] = [
       'seen',
@@ -348,7 +256,7 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   // TAB NAVIGATION
   // =========================================================================
 
-  setActiveTab(tab: 'overview' | 'paths' | 'timeline' | 'network' | 'settings'): void {
+  setActiveTab(tab: 'overview' | 'paths' | 'timeline'): void {
     this.activeTab = tab;
 
     // Refresh data when switching tabs
@@ -358,6 +266,20 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
     } else if (tab === 'paths') {
       this.pathProgressList = this.sessionHumanService.getAllPathProgress();
     }
+  }
+
+  // =========================================================================
+  // NAVIGATION
+  // =========================================================================
+
+  /** Navigate to identity profile for editing */
+  goToIdentityProfile(): void {
+    void this.router.navigate(['/identity/profile']);
+  }
+
+  /** Navigate to registration for network upgrade */
+  onJoinNetwork(): void {
+    void this.router.navigate(['/identity/register']);
   }
 
   // =========================================================================
@@ -437,75 +359,6 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
   }
 
   // =========================================================================
-  // SETTINGS / EDIT
-  // =========================================================================
-
-  startEditing(): void {
-    this.isEditing = true;
-    this.initEditForm();
-  }
-
-  cancelEditing(): void {
-    this.isEditing = false;
-    this.initEditForm();
-  }
-
-  async saveProfile(): Promise<void> {
-    // Parse interests (comma-separated to array)
-    const interests = this.editForm.interests
-      .split(',')
-      .map(i => i.trim())
-      .filter(i => i.length > 0);
-
-    // If authenticated via Holochain, update the Holochain profile
-    if (this.isNetworkAuthenticated()) {
-      try {
-        await this.identityService.updateProfile({
-          displayName: this.editForm.displayName,
-          bio: this.editForm.bio || undefined,
-          affinities: interests,
-          // Note: avatarUrl and locale not in Holochain schema yet
-        });
-        this.isEditing = false;
-      } catch {
-        // Profile update failed silently - user will need to retry
-      }
-    } else {
-      // Update session data for visitors
-      this.sessionHumanService.setDisplayName(this.editForm.displayName);
-      this.sessionHumanService.setAvatarUrl(this.editForm.avatarUrl);
-      this.sessionHumanService.setBio(this.editForm.bio);
-      this.sessionHumanService.setLocale(this.editForm.locale);
-      this.sessionHumanService.setInterests(interests);
-      this.isEditing = false;
-    }
-  }
-
-  // =========================================================================
-  // DATA MANAGEMENT
-  // =========================================================================
-
-  exportData(): void {
-    const migration = this.sessionHumanService.prepareMigration();
-    if (migration) {
-      const blob = new Blob([JSON.stringify(migration, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `lamad-session-${this.session?.sessionId ?? 'export'}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  resetSession(): void {
-    if (confirm('Are you sure you want to reset your session? All progress will be lost.')) {
-      this.sessionHumanService.resetSession();
-      this.loadData();
-    }
-  }
-
-  // =========================================================================
   // TIMELINE HELPERS
   // =========================================================================
 
@@ -572,75 +425,5 @@ export class ProfilePageComponent implements OnInit, OnDestroy {
       create: '#4fc3f7',
     };
     return colors[level];
-  }
-
-  // =========================================================================
-  // NETWORK / AGENCY HELPERS
-  // =========================================================================
-
-  /**
-   * Get CSS class for agency stage badge.
-   */
-  getStageBadgeClass(): string {
-    const stage = this.agencyState().currentStage;
-    return `stage-badge--${stage}`;
-  }
-
-  /**
-   * Get CSS class for connection status dot.
-   */
-  getStatusDotClass(): string {
-    const status = this.connectionStatus().state;
-    return `status-dot--${status}`;
-  }
-
-  /**
-   * Get icon for data location.
-   */
-  getLocationIcon(location: string): string {
-    const icons: Record<string, string> = {
-      'browser-memory': 'memory',
-      'browser-storage': 'storage',
-      'hosted-server': 'cloud',
-      'local-holochain': 'smartphone',
-      dht: 'lan',
-      'encrypted-backup': 'lock',
-    };
-    return icons[location] ?? 'folder';
-  }
-
-  /**
-   * Truncate hash for display.
-   */
-  truncateHash(hash: string | null): string {
-    if (!hash) return 'N/A';
-    if (hash.length <= 16) return hash;
-    return `${hash.substring(0, 8)}...${hash.substring(hash.length - 4)}`;
-  }
-
-  /**
-   * Copy value to clipboard.
-   */
-  async copyToClipboard(value: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      // Clipboard write failed silently - not all browsers support this API
-    }
-  }
-
-  /**
-   * Reconnect to network.
-   */
-  async reconnect(): Promise<void> {
-    await this.holochainService.disconnect();
-    await this.holochainService.connect();
-  }
-
-  /**
-   * Check if connected to network.
-   */
-  isConnected(): boolean {
-    return this.connectionStatus().state === 'connected';
   }
 }

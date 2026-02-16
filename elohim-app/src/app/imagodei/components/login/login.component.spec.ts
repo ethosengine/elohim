@@ -336,8 +336,9 @@ describe('LoginComponent', () => {
       expect(newComponent.currentStep()).toBe('federated');
     });
 
-    // Context routing: Tauri with doorway selected -> credentials
-    it('should show credentials for Tauri with doorway selected', async () => {
+    // Context routing: Tauri with doorway selected but no key bundle -> federated
+    // (First-time user: always show federated input for identity import)
+    it('should show federated for Tauri with doorway selected', async () => {
       (mockTauriAuth as any).isTauri = signal(true);
       Object.defineProperty(mockDoorwayRegistry, 'hasSelection', {
         value: signal(true),
@@ -350,7 +351,7 @@ describe('LoginComponent', () => {
       newComponent.ngOnInit();
       await newFixture.whenStable();
 
-      expect(newComponent.currentStep()).toBe('credentials');
+      expect(newComponent.currentStep()).toBe('federated');
     });
   });
 

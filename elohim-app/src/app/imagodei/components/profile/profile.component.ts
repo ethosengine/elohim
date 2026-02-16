@@ -9,12 +9,17 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 
 // @coverage: 92.5% (2026-02-05)
 
+import { takeUntil } from 'rxjs/operators';
+
+import { Subject } from 'rxjs';
+
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import {
   type UpdateProfileRequest,
   type ProfileReach,
@@ -33,6 +38,7 @@ import { AGENCY_STAGES, type AgencyStageInfo } from '../../models/agency.model';
 import { AgencyService } from '../../services/agency.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { IdentityService } from '../../services/identity.service';
+import { SessionHumanService } from '../../services/session-human.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
 
 @Component({
@@ -42,13 +48,17 @@ import { TauriAuthService } from '../../services/tauri-auth.service';
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css'],
 })
-export class ProfileComponent implements OnInit {
+export class ProfileComponent implements OnInit, OnDestroy {
   private readonly identityService = inject(IdentityService);
   private readonly agencyService = inject(AgencyService);
   private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
   private readonly tauriAuth = inject(TauriAuthService);
+  private readonly holochainService = inject(HolochainClientService);
+  private readonly sessionHumanService = inject(SessionHumanService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroy$ = new Subject<void>();
 
   // ==========================================================================
   // Component State
@@ -164,12 +174,69 @@ export class ProfileComponent implements OnInit {
   ];
 
   // ==========================================================================
+  // Network / Agency Signals
+  // ==========================================================================
+
+  readonly agencyState = this.agencyService.agencyState;
+  readonly connectionStatus = this.agencyService.connectionStatus;
+  readonly edgeNodeInfo = computed(() => this.holochainService.getDisplayInfo());
+
+  // ==========================================================================
+  // Doorway Management
+  // ==========================================================================
+
+  /** Whether the add-doorway inline form is visible */
+  readonly showAddDoorway = signal(false);
+
+  /** URL being validated */
+  readonly newDoorwayUrl = signal('');
+
+  /** Validation state */
+  readonly doorwayValidating = signal(false);
+  readonly doorwayValidationError = signal<string | null>(null);
+  readonly doorwayValidationResult = signal<{ name: string; url: string } | null>(null);
+
+  // ==========================================================================
+  // Data Management
+  // ==========================================================================
+
+  /** Export session data as JSON file */
+  exportData(): void {
+    const migration = this.sessionHumanService.prepareMigration();
+    if (migration) {
+      const blob = new Blob([JSON.stringify(migration, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `elohim-identity-export.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  // ==========================================================================
   // Lifecycle
   // ==========================================================================
 
   ngOnInit(): void {
     // Load fresh profile data
     void this.loadProfile();
+
+    // Handle fragment navigation (e.g., #network from agency badge)
+    this.route.fragment.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
+      if (fragment === 'network' || fragment === 'upgrade') {
+        // Scroll to the section after a short delay to let the DOM render
+        setTimeout(() => {
+          const el = document.getElementById(fragment);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   // ==========================================================================
@@ -350,5 +417,136 @@ export class ProfileComponent implements OnInit {
    */
   navigateToDiscovery(): void {
     void this.router.navigate(['/lamad/discovery']);
+  }
+
+  // ==========================================================================
+  // Network / Agency Helpers
+  // ==========================================================================
+
+  /**
+   * Get CSS class for agency stage badge.
+   */
+  getStageBadgeClass(): string {
+    const stage = this.agencyState().currentStage;
+    return `stage-badge--${stage}`;
+  }
+
+  /**
+   * Get CSS class for connection status dot.
+   */
+  getStatusDotClass(): string {
+    const status = this.connectionStatus().state;
+    return `status-dot--${status}`;
+  }
+
+  /**
+   * Get icon for data location.
+   */
+  getLocationIcon(location: string): string {
+    const icons: Record<string, string> = {
+      'browser-memory': 'memory',
+      'browser-storage': 'storage',
+      'hosted-server': 'cloud',
+      'local-holochain': 'smartphone',
+      dht: 'lan',
+      'encrypted-backup': 'lock',
+    };
+    return icons[location] ?? 'folder';
+  }
+
+  /**
+   * Truncate hash for display.
+   */
+  truncateHash(hash: string | null): string {
+    if (!hash) return 'N/A';
+    if (hash.length <= 16) return hash;
+    return `${hash.substring(0, 8)}...${hash.substring(hash.length - 4)}`;
+  }
+
+  /**
+   * Copy value to clipboard.
+   */
+  async copyToClipboard(value: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      // Clipboard write failed silently - not all browsers support this API
+    }
+  }
+
+  /**
+   * Reconnect to network.
+   */
+  async reconnect(): Promise<void> {
+    await this.holochainService.disconnect();
+    await this.holochainService.connect();
+  }
+
+  /**
+   * Check if connected to network.
+   */
+  isConnected(): boolean {
+    return this.connectionStatus().state === 'connected';
+  }
+
+  // ==========================================================================
+  // Doorway Management
+  // ==========================================================================
+
+  /**
+   * Handle input event for doorway URL field.
+   */
+  onDoorwayUrlInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.newDoorwayUrl.set(input.value);
+  }
+
+  /**
+   * Toggle inline add-doorway form.
+   */
+  toggleAddDoorway(): void {
+    this.showAddDoorway.update(v => !v);
+    this.doorwayValidationError.set(null);
+    this.doorwayValidationResult.set(null);
+    this.newDoorwayUrl.set('');
+  }
+
+  /**
+   * Validate a doorway URL.
+   */
+  async validateNewDoorway(): Promise<void> {
+    const url = this.newDoorwayUrl().trim();
+    if (!url) return;
+
+    this.doorwayValidating.set(true);
+    this.doorwayValidationError.set(null);
+    this.doorwayValidationResult.set(null);
+
+    const result = await this.doorwayRegistry.validateDoorway(url);
+
+    this.doorwayValidating.set(false);
+    if (result.isValid && result.doorway) {
+      this.doorwayValidationResult.set({ name: result.doorway.name, url: result.doorway.url });
+    } else {
+      this.doorwayValidationError.set(result.error ?? 'Could not reach doorway');
+    }
+  }
+
+  /**
+   * Add the validated doorway and select it.
+   */
+  addValidatedDoorway(): void {
+    const result = this.doorwayValidationResult();
+    if (result) {
+      this.doorwayRegistry.selectDoorwayByUrl(result.url);
+      this.toggleAddDoorway();
+    }
+  }
+
+  /**
+   * Set a doorway as the primary/active one.
+   */
+  setDoorwayAsPrimary(doorwayUrl: string): void {
+    this.doorwayRegistry.selectDoorwayByUrl(doorwayUrl);
   }
 }

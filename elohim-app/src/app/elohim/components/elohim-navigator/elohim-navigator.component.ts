@@ -12,12 +12,12 @@ import { Subject } from 'rxjs';
 import { RunningContextService } from '@app/doorway/services/running-context.service';
 import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { AgencyBadgeComponent } from '@app/imagodei/components/agency-badge/agency-badge.component';
 import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
 import { SessionHuman, HolochainUpgradePrompt } from '@app/imagodei/models/session-human.model';
 import { AuthService } from '@app/imagodei/services/auth.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
-import { AgencyBadgeComponent } from '@app/lamad/components/agency-badge/agency-badge.component';
 
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 

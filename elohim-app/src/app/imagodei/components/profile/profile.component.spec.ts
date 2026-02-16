@@ -1,14 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { signal } from '@angular/core';
 
-import { ProfileComponent } from './profile.component';
-import { IdentityService } from '../../services/identity.service';
+import { of } from 'rxjs';
+
+import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
+
+import type { HumanProfile } from '../../models/identity.model';
 import { AgencyService } from '../../services/agency.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { IdentityService } from '../../services/identity.service';
+import { SessionHumanService } from '../../services/session-human.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
-import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
-import type { HumanProfile } from '../../models/identity.model';
+import { ProfileComponent } from './profile.component';
 
 describe('ProfileComponent', () => {
   let component: ProfileComponent;
@@ -48,7 +53,10 @@ describe('ProfileComponent', () => {
       [],
       {
         currentStage: signal('discovery'),
-        stageInfo: signal({ stage: 'discovery', description: 'Test' }),
+        stageInfo: signal({ stage: 'discovery', description: 'Test', label: 'Discovery', icon: 'explore', tagline: 'Exploring', benefits: [], limitations: [] }),
+        canUpgrade: signal(false),
+        agencyState: signal({ currentStage: 'discovery', keys: [], dataResidency: [], migrationTarget: null }),
+        connectionStatus: signal({ state: 'offline', label: 'Offline', description: 'Not connected' }),
       }
     );
 
@@ -89,6 +97,36 @@ describe('ProfileComponent', () => {
             graduationError: signal(''),
             isGraduationEligible: signal(false),
             confirmStewardship: jasmine.createSpy('confirmStewardship').and.returnValue(Promise.resolve(false)),
+          },
+        },
+        {
+          provide: HolochainClientService,
+          useValue: {
+            getDisplayInfo: () => ({
+              state: 'connected',
+              mode: 'doorway',
+              adminUrl: 'ws://localhost:4444',
+              appUrl: 'ws://localhost:4445',
+              agentPubKey: 'test-key',
+              dnaHash: 'test-dna',
+              connectedAt: new Date(),
+              hasStoredCredentials: true,
+              error: null,
+            }),
+            disconnect: jasmine.createSpy('disconnect').and.returnValue(Promise.resolve()),
+            connect: jasmine.createSpy('connect').and.returnValue(Promise.resolve()),
+          },
+        },
+        {
+          provide: SessionHumanService,
+          useValue: {
+            prepareMigration: () => null,
+          },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            fragment: of(null),
           },
         },
         { provide: Router, useValue: mockRouter },
