@@ -97,6 +97,8 @@ pub struct AppState {
     pub zome_caller: Option<Arc<crate::services::ZomeCaller>>,
     /// Cache of peer doorways discovered via HTTP federation
     pub peer_cache: crate::services::federation::PeerCache,
+    /// Cached P2P status from elohim-storage (polled every 30s)
+    pub p2p_status: Option<tokio::sync::watch::Receiver<Option<crate::routes::health::P2PHealth>>>,
 }
 
 impl AppState {
@@ -158,6 +160,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            p2p_status: None,
         }
     }
 
@@ -223,6 +226,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            p2p_status: None,
         }
     }
 
@@ -303,6 +307,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            p2p_status: None,
         }
     }
 
@@ -377,6 +382,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            p2p_status: None,
         })
     }
 

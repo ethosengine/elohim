@@ -130,6 +130,39 @@ def getRemediationHint(String p) {
 }
 def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 ? 'HIGH' : u > 0 ? 'MEDIUM' : 'LOW' }
 
+/**
+ * Advisory P2P peer validation — checks doorway /health for P2P status.
+ * Logs warnings but never fails the build.
+ */
+def runP2PValidation(String environment, String doorwayUrl) {
+    def result = sh(
+        script: """
+            set +e
+            HEALTH=\$(curl -s --max-time 10 ${doorwayUrl}/health 2>/dev/null)
+            if [ \$? -ne 0 ]; then
+                echo "P2P [${environment}]: Could not reach ${doorwayUrl}/health"
+                exit 0
+            fi
+
+            PEERS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('connected_peers',0) if p else 'n/a')" 2>/dev/null)
+            SYNC_DOCS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('sync_documents',0) if p else 'n/a')" 2>/dev/null)
+            PEER_ID=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('peer_id','unknown')[:12] if p else 'n/a')" 2>/dev/null)
+
+            echo "P2P [${environment}]: peers=\${PEERS} sync_docs=\${SYNC_DOCS} peer_id=\${PEER_ID}"
+
+            if [ "\$PEERS" = "n/a" ]; then
+                echo "P2P [${environment}]: P2P not enabled on this doorway"
+            elif [ "\$PEERS" = "0" ]; then
+                echo "P2P [${environment}]: WARNING - no peers connected"
+            else
+                echo "P2P [${environment}]: OK - \${PEERS} peer(s) connected"
+            fi
+        """,
+        returnStatus: true
+    )
+    return result == 0
+}
+
 def getGitCommitHashFull() {
     return sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
 }
@@ -972,6 +1005,31 @@ spec:
                         def unhealthy = healthResults.findAll { k, v -> !v.healthy }
                         if (unhealthy.size() > 0) {
                             unstable("${unhealthy.size()} service(s) unhealthy after deployment")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('P2P Validation (Advisory)') {
+            steps {
+                container('builder') {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        script {
+                            echo '''
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          P2P PEER VALIDATION (ADVISORY)                       │
+└──────────────────────────────────────────────────────────────────────────────┘'''
+                            def p2pResults = [:]
+                            def doorwayEndpoints = [
+                                alpha: 'https://doorway-alpha.elohim.host',
+                                staging: 'https://doorway-staging.elohim.host',
+                            ]
+                            doorwayEndpoints.each { env, url ->
+                                p2pResults[env] = runP2PValidation(env, url)
+                            }
+                            currentBuild.description = (currentBuild.description ?: '') +
+                                " | P2P: ${p2pResults.collect { k, v -> "${k}=${v ? 'ok' : 'warn'}" }.join(', ')}"
                         }
                     }
                 }

@@ -57,7 +57,7 @@ metadata:
     environment: alpha
 spec:
   serviceName: elohim-edgenode-alpha-headless
-  replicas: 1
+  replicas: 2
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
@@ -215,6 +215,8 @@ spec:
               value: "9876"
             - name: DISABLE_MDNS
               value: "true"
+            - name: P2P_BOOTSTRAP_NODES
+              value: "/dns4/elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-edgenode-alpha-1.elohim-edgenode-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
           ports:
             - name: storage-http
               containerPort: 8090

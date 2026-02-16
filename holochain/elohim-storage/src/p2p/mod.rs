@@ -252,6 +252,7 @@ impl P2PNode {
         self.refresh_status().await;
 
         let mut status_interval = tokio::time::interval(Duration::from_secs(30));
+        let mut sync_interval = tokio::time::interval(Duration::from_secs(60));
 
         loop {
             let mut swarm = self.swarm.write().await;
@@ -264,6 +265,10 @@ impl P2PNode {
                 _ = status_interval.tick() => {
                     drop(swarm);
                     self.refresh_status().await;
+                }
+                _ = sync_interval.tick() => {
+                    drop(swarm);
+                    self.initiate_sync_round().await;
                 }
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
@@ -279,8 +284,18 @@ impl P2PNode {
             SwarmEvent::NewListenAddr { address, .. } => {
                 info!(address = %address, "Listening on");
             }
-            SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+            SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 debug!(peer = %peer_id, "Connected to peer");
+                // In K8s (mDNS disabled), add connected peers to Kademlia for DHT routing.
+                // With mDNS enabled, discovery handles this (line 362-368). Without mDNS,
+                // peers dialed via DNS bootstrap connect but aren't added to Kademlia
+                // because DNS multiaddrs lack PeerIDs at deploy time.
+                if !self.config.enable_mdns {
+                    let addr = endpoint.get_remote_address().clone();
+                    let mut swarm = self.swarm.write().await;
+                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr.clone());
+                    info!(peer = %peer_id, addr = %addr, "Added peer to Kademlia (bootstrap connection)");
+                }
                 self.refresh_status().await;
             }
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
@@ -393,8 +408,7 @@ impl P2PNode {
                         request_id,
                         response,
                     } => {
-                        debug!(request_id = ?request_id, response = ?response, "Received sync response");
-                        // Response handling for outbound requests would go here
+                        self.handle_sync_response(peer, request_id, response).await;
                     }
                 }
             }
@@ -625,6 +639,114 @@ impl P2PNode {
         }
     }
 
+    /// Handle an outbound sync response from a peer.
+    /// Called when we receive responses to our sync requests (e.g., from initiate_sync_round).
+    async fn handle_sync_response(
+        &self,
+        peer: PeerId,
+        request_id: request_response::OutboundRequestId,
+        response: SyncResponse,
+    ) {
+        match response {
+            SyncResponse::DocumentList { app_id, documents, total, .. } => {
+                debug!(
+                    peer = %peer, app_id = %app_id, doc_count = documents.len(),
+                    total = total, "Received document list from peer"
+                );
+
+                // Compare with local documents and request changes for diverged ones
+                for remote_doc in &documents {
+                    match self.sync_manager.get_heads(&app_id, &remote_doc.doc_id).await {
+                        Ok(local_heads) => {
+                            if local_heads != remote_doc.heads {
+                                // Heads differ — request changes from this peer
+                                let sync_request = SyncRequest::SyncChanges {
+                                    app_id: app_id.clone(),
+                                    doc_id: remote_doc.doc_id.clone(),
+                                    have_heads: local_heads,
+                                    bloom_filter: None,
+                                };
+                                let mut swarm = self.swarm.write().await;
+                                let req_id = swarm
+                                    .behaviour_mut()
+                                    .sync_protocol
+                                    .send_request(&peer, sync_request);
+                                debug!(
+                                    peer = %peer, doc_id = %remote_doc.doc_id,
+                                    request_id = ?req_id, "Requested changes for diverged document"
+                                );
+                            }
+                        }
+                        Err(_) => {
+                            // Document doesn't exist locally — request full sync
+                            let sync_request = SyncRequest::SyncChanges {
+                                app_id: app_id.clone(),
+                                doc_id: remote_doc.doc_id.clone(),
+                                have_heads: vec![],
+                                bloom_filter: None,
+                            };
+                            let mut swarm = self.swarm.write().await;
+                            let req_id = swarm
+                                .behaviour_mut()
+                                .sync_protocol
+                                .send_request(&peer, sync_request);
+                            debug!(
+                                peer = %peer, doc_id = %remote_doc.doc_id,
+                                request_id = ?req_id, "Requested full sync for new document"
+                            );
+                        }
+                    }
+                }
+            }
+            SyncResponse::Changes { app_id, doc_id, changes, new_heads, .. } => {
+                if changes.is_empty() {
+                    debug!(peer = %peer, app_id = %app_id, doc_id = %doc_id, "No new changes from peer");
+                    return;
+                }
+                info!(
+                    peer = %peer, app_id = %app_id, doc_id = %doc_id,
+                    change_count = changes.len(), "Applying changes from peer"
+                );
+                if let Err(e) = self.sync_manager.apply_changes(&app_id, &doc_id, changes).await {
+                    warn!(
+                        peer = %peer, app_id = %app_id, doc_id = %doc_id,
+                        error = %e, "Failed to apply sync changes"
+                    );
+                } else {
+                    debug!(
+                        peer = %peer, doc_id = %doc_id,
+                        new_heads = ?new_heads, "Changes applied successfully"
+                    );
+                }
+            }
+            SyncResponse::Heads { app_id, doc_id, heads, .. } => {
+                // Compare with local heads and request changes if different
+                match self.sync_manager.get_heads(&app_id, &doc_id).await {
+                    Ok(local_heads) if local_heads != heads => {
+                        let sync_request = SyncRequest::SyncChanges {
+                            app_id: app_id.clone(),
+                            doc_id: doc_id.clone(),
+                            have_heads: local_heads,
+                            bloom_filter: None,
+                        };
+                        let mut swarm = self.swarm.write().await;
+                        swarm.behaviour_mut().sync_protocol.send_request(&peer, sync_request);
+                        debug!(peer = %peer, doc_id = %doc_id, "Heads differ, requesting changes");
+                    }
+                    _ => {
+                        debug!(peer = %peer, doc_id = %doc_id, "Heads match, in sync");
+                    }
+                }
+            }
+            SyncResponse::Error { message } => {
+                warn!(peer = %peer, request_id = ?request_id, error = %message, "Sync error from peer");
+            }
+            _ => {
+                debug!(peer = %peer, request_id = ?request_id, "Unhandled sync response type");
+            }
+        }
+    }
+
     /// Get shutdown sender for graceful shutdown
     pub fn shutdown_sender(&self) -> broadcast::Sender<()> {
         self.shutdown_tx.clone()
@@ -639,6 +761,38 @@ impl P2PNode {
     pub fn handle(&self) -> P2PHandle {
         P2PHandle {
             status_rx: self.status_tx.subscribe(),
+        }
+    }
+
+    /// Initiate a sync round with all connected peers.
+    /// Sends ListDocuments requests; responses arrive as SyncProtocol events
+    /// and are handled in `handle_behaviour_event`.
+    async fn initiate_sync_round(&self) {
+        let swarm = self.swarm.read().await;
+        let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+        drop(swarm);
+
+        if peers.is_empty() {
+            debug!("Sync round: no connected peers, skipping");
+            return;
+        }
+
+        info!(peer_count = peers.len(), "Initiating sync round");
+
+        for peer_id in peers {
+            let request = SyncRequest::ListDocuments {
+                app_id: "elohim".to_string(),
+                prefix: None,
+                offset: 0,
+                limit: 1000,
+            };
+
+            let mut swarm = self.swarm.write().await;
+            let request_id = swarm
+                .behaviour_mut()
+                .sync_protocol
+                .send_request(&peer_id, request);
+            debug!(peer = %peer_id, request_id = ?request_id, "Sent ListDocuments sync request");
         }
     }
 

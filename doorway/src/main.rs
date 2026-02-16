@@ -325,6 +325,42 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
+    // Set up P2P status polling from elohim-storage (if STORAGE_URL configured)
+    if let Some(ref storage_url) = state.args.storage_url {
+        let (tx, rx) = tokio::sync::watch::channel(None);
+        state.p2p_status = Some(rx);
+        let url = format!("{}/p2p/status", storage_url.trim_end_matches('/'));
+        tokio::spawn(async move {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .unwrap();
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                match client.get(&url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        if let Ok(status) = resp.json::<serde_json::Value>().await {
+                            let health = doorway::routes::health::P2PHealth {
+                                connected_peers: status["connected_peers"].as_u64().unwrap_or(0)
+                                    as usize,
+                                peer_id: status["peer_id"].as_str().unwrap_or("").to_string(),
+                                sync_documents: status["sync_documents"].as_u64().unwrap_or(0)
+                                    as usize,
+                            };
+                            let _ = tx.send(Some(health));
+                        }
+                    }
+                    _ => {
+                        // Storage not reachable or P2P not enabled — clear cached status
+                        let _ = tx.send(None);
+                    }
+                }
+            }
+        });
+        info!("P2P status polling enabled (every 30s from elohim-storage)");
+    }
+
     let state = Arc::new(state);
 
     // Start zome capability discovery (import configs, cache rules)

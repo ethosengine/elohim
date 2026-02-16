@@ -60,6 +60,9 @@ pub struct HealthResponse {
     pub conductor: ConductorHealth,
     /// Projection role (writer or reader)
     pub projection: ProjectionRole,
+    /// P2P network status (populated when storage has P2P enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub p2p: Option<P2PHealth>,
     /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -94,6 +97,17 @@ pub struct ConductorHealth {
 pub struct ProjectionRole {
     /// Whether this instance is the projection writer
     pub writer: bool,
+}
+
+/// P2P network health status (from elohim-storage /p2p/status)
+#[derive(Debug, Clone, Serialize)]
+pub struct P2PHealth {
+    /// Number of connected P2P peers
+    pub connected_peers: usize,
+    /// Local peer ID
+    pub peer_id: String,
+    /// Number of sync-tracked documents
+    pub sync_documents: usize,
 }
 
 /// Build health response with current state
@@ -201,6 +215,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         projection: ProjectionRole {
             writer: args.projection_writer,
         },
+        p2p: state.p2p_status.as_ref().and_then(|rx| rx.borrow().clone()),
         error,
     }
 }
