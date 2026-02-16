@@ -30,6 +30,9 @@ export * from './trust-badge.model';
 // Human consent and relationships
 export * from './human-consent.model';
 
+// Banner notification system
+export * from './banner-notice.model';
+
 // Infrastructure
 export * from './source-chain.model';
 export * from './json-ld.model';

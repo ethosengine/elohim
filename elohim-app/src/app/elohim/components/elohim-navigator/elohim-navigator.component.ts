@@ -5,7 +5,7 @@ import { RouterLink, Router, NavigationEnd } from '@angular/router';
 
 // @coverage: 38.3% (2026-02-05)
 
-import { filter, takeUntil } from 'rxjs/operators';
+import { filter, map, takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';
 
@@ -14,12 +14,21 @@ import { EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.mod
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { AgencyBadgeComponent } from '@app/imagodei/components/agency-badge/agency-badge.component';
 import { ConnectionIndicatorComponent } from '@app/imagodei/components/connection-indicator/connection-indicator.component';
-import { SessionHuman, HolochainUpgradePrompt } from '@app/imagodei/models/session-human.model';
+import { UpgradeModalComponent } from '@app/imagodei/components/upgrade-modal/upgrade-modal.component';
+import { SessionHuman } from '@app/imagodei/models/session-human.model';
 import { AuthService } from '@app/imagodei/services/auth.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
+import { UpgradeBannerProvider } from '@app/imagodei/services/providers/upgrade-banner.provider';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
+import {
+  AlertBannerComponent,
+  AlertData,
+  AlertAction,
+} from '../../../shared/components/alert-banner';
+import { BannerNotice, bannerNoticeToAlertData } from '../../models/banner-notice.model';
+import { BannerService } from '../../services/banner.service';
 
 /**
  * Context app identifiers for the Elohim Protocol
@@ -57,6 +66,8 @@ export interface ContextAppConfig {
     ThemeToggleComponent,
     AgencyBadgeComponent,
     ConnectionIndicatorComponent,
+    AlertBannerComponent,
+    UpgradeModalComponent,
   ],
   templateUrl: './elohim-navigator.component.html',
   styleUrls: ['./elohim-navigator.component.css'],
@@ -73,7 +84,12 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
 
   /** Session human state */
   session: SessionHuman | null = null;
-  activeUpgradePrompt: HolochainUpgradePrompt | null = null;
+
+  /** Banner notices mapped to AlertData for the template */
+  bannerAlerts: AlertData[] = [];
+
+  /** Active banner notices (kept for delegation) */
+  private bannerNotices: BannerNotice[] = [];
 
   /** UI state */
   showProfileTray = false;
@@ -143,6 +159,12 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
 
   private readonly destroy$ = new Subject<void>();
 
+  /** Banner service for aggregated notifications */
+  private readonly bannerService = inject(BannerService);
+
+  /** Upgrade banner provider (injected to ensure it's instantiated and to subscribe to modal requests) */
+  private readonly upgradeBannerProvider = inject(UpgradeBannerProvider);
+
   constructor(
     private readonly sessionHumanService: SessionHumanService,
     private readonly router: Router,
@@ -199,10 +221,26 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
       this.session = session;
     });
 
-    // Subscribe to upgrade prompts
-    this.sessionHumanService.upgradePrompts$.pipe(takeUntil(this.destroy$)).subscribe(prompts => {
-      this.activeUpgradePrompt = prompts.find(p => !p.dismissed) ?? null;
-    });
+    // Subscribe to banner notices for the current context
+    this.bannerService
+      .noticesForContext$(this.context as 'global' | 'lamad' | 'shefa' | 'qahal' | 'doorway')
+      .pipe(
+        map(notices => {
+          this.bannerNotices = notices;
+          return notices.map(bannerNoticeToAlertData);
+        }),
+        takeUntil(this.destroy$)
+      )
+      .subscribe(alerts => {
+        this.bannerAlerts = alerts;
+      });
+
+    // Subscribe to upgrade modal requests from the provider
+    this.upgradeBannerProvider.upgradeModalRequested$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.openUpgradeModal();
+      });
 
     // Close trays on navigation
     this.router.events
@@ -396,19 +434,23 @@ export class ElohimNavigatorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Dismiss the current upgrade prompt
+   * Handle banner dismiss event from AlertBannerComponent.
    */
-  dismissUpgradePrompt(): void {
-    if (this.activeUpgradePrompt) {
-      this.sessionHumanService.dismissUpgradePrompt(this.activeUpgradePrompt.id);
+  onBannerDismissed(alert: AlertData): void {
+    const notice = this.bannerNotices.find(n => n.id === alert.id);
+    if (notice) {
+      this.bannerService.dismissNotice(notice);
     }
   }
 
   /**
-   * Handle "Join Network" action
+   * Handle banner action event from AlertBannerComponent.
    */
-  onJoinNetwork(): void {
-    this.openUpgradeModal();
+  onBannerAction(event: { alert: AlertData; action: AlertAction }): void {
+    const notice = this.bannerNotices.find(n => n.id === event.alert.id);
+    if (notice) {
+      this.bannerService.handleAction(notice, event.action.id);
+    }
   }
 
   // =========================================================================
