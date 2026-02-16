@@ -171,6 +171,15 @@ pub struct Args {
     /// Returned in native-handoff response for Tauri clients
     #[arg(long, env = "SIGNAL_URL")]
     pub signal_url: Option<String>,
+
+    /// Headless service base name for StatefulSet peer discovery
+    /// e.g., "elohim-edgenode-staging" → queries elohim-edgenode-staging-{N}.elohim-edgenode-staging-headless:8090
+    #[arg(long, env = "HEADLESS_SERVICE_BASE")]
+    pub headless_service_base: Option<String>,
+
+    /// Number of StatefulSet replicas for P2P peer enumeration
+    #[arg(long, env = "STATEFULSET_REPLICAS")]
+    pub statefulset_replicas: Option<u32>,
 }
 
 /// NATS connection configuration

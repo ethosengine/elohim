@@ -29,15 +29,17 @@
 //! ```
 
 pub mod behaviour;
+pub mod kad_store;
 pub mod shard_protocol;
 pub mod sync_protocol;
 
 use futures::StreamExt;
 use libp2p::{
+    autonat, dcutr, identify,
     kad,
     mdns, noise,
     multiaddr::Protocol,
-    request_response,
+    relay, request_response,
     swarm::{Swarm, SwarmEvent},
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
@@ -53,7 +55,7 @@ use crate::error::StorageError;
 use crate::identity::NodeIdentity;
 use crate::sync::{DocStore, DocStoreConfig, SyncManager, StreamTracker};
 
-pub use behaviour::ElohimStorageBehaviour;
+pub use behaviour::{ElohimStorageBehaviour, RelayMode};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{SyncCodec, SyncProtocol, SyncRequest, SyncResponse, DocumentInfo};
 
@@ -72,6 +74,10 @@ pub struct P2PConfig {
     pub request_timeout: Duration,
     /// Storage directory for sync databases
     pub storage_dir: std::path::PathBuf,
+    /// Relay mode: Client (desktop steward), Server (K8s pod), Both (doorway host)
+    pub relay_mode: RelayMode,
+    /// Addresses to announce to the network (e.g., public IP/DNS multiaddrs)
+    pub announce_addresses: Vec<String>,
 }
 
 impl Default for P2PConfig {
@@ -85,6 +91,8 @@ impl Default for P2PConfig {
             storage_dir: dirs::data_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join("elohim-storage"),
+            relay_mode: RelayMode::default(),
+            announce_addresses: Vec::new(),
         }
     }
 }
@@ -105,6 +113,10 @@ pub struct P2PNode {
     shutdown_tx: broadcast::Sender<()>,
     /// Status broadcast for HttpServer handle
     status_tx: tokio::sync::watch::Sender<P2PStatusInfo>,
+    /// Current NAT status (updated by autonat events)
+    nat_status: Arc<RwLock<String>>,
+    /// Active relay reservation count
+    relay_reservations: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 /// P2P node status for observability
@@ -115,6 +127,14 @@ pub struct P2PStatusInfo {
     pub connected_peers: usize,
     pub bootstrap_nodes: Vec<String>,
     pub sync_documents: usize,
+    /// NAT status detected by autonat: "Unknown", "Public", "Private"
+    pub nat_status: String,
+    /// Number of active relay reservations
+    pub relay_reservations: usize,
+    /// Addresses announced to the network
+    pub announce_addresses: Vec<String>,
+    /// Relay mode this node is running in
+    pub relay_mode: String,
 }
 
 /// Send+Sync handle for querying P2P status from HttpServer.
@@ -141,7 +161,7 @@ impl P2PNode {
         let keypair = identity.keypair().clone();
         let peer_id = *identity.peer_id();
 
-        // Build swarm
+        // Build swarm with relay client transport for NAT traversal
         let swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
             .with_tcp(
@@ -150,8 +170,10 @@ impl P2PNode {
                 yamux::Config::default,
             )
             .map_err(|e| StorageError::P2PNetwork(format!("Transport error: {}", e)))?
-            .with_behaviour(|key| {
-                ElohimStorageBehaviour::new(key.clone(), config.clone())
+            .with_relay_client(noise::Config::new, yamux::Config::default)
+            .map_err(|e| StorageError::P2PNetwork(format!("Relay client error: {}", e)))?
+            .with_behaviour(|key, relay_client| {
+                ElohimStorageBehaviour::new(key.clone(), config.clone(), relay_client)
             })
             .map_err(|e| StorageError::P2PNetwork(format!("Behaviour error: {}", e)))?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
@@ -174,10 +196,14 @@ impl P2PNode {
             connected_peers: 0,
             bootstrap_nodes: config.bootstrap_nodes.clone(),
             sync_documents: 0,
+            nat_status: "Unknown".to_string(),
+            relay_reservations: 0,
+            announce_addresses: config.announce_addresses.clone(),
+            relay_mode: config.relay_mode.to_string(),
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
-        info!(peer_id = %peer_id, "Created P2P node with sync support");
+        info!(peer_id = %peer_id, relay_mode = %config.relay_mode, "Created P2P node with NAT traversal");
 
         Ok(Self {
             identity,
@@ -187,6 +213,8 @@ impl P2PNode {
             sync_manager,
             shutdown_tx,
             status_tx,
+            nat_status: Arc::new(RwLock::new("Unknown".to_string())),
+            relay_reservations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         })
     }
 
@@ -208,6 +236,19 @@ impl P2PNode {
             swarm
                 .listen_on(multiaddr)
                 .map_err(|e| StorageError::P2PNetwork(format!("Listen error: {}", e)))?;
+        }
+
+        // Add external addresses for announcement (e.g., public IP, DNS names)
+        for addr_str in &self.config.announce_addresses {
+            match addr_str.parse::<Multiaddr>() {
+                Ok(addr) => {
+                    swarm.add_external_address(addr.clone());
+                    info!(address = %addr, "Added external announce address");
+                }
+                Err(e) => {
+                    warn!("Invalid announce address '{}': {}", addr_str, e);
+                }
+            }
         }
 
         // Dial bootstrap nodes
@@ -434,6 +475,80 @@ impl P2PNode {
                 request_response::Event::ResponseSent { peer, request_id },
             ) => {
                 debug!(peer = %peer, request_id = ?request_id, "Sync response sent");
+            }
+
+            // === NAT traversal events ===
+
+            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
+                peer_id,
+                info,
+            }) => {
+                info!(
+                    peer = %peer_id,
+                    agent = %info.agent_version,
+                    protocols = ?info.protocols.len(),
+                    "Identify: received peer info"
+                );
+                // Add observed addresses to Kademlia for better routing
+                let mut swarm = self.swarm.write().await;
+                for addr in info.listen_addrs {
+                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Sent { peer_id }) => {
+                debug!(peer = %peer_id, "Identify: sent our info to peer");
+            }
+            behaviour::ElohimStorageBehaviourEvent::Identify(event) => {
+                debug!(event = ?event, "Identify event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::AutoNat(autonat::Event::StatusChanged {
+                old,
+                new,
+            }) => {
+                let status_str = match &new {
+                    autonat::NatStatus::Public(_addr) => "Public",
+                    autonat::NatStatus::Private => "Private",
+                    autonat::NatStatus::Unknown => "Unknown",
+                };
+                info!(
+                    old = ?old,
+                    new = ?new,
+                    "AutoNAT: NAT status changed to {}",
+                    status_str
+                );
+                *self.nat_status.write().await = status_str.to_string();
+            }
+            behaviour::ElohimStorageBehaviourEvent::AutoNat(event) => {
+                debug!(event = ?event, "AutoNAT event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::RelayClient(
+                relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, .. },
+            ) => {
+                if renewal {
+                    debug!(relay = %relay_peer_id, "Relay: reservation renewed");
+                } else {
+                    info!(relay = %relay_peer_id, "Relay: reservation accepted");
+                    self.relay_reservations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::RelayClient(event) => {
+                debug!(event = ?event, "Relay client event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::RelayServer(event) => {
+                debug!(event = ?event, "Relay server event");
+            }
+
+            behaviour::ElohimStorageBehaviourEvent::Dcutr(dcutr::Event {
+                remote_peer_id,
+                result,
+            }) => {
+                match result {
+                    Ok(_) => info!(peer = %remote_peer_id, "DCUtR: direct connection upgraded"),
+                    Err(ref e) => debug!(peer = %remote_peer_id, error = %e, "DCUtR: upgrade failed"),
+                }
             }
         }
     }
@@ -805,6 +920,8 @@ impl P2PNode {
             .collect();
         let bootstrap_nodes: Vec<String> = self.config.bootstrap_nodes.clone();
         let sync_documents = self.sync_manager.count_documents("_all").await.unwrap_or(0) as usize;
+        let nat_status = self.nat_status.read().await.clone();
+        let relay_reservations = self.relay_reservations.load(std::sync::atomic::Ordering::Relaxed);
 
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
@@ -812,6 +929,10 @@ impl P2PNode {
             connected_peers,
             bootstrap_nodes,
             sync_documents,
+            nat_status,
+            relay_reservations,
+            announce_addresses: self.config.announce_addresses.clone(),
+            relay_mode: self.config.relay_mode.to_string(),
         };
         let _ = self.status_tx.send(status);
     }

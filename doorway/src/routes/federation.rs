@@ -177,6 +177,137 @@ pub fn handle_doorway_keys(state: Arc<AppState>) -> Response<Full<Bytes>> {
 }
 
 // =============================================================================
+// P2P Peer Advertisement
+// =============================================================================
+
+/// P2P peer info for bootstrap discovery
+#[derive(Serialize)]
+pub struct P2PPeerInfo {
+    pub peer_id: String,
+    pub multiaddrs: Vec<String>,
+    pub capabilities: Vec<String>,
+    pub nat_status: Option<String>,
+}
+
+/// Response for GET /api/v1/federation/p2p-peers
+#[derive(Serialize)]
+pub struct P2PPeersResponse {
+    pub peers: Vec<P2PPeerInfo>,
+    pub total: usize,
+}
+
+/// Handle GET /api/v1/federation/p2p-peers
+///
+/// Returns P2P peer information for desktop stewards to bootstrap into the mesh.
+/// Queries local elohim-storage's /p2p/status endpoint and transforms the result.
+/// For StatefulSet pods (replicas > 1), iterates headless DNS names.
+pub async fn handle_federation_p2p_peers(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let storage_url = state.args.storage_url.clone()
+        .unwrap_or_else(|| "http://localhost:8090".to_string());
+
+    let mut peers = Vec::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
+    // Query local elohim-storage's P2P status
+    match query_storage_p2p_status(&client, &storage_url).await {
+        Ok(peer) => peers.push(peer),
+        Err(e) => {
+            tracing::debug!("Failed to query local storage P2P status: {}", e);
+        }
+    }
+
+    // For K8s StatefulSet, also query headless DNS peers
+    // Pattern: elohim-edgenode-{env}-{N}.elohim-edgenode-{env}-headless:8090
+    if let Some(ref headless_base) = state.args.headless_service_base {
+        let replicas = state.args.statefulset_replicas.unwrap_or(2);
+        for i in 0..replicas {
+            let peer_url = format!(
+                "http://{}-{}.{}-headless:8090",
+                headless_base, i, headless_base
+            );
+            // Skip if same as local storage
+            if peer_url.contains("localhost") {
+                continue;
+            }
+            match query_storage_p2p_status(&client, &peer_url).await {
+                Ok(peer) => {
+                    // Deduplicate by peer_id
+                    if !peers.iter().any(|p| p.peer_id == peer.peer_id) {
+                        peers.push(peer);
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!("Failed to query peer at {}: {}", peer_url, e);
+                }
+            }
+        }
+    }
+
+    let total = peers.len();
+    let response = P2PPeersResponse { peers, total };
+
+    match serde_json::to_string_pretty(&response) {
+        Ok(json) => Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .header("Cache-Control", "public, max-age=30")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap(),
+        Err(e) => Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(format!(
+                r#"{{"error": "Serialization failed: {e}"}}"#
+            ))))
+            .unwrap(),
+    }
+}
+
+/// Query a single elohim-storage instance's /p2p/status and transform to P2PPeerInfo
+async fn query_storage_p2p_status(
+    client: &reqwest::Client,
+    base_url: &str,
+) -> Result<P2PPeerInfo, String> {
+    let url = format!("{}/p2p/status", base_url.trim_end_matches('/'));
+    let resp = client.get(&url).send().await
+        .map_err(|e| format!("HTTP error: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Non-200 status: {}", resp.status()));
+    }
+
+    let body: serde_json::Value = resp.json().await
+        .map_err(|e| format!("JSON parse error: {}", e))?;
+
+    let peer_id = body["peer_id"].as_str()
+        .ok_or("Missing peer_id")?
+        .to_string();
+
+    let multiaddrs: Vec<String> = body["listen_addresses"]
+        .as_array()
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+
+    let nat_status = body["nat_status"].as_str().map(String::from);
+
+    let relay_mode = body["relay_mode"].as_str().unwrap_or("client");
+    let mut capabilities = vec!["shard".to_string(), "sync".to_string()];
+    if relay_mode == "server" || relay_mode == "both" {
+        capabilities.push("relay".to_string());
+    }
+
+    Ok(P2PPeerInfo {
+        peer_id,
+        multiaddrs,
+        capabilities,
+        nat_status,
+    })
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 

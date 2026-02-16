@@ -60,12 +60,23 @@ pub struct HealthResponse {
     pub conductor: ConductorHealth,
     /// Projection role (writer or reader)
     pub projection: ProjectionRole,
-    /// P2P network status (populated when storage has P2P enabled)
+    /// P2P network status (from elohim-storage sidecar)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub p2p: Option<P2PHealth>,
     /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+/// P2P network health from elohim-storage sidecar
+#[derive(Serialize, Clone)]
+pub struct P2PHealth {
+    /// Whether P2P networking is enabled
+    pub enabled: bool,
+    /// Number of connected P2P peers
+    pub peer_count: usize,
+    /// Local peer ID
+    pub peer_id: Option<String>,
 }
 
 /// Cache status for backwards compatibility
@@ -97,17 +108,6 @@ pub struct ConductorHealth {
 pub struct ProjectionRole {
     /// Whether this instance is the projection writer
     pub writer: bool,
-}
-
-/// P2P network health status (from elohim-storage /p2p/status)
-#[derive(Debug, Clone, Serialize)]
-pub struct P2PHealth {
-    /// Number of connected P2P peers
-    pub connected_peers: usize,
-    /// Local peer ID
-    pub peer_id: String,
-    /// Number of sync-tracked documents
-    pub sync_documents: usize,
 }
 
 /// Build health response with current state
@@ -187,6 +187,9 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
+    // Read cached P2P health (non-blocking — uses try_read to avoid stalling health checks)
+    let p2p = state.p2p_health.try_read().ok().and_then(|guard| guard.clone());
+
     HealthResponse {
         healthy: true, // Service is running
         status,
@@ -215,7 +218,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
         projection: ProjectionRole {
             writer: args.projection_writer,
         },
-        p2p: state.p2p_status.as_ref().and_then(|rx| rx.borrow().clone()),
+        p2p,
         error,
     }
 }

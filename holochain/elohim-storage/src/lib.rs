@@ -95,7 +95,7 @@ pub use content_server::{ContentServerBridge, ContentServerConfig, PublisherInfo
 #[cfg(feature = "p2p")]
 pub use identity::NodeIdentity;
 #[cfg(feature = "p2p")]
-pub use p2p::{P2PConfig, P2PHandle, P2PNode, P2PStatusInfo};
+pub use p2p::{P2PConfig, P2PHandle, P2PNode, P2PStatusInfo, RelayMode};
 
 // Sync re-exports
 pub use sync::{DocStore, DocStoreConfig, StoredDocument, StreamPosition, StreamTracker, SyncManager};

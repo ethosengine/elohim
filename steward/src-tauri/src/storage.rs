@@ -21,6 +21,14 @@ pub struct StorageConfig {
     pub port: u16,
     pub storage_dir: PathBuf,
     pub enable_content_db: bool,
+    /// Enable P2P networking for shard transfer and sync
+    pub enable_p2p: bool,
+    /// P2P listen port (0 for random)
+    pub p2p_port: u16,
+    /// Bootstrap node multiaddrs for P2P mesh discovery
+    pub bootstrap_nodes: Vec<String>,
+    /// Agent public key for P2P identity
+    pub agent_pubkey: Option<String>,
 }
 
 impl StorageProcess {
@@ -37,6 +45,19 @@ impl StorageProcess {
 
         if config.enable_content_db {
             cmd.arg("--enable-content-db");
+        }
+
+        if config.enable_p2p {
+            cmd.arg("--enable-p2p");
+            cmd.arg("--p2p-port").arg(config.p2p_port.to_string());
+
+            if let Some(ref pubkey) = config.agent_pubkey {
+                cmd.arg("--agent-pubkey").arg(pubkey);
+            }
+
+            for node in &config.bootstrap_nodes {
+                cmd.arg("--bootstrap-nodes").arg(node);
+            }
         }
 
         // Suppress stdin, let stdout/stderr flow to parent's log

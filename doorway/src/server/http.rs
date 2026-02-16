@@ -97,8 +97,8 @@ pub struct AppState {
     pub zome_caller: Option<Arc<crate::services::ZomeCaller>>,
     /// Cache of peer doorways discovered via HTTP federation
     pub peer_cache: crate::services::federation::PeerCache,
-    /// Cached P2P status from elohim-storage (polled every 30s)
-    pub p2p_status: Option<tokio::sync::watch::Receiver<Option<crate::routes::health::P2PHealth>>>,
+    /// Cached P2P health from elohim-storage sidecar (polled every 30s)
+    pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
 }
 
 impl AppState {
@@ -160,7 +160,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
-            p2p_status: None,
+            p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
@@ -226,7 +226,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
-            p2p_status: None,
+            p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
@@ -307,7 +307,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
-            p2p_status: None,
+            p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
@@ -382,7 +382,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
-            p2p_status: None,
+            p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         })
     }
 
@@ -445,6 +445,40 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         std::time::Duration::from_secs(60),
     );
     info!("Custodian service enabled for P2P blob distribution");
+
+    // Start P2P health polling task (every 30 seconds)
+    {
+        let p2p_health = Arc::clone(&state.p2p_health);
+        let storage_url = state.args.storage_url.clone()
+            .unwrap_or_else(|| "http://localhost:8090".to_string());
+        tokio::spawn(async move {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                let url = format!("{}/p2p/status", storage_url.trim_end_matches('/'));
+                match client.get(&url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        if let Ok(body) = resp.json::<serde_json::Value>().await {
+                            let health = crate::routes::health::P2PHealth {
+                                enabled: true,
+                                peer_count: body["connected_peers"].as_u64().unwrap_or(0) as usize,
+                                peer_id: body["peer_id"].as_str().map(String::from),
+                            };
+                            *p2p_health.write().await = Some(health);
+                        }
+                    }
+                    _ => {
+                        // P2P not available — clear cached health
+                        *p2p_health.write().await = None;
+                    }
+                }
+            }
+        });
+    }
 
     loop {
         match listener.accept().await {
@@ -568,6 +602,11 @@ async fn handle_request(
         // Federation doorway listing
         (Method::GET, "/api/v1/federation/doorways") => {
             to_boxed(routes::handle_federation_doorways(Arc::clone(&state)).await)
+        }
+
+        // P2P peer discovery for desktop steward bootstrap
+        (Method::GET, "/api/v1/federation/p2p-peers") => {
+            to_boxed(routes::handle_federation_p2p_peers(Arc::clone(&state)).await)
         }
 
         // CORS preflight

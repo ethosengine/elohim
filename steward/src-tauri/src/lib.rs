@@ -258,6 +258,53 @@ fn holochain_dir() -> PathBuf {
 
 const STORAGE_PORT: u16 = 8090;
 
+/// Fetch P2P bootstrap node multiaddrs from a doorway's federation endpoint.
+///
+/// Desktop stewards call this to discover relay servers and bootstrap into the P2P mesh.
+/// Falls back gracefully — if the doorway doesn't support this endpoint yet, P2P
+/// still works via mDNS for local peers.
+async fn fetch_p2p_bootstrap_nodes(doorway_url: &str) -> Result<Vec<String>, String> {
+    let url = format!(
+        "{}/api/v1/federation/p2p-peers",
+        doorway_url.trim_end_matches('/')
+    );
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("HTTP client error: {}", e))?;
+
+    let resp = client.get(&url).send().await
+        .map_err(|e| format!("Failed to fetch P2P peers: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("P2P peers endpoint returned {}", resp.status()));
+    }
+
+    let body: serde_json::Value = resp.json().await
+        .map_err(|e| format!("Failed to parse P2P peers response: {}", e))?;
+
+    let mut multiaddrs = Vec::new();
+    if let Some(peers) = body["peers"].as_array() {
+        for peer in peers {
+            let peer_id = peer["peer_id"].as_str().unwrap_or_default();
+            if let Some(addrs) = peer["multiaddrs"].as_array() {
+                for addr in addrs {
+                    if let Some(addr_str) = addr.as_str() {
+                        // Append peer ID to multiaddr if not already present
+                        if addr_str.contains("/p2p/") {
+                            multiaddrs.push(addr_str.to_string());
+                        } else if !peer_id.is_empty() {
+                            multiaddrs.push(format!("{}/p2p/{}", addr_str, peer_id));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(multiaddrs)
+}
+
 /// Spawn elohim-storage as a managed sidecar process.
 ///
 /// - Skips if port is already healthy (dev guard — supports `just storage-start`)
@@ -308,8 +355,26 @@ async fn spawn_storage_sidecar(handle: &AppHandle) {
         .join("storage")
     };
 
+    // Read P2P bootstrap info from doorway.json (if user has connected to a doorway)
+    let agent_pubkey = read_active_account_value("agentPubKey");
+    let doorway_url = read_active_account_value("doorwayUrl");
+
+    // Fetch bootstrap nodes from doorway's P2P peer endpoint
+    let mut bootstrap_nodes = Vec::new();
+    if let Some(ref url) = doorway_url {
+        match fetch_p2p_bootstrap_nodes(url).await {
+            Ok(nodes) => {
+                log::info!("Fetched {} P2P bootstrap nodes from doorway", nodes.len());
+                bootstrap_nodes = nodes;
+            }
+            Err(e) => {
+                log::debug!("Could not fetch P2P bootstrap nodes: {} (P2P still works via mDNS)", e);
+            }
+        }
+    }
+
     log::info!(
-        "Starting elohim-storage on port {} (storage_dir: {})",
+        "Starting elohim-storage on port {} (storage_dir: {}, p2p: enabled)",
         STORAGE_PORT,
         storage_dir.display()
     );
@@ -319,6 +384,10 @@ async fn spawn_storage_sidecar(handle: &AppHandle) {
         port: STORAGE_PORT,
         storage_dir,
         enable_content_db: true,
+        enable_p2p: true,
+        p2p_port: 9876,
+        bootstrap_nodes,
+        agent_pubkey,
     };
 
     match storage::StorageProcess::spawn(config).await {
