@@ -109,8 +109,12 @@ impl AgentProvisioner {
             )
         })?;
 
-        let agent_pub_key_b64 =
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &agent_key);
+        // Use URL_SAFE_NO_PAD to match the format from zome discovery (discovery.rs:520)
+        // which is what ends up in JWT claims via get_agent_pub_key()
+        let agent_pub_key_b64 = base64::Engine::encode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            &agent_key,
+        );
 
         // 4. Install app
         if let Err(e) = admin
@@ -140,7 +144,7 @@ impl AgentProvisioner {
             ));
         }
 
-        // 6. Register agent→conductor mapping
+        // 6. Register agent→conductor mapping (both encodings for format compat)
         if let Err(e) = self
             .registry
             .register_agent(
@@ -159,6 +163,21 @@ impl AgentProvisioner {
                 warn!("Cleanup uninstall also failed: {}", cleanup_err);
             }
             return Err(format!("Failed to register agent mapping: {e}"));
+        }
+
+        // Also register under base64-standard encoding (covers any code path that
+        // might use STANDARD instead of URL_SAFE_NO_PAD for the JWT agent key)
+        let agent_pub_key_std =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &agent_key);
+        if agent_pub_key_std != agent_pub_key_b64 {
+            let _ = self
+                .registry
+                .register_agent(
+                    &agent_pub_key_std,
+                    &conductor.conductor_id,
+                    &installed_app_id,
+                )
+                .await;
         }
 
         info!(
