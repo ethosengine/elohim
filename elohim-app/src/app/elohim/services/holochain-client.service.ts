@@ -123,8 +123,19 @@ export class HolochainClientService {
 
   /**
    * Build ConnectionConfig from current HolochainConfig.
+   * Includes the doorway JWT for conductor affinity routing when available.
    */
   private buildConnectionConfig(): ConnectionConfig {
+    // Read doorway JWT from localStorage for conductor affinity routing.
+    // In multi-conductor deployments, doorway uses this token to route
+    // admin and app WebSocket connections to the same conductor.
+    let doorwayToken: string | undefined;
+    try {
+      doorwayToken = localStorage.getItem('elohim-auth-token') ?? undefined;
+    } catch {
+      // localStorage not available (SSR) — no token
+    }
+
     return {
       mode: this.strategy.mode,
       adminUrl: this.config.adminUrl,
@@ -135,6 +146,7 @@ export class HolochainClientService {
       happPath: this.config.happPath,
       origin: this.config.origin,
       useLocalProxy: this.config.useLocalProxy,
+      doorwayToken,
     };
   }
 

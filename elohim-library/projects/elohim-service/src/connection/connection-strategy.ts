@@ -76,6 +76,9 @@ export interface ConnectionConfig {
 
   /** Use local dev-proxy in Eclipse Che (auto-detected if true) */
   useLocalProxy?: boolean;
+
+  /** Doorway JWT token for conductor affinity routing (multi-conductor) */
+  doorwayToken?: string;
 }
 
 /**

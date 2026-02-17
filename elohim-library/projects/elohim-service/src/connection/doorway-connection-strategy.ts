@@ -160,11 +160,10 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       return url;
     }
 
-    // Deployed: use configured URL with /hc/admin path and optional API key
+    // Deployed: use configured URL with /hc/admin path, optional API key, and JWT for affinity
     const baseUrl = config.adminUrl.replace(/\/$/, '');
-    const url = config.proxyApiKey
-      ? `${baseUrl}/hc/admin?apiKey=${encodeURIComponent(config.proxyApiKey)}`
-      : `${baseUrl}/hc/admin`;
+    const params = this.buildQueryParams(config);
+    const url = params ? `${baseUrl}/hc/admin?${params}` : `${baseUrl}/hc/admin`;
     console.log('[DoorwayStrategy] Admin URL (doorway):', url);
     return url;
   }
@@ -183,10 +182,8 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     // Route app interface through doorway using /hc/app/:port path
     if (config.adminUrl && !config.adminUrl.includes('localhost')) {
       const baseUrl = config.adminUrl.replace(/\/$/, '');
-      const apiKeyParam = config.proxyApiKey
-        ? `?apiKey=${encodeURIComponent(config.proxyApiKey)}`
-        : '';
-      const url = `${baseUrl}/hc/app/${port}${apiKeyParam}`;
+      const params = this.buildQueryParams(config);
+      const url = params ? `${baseUrl}/hc/app/${port}?${params}` : `${baseUrl}/hc/app/${port}`;
       console.log('[DoorwayStrategy] App URL (doorway):', url);
       return url;
     }
@@ -467,6 +464,21 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   // ==========================================================================
   // Helper Methods
   // ==========================================================================
+
+  /**
+   * Build query string parameters for WebSocket URLs.
+   * Includes API key and JWT token for conductor affinity routing.
+   */
+  private buildQueryParams(config: ConnectionConfig): string {
+    const params: string[] = [];
+    if (config.proxyApiKey) {
+      params.push(`apiKey=${encodeURIComponent(config.proxyApiKey)}`);
+    }
+    if (config.doorwayToken) {
+      params.push(`token=${encodeURIComponent(config.doorwayToken)}`);
+    }
+    return params.join('&');
+  }
 
   /**
    * Get installed app info from conductor.
