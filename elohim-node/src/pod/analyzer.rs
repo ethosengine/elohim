@@ -4,7 +4,6 @@
 //! that may require action.
 
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
 
 use super::models::*;
 
@@ -16,7 +15,7 @@ const SPIKE_THRESHOLD: f64 = 2.5;
 
 /// Analyzer for observation patterns
 pub struct Analyzer {
-    node_id: String,
+    _node_id: String,
     /// Historical metrics for trend analysis
     metric_history: HashMap<String, Vec<f64>>,
 }
@@ -24,7 +23,7 @@ pub struct Analyzer {
 impl Analyzer {
     pub fn new(node_id: String) -> Self {
         Self {
-            node_id,
+            _node_id: node_id,
             metric_history: HashMap::new(),
         }
     }

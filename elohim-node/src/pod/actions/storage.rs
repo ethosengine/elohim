@@ -2,7 +2,7 @@
 //!
 //! Actions for replicating, evicting, rebuilding, and rebalancing storage.
 
-use tracing::{debug, info, warn};
+use tracing::info;
 
 use crate::pod::executor::ActionHandler;
 use crate::pod::models::*;

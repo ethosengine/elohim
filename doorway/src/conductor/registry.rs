@@ -187,6 +187,11 @@ impl ConductorRegistry {
         self.agents.get(agent_pub_key).map(|e| e.clone())
     }
 
+    /// Look up conductor info by ID
+    pub fn get_conductor_info(&self, conductor_id: &str) -> Option<ConductorInfo> {
+        self.conductors.get(conductor_id).map(|c| c.clone())
+    }
+
     /// Find the conductor with the most available capacity
     pub fn find_least_loaded(&self) -> Option<ConductorInfo> {
         self.conductors

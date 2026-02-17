@@ -16,7 +16,9 @@ use hyper::{Request, Response, StatusCode};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-use crate::auth::{extract_token_from_header, ApiKeyValidator, JwtValidator, PermissionLevel};
+use crate::auth::{
+    extract_token_from_header, ApiKeyValidator, Claims, JwtValidator, PermissionLevel,
+};
 use crate::proxy;
 use crate::server::http::AppState;
 
@@ -34,11 +36,16 @@ pub async fn handle_admin_upgrade(
     // Extract auth from request
     let auth_result = extract_permission(&state, &req);
 
+    // Check if this agent has a conductor assignment for affinity routing
+    let assigned_admin_url = resolve_admin_url(&state, &req);
+
     match auth_result {
         Ok(permission_level) => {
             info!(
-                "Admin WebSocket upgrade request (origin: {:?}, permission: {})",
-                origin, permission_level
+                "Admin WebSocket upgrade request (origin: {:?}, permission: {}, affinity: {})",
+                origin,
+                permission_level,
+                assigned_admin_url.as_deref().unwrap_or("default pool")
             );
 
             match hyper_tungstenite::upgrade(req, None) {
@@ -53,8 +60,22 @@ pub async fn handle_admin_upgrade(
                     tokio::spawn(async move {
                         match websocket.await {
                             Ok(ws) => {
-                                // Use admin pool routing if available (better scalability)
-                                if let Some(p) = admin_pool {
+                                // Priority 1: Route to assigned conductor's admin (affinity)
+                                if let Some(ref admin_url) = assigned_admin_url {
+                                    if let Err(e) = proxy::admin::run_proxy(
+                                        ws,
+                                        admin_url,
+                                        origin,
+                                        dev_mode,
+                                        permission_level,
+                                    )
+                                    .await
+                                    {
+                                        error!("Affinity admin proxy error: {:?}", e);
+                                    }
+                                }
+                                // Priority 2: Global admin pool (load-balanced)
+                                else if let Some(p) = admin_pool {
                                     if let Err(e) = proxy::pool::run_admin_proxy(
                                         ws,
                                         p,
@@ -66,19 +87,18 @@ pub async fn handle_admin_upgrade(
                                     {
                                         error!("Pool admin proxy error: {:?}", e);
                                     }
-                                } else {
-                                    // Fall back to direct proxy
-                                    if let Err(e) = proxy::admin::run_proxy(
-                                        ws,
-                                        &conductor_url,
-                                        origin,
-                                        dev_mode,
-                                        permission_level,
-                                    )
-                                    .await
-                                    {
-                                        error!("Admin proxy error: {:?}", e);
-                                    }
+                                }
+                                // Priority 3: Direct proxy to default conductor
+                                else if let Err(e) = proxy::admin::run_proxy(
+                                    ws,
+                                    &conductor_url,
+                                    origin,
+                                    dev_mode,
+                                    permission_level,
+                                )
+                                .await
+                                {
+                                    error!("Admin proxy error: {:?}", e);
                                 }
                             }
                             Err(e) => {
@@ -130,25 +150,30 @@ pub async fn handle_app_upgrade(
     // Preserve query parameters (like auth token)
     let query = req.uri().query().map(|q| q.to_string());
 
-    // Extract conductor host from CONDUCTOR_URL (e.g. "ws://edgenode:4445" -> "edgenode")
-    let conductor_host = extract_conductor_host(&state.args.conductor_url);
+    // Route to the agent's assigned conductor if JWT present, else use default
+    let (conductor_host, conductor_port) = resolve_conductor_for_app(&state, &req, port);
 
     info!(
-        "App WebSocket upgrade request for port {} (origin: {:?}, conductor: {})",
-        port, origin, conductor_host
+        "App WebSocket upgrade request for port {} (origin: {:?}, conductor: {}:{})",
+        port, origin, conductor_host, conductor_port
     );
 
     match hyper_tungstenite::upgrade(req, None) {
         Ok((response, websocket)) => {
-            // App connections always use direct proxy to the specific app port
-            // (The worker pool is for admin interface only, as it's connected to the conductor admin port)
+            // App connections use direct proxy to the conductor hosting this agent
             tokio::spawn(async move {
                 match websocket.await {
                     Ok(ws) => {
-                        if let Err(e) =
-                            proxy::app::run_proxy(ws, port, origin, query, &conductor_host).await
+                        if let Err(e) = proxy::app::run_proxy(
+                            ws,
+                            conductor_port,
+                            origin,
+                            query,
+                            &conductor_host,
+                        )
+                        .await
                         {
-                            error!("App proxy error (port {}): {:?}", port, e);
+                            error!("App proxy error (port {}): {:?}", conductor_port, e);
                         }
                     }
                     Err(e) => {
@@ -171,6 +196,124 @@ pub async fn handle_app_upgrade(
                 .unwrap()
         }
     }
+}
+
+/// Resolve the conductor host and port for an app WebSocket request.
+///
+/// If the request contains a valid JWT with an `agent_pub_key` that is assigned
+/// to a specific conductor in the registry, returns that conductor's host and port.
+/// Otherwise falls back to the default conductor URL and the client-requested port.
+fn resolve_conductor_for_app(
+    state: &AppState,
+    req: &Request<Incoming>,
+    client_port: u16,
+) -> (String, u16) {
+    let fallback = || {
+        (
+            extract_conductor_host(&state.args.conductor_url),
+            client_port,
+        )
+    };
+
+    let registry = match &state.conductor_registry {
+        Some(r) => r,
+        None => return fallback(),
+    };
+
+    let claims = match extract_claims(state, req) {
+        Some(c) => c,
+        None => return fallback(),
+    };
+
+    let entry = match registry.get_conductor_for_agent(&claims.agent_pub_key) {
+        Some(e) => e,
+        None => return fallback(),
+    };
+
+    // Extract host and port from the conductor's app URL (e.g. "ws://host:8445")
+    match extract_host_and_port(&entry.conductor_url) {
+        Some((host, port)) => {
+            info!(
+                agent = %claims.agent_pub_key,
+                conductor = %entry.conductor_id,
+                host = %host,
+                port = port,
+                "App WS routed to assigned conductor"
+            );
+            (host, port)
+        }
+        None => fallback(),
+    }
+}
+
+/// Resolve the admin URL for an admin WebSocket request.
+///
+/// If the request contains a valid JWT with an `agent_pub_key` assigned to a
+/// specific conductor, returns that conductor's `admin_url`.
+/// Returns `None` to indicate "use the default admin pool".
+fn resolve_admin_url(state: &AppState, req: &Request<Incoming>) -> Option<String> {
+    let registry = state.conductor_registry.as_ref()?;
+    let claims = extract_claims(state, req)?;
+    let entry = registry.get_conductor_for_agent(&claims.agent_pub_key)?;
+    let conductor_info = registry.get_conductor_info(&entry.conductor_id)?;
+
+    info!(
+        agent = %claims.agent_pub_key,
+        conductor = %entry.conductor_id,
+        admin_url = %conductor_info.admin_url,
+        "Admin WS routed to assigned conductor"
+    );
+
+    Some(conductor_info.admin_url)
+}
+
+/// Extract JWT claims from a request (query string or Authorization header).
+fn extract_claims(state: &AppState, req: &Request<Incoming>) -> Option<Claims> {
+    // Try query string first
+    if let Some(token) = extract_token_from_query(req.uri().query()) {
+        return decode_jwt_claims(state, &token);
+    }
+
+    // Try Authorization header
+    let auth_header = req
+        .headers()
+        .get(hyper::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+
+    if let Some(token) = extract_token_from_header(auth_header) {
+        return decode_jwt_claims(state, token);
+    }
+
+    None
+}
+
+/// Decode JWT token and return full claims (unlike validate_jwt which returns only permission).
+fn decode_jwt_claims(state: &AppState, token: &str) -> Option<Claims> {
+    let jwt = if state.args.dev_mode {
+        JwtValidator::new_dev()
+    } else {
+        state.args.jwt_secret.as_ref().and_then(|secret| {
+            JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()
+        })?
+    };
+
+    let result = jwt.verify_token(token);
+    if result.valid {
+        result.claims
+    } else {
+        None
+    }
+}
+
+/// Extract host and port from a WebSocket URL.
+///
+/// e.g. "ws://elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless:8445" -> ("elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless", 8445)
+fn extract_host_and_port(url: &str) -> Option<(String, u16)> {
+    let after_scheme = url.split("://").nth(1)?;
+    let colon = after_scheme.rfind(':')?;
+    let host = after_scheme[..colon].to_string();
+    let port = after_scheme[colon + 1..].parse::<u16>().ok()?;
+    Some((host, port))
 }
 
 /// Extract the host portion from a conductor URL.

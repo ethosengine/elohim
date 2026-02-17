@@ -2,8 +2,7 @@
 //!
 //! Actions for debugging and troubleshooting the node.
 
-use std::path::PathBuf;
-use tracing::{debug, info, warn, error};
+use tracing::info;
 
 use crate::pod::executor::ActionHandler;
 use crate::pod::models::*;
@@ -118,7 +117,7 @@ impl DebugActionHandler {
             .and_then(|v| v.as_str())
             .unwrap_or("Automated bug report");
 
-        let description = action.params.get("description")
+        let _description = action.params.get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
@@ -126,7 +125,7 @@ impl DebugActionHandler {
             .and_then(|v| v.as_str())
             .unwrap_or("medium");
 
-        let context = action.params.get("context");
+        let _context = action.params.get("context");
 
         info!(
             title,
