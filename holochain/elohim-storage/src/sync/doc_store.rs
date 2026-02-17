@@ -89,6 +89,23 @@ impl DocStore {
         Ok(Self { db, docs, meta })
     }
 
+    /// Create a document store from an existing sled::Db handle.
+    ///
+    /// Used when the database is shared with other components (e.g., Kademlia store).
+    pub fn from_db(db: sled::Db) -> Result<Self, StorageError> {
+        let docs = db
+            .open_tree("documents")
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        let meta = db
+            .open_tree("metadata")
+            .map_err(|e| StorageError::Database(e.to_string()))?;
+
+        info!("DocStore initialized from shared sled::Db");
+
+        Ok(Self { db, docs, meta })
+    }
+
     /// Create document store at a specific path
     pub async fn at_path(path: impl AsRef<Path>) -> Result<Self, StorageError> {
         Self::new(DocStoreConfig {

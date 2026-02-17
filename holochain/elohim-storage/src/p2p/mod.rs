@@ -53,7 +53,7 @@ use tracing::{debug, error, info, warn};
 use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::identity::NodeIdentity;
-use crate::sync::{DocStore, DocStoreConfig, SyncManager, StreamTracker};
+use crate::sync::{DocStore, SyncManager, StreamTracker};
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
@@ -161,6 +161,22 @@ impl P2PNode {
         let keypair = identity.keypair().clone();
         let peer_id = *identity.peer_id();
 
+        // Open sled database ONCE — shared between Kademlia store and DocStore.
+        // sled uses flock() which prevents multiple opens of the same path.
+        let sled_path = config.storage_dir.join("sync.sled");
+        if let Some(parent) = sled_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        let sled_db = sled::Config::new()
+            .path(&sled_path)
+            .cache_capacity(64 * 1024 * 1024)
+            .mode(sled::Mode::HighThroughput)
+            .open()
+            .map_err(|e| StorageError::Database(format!("Failed to open sync.sled: {}", e)))?;
+
+        // Clone handle for the behaviour closure (sled::Db is Arc-based, clone is cheap)
+        let kad_db = sled_db.clone();
+
         // Build swarm with relay client transport for NAT traversal
         let swarm = SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
@@ -173,18 +189,15 @@ impl P2PNode {
             .with_relay_client(noise::Config::new, yamux::Config::default)
             .map_err(|e| StorageError::P2PNetwork(format!("Relay client error: {}", e)))?
             .with_behaviour(|key, relay_client| {
-                ElohimStorageBehaviour::new(key.clone(), config.clone(), relay_client)
+                ElohimStorageBehaviour::new(key.clone(), config.clone(), relay_client, kad_db)
             })
             .map_err(|e| StorageError::P2PNetwork(format!("Behaviour error: {}", e)))?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
-        // Initialize sync infrastructure
-        let doc_store_config = DocStoreConfig {
-            db_path: config.storage_dir.join("sync.sled"),
-            ..Default::default()
-        };
-        let doc_store = Arc::new(DocStore::new(doc_store_config).await?);
+        // Initialize sync infrastructure (reuses same sled::Db handle)
+        let doc_store = Arc::new(DocStore::from_db(sled_db)
+            .map_err(|e| StorageError::Database(format!("DocStore init failed: {}", e)))?);
         let stream_tracker = Arc::new(StreamTracker::new());
         let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
 

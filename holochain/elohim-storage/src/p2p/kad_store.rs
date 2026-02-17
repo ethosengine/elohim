@@ -10,7 +10,6 @@ use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::path::Path;
 use tracing::{debug, warn};
 
 // libp2p's Record and ProviderRecord don't implement serde, so we use
@@ -96,12 +95,10 @@ pub struct SledRecordStore {
 }
 
 impl SledRecordStore {
-    /// Open or create a sled-backed Kademlia store.
+    /// Create a sled-backed Kademlia store from an existing sled::Db handle.
     ///
-    /// Uses the given sled database path (typically the same `sync.sled` DB).
-    pub fn new(db_path: &Path) -> Result<Self, String> {
-        let db = sled::open(db_path)
-            .map_err(|e| format!("Failed to open sled DB at {}: {}", db_path.display(), e))?;
+    /// Shares the database with DocStore to avoid flock() conflicts.
+    pub fn from_db(db: sled::Db) -> Result<Self, String> {
         let records_tree = db
             .open_tree("kademlia_records")
             .map_err(|e| format!("Failed to open kademlia_records tree: {}", e))?;
@@ -319,7 +316,8 @@ mod tests {
     #[test]
     fn test_record_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
-        let mut store = SledRecordStore::new(dir.path()).unwrap();
+        let db = sled::open(dir.path()).unwrap();
+        let mut store = SledRecordStore::from_db(db).unwrap();
 
         let key = RecordKey::new(&b"test-key"[..]);
         let record = Record {
@@ -352,14 +350,16 @@ mod tests {
 
         // Write
         {
-            let mut store = SledRecordStore::new(dir.path()).unwrap();
+            let db = sled::open(dir.path()).unwrap();
+            let mut store = SledRecordStore::from_db(db).unwrap();
             store.put(record).unwrap();
             store.flush().unwrap();
         }
 
         // Reopen and verify
         {
-            let store = SledRecordStore::new(dir.path()).unwrap();
+            let db = sled::open(dir.path()).unwrap();
+            let store = SledRecordStore::from_db(db).unwrap();
             let retrieved = store.get(&key).unwrap();
             assert_eq!(retrieved.value, b"persist-value");
         }
