@@ -296,3 +296,264 @@ fn now() -> u64 {
         .unwrap()
         .as_secs()
 }
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+// ---------- Doorway Bootstrap Client ----------
+
+/// Peer info returned from bootstrap discovery.
+#[derive(Debug, Clone)]
+pub struct BootstrapPeerInfo {
+    pub agent: Vec<u8>,
+    pub urls: Vec<String>,
+    pub signed_at_ms: u64,
+}
+
+/// Put agent info into the doorway bootstrap service.
+///
+/// Constructs a `SignedAgentInfo` envelope with Ed25519 signature and sends it
+/// as MessagePack to `POST /bootstrap/put`.
+///
+/// Uses `rmpv` manual encoding to match doorway's expected binary format
+/// (string-keyed maps, not struct serialization).
+pub async fn bootstrap_put(
+    doorway_url: &str,
+    space: &[u8; 36],
+    agent: &[u8; 36],
+    urls: &[String],
+    signing_key: &ed25519_dalek::SigningKey,
+) -> Result<(), RegistrationError> {
+    use ed25519_dalek::Signer;
+    use rmpv::Value;
+
+    let signed_at_ms = now_ms() as i64;
+    let expires_after_ms: i64 = 20 * 60 * 1000; // 20 minutes
+
+    // Build inner agent_info as MessagePack bytes
+    let url_values: Vec<Value> = urls
+        .iter()
+        .map(|u| Value::String(u.clone().into()))
+        .collect();
+
+    let agent_info_map = Value::Map(vec![
+        (Value::String("space".into()), Value::Binary(space.to_vec())),
+        (Value::String("agent".into()), Value::Binary(agent.to_vec())),
+        (Value::String("urls".into()), Value::Array(url_values)),
+        (
+            Value::String("signed_at_ms".into()),
+            Value::Integer(signed_at_ms.into()),
+        ),
+        (
+            Value::String("expires_after_ms".into()),
+            Value::Integer(expires_after_ms.into()),
+        ),
+    ]);
+
+    let mut agent_info_bytes = Vec::new();
+    rmpv::encode::write_value(&mut agent_info_bytes, &agent_info_map)
+        .map_err(|e| RegistrationError::Network(format!("msgpack encode agent_info: {}", e)))?;
+
+    // Sign the agent_info bytes
+    let signature = signing_key.sign(&agent_info_bytes);
+
+    // Build outer SignedAgentInfo envelope
+    let envelope = Value::Map(vec![
+        (Value::String("agent".into()), Value::Binary(agent.to_vec())),
+        (
+            Value::String("signature".into()),
+            Value::Binary(signature.to_bytes().to_vec()),
+        ),
+        (
+            Value::String("agent_info".into()),
+            Value::Binary(agent_info_bytes),
+        ),
+    ]);
+
+    let mut body = Vec::new();
+    rmpv::encode::write_value(&mut body, &envelope)
+        .map_err(|e| RegistrationError::Network(format!("msgpack encode envelope: {}", e)))?;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/bootstrap/put", doorway_url))
+        .header("Content-Type", "application/msgpack")
+        .body(body)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| RegistrationError::Network(e.to_string()))?;
+
+    if !response.status().is_success() {
+        return Err(RegistrationError::Network(format!(
+            "bootstrap_put failed: HTTP {}",
+            response.status()
+        )));
+    }
+
+    info!("Bootstrap put successful");
+    Ok(())
+}
+
+/// Discover random peers from the doorway bootstrap service.
+///
+/// Sends `POST /bootstrap/random` with a MessagePack query and parses the
+/// response array of `SignedAgentInfo` envelopes.
+pub async fn bootstrap_random(
+    doorway_url: &str,
+    space: &[u8; 36],
+    limit: u32,
+) -> Result<Vec<BootstrapPeerInfo>, RegistrationError> {
+    use rmpv::Value;
+
+    // Build request body
+    let request = Value::Map(vec![
+        (Value::String("space".into()), Value::Binary(space.to_vec())),
+        (
+            Value::String("limit".into()),
+            Value::Integer((limit as i64).into()),
+        ),
+    ]);
+
+    let mut body = Vec::new();
+    rmpv::encode::write_value(&mut body, &request)
+        .map_err(|e| RegistrationError::Network(format!("msgpack encode: {}", e)))?;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/bootstrap/random", doorway_url))
+        .header("Content-Type", "application/msgpack")
+        .body(body)
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| RegistrationError::Network(e.to_string()))?;
+
+    if !response.status().is_success() {
+        return Err(RegistrationError::Network(format!(
+            "bootstrap_random failed: HTTP {}",
+            response.status()
+        )));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| RegistrationError::Network(e.to_string()))?;
+
+    // Parse response as MessagePack array of SignedAgentInfo
+    let value = rmpv::decode::read_value(&mut bytes.as_ref())
+        .map_err(|e| RegistrationError::InvalidResponse(format!("msgpack decode: {}", e)))?;
+
+    let peers = match value {
+        Value::Array(items) => {
+            let mut peers = Vec::new();
+            for item in items {
+                if let Some(peer) = parse_signed_agent_info(&item) {
+                    peers.push(peer);
+                }
+            }
+            peers
+        }
+        _ => {
+            warn!("bootstrap_random: unexpected response format");
+            vec![]
+        }
+    };
+
+    info!(num_peers = peers.len(), "Bootstrap random discovery complete");
+    Ok(peers)
+}
+
+/// Get the current server timestamp from doorway bootstrap.
+pub async fn bootstrap_now(
+    doorway_url: &str,
+) -> Result<u64, RegistrationError> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/bootstrap/now", doorway_url))
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| RegistrationError::Network(e.to_string()))?;
+
+    if !response.status().is_success() {
+        return Err(RegistrationError::Network(format!(
+            "bootstrap_now failed: HTTP {}",
+            response.status()
+        )));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| RegistrationError::Network(e.to_string()))?;
+
+    let value = rmpv::decode::read_value(&mut bytes.as_ref())
+        .map_err(|e| RegistrationError::InvalidResponse(format!("msgpack decode: {}", e)))?;
+
+    match value {
+        rmpv::Value::Integer(n) => n
+            .as_u64()
+            .ok_or_else(|| RegistrationError::InvalidResponse("timestamp not u64".into())),
+        _ => Err(RegistrationError::InvalidResponse(
+            "expected integer timestamp".into(),
+        )),
+    }
+}
+
+/// Parse a SignedAgentInfo MessagePack value into BootstrapPeerInfo.
+fn parse_signed_agent_info(value: &rmpv::Value) -> Option<BootstrapPeerInfo> {
+    let map = value.as_map()?;
+
+    let agent_info_bytes = map.iter().find_map(|(k, v)| {
+        if k.as_str()? == "agent_info" {
+            v.as_slice()
+        } else {
+            None
+        }
+    })?;
+
+    // Parse inner agent_info
+    let inner = rmpv::decode::read_value(&mut &agent_info_bytes[..]).ok()?;
+    let inner_map = inner.as_map()?;
+
+    let agent = inner_map.iter().find_map(|(k, v)| {
+        if k.as_str()? == "agent" {
+            Some(v.as_slice()?.to_vec())
+        } else {
+            None
+        }
+    })?;
+
+    let urls = inner_map.iter().find_map(|(k, v)| {
+        if k.as_str()? == "urls" {
+            let arr = v.as_array()?;
+            Some(
+                arr.iter()
+                    .filter_map(|u| u.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            None
+        }
+    })?;
+
+    let signed_at_ms = inner_map.iter().find_map(|(k, v)| {
+        if k.as_str()? == "signed_at_ms" {
+            v.as_i64().map(|n| n as u64)
+        } else {
+            None
+        }
+    })?;
+
+    Some(BootstrapPeerInfo {
+        agent,
+        urls,
+        signed_at_ms,
+    })
+}

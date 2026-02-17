@@ -7,7 +7,7 @@
  * Architecture supports multiple deployment modes via ConnectionStrategy:
  *
  * 1. Doorway Mode (browser):
- *    Browser → Doorway Proxy (wss://doorway-dev.elohim.host) → Conductor
+ *    Browser → Doorway Proxy (wss://doorway-alpha.elohim.host) → Conductor
  *    Uses Projection tier for fast cached reads
  *
  * 2. Direct Mode (native/Tauri):

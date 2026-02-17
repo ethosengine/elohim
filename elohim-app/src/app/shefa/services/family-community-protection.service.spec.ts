@@ -42,7 +42,7 @@ describe('FamilyCommunityProtectionService', () => {
     it('should return observable', (done) => {
       const result = service.initializeProtectionMonitoring('operator-1');
       expect(result).toBeDefined();
-      result.subscribe(() => {
+      result.pipe(take(1)).subscribe(() => {
         done();
       });
     });

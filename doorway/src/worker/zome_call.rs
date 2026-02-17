@@ -173,7 +173,7 @@ impl ZomeCallBuilder {
     pub fn build_zome_call<T: Serialize>(&self, fn_name: &str, payload: &T) -> Result<Vec<u8>> {
         // Serialize the payload to MessagePack
         let payload_bytes = rmp_serde::to_vec(payload)
-            .map_err(|e| DoorwayError::Internal(format!("Failed to serialize payload: {}", e)))?;
+            .map_err(|e| DoorwayError::Internal(format!("Failed to serialize payload: {e}")))?;
 
         // Build the zome call request
         // Format: { type: "call_zome", data: { cell_id, zome_name, fn_name, payload, provenance, cap_secret } }
@@ -217,7 +217,7 @@ impl ZomeCallBuilder {
 
         let mut buf = Vec::new();
         rmpv::encode::write_value(&mut buf, &request)
-            .map_err(|e| DoorwayError::Internal(format!("Failed to encode request: {}", e)))?;
+            .map_err(|e| DoorwayError::Internal(format!("Failed to encode request: {e}")))?;
 
         Ok(buf)
     }
@@ -230,7 +230,7 @@ impl ZomeCallBuilder {
         // Decode the response envelope
         let mut cursor = std::io::Cursor::new(response);
         let value = rmpv::decode::read_value(&mut cursor)
-            .map_err(|e| DoorwayError::Holochain(format!("Failed to decode response: {}", e)))?;
+            .map_err(|e| DoorwayError::Holochain(format!("Failed to decode response: {e}")))?;
 
         // Extract the response data
         if let Value::Map(ref map) = value {
@@ -253,7 +253,7 @@ impl ZomeCallBuilder {
                 // The data is MessagePack-encoded ExternIO
                 // Holochain wraps the actual return value
                 let result: Option<T> = rmp_serde::from_slice(data)
-                    .map_err(|e| DoorwayError::Holochain(format!("Failed to parse result: {}", e)))?;
+                    .map_err(|e| DoorwayError::Holochain(format!("Failed to parse result: {e}")))?;
                 return Ok(result);
             }
         }
@@ -268,7 +268,7 @@ fn decode_base64(s: &str) -> Result<Vec<u8>> {
     use base64::{engine::general_purpose::STANDARD, Engine};
     STANDARD
         .decode(s)
-        .map_err(|e| DoorwayError::Internal(format!("Invalid base64: {}", e)))
+        .map_err(|e| DoorwayError::Internal(format!("Invalid base64: {e}")))
 }
 
 /// Get a field from a MessagePack map

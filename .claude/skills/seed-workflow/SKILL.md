@@ -176,9 +176,9 @@ npm run seed
 npm run seed:dev
 
 # Or manually:
-export DOORWAY_URL='https://doorway-dev.elohim.host'
+export DOORWAY_URL='https://doorway-alpha.elohim.host'
 export DOORWAY_API_KEY='dev-elohim-auth-2024'
-export HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host?apiKey=dev-elohim-auth-2024'
+export HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host?apiKey=dev-elohim-auth-2024'
 npm run seed
 ```
 
@@ -218,7 +218,7 @@ hc sandbox call --running $(cat /projects/elohim/holochain/local-dev/.hc_ports |
 echo $DOORWAY_API_KEY
 
 # Test connection
-curl -H "X-API-Key: $DOORWAY_API_KEY" https://doorway-dev.elohim.host/health
+curl -H "X-API-Key: $DOORWAY_API_KEY" https://doorway-alpha.elohim.host/health
 ```
 
 ### Partial Seed Failures

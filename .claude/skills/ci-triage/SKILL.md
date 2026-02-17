@@ -45,7 +45,7 @@ holochain → edge → app → genesis
 ## Health Checks
 
 ```bash
-curl -s https://doorway-dev.elohim.host/health | jq
+curl -s https://doorway-alpha.elohim.host/health | jq
 curl -s https://alpha.elohim.host -o /dev/null -w '%{http_code}'
 ```
 

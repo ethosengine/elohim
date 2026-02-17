@@ -31,6 +31,8 @@ import {
 } from '../models/agency.model';
 import { type KeyLocation } from '../models/identity.model';
 
+import { AuthService } from './auth.service';
+
 const STAGE_NODE_STEWARD: AgencyStage = 'node-steward';
 const STAGE_APP_STEWARD: AgencyStage = 'app-steward';
 const KEY_TYPE_SIGNING = 'signing-key';
@@ -41,6 +43,7 @@ const KEY_LABEL_SIGNING = 'Signing Key';
 })
 export class AgencyService {
   private readonly holochainService = inject(HolochainClientService);
+  private readonly authService = inject(AuthService);
 
   /**
    * Computed agency state based on current connections and session.
@@ -137,6 +140,11 @@ export class AgencyService {
     if (holochainState === 'connecting' || holochainState === 'authenticating') {
       // Still connecting, but we have intent to connect
       return hasStoredCredentials ? 'hosted' : 'visitor';
+    }
+
+    // Authenticated via JWT but Holochain not connected yet
+    if (this.authService.isAuthenticated()) {
+      return 'hosted';
     }
 
     // Not connected = Visitor

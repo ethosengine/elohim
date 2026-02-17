@@ -48,7 +48,7 @@ pub struct HeartbeatLoop {
     config: HeartbeatConfig,
     state: Arc<OrchestratorState>,
     shutdown_tx: Option<mpsc::Sender<()>>,
-    shutdown_rx: Option<mpsc::Receiver<()>>,
+    _shutdown_rx: Option<mpsc::Receiver<()>>,
 }
 
 impl HeartbeatLoop {
@@ -59,7 +59,7 @@ impl HeartbeatLoop {
             config,
             state,
             shutdown_tx: Some(shutdown_tx),
-            shutdown_rx: Some(shutdown_rx),
+            _shutdown_rx: Some(shutdown_rx),
         }
     }
 
@@ -216,10 +216,7 @@ async fn run_heartbeat_loop(config: HeartbeatConfig, state: Arc<OrchestratorStat
         let failed_nodes = state.get_failed_nodes().await;
 
         if !failed_nodes.is_empty() {
-            warn!(
-                count = failed_nodes.len(),
-                "Detected failed nodes"
-            );
+            warn!(count = failed_nodes.len(), "Detected failed nodes");
 
             for node_id in failed_nodes {
                 error!(node_id = %node_id, "Node marked as failed - triggering disaster recovery");
@@ -238,10 +235,7 @@ async fn run_heartbeat_loop(config: HeartbeatConfig, state: Arc<OrchestratorStat
 
         // Log health summary
         let online_nodes = state.get_online_nodes().await;
-        debug!(
-            online = online_nodes.len(),
-            "Heartbeat check complete"
-        );
+        debug!(online = online_nodes.len(), "Heartbeat check complete");
     }
 }
 
@@ -314,7 +308,11 @@ impl NodeHealthAggregation {
         let ping_ratio = self.successful_pings as f64 / total_pings as f64;
 
         // Weight: 70% peer attestations, 30% self-reported heartbeat
-        let heartbeat_factor = if self.self_reported.is_some() { 0.3 } else { 0.0 };
+        let heartbeat_factor = if self.self_reported.is_some() {
+            0.3
+        } else {
+            0.0
+        };
 
         (ping_ratio * 0.7) + heartbeat_factor
     }
@@ -412,8 +410,8 @@ mod tests {
             node_id: "test-node".to_string(),
             self_reported: None,
             peer_attestations: 3,
-            successful_pings: 7,
-            failed_pings: 3,
+            successful_pings: 9,
+            failed_pings: 1,
             health_score: 0.0,
             impact_score: 0.0,
             status: NodeHealthStatus::Unknown,

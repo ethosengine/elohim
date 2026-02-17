@@ -1,0 +1,109 @@
+<div class="data-section">
+  <span class="section-title">
+    <span class="material-icons section-title-icon">download</span>
+    Data & Privacy
+  </span>
+
+  <!-- Hosting Economics (for hosted users) -->
+  @if (hostingCost(); as cost) {
+    <div class="hosting-card">
+      <h4 class="subsection-title">
+        <span class="material-icons">cloud</span>
+        Hosting Costs
+      </h4>
+      <div class="metrics-grid">
+        <div class="metric">
+          <span class="metric-label">Monthly Cost</span>
+          <span class="metric-value">{{ cost.monthlyCostDisplay }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Storage Used</span>
+          <span class="metric-value">{{ cost.storageUsedDisplay }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Covered By</span>
+          <span class="metric-value">{{ cost.coveredByName || cost.coverageSource }}</span>
+        </div>
+      </div>
+      @if (cost.migrationRecommended) {
+        <div class="migration-hint">
+          <span class="material-icons">info</span>
+          Consider upgrading to App Steward to reduce hosting costs.
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Node Operator Income (for node stewards) -->
+  @if (nodeOperatorIncome(); as income) {
+    <div class="hosting-card income-card">
+      <h4 class="subsection-title">
+        <span class="material-icons">dns</span>
+        Hosting Income
+      </h4>
+      <div class="metrics-grid">
+        <div class="metric">
+          <span class="metric-label">Hosted Humans</span>
+          <span class="metric-value">{{ income.hostedHumanCount }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Storage Provided</span>
+          <span class="metric-value">
+            {{ formatStorageBytes(income.totalStorageProvidedBytes) }}
+          </span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">This Month</span>
+          <span class="metric-value">{{ income.currentMonthIncome }} {{ income.incomeUnit }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Uptime</span>
+          <span class="metric-value">{{ income.uptimePercentage }}%</span>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Key Backup Status -->
+  @if (isAuthenticated() && keyBackup(); as backup) {
+    <div class="backup-card" [class.backed-up]="backup.isBackedUp">
+      <div class="backup-header">
+        <span class="material-icons backup-icon">
+          {{ backup.isBackedUp ? 'verified_user' : 'warning' }}
+        </span>
+        <div class="backup-info">
+          <span class="backup-title">
+            {{ backup.isBackedUp ? 'Keys Backed Up' : 'Keys Not Backed Up' }}
+          </span>
+          @if (backup.isBackedUp) {
+            <span class="backup-detail">
+              {{ formatBackupMethod(backup.method) }}
+              @if (backup.lastVerified) {
+                &middot; Verified {{ formatBackupDate(backup.lastVerified) }}
+              }
+            </span>
+          } @else {
+            <span class="backup-detail">Back up your keys to prevent loss of access.</span>
+          }
+        </div>
+      </div>
+      @if (backup.isBackedUp && !backup.recoveryTested) {
+        <div class="backup-warning">
+          <span class="material-icons">info</span>
+          Recovery has not been tested. Consider verifying your backup.
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Export Data -->
+  <div class="export-section">
+    <p class="section-description">
+      Export your identity and session data. You have full control over your data.
+    </p>
+    <button type="button" class="btn btn-secondary" (click)="exportData.emit()">
+      <span class="material-icons">download</span>
+      Export Data
+    </button>
+  </div>
+</div>

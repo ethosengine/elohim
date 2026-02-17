@@ -99,6 +99,8 @@ export type LamadEntryType =
   | 'path-progress' // Progress through a learning path
   | 'step-completion' // Completion of a specific step
   | 'assessment-result' // Quiz/assessment result
+  | 'streak-record' // Daily engagement streak entry
+  | 'mastery-level-up' // Level-up event for timeline
 
   // Recognition entries
   | 'recognition-event' // Recognition flowing to a presence

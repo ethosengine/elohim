@@ -1,0 +1,340 @@
+.subsection-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-color, #1a1a2e);
+}
+
+.subsection-title .material-icons {
+  font-size: 1.15rem;
+  color: var(--primary-500, #3b82f6);
+}
+
+.section-description {
+  margin: 0.5rem 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+/* Data Residency */
+.residency-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.residency-card {
+  background: var(--surface-card, #fff);
+  border-radius: 8px;
+  padding: 0.875rem;
+  border: 1px solid var(--surface-border, #dee2e6);
+}
+
+.residency-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+}
+
+.residency-icon {
+  color: var(--primary-500, #3b82f6);
+  font-size: 1.25rem;
+}
+
+.residency-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.residency-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-color, #1a1a2e);
+}
+
+.residency-location {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.location-icon {
+  color: var(--text-color-secondary, #6c757d);
+  font-size: 1.15rem;
+}
+
+.residency-description {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.residency-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.meta-item .material-icons {
+  font-size: 0.85rem;
+}
+
+.meta-item.exportable {
+  color: #4caf50;
+}
+
+.meta-item.deletable {
+  color: #f44336;
+}
+
+/* Connection Details */
+.connection-section {
+  margin-top: 1.25rem;
+}
+
+.connection-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--surface-card, #fff);
+  border: 1px solid var(--surface-border, #dee2e6);
+  border-radius: 8px;
+  padding: 0.875rem;
+}
+
+.connection-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.connection-label {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary, #6c757d);
+  flex-shrink: 0;
+}
+
+.connection-value {
+  font-size: 0.8rem;
+  color: var(--text-color, #1a1a2e);
+  text-align: right;
+}
+
+.connection-value.monospace {
+  font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+  word-break: break-all;
+}
+
+.connection-value.stored {
+  color: #4caf50;
+}
+
+.connection-value-with-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.connection-value-with-copy code {
+  font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+  font-size: 0.75rem;
+  background: var(--surface-ground, #f8f9fa);
+  padding: 0.2rem 0.375rem;
+  border-radius: 4px;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 4px;
+  color: var(--text-color-secondary, #6c757d);
+  display: flex;
+  align-items: center;
+}
+
+.copy-btn:hover {
+  background: var(--surface-hover, #e9ecef);
+  color: var(--text-color, #1a1a2e);
+}
+
+.copy-btn .material-icons {
+  font-size: 0.9rem;
+}
+
+.connection-actions {
+  margin-top: 0.75rem;
+}
+
+/* Keys Section */
+.keys-section {
+  margin-top: 1.25rem;
+}
+
+.keys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.key-card {
+  background: #fff8e1;
+  border-radius: 8px;
+  padding: 0.875rem;
+  border: 1px solid #ffe082;
+}
+
+.key-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.375rem;
+}
+
+.key-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-color, #1a1a2e);
+}
+
+.key-type {
+  font-size: 0.7rem;
+  color: var(--text-color-secondary, #6c757d);
+  text-transform: uppercase;
+}
+
+.key-value {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.key-value code {
+  flex: 1;
+  font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+  font-size: 0.8rem;
+  background: rgb(255 255 255 / 50%);
+  padding: 0.375rem;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.key-actions {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+}
+
+.key-action {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.key-action .material-icons {
+  font-size: 0.85rem;
+}
+
+.key-action.exportable {
+  color: #4caf50;
+}
+
+.key-action.revokable {
+  color: #f44336;
+}
+
+/* Not Connected State */
+.not-connected-section {
+  margin-top: 1.25rem;
+}
+
+.not-connected-card {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  background: var(--surface-ground, #f8f9fa);
+  border-radius: 10px;
+}
+
+.not-connected-icon {
+  font-size: 3rem;
+  color: var(--text-color-secondary, #6c757d);
+  margin-bottom: 0.75rem;
+}
+
+.not-connected-card h3 {
+  margin: 0 0 0.375rem;
+  color: var(--text-color, #1a1a2e);
+}
+
+.not-connected-card p {
+  margin: 0 0 1rem;
+  color: var(--text-color-secondary, #6c757d);
+  font-size: 0.9rem;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
+}
+
+.btn-primary {
+  background: var(--primary-500, #3b82f6);
+  color: white;
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--primary-600, #2563eb);
+}
+
+.btn-secondary {
+  background: var(--surface-ground, #f8f9fa);
+  color: var(--text-color, #1a1a2e);
+  border: 1px solid var(--surface-border, #dee2e6);
+}
+
+.btn-secondary:not(:disabled):hover {
+  background: var(--surface-hover, #e9ecef);
+}
+
+@media (width <= 480px) {
+  .connection-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+  }
+
+  .residency-grid,
+  .keys-grid {
+    grid-template-columns: 1fr;
+  }
+}

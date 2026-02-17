@@ -1,0 +1,150 @@
+<!-- Loading state -->
+<div *ngIf="isLoading" class="dashboard-loading">
+  <div class="loading-spinner"></div>
+  <p>Loading your learning profile...</p>
+</div>
+
+<!-- Dashboard content -->
+<div *ngIf="!isLoading && profile" class="learner-dashboard">
+  <!-- Level & XP Header -->
+  <header class="dashboard-header">
+    <div class="level-badge" [style.background-color]="profile.learnerLevel.color">
+      <span class="level-icon material-icons">{{ profile.learnerLevel.icon }}</span>
+      <span class="level-number">{{ profile.learnerLevel.level }}</span>
+    </div>
+    <div class="level-info">
+      <h1>{{ profile.learnerLevel.label }}</h1>
+      <div class="xp-bar-container">
+        <div class="xp-bar" [style.width.%]="profile.levelProgress"></div>
+      </div>
+      <p class="xp-text">{{ profile.totalXP | number }} XP total</p>
+    </div>
+  </header>
+
+  <div class="dashboard-grid">
+    <!-- Streak Card -->
+    <section class="card streak-card">
+      <div class="card-header">
+        <span class="material-icons streak-icon" [class.streak-active]="profile.streak.todayActive">
+          local_fire_department
+        </span>
+        <h2>Streak</h2>
+      </div>
+      <div class="streak-stats">
+        <div class="streak-number">
+          <span class="big-number">{{ profile.streak.currentStreak }}</span>
+          <span class="streak-label">day{{ profile.streak.currentStreak !== 1 ? 's' : '' }}</span>
+        </div>
+        <div class="streak-best">
+          Best: {{ profile.streak.bestStreak }} day{{ profile.streak.bestStreak !== 1 ? 's' : '' }}
+        </div>
+      </div>
+      <div class="activity-dots">
+        <span
+          *ngFor="let day of last30Days"
+          class="activity-dot"
+          [class.active]="profile.streak.recentActivity[day]"
+          [title]="day"
+        ></span>
+      </div>
+    </section>
+
+    <!-- Mastery Distribution -->
+    <section class="card mastery-card">
+      <h2>Mastery Distribution</h2>
+      <div class="mastery-bars">
+        <div
+          *ngFor="let level of masteryLevels"
+          class="mastery-bar-row"
+          [class.gate-level]="level === 'apply'"
+        >
+          <span class="mastery-bar-icon material-icons">{{ getMasteryIcon(level) }}</span>
+          <span class="mastery-bar-label">{{ getMasteryLabel(level) }}</span>
+          <div class="mastery-bar-track">
+            <div
+              class="mastery-bar-fill"
+              [style.width.%]="getBarWidth(level)"
+              [style.background-color]="getMasteryColor(level)"
+            ></div>
+          </div>
+          <span class="mastery-bar-count">{{ profile.levelDistribution[level] }}</span>
+        </div>
+      </div>
+      <p class="mastery-summary">
+        {{ profile.totalMasteredNodes }} node{{
+          profile.totalMasteredNodes !== 1 ? 's' : ''
+        }}
+        tracked &middot; {{ profile.nodesAboveGate }} above gate
+      </p>
+    </section>
+
+    <!-- Active Paths -->
+    <section class="card paths-card">
+      <h2>Active Paths</h2>
+      <div *ngIf="profile.paths.inProgress.length === 0" class="empty-state">
+        <p>No paths in progress</p>
+        <a routerLink="/lamad" class="btn btn-primary">Explore Paths</a>
+      </div>
+      <div *ngFor="let path of profile.paths.inProgress" class="path-entry">
+        <div class="path-info">
+          <span class="path-title">{{ path.title }}</span>
+          <span class="path-steps">{{ path.completedSteps }}/{{ path.totalSteps }} steps</span>
+        </div>
+        <div class="path-progress-track">
+          <div class="path-progress-fill" [style.width.%]="path.progressPercent"></div>
+        </div>
+        <a [routerLink]="['/lamad/path', path.pathId]" class="btn btn-sm">Continue</a>
+      </div>
+    </section>
+
+    <!-- Recent Level-Ups -->
+    <section class="card levelups-card" *ngIf="profile.recentLevelUps.length > 0">
+      <h2>Recent Level-Ups</h2>
+      <div class="levelup-timeline">
+        <div
+          *ngFor="let event of profile.recentLevelUps"
+          class="levelup-entry"
+          [class.gate-crossing]="event.isGateLevel"
+        >
+          <div class="levelup-badges">
+            <span class="level-from" [style.background-color]="getMasteryColor(event.fromLevel)">
+              {{ getMasteryLabel(event.fromLevel) }}
+            </span>
+            <span class="material-icons arrow">arrow_forward</span>
+            <span class="level-to" [style.background-color]="getMasteryColor(event.toLevel)">
+              {{ getMasteryLabel(event.toLevel) }}
+            </span>
+          </div>
+          <span class="levelup-points">+{{ event.pointsEarned }} XP</span>
+          <span *ngIf="event.isGateLevel" class="gate-badge">Gate Crossed</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Practice Stats -->
+    <section class="card practice-card">
+      <h2>Practice</h2>
+      <div class="practice-grid">
+        <div class="practice-stat">
+          <span class="stat-number">{{ profile.practice.totalChallenges }}</span>
+          <span class="stat-label">Challenges</span>
+        </div>
+        <div class="practice-stat">
+          <span class="stat-number">{{ profile.practice.totalLevelUps }}</span>
+          <span class="stat-label">Level Ups</span>
+        </div>
+        <div class="practice-stat">
+          <span class="stat-number">{{ profile.practice.totalDiscoveries }}</span>
+          <span class="stat-label">Discoveries</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Empty state -->
+<div *ngIf="!isLoading && !profile" class="dashboard-empty">
+  <h1>My Learning</h1>
+  <p>Start exploring to build your learning profile.</p>
+  <a routerLink="/lamad" class="btn btn-primary">Explore Paths</a>
+</div>

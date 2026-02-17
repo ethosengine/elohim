@@ -614,6 +614,59 @@ When tests reveal design issues, add suggestions:
   - Suggested: `scoreAnswer(submission: AnswerSubmission)`
 ```
 
+## Multi-Project Patterns
+
+### Doorway (Rust) - Async Test Patterns
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_async_handler() {
+        // Setup
+        let config = TestConfig::default();
+        let handler = Handler::new(config);
+
+        // Act
+        let result = handler.process(request).await;
+
+        // Assert
+        assert!(result.is_ok());
+    }
+}
+```
+
+Key patterns:
+- Use `#[tokio::test]` for async tests (doorway uses tokio runtime)
+- Always set `RUSTFLAGS=""` when running doorway cargo commands
+- Mock HTTP clients with `mockito` or custom test doubles
+- Use `Arc<Mutex<>>` for shared state in concurrent tests
+
+### Sophia (React) - Testing Library Patterns
+```typescript
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+describe('WidgetComponent', () => {
+    it('handles user interaction', async () => {
+        const user = userEvent.setup();
+        const onChange = jest.fn();
+
+        render(<WidgetComponent onChange={onChange} />);
+
+        await user.click(screen.getByRole('button'));
+        expect(onChange).toHaveBeenCalledWith(expected);
+    });
+});
+```
+
+Key differences from elohim-app (Jasmine/Karma):
+- Jest, not Jasmine (use `jest.fn()` not `jasmine.createSpyObj()`)
+- React Testing Library, not Angular TestBed
+- `describe/it` same, but matchers differ (`toHaveBeenCalledWith` not `toHaveBeenCalledOnceWith`)
+- Test files are `.test.ts`/`.test.tsx`, not `.spec.ts`
+
 ## Best Practices
 
 1. **Meaningful tests** - Don't just hit lines, verify behavior

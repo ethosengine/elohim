@@ -361,6 +361,32 @@
   flex-shrink: 0; /* Prevent header from shrinking */
 }
 
+/* Clickable profile header - links to identity profile */
+.profile-header-link {
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.profile-header-link:hover {
+  background: rgb(99 102 241 / 12%);
+}
+
+.profile-header-arrow {
+  width: 16px;
+  height: 16px;
+  color: var(--lamad-text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: color 0.2s;
+}
+
+.profile-header-link:hover .profile-header-arrow {
+  color: var(--lamad-accent-primary);
+}
+
 .profile-avatar-large {
   width: 3rem;
   height: 3rem;
@@ -391,6 +417,49 @@
   color: var(--lamad-text-muted);
 }
 
+.profile-identifier {
+  font-size: 0.75rem;
+  color: var(--lamad-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+/* Connection Details */
+.profile-connection-details {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.connection-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+}
+
+.connection-detail .detail-label {
+  color: var(--lamad-text-muted);
+  font-size: 0.75rem;
+}
+
+.connection-detail .detail-value {
+  color: var(--lamad-text-secondary);
+  font-size: 0.75rem;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.connection-detail .detail-value.monospace {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+}
+
 /* Profile Actions */
 .profile-actions {
   padding: 0.5rem;
@@ -419,6 +488,12 @@
   width: 18px;
   height: 18px;
   opacity: 70%;
+}
+
+.action-icon-emoji {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .action-label {
@@ -760,85 +835,6 @@
   height: 16px;
 }
 
-/* ============================================================================
-   Upgrade Banner
-   ============================================================================ */
-
-.upgrade-banner {
-  background: linear-gradient(90deg, rgb(99 102 241 / 10%) 0%, rgb(139 92 246 / 10%) 100%);
-  border-bottom: 1px solid var(--lamad-border);
-  padding: 0.5rem 1rem;
-}
-
-.upgrade-banner-content {
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.upgrade-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.upgrade-text {
-  flex: 1;
-  display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
-  font-size: 0.85rem;
-}
-
-.upgrade-text strong {
-  color: var(--lamad-accent-primary);
-}
-
-.upgrade-text span {
-  color: var(--lamad-text-secondary);
-}
-
-.upgrade-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.btn-upgrade {
-  padding: 0.25rem 0.75rem;
-  background: var(--lamad-accent-gradient);
-  border: none;
-  border-radius: 0.25rem;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-upgrade:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
-}
-
-.btn-dismiss {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  background: transparent;
-  border: none;
-  color: var(--lamad-text-muted);
-  font-size: 1rem;
-  cursor: pointer;
-  opacity: 60%;
-  transition: opacity 0.2s;
-}
-
-.btn-dismiss:hover {
-  opacity: 100%;
-}
 
 /* ============================================================================
    Main Content Area
@@ -851,220 +847,6 @@
   margin: 0 auto;
 }
 
-/* ============================================================================
-   Upgrade Modal
-   ============================================================================ */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 60%);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  border: none;
-}
-
-.upgrade-modal {
-  background: var(--lamad-surface);
-  border-radius: 1rem;
-  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%);
-  max-width: 600px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-}
-
-.modal-close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  padding: 0.5rem;
-  background: transparent;
-  border: none;
-  color: var(--lamad-text-muted);
-  cursor: pointer;
-  opacity: 60%;
-  transition: opacity 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-close:hover {
-  opacity: 100%;
-}
-
-.modal-header {
-  padding: 2rem 2rem 1rem;
-  text-align: center;
-  border-bottom: 1px solid var(--lamad-border);
-}
-
-.modal-header h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.5rem;
-  background: var(--lamad-accent-gradient);
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.modal-subtitle {
-  margin: 0;
-  color: var(--lamad-text-secondary);
-  font-size: 0.9rem;
-}
-
-.modal-body {
-  padding: 1.5rem 2rem;
-}
-
-.upgrade-benefits h3,
-.upgrade-how h3,
-.session-summary h3 {
-  margin: 0 0 1rem;
-  font-size: 1rem;
-  color: var(--lamad-text-secondary);
-}
-
-.upgrade-benefits ul {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 1.5rem;
-}
-
-.upgrade-benefits li {
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--lamad-border);
-}
-
-.upgrade-benefits li:last-child {
-  border-bottom: none;
-}
-
-.benefit-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--lamad-accent-primary);
-}
-
-.upgrade-benefits strong {
-  display: block;
-  color: var(--lamad-text-primary);
-  margin-bottom: 0.25rem;
-}
-
-.upgrade-benefits p {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--lamad-text-muted);
-}
-
-.upgrade-how {
-  margin-bottom: 1.5rem;
-}
-
-.upgrade-how ol {
-  margin: 0;
-  padding-left: 1.5rem;
-}
-
-.upgrade-how li {
-  padding: 0.5rem 0;
-  color: var(--lamad-text-secondary);
-}
-
-.session-summary {
-  background: rgb(99 102 241 / 5%);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  border: 1px solid var(--lamad-border);
-}
-
-.summary-stats {
-  display: flex;
-  gap: 1.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.stat {
-  text-align: center;
-}
-
-.stat-value {
-  display: block;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--lamad-accent-primary);
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  color: var(--lamad-text-muted);
-}
-
-.summary-note {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--lamad-text-muted);
-  font-style: italic;
-}
-
-.modal-footer {
-  padding: 1.5rem 2rem;
-  border-top: 1px solid var(--lamad-border);
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  background: transparent;
-  border: 1px solid var(--lamad-border);
-  border-radius: 0.5rem;
-  color: var(--lamad-text-secondary);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-  background: rgb(99 102 241 / 5%);
-  border-color: var(--lamad-accent-primary);
-}
-
-.btn-primary {
-  padding: 0.5rem 1rem;
-  background: var(--lamad-accent-gradient);
-  border: none;
-  border-radius: 0.5rem;
-  color: white;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgb(99 102 241 / 30%);
-}
-
-.btn-primary:disabled {
-  opacity: 60%;
-  cursor: not-allowed;
-}
 
 /* ============================================================================
    Responsive
@@ -1204,50 +986,6 @@
   .settings-section,
   .profile-footer {
     flex-shrink: 0;
-  }
-
-  /* Upgrade Banner Mobile */
-  .upgrade-banner-content {
-    flex-wrap: wrap;
-  }
-
-  .upgrade-text {
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  /* Modal Mobile */
-  .modal-overlay {
-    padding: 1rem;
-    align-items: flex-end; /* Sheet-like on mobile too? Or center. Center is fine. */
-  }
-
-  .upgrade-modal {
-    border-radius: 1rem;
-    max-height: 85vh;
-  }
-
-  .modal-header {
-    padding: 1.5rem 1.5rem 1rem;
-  }
-
-  .modal-body {
-    padding: 1rem 1.5rem;
-  }
-
-  .modal-footer {
-    padding: 1rem 1.5rem;
-    flex-direction: column-reverse;
-  }
-
-  .modal-footer button {
-    width: 100%;
-    padding: 0.75rem; /* Larger touch target */
-  }
-
-  .summary-stats {
-    gap: 1rem;
-    justify-content: space-around;
   }
 
   /* Edge Node Mobile Adjustments */

@@ -166,6 +166,9 @@ export {
 // LAMAD STEWARD ECONOMY MODELS
 // ============================================================================
 
+// Learner Mastery Profile models (gamified dashboard aggregation)
+export * from './learner-mastery-profile.model';
+
 // Stewardship Allocation models - One-to-many content stewardship
 export * from './stewardship-allocation.model';
 

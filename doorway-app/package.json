@@ -6,7 +6,11 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "lint": "npx eslint src --ext .ts,.html",
+    "lint:fix": "npx eslint src --ext .ts,.html --fix",
+    "format": "npx prettier --write \"src/**/*.{ts,html,css,scss}\"",
+    "format:check": "npx prettier --check \"src/**/*.{ts,html,css,scss}\""
   },
   "private": true,
   "dependencies": {
@@ -32,6 +36,11 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
-    "typescript": "~5.7.2"
+    "typescript": "~5.7.2",
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "angular-eslint": "^19.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0"
   }
 }

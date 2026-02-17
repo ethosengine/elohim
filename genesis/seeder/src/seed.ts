@@ -22,7 +22,7 @@
  *
  * ## Environment Variables
  *
- * - DOORWAY_URL (required): Doorway endpoint (e.g., https://doorway-dev.elohim.host)
+ * - DOORWAY_URL (required): Doorway endpoint (e.g., https://doorway-alpha.elohim.host)
  * - STORAGE_URL (optional): Direct storage URL for blob sync
  * - SKIP_VERIFICATION: Skip pre/post-flight conductor checks
  * - SKIP_BLOB_SYNC: Skip genesis blob sync
@@ -452,8 +452,8 @@ const CONTENT_ONLY = args.includes('--content-only') || process.env.SEED_CONTENT
 // =============================================================================
 
 // Doorway URL is REQUIRED - seeder only works through doorway
-const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway-dev.elohim.host'
-const HOLOCHAIN_ADMIN_URL = process.env.HOLOCHAIN_ADMIN_URL; // e.g., 'wss://doorway-dev.elohim.host?apiKey=...'
+const DOORWAY_URL = process.env.DOORWAY_URL; // e.g., 'https://doorway-alpha.elohim.host'
+const HOLOCHAIN_ADMIN_URL = process.env.HOLOCHAIN_ADMIN_URL; // e.g., 'wss://doorway-alpha.elohim.host?apiKey=...'
 const SKIP_VERIFICATION = process.env.SKIP_VERIFICATION === 'true';
 const SKIP_BLOB_SYNC = process.env.SKIP_BLOB_SYNC === 'true';
 const APP_ID = 'elohim';
@@ -1023,6 +1023,24 @@ async function seedViaDoorway(): Promise<SeedResult> {
   }
 
   // ========================================
+  // SCHEMA VERSION PRE-FLIGHT CHECK
+  // ========================================
+  console.log('\n📋 Checking schema compatibility...');
+  try {
+    const schemaInfo = await doorwayClient.getSchemaInfo();
+    if (!schemaInfo.supportedVersions.includes(1)) {
+      console.error(`❌ Storage does not support schema version 1. Supported: ${schemaInfo.supportedVersions.join(', ')}`);
+      console.error('   Seeder requires schema version 1. Update the seeder or storage to match.');
+      process.exit(1);
+    }
+    console.log(`   Schema versions supported: ${schemaInfo.supportedVersions.join(', ')} (current: ${schemaInfo.currentVersion})`);
+  } catch (error) {
+    // Non-fatal: older storage versions may not have /db/schema endpoint
+    console.warn(`   ⚠️ Schema check unavailable: ${error instanceof Error ? error.message : error}`);
+    console.warn('   Proceeding without schema validation (storage may be an older version)');
+  }
+
+  // ========================================
   // LOAD CONTENT
   // ========================================
   let filteredConcepts: { concept: ConceptJson; file: string }[] = [];
@@ -1236,6 +1254,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
     // Backend uses serde rename_all = "camelCase" so expects camelCase field names
     // Coerce null values to undefined for optional fields (TypeScript compatibility)
     const transformedItems = itemsToSeed.map(item => ({
+      schemaVersion: 1,
       id: item.id,
       title: item.title,
       description: item.description,
@@ -1310,6 +1329,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
             if (!seen.has(key) && item.id !== targetId) {
               seen.add(key);
               relationships.push({
+                schemaVersion: 1,
                 sourceId: item.id,
                 targetId: targetId,
                 relationshipType: 'RELATES_TO',
@@ -1333,6 +1353,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
                   if (!seen.has(key)) {
                     seen.add(key);
                     relationships.push({
+                      schemaVersion: 1,
                       sourceId: item.id,
                       targetId: targetId,
                       relationshipType: relType.toUpperCase(),
@@ -1857,6 +1878,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       }
 
       return {
+        schemaVersion: 1,
         id: pathData.id,
         title: pathData.title,
         description: pathData.description || '',
@@ -1935,7 +1957,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
  * Seeds content through doorway → elohim-storage → conductor.
  *
  * Usage:
- *   DOORWAY_URL=https://doorway-dev.elohim.host npm run seed
+ *   DOORWAY_URL=https://doorway-alpha.elohim.host npm run seed
  *
  * Options:
  *   --limit=N     Limit to N concepts
@@ -1951,7 +1973,7 @@ async function seed() {
     console.error('\n❌ DOORWAY_URL environment variable is required');
     console.error('');
     console.error('Usage:');
-    console.error('  DOORWAY_URL=https://doorway-dev.elohim.host npm run seed');
+    console.error('  DOORWAY_URL=https://doorway-alpha.elohim.host npm run seed');
     console.error('');
     console.error('The seeder works through doorway, which relays to elohim-storage.');
     console.error('Architecture: Seeder → Doorway → elohim-storage → Conductor');

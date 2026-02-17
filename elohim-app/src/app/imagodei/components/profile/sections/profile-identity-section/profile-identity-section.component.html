@@ -1,0 +1,36 @@
+<div class="profile-details">
+  @if (profile().bio) {
+    <div class="detail-group">
+      <span class="detail-label">Bio</span>
+      <p class="detail-value bio">{{ profile().bio }}</p>
+    </div>
+  }
+
+  @if (profile().affinities && profile().affinities.length > 0) {
+    <div class="detail-group">
+      <span class="detail-label">Interests</span>
+      <div class="affinities">
+        @for (affinity of profile().affinities; track affinity) {
+          <span class="affinity-tag">{{ affinity }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  @if (profile().location) {
+    <div class="detail-group">
+      <span class="detail-label">Location</span>
+      <span class="detail-value">{{ profile().location }}</span>
+    </div>
+  }
+
+  <div class="detail-group">
+    <span class="detail-label">Visibility</span>
+    <span class="detail-value">{{ getReachLabel(profile().profileReach) }}</span>
+  </div>
+
+  <div class="detail-group">
+    <span class="detail-label">Member Since</span>
+    <span class="detail-value">{{ formatDate(profile().createdAt) }}</span>
+  </div>
+</div>

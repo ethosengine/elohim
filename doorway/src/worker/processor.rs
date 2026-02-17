@@ -68,7 +68,7 @@ mod base64_bytes {
         let s = String::deserialize(deserializer)?;
         STANDARD
             .decode(&s)
-            .map_err(|e| serde::de::Error::custom(format!("base64 decode error: {}", e)))
+            .map_err(|e| serde::de::Error::custom(format!("base64 decode error: {e}")))
     }
 }
 
@@ -118,7 +118,7 @@ impl Worker {
         // Connect to NATS
         let nats_client = async_nats::connect(&config.nats_url)
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to connect to NATS: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to connect to NATS: {e}")))?;
 
         let jetstream = jetstream::new(nats_client.clone());
 
@@ -191,9 +191,12 @@ impl Worker {
                 ..Default::default()
             })
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to create stream: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to create stream: {e}")))?;
 
-        info!("Using stream {} with subjects {}.>", STREAM_NAME, SUBJECT_PREFIX);
+        info!(
+            "Using stream {} with subjects {}.>",
+            STREAM_NAME, SUBJECT_PREFIX
+        );
         Ok(stream)
     }
 
@@ -207,13 +210,13 @@ impl Worker {
                 jetstream::consumer::pull::Config {
                     durable_name: Some(consumer_name.clone()),
                     ack_policy: jetstream::consumer::AckPolicy::Explicit,
-                    filter_subject: format!("{}.>", SUBJECT_PREFIX),
+                    filter_subject: format!("{SUBJECT_PREFIX}.>"),
                     max_ack_pending: self.config.max_concurrent as i64,
                     ..Default::default()
                 },
             )
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to create consumer: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to create consumer: {e}")))?;
 
         info!("Using consumer {}", consumer_name);
         Ok(consumer)
@@ -227,7 +230,7 @@ impl Worker {
             .expires(Duration::from_secs(5))
             .messages()
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to fetch messages: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to fetch messages: {e}")))?;
 
         let mut count = 0;
 
@@ -304,7 +307,10 @@ impl Worker {
             .publish(request.reply_subject.clone(), response_json.into())
             .await
         {
-            error!("Failed to publish response to {}: {}", request.reply_subject, e);
+            error!(
+                "Failed to publish response to {}: {}",
+                request.reply_subject, e
+            );
         } else {
             debug!(
                 "Published response for {} to {}",

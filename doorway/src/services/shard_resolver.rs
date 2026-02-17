@@ -31,7 +31,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::cache::ContentCache;
 
@@ -126,15 +126,15 @@ impl std::fmt::Display for ShardResolverError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ShardResolverError::NotFound => write!(f, "Blob not found"),
-            ShardResolverError::DnaError(e) => write!(f, "DNA error: {}", e),
+            ShardResolverError::DnaError(e) => write!(f, "DNA error: {e}"),
             ShardResolverError::FetchError { shard_hash, error } => {
-                write!(f, "Failed to fetch shard {}: {}", shard_hash, error)
+                write!(f, "Failed to fetch shard {shard_hash}: {error}")
             }
             ShardResolverError::InsufficientShards { needed, available } => {
-                write!(f, "Need {} shards but only {} available", needed, available)
+                write!(f, "Need {needed} shards but only {available} available")
             }
-            ShardResolverError::ReassemblyError(e) => write!(f, "Reassembly failed: {}", e),
-            ShardResolverError::Internal(e) => write!(f, "Internal error: {}", e),
+            ShardResolverError::ReassemblyError(e) => write!(f, "Reassembly failed: {e}"),
+            ShardResolverError::Internal(e) => write!(f, "Internal error: {e}"),
         }
     }
 }
@@ -286,7 +286,9 @@ impl ShardResolver {
         let start = Instant::now();
         let blob_hash = &resolution.manifest.blob_hash;
 
-        self.stats.resolutions_attempted.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .resolutions_attempted
+            .fetch_add(1, Ordering::Relaxed);
 
         debug!(
             blob_hash = %blob_hash,
@@ -328,8 +330,12 @@ impl ShardResolver {
             }
         }
 
-        self.stats.resolutions_successful.fetch_add(1, Ordering::Relaxed);
-        self.stats.bytes_resolved.fetch_add(result.data.len() as u64, Ordering::Relaxed);
+        self.stats
+            .resolutions_successful
+            .fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .bytes_resolved
+            .fetch_add(result.data.len() as u64, Ordering::Relaxed);
 
         info!(
             blob_hash = %blob_hash,
@@ -368,7 +374,9 @@ impl ShardResolver {
                     .cloned()
                     .unwrap_or_default();
 
-                let data = self.fetch_shard_with_fallback(shard_hash, &locations).await?;
+                let data = self
+                    .fetch_shard_with_fallback(shard_hash, &locations)
+                    .await?;
 
                 Ok(ResolvedBlob {
                     data,
@@ -391,7 +399,9 @@ impl ShardResolver {
                         .cloned()
                         .unwrap_or_default();
 
-                    let shard_data = self.fetch_shard_with_fallback(shard_hash, &locations).await?;
+                    let shard_data = self
+                        .fetch_shard_with_fallback(shard_hash, &locations)
+                        .await?;
                     all_data.extend_from_slice(&shard_data);
                     shards_fetched += 1;
                 }
@@ -440,7 +450,10 @@ impl ShardResolver {
         // Try each location in order
         let mut last_error = None;
         for location in &active_locations {
-            match self.fetch_shard_from_url(shard_hash, &location.endpoint_url).await {
+            match self
+                .fetch_shard_from_url(shard_hash, &location.endpoint_url)
+                .await
+            {
                 Ok(data) => {
                     self.stats.shards_fetched.fetch_add(1, Ordering::Relaxed);
                     return Ok(data);
@@ -457,12 +470,16 @@ impl ShardResolver {
             }
         }
 
-        self.stats.shard_fetch_errors.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .shard_fetch_errors
+            .fetch_add(1, Ordering::Relaxed);
 
-        Err(last_error.unwrap_or_else(|| ShardResolverError::FetchError {
-            shard_hash: shard_hash.to_string(),
-            error: "All locations failed".into(),
-        }))
+        Err(
+            last_error.unwrap_or_else(|| ShardResolverError::FetchError {
+                shard_hash: shard_hash.to_string(),
+                error: "All locations failed".into(),
+            }),
+        )
     }
 
     /// Fetch a shard from a specific storage URL
@@ -480,12 +497,14 @@ impl ShardResolver {
             match self.http_client.get(&url).send().await {
                 Ok(response) => {
                     if response.status().is_success() {
-                        let bytes = response.bytes().await.map_err(|e| {
-                            ShardResolverError::FetchError {
-                                shard_hash: shard_hash.to_string(),
-                                error: format!("Failed to read response body: {}", e),
-                            }
-                        })?;
+                        let bytes =
+                            response
+                                .bytes()
+                                .await
+                                .map_err(|e| ShardResolverError::FetchError {
+                                    shard_hash: shard_hash.to_string(),
+                                    error: format!("Failed to read response body: {e}"),
+                                })?;
 
                         debug!(
                             shard_hash = %shard_hash,
@@ -653,14 +672,14 @@ mod tests {
     #[test]
     fn test_error_display() {
         let err = ShardResolverError::NotFound;
-        assert_eq!(format!("{}", err), "Blob not found");
+        assert_eq!(format!("{err}"), "Blob not found");
 
         let err = ShardResolverError::InsufficientShards {
             needed: 4,
             available: 2,
         };
-        assert!(format!("{}", err).contains("4"));
-        assert!(format!("{}", err).contains("2"));
+        assert!(format!("{err}").contains("4"));
+        assert!(format!("{err}").contains("2"));
     }
 
     #[test]

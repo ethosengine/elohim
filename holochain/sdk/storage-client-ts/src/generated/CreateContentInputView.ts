@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating content - camelCase API boundary type
  */
-export type CreateContentInputView = { id: string, title: string, description: string | null, contentType: string | null, contentFormat: string | null, contentBody: string | null, blobHash: string | null, blobCid: string | null, contentSizeBytes: bigint | null, 
+export type CreateContentInputView = { id: string, title: string, schemaVersion: number, description: string | null, contentType: string | null, contentFormat: string | null, contentBody: string | null, blobHash: string | null, blobCid: string | null, contentSizeBytes: bigint | null, 
 /**
  * Parsed metadata object (serialized to JSON string for DB)
  */

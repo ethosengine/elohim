@@ -20,9 +20,8 @@ use hyper::{Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
 
-use crate::orchestrator::{NodeHealthStatus, OrchestratorState, SocialMetrics};
+use crate::orchestrator::{NodeHealthStatus, SocialMetrics};
 use crate::server::AppState;
-use crate::services::custodian::CustodianService;
 
 // ============================================================================
 // Node Details Response
@@ -170,6 +169,7 @@ pub struct StewardCounts {
 /// Reach level coverage (how many nodes serve each level)
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub struct ReachCoverage {
     /// Nodes serving private content (reach 0)
     pub private: usize,
@@ -187,21 +187,6 @@ pub struct ReachCoverage {
     pub regional: usize,
     /// Nodes serving commons content (reach 7)
     pub commons: usize,
-}
-
-impl Default for ReachCoverage {
-    fn default() -> Self {
-        Self {
-            private: 0,
-            invited: 0,
-            local: 0,
-            neighborhood: 0,
-            municipal: 0,
-            bioregional: 0,
-            regional: 0,
-            commons: 0,
-        }
-    }
 }
 
 // ============================================================================
@@ -363,11 +348,11 @@ pub async fn handle_nodes(state: Arc<AppState>) -> Response<Full<Bytes>> {
             memory_gb,
             storage_tb,
             bandwidth_mbps,
-            cpu_usage_percent: None,      // Would come from heartbeat message
-            memory_usage_percent: None,   // Would come from heartbeat message
-            storage_usage_tb: None,       // Would come from heartbeat message
-            active_connections: None,     // Would come from heartbeat message
-            custodied_content_gb: None,   // Would come from heartbeat message
+            cpu_usage_percent: None,    // Would come from heartbeat message
+            memory_usage_percent: None, // Would come from heartbeat message
+            storage_usage_tb: None,     // Would come from heartbeat message
+            active_connections: None,   // Would come from heartbeat message
+            custodied_content_gb: None, // Would come from heartbeat message
             steward_tier,
             max_reach_level,
             active_reach_levels,
@@ -591,8 +576,8 @@ pub async fn handle_resources(state: Arc<AppState>) -> Response<Full<Bytes>> {
     let mut total_memory: f64 = 0.0;
     let mut total_storage: f64 = 0.0;
     let mut total_bandwidth: u32 = 0;
-    let mut total_connections: u32 = 0;
-    let mut custodied_content: f64 = 0.0;
+    let total_connections: u32 = 0;
+    let custodied_content: f64 = 0.0;
 
     for node in &all_nodes {
         if let Some(ref inv) = node.inventory {
@@ -680,6 +665,7 @@ fn status_to_string(status: &NodeHealthStatus) -> String {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn extract_social_metrics(
     social: &Option<SocialMetrics>,
 ) -> (

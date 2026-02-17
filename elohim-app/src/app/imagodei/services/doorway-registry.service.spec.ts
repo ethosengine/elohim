@@ -182,6 +182,47 @@ describe('DoorwayRegistryService', () => {
   });
 
   // ==========================================================================
+  // Select By URL Tests
+  // ==========================================================================
+
+  describe('selectDoorwayByUrl', () => {
+    it('should select a known doorway by URL', async () => {
+      // Load doorways first so there are known ones
+      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
+      mockHolochainClient.callZome.and.returnValue(
+        Promise.resolve({ success: true, data: [mockDoorway] })
+      );
+      await service.loadDoorways();
+
+      service.selectDoorwayByUrl('https://doorway.example.com');
+
+      expect(service.hasSelection()).toBe(true);
+      expect(service.selectedUrl()).toBe('https://doorway.example.com');
+      expect(service.selected()?.isExplicit).toBe(false);
+    });
+
+    it('should create minimal entry for unknown URL', () => {
+      service.selectDoorwayByUrl('https://unknown-doorway.example.com');
+
+      expect(service.hasSelection()).toBe(true);
+      expect(service.selectedUrl()).toBe('https://unknown-doorway.example.com');
+      expect(service.selected()?.doorway.name).toBe('unknown-doorway.example.com');
+      expect(service.selected()?.isExplicit).toBe(false);
+    });
+
+    it('should not re-select if already selected', () => {
+      service.selectDoorwayByUrl('https://doorway.example.com');
+      const firstSelection = service.selected();
+
+      service.selectDoorwayByUrl('https://doorway.example.com');
+      const secondSelection = service.selected();
+
+      // Should be same selection (not re-created)
+      expect(firstSelection?.selectedAt).toBe(secondSelection?.selectedAt);
+    });
+  });
+
+  // ==========================================================================
   // Lookup Tests
   // ==========================================================================
 

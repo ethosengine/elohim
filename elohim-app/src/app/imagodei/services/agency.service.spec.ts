@@ -8,6 +8,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
 import { AgencyService } from './agency.service';
+import { AuthService } from './auth.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import type {
   EdgeNodeDisplayInfo,
@@ -18,6 +19,7 @@ import type {
 describe('AgencyService', () => {
   let service: AgencyService;
   let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
+  let mockAuthService: jasmine.SpyObj<AuthService>;
   let connectionSignal: ReturnType<typeof signal<HolochainConnection>>;
 
   const createMockDisplayInfo = (
@@ -62,10 +64,15 @@ describe('AgencyService', () => {
 
     mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
 
+    // Create mock AuthService - default: not authenticated
+    mockAuthService = jasmine.createSpyObj('AuthService', ['isAuthenticated']);
+    mockAuthService.isAuthenticated.and.returnValue(false);
+
     TestBed.configureTestingModule({
       providers: [
         AgencyService,
         { provide: HolochainClientService, useValue: mockHolochainClient },
+        { provide: AuthService, useValue: mockAuthService },
       ],
     });
 

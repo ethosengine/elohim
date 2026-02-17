@@ -16,7 +16,6 @@ use tracing::{debug, error, info, warn};
 
 use crate::types::{DoorwayError, Result};
 
-
 /// Conductor connection manager
 pub struct ConductorConnection {
     /// URL of the conductor
@@ -29,8 +28,20 @@ pub struct ConductorConnection {
 }
 
 impl ConductorConnection {
-    /// Create a new conductor connection
+    /// Create a new conductor connection (no authentication)
     pub async fn connect(conductor_url: &str) -> Result<Self> {
+        Self::connect_with_auth(conductor_url, None).await
+    }
+
+    /// Create a new conductor connection with optional app authentication token.
+    ///
+    /// If `auth_token` is provided, the connection sends an `authenticate` message
+    /// after each WebSocket connect (including reconnects), matching the Holochain 0.6
+    /// app interface protocol used by elohim-storage.
+    pub async fn connect_with_auth(
+        conductor_url: &str,
+        auth_token: Option<Vec<u8>>,
+    ) -> Result<Self> {
         let (tx, rx) = mpsc::channel::<(Vec<u8>, oneshot::Sender<Vec<u8>>)>(1000);
         let connected = Arc::new(RwLock::new(false));
 
@@ -44,7 +55,7 @@ impl ConductorConnection {
         let url = conductor_url.to_string();
         let connected_flag = Arc::clone(&connected);
         tokio::spawn(async move {
-            connection_loop(url, rx, connected_flag).await;
+            connection_loop(url, auth_token, rx, connected_flag).await;
         });
 
         // Wait for initial connection
@@ -85,6 +96,7 @@ impl ConductorConnection {
 /// Main connection loop with reconnection logic
 async fn connection_loop(
     conductor_url: String,
+    auth_token: Option<Vec<u8>>,
     mut rx: mpsc::Receiver<(Vec<u8>, oneshot::Sender<Vec<u8>>)>,
     connected: Arc<RwLock<bool>>,
 ) {
@@ -95,7 +107,24 @@ async fn connection_loop(
         info!("Connecting to conductor at {}", conductor_url);
 
         match connect_to_conductor(&conductor_url).await {
-            Ok((ws_sink, ws_stream)) => {
+            Ok((mut ws_sink, ws_stream)) => {
+                // Authenticate if token provided (Holochain 0.6 app interface)
+                if let Some(ref token) = auth_token {
+                    match send_authenticate(&mut ws_sink, token).await {
+                        Ok(()) => {
+                            debug!("Authenticated with conductor");
+                        }
+                        Err(e) => {
+                            error!("Failed to authenticate with conductor: {}", e);
+                            *connected.write().await = false;
+                            warn!("Reconnecting to conductor in {:?}...", reconnect_delay);
+                            tokio::time::sleep(reconnect_delay).await;
+                            reconnect_delay = (reconnect_delay * 2).min(max_reconnect_delay);
+                            continue;
+                        }
+                    }
+                }
+
                 *connected.write().await = true;
                 reconnect_delay = Duration::from_millis(100);
                 info!("Connected to conductor");
@@ -113,13 +142,57 @@ async fn connection_loop(
         }
 
         // Wait before reconnecting
-        warn!(
-            "Reconnecting to conductor in {:?}...",
-            reconnect_delay
-        );
+        warn!("Reconnecting to conductor in {:?}...", reconnect_delay);
         tokio::time::sleep(reconnect_delay).await;
         reconnect_delay = (reconnect_delay * 2).min(max_reconnect_delay);
     }
+}
+
+/// Send authenticate message after WebSocket connect.
+///
+/// Holochain 0.6 app interface format: { type: "authenticate", data: <binary {token: <bytes>}> }
+async fn send_authenticate(
+    ws_sink: &mut futures_util::stream::SplitSink<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+        Message,
+    >,
+    token: &[u8],
+) -> Result<()> {
+    let inner = rmpv::Value::Map(vec![(
+        rmpv::Value::String("token".into()),
+        rmpv::Value::Binary(token.to_vec()),
+    )]);
+
+    let mut inner_buf = Vec::new();
+    rmpv::encode::write_value(&mut inner_buf, &inner)
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth: {e}")))?;
+
+    let envelope = rmpv::Value::Map(vec![
+        (
+            rmpv::Value::String("type".into()),
+            rmpv::Value::String("authenticate".into()),
+        ),
+        (
+            rmpv::Value::String("data".into()),
+            rmpv::Value::Binary(inner_buf),
+        ),
+    ]);
+
+    let mut buf = Vec::new();
+    rmpv::encode::write_value(&mut buf, &envelope)
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to encode auth envelope: {e}")))?;
+
+    ws_sink
+        .send(Message::Binary(buf))
+        .await
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to send auth: {e}")))?;
+
+    // Brief pause — if conductor rejects, it closes the connection
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    Ok(())
 }
 
 /// Connect to conductor with proper headers
@@ -150,11 +223,11 @@ async fn connect_to_conductor(
             tokio_tungstenite::tungstenite::handshake::client::generate_key(),
         )
         .body(())
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {e}")))?;
 
     let (ws, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("WebSocket connect failed: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("WebSocket connect failed: {e}")))?;
 
     Ok(ws.split())
 }

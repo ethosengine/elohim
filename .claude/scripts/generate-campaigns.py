@@ -12,6 +12,7 @@ Usage:
   python3 generate-campaigns.py --tier mechanical   # Filter by tier
   python3 generate-campaigns.py --agent quality-sweep  # Filter by agent type
   python3 generate-campaigns.py --task-descriptions # Output TaskCreate-ready descriptions
+  python3 generate-campaigns.py --project doorway   # Filter by project
 """
 
 import json
@@ -49,9 +50,30 @@ def load_manifest():
 
 
 def extract_module(filepath):
-    """Extract the module name from a file path (first dir after src/app/)."""
+    """Extract the module name from a file path.
+
+    Handles multiple project path conventions:
+    - elohim-app/doorway-app: first dir after src/app/
+    - sophia: package name from packages/<name>/
+    - doorway: first dir after src/
+    """
+    # Angular apps: src/app/<module>/
     match = re.search(r'/src/app/([^/]+)/', filepath)
-    return match.group(1) if match else 'root'
+    if match:
+        return match.group(1)
+
+    # sophia monorepo: packages/<package>/
+    match = re.search(r'/packages/([^/]+)/', filepath)
+    if match:
+        return match.group(1)
+
+    # Rust: src/<module>/
+    match = re.search(r'/doorway/src/([^/]+)', filepath)
+    if match:
+        mod = match.group(1)
+        return mod.replace('.rs', '') if mod.endswith('.rs') else mod
+
+    return 'root'
 
 
 def slugify(rule_id, module=None, chunk_idx=None):
@@ -82,11 +104,25 @@ def build_file_map(issues):
     return {f: sorted(set(lines)) for f, lines in sorted(file_map.items())}
 
 
+def detect_project(filepath):
+    """Detect which project a filepath belongs to."""
+    if '/doorway-app/' in filepath:
+        return 'doorway-app'
+    if '/doorway/' in filepath:
+        return 'doorway'
+    if '/sophia/' in filepath:
+        return 'sophia'
+    if '/elohim-app/' in filepath:
+        return 'elohim-app'
+    return 'unknown'
+
+
 def build_campaign(rule_id, issues, module=None, chunk_idx=None):
     """Build a single campaign dict."""
     tier = issues[0].get('tier', 'sonnet')
     agent_type = TIER_AGENT_MAP.get(tier, 'quality-deep')
     file_map = build_file_map(issues)
+    project = issues[0].get('project', detect_project(issues[0]['file']))
 
     return {
         'campaign_id': slugify(rule_id, module, chunk_idx),
@@ -94,6 +130,7 @@ def build_campaign(rule_id, issues, module=None, chunk_idx=None):
         'tier': tier,
         'agent_type': agent_type,
         'model': TIER_MODEL_MAP.get(tier, 'sonnet'),
+        'project': project,
         'issue_count': len(issues),
         'file_count': len(file_map),
         'fix_hint': issues[0].get('fixHint', 'Review the rule documentation and fix accordingly'),
@@ -159,8 +196,8 @@ def format_task_description(campaign):
     """Format a campaign as a TaskCreate-ready description."""
     file_lines = []
     for filepath, lines in campaign['files'].items():
-        # Use relative path for readability
-        rel = filepath.replace('/projects/elohim/elohim-app/', '')
+        # Use relative path for readability — handle all projects
+        rel = filepath.replace('/projects/elohim/', '')
         line_str = ','.join(str(l) for l in lines)
         file_lines.append(f"- {rel}:{line_str}")
 
@@ -228,6 +265,7 @@ def main():
 
     tier_filter = None
     agent_filter = None
+    project_filter = None
     summary_mode = False
     task_mode = False
 
@@ -241,6 +279,9 @@ def main():
         elif args[i] == '--agent' and i + 1 < len(args):
             agent_filter = args[i + 1]
             i += 1
+        elif args[i] == '--project' and i + 1 < len(args):
+            project_filter = args[i + 1]
+            i += 1
         elif args[i] == '--task-descriptions':
             task_mode = True
         i += 1
@@ -250,6 +291,8 @@ def main():
         campaigns = [c for c in campaigns if c['tier'] == tier_filter]
     if agent_filter:
         campaigns = [c for c in campaigns if c['agent_type'] == agent_filter]
+    if project_filter:
+        campaigns = [c for c in campaigns if c.get('project') == project_filter]
 
     # Output
     if summary_mode:

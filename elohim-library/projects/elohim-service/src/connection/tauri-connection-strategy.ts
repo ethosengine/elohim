@@ -319,8 +319,11 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   // URL Resolution
   // ==========================================================================
 
-  resolveAdminUrl(config: ConnectionConfig): string {
-    const url = config.adminUrl || 'ws://localhost:4444';
+  resolveAdminUrl(_config: ConnectionConfig): string {
+    // In Tauri mode, always connect to the local embedded conductor.
+    // config.adminUrl may contain a doorway URL from environment config,
+    // which is not appropriate for direct conductor access.
+    const url = 'ws://localhost:4444';
     console.log('[TauriStrategy] Admin URL:', url);
     return url;
   }

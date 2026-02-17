@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "prepare": "cd .. && node elohim-app/node_modules/husky/bin.js",
-    "prebuild": "bash ../scripts/check-sophia.sh",
+    "prebuild": "bash ../scripts/check-sophia.sh && bash ../scripts/fetch-fonts.sh",
     "build:sophia": "cd ../sophia && pnpm install && pnpm build && pnpm build:umd",
     "start": "ng serve --proxy-config proxy.conf.mjs --disable-host-check",
     "stop": "pkill -f 'ng serve' 2>/dev/null && echo 'Stopped Angular dev server' || echo 'Angular dev server not running'",

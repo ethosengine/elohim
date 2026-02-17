@@ -27,7 +27,7 @@ WASM_ZOME_DIRS = [
 
 # Directories that should NOT have WASM RUSTFLAGS (native Rust)
 NATIVE_DIRS = [
-    "holochain/doorway/",
+    "doorway/",
     "holochain/elohim-storage/",
     "holochain/rna/rust/",
     "holochain/crates/",

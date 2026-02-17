@@ -43,11 +43,14 @@ pub struct GatewayPublisher {
 impl GatewayPublisher {
     /// Create a new gateway publisher
     pub async fn new(nats_url: &str, config: GatewayConfig) -> Result<Self> {
-        info!("Gateway {} connecting to NATS at {}", config.gateway_id, nats_url);
+        info!(
+            "Gateway {} connecting to NATS at {}",
+            config.gateway_id, nats_url
+        );
 
         let nats_client = async_nats::connect(nats_url)
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to connect to NATS: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to connect to NATS: {e}")))?;
 
         let jetstream = jetstream::new(nats_client.clone());
 
@@ -81,7 +84,7 @@ impl GatewayPublisher {
                 ..Default::default()
             })
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to create stream: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to create stream: {e}")))?;
 
         info!("Using stream {} for request routing", STREAM_NAME);
         Ok(stream)
@@ -96,7 +99,7 @@ impl GatewayPublisher {
             .nats_client
             .subscribe(reply_subject.clone())
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to subscribe to replies: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to subscribe to replies: {e}")))?;
 
         info!("Listening for responses on {}", reply_subject);
 
@@ -122,10 +125,7 @@ impl GatewayPublisher {
                         if let Some(sender) = sender {
                             let _ = sender.send(response);
                         } else {
-                            warn!(
-                                "No pending request for response {}",
-                                response.request_id
-                            );
+                            warn!("No pending request for response {}", response.request_id);
                         }
                     }
                     Err(e) => {
@@ -173,17 +173,17 @@ impl GatewayPublisher {
 
         // Serialize and publish the request
         let request_json = serde_json::to_vec(&request)
-            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize request: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize request: {e}")))?;
 
         // Determine subject based on interface
-        let subject = format!("{}.{}", SUBJECT_PREFIX, interface);
+        let subject = format!("{SUBJECT_PREFIX}.{interface}");
 
         self.jetstream
             .publish(subject.clone(), request_json.into())
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to publish request: {}", e)))?
+            .map_err(|e| DoorwayError::Nats(format!("Failed to publish request: {e}")))?
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to confirm publish: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to confirm publish: {e}")))?;
 
         debug!(
             "Published request {} to {} (reply: {})",
@@ -199,7 +199,9 @@ impl GatewayPublisher {
                     Ok(response.payload)
                 } else {
                     Err(DoorwayError::Holochain(
-                        response.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        response
+                            .error
+                            .unwrap_or_else(|| "Unknown error".to_string()),
                     ))
                 }
             }
@@ -220,7 +222,12 @@ impl GatewayPublisher {
     }
 
     /// Send a request and return immediately (fire-and-forget)
-    pub async fn publish_only(&self, payload: Vec<u8>, interface: &str, app_port: Option<u16>) -> Result<String> {
+    pub async fn publish_only(
+        &self,
+        payload: Vec<u8>,
+        interface: &str,
+        app_port: Option<u16>,
+    ) -> Result<String> {
         let request_id = uuid::Uuid::new_v4().to_string();
 
         let request = WorkerRequest {
@@ -232,16 +239,16 @@ impl GatewayPublisher {
         };
 
         let request_json = serde_json::to_vec(&request)
-            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize request: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to serialize request: {e}")))?;
 
-        let subject = format!("{}.{}", SUBJECT_PREFIX, interface);
+        let subject = format!("{SUBJECT_PREFIX}.{interface}");
 
         self.jetstream
             .publish(subject, request_json.into())
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to publish request: {}", e)))?
+            .map_err(|e| DoorwayError::Nats(format!("Failed to publish request: {e}")))?
             .await
-            .map_err(|e| DoorwayError::Nats(format!("Failed to confirm publish: {}", e)))?;
+            .map_err(|e| DoorwayError::Nats(format!("Failed to confirm publish: {e}")))?;
 
         Ok(request_id)
     }
@@ -265,11 +272,7 @@ pub struct SessionGateway {
 
 impl SessionGateway {
     /// Create a new session gateway
-    pub fn new(
-        publisher: Arc<GatewayPublisher>,
-        interface: &str,
-        app_port: Option<u16>,
-    ) -> Self {
+    pub fn new(publisher: Arc<GatewayPublisher>, interface: &str, app_port: Option<u16>) -> Self {
         Self {
             publisher,
             session_id: uuid::Uuid::new_v4().to_string(),

@@ -200,7 +200,7 @@ impl DIDResolver {
             ],
             id: did.to_string(),
             verification_method: vec![VerificationMethod {
-                id: format!("{}#{}", did, key_part),
+                id: format!("{did}#{key_part}"),
                 method_type: "Ed25519VerificationKey2020".to_string(),
                 controller: did.to_string(),
                 public_key_multibase: Some(key_part.to_string()),
@@ -214,10 +214,7 @@ impl DIDResolver {
     }
 
     /// Extract a specific service endpoint from a DID document
-    pub fn extract_service_endpoint(
-        document: &DIDDocument,
-        service_type: &str,
-    ) -> Option<String> {
+    pub fn extract_service_endpoint(document: &DIDDocument, service_type: &str) -> Option<String> {
         document
             .service
             .iter()
@@ -284,7 +281,7 @@ fn did_web_to_url(did: &str) -> Result<String, DIDResolverError> {
         "/.well-known/did.json".to_string()
     };
 
-    Ok(format!("https://{}{}", domain, path))
+    Ok(format!("https://{domain}{path}"))
 }
 
 /// DID Document structure (simplified for resolution)
@@ -314,7 +311,10 @@ pub struct DIDDocument {
     pub service: Vec<Service>,
 
     /// Elohim-specific capabilities
-    #[serde(rename = "elohim:capabilities", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "elohim:capabilities",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub elohim_capabilities: Option<Vec<String>>,
 
     /// Elohim-specific region

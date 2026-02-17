@@ -147,7 +147,10 @@ impl DnaRules {
 
     /// Get functions that should be invalidated when this function is called
     pub fn get_invalidations(&self, fn_name: &str) -> Vec<String> {
-        self.invalidation_map.get(fn_name).cloned().unwrap_or_default()
+        self.invalidation_map
+            .get(fn_name)
+            .cloned()
+            .unwrap_or_default()
     }
 }
 

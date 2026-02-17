@@ -104,7 +104,7 @@ pub struct ProjectionEngine {
     /// Projection store for persisting projections
     store: Arc<ProjectionStore>,
     /// Configuration
-    config: EngineConfig,
+    _config: EngineConfig,
     /// Shutdown signal sender
     shutdown_tx: broadcast::Sender<()>,
 }
@@ -115,7 +115,7 @@ impl ProjectionEngine {
         let (shutdown_tx, _) = broadcast::channel(1);
         Self {
             store,
-            config,
+            _config: config,
             shutdown_tx,
         }
     }
@@ -194,7 +194,10 @@ impl ProjectionEngine {
                     .unwrap_or_default();
 
                 if !endpoints.is_empty() {
-                    let count = self.store.update_blob_endpoints(blob_hash, endpoints.clone()).await?;
+                    let count = self
+                        .store
+                        .update_blob_endpoints(blob_hash, endpoints.clone())
+                        .await?;
                     debug!(
                         blob_hash = blob_hash,
                         endpoints = ?endpoints,
@@ -279,7 +282,11 @@ mod tests {
             action_hash: "uhCkk...".to_string(),
             entry_hash: Some("uhCEk...".to_string()),
             author: "uhCAk...".to_string(),
-            search_tokens: vec!["elohim".to_string(), "protocol".to_string(), "governance".to_string()],
+            search_tokens: vec![
+                "elohim".to_string(),
+                "protocol".to_string(),
+                "governance".to_string(),
+            ],
             invalidates: vec![],
             ttl_secs: None,
         };

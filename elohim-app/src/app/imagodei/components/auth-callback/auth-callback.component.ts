@@ -18,6 +18,7 @@ import { Router } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-05)
 
+import { SeoService } from '../../../services/seo.service';
 import { AuthService } from '../../services/auth.service';
 import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 
@@ -46,7 +47,7 @@ type CallbackStatus = 'processing' | 'success' | 'error';
               </svg>
             </div>
             <h2>Welcome back!</h2>
-            <p>Redirecting you to Lamad...</p>
+            <p>Redirecting...</p>
           </div>
         }
 
@@ -200,6 +201,7 @@ export class AuthCallbackComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly oauthProvider = inject(OAuthAuthProvider);
   private readonly authService = inject(AuthService);
+  private readonly seoService = inject(SeoService);
 
   readonly status = signal<CallbackStatus>('processing');
   readonly errorMessage = signal<string>('');
@@ -243,10 +245,12 @@ export class AuthCallbackComponent implements OnInit {
         this.authService.setAuthFromResult(result);
 
         this.status.set('success');
+        this.seoService.setTitle('Welcome');
 
-        // Redirect to lamad after brief delay for UX
+        // Redirect to intended destination (or /lamad as default) after brief delay for UX
+        const returnUrl = this.oauthProvider.consumeReturnUrl() ?? '/lamad';
         setTimeout(() => {
-          void this.router.navigate(['/lamad']);
+          void this.router.navigate([returnUrl]);
         }, 1500);
       } else {
         this.status.set('error');
@@ -259,8 +263,8 @@ export class AuthCallbackComponent implements OnInit {
   }
 
   retry(): void {
-    // Navigate back to identity page (with doorway picker)
-    void this.router.navigate(['/identity']);
+    // Navigate to login page to restart auth flow
+    void this.router.navigate(['/identity/login']);
   }
 
   goHome(): void {

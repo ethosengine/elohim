@@ -1,15 +1,17 @@
 /**
  * LoginComponent Tests
  *
- * Tests for hosted human authentication component.
+ * Tests for hosted human authentication component with context-aware routing.
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../services/auth.service';
 import { PasswordAuthProvider } from '../../services/providers/password-auth.provider';
+import { OAuthAuthProvider } from '../../services/providers/oauth-auth.provider';
 import { IdentityService } from '../../services/identity.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { TauriAuthService } from '../../services/tauri-auth.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
@@ -20,10 +22,13 @@ describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
   let mockAuthService: jasmine.SpyObj<AuthService>;
   let mockPasswordProvider: jasmine.SpyObj<PasswordAuthProvider>;
+  let mockOAuthProvider: jasmine.SpyObj<OAuthAuthProvider>;
   let mockIdentityService: jasmine.SpyObj<IdentityService>;
   let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
+  let mockTauriAuth: jasmine.SpyObj<TauriAuthService>;
   let mockRouter: jasmine.SpyObj<Router>;
-  let mockActivatedRoute: jasmine.SpyObj<ActivatedRoute>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockActivatedRoute: any;
 
   beforeEach(async () => {
     // Create mocks
@@ -48,6 +53,10 @@ describe('LoginComponent', () => {
 
     mockPasswordProvider = jasmine.createSpyObj('PasswordAuthProvider', ['login', 'logout']);
 
+    mockOAuthProvider = jasmine.createSpyObj('OAuthAuthProvider', ['initiateLogin', 'storeReturnUrl'], {
+      isFlowInProgress: signal(false),
+    });
+
     mockIdentityService = jasmine.createSpyObj(
       'IdentityService',
       ['waitForAuthenticatedState'],
@@ -60,19 +69,26 @@ describe('LoginComponent', () => {
 
     mockDoorwayRegistry = jasmine.createSpyObj(
       'DoorwayRegistryService',
-      ['select'],
+      ['selectDoorwayByUrl'],
       {
         selected: signal(null),
         hasSelection: signal(false),
+        selectedUrl: signal(null),
       }
     );
+
+    mockTauriAuth = {
+      isTauri: signal(false),
+      needsUnlock: jasmine.createSpy('needsUnlock').and.returnValue(false),
+      getDoorwayStatus: jasmine.createSpy('getDoorwayStatus').and.returnValue(Promise.resolve(null)),
+    } as any;
 
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
     mockRouter.navigate.and.returnValue(Promise.resolve(true));
 
     mockActivatedRoute = {
       queryParams: of({}),
-    } as any;
+    };
 
     // Mock localStorage
     spyOn(localStorage, 'getItem').and.returnValue(null);
@@ -84,8 +100,10 @@ describe('LoginComponent', () => {
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
+        { provide: OAuthAuthProvider, useValue: mockOAuthProvider },
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
+        { provide: TauriAuthService, useValue: mockTauriAuth },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
@@ -170,19 +188,14 @@ describe('LoginComponent', () => {
     expect(typeof component.goToRegister).toBe('function');
   });
 
-  it('should have onDoorwaySelected method', () => {
-    expect(component.onDoorwaySelected).toBeDefined();
-    expect(typeof component.onDoorwaySelected).toBe('function');
+  it('should have goBackToFederated method', () => {
+    expect(component.goBackToFederated).toBeDefined();
+    expect(typeof component.goBackToFederated).toBe('function');
   });
 
-  it('should have onDoorwayPickerCancelled method', () => {
-    expect(component.onDoorwayPickerCancelled).toBeDefined();
-    expect(typeof component.onDoorwayPickerCancelled).toBe('function');
-  });
-
-  it('should have goBackToDoorway method', () => {
-    expect(component.goBackToDoorway).toBeDefined();
-    expect(typeof component.goBackToDoorway).toBe('function');
+  it('should have onFederatedLogin method', () => {
+    expect(component.onFederatedLogin).toBeDefined();
+    expect(typeof component.onFederatedLogin).toBe('function');
   });
 
   // ==========================================================================
@@ -211,21 +224,10 @@ describe('LoginComponent', () => {
   // Step Navigation
   // ==========================================================================
 
-  it('should move to credentials step when doorway selected', () => {
-    component.currentStep.set('doorway');
-    component.onDoorwaySelected({ id: 'test', name: 'Test', url: 'http://test', region: 'us', operator: 'test', description: 'test' } as any);
-    expect(component.currentStep()).toBe('credentials');
-  });
-
-  it('should navigate to home when doorway picker cancelled', () => {
-    component.onDoorwayPickerCancelled();
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
-  });
-
-  it('should go back to doorway step', () => {
+  it('should go back to federated step', () => {
     component.currentStep.set('credentials');
-    component.goBackToDoorway();
-    expect(component.currentStep()).toBe('doorway');
+    component.goBackToFederated();
+    expect(component.currentStep()).toBe('federated');
   });
 
   // ==========================================================================
@@ -243,8 +245,8 @@ describe('LoginComponent', () => {
   // Initial State
   // ==========================================================================
 
-  it('should start with doorway step', () => {
-    expect(component.currentStep()).toBe('doorway');
+  it('should start with federated step', () => {
+    expect(component.currentStep()).toBe('federated');
   });
 
   it('should initialize with no error', () => {
@@ -282,7 +284,7 @@ describe('LoginComponent', () => {
       component.ngOnInit();
 
       setTimeout(() => {
-        expect((component as any).returnUrl).toBe('/dashboard');
+        expect(component.returnUrl).toBe('/dashboard');
         done();
       }, 100);
     });
@@ -293,7 +295,7 @@ describe('LoginComponent', () => {
       component.ngOnInit();
 
       setTimeout(() => {
-        expect((component as any).returnUrl).toBe('/');
+        expect(component.returnUrl).toBe('/');
         done();
       }, 100);
     });
@@ -306,36 +308,118 @@ describe('LoginComponent', () => {
       expect(component.form.identifier).toBe('user@example.com');
     });
 
-    it('should skip to credentials step if doorway already selected', () => {
-      // Override the hasSelection property with a signal that returns true
-      Object.defineProperty(mockDoorwayRegistry, 'hasSelection', {
-        value: signal(true),
-        writable: true,
-        configurable: true,
-      });
-
-      // Create a new component instance that will read the updated signal
-      const newFixture = TestBed.createComponent(LoginComponent);
-      const newComponent = newFixture.componentInstance;
-
-      newComponent.ngOnInit();
-
-      expect(newComponent.currentStep()).toBe('credentials');
-    });
-
-    it('should stay on doorway step if no doorway selected', () => {
-      // The default mock already has hasSelection = signal(false)
-      component.ngOnInit();
-
-      expect(component.currentStep()).toBe('doorway');
-    });
-
     it('should redirect if already authenticated', () => {
       mockAuthService.isAuthenticated.and.returnValue(true);
 
       component.ngOnInit();
 
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
+    });
+
+    // Context routing: dev browser (localhost doorwayUrl, no saved doorway)
+    // Default environment.client.doorwayUrl is localhost -> federated step
+    it('should show federated step for dev browser with no saved doorway', () => {
+      component.ngOnInit();
+
+      expect(component.currentStep()).toBe('federated');
+    });
+
+    // Context routing: Tauri with no doorway -> federated step
+    it('should show federated step for Tauri with no doorway selected', async () => {
+      (mockTauriAuth as any).isTauri = signal(true);
+
+      const newFixture = TestBed.createComponent(LoginComponent);
+      const newComponent = newFixture.componentInstance;
+      newComponent.ngOnInit();
+      await newFixture.whenStable();
+
+      expect(newComponent.currentStep()).toBe('federated');
+    });
+
+    // Context routing: Tauri with doorway selected but no key bundle -> federated
+    // (First-time user: always show federated input for identity import)
+    it('should show federated for Tauri with doorway selected', async () => {
+      (mockTauriAuth as any).isTauri = signal(true);
+      Object.defineProperty(mockDoorwayRegistry, 'hasSelection', {
+        value: signal(true),
+        writable: true,
+        configurable: true,
+      });
+
+      const newFixture = TestBed.createComponent(LoginComponent);
+      const newComponent = newFixture.componentInstance;
+      newComponent.ngOnInit();
+      await newFixture.whenStable();
+
+      expect(newComponent.currentStep()).toBe('federated');
+    });
+  });
+
+  // ==========================================================================
+  // Federated Login
+  // ==========================================================================
+
+  describe('onFederatedLogin', () => {
+    it('should show error for invalid identifier', () => {
+      component.federatedIdentifier = 'invalid';
+
+      component.onFederatedLogin();
+
+      expect(component.error()).toBe(
+        'Please enter a valid identity (e.g. you@your-doorway.host)'
+      );
+      expect(mockOAuthProvider.initiateLogin).not.toHaveBeenCalled();
+    });
+
+    it('should show error for empty identifier', () => {
+      component.federatedIdentifier = '';
+
+      component.onFederatedLogin();
+
+      expect(component.error()).toBeTruthy();
+    });
+
+    it('should initiate OAuth for valid federated identifier in browser', () => {
+      component.federatedIdentifier = 'matthew@alpha.elohim.host';
+
+      component.onFederatedLogin();
+
+      expect(component.currentStep()).toBe('redirecting');
+      expect(mockDoorwayRegistry.selectDoorwayByUrl).toHaveBeenCalled();
+      expect(mockOAuthProvider.initiateLogin).toHaveBeenCalled();
+    });
+
+    it('should pass username as login_hint', () => {
+      component.federatedIdentifier = 'matthew@alpha.elohim.host';
+
+      component.onFederatedLogin();
+
+      const args = mockOAuthProvider.initiateLogin.calls.mostRecent().args;
+      expect(args[2]).toBe('matthew');
+    });
+
+    it('should clear previous error on submit', () => {
+      component.error.set('old error');
+      component.federatedIdentifier = 'matthew@alpha.elohim.host';
+
+      component.onFederatedLogin();
+
+      // Error should be null (cleared) since the identifier is valid
+      expect(component.error()).toBeNull();
+    });
+
+    it('should show credentials step for Tauri with valid federated identifier', () => {
+      (mockTauriAuth as any).isTauri = signal(true);
+
+      const newFixture = TestBed.createComponent(LoginComponent);
+      const newComponent = newFixture.componentInstance;
+      newComponent.federatedIdentifier = 'matthew@alpha.elohim.host';
+
+      newComponent.onFederatedLogin();
+
+      expect(newComponent.currentStep()).toBe('credentials');
+      expect(newComponent.form.identifier).toBe('matthew');
+      expect(newComponent.isLoading()).toBe(false);
     });
   });
 
@@ -378,9 +462,9 @@ describe('LoginComponent', () => {
     });
 
     it('should set loading state during login', async () => {
-      let resolveLogin: any;
+      let resolveLogin: (value: any) => void;
       mockAuthService.login.and.returnValue(
-        new Promise((resolve) => {
+        new Promise(resolve => {
           resolveLogin = resolve;
         })
       );
@@ -391,7 +475,7 @@ describe('LoginComponent', () => {
       expect(component.isLoading()).toBe(true);
 
       // Resolve the login
-      resolveLogin({
+      resolveLogin!({
         success: true,
         token: 'mock-token',
         humanId: 'mock-human',
@@ -457,7 +541,7 @@ describe('LoginComponent', () => {
     });
 
     it('should navigate to return URL after successful login', async () => {
-      (component as any).returnUrl = '/dashboard';
+      component.returnUrl = '/dashboard';
 
       await component.onLogin();
 

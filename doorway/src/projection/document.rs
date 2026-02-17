@@ -7,8 +7,8 @@ use mongodb::options::IndexOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use crate::db::schemas::Metadata;
 use crate::db::mongo::{IntoIndexes, MutMetadata};
+use crate::db::schemas::Metadata;
 
 /// A projected document stored in MongoDB
 ///
@@ -117,7 +117,7 @@ impl ProjectedDocument {
         let now = DateTime::now();
 
         Self {
-            mongo_id: Some(format!("{}:{}", doc_type, doc_id)),
+            mongo_id: Some(format!("{doc_type}:{doc_id}")),
             doc_type,
             doc_id,
             action_hash: action_hash.into(),
@@ -176,7 +176,7 @@ impl ProjectedDocument {
     /// Extract search tokens from text content
     pub fn extract_search_tokens(text: &str) -> Vec<String> {
         text.split_whitespace()
-            .filter(|word| word.len() >= 3)
+            .filter(|word| word.len() > 3)
             .map(|word| word.to_lowercase())
             .collect()
     }
@@ -298,7 +298,7 @@ impl ProjectionQuery {
             // Simple token matching (MongoDB text search would need a text index)
             let tokens: Vec<String> = search
                 .split_whitespace()
-                .filter(|w| w.len() >= 3)
+                .filter(|w| w.len() > 3)
                 .map(|w| w.to_lowercase())
                 .collect();
             if !tokens.is_empty() {

@@ -12,11 +12,11 @@
  *   - Deployment manifest comparing expected vs actual versions
  *
  * Dependency Graph:
- *   elohim-holochain (DNA/hApp, WASM)
- *       ├──► elohim-edge (infrastructure) ──┐
- *       │                                   ├──► elohim-genesis (seed + test)
- *       └──► elohim-steward (manual only)   │
- *   elohim (Angular app) ──────────────────┘
+ *   elohim-holochain (DNA/hApp, WASM) [cascades: false]
+ *       ├──► elohim-edge (builds after DNA when both change, but DNA doesn't auto-trigger Edge)
+ *       │                                    ├──► elohim-genesis (seed + test)
+ *       └──► elohim-steward (manual only)    │
+ *   elohim (Angular app) ───────────────────┘
  */
 
 // =============================================================================
@@ -31,6 +31,7 @@ import groovy.transform.Field
         changePatterns: ['holochain/dna/', 'holochain/holochain-cache-core/', 'holochain/rna/', 'VERSION'],
         artifacts: ['elohim.happ'],
         dependsOn: [],
+        cascades: false,      // Sprint 5: DNA changes don't auto-trigger Edge rebuilds
         triggersGenesis: true,
         deploymentCheck: null  // No deployment, just artifacts
     ],
@@ -48,7 +49,7 @@ import groovy.transform.Field
     ],
     'elohim': [
         jenkinsPath: 'Jenkinsfile',
-        changePatterns: ['elohim-app/', 'elohim-library/', 'VERSION'],
+        changePatterns: ['elohim-app/', 'elohim-library/', 'holochain/sdk/', 'VERSION'],
         artifacts: ['elohim-app'],
         dependsOn: [],
         triggersGenesis: true,
@@ -74,6 +75,15 @@ import groovy.transform.Field
         manualOnly: true,
         triggersGenesis: false,
         deploymentCheck: null
+    ],
+    'elohim-sophia': [
+        jenkinsPath: 'sophia/Jenkinsfile',
+        changePatterns: ['sophia/'],
+        artifacts: ['sophia-element'],
+        dependsOn: [],
+        cascades: true,        // sophia changes should trigger elohim (app) rebuild
+        triggersGenesis: false,
+        deploymentCheck: null   // Library, not a deployed service
     ]
 ]
 
@@ -107,34 +117,76 @@ def getGitCommitHash() {
 // CI Summary helpers for Claude triage
 def categorizeFailure(String p) {
     ['elohim-holochain':'DNA_BUILD', 'elohim-edge':'INFRASTRUCTURE',
-     'elohim':'APP_BUILD', 'elohim-genesis':'SEEDING', 'elohim-steward':'DESKTOP_BUILD'][p] ?: 'UNKNOWN'
+     'elohim':'APP_BUILD', 'elohim-genesis':'SEEDING', 'elohim-steward':'DESKTOP_BUILD',
+     'elohim-sophia':'SOPHIA_BUILD'][p] ?: 'UNKNOWN'
 }
 def getRemediationHint(String p) {
     ['elohim-holochain':'Check RUSTFLAGS, cargo build locally',
      'elohim-edge':'Check hApp artifact, Harbor creds',
      'elohim':'Run npm run build locally',
      'elohim-genesis':'Check doorway-alpha.elohim.host/health or doorway-staging.elohim.host/health',
-     'elohim-steward':'Check Tauri build, hApp artifact'][p] ?: 'Check logs'
+     'elohim-steward':'Check Tauri build, hApp artifact',
+     'elohim-sophia':'cd sophia && pnpm lint && pnpm test'][p] ?: 'Check logs'
 }
 def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 ? 'HIGH' : u > 0 ? 'MEDIUM' : 'LOW' }
+
+/**
+ * Advisory P2P peer validation — checks doorway /health for P2P status.
+ * Logs warnings but never fails the build.
+ */
+def runP2PValidation(String environment, String doorwayUrl) {
+    def result = sh(
+        script: """
+            set +e
+            HEALTH=\$(curl -s --max-time 10 ${doorwayUrl}/health 2>/dev/null)
+            if [ \$? -ne 0 ]; then
+                echo "P2P [${environment}]: Could not reach ${doorwayUrl}/health"
+                exit 0
+            fi
+
+            PEERS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('connected_peers',0) if p else 'n/a')" 2>/dev/null)
+            SYNC_DOCS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('sync_documents',0) if p else 'n/a')" 2>/dev/null)
+            PEER_ID=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('peer_id','unknown')[:12] if p else 'n/a')" 2>/dev/null)
+
+            echo "P2P [${environment}]: peers=\${PEERS} sync_docs=\${SYNC_DOCS} peer_id=\${PEER_ID}"
+
+            if [ "\$PEERS" = "n/a" ]; then
+                echo "P2P [${environment}]: P2P not enabled on this doorway"
+            elif [ "\$PEERS" = "0" ]; then
+                echo "P2P [${environment}]: WARNING - no peers connected"
+            else
+                echo "P2P [${environment}]: OK - \${PEERS} peer(s) connected"
+            fi
+        """,
+        returnStatus: true
+    )
+    return result == 0
+}
 
 def getGitCommitHashFull() {
     return sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
 }
 
 /**
- * Analyze all changes since the last successful orchestrator build.
+ * Analyze all changes since the last orchestrator build.
  *
  * Priority order:
  *   1. FORCE_COMMIT parameter (manual override)
- *   2. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin)
- *   3. HEAD~1 fallback (only diffs the latest push)
+ *   2. Stored global baseline (advances on every completed build, even UNSTABLE)
+ *   3. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin - only advances on SUCCESS)
+ *   4. HEAD~1 fallback (only diffs the latest push)
  */
-def analyzeChangeset() {
+def analyzeChangeset(storedGlobalBaseline = null) {
     // 1. Manual override via FORCE_COMMIT parameter
     def baseCommit = params.FORCE_COMMIT?.trim() ?: null
 
-    // 2. Jenkins Git plugin automatic tracking
+    // 2. Stored global baseline from previous completed build
+    if (!baseCommit && storedGlobalBaseline) {
+        baseCommit = storedGlobalBaseline
+        echo "Using stored global baseline: ${baseCommit.take(8)}"
+    }
+
+    // 3. Jenkins Git plugin automatic tracking (only updates on SUCCESS)
     if (!baseCommit) {
         baseCommit = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
     }
@@ -158,7 +210,7 @@ def analyzeChangeset() {
         echo "WARNING: Commit ${baseCommit} not found in repo"
     }
 
-    // 3. Fallback: diff against previous commit only
+    // 4. Fallback: diff against previous commit only
     // This is conservative - only looks at what changed in the latest push.
     // Once this build succeeds, GIT_PREVIOUS_SUCCESSFUL_COMMIT will be set
     // and future builds will diff correctly.
@@ -171,20 +223,58 @@ def analyzeChangeset() {
 
 /**
  * Determine which pipelines need to run based on changed files.
- * Returns a detailed map with reasoning.
+ * Uses per-pipeline baselines when available to avoid re-triggering
+ * pipelines that already built successfully for intermediate changes.
  */
-def analyzePipelineRequirements(changedFiles) {
+def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
     // CI config files that shouldn't trigger source builds
-    def ciOnlyPatterns = ['Jenkinsfile', 'orchestrator/', '.claude', '.github/']
+    def ciOnlyPatterns = ['orchestrator/', '.claude', '.github/', '.husky/']
+    def ciOnlyFiles = ['CLAUDE.md', 'ROADMAP.md']
     def analysis = [:]
+
+    // Cache git diffs per unique baseline commit to avoid redundant calls
+    def cachedDiffs = [:]
 
     PIPELINES.each { name, config ->
         def matchedPatterns = []
         def matchedFiles = []
+        def baselineUsed = 'global'
 
-        changedFiles.each { file ->
-            // Skip CI-only files (Jenkinsfiles, orchestrator config, etc.)
-            if (file.endsWith('Jenkinsfile') || ciOnlyPatterns.any { file.startsWith(it) }) {
+        // Use per-pipeline baseline if available, otherwise fall back to global changeset
+        def filesToCheck = changedFiles
+        def baseline = pipelineBaselines[name]
+
+        if (baseline) {
+            if (!cachedDiffs.containsKey(baseline)) {
+                try {
+                    def commitExists = sh(
+                        script: "git cat-file -t ${baseline} 2>/dev/null || echo 'missing'",
+                        returnStdout: true
+                    ).trim()
+                    if (commitExists == 'commit') {
+                        cachedDiffs[baseline] = sh(
+                            script: "git diff --name-only ${baseline}..HEAD",
+                            returnStdout: true
+                        ).trim().split('\n').findAll { it }
+                    } else {
+                        cachedDiffs[baseline] = null
+                    }
+                } catch (Exception e) {
+                    echo "WARNING: Could not diff from baseline ${baseline.take(8)}: ${e.message}"
+                    cachedDiffs[baseline] = null
+                }
+            }
+            if (cachedDiffs[baseline] != null) {
+                filesToCheck = cachedDiffs[baseline]
+                baselineUsed = baseline.take(8)
+            }
+        }
+
+        filesToCheck.each { file ->
+            // Skip CI-only files (Jenkinsfiles, orchestrator config, hooks, docs)
+            if (file.endsWith('Jenkinsfile') ||
+                ciOnlyPatterns.any { pattern -> file.startsWith(pattern) } ||
+                ciOnlyFiles.contains(file)) {
                 return  // skip this file
             }
 
@@ -205,7 +295,8 @@ def analyzePipelineRequirements(changedFiles) {
             matchedFileCount: matchedFiles.size(),
             sampleFiles: matchedFiles.take(5),
             dependsOn: config.dependsOn ?: [],
-            triggersGenesis: config.triggersGenesis ?: false
+            triggersGenesis: config.triggersGenesis ?: false,
+            baselineUsed: baselineUsed
         ]
     }
 
@@ -270,6 +361,30 @@ def orderByDependencies(pipelineList) {
 }
 
 /**
+ * Group pipelines into dependency levels for parallel execution.
+ * Pipelines in the same level have no dependencies on each other.
+ * Genesis is excluded (always runs last after all builds succeed).
+ */
+def groupByDependencyLevel(pipelineList) {
+    def nonGenesis = pipelineList.findAll { it != 'elohim-genesis' }
+    def levels = []
+    def placed = [] as Set
+
+    while (placed.size() < nonGenesis.size()) {
+        def currentLevel = nonGenesis.findAll { name ->
+            if (placed.contains(name)) return false
+            def deps = (PIPELINES[name].dependsOn ?: [])
+            deps.every { dep -> !nonGenesis.contains(dep) || placed.contains(dep) }
+        }
+        if (currentLevel.isEmpty()) break
+        levels.add(currentLevel)
+        placed.addAll(currentLevel)
+    }
+
+    return levels
+}
+
+/**
  * If a pipeline is building, auto-include all pipelines that depend on it.
  * Uses fixed-point iteration for transitive propagation.
  * Example: DNA builds → edge auto-includes (dependsOn DNA) → genesis auto-includes (dependsOn edge)
@@ -283,7 +398,12 @@ def propagateDependencies(pipelines, analysis) {
             if (config.manualOnly) return                  // never auto-trigger
 
             def deps = config.dependsOn ?: []
-            def buildingDep = deps.find { pipelines.contains(it) }
+            def buildingDep = deps.find { dep ->
+                if (!pipelines.contains(dep)) return false
+                // Sprint 5: respect cascades flag (default true for backward compat)
+                def depConfig = PIPELINES[dep]
+                return (depConfig.cascades == null) ? true : depConfig.cascades
+            }
             if (buildingDep) {
                 pipelines.add(name)
                 analysis[name].shouldRun = true
@@ -293,6 +413,37 @@ def propagateDependencies(pipelines, analysis) {
         }
     }
     return pipelines
+}
+
+/**
+ * Load per-pipeline baseline commits from the previous orchestrator build.
+ * Each baseline records the commit at which that pipeline last built successfully.
+ * This prevents re-triggering pipelines for changes they already built.
+ */
+def loadPipelineBaselines() {
+    def baselines = [:]
+    try {
+        copyArtifacts(
+            projectName: env.JOB_NAME,
+            filter: 'pipeline-baselines.json',
+            selector: lastCompleted(),
+            optional: true,
+            flatten: true
+        )
+        if (fileExists('pipeline-baselines.json')) {
+            baselines = readJSON(file: 'pipeline-baselines.json')
+            echo "Loaded per-pipeline baselines from previous build"
+            baselines.each { name, commit ->
+                echo "   ${name}: ${commit.take(8)}"
+            }
+        } else {
+            echo "No previous pipeline baselines found (first run)"
+        }
+    } catch (Exception e) {
+        echo "WARNING: Could not load pipeline baselines: ${e.message}"
+        echo "   Using global baseline (GIT_PREVIOUS_SUCCESSFUL_COMMIT)"
+    }
+    return baselines
 }
 
 /**
@@ -313,7 +464,8 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
         )
 
         return [
-            success: result.result == 'SUCCESS',
+            success: result.result in ['SUCCESS', 'UNSTABLE'],
+            unstable: result.result == 'UNSTABLE',
             result: result.result,
             duration: result.duration,
             url: result.absoluteUrl
@@ -342,7 +494,9 @@ def printDecisionMatrix(analysis, pipelines) {
         def icon = willRun ? '🔨' : (info.manualOnly ? '🔒' : '⏭️')
         def status = willRun ? 'BUILD' : (info.manualOnly ? 'MANUAL' : 'SKIP')
 
-        echo "║ ${icon} ${name.padRight(20)} │ ${status.padRight(8)} │ ${info.matchedPatterns.join(', ') ?: 'no changes'}"
+        def reason = info.matchedPatterns.join(', ') ?: 'no changes'
+        def baselineInfo = info.baselineUsed && info.baselineUsed != 'global' ? " (since ${info.baselineUsed})" : ''
+        echo "║ ${icon} ${name.padRight(20)} │ ${status.padRight(8)} │ ${reason}${baselineInfo}"
 
         if (info.sampleFiles && info.sampleFiles.size() > 0) {
             info.sampleFiles.each { file ->
@@ -555,10 +709,32 @@ spec:
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
                         if (mode in ['auto', 'status']) {
-                            // Automatic changeset analysis
-                            echo "🔍 Analyzing changesets since last successful build..."
-                            changedFiles = analyzeChangeset()
-                            analysis = analyzePipelineRequirements(changedFiles)
+                            // Load per-pipeline baselines for accurate change detection
+                            def pipelineBaselines = [:]
+                            if (!(params.FORCE_COMMIT?.trim())) {
+                                pipelineBaselines = loadPipelineBaselines()
+                            }
+
+                            // Automatic changeset analysis (uses stored global baseline if available)
+                            echo "🔍 Analyzing changesets since last build..."
+                            changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
+
+                            // Bootstrap safeguard: if no per-pipeline baselines exist and the
+                            // changeset is very large, the global baseline is stale (e.g. first
+                            // run after adding baselines, or after repeated failures). Fall back
+                            // to HEAD~1 to avoid rebuilding the entire history.
+                            if (!pipelineBaselines && changedFiles.size() > 50) {
+                                echo "⚠️ Stale baseline detected (${changedFiles.size()} files, no per-pipeline baselines)"
+                                echo "   Falling back to HEAD~1 to avoid unnecessary rebuilds"
+                                changedFiles = sh(
+                                    script: 'git diff --name-only HEAD~1 2>/dev/null || git diff --name-only HEAD',
+                                    returnStdout: true
+                                ).trim().split('\n').findAll { it }
+                                echo "   Narrowed changeset to ${changedFiles.size()} files"
+                            }
+
+                            analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
+                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
                             env.CHANGED_FILES_COUNT = changedFiles.size().toString()
                             env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
@@ -624,7 +800,8 @@ spec:
                                     matchedFileCount: 0,
                                     sampleFiles: [],
                                     dependsOn: config.dependsOn ?: [],
-                                    triggersGenesis: config.triggersGenesis ?: false
+                                    triggersGenesis: config.triggersGenesis ?: false,
+                                    baselineUsed: 'global'
                                 ]
                             }
                             env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
@@ -662,51 +839,82 @@ spec:
                     script {
                         def pipelines = (env.PIPELINES_TO_RUN ?: '').split(',').findAll { it }
                         def results = [:]
+                        def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
 
                         if (pipelines.isEmpty()) {
                             echo 'ℹ️  No pipelines to execute'
                             return
                         }
 
+                        def levels = groupByDependencyLevel(pipelines)
+                        def hasGenesis = pipelines.contains('elohim-genesis')
+                        def levelDesc = levels.collect { lvl ->
+                            lvl.size() > 1 ? "[${lvl.join(' + ')}]" : lvl[0]
+                        }.join(' → ')
+                        if (hasGenesis) levelDesc += ' → genesis'
+
                         echo """
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                              EXECUTING BUILDS                                 │
+│                          EXECUTING BUILDS (PARALLEL)                          │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│  Order: ${pipelines.join(' → ')}
+│  Plan: ${levelDesc}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
-                        // Execute in dependency order
-                        pipelines.each { name ->
-                            if (name == 'elohim-genesis') {
-                                // Genesis runs after all others, skip for now
-                                return
-                            }
-
+                        // Execute in dependency-level order (parallel within each level)
+                        levels.eachWithIndex { level, idx ->
                             echo ''
                             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                            echo "🔨 Building: ${name}"
+                            echo "📦 Level ${idx}: ${level.join(' + ')}"
                             echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                            def result = triggerPipeline(name, env.BRANCH_NAME, true)
-                            results[name] = result
-
-                            if (result.success) {
-                                echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                            if (level.size() == 1) {
+                                def name = level[0]
+                                echo "🔨 Building: ${name}"
+                                def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                results[name] = result
+                                if (result.success) {
+                                    if (result.unstable) {
+                                        echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
+                                    } else {
+                                        echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                    }
+                                    pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                                } else {
+                                    echo "❌ ${name}: ${result.result}"
+                                    if (result.error) echo "   Error: ${result.error}"
+                                }
                             } else {
-                                echo "❌ ${name}: ${result.result}"
-                                if (result.error) echo "   Error: ${result.error}"
+                                def parallelBuilds = [:]
+                                level.each { name ->
+                                    parallelBuilds[name] = {
+                                        echo "🔨 Building: ${name}"
+                                        def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                        results[name] = result
+                                        if (result.success) {
+                                            if (result.unstable) {
+                                                echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
+                                            } else {
+                                                echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                            }
+                                            pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                                        } else {
+                                            echo "❌ ${name}: ${result.result}"
+                                            if (result.error) echo "   Error: ${result.error}"
+                                        }
+                                    }
+                                }
+                                parallel parallelBuilds
+                            }
+
+                            // Fail fast: abort if any pipeline in this level failed
+                            def levelFailed = level.findAll { !results[it]?.success }
+                            if (levelFailed) {
+                                error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
                             }
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
-
-                        // Check if all succeeded before genesis
-                        def allSucceeded = results.every { k, v -> v.success }
-
-                        if (!allSucceeded) {
-                            def failed = results.findAll { k, v -> !v.success }.keySet()
-                            error "Build(s) failed: ${failed.join(', ')} - Aborting genesis"
-                        }
+                        env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
                         // Run genesis if requested
                         if (pipelines.contains('elohim-genesis')) {
@@ -720,12 +928,14 @@ spec:
 
                             if (genesisResult.success) {
                                 echo '✅ elohim-genesis: SUCCESS'
+                                pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
                             } else {
                                 echo "❌ elohim-genesis: ${genesisResult.result}"
                                 unstable('Genesis failed - seeding or tests may have issues')
                             }
 
                             env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                         }
                     }
                 }
@@ -800,18 +1010,44 @@ spec:
                 }
             }
         }
+
+        stage('P2P Validation (Advisory)') {
+            steps {
+                container('builder') {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        script {
+                            echo '''
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          P2P PEER VALIDATION (ADVISORY)                       │
+└──────────────────────────────────────────────────────────────────────────────┘'''
+                            def p2pResults = [:]
+                            def doorwayEndpoints = [
+                                alpha: 'https://doorway-alpha.elohim.host',
+                                staging: 'https://doorway-staging.elohim.host',
+                            ]
+                            doorwayEndpoints.each { env, url ->
+                                p2pResults[env] = runP2PValidation(env, url)
+                            }
+                            currentBuild.description = (currentBuild.description ?: '') +
+                                " | P2P: ${p2pResults.collect { k, v -> "${k}=${v ? 'ok' : 'warn'}" }.join(', ')}"
+                        }
+                    }
+                }
+            }
+        }
     }
 
     post {
         always {
-            node('') {
+            container('builder') {
                 script {
                     def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
                     def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
                     def postflight = readJSON(text: env.POSTFLIGHT_HEALTH ?: '{}')
                     def verification = readJSON(text: env.VERIFICATION_RESULTS ?: '{}')
 
-                    def successCount = results.count { k, v -> v?.success }
+                    def successCount = results.count { k, v -> v?.success && !v?.unstable }
+                    def unstableCount = results.count { k, v -> v?.unstable }
                     def failCount = results.count { k, v -> !v?.success }
                     def healthyCount = postflight.count { k, v -> v?.healthy }
                     def verifiedCount = verification.count { k, v -> v?.match }
@@ -825,11 +1061,11 @@ spec:
   Branch:       ${env.BRANCH_NAME}
   Mode:         ${params.MODE}
 
-  BUILDS:       ✅ ${successCount} succeeded │ ❌ ${failCount} failed
+  BUILDS:       ✅ ${successCount} succeeded │ ⚠️ ${unstableCount} unstable │ ❌ ${failCount} failed
   SERVICES:     ${healthyCount}/${postflight.size()} healthy
   VERIFIED:     ${verifiedCount}/${verification.size()} deployments match commit
 
-${failCount > 0 ? '  ⚠️  ATTENTION: Build failures detected!' : '  ✅ All builds completed successfully'}
+${failCount > 0 ? '  ❌ ATTENTION: Build failures detected!' : unstableCount > 0 ? '  ⚠️  Some builds unstable (quality gate warnings)' : '  ✅ All builds completed successfully'}
 ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealthy!' : ''}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -842,6 +1078,19 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                             if (result?.url) echo "     ${result.url}"
                     }
                 }
+
+                    if (unstableCount > 0) {
+                        echo 'Unstable pipelines:'
+                        results.findAll { k, v -> v?.unstable }.each { name, result ->
+                            echo "  ⚠️ ${name}: UNSTABLE"
+                            if (result?.url) echo "     ${result.url}"
+                        }
+                    }
+
+                    // Propagate unstable status to orchestrator build
+                    if (failCount == 0 && unstableCount > 0) {
+                        currentBuild.result = 'UNSTABLE'
+                    }
 
                     // Generate machine-readable CI summary for Claude consumption
                     def unhealthyCount = postflight.count { k, v -> !v?.healthy }
@@ -859,7 +1108,7 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                         pipelines: results.collect { name, r ->
                             [
                                 name: name,
-                                status: r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE'),
+                                status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
                                 url: r?.url,
                                 duration_ms: r?.duration,
                                 category: r?.success ? null : categorizeFailure(name),
@@ -877,8 +1126,9 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                             mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
                         ],
                         summary: [
-                            overall_status: failCount > 0 ? 'FAILURE' : (unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
+                            overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
                             builds_succeeded: successCount,
+                            builds_unstable: unstableCount,
                             builds_failed: failCount,
                             services_healthy: healthyCount,
                             services_total: postflight.size(),
@@ -891,7 +1141,17 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                     ]
 
                     writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
-                    archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: false
+
+                    // Archive per-pipeline baselines for next run's change detection
+                    // __global__ advances on every completed build (even UNSTABLE),
+                    // preventing stale GIT_PREVIOUS_SUCCESSFUL_COMMIT from re-triggering everything
+                    def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+                    if (env.GIT_COMMIT_FULL) {
+                        pipelineBaselines['__global__'] = env.GIT_COMMIT_FULL
+                    }
+                    writeJSON file: 'pipeline-baselines.json', json: pipelineBaselines, pretty: 2
+
+                    archiveArtifacts artifacts: 'ci-summary.json,pipeline-baselines.json', allowEmptyArchive: true
                     echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
                 }
             }

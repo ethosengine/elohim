@@ -70,7 +70,12 @@ pub struct VerifyBlobResponse {
 
 impl VerifyBlobResponse {
     /// Create a success response
-    pub fn success(computed_hash: String, expected_hash: String, size_bytes: u64, duration_ms: u64) -> Self {
+    pub fn success(
+        computed_hash: String,
+        expected_hash: String,
+        size_bytes: u64,
+        duration_ms: u64,
+    ) -> Self {
         let is_valid = computed_hash.to_lowercase() == expected_hash.to_lowercase();
         Self {
             is_valid,
@@ -135,7 +140,10 @@ impl VerificationService {
             .build()
             .expect("Failed to create HTTP client");
 
-        Self { config, http_client }
+        Self {
+            config,
+            http_client,
+        }
     }
 
     /// Create with default configuration
@@ -153,7 +161,7 @@ impl VerificationService {
             Err(e) => {
                 return VerifyBlobResponse::error(
                     expected_hash.to_string(),
-                    format!("Base64 decode failed: {}", e),
+                    format!("Base64 decode failed: {e}"),
                 );
             }
         };
@@ -232,7 +240,7 @@ impl VerificationService {
                 warn!("Failed to fetch blob from {}: {}", url, e);
                 return VerifyBlobResponse::error(
                     expected_hash.to_string(),
-                    format!("Failed to fetch blob: {}", e),
+                    format!("Failed to fetch blob: {e}"),
                 );
             }
         };
@@ -265,7 +273,7 @@ impl VerificationService {
                 warn!("Failed to read blob body from {}: {}", url, e);
                 return VerifyBlobResponse::error(
                     expected_hash.to_string(),
-                    format!("Failed to read blob body: {}", e),
+                    format!("Failed to read blob body: {e}"),
                 );
             }
         };
@@ -312,7 +320,9 @@ impl VerificationService {
 
         // Check if we should fetch from URL
         if let Some(ref fetch_url) = request.fetch_url {
-            return self.verify_from_url(fetch_url, &request.expected_hash).await;
+            return self
+                .verify_from_url(fetch_url, &request.expected_hash)
+                .await;
         }
 
         VerifyBlobResponse::error(

@@ -16,31 +16,48 @@ import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
 // @coverage: 100.0% (2026-02-05)
 
 import { isNetworkMode } from '../models/identity.model';
+import { AuthService } from '../services/auth.service';
 import { IdentityService } from '../services/identity.service';
 import { SessionHumanService } from '../services/session-human.service';
 
-/** Registration route for unauthenticated users */
-const REGISTER_ROUTE = '/identity/register';
+/** Login route for unauthenticated users */
+const LOGIN_ROUTE = '/identity/login';
+
+/** Max time to wait for identity state to settle after auth (ms) */
+const IDENTITY_SETTLE_TIMEOUT = 5000;
 
 /**
  * Guard that requires network authentication.
  *
- * Redirects to /register if not authenticated via network.
+ * Redirects to /login if not authenticated via network.
  * Passes return URL as query parameter for post-auth redirect.
+ *
+ * Handles the race between AuthService (updated immediately on login)
+ * and IdentityService (async transition to hosted/steward mode).
+ * When AuthService reports authenticated but IdentityService hasn't
+ * settled yet, waits briefly for the identity state to transition.
  */
-// eslint-disable-next-line sonarjs/function-return-type
-export const identityGuard: CanActivateFn = (route, state): boolean | UrlTree => {
+export const identityGuard: CanActivateFn = async (route, state): Promise<boolean | UrlTree> => {
   const identityService = inject(IdentityService);
+  const authService = inject(AuthService);
   const router = inject(Router);
 
-  // Check if authenticated via network (hosted or steward)
+  // Fast path: identity already in network mode
   const mode = identityService.mode();
   if (isNetworkMode(mode) && identityService.isAuthenticated()) {
     return true;
   }
 
-  // Redirect to register with return URL
-  return router.createUrlTree([REGISTER_ROUTE], {
+  // Auth is valid but identity hasn't transitioned yet — wait for it to settle
+  if (authService.isAuthenticated()) {
+    const settled = await identityService.waitForAuthenticatedState(IDENTITY_SETTLE_TIMEOUT);
+    if (settled) {
+      return true;
+    }
+  }
+
+  // Redirect to login with return URL
+  return router.createUrlTree([LOGIN_ROUTE], {
     queryParams: { returnUrl: state.url },
   });
 };
@@ -68,8 +85,8 @@ export const sessionOrAuthGuard: CanActivateFn = (): boolean | UrlTree => {
     return true;
   }
 
-  // Neither - redirect to register
-  return router.createUrlTree([REGISTER_ROUTE]);
+  // Neither - redirect to login
+  return router.createUrlTree([LOGIN_ROUTE]);
 };
 
 /**
@@ -91,7 +108,7 @@ export function attestationGuard(requiredAttestation: string): CanActivateFn {
     // Must be network authenticated (hosted or steward)
     const mode = identityService.mode();
     if (!isNetworkMode(mode) || !identityService.isAuthenticated()) {
-      return router.createUrlTree([REGISTER_ROUTE], {
+      return router.createUrlTree([LOGIN_ROUTE], {
         queryParams: { returnUrl: state.url },
       });
     }

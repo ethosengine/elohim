@@ -11,11 +11,12 @@
   },
   "build": {
     "beforeBuildCommand": "",
+    "beforeBundleCommand": "",
     "devUrl": "http://localhost:4200",
     "frontendDist": "../ui"
   },
   "app": {
-    "withGlobalTauri": false,
+    "withGlobalTauri": true,
     "security": {
       "csp": null
     },

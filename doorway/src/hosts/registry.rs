@@ -168,9 +168,7 @@ impl HostRegistry {
 
     /// Get a host by node ID
     pub async fn get(&self, node_id: &str) -> Result<Option<HostDoc>, DoorwayError> {
-        self.collection
-            .find_one(doc! { "node_id": node_id })
-            .await
+        self.collection.find_one(doc! { "node_id": node_id }).await
     }
 
     /// List all registered hosts
@@ -180,9 +178,7 @@ impl HostRegistry {
 
     /// List online hosts
     pub async fn list_online(&self) -> Result<Vec<HostDoc>, DoorwayError> {
-        self.collection
-            .find_many(doc! { "status": "online" })
-            .await
+        self.collection.find_many(doc! { "status": "online" }).await
     }
 
     /// Get hosts by region
@@ -232,7 +228,7 @@ impl HostRegistry {
                 },
             )
             .await
-            .map_err(|e| DoorwayError::Database(format!("Failed to mark stale hosts: {}", e)))?;
+            .map_err(|e| DoorwayError::Database(format!("Failed to mark stale hosts: {e}")))?;
 
         if result.modified_count > 0 {
             info!("Marked {} stale hosts as offline", result.modified_count);

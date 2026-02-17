@@ -1,0 +1,140 @@
+<!-- Agency Progression Stepper -->
+<div class="agency-stepper" role="list" aria-label="Agency progression">
+  @for (stage of stages; track stage.stage) {
+    <div class="step" [ngClass]="getStepperClass(stage)" role="listitem">
+      <div
+        class="step-indicator"
+        [attr.aria-current]="stage.stage === agencyInfo().stage ? 'step' : null"
+      >
+        <span class="material-icons step-icon">{{ stage.icon }}</span>
+      </div>
+      <span class="step-label">{{ stage.label }}</span>
+    </div>
+    @if (stage.order < 4) {
+      <div class="step-connector" [class.completed]="stage.order < agencyInfo().order"></div>
+    }
+  }
+</div>
+
+<!-- Agency Stage Card -->
+<div class="agency-stage-card">
+  <div class="stage-header">
+    <span class="material-icons stage-icon">{{ agencyInfo().icon }}</span>
+    <div class="stage-info">
+      <span class="stage-badge" [ngClass]="getStageBadgeClass()">{{ agencyInfo().label }}</span>
+      <span class="stage-tagline">{{ agencyInfo().tagline }}</span>
+    </div>
+    <div class="connection-status">
+      <span class="status-dot" [ngClass]="getStatusDotClass()"></span>
+      <span class="status-label">{{ connectionStatus().label }}</span>
+    </div>
+  </div>
+  <p class="stage-description">{{ agencyInfo().description }}</p>
+
+  <div class="stage-details">
+    <div class="benefits">
+      <h4>Benefits</h4>
+      <ul>
+        @for (benefit of agencyInfo().benefits; track benefit) {
+          <li>
+            <span class="material-icons benefit-icon">check_circle</span>
+            {{ benefit }}
+          </li>
+        }
+      </ul>
+    </div>
+    <div class="limitations">
+      <h4>Current Limitations</h4>
+      <ul>
+        @for (limitation of agencyInfo().limitations; track limitation) {
+          <li>
+            <span class="material-icons limitation-icon">info</span>
+            {{ limitation }}
+          </li>
+        }
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Upgrade Section -->
+@if (canUpgrade()) {
+  <div class="upgrade-section" id="upgrade">
+    <span class="section-title">Upgrade to {{ nextStageLabel() }}</span>
+    @if (nextStageInfo(); as info) {
+      <p class="section-description">{{ info.description }}</p>
+      <ul class="upgrade-benefits">
+        @for (benefit of info.benefits; track benefit) {
+          <li>{{ benefit }}</li>
+        }
+      </ul>
+    }
+
+    @if (isGraduationEligible()) {
+      @if (graduationStatus() === 'confirmed') {
+        <div class="graduation-success">
+          <span class="material-icons">verified</span>
+          <div>
+            <strong>Stewardship confirmed!</strong>
+            <p>Your keys are now on your device. The doorway conductor has been retired.</p>
+          </div>
+        </div>
+      } @else {
+        <div class="graduation-form">
+          <p class="graduation-prompt">
+            Enter your password to sign the stewardship confirmation. This moves your identity to
+            your device and frees doorway capacity.
+          </p>
+          <div class="form-group">
+            <label for="graduationPassword">Password</label>
+            <input
+              id="graduationPassword"
+              type="password"
+              [(ngModel)]="graduationPassword"
+              [disabled]="graduationStatus() === 'confirming'"
+              placeholder="Your doorway password"
+            />
+          </div>
+          @if (graduationError()) {
+            <div class="error-banner" role="alert">
+              <span class="error-icon">&#x2715;</span>
+              <span>{{ graduationError() }}</span>
+            </div>
+          }
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="onConfirmGraduation()"
+            [disabled]="graduationStatus() === 'confirming' || !graduationPassword"
+          >
+            @if (graduationStatus() === 'confirming') {
+              <span class="spinner"></span>
+              Confirming...
+            } @else {
+              Confirm Stewardship
+            }
+          </button>
+        </div>
+      }
+    }
+
+    @if (!isTauriApp()) {
+      <div class="upgrade-browser-info">
+        <p>To upgrade to App Steward, download the Elohim desktop app:</p>
+        <ol class="upgrade-steps">
+          <li>Download and install the Elohim app</li>
+          <li>Login to your doorway from the app</li>
+          <li>Confirm stewardship to take control of your keys</li>
+        </ol>
+        <a
+          href="https://elohim.host/download"
+          target="_blank"
+          rel="noopener"
+          class="btn btn-secondary"
+        >
+          Download Elohim App
+        </a>
+      </div>
+    }
+  </div>
+}

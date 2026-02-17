@@ -9,6 +9,7 @@ use http_body_util::Full;
 use serde::Serialize;
 
 use crate::error::StorageError;
+use crate::views::SUPPORTED_SCHEMA_VERSIONS;
 
 /// Build a JSON response with the given status code
 pub fn json_response<T: Serialize>(status: StatusCode, body: &T) -> Response<Full<Bytes>> {
@@ -28,6 +29,20 @@ pub fn ok<T: Serialize>(body: &T) -> Response<Full<Bytes>> {
 /// Build a JSON response with 201 Created status
 pub fn created<T: Serialize>(body: &T) -> Response<Full<Bytes>> {
     json_response(StatusCode::CREATED, body)
+}
+
+/// Build a JSON response with 200 OK status and X-Supported-Schema-Versions header.
+/// Used by bulk endpoints to advertise supported schema versions to clients.
+pub fn ok_with_schema_info<T: Serialize>(body: &T) -> Response<Full<Bytes>> {
+    let versions = SUPPORTED_SCHEMA_VERSIONS.iter()
+        .map(|v| v.to_string()).collect::<Vec<_>>().join(",");
+    let json = serde_json::to_string(body).unwrap_or_else(|_| "{}".to_string());
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("X-Supported-Schema-Versions", versions)
+        .body(Full::new(Bytes::from(json)))
+        .unwrap()
 }
 
 /// Build an empty response with 204 No Content status

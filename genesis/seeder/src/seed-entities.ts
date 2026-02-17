@@ -28,6 +28,7 @@ import { DoorwayClient } from './doorway-client.js';
 
 /** Input for creating a contributor presence */
 export interface CreatePresenceInput {
+  schemaVersion?: number;
   displayName: string;
   presenceState?: string;
   externalIdentifiersJson?: string;
@@ -40,6 +41,7 @@ export interface CreatePresenceInput {
 
 /** Input for creating content mastery */
 export interface CreateMasteryInput {
+  schemaVersion?: number;
   humanId: string;
   contentId: string;
   masteryLevel?: string;
@@ -50,6 +52,7 @@ export interface CreateMasteryInput {
 
 /** Input for creating an economic event */
 export interface CreateEventInput {
+  schemaVersion?: number;
   action: string;
   provider: string;
   receiver: string;
@@ -122,6 +125,7 @@ export function buildContributorPresences(contentItems: Content[]): CreatePresen
   const presences: CreatePresenceInput[] = [];
   for (const [author, contentIds] of authorMap) {
     presences.push({
+      schemaVersion: 1,
       displayName: author,
       presenceState: 'unclaimed',
       establishingContentIdsJson: JSON.stringify([...contentIds]),
@@ -172,6 +176,7 @@ export async function seedContributorPresences(
  */
 export function buildInitialMastery(humanId: string, contentIds: string[]): CreateMasteryInput[] {
   return contentIds.map(contentId => ({
+    schemaVersion: 1,
     humanId: humanId,
     contentId: contentId,
     masteryLevel: 'not_started',
@@ -239,6 +244,7 @@ export function generateSampleEvents(
     // Generate view events
     for (let i = 0; i < viewsPerContent; i++) {
       events.push({
+        schemaVersion: 1,
         action: 'use',
         provider: agentId,
         receiver: contentId,
@@ -250,6 +256,7 @@ export function generateSampleEvents(
     // Maybe generate completion event
     if (Math.random() < completionRate) {
       events.push({
+        schemaVersion: 1,
         action: 'produce',
         provider: agentId,
         receiver: agentId,

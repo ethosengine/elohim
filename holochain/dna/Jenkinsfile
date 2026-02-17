@@ -326,8 +326,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     echo "   ✅ infrastructure.dna"
 
                                     echo ""
-                                    echo "=== Packaging hApp (all 3 DNAs) ==="
+                                    echo "=== Injecting version metadata into hApp manifest ==="
                                     cd ../elohim
+                                    _hv=$(grep HAPP_VERSION ../../../VERSION | cut -d= -f2)
+                                    _gc=$(git -C ../../.. rev-parse --short HEAD)
+                                    sed -i "2a # Build: HAPP_VERSION=${_hv} commit=${_gc}" workdir/happ.yaml
+
+                                    echo "=== Packaging hApp (all 3 DNAs) ==="
                                     hc app pack workdir -o elohim.happ
 
                                     echo ""

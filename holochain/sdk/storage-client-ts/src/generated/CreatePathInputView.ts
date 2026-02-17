@@ -5,7 +5,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating a path - camelCase API boundary type
  */
-export type CreatePathInputView = { id: string, title: string, description: string | null, pathType: string | null, difficulty: string | null, estimatedDuration: string | null, thumbnailUrl: string | null, thumbnailAlt: string | null, 
+export type CreatePathInputView = { id: string, title: string, schemaVersion: number, description: string | null, pathType: string | null, difficulty: string | null, estimatedDuration: string | null, thumbnailUrl: string | null, thumbnailAlt: string | null, 
 /**
  * Parsed metadata object (serialized to JSON string for DB)
  */

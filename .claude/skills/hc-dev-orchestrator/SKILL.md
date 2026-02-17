@@ -278,6 +278,6 @@ npm run doorway:start
 ### Connect to Remote Environment
 ```bash
 # Dev environment
-export DOORWAY_URL='https://doorway-dev.elohim.host'
-export HOLOCHAIN_ADMIN_URL='wss://doorway-dev.elohim.host/admin?apiKey=dev-elohim-auth-2024'
+export DOORWAY_URL='https://doorway-alpha.elohim.host'
+export HOLOCHAIN_ADMIN_URL='wss://doorway-alpha.elohim.host/admin?apiKey=dev-elohim-auth-2024'
 ```

@@ -1,0 +1,125 @@
+# Doorway Staging Read Replicas — Projection Readers
+#
+# Full doorway instances with PROJECTION_WRITER=false.
+# Read from shared MongoDB projection, know the conductor pool,
+# serve all read-heavy routes. The only difference from the writer
+# is: no signal subscriber, no doorway-app sidecar.
+#
+# Every replica is a full doorway — it can query conductors,
+# serve blobs, answer /admin/conductors, and handle cache reads.
+#
+# Architecture:
+#   Ingress (read-heavy paths) -> read replica Service -> these pods
+#   All pods share: same MongoDB, same CONDUCTOR_URLS, same STORAGE_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-doorway-read-staging
+  namespace: elohim-staging
+  labels:
+    app: elohim-doorway-read
+    environment: staging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: elohim-doorway-read
+      environment: staging
+  template:
+    metadata:
+      labels:
+        app: elohim-doorway-read
+        environment: staging
+    spec:
+      nodeSelector:
+        node-type: operations
+      containers:
+        - name: doorway
+          image: harbor.ethosengine.com/ethosengine/elohim-doorway:DOORWAY_TAG_PLACEHOLDER
+          imagePullPolicy: Always
+          args:
+            - "--listen"
+            - "0.0.0.0:8080"
+            - "--conductor-url"
+            - "ws://elohim-edgenode-staging:4445"
+          ports:
+            - name: gateway-ws
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: DEV_MODE
+              value: "true"
+            - name: RUST_LOG
+              value: "info,doorway=debug"
+            - name: PROJECTION_WRITER
+              value: "false"
+            - name: CONDUCTOR_URLS
+              value: "ws://elohim-edgenode-staging-0.elohim-edgenode-staging-headless:8445,ws://elohim-edgenode-staging-1.elohim-edgenode-staging-headless:8445"
+            - name: CONDUCTOR_ADMIN_URL
+              value: "ws://elohim-edgenode-staging:4444"
+            - name: STORAGE_URL
+              value: "http://elohim-edgenode-staging:8090"
+            - name: THRESHOLD_URL
+              value: "http://localhost:80"
+            - name: NATS_URL
+              value: "nats://nats.elohim-staging:4222"
+            - name: MONGODB_URI
+              value: "mongodb://mongodb.elohim-staging:27017"
+            - name: MONGODB_DB
+              value: "doorway-staging"
+            - name: INSTALLED_APP_ID
+              value: "elohim"
+            - name: API_KEY_AUTHENTICATED
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-staging-secrets
+                  key: api-key-authenticated
+            - name: API_KEY_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-staging-secrets
+                  key: api-key-admin
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-staging-secrets
+                  key: jwt-secret
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-doorway-read-staging
+  namespace: elohim-staging
+  labels:
+    app: elohim-doorway-read
+    environment: staging
+spec:
+  type: ClusterIP
+  ports:
+    - name: gateway-ws
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: elohim-doorway-read
+    environment: staging

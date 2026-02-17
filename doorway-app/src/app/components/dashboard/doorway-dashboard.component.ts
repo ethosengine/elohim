@@ -2,20 +2,17 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { DoorwayAdminService } from '../../services/doorway-admin.service';
 import {
-  NodesResponse,
   NodeDetails,
   ClusterMetrics,
   ResourceSummary,
   CustodianNetwork,
   NodeStatus,
-  StewardTier,
   statusColor,
   tierColor,
   reachLevelName,
   // User admin models
   UserSummary,
   UserDetails,
-  UsersResponse,
   ListUsersParams,
   UserPermissionLevel,
   permissionLevelColor,
@@ -226,8 +223,8 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
         this.usersTotal.set(response.total);
         this.usersTotalPages.set(response.totalPages);
       }
-    } catch (e) {
-      console.error('[Dashboard] Failed to load users:', e);
+    } catch {
+      // Failed to load users
     } finally {
       this.usersLoading.set(false);
     }
@@ -294,7 +291,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
         this.viewUser(userId);
       }
     } else {
-      console.error('[Dashboard] Failed to toggle user status:', result?.message);
+      // Failed to toggle user status
     }
   }
 

@@ -85,10 +85,10 @@ Fix: Verify DNA is installed, check cell discovery
 
 ```bash
 # Doorway health (dev)
-curl https://doorway-dev.elohim.host/health
+curl https://doorway-alpha.elohim.host/health
 
 # Doorway version
-curl https://doorway-dev.elohim.host/version
+curl https://doorway-alpha.elohim.host/version
 
 # App health
 curl https://alpha.elohim.host/health

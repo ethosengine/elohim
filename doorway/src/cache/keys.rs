@@ -55,13 +55,7 @@ impl CacheKey {
     }
 
     /// Create a cache key with reach level (for reach-aware caching)
-    pub fn with_reach(
-        dna_hash: &str,
-        zome: &str,
-        fn_name: &str,
-        args: &str,
-        reach: &str,
-    ) -> Self {
+    pub fn with_reach(dna_hash: &str, zome: &str, fn_name: &str, args: &str, reach: &str) -> Self {
         let mut key = Self::new(dna_hash, zome, fn_name, args);
         key.reach = Some(reach.to_string());
         key
@@ -84,7 +78,7 @@ impl CacheKey {
 
     /// Create a pattern for invalidating all calls to a function
     pub fn invalidation_pattern(dna_hash: &str, zome: &str, fn_name: &str) -> String {
-        format!("{}:{}:{}:", dna_hash, zome, fn_name)
+        format!("{dna_hash}:{zome}:{fn_name}:")
     }
 }
 
@@ -148,14 +142,20 @@ mod tests {
     #[test]
     fn test_display() {
         let key = CacheKey::new("dna_hash_very_long", "zome", "get_thing", "{}");
-        let display = format!("{}", key);
+        let display = format!("{key}");
         assert!(display.contains("zome"));
         assert!(display.contains("get_thing"));
     }
 
     #[test]
     fn test_cache_key_with_reach() {
-        let key = CacheKey::with_reach("dna123", "content_store", "get_content", r#"{"id":"abc"}"#, "commons");
+        let key = CacheKey::with_reach(
+            "dna123",
+            "content_store",
+            "get_content",
+            r#"{"id":"abc"}"#,
+            "commons",
+        );
         assert_eq!(key.reach, Some("commons".to_string()));
         assert!(key.to_storage_key().ends_with(":commons"));
     }

@@ -55,7 +55,7 @@ describe('TauriAuthService', () => {
     mockAuthService = jasmine.createSpyObj('AuthService', ['setTauriSession', 'logout']);
 
     // Mock DoorwayRegistryService
-    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', [], {
+    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', ['clearSelection'], {
       selected: jasmine.createSpy().and.returnValue(mockDoorway),
     });
 
@@ -369,6 +369,12 @@ describe('TauriAuthService', () => {
     it('should handle missing doorway selection', async () => {
       (mockDoorwayRegistry.selected as jasmine.Spy).and.returnValue(null);
 
+      // Mock 404 for initial session check during initialize()
+      fetchSpy.and.returnValue(Promise.resolve({
+        ok: false,
+        status: 404,
+      } as Response));
+
       let oauthCallbackHandler: any;
       mockTauriWindow.__TAURI__.event.listen.and.callFake((event: string, handler: any) => {
         if (event === 'oauth-callback') {
@@ -512,6 +518,112 @@ describe('TauriAuthService', () => {
 
     it('should not error if listeners were not set up', () => {
       expect(() => service.destroy()).not.toThrow();
+    });
+  });
+
+  // ==========================================================================
+  // Graduation (Confirm Stewardship)
+  // ==========================================================================
+
+  describe('confirmStewardship', () => {
+    it('should return false when Tauri core is not available', async () => {
+      delete (window as any).__TAURI__;
+
+      const result = await service.confirmStewardship('password123');
+
+      expect(result).toBe(false);
+      expect(service.graduationStatus()).toBe('error');
+      expect(service.graduationError()).toContain('Tauri IPC not available');
+    });
+
+    it('should call Tauri IPC and set confirmed on success', async () => {
+      const mockInvoke = jasmine.createSpy('invoke').and.returnValue(Promise.resolve());
+      (window as any).__TAURI__ = {
+        ...mockTauriWindow.__TAURI__,
+        core: { invoke: mockInvoke },
+      };
+
+      const result = await service.confirmStewardship('password123');
+
+      expect(result).toBe(true);
+      expect(mockInvoke).toHaveBeenCalledWith('doorway_confirm_stewardship', { password: 'password123' });
+      expect(service.graduationStatus()).toBe('confirmed');
+      expect(service.status()).toBe('authenticated');
+    });
+
+    it('should set error status on IPC failure', async () => {
+      const mockInvoke = jasmine.createSpy('invoke').and.returnValue(
+        Promise.reject(new Error('Invalid password'))
+      );
+      (window as any).__TAURI__ = {
+        ...mockTauriWindow.__TAURI__,
+        core: { invoke: mockInvoke },
+      };
+
+      const result = await service.confirmStewardship('wrong-password');
+
+      expect(result).toBe(false);
+      expect(service.graduationStatus()).toBe('error');
+      expect(service.graduationError()).toBe('Invalid password');
+    });
+
+    it('should set confirming status during IPC call', async () => {
+      let resolveInvoke: () => void;
+      const invokePromise = new Promise<void>(resolve => { resolveInvoke = resolve; });
+      const mockInvoke = jasmine.createSpy('invoke').and.returnValue(invokePromise);
+      (window as any).__TAURI__ = {
+        ...mockTauriWindow.__TAURI__,
+        core: { invoke: mockInvoke },
+      };
+
+      const resultPromise = service.confirmStewardship('password123');
+
+      expect(service.graduationStatus()).toBe('confirming');
+
+      resolveInvoke!();
+      await resultPromise;
+
+      expect(service.graduationStatus()).toBe('confirmed');
+    });
+  });
+
+  // ==========================================================================
+  // Graduation Eligibility
+  // ==========================================================================
+
+  describe('isGraduationEligible', () => {
+    it('should be false when not in Tauri environment', () => {
+      delete (window as any).__TAURI__;
+
+      expect(service.isGraduationEligible()).toBe(false);
+    });
+
+    it('should be false when not authenticated', () => {
+      (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
+      service.status.set('needs_login');
+
+      expect(service.isGraduationEligible()).toBe(false);
+    });
+
+    it('should be true when in Tauri and authenticated', () => {
+      (window as any).__TAURI__ = mockTauriWindow.__TAURI__;
+      service.status.set('authenticated');
+
+      expect(service.isGraduationEligible()).toBe(true);
+    });
+  });
+
+  // ==========================================================================
+  // Graduation Initial State
+  // ==========================================================================
+
+  describe('graduation initial state', () => {
+    it('should start with idle graduation status', () => {
+      expect(service.graduationStatus()).toBe('idle');
+    });
+
+    it('should start with empty graduation error', () => {
+      expect(service.graduationError()).toBe('');
     });
   });
 

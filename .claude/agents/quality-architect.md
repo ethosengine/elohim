@@ -125,6 +125,25 @@ Scan for the gaps that file-level agents miss:
 - Event emitters that nothing subscribes to
 - API endpoints defined but not wired to UI
 
+### Multi-Project Scope
+
+When scanning for gaps, include all projects:
+
+**Doorway (Rust):**
+- Look for `todo!()`, `unimplemented!()`, `panic!("Not yet implemented")` markers
+- Check for `#[allow(dead_code)]` annotations hiding unused features
+- Use label `project:doorway` for GitHub issues
+
+**Sophia (React):**
+- Look for `TODO`, `FIXME`, `HACK` in TypeScript source
+- Check for disabled Storybook stories or skipped tests
+- sophia is a submodule - note this in issue descriptions
+- Use label `project:sophia` for GitHub issues
+
+**Doorway-App:**
+- Same patterns as elohim-app but in doorway-app directory
+- Use label `project:doorway-app` for GitHub issues
+
 **Depth over breadth:** Don't just grep for TODOs. Read the code around them. Understand what the feature *would* do, who it serves, and why it matters.
 
 ## 3. User Story Generation

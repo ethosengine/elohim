@@ -55,10 +55,12 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
+use elohim_storage::db::init_pool_from_dir;
+
 #[cfg(feature = "p2p")]
-use elohim_storage::p2p::{P2PConfig, P2PNode};
+use elohim_storage::p2p::{P2PConfig, P2PNode, RelayMode};
 #[cfg(feature = "p2p")]
-use elohim_storage::db::{init_pool_from_dir, local_sessions};
+use elohim_storage::db::local_sessions;
 #[cfg(feature = "p2p")]
 use elohim_storage::identity::NodeIdentity;
 
@@ -158,6 +160,21 @@ struct Args {
     #[arg(long, env = "P2P_BOOTSTRAP_FROM_SESSION")]
     #[cfg(feature = "p2p")]
     bootstrap_from_session: bool,
+
+    /// Relay mode: client (desktop steward), server (K8s pod), both (doorway host)
+    /// Client: connect through relay servers for NAT traversal
+    /// Server: accept relay reservations from NAT-ed peers
+    /// Both: relay client + server
+    #[arg(long, env = "RELAY_MODE", default_value = "client")]
+    #[cfg(feature = "p2p")]
+    relay_mode: String,
+
+    /// Addresses to announce to the network (multiaddr format)
+    /// Used by K8s pods to advertise stable DNS/IP addresses
+    /// Format: /dns4/edgenode-0.headless.svc/tcp/9876
+    #[arg(long, env = "ANNOUNCE_ADDRS", value_delimiter = ',')]
+    #[cfg(feature = "p2p")]
+    announce_addrs: Vec<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -291,6 +308,10 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
 
         // Configure P2P
         let enable_mdns = !args.disable_mdns;
+        let relay_mode: RelayMode = args.relay_mode.parse().unwrap_or_else(|e| {
+            warn!("Invalid relay mode: {}, defaulting to client", e);
+            RelayMode::Client
+        });
         let p2p_config = P2PConfig {
             listen_addresses: if args.p2p_port == 0 {
                 vec!["/ip4/0.0.0.0/tcp/0".to_string()]
@@ -300,6 +321,8 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
             bootstrap_nodes: bootstrap_nodes.clone(),
             enable_mdns,
             storage_dir: config.storage_dir.clone(),
+            relay_mode,
+            announce_addresses: args.announce_addrs.clone(),
             ..Default::default()
         };
 
@@ -311,10 +334,13 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
 
         info!("P2P networking enabled");
         info!("  Peer ID: {}", p2p_node.peer_id());
+        info!("  Relay mode: {}", relay_mode);
         info!("  mDNS discovery: {}", if enable_mdns { "enabled" } else { "disabled" });
         info!("  Bootstrap nodes: {}", if bootstrap_nodes.is_empty() { "none".to_string() } else { bootstrap_nodes.len().to_string() });
-        info!("  Shard protocol: /elohim/shard/1.0.0");
-        info!("  Sync protocol: /elohim/sync/1.0.0");
+        if !args.announce_addrs.is_empty() {
+            info!("  Announce addresses: {}", args.announce_addrs.join(", "));
+        }
+        info!("  Protocols: /elohim/shard/1.0.0, /elohim/sync/1.0.0, /elohim/id/1.0.0");
 
         Some(p2p_node)
     } else {
@@ -435,6 +461,30 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         info!("  GET  /db/paths/{{id}}      - Get path with steps");
         info!("  POST /db/paths           - Create path");
         info!("  POST /db/paths/bulk      - Bulk create paths");
+    }
+
+    // Initialize Diesel connection pool for session management
+    // (Separate from ContentDb — Diesel uses its own pool for session CRUD)
+    match init_pool_from_dir(&config.storage_dir) {
+        Ok(pool) => {
+            http_server = http_server.with_db_pool(pool);
+            info!("Session API:");
+            info!("  GET    /session       - Get active session");
+            info!("  POST   /session       - Create session");
+            info!("  DELETE /session       - Delete session");
+            info!("  GET    /session/all   - List all sessions");
+        }
+        Err(e) => {
+            warn!("Failed to initialize session pool: {} (session API disabled)", e);
+        }
+    }
+
+    // Wire P2P services into HTTP server
+    #[cfg(feature = "p2p")]
+    if let Some(ref node) = p2p_node {
+        http_server = http_server.with_sync_manager(node.sync_manager().clone());
+        http_server = http_server.with_p2p_handle(node.handle());
+        info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
     }
 
     let http_server = Arc::new(http_server);

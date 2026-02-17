@@ -32,7 +32,7 @@ const RECOGNITION_POINTS_UNIT = 'recognition-points';
       <!-- Header -->
       <div class="dashboard-header">
         <div class="header-content">
-          <h1>Shefa Dashboard</h1>
+          <h1>Overview</h1>
           <p class="subtitle">Economics of Human Flourishing</p>
         </div>
         <div

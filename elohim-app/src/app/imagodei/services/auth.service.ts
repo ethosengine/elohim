@@ -26,6 +26,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 
 // @coverage: 93.6% (2026-02-05)
 
+import { SIGNING_CREDENTIALS_KEY } from '../../elohim/models/holochain-connection.model';
 import {
   type AuthState,
   type AuthProvider,
@@ -38,9 +39,12 @@ import {
   AUTH_PROVIDER_KEY,
   AUTH_EXPIRY_KEY,
   AUTH_IDENTIFIER_KEY,
+  AUTH_HUMAN_ID_KEY,
+  AUTH_AGENT_PUB_KEY_KEY,
   parseExpiryDate,
   isTokenExpiringSoon,
 } from '../models/auth.model';
+import { DOORWAY_CACHE_KEY } from '../models/doorway.model';
 
 import { DoorwayRegistryService } from './doorway-registry.service';
 
@@ -337,6 +341,8 @@ export class AuthService {
       const provider = localStorage.getItem(AUTH_PROVIDER_KEY) as AuthProviderType | null;
       const expiresAtStr = localStorage.getItem(AUTH_EXPIRY_KEY);
       const identifier = localStorage.getItem(AUTH_IDENTIFIER_KEY);
+      const humanId = localStorage.getItem(AUTH_HUMAN_ID_KEY);
+      const agentPubKey = localStorage.getItem(AUTH_AGENT_PUB_KEY_KEY);
 
       if (!token || !provider) {
         return false;
@@ -350,18 +356,14 @@ export class AuthService {
         return false;
       }
 
-      // We don't have humanId and agentPubKey in localStorage
-      // The IdentityService should fetch these from /auth/me or Holochain
-      // For now, mark as authenticated and let the app verify
       this.updateState({
         isAuthenticated: true,
         token,
         provider,
         expiresAt,
         identifier,
-        // These will be populated when IdentityService verifies the token
-        humanId: null,
-        agentPubKey: null,
+        humanId,
+        agentPubKey,
         isLoading: false,
         error: null,
       });
@@ -412,7 +414,14 @@ export class AuthService {
     });
 
     // Persist to localStorage
-    this.persistAuth(result.token, provider, result.expiresAt, result.identifier);
+    this.persistAuth(
+      result.token,
+      provider,
+      result.expiresAt,
+      result.identifier,
+      result.humanId,
+      result.agentPubKey
+    );
 
     // Schedule token refresh
     this.scheduleRefresh(expiresAt);
@@ -425,13 +434,21 @@ export class AuthService {
     token: string,
     provider: AuthProviderType,
     expiresAt: string | number,
-    identifier: string
+    identifier: string,
+    humanId?: string,
+    agentPubKey?: string
   ): void {
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     localStorage.setItem(AUTH_PROVIDER_KEY, provider);
     // Store as string - parseExpiryDate handles both formats on restore
     localStorage.setItem(AUTH_EXPIRY_KEY, String(expiresAt));
     localStorage.setItem(AUTH_IDENTIFIER_KEY, identifier);
+    if (humanId) {
+      localStorage.setItem(AUTH_HUMAN_ID_KEY, humanId);
+    }
+    if (agentPubKey) {
+      localStorage.setItem(AUTH_AGENT_PUB_KEY_KEY, agentPubKey);
+    }
   }
 
   /**
@@ -442,6 +459,10 @@ export class AuthService {
     localStorage.removeItem(AUTH_PROVIDER_KEY);
     localStorage.removeItem(AUTH_EXPIRY_KEY);
     localStorage.removeItem(AUTH_IDENTIFIER_KEY);
+    localStorage.removeItem(AUTH_HUMAN_ID_KEY);
+    localStorage.removeItem(AUTH_AGENT_PUB_KEY_KEY);
+    localStorage.removeItem(SIGNING_CREDENTIALS_KEY);
+    localStorage.removeItem(DOORWAY_CACHE_KEY);
   }
 
   /**

@@ -48,9 +48,10 @@ struct Args {
 async fn main() {
     // Initialize logging
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            EnvFilter::new("info,doorway=debug")
-        }))
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,doorway=debug")),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
@@ -58,7 +59,9 @@ async fn main() {
     let args = Args::parse();
 
     let config = WorkerConfig {
-        worker_id: args.worker_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+        worker_id: args
+            .worker_id
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
         nats_url: args.nats_url,
         conductor_url: args.conductor_url,
         request_timeout_ms: args.request_timeout_ms,

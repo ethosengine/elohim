@@ -41,11 +41,7 @@ pub struct RequesterContext {
 /// - local: Authenticated users within family/location
 /// - neighborhood+: Authenticated users
 /// - commons: Everyone
-pub fn can_serve_at_reach(
-    reach: &str,
-    requester: &RequesterContext,
-    beneficiary_id: &str,
-) -> bool {
+pub fn can_serve_at_reach(reach: &str, requester: &RequesterContext, beneficiary_id: &str) -> bool {
     match reach {
         "private" => {
             // Only beneficiary can access private content
@@ -73,10 +69,7 @@ pub fn can_serve_at_reach(
 /// Geographic distance between two locations (simplified)
 ///
 /// Returns estimated distance in kilometers between two lat/lng pairs
-pub fn geographic_distance(
-    loc1: Option<&str>,
-    loc2: Option<&str>,
-) -> Option<f64> {
+pub fn geographic_distance(loc1: Option<&str>, loc2: Option<&str>) -> Option<f64> {
     match (loc1, loc2) {
         (Some(l1), Some(l2)) => {
             // Very simplified: parse "lat,lng" format and do basic calculation
@@ -161,17 +154,17 @@ pub fn prioritize_sources(
 ) -> Vec<CustodianSource> {
     // Calculate distance for each source
     for source in &mut sources {
-        source.distance_km = geographic_distance(
-            requester.location.as_deref(),
-            source.location.as_deref(),
-        );
+        source.distance_km =
+            geographic_distance(requester.location.as_deref(), source.location.as_deref());
     }
 
     // Sort by priority score
     sources.sort_by(|a, b| {
         let score_a = a.priority_score(requester.location.as_deref());
         let score_b = b.priority_score(requester.location.as_deref());
-        score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+        score_b
+            .partial_cmp(&score_a)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     sources
@@ -187,7 +180,7 @@ pub fn invalidation_pattern_for_reach(
     reach: &str,
 ) -> String {
     // Pattern: dna:zome:fn:*:reach
-    format!("{}:{}:{}:*:{}", dna_hash, zome, fn_name, reach)
+    format!("{dna_hash}:{zome}:{fn_name}:*:{reach}")
 }
 
 #[cfg(test)]
@@ -244,7 +237,11 @@ mod tests {
         assert!(can_serve_at_reach("neighborhood", &authenticated, "alice"));
 
         // Unauthenticated cannot
-        assert!(!can_serve_at_reach("neighborhood", &unauthenticated, "alice"));
+        assert!(!can_serve_at_reach(
+            "neighborhood",
+            &unauthenticated,
+            "alice"
+        ));
     }
 
     #[test]
@@ -285,8 +282,10 @@ mod tests {
         };
 
         // Local high-priority source should score higher
-        assert!(local_high.priority_score(requester.location.as_deref())
-            > distant_low.priority_score(requester.location.as_deref()));
+        assert!(
+            local_high.priority_score(requester.location.as_deref())
+                > distant_low.priority_score(requester.location.as_deref())
+        );
     }
 
     #[test]
@@ -323,7 +322,8 @@ mod tests {
 
     #[test]
     fn test_invalidation_pattern_for_reach() {
-        let pattern = invalidation_pattern_for_reach("dna123", "content_store", "get_content", "commons");
+        let pattern =
+            invalidation_pattern_for_reach("dna123", "content_store", "get_content", "commons");
         assert!(pattern.contains("commons"));
         assert!(pattern.contains("content_store"));
     }

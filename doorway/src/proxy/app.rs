@@ -4,29 +4,35 @@
 //! No message filtering needed - app interfaces handle their own auth.
 
 use futures_util::{SinkExt, StreamExt};
-use tokio_tungstenite::{connect_async_with_config, tungstenite::{protocol::Message, http::Request}};
+use tokio_tungstenite::{
+    connect_async_with_config,
+    tungstenite::{http::Request, protocol::Message},
+};
 use tracing::{debug, error, info};
 
 use crate::types::{DoorwayError, Result};
 
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
-/// Run the app proxy between client and conductor app interface
+/// Run the app proxy between client and conductor app interface.
+///
+/// `conductor_host` is the hostname of the conductor (e.g. "elohim-edgenode-alpha")
+/// extracted from CONDUCTOR_URL. Falls back to "localhost" for local dev.
 pub async fn run_proxy(
     client_ws: HyperWebSocket,
     port: u16,
     origin: Option<String>,
     query: Option<String>,
+    conductor_host: &str,
 ) -> Result<()> {
-    // Build app interface URL
-    // Filter out Doorway-specific params (apiKey, token) - conductor uses its own auth
-    let mut app_url = format!("ws://localhost:{}", port);
+    // Build app interface URL using the conductor host (not hardcoded localhost)
+    // Strip Doorway-specific params (apiKey) but keep conductor params
+    let mut app_url = format!("ws://{conductor_host}:{port}");
     if let Some(q) = query {
         let filtered: Vec<&str> = q
             .split('&')
-            .filter(|param| {
-                !param.starts_with("apiKey=") && !param.starts_with("token=")
-            })
+            .filter(|param| !param.starts_with("apiKey="))
             .collect();
         if !filtered.is_empty() {
             app_url = format!("{}?{}", app_url, filtered.join("&"));
@@ -38,18 +44,21 @@ pub async fn run_proxy(
     // Connect to conductor app interface with proper headers
     let request = Request::builder()
         .uri(&app_url)
-        .header("Host", format!("localhost:{}", port))
+        .header("Host", format!("{conductor_host}:{port}"))
         .header("Origin", "http://localhost")
         .header("Connection", "Upgrade")
         .header("Upgrade", "websocket")
         .header("Sec-WebSocket-Version", "13")
-        .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
+        .header(
+            "Sec-WebSocket-Key",
+            tokio_tungstenite::tungstenite::handshake::client::generate_key(),
+        )
         .body(())
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to build request: {e}")))?;
 
     let (conductor_ws, _) = connect_async_with_config(request, None, false)
         .await
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to app interface: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to connect to app interface: {e}")))?;
 
     info!("Connected to app interface on port {}", port);
 
@@ -97,7 +106,7 @@ pub async fn run_proxy(
         while let Some(msg) = conductor_stream.next().await {
             match msg {
                 Ok(Message::Binary(data)) => {
-                    if let Err(e) = client_sink.send(Message::Binary(data.into())).await {
+                    if let Err(e) = client_sink.send(Message::Binary(data)).await {
                         error!("Failed to send to app client: {}", e);
                         break;
                     }
@@ -109,10 +118,10 @@ pub async fn run_proxy(
                     }
                 }
                 Ok(Message::Ping(data)) => {
-                    let _ = client_sink.send(Message::Ping(data.into())).await;
+                    let _ = client_sink.send(Message::Ping(data)).await;
                 }
                 Ok(Message::Pong(data)) => {
-                    let _ = client_sink.send(Message::Pong(data.into())).await;
+                    let _ = client_sink.send(Message::Pong(data)).await;
                 }
                 Ok(Message::Close(frame)) => {
                     info!("App interface closed connection: {:?}", frame);

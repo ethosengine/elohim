@@ -19,7 +19,7 @@ pub fn hash_password(password: &str) -> Result<String, DoorwayError> {
     argon2
         .hash_password(password.as_bytes(), &salt)
         .map(|hash| hash.to_string())
-        .map_err(|e| DoorwayError::Auth(format!("Failed to hash password: {}", e)))
+        .map_err(|e| DoorwayError::Auth(format!("Failed to hash password: {e}")))
 }
 
 /// Verify a password against a stored hash
@@ -27,7 +27,7 @@ pub fn hash_password(password: &str) -> Result<String, DoorwayError> {
 /// Returns true if the password matches the hash.
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, DoorwayError> {
     let parsed_hash = PasswordHash::new(hash)
-        .map_err(|e| DoorwayError::Auth(format!("Invalid password hash format: {}", e)))?;
+        .map_err(|e| DoorwayError::Auth(format!("Invalid password hash format: {e}")))?;
 
     Ok(Argon2::default()
         .verify_password(password.as_bytes(), &parsed_hash)

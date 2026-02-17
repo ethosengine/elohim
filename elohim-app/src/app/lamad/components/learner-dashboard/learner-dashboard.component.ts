@@ -1,123 +1,105 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-05)
+import { Subscription } from 'rxjs';
+
+import {
+  getMasteryColor,
+  getMasteryIcon,
+  getMasteryLabel,
+} from '../../models/mastery-visualization';
+import { MasteryStatsService } from '../../services/mastery-stats.service';
+
+import type { MasteryLevel } from '../../models/content-mastery.model';
+import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile.model';
 
 /**
- * LearnerDashboardComponent - Personal learning dashboard.
+ * LearnerDashboardComponent - Gamified personal learning dashboard.
  *
  * Route: /lamad/me
  *
  * Displays:
+ * - Learner level badge + XP progress bar
+ * - Engagement streak with 30-day activity dots
+ * - Mastery distribution (Bloom's taxonomy bars)
  * - Active paths with progress
- * - Completed paths
- * - Attestations earned
- * - Learning frontier (what's next)
- *
- * Implements Section 1.3 of LAMAD_API_SPECIFICATION_v1.0.md
- * Full implementation planned for Phase 5.
+ * - Recent level-up timeline
+ * - Practice challenge stats
  */
 @Component({
   selector: 'app-learner-dashboard',
   standalone: true,
   imports: [CommonModule, RouterModule],
-  template: `
-    <div class="learner-dashboard">
-      <header class="dashboard-header">
-        <h1>My Learning</h1>
-        <p class="subtitle">Track your progress and discover what's next</p>
-      </header>
-
-      <section class="placeholder-section">
-        <div class="placeholder-card">
-          <h2>Active Paths</h2>
-          <p>Your in-progress learning paths will appear here.</p>
-          <a routerLink="/lamad" class="btn btn-primary">Explore Paths</a>
-        </div>
-
-        <div class="placeholder-card">
-          <h2>Completed</h2>
-          <p>Paths you've finished will be listed here.</p>
-        </div>
-
-        <div class="placeholder-card">
-          <h2>Attestations</h2>
-          <p>Achievements and credentials you've earned.</p>
-        </div>
-      </section>
-
-      <p class="coming-soon">Full dashboard coming soon...</p>
-    </div>
-  `,
-  styles: [
-    `
-      .learner-dashboard {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 2rem;
-      }
-
-      .dashboard-header {
-        padding-bottom: 1.5rem;
-        border-bottom: 1px solid var(--border-color, #e5e7eb);
-        margin-bottom: 2rem;
-      }
-
-      .dashboard-header h1 {
-        font-size: 2rem;
-        font-weight: 800;
-        color: var(--text-primary, #111827);
-        margin: 0 0 0.5rem 0;
-      }
-
-      .subtitle {
-        color: var(--text-secondary, #6b7280);
-      }
-
-      .placeholder-section {
-        display: grid;
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-      }
-
-      .placeholder-card {
-        background: var(--bg-secondary, #f9fafb);
-        border: 1px solid var(--border-color, #e5e7eb);
-        border-radius: 8px;
-        padding: 1.5rem;
-      }
-
-      .placeholder-card h2 {
-        font-size: 1.125rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-      }
-
-      .placeholder-card p {
-        color: var(--text-secondary, #6b7280);
-        margin-bottom: 1rem;
-      }
-
-      .btn {
-        display: inline-block;
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        text-decoration: none;
-        font-weight: 500;
-      }
-
-      .btn-primary {
-        background: var(--primary-color, #3b82f6);
-        color: white;
-      }
-
-      .coming-soon {
-        text-align: center;
-        color: var(--text-tertiary, #9ca3af);
-        font-style: italic;
-      }
-    `,
-  ],
+  templateUrl: './learner-dashboard.component.html',
+  styleUrls: ['./learner-dashboard.component.css'],
 })
-export class LearnerDashboardComponent {}
+export class LearnerDashboardComponent implements OnInit, OnDestroy {
+  private readonly masteryStats = inject(MasteryStatsService);
+  private subscription: Subscription | null = null;
+
+  profile: LearnerMasteryProfile | null = null;
+  isLoading = true;
+
+  /** Mastery levels for the distribution bars (skip not_started) */
+  readonly masteryLevels: MasteryLevel[] = [
+    'seen',
+    'remember',
+    'understand',
+    'apply',
+    'analyze',
+    'evaluate',
+    'create',
+  ];
+
+  /** Last 30 days as YYYY-MM-DD strings for streak dots */
+  readonly last30Days: string[] = this.buildLast30Days();
+
+  // Expose visualization helpers to template
+  readonly getMasteryColor = getMasteryColor;
+  readonly getMasteryIcon = getMasteryIcon;
+  readonly getMasteryLabel = getMasteryLabel;
+
+  ngOnInit(): void {
+    this.subscription = this.masteryStats.learnerProfile$.subscribe(profile => {
+      this.profile = profile;
+      this.isLoading = false;
+    });
+
+    // Record dashboard visit as daily engagement
+    this.masteryStats.recordDailyEngagement('dashboard_visit');
+  }
+
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
+  }
+
+  /**
+   * Compute bar width percentage for a mastery level.
+   * Relative to the max count across all levels.
+   */
+  getBarWidth(level: MasteryLevel): number {
+    if (!this.profile) return 0;
+
+    const count = this.profile.levelDistribution[level] ?? 0;
+    if (count === 0) return 0;
+
+    let max = 0;
+    for (const l of this.masteryLevels) {
+      const c = this.profile.levelDistribution[l] ?? 0;
+      if (c > max) max = c;
+    }
+
+    return max > 0 ? (count / max) * 100 : 0;
+  }
+
+  private buildLast30Days(): string[] {
+    const days: string[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }
+}

@@ -65,7 +65,7 @@ Cypress.Commands.add('getDoorwayHost', () => {
   const baseUrl = Cypress.config('baseUrl') || '';
 
   if (baseUrl.includes('alpha.elohim.host')) {
-    return 'https://doorway-dev.elohim.host';
+    return 'https://doorway-alpha.elohim.host';
   } else if (baseUrl.includes('staging.elohim.host')) {
     return 'https://doorway-staging.elohim.host';
   } else if (baseUrl.includes('elohim.host') && !baseUrl.includes('doorway')) {

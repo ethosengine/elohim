@@ -187,7 +187,7 @@ export class DoorwayRegistryService {
         if (dhtDoorways.length > 0) {
           this.doorwaysSignal.set(dhtDoorways);
           this.cacheResult(dhtDoorways);
-          return dhtDoorways;
+          return this.mergeWithFederationPeers(dhtDoorways);
         }
       }
 
@@ -196,19 +196,19 @@ export class DoorwayRegistryService {
       if (fallbackDoorways.length > 0) {
         this.doorwaysSignal.set(fallbackDoorways);
         this.cacheResult(fallbackDoorways);
-        return fallbackDoorways;
+        return this.mergeWithFederationPeers(fallbackDoorways);
       }
 
       // Fall back to cached or bootstrap
       const cached = this.getCached();
       if (cached) {
         this.doorwaysSignal.set(cached);
-        return cached;
+        return this.mergeWithFederationPeers(cached);
       }
 
       // Last resort: bootstrap list
       this.doorwaysSignal.set(BOOTSTRAP_DOORWAYS);
-      return BOOTSTRAP_DOORWAYS;
+      return this.mergeWithFederationPeers(BOOTSTRAP_DOORWAYS);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load doorways';
       this.errorSignal.set(message);
@@ -258,6 +258,32 @@ export class DoorwayRegistryService {
 
     this.selectedSignal.set(selection);
     this.persistSelection(selection);
+  }
+
+  /**
+   * Select a doorway by URL (for auto-selection in hosted contexts).
+   * Finds the doorway in known list or creates a minimal entry.
+   */
+  selectDoorwayByUrl(url: string): void {
+    if (this.selectedUrl() === url) return;
+
+    const known = this.doorwaysSignal().find(d => d.url === url);
+    if (known) {
+      this.selectDoorway(known, false);
+    } else {
+      const doorway: DoorwayInfo = {
+        id: url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/g, '-'),
+        name: new URL(url).hostname,
+        url,
+        description: '',
+        region: 'global',
+        operator: '',
+        features: [],
+        status: 'unknown',
+        registrationOpen: true,
+      };
+      this.selectDoorway(doorway, false);
+    }
   }
 
   /**
@@ -506,6 +532,62 @@ export class DoorwayRegistryService {
     } catch {
       // Invalid stored data, clear it
       localStorage.removeItem(DOORWAY_URL_KEY);
+    }
+  }
+
+  // ===========================================================================
+  // Private Methods - Federation
+  // ===========================================================================
+
+  /**
+   * Merge existing doorways with federation peers from the selected doorway.
+   * Deduplicates by ID, tagging federation-sourced entries.
+   */
+  private async mergeWithFederationPeers(doorways: DoorwayInfo[]): Promise<DoorwayInfo[]> {
+    const selectedUrl = this.selectedUrl();
+    if (!selectedUrl) return doorways;
+
+    const peers = await this.fetchFederationPeers(selectedUrl);
+    if (peers.length === 0) return doorways;
+
+    // Deduplicate by ID — existing entries take priority
+    const existingIds = new Set(doorways.map(d => d.id));
+    const newPeers = peers.filter(p => !existingIds.has(p.id));
+
+    if (newPeers.length > 0) {
+      const merged = [...doorways, ...newPeers];
+      this.doorwaysSignal.set(merged);
+      return merged;
+    }
+
+    return doorways;
+  }
+
+  /**
+   * Fetch federation peers from the selected doorway's federation endpoint.
+   */
+  private async fetchFederationPeers(baseUrl: string): Promise<DoorwayInfo[]> {
+    try {
+      const resp = await fetch(`${baseUrl}/api/v1/federation/doorways`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!resp.ok) return [];
+      const data = (await resp.json()) as {
+        doorways?: { id: string; url: string; region?: string }[];
+      };
+      return (data.doorways ?? []).map(d => ({
+        id: d.id,
+        name: d.id,
+        url: d.url,
+        description: 'Discovered via federation',
+        region: (d.region ?? 'global') as DoorwayInfo['region'],
+        operator: 'Federation',
+        features: [] as DoorwayInfo['features'],
+        status: 'online' as DoorwayInfo['status'],
+        registrationOpen: false,
+      }));
+    } catch {
+      return [];
     }
   }
 

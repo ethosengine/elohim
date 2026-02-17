@@ -21,14 +21,15 @@ use crate::auth::{
     extract_token_from_header, hash_password, verify_password, Claims, JwtValidator,
     PermissionLevel, TokenInput,
 };
+use crate::conductor::AgentProvisioner;
 use crate::custodial_keys::{CustodialKeyService, KeyExportFormat};
 use crate::db::schemas::{
-    get_registered_clients, validate_redirect_uri, CustodialKeyMaterial, OAuthSessionDoc, UserDoc,
+    get_registered_clients, validate_redirect_uri, OAuthSessionDoc, UserDoc,
     OAUTH_SESSION_COLLECTION, USER_COLLECTION,
 };
+use crate::routes::zome_helpers::{call_create_human, get_agent_pub_key, CreateHumanInput};
 use crate::server::AppState;
 use crate::types::DoorwayError;
-use crate::routes::zome_helpers::{call_create_human, get_agent_pub_key, CreateHumanInput};
 use rand::Rng;
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
@@ -66,6 +67,10 @@ pub struct RegisterRequest {
     /// Optional location
     #[serde(default)]
     pub location: Option<String>,
+    /// Bootstrap key to grant Admin permission on registration.
+    /// Must match the API_KEY_ADMIN environment variable.
+    #[serde(default)]
+    pub admin_bootstrap_key: Option<String>,
 }
 
 fn default_profile_reach() -> String {
@@ -158,6 +163,8 @@ pub struct OAuthAuthorizeRequest {
     pub state: String,
     #[serde(default)]
     pub scope: Option<String>,
+    #[serde(default)]
+    pub login_hint: Option<String>,
 }
 
 /// OAuth token exchange request body.
@@ -206,8 +213,8 @@ pub struct OAuthErrorResponse {
 // =============================================================================
 
 /// Response for native handoff endpoint.
-/// Returns identity info for Tauri to create a local session.
-/// Content syncs via P2P (DHT gossip), not from doorway.
+/// Returns identity + network context for Tauri to create a local session.
+/// Content syncs via P2P (DHT gossip) once the native conductor joins the network.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeHandoffResponse {
@@ -215,6 +222,8 @@ pub struct NativeHandoffResponse {
     pub human_id: String,
     /// User identifier (email/username)
     pub identifier: String,
+    /// Conductor-generated agent public key (base64)
+    pub agent_pub_key: String,
     /// Doorway ID that issued this session
     pub doorway_id: String,
     /// Doorway URL for future recovery
@@ -228,10 +237,27 @@ pub struct NativeHandoffResponse {
     /// Bootstrap URL for P2P discovery (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bootstrap_url: Option<String>,
+    /// Signal relay URL for WebRTC signaling (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal_url: Option<String>,
+    /// Custom network seed (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network_seed: Option<String>,
+    /// Installed app ID on the doorway conductor
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub installed_app_id: Option<String>,
+    /// Which conductor hosts this user's agent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conductor_id: Option<String>,
+    /// Encrypted key bundle for identity import (inline, non-destructive)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_bundle: Option<KeyExportFormat>,
+    /// Whether the user has confirmed stewardship (graduated from custodial)
+    pub is_steward: bool,
 }
 
 // =============================================================================
-// Key Export Types (Sovereignty Migration)
+// Key Export Types (Stewardship Migration)
 // =============================================================================
 
 /// Response containing the encrypted key bundle for migration to Tauri.
@@ -246,11 +272,11 @@ pub struct KeyExportResponse {
     pub instructions: String,
 }
 
-/// Request to confirm sovereignty migration.
+/// Request to confirm stewardship migration.
 /// Called by Tauri app after successful key import.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ConfirmSovereigntyRequest {
+pub struct ConfirmStewardshipRequest {
     /// Signature proving possession of the key (signs the human_id)
     pub signature: String,
 }
@@ -259,7 +285,7 @@ pub struct ConfirmSovereigntyRequest {
 // Recovery Request/Response Types
 // =============================================================================
 
-/// Request to initiate disaster recovery for a sovereign user.
+/// Request to initiate disaster recovery for a steward user.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecoverCustodyRequest {
@@ -427,14 +453,14 @@ pub struct QuestionFeedback {
     pub message: String,
 }
 
-/// Response for sovereignty confirmation.
+/// Response for stewardship confirmation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SovereigntyConfirmedResponse {
+pub struct StewardshipConfirmedResponse {
     pub success: bool,
     pub message: String,
-    /// When the user became sovereign
-    pub sovereignty_at: String,
+    /// When the user became a steward
+    pub stewardship_at: String,
 }
 
 // =============================================================================
@@ -449,7 +475,10 @@ fn json_response<T: Serialize>(status: StatusCode, body: &T) -> Response<BoxBody
         .header("Content-Type", "application/json")
         .header("Access-Control-Allow-Origin", "*")
         .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        .header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        )
         .body(full_body(json))
         .unwrap()
 }
@@ -459,7 +488,10 @@ fn cors_preflight() -> Response<BoxBody> {
         .status(StatusCode::NO_CONTENT)
         .header("Access-Control-Allow-Origin", "*")
         .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        .header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        )
         .header("Access-Control-Max-Age", "86400")
         .body(empty_body())
         .unwrap()
@@ -483,15 +515,14 @@ async fn parse_json_body<T: for<'de> Deserialize<'de>>(
     let body = req
         .collect()
         .await
-        .map_err(|e| DoorwayError::Http(format!("Failed to read body: {}", e)))?;
+        .map_err(|e| DoorwayError::Http(format!("Failed to read body: {e}")))?;
 
     let bytes = body.to_bytes();
     if bytes.len() > 10240 {
         return Err(DoorwayError::Http("Request body too large".into()));
     }
 
-    serde_json::from_slice(&bytes)
-        .map_err(|e| DoorwayError::Http(format!("Invalid JSON: {}", e)))
+    serde_json::from_slice(&bytes).map_err(|e| DoorwayError::Http(format!("Invalid JSON: {e}")))
 }
 
 fn get_auth_header(req: &Request<hyper::body::Incoming>) -> Option<&str> {
@@ -525,7 +556,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -545,102 +576,134 @@ async fn handle_register(
 
     // Determine display name for registration
     let display_name = if body.display_name.is_empty() {
-        body.identifier.split('@').next().unwrap_or("User").to_string()
+        body.identifier
+            .split('@')
+            .next()
+            .unwrap_or("User")
+            .to_string()
     } else {
         body.display_name.clone()
     };
 
     // For doorway-hosted registration, create identity via imagodei zome
-    let (human_id, agent_pub_key, profile) = if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
-        // Generate UUID for human_id
-        let generated_human_id = uuid::Uuid::new_v4().to_string();
+    let (human_id, agent_pub_key, profile) =
+        if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
+            // Generate UUID for human_id
+            let generated_human_id = uuid::Uuid::new_v4().to_string();
 
-        // Try to call imagodei zome (only if conductor is connected)
-        let zome_result = call_create_human(
-            &state,
-            CreateHumanInput {
-                id: generated_human_id.clone(),
-                display_name: display_name.clone(),
-                bio: body.bio.clone(),
-                affinities: body.affinities.clone(),
-                profile_reach: body.profile_reach.clone(),
-                location: body.location.clone(),
-            },
-        ).await;
+            // Try to call imagodei zome (only if conductor is connected)
+            let zome_result = call_create_human(
+                &state,
+                CreateHumanInput {
+                    id: generated_human_id.clone(),
+                    display_name: display_name.clone(),
+                    bio: body.bio.clone(),
+                    affinities: body.affinities.clone(),
+                    profile_reach: body.profile_reach.clone(),
+                    location: body.location.clone(),
+                },
+            )
+            .await;
 
-        match zome_result {
-            Ok(human_output) => {
-                // Get agent_pub_key from discovered zome config
-                let agent_key = match get_agent_pub_key(&state) {
-                    Ok(k) => k,
-                    Err(e) => {
-                        warn!("Failed to get agent_pub_key: {}", e);
+            match zome_result {
+                Ok(human_output) => {
+                    // Get agent_pub_key from discovered zome config
+                    let agent_key = match get_agent_pub_key(&state) {
+                        Ok(k) => k,
+                        Err(e) => {
+                            warn!("Failed to get agent_pub_key: {}", e);
+                            return json_response(
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                &ErrorResponse {
+                                    error: "Failed to get agent identity".into(),
+                                    code: Some("AGENT_KEY_ERROR".into()),
+                                },
+                            );
+                        }
+                    };
+
+                    info!(
+                        "Created Holochain identity via imagodei zome: {} (display_name={})",
+                        human_output.human.id, display_name
+                    );
+
+                    let profile = HumanProfileResponse {
+                        id: human_output.human.id.clone(),
+                        display_name: human_output.human.display_name,
+                        bio: human_output.human.bio,
+                        affinities: human_output.human.affinities,
+                        profile_reach: human_output.human.profile_reach,
+                        location: human_output.human.location,
+                        created_at: human_output.human.created_at,
+                        updated_at: human_output.human.updated_at,
+                    };
+
+                    (human_output.human.id, agent_key, Some(profile))
+                }
+                Err(e) => {
+                    // Zome call failed - check if we should fall back to placeholder (dev mode)
+                    if state.args.dev_mode {
+                        warn!("Imagodei zome unavailable, using dev fallback: {}", e);
+                        // Generate deterministic IDs for dev mode
+                        use sha2::{Digest, Sha256};
+                        let mut hasher = Sha256::new();
+                        hasher.update(body.identifier.as_bytes());
+                        hasher.update(b"human_id_salt");
+                        let hash = hasher.finalize();
+                        let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
+
+                        let mut hasher2 = Sha256::new();
+                        hasher2.update(body.identifier.as_bytes());
+                        hasher2.update(b"agent_pub_key_salt");
+                        let hash2 = hasher2.finalize();
+                        let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
+
+                        (human_id, agent_pub_key, None)
+                    } else {
+                        // Production mode - fail if zome unavailable
+                        warn!("Failed to create identity via imagodei zome: {}", e);
                         return json_response(
-                            StatusCode::INTERNAL_SERVER_ERROR,
+                            StatusCode::SERVICE_UNAVAILABLE,
                             &ErrorResponse {
-                                error: "Failed to get agent identity".into(),
-                                code: Some("AGENT_KEY_ERROR".into()),
+                                error: format!("Failed to create Holochain identity: {e}"),
+                                code: Some("IDENTITY_CREATION_FAILED".into()),
                             },
                         );
                     }
-                };
-
-                info!(
-                    "Created Holochain identity via imagodei zome: {} (display_name={})",
-                    human_output.human.id, display_name
-                );
-
-                let profile = HumanProfileResponse {
-                    id: human_output.human.id.clone(),
-                    display_name: human_output.human.display_name,
-                    bio: human_output.human.bio,
-                    affinities: human_output.human.affinities,
-                    profile_reach: human_output.human.profile_reach,
-                    location: human_output.human.location,
-                    created_at: human_output.human.created_at,
-                    updated_at: human_output.human.updated_at,
-                };
-
-                (human_output.human.id, agent_key, Some(profile))
-            }
-            Err(e) => {
-                // Zome call failed - check if we should fall back to placeholder (dev mode)
-                if state.args.dev_mode {
-                    warn!(
-                        "Imagodei zome unavailable, using dev fallback: {}",
-                        e
-                    );
-                    // Generate deterministic IDs for dev mode
-                    use sha2::{Digest, Sha256};
-                    let mut hasher = Sha256::new();
-                    hasher.update(body.identifier.as_bytes());
-                    hasher.update(b"human_id_salt");
-                    let hash = hasher.finalize();
-                    let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
-
-                    let mut hasher2 = Sha256::new();
-                    hasher2.update(body.identifier.as_bytes());
-                    hasher2.update(b"agent_pub_key_salt");
-                    let hash2 = hasher2.finalize();
-                    let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
-
-                    (human_id, agent_pub_key, None)
-                } else {
-                    // Production mode - fail if zome unavailable
-                    warn!("Failed to create identity via imagodei zome: {}", e);
-                    return json_response(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        &ErrorResponse {
-                            error: format!("Failed to create Holochain identity: {}", e),
-                            code: Some("IDENTITY_CREATION_FAILED".into()),
-                        },
-                    );
                 }
             }
+        } else {
+            // human_id and agent_pub_key provided (legacy/external registration)
+            (body.human_id.clone(), body.agent_pub_key.clone(), None)
+        };
+
+    // Attempt agent provisioning on a conductor (non-fatal)
+    let provisioned = if let Some(registry) = &state.conductor_registry {
+        if !state.args.dev_mode {
+            let provisioner = AgentProvisioner::new(Arc::clone(registry))
+                .with_app_id(state.args.installed_app_id.clone());
+            match provisioner.provision_agent(&body.identifier).await {
+                Ok(p) => {
+                    info!(
+                        conductor = %p.conductor_id,
+                        agent = %p.agent_pub_key,
+                        "Agent provisioned on conductor during registration"
+                    );
+                    Some(p)
+                }
+                Err(e) => {
+                    warn!(
+                        "Agent provisioning failed, falling back to local keys: {}",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
         }
     } else {
-        // human_id and agent_pub_key provided (legacy/external registration)
-        (body.human_id.clone(), body.agent_pub_key.clone(), None)
+        None
     };
 
     // Validate password strength (minimum 8 characters)
@@ -662,10 +725,7 @@ async fn handle_register(
 
     // In dev mode without MongoDB, use simplified flow
     if state.args.dev_mode && state.mongo.is_none() {
-        info!(
-            "Dev mode register (no MongoDB): {}",
-            body.identifier
-        );
+        info!("Dev mode register (no MongoDB): {}", body.identifier);
         return generate_auth_response(
             &jwt,
             &state,
@@ -675,6 +735,7 @@ async fn handle_register(
             None, // No session_id for registration (key not activated yet)
             StatusCode::CREATED,
             profile,
+            PermissionLevel::Authenticated,
         );
     }
 
@@ -699,7 +760,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -725,7 +786,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -739,7 +800,7 @@ async fn handle_register(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Failed to hash password: {}", e),
+                    error: format!("Failed to hash password: {e}"),
                     code: Some("HASH_ERROR".into()),
                 },
             )
@@ -762,17 +823,42 @@ async fn handle_register(
         }
     };
 
-    // Use custodial key's public key as the agent_pub_key
-    let actual_agent_pub_key = custodial_key.public_key.clone();
+    // Use conductor-generated key if provisioned, otherwise use custodial key
+    let actual_agent_pub_key = if let Some(ref p) = provisioned {
+        p.agent_pub_key.clone()
+    } else {
+        custodial_key.public_key.clone()
+    };
 
     // Create user document with custodial key
-    let user = UserDoc::new_with_custodial_key(
+    let mut user = UserDoc::new_with_custodial_key(
         body.identifier.clone(),
         body.identifier_type.clone(),
         password_hash,
         human_id.clone(),
         custodial_key,
     );
+
+    // If agent was provisioned on a conductor, set conductor_id and override agent key
+    if let Some(ref p) = provisioned {
+        user.set_conductor(p.conductor_id.clone());
+        user.agent_pub_key = p.agent_pub_key.clone();
+    }
+
+    // Check admin bootstrap key - promote to Admin if key matches API_KEY_ADMIN
+    if let Some(ref bootstrap_key) = body.admin_bootstrap_key {
+        if let Some(ref admin_key) = state.args.api_key_admin {
+            if !admin_key.is_empty() && bootstrap_key == admin_key {
+                user.permission_level = PermissionLevel::Admin;
+                info!("Admin bootstrap: promoting {} to Admin", body.identifier);
+            } else {
+                warn!("Admin bootstrap key mismatch for {}", body.identifier);
+            }
+        }
+    }
+
+    // Capture permission level before user is moved into insert
+    let user_permission_level = user.permission_level;
 
     // Insert into MongoDB
     if let Err(e) = collection.insert_one(user).await {
@@ -790,13 +876,16 @@ async fn handle_register(
         return json_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &ErrorResponse {
-                error: format!("Failed to create user: {}", e),
+                error: format!("Failed to create user: {e}"),
                 code: Some("DB_ERROR".into()),
             },
         );
     }
 
-    info!("Registered new user: {} with custodial key", body.identifier);
+    info!(
+        "Registered new user: {} with custodial key",
+        body.identifier
+    );
 
     generate_auth_response(
         &jwt,
@@ -807,6 +896,7 @@ async fn handle_register(
         None, // No session_id for registration (key not activated yet)
         StatusCode::CREATED,
         profile,
+        user_permission_level,
     )
 }
 
@@ -828,7 +918,7 @@ async fn handle_login(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -863,6 +953,7 @@ async fn handle_login(
             Some(dev_session_id),
             StatusCode::OK,
             None,
+            PermissionLevel::Admin, // Dev mode gets admin access
         );
     }
 
@@ -887,7 +978,7 @@ async fn handle_login(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -915,7 +1006,7 @@ async fn handle_login(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -977,7 +1068,10 @@ async fn handle_login(
         }
     }
 
-    info!("Login successful: {}", body.identifier);
+    info!(
+        "Login successful: {} (permission: {:?})",
+        body.identifier, user.permission_level
+    );
 
     generate_auth_response(
         &jwt,
@@ -988,6 +1082,7 @@ async fn handle_login(
         Some(session_id),
         StatusCode::OK,
         None,
+        user.permission_level,
     )
 }
 
@@ -1058,16 +1153,14 @@ async fn handle_refresh(
         old_claims.session_id, // Preserve session_id from old token
         StatusCode::OK,
         None,
+        old_claims.permission_level, // Preserve permission from old token
     )
 }
 
 /// GET /auth/me
 ///
 /// Get current user info from token.
-async fn handle_me(
-    req: Request<hyper::body::Incoming>,
-    state: Arc<AppState>,
-) -> Response<BoxBody> {
+async fn handle_me(req: Request<hyper::body::Incoming>, state: Arc<AppState>) -> Response<BoxBody> {
     let auth_header = get_auth_header(&req);
     let token = match extract_token_from_header(auth_header) {
         Some(t) => t,
@@ -1198,17 +1291,87 @@ async fn handle_native_handoff(
         }
     };
 
-    // Get bootstrap URL from config (optional)
+    // Get network config from args
     let bootstrap_url = state.args.bootstrap_url.clone();
+    let signal_url = state.args.signal_url.clone();
 
-    // TODO: Fetch display_name and profile_image_hash from user profile in MongoDB
-    // For now, return None for these optional fields
-    let display_name: Option<String> = None;
-    let profile_image_hash: Option<String> = None;
+    // Look up UserDoc from MongoDB for agent_pub_key, conductor_id, custodial key, is_steward
+    let (agent_pub_key, conductor_id, display_name, profile_image_hash, key_bundle, is_steward) =
+        if let Some(ref mongo) = state.mongo {
+            match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+                Ok(collection) => {
+                    match collection
+                        .find_one(doc! { "identifier": &claims.identifier })
+                        .await
+                    {
+                        Ok(Some(user)) => {
+                            // Export key bundle inline (non-destructive, does NOT mark as exported)
+                            let bundle = if user.has_custodial_key() {
+                                let key_service = CustodialKeyService::new();
+                                match key_service.export_key(&user, &doorway_id) {
+                                    Ok(export) => Some(export),
+                                    Err(e) => {
+                                        warn!(
+                                            identifier = %claims.identifier,
+                                            error = %e,
+                                            "Failed to export key for native handoff"
+                                        );
+                                        None
+                                    }
+                                }
+                            } else {
+                                None
+                            };
+
+                            (
+                                user.agent_pub_key.clone(),
+                                user.conductor_id.clone(),
+                                None::<String>, // TODO: display_name from profile
+                                None::<String>, // TODO: profile_image_hash from profile
+                                bundle,
+                                user.is_steward,
+                            )
+                        }
+                        Ok(None) => {
+                            warn!(
+                                identifier = %claims.identifier,
+                                "User not found in MongoDB during native handoff"
+                            );
+                            (claims.human_id.clone(), None, None, None, None, false)
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "MongoDB lookup failed during native handoff");
+                            (claims.human_id.clone(), None, None, None, None, false)
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to get collection during native handoff");
+                    (claims.human_id.clone(), None, None, None, None, false)
+                }
+            }
+        } else {
+            (claims.human_id.clone(), None, None, None, None, false)
+        };
+
+    // Look up installed_app_id from conductor registry
+    let installed_app_id = if let Some(ref registry) = state.conductor_registry {
+        if let Some(entry) = registry.get_conductor_for_agent(&agent_pub_key) {
+            Some(entry.app_id)
+        } else {
+            Some(state.args.installed_app_id.clone())
+        }
+    } else {
+        None
+    };
 
     info!(
-        "Native handoff: {} migrating to native session",
-        claims.identifier
+        identifier = %claims.identifier,
+        agent_pub_key = %agent_pub_key,
+        conductor_id = ?conductor_id,
+        has_key_bundle = key_bundle.is_some(),
+        is_steward = is_steward,
+        "Native handoff: identity + network context provided"
     );
 
     json_response(
@@ -1216,22 +1379,29 @@ async fn handle_native_handoff(
         &NativeHandoffResponse {
             human_id: claims.human_id,
             identifier: claims.identifier,
+            agent_pub_key,
             doorway_id,
             doorway_url,
             display_name,
             profile_image_hash,
             bootstrap_url,
+            signal_url,
+            network_seed: None, // reserved for future custom network seeds
+            installed_app_id,
+            conductor_id,
+            key_bundle,
+            is_steward,
         },
     )
 }
 
 // =============================================================================
-// Sovereignty Migration Handlers
+// Stewardship Migration Handlers
 // =============================================================================
 
 /// GET /auth/export-key
 ///
-/// Export the user's encrypted key bundle for migration to sovereignty (Tauri).
+/// Export the user's encrypted key bundle for migration to stewardship (Tauri).
 /// The private key remains encrypted with the user's password - they must
 /// enter their password in the Tauri app to decrypt it.
 ///
@@ -1304,7 +1474,7 @@ async fn handle_export_key(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1329,7 +1499,7 @@ async fn handle_export_key(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1345,7 +1515,7 @@ async fn handle_export_key(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Cannot export key: {}", e),
+                    error: format!("Cannot export key: {e}"),
                     code: Some("EXPORT_ERROR".into()),
                 },
             );
@@ -1369,7 +1539,7 @@ async fn handle_export_key(
     }
 
     info!(
-        "Exported custodial key for {} (preparing for sovereignty)",
+        "Exported custodial key for {} (preparing for stewardship)",
         claims.identifier
     );
 
@@ -1379,13 +1549,13 @@ async fn handle_export_key(
             key_bundle: export,
             instructions: "Import this key bundle into your Elohim Tauri app. \
                 You will need to enter your password to decrypt the key. \
-                Once imported, call /auth/confirm-sovereignty to complete migration."
+                Once imported, call /auth/confirm-stewardship to complete migration."
                 .to_string(),
         },
     )
 }
 
-/// POST /auth/confirm-sovereignty
+/// POST /auth/confirm-stewardship
 ///
 /// Confirm that the user has successfully migrated their key to Tauri.
 /// Called by the Tauri app after successful key import and decryption.
@@ -1395,13 +1565,18 @@ async fn handle_export_key(
 ///
 /// This endpoint:
 /// 1. Validates the JWT token
-/// 2. Verifies the signature proves key possession
-/// 3. Marks the user as sovereign in MongoDB
-/// 4. Clears their cached signing key
-async fn handle_confirm_sovereignty(
+/// 2. Verifies Ed25519 signature proves key possession
+/// 3. Marks the user as steward in MongoDB
+/// 4. Deprovisions conductor cell (best effort)
+/// 5. Clears conductor_id on UserDoc
+/// 6. Deactivates ALL cached signing keys
+async fn handle_confirm_stewardship(
     req: Request<hyper::body::Incoming>,
     state: Arc<AppState>,
 ) -> Response<BoxBody> {
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+    use ed25519_dalek::Verifier;
+
     // Get auth header before consuming request
     let auth_header = req
         .headers()
@@ -1410,13 +1585,13 @@ async fn handle_confirm_sovereignty(
         .map(|s| s.to_string());
 
     // Parse request body
-    let body: ConfirmSovereigntyRequest = match parse_json_body(req).await {
+    let body: ConfirmStewardshipRequest = match parse_json_body(req).await {
         Ok(b) => b,
         Err(e) => {
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -1455,9 +1630,6 @@ async fn handle_confirm_sovereignty(
 
     let claims = result.claims.unwrap();
 
-    // TODO: Verify signature proves key possession
-    // For now, we trust that if they have a valid token and the exported key,
-    // they're the rightful owner. In production, we should verify the signature.
     if body.signature.is_empty() {
         return json_response(
             StatusCode::BAD_REQUEST,
@@ -1482,28 +1654,182 @@ async fn handle_confirm_sovereignty(
         }
     };
 
-    // Update user to mark as sovereign
+    // Fetch user from MongoDB (need custodial_key.public_key for sig verification)
     let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
         Ok(c) => c,
         Err(e) => {
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
         }
     };
 
-    let sovereignty_time = bson::DateTime::now();
+    let user = match collection
+        .find_one(doc! { "identifier": &claims.identifier })
+        .await
+    {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return json_response(
+                StatusCode::NOT_FOUND,
+                &ErrorResponse {
+                    error: "User not found".into(),
+                    code: Some("USER_NOT_FOUND".into()),
+                },
+            )
+        }
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: format!("Database error: {e}"),
+                    code: Some("DB_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    // Idempotency check: if already steward, return success immediately
+    if user.is_steward {
+        info!(
+            "User {} already a steward, returning success (idempotent)",
+            claims.identifier
+        );
+        return json_response(
+            StatusCode::OK,
+            &StewardshipConfirmedResponse {
+                success: true,
+                message: "Already a steward.".into(),
+                stewardship_at: user
+                    .stewardship_at
+                    .map(|dt| {
+                        chrono::DateTime::from_timestamp(
+                            dt.timestamp_millis() / 1000,
+                            ((dt.timestamp_millis() % 1000) * 1_000_000) as u32,
+                        )
+                        .unwrap_or_default()
+                        .to_rfc3339()
+                    })
+                    .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+            },
+        );
+    }
+
+    // Verify Ed25519 signature — steward signs human_id, we verify with custodial public key
+    let custodial_key = match &user.custodial_key {
+        Some(k) => k,
+        None => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: "User has no custodial key to verify against".into(),
+                    code: Some("NO_CUSTODIAL_KEY".into()),
+                },
+            )
+        }
+    };
+
+    let pub_key_bytes = match BASE64.decode(&custodial_key.public_key) {
+        Ok(b) if b.len() == 32 => b,
+        Ok(b) => {
+            warn!(
+                "Invalid custodial public key length for {}: expected 32, got {}",
+                claims.identifier,
+                b.len()
+            );
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: "Invalid custodial key format".into(),
+                    code: Some("KEY_FORMAT_ERROR".into()),
+                },
+            );
+        }
+        Err(e) => {
+            warn!("Failed to decode custodial public key: {}", e);
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: "Failed to decode custodial key".into(),
+                    code: Some("KEY_DECODE_ERROR".into()),
+                },
+            );
+        }
+    };
+
+    let verifying_key =
+        match ed25519_dalek::VerifyingKey::from_bytes(pub_key_bytes.as_slice().try_into().unwrap())
+        {
+            Ok(k) => k,
+            Err(e) => {
+                warn!(
+                    "Invalid Ed25519 verifying key for {}: {}",
+                    claims.identifier, e
+                );
+                return json_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &ErrorResponse {
+                        error: "Invalid custodial key".into(),
+                        code: Some("KEY_ERROR".into()),
+                    },
+                );
+            }
+        };
+
+    let sig_bytes = match BASE64.decode(&body.signature) {
+        Ok(b) if b.len() == 64 => b,
+        Ok(b) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: format!("Invalid signature length: expected 64, got {}", b.len()),
+                    code: Some("INVALID_SIGNATURE".into()),
+                },
+            )
+        }
+        Err(e) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                &ErrorResponse {
+                    error: format!("Invalid signature encoding: {e}"),
+                    code: Some("INVALID_SIGNATURE".into()),
+                },
+            )
+        }
+    };
+
+    let signature = ed25519_dalek::Signature::from_bytes(sig_bytes.as_slice().try_into().unwrap());
+    if verifying_key
+        .verify(user.human_id.as_bytes(), &signature)
+        .is_err()
+    {
+        warn!(
+            "Stewardship signature verification failed for {}",
+            claims.identifier
+        );
+        return json_response(
+            StatusCode::FORBIDDEN,
+            &ErrorResponse {
+                error: "Signature verification failed — cannot prove key possession".into(),
+                code: Some("SIGNATURE_INVALID".into()),
+            },
+        );
+    }
+
+    // Mark is_steward: true + set stewardship_at in MongoDB
+    let stewardship_time = bson::DateTime::now();
     if let Err(e) = collection
         .update_one(
             doc! { "identifier": &claims.identifier },
             doc! {
                 "$set": {
-                    "is_sovereign": true,
-                    "sovereignty_at": sovereignty_time,
+                    "is_steward": true,
+                    "stewardship_at": stewardship_time,
+                    "conductor_id": bson::Bson::Null,
                 }
             },
         )
@@ -1512,29 +1838,48 @@ async fn handle_confirm_sovereignty(
         return json_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &ErrorResponse {
-                error: format!("Failed to update user: {}", e),
+                error: format!("Failed to update user: {e}"),
                 code: Some("DB_ERROR".into()),
             },
         );
     }
 
-    // Clear cached signing key if session_id exists
-    if let Some(session_id) = &claims.session_id {
-        let key_service = CustodialKeyService::new();
-        key_service.deactivate_key(session_id);
+    // Deprovision conductor cell (best effort)
+    if let Some(ref registry) = state.conductor_registry {
+        let provisioner = AgentProvisioner::new(Arc::clone(registry))
+            .with_app_id(state.args.installed_app_id.clone());
+        match provisioner.deprovision_agent(&user.agent_pub_key).await {
+            Ok(()) => {
+                info!(
+                    agent = %user.agent_pub_key,
+                    "Conductor cell deprovisioned during stewardship graduation"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    agent = %user.agent_pub_key,
+                    error = %e,
+                    "Failed to deprovision conductor cell during graduation (will be cleaned up later)"
+                );
+            }
+        }
     }
 
+    // Deactivate ALL cached signing keys for this user
+    let key_service = CustodialKeyService::new();
+    key_service.deactivate_all(&user.human_id);
+
     info!(
-        "User {} has migrated to sovereignty! Custodial keys no longer needed.",
+        "User {} has graduated to stewardship! Conductor cell retired.",
         claims.identifier
     );
 
     json_response(
         StatusCode::OK,
-        &SovereigntyConfirmedResponse {
+        &StewardshipConfirmedResponse {
             success: true,
-            message: "Welcome to sovereignty! You now have full control of your identity.".into(),
-            sovereignty_at: chrono::Utc::now().to_rfc3339(),
+            message: "Welcome to stewardship! You now have full control of your identity.".into(),
+            stewardship_at: chrono::Utc::now().to_rfc3339(),
         },
     )
 }
@@ -1545,11 +1890,11 @@ async fn handle_confirm_sovereignty(
 
 /// POST /auth/recover-custody
 ///
-/// Initiate disaster recovery for a sovereign user who has lost device access.
+/// Initiate disaster recovery for a steward user who has lost device access.
 /// This creates a RecoveryRequest in the DHT and notifies emergency contacts.
 ///
 /// Flow:
-/// 1. Validate user exists and is_sovereign == true
+/// 1. Validate user exists and is_steward == true
 /// 2. Create RecoveryRequest in DHT via imagodei zome
 /// 3. Return request_id, required_approvals, expires_at
 async fn handle_recover_custody(
@@ -1562,7 +1907,7 @@ async fn handle_recover_custody(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -1606,7 +1951,7 @@ async fn handle_recover_custody(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1633,27 +1978,31 @@ async fn handle_recover_custody(
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
         }
     };
 
-    // Verify user is sovereign (recovery only applies to sovereign users)
-    if !user.is_sovereign {
+    // Verify user is a steward (recovery only applies to steward users)
+    if !user.is_steward {
         return json_response(
             StatusCode::BAD_REQUEST,
             &ErrorResponse {
-                error: "Recovery is only available for sovereign users. Use regular login.".into(),
-                code: Some("NOT_SOVEREIGN".into()),
+                error: "Recovery is only available for steward users. Use regular login.".into(),
+                code: Some("NOT_STEWARD".into()),
             },
         );
     }
 
     // TODO: Call imagodei zome to create RecoveryRequest in DHT
     // For now, create a mock response until zome integration is complete
-    let request_id = format!("recovery-{}-{}", user.human_id, chrono::Utc::now().timestamp());
+    let request_id = format!(
+        "recovery-{}-{}",
+        user.human_id,
+        chrono::Utc::now().timestamp()
+    );
     let expires_at = (chrono::Utc::now() + chrono::Duration::hours(48)).to_rfc3339();
     let required_approvals = 2u32; // TODO: Calculate from relationships
 
@@ -1672,10 +2021,9 @@ async fn handle_recover_custody(
             expires_at,
             status: "pending".to_string(),
             instructions: format!(
-                "Your recovery request has been submitted to doorway '{}'. \
+                "Your recovery request has been submitted to doorway '{doorway_id}'. \
                  Contact your emergency contacts to approve your recovery. \
-                 You need {} approvals to regain access.",
-                doorway_id, required_approvals
+                 You need {required_approvals} approvals to regain access."
             ),
         },
     )
@@ -1687,7 +2035,7 @@ async fn handle_recover_custody(
 /// Returns current vote count and status. If approved, includes recovery_token.
 async fn handle_check_recovery_status(
     req: Request<hyper::body::Incoming>,
-    state: Arc<AppState>,
+    _state: Arc<AppState>,
 ) -> Response<BoxBody> {
     let body: CheckRecoveryStatusRequest = match parse_json_body(req).await {
         Ok(b) => b,
@@ -1695,7 +2043,7 @@ async fn handle_check_recovery_status(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -1762,7 +2110,7 @@ async fn handle_check_recovery_status(
 /// Flow:
 /// 1. Validate recovery session token
 /// 2. Generate NEW custodial keypair (old key is lost)
-/// 3. Update user: custodial_key = new, is_sovereign = false
+/// 3. Update user: custodial_key = new, is_steward = false
 /// 4. Activate key, generate JWT with recovery_mode flag
 async fn handle_activate_recovery(
     req: Request<hyper::body::Incoming>,
@@ -1774,7 +2122,7 @@ async fn handle_activate_recovery(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -1832,13 +2180,13 @@ async fn handle_activate_recovery(
         }
     };
 
-    let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+    let _collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
         Ok(c) => c,
         Err(e) => {
             return json_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &ErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: format!("Database error: {e}"),
                     code: Some("DB_ERROR".into()),
                 },
             )
@@ -1847,7 +2195,10 @@ async fn handle_activate_recovery(
 
     // TODO: Look up user by human_id from recovery request
     // For now, this is a placeholder - in production, we'd validate against DHT
-    warn!("Recovery activation placeholder - would validate request {} in DHT", body.request_id);
+    warn!(
+        "Recovery activation placeholder - would validate request {} in DHT",
+        body.request_id
+    );
 
     // In production:
     // 1. Fetch RecoveryRequest from DHT
@@ -1880,7 +2231,7 @@ async fn handle_elohim_verify_start(
     req: Request<hyper::body::Incoming>,
     _state: Arc<AppState>,
 ) -> Response<BoxBody> {
-    use crate::services::{ElohimVerifier, UserProfileData, PathCompletion, QuizScore};
+    use crate::services::{ElohimVerifier, PathCompletion, QuizScore, UserProfileData};
 
     let body: ElohimVerifyStartRequest = match parse_json_body(req).await {
         Ok(b) => b,
@@ -1888,7 +2239,7 @@ async fn handle_elohim_verify_start(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -1911,22 +2262,18 @@ async fn handle_elohim_verify_start(
         human_id: "human-123".to_string(),
         display_name: "Test User".to_string(),
         affinities: vec!["Technology".to_string(), "Philosophy".to_string()],
-        completed_paths: vec![
-            PathCompletion {
-                path_id: "elohim-protocol".to_string(),
-                path_title: "Elohim Protocol Foundations".to_string(),
-                completed_at: "2024-12-01".to_string(),
-            },
-        ],
-        quiz_scores: vec![
-            QuizScore {
-                quiz_id: "quiz-manifesto".to_string(),
-                quiz_title: "Manifesto Foundations".to_string(),
-                score: 8.0,
-                max_score: 10.0,
-                completed_at: "2024-12-05".to_string(),
-            },
-        ],
+        completed_paths: vec![PathCompletion {
+            path_id: "elohim-protocol".to_string(),
+            path_title: "Elohim Protocol Foundations".to_string(),
+            completed_at: "2024-12-01".to_string(),
+        }],
+        quiz_scores: vec![QuizScore {
+            quiz_id: "quiz-manifesto".to_string(),
+            quiz_title: "Manifesto Foundations".to_string(),
+            score: 8.0,
+            max_score: 10.0,
+            completed_at: "2024-12-05".to_string(),
+        }],
         relationship_names: vec!["Alice".to_string(), "Bob".to_string()],
         learning_preferences: None,
         milestones: vec!["First Path Complete".to_string()],
@@ -1956,7 +2303,8 @@ async fn handle_elohim_verify_start(
             time_limit_seconds: 300, // 5 minutes
             instructions: "Answer the following questions about your profile. \
                 These questions are based on your actual usage and only you should \
-                know the answers. You have 5 minutes to complete.".to_string(),
+                know the answers. You have 5 minutes to complete."
+                .to_string(),
         },
     )
 }
@@ -1969,7 +2317,7 @@ async fn handle_elohim_verify_answer(
     req: Request<hyper::body::Incoming>,
     _state: Arc<AppState>,
 ) -> Response<BoxBody> {
-    use crate::services::{ElohimVerifier, UserProfileData, PathCompletion, QuizScore};
+    use crate::services::{ElohimVerifier, PathCompletion, QuizScore, UserProfileData};
 
     let body: ElohimVerifyAnswerRequest = match parse_json_body(req).await {
         Ok(b) => b,
@@ -1977,7 +2325,7 @@ async fn handle_elohim_verify_answer(
             return json_response(
                 StatusCode::BAD_REQUEST,
                 &ErrorResponse {
-                    error: format!("Invalid JSON body: {}", e),
+                    error: format!("Invalid JSON body: {e}"),
                     code: None,
                 },
             )
@@ -2010,22 +2358,18 @@ async fn handle_elohim_verify_answer(
         human_id: "human-123".to_string(),
         display_name: "Test User".to_string(),
         affinities: vec!["Technology".to_string(), "Philosophy".to_string()],
-        completed_paths: vec![
-            PathCompletion {
-                path_id: "elohim-protocol".to_string(),
-                path_title: "Elohim Protocol Foundations".to_string(),
-                completed_at: "2024-12-01".to_string(),
-            },
-        ],
-        quiz_scores: vec![
-            QuizScore {
-                quiz_id: "quiz-manifesto".to_string(),
-                quiz_title: "Manifesto Foundations".to_string(),
-                score: 8.0,
-                max_score: 10.0,
-                completed_at: "2024-12-05".to_string(),
-            },
-        ],
+        completed_paths: vec![PathCompletion {
+            path_id: "elohim-protocol".to_string(),
+            path_title: "Elohim Protocol Foundations".to_string(),
+            completed_at: "2024-12-01".to_string(),
+        }],
+        quiz_scores: vec![QuizScore {
+            quiz_id: "quiz-manifesto".to_string(),
+            quiz_title: "Manifesto Foundations".to_string(),
+            score: 8.0,
+            max_score: 10.0,
+            completed_at: "2024-12-05".to_string(),
+        }],
         relationship_names: vec!["Alice".to_string(), "Bob".to_string()],
         learning_preferences: None,
         milestones: vec!["First Path Complete".to_string()],
@@ -2101,7 +2445,7 @@ async fn handle_authorize(
                 StatusCode::BAD_REQUEST,
                 &OAuthErrorResponse {
                     error: "invalid_request".to_string(),
-                    error_description: Some(format!("Invalid query parameters: {}", e)),
+                    error_description: Some(format!("Invalid query parameters: {e}")),
                     state: None,
                 },
             )
@@ -2148,6 +2492,16 @@ async fn handle_authorize(
         );
     }
 
+    // Check if this is an AJAX/fetch request (Bearer token = SPA calling us)
+    // SPA fetch requests can't follow cross-origin redirects due to CORS,
+    // so we return JSON with the redirect URL instead of a 302.
+    let is_ajax = req
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.starts_with("Bearer "))
+        .unwrap_or(false);
+
     // Check if user is already authenticated (via cookie or header)
     let auth_header = get_auth_header(&req);
     let token = extract_token_from_header(auth_header);
@@ -2189,7 +2543,9 @@ async fn handle_authorize(
                             StatusCode::INTERNAL_SERVER_ERROR,
                             &OAuthErrorResponse {
                                 error: "server_error".to_string(),
-                                error_description: Some("Failed to create authorization".to_string()),
+                                error_description: Some(
+                                    "Failed to create authorization".to_string(),
+                                ),
                                 state: Some(params.state),
                             },
                         );
@@ -2201,15 +2557,32 @@ async fn handle_authorize(
             let redirect_url = format!(
                 "{}{}code={}&state={}",
                 params.redirect_uri,
-                if params.redirect_uri.contains('?') { "&" } else { "?" },
+                if params.redirect_uri.contains('?') {
+                    "&"
+                } else {
+                    "?"
+                },
                 urlencoding::encode(&code),
                 urlencoding::encode(&params.state)
             );
 
             info!(
-                "OAuth authorize: redirecting {} to client with code",
+                "OAuth authorize: {} {} to client with code",
+                if is_ajax {
+                    "returning redirect_uri to"
+                } else {
+                    "redirecting"
+                },
                 claims.identifier
             );
+
+            // SPA fetch can't follow cross-origin 302s (CORS), so return JSON
+            if is_ajax {
+                return json_response(
+                    StatusCode::OK,
+                    &serde_json::json!({ "redirect_uri": redirect_url }),
+                );
+            }
 
             return Response::builder()
                 .status(StatusCode::FOUND)
@@ -2222,15 +2595,19 @@ async fn handle_authorize(
 
     // User not authenticated - redirect to login page with OAuth params
     // The login page will handle authentication and then call /auth/authorize again
+    let mut login_params = vec![
+        ("client_id", params.client_id.as_str()),
+        ("redirect_uri", params.redirect_uri.as_str()),
+        ("response_type", params.response_type.as_str()),
+        ("state", params.state.as_str()),
+        ("scope", params.scope.as_deref().unwrap_or("")),
+    ];
+    if let Some(ref hint) = params.login_hint {
+        login_params.push(("login_hint", hint.as_str()));
+    }
     let login_url = format!(
         "/threshold/login?{}",
-        serde_urlencoded::to_string(&[
-            ("client_id", params.client_id.as_str()),
-            ("redirect_uri", params.redirect_uri.as_str()),
-            ("response_type", params.response_type.as_str()),
-            ("state", params.state.as_str()),
-            ("scope", params.scope.as_deref().unwrap_or("")),
-        ]).unwrap_or_default()
+        serde_urlencoded::to_string(&login_params).unwrap_or_default()
     );
 
     info!("OAuth authorize: redirecting to login page");
@@ -2278,7 +2655,7 @@ async fn handle_token(
                 StatusCode::BAD_REQUEST,
                 &OAuthErrorResponse {
                     error: "invalid_request".to_string(),
-                    error_description: Some(format!("Failed to read body: {}", e)),
+                    error_description: Some(format!("Failed to read body: {e}")),
                     state: None,
                 },
             )
@@ -2293,7 +2670,7 @@ async fn handle_token(
                     StatusCode::BAD_REQUEST,
                     &OAuthErrorResponse {
                         error: "invalid_request".to_string(),
-                        error_description: Some(format!("Invalid JSON: {}", e)),
+                        error_description: Some(format!("Invalid JSON: {e}")),
                         state: None,
                     },
                 )
@@ -2308,7 +2685,7 @@ async fn handle_token(
                     StatusCode::BAD_REQUEST,
                     &OAuthErrorResponse {
                         error: "invalid_request".to_string(),
-                        error_description: Some(format!("Invalid form data: {}", e)),
+                        error_description: Some(format!("Invalid form data: {e}")),
                         state: None,
                     },
                 )
@@ -2322,7 +2699,9 @@ async fn handle_token(
             StatusCode::BAD_REQUEST,
             &OAuthErrorResponse {
                 error: "unsupported_grant_type".to_string(),
-                error_description: Some("Only 'authorization_code' grant type is supported".to_string()),
+                error_description: Some(
+                    "Only 'authorization_code' grant type is supported".to_string(),
+                ),
                 state: None,
             },
         );
@@ -2383,7 +2762,7 @@ async fn handle_token(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &OAuthErrorResponse {
                     error: "server_error".to_string(),
-                    error_description: Some(format!("Database error: {}", e)),
+                    error_description: Some(format!("Database error: {e}")),
                     state: None,
                 },
             )
@@ -2391,10 +2770,7 @@ async fn handle_token(
     };
 
     // Find the session by code
-    let session = match collection
-        .find_one(doc! { "code": &token_req.code })
-        .await
-    {
+    let session = match collection.find_one(doc! { "code": &token_req.code }).await {
         Ok(Some(s)) => s,
         Ok(None) => {
             warn!("OAuth token exchange: code not found");
@@ -2412,7 +2788,7 @@ async fn handle_token(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 &OAuthErrorResponse {
                     error: "server_error".to_string(),
-                    error_description: Some(format!("Database error: {}", e)),
+                    error_description: Some(format!("Database error: {e}")),
                     state: None,
                 },
             )
@@ -2542,7 +2918,7 @@ fn generate_oauth_token_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &OAuthErrorResponse {
                 error: "server_error".to_string(),
-                error_description: Some(format!("Failed to generate token: {}", e)),
+                error_description: Some(format!("Failed to generate token: {e}")),
                 state: None,
             },
         ),
@@ -2553,22 +2929,22 @@ fn generate_oauth_token_response(
 // Helper Functions
 // =============================================================================
 
+#[allow(clippy::result_large_err)]
 fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>> {
     if state.args.dev_mode {
         Ok(JwtValidator::new_dev())
     } else {
         match &state.args.jwt_secret {
-            Some(secret) => {
-                JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).map_err(|e| {
+            Some(secret) => JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds)
+                .map_err(|e| {
                     json_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         &ErrorResponse {
-                            error: format!("JWT configuration error: {}", e),
+                            error: format!("JWT configuration error: {e}"),
                             code: Some("CONFIG_ERROR".into()),
                         },
                     )
-                })
-            }
+                }),
             None => Err(json_response(
                 StatusCode::NOT_IMPLEMENTED,
                 &ErrorResponse {
@@ -2581,6 +2957,7 @@ fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Response<BoxBody>
 }
 
 /// Generate a successful auth response with JWT token
+#[allow(clippy::too_many_arguments)]
 fn generate_auth_response(
     jwt: &JwtValidator,
     state: &AppState,
@@ -2590,6 +2967,7 @@ fn generate_auth_response(
     session_id: Option<String>,
     status: StatusCode,
     profile: Option<HumanProfileResponse>,
+    permission_level: PermissionLevel,
 ) -> Response<BoxBody> {
     // Get doorway identity from config
     let doorway_id = state.args.doorway_id.clone();
@@ -2599,7 +2977,7 @@ fn generate_auth_response(
         human_id: human_id.to_string(),
         agent_pub_key: agent_pub_key.to_string(),
         identifier: identifier.to_string(),
-        permission_level: PermissionLevel::Authenticated,
+        permission_level,
         session_id,
         doorway_id: doorway_id.clone(),
         doorway_url: doorway_url.clone(),
@@ -2627,7 +3005,7 @@ fn generate_auth_response(
         Err(e) => json_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             &ErrorResponse {
-                error: format!("Failed to generate token: {}", e),
+                error: format!("Failed to generate token: {e}"),
                 code: Some("TOKEN_ERROR".into()),
             },
         ),
@@ -2676,18 +3054,27 @@ pub async fn handle_auth_request(
         // Native handoff (Tauri session migration)
         (&Method::GET, "/auth/native-handoff") => handle_native_handoff(req, state).await,
 
-        // Sovereignty migration endpoints
+        // Stewardship migration endpoints
         (&Method::GET, "/auth/export-key") => handle_export_key(req, state).await,
-        (&Method::POST, "/auth/confirm-sovereignty") => handle_confirm_sovereignty(req, state).await,
+        (&Method::POST, "/auth/confirm-stewardship")
+        | (&Method::POST, "/auth/confirm-sovereignty") => {
+            handle_confirm_stewardship(req, state).await
+        }
 
         // Disaster recovery endpoints
         (&Method::POST, "/auth/recover-custody") => handle_recover_custody(req, state).await,
-        (&Method::POST, "/auth/check-recovery-status") => handle_check_recovery_status(req, state).await,
+        (&Method::POST, "/auth/check-recovery-status") => {
+            handle_check_recovery_status(req, state).await
+        }
         (&Method::POST, "/auth/activate-recovery") => handle_activate_recovery(req, state).await,
 
         // Elohim verification endpoints
-        (&Method::POST, "/auth/elohim-verify/start") => handle_elohim_verify_start(req, state).await,
-        (&Method::POST, "/auth/elohim-verify/answer") => handle_elohim_verify_answer(req, state).await,
+        (&Method::POST, "/auth/elohim-verify/start") => {
+            handle_elohim_verify_start(req, state).await
+        }
+        (&Method::POST, "/auth/elohim-verify/answer") => {
+            handle_elohim_verify_answer(req, state).await
+        }
 
         // Method not allowed
         (_, "/auth/register")
@@ -2699,6 +3086,7 @@ pub async fn handle_auth_request(
         | (_, "/auth/token")
         | (_, "/auth/native-handoff")
         | (_, "/auth/export-key")
+        | (_, "/auth/confirm-stewardship")
         | (_, "/auth/confirm-sovereignty")
         | (_, "/auth/recover-custody")
         | (_, "/auth/check-recovery-status")

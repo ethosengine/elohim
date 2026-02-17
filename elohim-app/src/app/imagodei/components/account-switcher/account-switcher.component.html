@@ -1,0 +1,36 @@
+<div class="account-switcher">
+  <h3 class="switcher-title">Switch Account</h3>
+
+  @if (isLoading()) {
+    <div class="loading">Loading accounts...</div>
+  } @else {
+    <ul class="account-list">
+      @for (account of accounts(); track account.humanId) {
+        <li
+          class="account-item"
+          [class.active]="account.isActive"
+          (click)="account.isActive ? null : onSwitchAccount(account.humanId)"
+          (keydown.enter)="account.isActive ? null : onSwitchAccount(account.humanId)"
+          [attr.tabindex]="account.isActive ? -1 : 0"
+          role="button"
+        >
+          <div class="account-info">
+            <span class="account-name">{{ account.displayName || account.identifier }}</span>
+            <span class="account-doorway">{{ account.doorwayUrl }}</span>
+          </div>
+          @if (account.isActive) {
+            <span class="active-badge">Active</span>
+          }
+          @if (account.isSteward) {
+            <span class="steward-badge">Steward</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  <div class="switcher-actions">
+    <button class="btn-add" (click)="onAddAccount()">Add Account</button>
+    <button class="btn-cancel" (click)="onCancel()">Cancel</button>
+  </div>
+</div>

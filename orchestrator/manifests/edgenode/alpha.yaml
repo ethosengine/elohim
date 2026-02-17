@@ -1,27 +1,17 @@
-# Edge Node Alpha Deployment
+# Edge Node Alpha StatefulSet — P2P Sovereign Data Stack
 #
-# Provides stable Holochain conductor for Eclipse Che workspaces.
+# Contains only the Holochain conductor, storage, and P2P networking.
+# Doorway (Web 2.0 gateway) runs as a separate Deployment — see ../doorway/alpha.yaml
 #
 # Architecture:
-#   Browser -> Doorway Gateway (auth + whitelist + worker pool) -> Conductor (localhost)
+#   Doorway Deployment -> ClusterIP service -> ws-proxy (socat) -> Conductor (localhost)
+#   P2P: elohim-storage nodes discover each other via headless service DNS
 #
 # Ports:
-#   - 4444: Conductor Admin WebSocket (localhost only)
-#   - 8444: socat proxy (pod-internal, for legacy/direct access)
-#   - 8080: Doorway Gateway (public, authenticated)
----
-# Secret for Doorway Gateway API keys
-apiVersion: v1
-kind: Secret
-metadata:
-  name: elohim-doorway-alpha-secrets
-  namespace: elohim-alpha
-type: Opaque
-stringData:
-  # IMPORTANT: Change these in production!
-  api-key-authenticated: "dev-elohim-auth-2024"
-  api-key-admin: "dev-elohim-admin-2024"
-  jwt-secret: "dev-jwt-secret-change-in-production-2024"
+#   - 4444: Conductor Admin WebSocket (localhost only, bridged via socat :8444)
+#   - 4445: Conductor App WebSocket (localhost only, bridged via socat :8445)
+#   - 8090: elohim-storage HTTP API
+#   - 9876: P2P libp2p transport (cross-namespace via NetworkPolicy)
 ---
 # ConfigMap for conductor configuration
 apiVersion: v1
@@ -57,32 +47,8 @@ data:
       type: lair_server_in_proc
       lair_root: "/var/local/lib/holochain/ks"
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: holochain-data-alpha
-  namespace: elohim-alpha
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: microk8s-hostpath
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: storage-data-alpha
-  namespace: elohim-alpha
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: microk8s-hostpath
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: elohim-edgenode-alpha
   namespace: elohim-alpha
@@ -90,7 +56,11 @@ metadata:
     app: elohim-edgenode
     environment: alpha
 spec:
-  replicas: 1
+  serviceName: elohim-edgenode-alpha-headless
+  replicas: 2
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: elohim-edgenode
@@ -101,6 +71,8 @@ spec:
         app: elohim-edgenode
         environment: alpha
     spec:
+      securityContext:
+        fsGroup: 1000
       nodeSelector:
         node-type: operations
       # Init container fetches hApp from Harbor registry using oras
@@ -184,15 +156,22 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 3
-        # Socat proxy for direct pod-internal access (legacy, not publicly exposed)
+        # Socat proxy — bridges localhost-bound conductor ports to pod network
+        # Doorway Deployment connects via ClusterIP service → these bridged ports
         - name: ws-proxy
           image: alpine/socat:latest
+          command: ['sh', '-c']
           args:
-            - "TCP-LISTEN:8444,fork,reuseaddr"
-            - "TCP:127.0.0.1:4444"
+            - |
+              socat TCP-LISTEN:8444,fork,reuseaddr TCP:127.0.0.1:4444 &
+              socat TCP-LISTEN:8445,fork,reuseaddr TCP:127.0.0.1:4445 &
+              wait
           ports:
             - name: admin-ws-int
               containerPort: 8444
+              protocol: TCP
+            - name: app-ws-int
+              containerPort: 8445
               protocol: TCP
           resources:
             requests:
@@ -206,63 +185,6 @@ spec:
               port: 8444
             initialDelaySeconds: 5
             periodSeconds: 5
-        # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
-        # Uses dev-latest tag for development
-        - name: doorway
-          image: harbor.ethosengine.com/ethosengine/elohim-doorway:DOORWAY_TAG_PLACEHOLDER
-          imagePullPolicy: Always
-          args:
-            - "--listen"
-            - "0.0.0.0:8080"
-            - "--conductor-url"
-            - "ws://localhost:4444"
-          ports:
-            - name: gateway-ws
-              containerPort: 8080
-              protocol: TCP
-          env:
-            - name: DEV_MODE
-              value: "true"
-            - name: RUST_LOG
-              value: "info,doorway=debug"
-            - name: STORAGE_URL
-              value: "http://localhost:8090"
-            - name: THRESHOLD_URL
-              value: "http://localhost:80"
-            - name: API_KEY_AUTHENTICATED
-              valueFrom:
-                secretKeyRef:
-                  name: elohim-doorway-alpha-secrets
-                  key: api-key-authenticated
-            - name: API_KEY_ADMIN
-              valueFrom:
-                secretKeyRef:
-                  name: elohim-doorway-alpha-secrets
-                  key: api-key-admin
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: elohim-doorway-alpha-secrets
-                  key: jwt-secret
-          resources:
-            requests:
-              memory: "64Mi"
-              cpu: "50m"
-            limits:
-              memory: "256Mi"
-              cpu: "200m"
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 30
         # elohim-storage - Blob storage and import processing sidecar
         # Handles heavy R/W operations, forwards to conductor
         - name: elohim-storage
@@ -287,6 +209,24 @@ spec:
               value: "50"
             - name: IMPORT_CHUNK_DELAY_MS
               value: "300"
+            - name: ENABLE_P2P
+              value: "true"
+            - name: P2P_PORT
+              value: "9876"
+            - name: DISABLE_MDNS
+              value: "true"
+            - name: P2P_BOOTSTRAP_NODES
+              value: "/dns4/elohim-edgenode-alpha-0.elohim-edgenode-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-edgenode-alpha-1.elohim-edgenode-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
+            # K8s pods act as relay servers for desktop stewards behind NAT
+            - name: RELAY_MODE
+              value: "server"
+          ports:
+            - name: storage-http
+              containerPort: 8090
+              protocol: TCP
+            - name: p2p
+              containerPort: 9876
+              protocol: TCP
           resources:
             requests:
               memory: "128Mi"
@@ -336,51 +276,61 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "200m"
-        # Doorway Operator Dashboard - Angular app for node operators
-        # Provides: federated OAuth, node metrics, configuration UI
-        - name: doorway-app
-          image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
-          imagePullPolicy: Always
-          ports:
-            - name: operator-ui
-              containerPort: 80
-              protocol: TCP
-          env:
-            - name: DOORWAY_API_URL
-              value: "http://localhost:8080"
-          resources:
-            requests:
-              memory: "32Mi"
-              cpu: "10m"
-            limits:
-              memory: "128Mi"
-              cpu: "100m"
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 80
-            initialDelaySeconds: 10
-            periodSeconds: 30
       volumes:
         # Shared volume for hApp (fetched by init container)
         - name: happ-volume
           emptyDir: {}
-        # Storage data for elohim-storage blobs
-        - name: storage-data
-          persistentVolumeClaim:
-            claimName: storage-data-alpha
-        - name: holochain-data
-          persistentVolumeClaim:
-            claimName: holochain-data-alpha
+        # Conductor config from ConfigMap
         - name: conductor-config
           configMap:
             name: elohim-edgenode-alpha-config
+  # Per-pod persistent volumes — each StatefulSet replica gets its own PVCs
+  # Named volumes are referenced in volumeMounts above
+  volumeClaimTemplates:
+    - metadata:
+        name: holochain-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi
+    - metadata:
+        name: storage-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 5Gi
+---
+# Headless service for StatefulSet DNS-based peer discovery
+# Each pod gets a stable DNS name: elohim-edgenode-alpha-{N}.elohim-edgenode-alpha-headless.elohim-alpha.svc.cluster.local
+# Doorway uses these DNS names in CONDUCTOR_URLS for per-conductor routing
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-edgenode-alpha-headless
+  namespace: elohim-alpha
+  labels:
+    app: elohim-edgenode
+    environment: alpha
+spec:
+  clusterIP: None
+  selector:
+    app: elohim-edgenode
+    environment: alpha
+  ports:
+    - name: admin-ws
+      port: 4444
+      targetPort: 8444
+      protocol: TCP
+    - name: app-ws
+      port: 4445
+      targetPort: 8445
+      protocol: TCP
+    - name: p2p
+      port: 9876
+      targetPort: 9876
+      protocol: TCP
 ---
 apiVersion: v1
 kind: Service
@@ -393,77 +343,26 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    # Internal socat proxy (for kubectl port-forward or pod-to-pod)
-    - name: admin-ws-int
+    # Conductor admin WebSocket (via socat bridge 8444→4444)
+    - name: admin-ws
       port: 4444
       targetPort: 8444
       protocol: TCP
-    # Doorway Gateway (for public authenticated access)
-    - name: gateway-ws
-      port: 8080
-      targetPort: 8080
+    # Conductor app WebSocket (via socat bridge 8445→4445)
+    - name: app-ws
+      port: 4445
+      targetPort: 8445
       protocol: TCP
-    # elohim-storage SQLite DB API (for fast seeding)
+    # elohim-storage HTTP API
     - name: storage-db
       port: 8090
       targetPort: 8090
       protocol: TCP
-    # Doorway Operator Dashboard
-    - name: operator-ui
-      port: 8081
-      targetPort: 80
+    # P2P libp2p transport
+    - name: p2p
+      port: 9876
+      targetPort: 9876
       protocol: TCP
   selector:
     app: elohim-edgenode
     environment: alpha
----
-# Public Ingress - routes all traffic through authenticated Doorway Gateway
-# Supports: /admin, /app/*, /bootstrap/*, /api/v1/*, /operator/*
-# Signal subdomain: signal.doorway-alpha.elohim.host (tx5/SBD protocol)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: elohim-edgenode-alpha
-  namespace: elohim-alpha
-  annotations:
-    # WebSocket support for /admin, /app/*, signal subdomain
-    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
-    nginx.ingress.kubernetes.io/websocket-services: "elohim-edgenode-alpha"
-    # Required for WebSocket upgrade headers
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header Upgrade $http_upgrade;
-      proxy_set_header Connection "upgrade";
-    cert-manager.io/cluster-issuer: letsencrypt-production
-spec:
-  ingressClassName: public
-  tls:
-    - hosts:
-        - doorway-alpha.elohim.host
-        - signal.doorway-alpha.elohim.host
-      secretName: doorway-alpha-tls
-  rules:
-    - host: doorway-alpha.elohim.host
-      http:
-        paths:
-          # All traffic through doorway gateway
-          # Doorway handles routing: /threshold/* → doorway-app, /hc/* → conductor
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: elohim-edgenode-alpha
-                port:
-                  number: 8080
-    - host: signal.doorway-alpha.elohim.host
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: elohim-edgenode-alpha
-                port:
-                  number: 8080

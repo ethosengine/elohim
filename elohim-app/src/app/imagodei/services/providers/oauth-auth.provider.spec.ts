@@ -81,8 +81,8 @@ describe('OAuthAuthProvider', () => {
       provider.initiateLogin(doorwayUrl);
 
       expect(window.location.href).toContain(`${doorwayUrl}/auth/authorize`);
-      expect(window.location.href).toContain('clientId=elohim-app');
-      expect(window.location.href).toContain('responseType=code');
+      expect(window.location.href).toContain('client_id=elohim-app');
+      expect(window.location.href).toContain('response_type=code');
       expect(window.location.href).toContain('state=');
     });
 
@@ -106,7 +106,7 @@ describe('OAuthAuthProvider', () => {
 
       provider.initiateLogin(doorwayUrl, returnUrl);
 
-      expect(window.location.href).toContain(`redirectUri=${encodeURIComponent(returnUrl)}`);
+      expect(window.location.href).toContain(`redirect_uri=${encodeURIComponent(returnUrl)}`);
 
       const storedState = sessionStorage.getItem(OAUTH_STATE_KEY);
       const state = JSON.parse(storedState!);
@@ -128,11 +128,11 @@ describe('OAuthAuthProvider', () => {
 
   describe('handleCallback', () => {
     const mockTokenResponse = {
-      accessToken: 'access-token-123',
-      tokenType: 'Bearer',
-      expiresIn: 3600,
-      humanId: 'human-123',
-      agentPubKey: 'agent-pub-key-123',
+      access_token: 'access-token-123',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      human_id: 'human-123',
+      agent_pub_key: 'agent-pub-key-123',
       identifier: 'user@example.com',
     };
 
@@ -153,7 +153,7 @@ describe('OAuthAuthProvider', () => {
       const req = httpMock.expectOne('https://doorway.example.com/auth/token');
       expect(req.request.method).toBe('POST');
       expect(req.request.body.code).toBe('auth-code-123');
-      expect(req.request.body.grantType).toBe('authorization_code');
+      expect(req.request.body.grant_type).toBe('authorization_code');
 
       req.flush(mockTokenResponse);
 
@@ -307,11 +307,11 @@ describe('OAuthAuthProvider', () => {
       };
 
       const mockTokenResponse = {
-        accessToken: 'access-token-123',
-        tokenType: 'Bearer',
-        expiresIn: 3600,
-        humanId: 'human-123',
-        agentPubKey: 'agent-pub-key-123',
+        access_token: 'access-token-123',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        human_id: 'human-123',
+        agent_pub_key: 'agent-pub-key-123',
         identifier: 'user@example.com',
       };
 
@@ -329,17 +329,61 @@ describe('OAuthAuthProvider', () => {
   });
 
   // ==========================================================================
+  // Return URL Storage
+  // ==========================================================================
+
+  describe('storeReturnUrl / consumeReturnUrl', () => {
+    const RETURN_URL_KEY = 'elohim-oauth-return-url';
+
+    it('should store and consume a return URL', () => {
+      provider.storeReturnUrl('/community/governance');
+
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBe('/community/governance');
+
+      const url = provider.consumeReturnUrl();
+      expect(url).toBe('/community/governance');
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBeNull();
+    });
+
+    it('should return null when no return URL is stored', () => {
+      expect(provider.consumeReturnUrl()).toBeNull();
+    });
+
+    it('should not store empty string', () => {
+      provider.storeReturnUrl('');
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBeNull();
+    });
+
+    it('should not store root path', () => {
+      provider.storeReturnUrl('/');
+      expect(sessionStorage.getItem(RETURN_URL_KEY)).toBeNull();
+    });
+
+    it('should remove URL on consume (one-time read)', () => {
+      provider.storeReturnUrl('/lamad/path/123');
+
+      const first = provider.consumeReturnUrl();
+      const second = provider.consumeReturnUrl();
+
+      expect(first).toBe('/lamad/path/123');
+      expect(second).toBeNull();
+    });
+  });
+
+  // ==========================================================================
   // Logout
   // ==========================================================================
 
   describe('logout', () => {
-    it('should clear OAuth state from sessionStorage', async () => {
+    it('should clear OAuth state and return URL from sessionStorage', async () => {
       sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify({ state: 'test' }));
+      sessionStorage.setItem('elohim-oauth-return-url', '/some/page');
       provider.isFlowInProgress.set(true);
 
       await provider.logout();
 
       expect(sessionStorage.getItem(OAUTH_STATE_KEY)).toBeNull();
+      expect(sessionStorage.getItem('elohim-oauth-return-url')).toBeNull();
       expect(provider.isFlowInProgress()).toBe(false);
     });
   });
@@ -351,11 +395,11 @@ describe('OAuthAuthProvider', () => {
   describe('refreshToken', () => {
     it('should call doorway refresh endpoint', async () => {
       const mockRefreshResponse = {
-        accessToken: 'refreshed-token-456',
-        tokenType: 'Bearer',
-        expiresIn: 3600,
-        humanId: 'human-123',
-        agentPubKey: 'agent-pub-key-123',
+        access_token: 'refreshed-token-456',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        human_id: 'human-123',
+        agent_pub_key: 'agent-pub-key-123',
         identifier: 'user@example.com',
       };
 

@@ -53,7 +53,7 @@ export interface ConnectionConfig {
   /** Connection mode */
   mode: ConnectionMode;
 
-  /** Admin WebSocket URL (Doorway: wss://doorway-dev.elohim.host, Direct: ws://localhost:4444) */
+  /** Admin WebSocket URL (Doorway: wss://doorway-alpha.elohim.host, Direct: ws://localhost:4444) */
   adminUrl: string;
 
   /** App WebSocket URL (may differ from adminUrl in direct mode) */
@@ -189,7 +189,7 @@ export interface IConnectionStrategy {
   /**
    * Resolve admin WebSocket URL.
    *
-   * - Doorway: wss://doorway-dev.elohim.host?apiKey=...
+   * - Doorway: wss://doorway-alpha.elohim.host?apiKey=...
    * - Direct: ws://localhost:4444
    * - Che: wss://{workspace}-hc-dev/admin
    */
@@ -198,7 +198,7 @@ export interface IConnectionStrategy {
   /**
    * Resolve app WebSocket URL for a given port.
    *
-   * - Doorway: wss://doorway-dev.elohim.host/app/{port}?apiKey=...
+   * - Doorway: wss://doorway-alpha.elohim.host/app/{port}?apiKey=...
    * - Direct: ws://localhost:{port}
    * - Che: wss://{workspace}-hc-dev/app/{port}
    */
@@ -207,7 +207,7 @@ export interface IConnectionStrategy {
   /**
    * Get blob storage URL for a given hash.
    *
-   * - Doorway: https://doorway-dev.elohim.host/api/blob/{hash}
+   * - Doorway: https://doorway-alpha.elohim.host/api/blob/{hash}
    * - Direct: http://localhost:8090/store/{hash} (elohim-storage sidecar)
    */
   getBlobStorageUrl(config: ConnectionConfig, blobHash: string): string;
@@ -216,7 +216,7 @@ export interface IConnectionStrategy {
    * Get the base URL for storage API operations.
    *
    * Used by StorageClientService for blob and metadata operations.
-   * - Doorway: https://doorway-dev.elohim.host (HTTP base from adminUrl)
+   * - Doorway: https://doorway-alpha.elohim.host (HTTP base from adminUrl)
    * - Direct: http://localhost:8090 (elohim-storage sidecar)
    */
   getStorageBaseUrl(config: ConnectionConfig): string;

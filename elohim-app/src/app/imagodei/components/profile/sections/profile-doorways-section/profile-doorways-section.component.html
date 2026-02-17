@@ -1,0 +1,105 @@
+<div class="doorways-section">
+  <span class="section-title">My Doorways</span>
+  <p class="section-description">
+    Doorways are your connections to the Elohim network. Multiple doorways provide redundancy for
+    identity recovery.
+  </p>
+  <div class="doorway-cards">
+    @for (doorway of doorways(); track doorway.id) {
+      <div class="doorway-card" [class.active]="doorway.id === activeDoorwayId()">
+        <div class="doorway-header">
+          <span
+            class="doorway-status-dot"
+            [class.online]="doorway.isReachable"
+            [class.offline]="!doorway.isReachable"
+          ></span>
+          <strong>{{ doorway.name || doorway.id }}</strong>
+          @if (doorway.id === activeDoorwayId()) {
+            <span class="doorway-active-badge">Active</span>
+          }
+        </div>
+        <span class="doorway-url">{{ doorway.url }}</span>
+        <div class="doorway-card-actions">
+          @if (doorway.latencyMs) {
+            <span class="doorway-latency">{{ doorway.latencyMs }}ms</span>
+          }
+          <a [href]="doorway.url" target="_blank" rel="noopener" class="doorway-visit-link">
+            Visit
+            <span class="material-icons">open_in_new</span>
+          </a>
+          @if (doorway.id !== activeDoorwayId()) {
+            <button
+              type="button"
+              class="doorway-set-primary-btn"
+              (click)="setAsPrimary.emit(doorway.url)"
+            >
+              Set as Primary
+            </button>
+          }
+        </div>
+        @if (doorway.id === activeDoorwayId() && registrationContext(); as reg) {
+          <div class="doorway-registration">
+            @if (reg.identifier) {
+              <div class="registration-row">
+                <span class="registration-label">Registered as</span>
+                <span class="registration-value">{{ reg.identifier }}</span>
+              </div>
+            }
+            @if (reg.registeredSince) {
+              <div class="registration-row">
+                <span class="registration-label">Member since</span>
+                <span class="registration-value">{{ formatDate(reg.registeredSince) }}</span>
+              </div>
+            }
+            @if (reg.credentialStorage) {
+              <div class="registration-row">
+                <span class="registration-label">Credentials</span>
+                <span class="registration-value">Stored in {{ reg.credentialStorage }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  @if (showAddDoorway()) {
+    <div class="add-doorway-form">
+      <div class="add-doorway-input-row">
+        <input
+          type="url"
+          [value]="newDoorwayUrl()"
+          (input)="onDoorwayUrlInput($event)"
+          placeholder="https://doorway.example.com"
+          [disabled]="validating()"
+        />
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="onValidate()"
+          [disabled]="validating() || !newDoorwayUrl().trim()"
+        >
+          @if (validating()) {
+            <span class="spinner"></span>
+          } @else {
+            Validate
+          }
+        </button>
+      </div>
+      @if (validationError()) {
+        <div class="add-doorway-error">{{ validationError() }}</div>
+      }
+      @if (validationResult(); as validated) {
+        <div class="add-doorway-success">
+          <span>{{ validated.name }} ({{ validated.url }})</span>
+          <button type="button" class="btn btn-primary" (click)="onAdd()">Add</button>
+        </div>
+      }
+      <button type="button" class="btn btn-secondary" (click)="toggleAddDoorway()">Cancel</button>
+    </div>
+  } @else {
+    <button type="button" class="btn btn-secondary" (click)="toggleAddDoorway()">
+      + Add Doorway
+    </button>
+  }
+</div>

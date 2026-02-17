@@ -30,7 +30,7 @@ pub fn parse_message(data: &[u8]) -> Result<ParsedMessage, DoorwayError> {
 
     // Decode outer envelope
     let envelope = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| DoorwayError::Holochain(format!("Failed to decode envelope: {}", e)))?;
+        .map_err(|e| DoorwayError::Holochain(format!("Failed to decode envelope: {e}")))?;
 
     // Try client envelope format first
     if let Value::Map(ref map) = envelope {
@@ -62,14 +62,12 @@ fn try_parse_client_envelope(
             // Decode the inner AdminRequest
             let mut inner_cursor = Cursor::new(inner_bytes.as_slice());
             let inner = rmpv::decode::read_value(&mut inner_cursor).map_err(|e| {
-                DoorwayError::Holochain(format!("Failed to decode inner request: {}", e))
+                DoorwayError::Holochain(format!("Failed to decode inner request: {e}"))
             })?;
 
             if let Value::Map(ref inner_map) = inner {
                 if let Some(operation) = get_string_field(inner_map, "type") {
-                    let data = get_field(inner_map, "data")
-                        .cloned()
-                        .unwrap_or(Value::Nil);
+                    let data = get_field(inner_map, "data").cloned().unwrap_or(Value::Nil);
                     return Ok(Some(ParsedMessage { operation, data }));
                 }
             }
@@ -123,10 +121,7 @@ fn get_field<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
 /// Encode an error response in MessagePack format
 pub fn encode_error(message: &str) -> Vec<u8> {
     let error_map = Value::Map(vec![
-        (
-            Value::String("type".into()),
-            Value::String("error".into()),
-        ),
+        (Value::String("type".into()), Value::String("error".into())),
         (
             Value::String("data".into()),
             Value::Map(vec![(

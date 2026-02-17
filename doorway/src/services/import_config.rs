@@ -43,7 +43,7 @@ use dashmap::DashMap;
 use tracing::{debug, info};
 
 // Re-export from doorway-client
-pub use doorway_client::{ImportConfig, ImportBatchType, IMPORT_CONFIG_FN};
+pub use doorway_client::{ImportBatchType, ImportConfig, IMPORT_CONFIG_FN};
 
 /// Import configuration for a specific DNA
 #[derive(Debug, Clone)]
@@ -79,7 +79,9 @@ impl DnaImportConfig {
 
     /// Get batch type config by name
     pub fn get_batch_type(&self, batch_type: &str) -> Option<&ImportBatchType> {
-        self.config.batch_types.iter()
+        self.config
+            .batch_types
+            .iter()
             .find(|bt| bt.batch_type == batch_type)
     }
 
@@ -125,7 +127,10 @@ impl ImportConfigStore {
             .or_insert_with(|| DnaImportConfig::empty(dna_hash))
             .discovered = true;
 
-        debug!(dna = dna_hash, "Import config discovery attempted (no config)");
+        debug!(
+            dna = dna_hash,
+            "Import config discovery attempted (no config)"
+        );
     }
 
     /// Check if discovery has been attempted for a DNA
@@ -214,7 +219,20 @@ impl ImportConfigDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use doorway_client::ImportBatchTypeBuilder;
+    use doorway_client::ImportBatchType;
+
+    fn make_batch_type(name: &str) -> ImportBatchType {
+        ImportBatchType {
+            batch_type: name.to_string(),
+            queue_fn: "queue_import".to_string(),
+            process_fn: "process_import_chunk".to_string(),
+            status_fn: "get_import_status".to_string(),
+            max_items: 5000,
+            chunk_size: 50,
+            chunk_interval_ms: 100,
+            schema_version: 1,
+        }
+    }
 
     #[test]
     fn test_empty_store() {
@@ -229,13 +247,12 @@ mod tests {
     fn test_store_config() {
         let store = ImportConfigStore::new();
 
+        let mut bt = make_batch_type("content");
+        bt.max_items = 1000;
         let config = ImportConfig {
             enabled: true,
-            batch_types: vec![
-                ImportBatchTypeBuilder::new("content")
-                    .max_items(1000)
-                    .build(),
-            ],
+            base_route: "/import".to_string(),
+            batch_types: vec![bt],
             require_auth: true,
             allowed_agents: None,
         };
@@ -257,9 +274,8 @@ mod tests {
 
         let config = ImportConfig {
             enabled: false,
-            batch_types: vec![
-                ImportBatchTypeBuilder::new("content").build(),
-            ],
+            base_route: "/import".to_string(),
+            batch_types: vec![make_batch_type("content")],
             require_auth: true,
             allowed_agents: None,
         };
@@ -276,24 +292,27 @@ mod tests {
     fn test_get_all_batch_types() {
         let store = ImportConfigStore::new();
 
-        store.set_config("dna1", ImportConfig {
-            enabled: true,
-            batch_types: vec![
-                ImportBatchTypeBuilder::new("content").build(),
-                ImportBatchTypeBuilder::new("paths").build(),
-            ],
-            require_auth: true,
-            allowed_agents: None,
-        });
+        store.set_config(
+            "dna1",
+            ImportConfig {
+                enabled: true,
+                base_route: "/import".to_string(),
+                batch_types: vec![make_batch_type("content"), make_batch_type("paths")],
+                require_auth: true,
+                allowed_agents: None,
+            },
+        );
 
-        store.set_config("dna2", ImportConfig {
-            enabled: true,
-            batch_types: vec![
-                ImportBatchTypeBuilder::new("content").build(),
-            ],
-            require_auth: true,
-            allowed_agents: None,
-        });
+        store.set_config(
+            "dna2",
+            ImportConfig {
+                enabled: true,
+                base_route: "/import".to_string(),
+                batch_types: vec![make_batch_type("content")],
+                require_auth: true,
+                allowed_agents: None,
+            },
+        );
 
         let batch_types = store.get_all_batch_types();
 

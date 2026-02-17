@@ -47,7 +47,10 @@ pub struct DIDDocument {
     pub elohim_region: Option<String>,
 
     /// Elohim-specific: Holochain cell ID (if connected)
-    #[serde(rename = "elohim:holochainCellId", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "elohim:holochainCellId",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub elohim_holochain_cell_id: Option<String>,
 }
 
@@ -91,16 +94,16 @@ fn derive_doorway_did(state: &AppState) -> String {
         // doorway_id is like "alpha-elohim-host" or "doorway-a.elohim.host"
         // If it contains dots, it's already a domain; otherwise, convert dashes
         if doorway_id.contains('.') {
-            format!("did:web:{}", doorway_id)
+            format!("did:web:{doorway_id}")
         } else {
             // Convert "alpha-elohim-host" to "alpha.elohim.host"
             let domain = doorway_id.replace('-', ".");
-            format!("did:web:{}", domain)
+            format!("did:web:{domain}")
         }
     } else if let Some(ref doorway_url) = state.args.doorway_url {
         // Extract domain from URL
         if let Some(domain) = extract_domain(doorway_url) {
-            format!("did:web:{}", domain)
+            format!("did:web:{domain}")
         } else {
             // Fallback: use node_id as a local identifier
             format!("did:web:localhost:doorway:{}", state.args.node_id)
@@ -119,11 +122,7 @@ fn extract_domain(url: &str) -> Option<String> {
         .unwrap_or(url);
 
     // Take everything before the first "/" or ":"
-    let domain = without_scheme
-        .split('/')
-        .next()?
-        .split(':')
-        .next()?;
+    let domain = without_scheme.split('/').next()?.split(':').next()?;
 
     if domain.is_empty() {
         None
@@ -143,16 +142,16 @@ fn build_did_document(state: &AppState) -> DIDDocument {
     // Blob storage endpoint
     if let Some(ref storage_url) = args.storage_url {
         services.push(Service {
-            id: format!("{}#blobs", did),
+            id: format!("{did}#blobs"),
             service_type: "ElohimBlobStore".to_string(),
-            service_endpoint: format!("{}/api/v1/blobs", storage_url),
+            service_endpoint: format!("{storage_url}/api/v1/blobs"),
         });
     } else if let Some(ref doorway_url) = args.doorway_url {
         // If no separate storage, doorway serves blobs
         services.push(Service {
-            id: format!("{}#blobs", did),
+            id: format!("{did}#blobs"),
             service_type: "ElohimBlobStore".to_string(),
-            service_endpoint: format!("{}/store", doorway_url),
+            service_endpoint: format!("{doorway_url}/store"),
         });
     }
 
@@ -163,7 +162,7 @@ fn build_did_document(state: &AppState) -> DIDDocument {
             .replace("https://", "wss://")
             .replace("http://", "ws://");
         services.push(Service {
-            id: format!("{}#holochain", did),
+            id: format!("{did}#holochain"),
             service_type: "HolochainGateway".to_string(),
             service_endpoint: format!("{}/app/{}", ws_url, args.app_port_min),
         });
@@ -173,9 +172,9 @@ fn build_did_document(state: &AppState) -> DIDDocument {
     if args.jwt_secret.is_some() {
         if let Some(ref doorway_url) = args.doorway_url {
             services.push(Service {
-                id: format!("{}#humans", did),
+                id: format!("{did}#humans"),
                 service_type: "ElohimHumanRegistry".to_string(),
-                service_endpoint: format!("{}/auth", doorway_url),
+                service_endpoint: format!("{doorway_url}/auth"),
             });
         }
     }
@@ -199,23 +198,27 @@ fn build_did_document(state: &AppState) -> DIDDocument {
             "https://elohim-protocol.org/ns/v1".to_string(),
         ],
         id: did.clone(),
-        verification_method: vec![
-            // Note: In production, this should include actual signing keys
-            // For now, we include a placeholder that indicates the verification
-            // method type without exposing actual key material
-            VerificationMethod {
-                id: format!("{}#node-key", did),
-                method_type: "Ed25519VerificationKey2020".to_string(),
-                controller: did.clone(),
-                public_key_multibase: None, // TODO: Add actual key when signing is implemented
-            },
-        ],
+        verification_method: vec![VerificationMethod {
+            id: format!("{did}#node-key"),
+            method_type: "Ed25519VerificationKey2020".to_string(),
+            controller: did.clone(),
+            public_key_multibase: state.node_verifying_key.as_ref().map(|key| {
+                // Multibase z-prefix (base58btc) with Ed25519 multicodec prefix 0xed01
+                let pub_bytes = key.to_bytes();
+                let mut prefixed = vec![0xed, 0x01];
+                prefixed.extend_from_slice(&pub_bytes);
+                format!("z{}", bs58::encode(&prefixed).into_string())
+            }),
+        }],
         authentication: vec![format!("{}#node-key", did)],
         assertion_method: vec![format!("{}#node-key", did)],
         service: services,
         elohim_capabilities: capabilities,
         elohim_region: args.region.clone(),
-        elohim_holochain_cell_id: None, // TODO: Populate from conductor connection
+        elohim_holochain_cell_id: state
+            .zome_configs
+            .get("infrastructure")
+            .map(|entry| format!("{:?}", entry.value())),
     }
 }
 
@@ -233,8 +236,7 @@ pub fn handle_did_document(state: Arc<AppState>) -> Response<Full<Bytes>> {
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to serialize DID document: {}"}}"#,
-                    e
+                    r#"{{"error": "Failed to serialize DID document: {e}"}}"#
                 ))))
                 .unwrap();
         }

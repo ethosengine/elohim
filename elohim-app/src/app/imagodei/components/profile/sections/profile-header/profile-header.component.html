@@ -1,0 +1,20 @@
+<div class="profile-identity">
+  <div class="avatar">{{ initials() }}</div>
+  <div class="identity-info">
+    <h2 class="display-name">{{ displayName() }}</h2>
+    <span class="mode-badge" [ngClass]="mode()">{{ mode() }}</span>
+    @if (did()) {
+      <div class="did-row">
+        <code class="did-value" [title]="did()!">{{ truncateDid(did()!) }}</code>
+        <button type="button" class="copy-btn" (click)="copyDid()" [attr.aria-label]="'Copy DID'">
+          <span class="material-icons">{{ didCopied ? 'check' : 'content_copy' }}</span>
+        </button>
+      </div>
+    }
+  </div>
+  @if (canEdit()) {
+    <button type="button" class="edit-btn" (click)="editProfile.emit()" aria-label="Edit profile">
+      <span class="material-icons">edit</span>
+    </button>
+  }
+</div>

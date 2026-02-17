@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for initiating a claim - camelCase API boundary type
  */
-export type InitiateClaimInputView = { claimingAgentId: string, verificationMethod: string, 
+export type InitiateClaimInputView = { schemaVersion: number, claimingAgentId: string, verificationMethod: string, 
 /**
  * Parsed evidence object (serialized to JSON string for DB)
  */

@@ -163,7 +163,7 @@ Search logs for: "COPY failed" or "RUN failed" or "denied"
 
 | Branch Pattern | Environment | Doorway URL |
 |---------------|-------------|-------------|
-| `dev`, `feat-*`, `claude-*` | Alpha | doorway-dev.elohim.host |
+| `dev`, `feat-*`, `claude-*` | Alpha | doorway-alpha.elohim.host |
 | `staging-*` | Staging | doorway-staging.elohim.host |
 | `main` | Production | doorway.elohim.host |
 

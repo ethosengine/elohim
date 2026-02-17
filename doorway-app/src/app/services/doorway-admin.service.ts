@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, Subject, catchError, map, of, retry, timeout } from 'rxjs';
+import { Observable, Subject, catchError, of, retry, timeout } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { environment } from '../../environments/environment';
 import {
@@ -14,7 +14,6 @@ import {
   NodeSnapshot,
   ClusterSnapshot,
   // User admin models
-  UserSummary,
   UserDetails,
   UsersResponse,
   ListUsersParams,
@@ -279,19 +278,15 @@ export class DoorwayAdminService {
       : window.location.host;
     const wsUrl = `${wsProtocol}//${host}/admin/ws`;
 
-    console.log('[DoorwayAdmin] Connecting to WebSocket:', wsUrl);
-
     this.ws$ = webSocket<DashboardMessage | ClientMessage>({
       url: wsUrl,
       openObserver: {
         next: () => {
-          console.log('[DoorwayAdmin] WebSocket connected');
           this._connectionState.set('connected');
         },
       },
       closeObserver: {
         next: () => {
-          console.log('[DoorwayAdmin] WebSocket disconnected');
           this._connectionState.set('disconnected');
           this.ws$ = null;
         },
@@ -391,7 +386,6 @@ export class DoorwayAdminService {
 
       case 'heartbeat':
         // Could trigger a UI pulse or log
-        console.debug('[DoorwayAdmin] Heartbeat received');
         break;
 
       case 'pong':

@@ -4,7 +4,7 @@ import type { JsonValue } from "./JsonValue";
 /**
  * Input for creating a relationship - camelCase API boundary type
  */
-export type CreateRelationshipInputView = { id: string | null, sourceId: string, targetId: string, relationshipType: string, confidence: number | null, inferenceSource: string | null, 
+export type CreateRelationshipInputView = { id: string | null, schemaVersion: number, sourceId: string, targetId: string, relationshipType: string, confidence: number | null, inferenceSource: string | null, 
 /**
  * Parsed metadata object (serialized to JSON string for DB)
  */

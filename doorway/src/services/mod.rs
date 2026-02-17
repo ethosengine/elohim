@@ -20,6 +20,7 @@ pub mod custodian;
 pub mod did_resolver;
 pub mod discovery;
 pub mod elohim_verifier;
+pub mod federation;
 pub mod import_client;
 pub mod import_config;
 pub mod import_orchestrator;
@@ -28,52 +29,55 @@ pub mod route_registry;
 pub mod shard_resolver;
 pub mod storage_registration;
 pub mod verification;
+pub mod zome_caller;
 
 pub use custodian::{
-    CommitmentStatus, CustodianBlobCommitment, CustodianCapability, CustodianSelectionCriteria,
-    CustodianService, CustodianServiceConfig, CustodianStats, HealthProbeResult, ReachLevel,
-    spawn_health_probe_task,
-};
-pub use recording::{
-    AudioCodec, ContainerFormat, RecordingCmd, RecordingConfig, RecordingError,
-    RecordingService, RecordingServiceConfig, RecordingSession, RecordingStatus,
-    RecordingStatusResponse, VideoCodec, spawn_recording_cleanup_task,
-};
-pub use shard_resolver::{
-    BlobResolution, ResolvedBlob, ResolverStats, ShardLocation, ShardManifest,
-    ShardResolver, ShardResolverConfig, ShardResolverError,
-};
-pub use verification::{
-    compute_sha256, StreamingHasher, VerificationConfig, VerificationService, VerifyBlobRequest,
-    VerifyBlobResponse,
-};
-pub use import_config::{
-    DnaImportConfig, ImportConfigDiscovery, ImportConfigStore,
-    ImportConfig, ImportBatchType, IMPORT_CONFIG_FN,
-};
-pub use import_orchestrator::{
-    BlobStore, ChunkResult, ImportError, ImportOrchestrator, ImportOrchestratorConfig,
-    ImportProgress, ImportStatus, InMemoryBlobStore, StartImportInput, StartImportOutput,
-    ZomeClient,
-};
-pub use discovery::{
-    CellInfo, DiscoveryConfig, DiscoveryResult, DiscoveryService,
-    spawn_discovery_task, spawn_discovery_task_with_routes,
-};
-pub use route_registry::{
-    AgentRouteEntry, CompiledRoute, RouteRegistry, RouteRegistryConfig, RouteRegistryStats,
-    RouteSource, RouteTarget, spawn_cleanup_task as spawn_route_cleanup_task,
-};
-pub use import_client::{ImportClient, ImportClientConfig};
-pub use storage_registration::{
-    StorageRegistrationConfig, StorageRegistrationResult, register_local_storage,
+    spawn_health_probe_task, CommitmentStatus, CustodianBlobCommitment, CustodianCapability,
+    CustodianSelectionCriteria, CustodianService, CustodianServiceConfig, CustodianStats,
+    HealthProbeResult, ReachLevel,
 };
 pub use did_resolver::{
-    DIDDocument, DIDResolver, DIDResolverConfig, DIDResolverError, DIDResolverStats,
-    Service as DIDService, VerificationMethod, create_resolver, create_resolver_with_config,
+    create_resolver, create_resolver_with_config, DIDDocument, DIDResolver, DIDResolverConfig,
+    DIDResolverError, DIDResolverStats, Service as DIDService, VerificationMethod,
+};
+pub use discovery::{
+    spawn_discovery_task, spawn_discovery_task_with_routes, CellInfo, DiscoveryConfig,
+    DiscoveryResult, DiscoveryService,
 };
 pub use elohim_verifier::{
     AnswerScore, ClientQuestion, ElohimVerifier, LearningPreferences, PathCompletion,
     QuestionAnswer, QuestionCategory, QuizScore, UserProfileData, VerificationQuestion,
     VerificationResult, MAX_ELOHIM_CONFIDENCE, MIN_ACCURACY_THRESHOLD, QUESTION_COUNT,
 };
+pub use federation::FederationConfig;
+pub use import_client::{ImportClient, ImportClientConfig};
+pub use import_config::{
+    DnaImportConfig, ImportBatchType, ImportConfig, ImportConfigDiscovery, ImportConfigStore,
+    IMPORT_CONFIG_FN,
+};
+pub use import_orchestrator::{
+    BlobStore, ChunkResult, ImportError, ImportOrchestrator, ImportOrchestratorConfig,
+    ImportProgress, ImportStatus, InMemoryBlobStore, StartImportInput, StartImportOutput,
+    ZomeClient,
+};
+pub use recording::{
+    spawn_recording_cleanup_task, AudioCodec, ContainerFormat, RecordingCmd, RecordingConfig,
+    RecordingError, RecordingService, RecordingServiceConfig, RecordingSession, RecordingStatus,
+    RecordingStatusResponse, VideoCodec,
+};
+pub use route_registry::{
+    spawn_cleanup_task as spawn_route_cleanup_task, AgentRouteEntry, CompiledRoute, RouteRegistry,
+    RouteRegistryConfig, RouteRegistryStats, RouteSource, RouteTarget,
+};
+pub use shard_resolver::{
+    BlobResolution, ResolvedBlob, ResolverStats, ShardLocation, ShardManifest, ShardResolver,
+    ShardResolverConfig, ShardResolverError,
+};
+pub use storage_registration::{
+    register_local_storage, StorageRegistrationConfig, StorageRegistrationResult,
+};
+pub use verification::{
+    compute_sha256, StreamingHasher, VerificationConfig, VerificationService, VerifyBlobRequest,
+    VerifyBlobResponse,
+};
+pub use zome_caller::ZomeCaller;

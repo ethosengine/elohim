@@ -46,7 +46,8 @@ use crate::views::{
     CreateContentInputView, CreatePathInputView, CreateRelationshipInputView,
     CreateHumanRelationshipInputView, CreateContributorPresenceInputView,
     CreateEconomicEventInputView, CreateAllocationInputView, UpdateAllocationInputView,
-    InitiateClaimInputView, CreateChapterInputView, CreateStepInputView,
+    CreateMasteryInputView, InitiateClaimInputView, CreateChapterInputView, CreateStepInputView,
+    validate_schema_versions, SUPPORTED_SCHEMA_VERSIONS,
 };
 use crate::db::policy_cache::{PolicyEnforcement, ContentMetadata, PolicyDecision, PolicyEvent, PolicyEventType};
 use crate::error::StorageError;
@@ -89,6 +90,33 @@ pub struct HttpServer {
     services: Option<Arc<Services>>,
     /// Policy enforcement for stewardship content filtering
     policy_enforcement: Option<Arc<PolicyEnforcement>>,
+    /// P2P handle for status endpoint (Send+Sync safe)
+    #[cfg(feature = "p2p")]
+    p2p_handle: Option<crate::p2p::P2PHandle>,
+}
+
+/// Extract X-Schema-Version header from request and validate it.
+/// Returns Ok(Some(version)) if present and valid, Ok(None) if absent, Err if unsupported.
+fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>, String> {
+    match req.headers().get("X-Schema-Version") {
+        Some(val) => {
+            let version = val.to_str()
+                .map_err(|_| "Invalid X-Schema-Version header encoding".to_string())?
+                .parse::<u32>()
+                .map_err(|_| "X-Schema-Version must be a positive integer".to_string())?;
+            if !SUPPORTED_SCHEMA_VERSIONS.contains(&version) {
+                return Err(format!(
+                    "Unsupported schema version: {}. Supported: {:?}",
+                    version, SUPPORTED_SCHEMA_VERSIONS
+                ));
+            }
+            Ok(Some(version))
+        }
+        None => {
+            warn!("Bulk request missing X-Schema-Version header (deprecated: clients should send this header)");
+            Ok(None)
+        }
+    }
 }
 
 impl HttpServer {
@@ -105,6 +133,8 @@ impl HttpServer {
             db_pool: None,
             services: None,
             policy_enforcement: None,
+            #[cfg(feature = "p2p")]
+            p2p_handle: None,
         }
     }
 
@@ -147,6 +177,13 @@ impl HttpServer {
     /// Set the Policy Enforcement engine for stewardship content filtering
     pub fn with_policy_enforcement(mut self, enforcement: Arc<PolicyEnforcement>) -> Self {
         self.policy_enforcement = Some(enforcement);
+        self
+    }
+
+    /// Set the P2P handle for status endpoint
+    #[cfg(feature = "p2p")]
+    pub fn with_p2p_handle(mut self, handle: crate::p2p::P2PHandle) -> Self {
+        self.p2p_handle = Some(handle);
         self
     }
 
@@ -284,6 +321,12 @@ impl HttpServer {
                 }
             }
 
+            // P2P Status endpoint
+            #[cfg(feature = "p2p")]
+            (Method::GET, "/p2p/status") => {
+                self.handle_p2p_status().await
+            }
+
             // Sync API: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
             (method, p) if p.starts_with("/sync/v1/") => {
                 if let Some(ref sync_manager) = self.sync_manager {
@@ -367,10 +410,20 @@ impl HttpServer {
         };
 
         match result {
-            Ok(response) => Ok(response),
+            Ok(mut response) => {
+                // Add CORS headers to ALL responses (not just preflight)
+                let headers = response.headers_mut();
+                headers.insert("Access-Control-Allow-Origin",
+                    hyper::header::HeaderValue::from_static("*"));
+                headers.insert("Access-Control-Allow-Methods",
+                    hyper::header::HeaderValue::from_static("GET, PUT, POST, DELETE, HEAD, OPTIONS"));
+                headers.insert("Access-Control-Allow-Headers",
+                    hyper::header::HeaderValue::from_static("Content-Type, Authorization, X-Agent-Id, X-Schema-Version"));
+                Ok(response)
+            }
             Err(e) => {
                 error!(error = %e, "Request error");
-                Ok(Response::builder()
+                Ok(Self::with_cors_headers(Response::builder())
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(Full::new(Bytes::from(format!("Error: {}", e))))
                     .unwrap())
@@ -618,7 +671,7 @@ impl HttpServer {
             .status(StatusCode::OK)
             .header("Access-Control-Allow-Origin", "*")
             .header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, HEAD, OPTIONS")
-            .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Agent-Id")
+            .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Agent-Id, X-Schema-Version")
             .header("Access-Control-Max-Age", "86400")
             .body(Full::new(Bytes::new()))
             .unwrap()
@@ -790,6 +843,29 @@ impl HttpServer {
                 .status(StatusCode::NOT_FOUND)
                 .body(Full::new(Bytes::from("Manifest not found")))
                 .unwrap()),
+        }
+    }
+
+    /// Handle P2P status request
+    #[cfg(feature = "p2p")]
+    async fn handle_p2p_status(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        if let Some(ref handle) = self.p2p_handle {
+            let status = handle.status();
+            let json = serde_json::to_string(&status)
+                .map_err(|e| StorageError::Internal(format!("Failed to serialize P2P status: {}", e)))?;
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(json)))
+                .unwrap())
+        } else {
+            Ok(Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "P2P networking not enabled"}"#
+                )))
+                .unwrap())
         }
     }
 
@@ -1190,7 +1266,7 @@ impl HttpServer {
     /// - Legacy: /db/content/... -> AppContext("lamad") for backwards compatibility
     fn extract_app_context(sub_path: &str) -> (db::AppContext, &str) {
         // Check if path starts with a known resource type (legacy route)
-        let legacy_prefixes = ["content", "paths", "stats"];
+        let legacy_prefixes = ["content", "paths", "stats", "schema"];
         for prefix in &legacy_prefixes {
             if sub_path == *prefix || sub_path.starts_with(&format!("{}/", prefix)) {
                 // Legacy route: default to 'lamad' for learning content
@@ -1233,6 +1309,18 @@ impl HttpServer {
         // They will be updated to use Diesel with app_ctx in a future phase.
         if resource_path == "stats" {
             return self.handle_db_stats(method, &content_db).await;
+        }
+
+        if resource_path == "schema" {
+            if method != Method::GET {
+                return Ok(response::method_not_allowed());
+            }
+            let deprecated: Vec<u32> = vec![];
+            return Ok(response::ok(&serde_json::json!({
+                "supportedVersions": SUPPORTED_SCHEMA_VERSIONS,
+                "currentVersion": SUPPORTED_SCHEMA_VERSIONS.last().copied().unwrap_or(1),
+                "deprecatedVersions": deprecated,
+            })));
         }
 
         if resource_path == "content" {
@@ -1596,6 +1684,10 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
+        if let Err(msg) = validate_schema_version_header(&req) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+
         let body = req.collect().await.map_err(|e| {
             StorageError::Internal(format!("Failed to read body: {}", e))
         })?;
@@ -1604,6 +1696,10 @@ impl HttpServer {
         // Deserialize camelCase InputViews, convert to internal DB types
         let input_views: Vec<CreateContentInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let items: Vec<db::content::CreateContentInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         let count = items.len();
@@ -1611,30 +1707,21 @@ impl HttpServer {
 
         // Use service layer if available
         if let Some(ref services) = self.services {
-            Ok(response::from_result(services.content.bulk_create(items)))
+            match services.content.bulk_create(items) {
+                Ok(result) => Ok(response::ok_with_schema_info(&result)),
+                Err(e) => Ok(response::error_response(e)),
+            }
         } else {
             // Fallback to direct repository calls (legacy)
             content_db.with_conn_mut(|conn| {
                 match db::content::bulk_create_content(conn, items) {
                     Ok(result) => {
                         info!(inserted = result.inserted, skipped = result.skipped, "Bulk content creation complete");
-
-                        let body = serde_json::to_string(&result)
-                            .map_err(|e| StorageError::Internal(e.to_string()))?;
-
-                        Ok(Response::builder()
-                            .status(StatusCode::OK)
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(body)))
-                            .unwrap())
+                        Ok(response::ok_with_schema_info(&result))
                     }
                     Err(e) => {
                         error!(error = %e, "Failed to bulk create content");
-                        Ok(Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                            .unwrap())
+                        Ok(response::error_response(e))
                     }
                 }
             })
@@ -1869,6 +1956,10 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if let Err(msg) = validate_schema_version_header(&req) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+
         // Service-based handling
         if let Some(ref services) = self.services {
             if method != Method::POST {
@@ -1883,21 +1974,24 @@ impl HttpServer {
             // Deserialize camelCase InputViews, convert to internal DB types
             let input_views: Vec<CreatePathInputView> = serde_json::from_slice(&body_bytes)
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+            if let Err(msg) = validate_schema_versions(&versions) {
+                return Ok(response::error_response(StorageError::InvalidInput(msg)));
+            }
             let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
 
             let count = paths.len();
             info!(count = count, "Bulk creating paths via service");
 
-            return Ok(response::from_result(services.path.bulk_create(paths)));
+            return match services.path.bulk_create(paths) {
+                Ok(result) => Ok(response::ok_with_schema_info(&result)),
+                Err(e) => Ok(response::error_response(e)),
+            };
         }
 
         // Legacy fallback
         if method != Method::POST {
-            return Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
-                .unwrap());
+            return Ok(response::method_not_allowed());
         }
 
         let body = req.collect().await.map_err(|e| {
@@ -1908,6 +2002,10 @@ impl HttpServer {
         // Deserialize camelCase InputViews, convert to internal DB types
         let input_views: Vec<CreatePathInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         let count = paths.len();
@@ -1917,23 +2015,11 @@ impl HttpServer {
             match db::paths::bulk_create_paths(conn, paths) {
                 Ok(result) => {
                     info!(inserted = result.inserted, skipped = result.skipped, "Bulk path creation complete");
-
-                    let body = serde_json::to_string(&result)
-                        .map_err(|e| StorageError::Internal(e.to_string()))?;
-
-                    Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(body)))
-                        .unwrap())
+                    Ok(response::ok_with_schema_info(&result))
                 }
                 Err(e) => {
                     error!(error = %e, "Failed to bulk create paths");
-                    Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                        .unwrap())
+                    Ok(response::error_response(e))
                 }
             }
         })
@@ -2190,6 +2276,10 @@ impl HttpServer {
         method: Method,
         content_db: &ContentDb,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if let Err(msg) = validate_schema_version_header(&req) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+
         // Service-based handling
         if let Some(ref services) = self.services {
             if method != Method::POST {
@@ -2204,18 +2294,21 @@ impl HttpServer {
             // Deserialize camelCase InputViews, convert to internal DB types
             let input_views: Vec<CreateRelationshipInputView> = serde_json::from_slice(&body_bytes)
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+            let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+            if let Err(msg) = validate_schema_versions(&versions) {
+                return Ok(response::error_response(StorageError::InvalidInput(msg)));
+            }
             let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
 
-            return Ok(response::from_result(services.relationship.bulk_create(inputs)));
+            return match services.relationship.bulk_create(inputs) {
+                Ok(result) => Ok(response::ok_with_schema_info(&result)),
+                Err(e) => Ok(response::error_response(e)),
+            };
         }
 
         // Legacy fallback
         if method != Method::POST {
-            return Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
-                .unwrap());
+            return Ok(response::method_not_allowed());
         }
 
         let body = req.collect().await.map_err(|e| {
@@ -2226,27 +2319,18 @@ impl HttpServer {
         // Deserialize camelCase InputViews, convert to internal DB types
         let input_views: Vec<CreateRelationshipInputView> = serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
 
         content_db.with_conn_mut(|conn| {
             match db::relationships::bulk_create_relationships(conn, inputs) {
-                Ok(result) => {
-                    let body = serde_json::to_string(&result)
-                        .map_err(|e| StorageError::Internal(e.to_string()))?;
-
-                    Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(body)))
-                        .unwrap())
-                }
+                Ok(result) => Ok(response::ok_with_schema_info(&result)),
                 Err(e) => {
                     error!(error = %e, "Failed to bulk create relationships");
-                    Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                        .unwrap())
+                    Ok(response::error_response(e))
                 }
             }
         })
@@ -3747,6 +3831,10 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
+        if let Err(msg) = validate_schema_version_header(&req) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+
         let mut conn = self.get_diesel_conn()?;
         let body = req.collect().await.map_err(|e| {
             StorageError::Internal(format!("Failed to read body: {}", e))
@@ -3756,11 +3844,15 @@ impl HttpServer {
         let input_views: Vec<CreateContributorPresenceInputView> =
             serde_json::from_slice(&body.to_bytes())
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let inputs: Vec<contributor_presences::CreateContributorPresenceInput> =
             input_views.into_iter().map(|v| v.into()).collect();
 
         match contributor_presences::bulk_create_presences(&mut conn, ctx, inputs) {
-            Ok(result) => Ok(response::ok(&result)),
+            Ok(result) => Ok(response::ok_with_schema_info(&result)),
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3776,6 +3868,10 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
+        if let Err(msg) = validate_schema_version_header(&req) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+
         let mut conn = self.get_diesel_conn()?;
         let body = req.collect().await.map_err(|e| {
             StorageError::Internal(format!("Failed to read body: {}", e))
@@ -3785,11 +3881,15 @@ impl HttpServer {
         let input_views: Vec<CreateEconomicEventInputView> =
             serde_json::from_slice(&body.to_bytes())
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let inputs: Vec<economic_events::CreateEconomicEventInput> =
             input_views.into_iter().map(|v| v.into()).collect();
 
         match economic_events::bulk_record_events(&mut conn, ctx, inputs) {
-            Ok(result) => Ok(response::ok(&result)),
+            Ok(result) => Ok(response::ok_with_schema_info(&result)),
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -3805,17 +3905,28 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
+        if let Err(msg) = validate_schema_version_header(&req) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+
         let mut conn = self.get_diesel_conn()?;
         let body = req.collect().await.map_err(|e| {
             StorageError::Internal(format!("Failed to read body: {}", e))
         })?;
 
-        let inputs: Vec<content_mastery::CreateMasteryInput> =
+        // Deserialize camelCase InputView array, convert to internal DB types
+        let input_views: Vec<CreateMasteryInputView> =
             serde_json::from_slice(&body.to_bytes())
                 .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+        let inputs: Vec<content_mastery::CreateMasteryInput> =
+            input_views.into_iter().map(|v| v.into()).collect();
 
         match content_mastery::bulk_upsert_mastery(&mut conn, ctx, inputs) {
-            Ok(result) => Ok(response::ok(&result)),
+            Ok(result) => Ok(response::ok_with_schema_info(&result)),
             Err(e) => Ok(response::error_response(e)),
         }
     }
@@ -4073,6 +4184,10 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
+        if let Err(msg) = validate_schema_version_header(&req) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
+
         let pool = self.db_pool.as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
         let mut conn = pool.get()
@@ -4084,6 +4199,10 @@ impl HttpServer {
         // Deserialize camelCase InputView array, convert to internal DB types
         let input_views: Vec<CreateAllocationInputView> = serde_json::from_slice(&body)
             .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
+        let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
+        if let Err(msg) = validate_schema_versions(&versions) {
+            return Ok(response::error_response(StorageError::InvalidInput(msg)));
+        }
         let inputs: Vec<stewardship_allocations::CreateAllocationInput> =
             input_views.into_iter().map(|v| v.into()).collect();
 
@@ -4108,7 +4227,7 @@ impl HttpServer {
             errors: Vec<String>,
         }
 
-        Ok(response::ok(&BulkResult { created, failed, errors }))
+        Ok(response::ok_with_schema_info(&BulkResult { created, failed, errors }))
     }
 
     // =========================================================================
@@ -4127,7 +4246,7 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         match db::local_sessions::get_active_session(&mut conn)? {
-            Some(session) => Ok(response::ok(&session)),
+            Some(session) => Ok(response::ok(&LocalSessionView::from(session))),
             None => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -4163,11 +4282,7 @@ impl HttpServer {
             "Created local session"
         );
 
-        Ok(Response::builder()
-            .status(StatusCode::CREATED)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Full::new(Bytes::from(serde_json::to_string(&session).unwrap())))
-            .unwrap())
+        Ok(response::created(&LocalSessionView::from(session)))
     }
 
     /// DELETE /session - Delete active session (logout)
@@ -4209,7 +4324,8 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         let sessions = db::local_sessions::list_all_sessions(&mut conn)?;
-        Ok(response::ok(&sessions))
+        let views: Vec<LocalSessionView> = sessions.into_iter().map(LocalSessionView::from).collect();
+        Ok(response::ok(&views))
     }
 
     // =========================================================================

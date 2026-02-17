@@ -17,6 +17,9 @@ export { AgentService } from './agent.service';
 export { ElohimAgentService } from './elohim-agent.service';
 export { TrustBadgeService } from './trust-badge.service';
 
+// Banner notification system
+export { BannerService } from './banner.service';
+
 // Cross-pillar services (formerly in shared/)
 export { ProfileService } from './profile.service';
 export { HumanConsentService } from './human-consent.service';
