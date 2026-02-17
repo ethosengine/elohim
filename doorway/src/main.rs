@@ -8,7 +8,10 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use doorway::{
-    conductor::{ConductorInfo, ConductorPoolMap, ConductorRegistry, ConductorRouter},
+    conductor::{
+        admin_client::AdminClient, ConductorInfo, ConductorPoolMap, ConductorRegistry,
+        ConductorRouter,
+    },
     config::Args,
     db::MongoClient,
     nats::NatsClient,
@@ -244,6 +247,13 @@ async fn main() -> anyhow::Result<()> {
             capacity_used: 0,
             capacity_max: 50,
         });
+    }
+
+    // Discover existing agents on each conductor (populate registry for affinity routing)
+    // Without this, agents provisioned before the registry existed would have no
+    // conductor affinity → requests load-balance via ClusterIP → CellMissing on wrong conductor
+    if conductor_urls.len() > 1 {
+        discover_existing_agents(&registry, &conductor_urls).await;
     }
 
     let registry = Arc::new(registry);
@@ -588,6 +598,94 @@ fn derive_admin_url_from_app(app_url: &str) -> String {
         }
     }
     "ws://localhost:4444".to_string()
+}
+
+/// Discover existing agents by querying each conductor's admin API.
+///
+/// Called at startup to populate the ConductorRegistry with pre-existing
+/// agent→conductor mappings. Without this, agents installed before the
+/// registry existed would have no affinity routing, causing CellMissing
+/// errors on multi-conductor setups.
+///
+/// Stores each agent key under both base64-standard and base64-url-safe
+/// encodings so the registry lookup matches regardless of which format
+/// the JWT agent_pub_key uses.
+async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: &[String]) {
+    use base64::Engine;
+    use std::time::Duration;
+
+    info!(
+        "Starting agent discovery across {} conductor(s)...",
+        conductor_urls.len()
+    );
+
+    let mut total_discovered = 0usize;
+
+    for (i, url) in conductor_urls.iter().enumerate() {
+        let conductor_id = format!("conductor-{i}");
+        let admin_url = derive_admin_url_from_app(url);
+        let admin = AdminClient::new(admin_url.clone()).with_timeout(Duration::from_secs(10));
+
+        match admin.list_apps().await {
+            Ok(apps) => {
+                let mut conductor_agents = 0usize;
+                for app in &apps {
+                    // Encode in both formats to match any JWT key encoding
+                    let key_std =
+                        base64::engine::general_purpose::STANDARD.encode(&app.agent_pub_key);
+                    let key_url =
+                        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&app.agent_pub_key);
+
+                    // Register under base64-standard encoding (provisioner format)
+                    if registry.get_conductor_for_agent(&key_std).is_none() {
+                        if let Err(e) = registry
+                            .register_agent(&key_std, &conductor_id, &app.installed_app_id)
+                            .await
+                        {
+                            warn!("Failed to register discovered agent (std): {}", e);
+                        } else {
+                            conductor_agents += 1;
+                        }
+                    }
+
+                    // Register under base64-url encoding (Holochain display format)
+                    if key_url != key_std && registry.get_conductor_for_agent(&key_url).is_none() {
+                        if let Err(e) = registry
+                            .register_agent(&key_url, &conductor_id, &app.installed_app_id)
+                            .await
+                        {
+                            warn!("Failed to register discovered agent (url): {}", e);
+                        }
+                    }
+                }
+                total_discovered += conductor_agents;
+                info!(
+                    conductor = %conductor_id,
+                    admin_url = %admin_url,
+                    apps = apps.len(),
+                    new_agents = conductor_agents,
+                    "Agent discovery completed for conductor"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    conductor = %conductor_id,
+                    admin_url = %admin_url,
+                    error = %e,
+                    "Agent discovery failed for conductor (affinity routing may be degraded)"
+                );
+            }
+        }
+    }
+
+    if total_discovered > 0 {
+        info!(
+            "Agent discovery complete: {} new agent mapping(s) registered",
+            total_discovered
+        );
+    } else {
+        info!("Agent discovery complete: no new agents found (registry may already be populated)");
+    }
 }
 
 /// Derive app WebSocket URL from conductor admin URL

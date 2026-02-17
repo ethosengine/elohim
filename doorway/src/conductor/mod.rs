@@ -10,6 +10,7 @@ pub mod provisioner;
 pub mod registry;
 pub mod router;
 
+pub use admin_client::InstalledAppInfo;
 pub use pool_map::ConductorPoolMap;
 pub use provisioner::{AgentProvisioner, ProvisionedAgent};
 pub use registry::{ConductorEntry, ConductorInfo, ConductorRegistry};

@@ -18,6 +18,15 @@ use tokio_tungstenite::{
 /// Default timeout for admin WebSocket operations
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Info about an installed app discovered on a conductor.
+#[derive(Debug, Clone)]
+pub struct InstalledAppInfo {
+    /// The installed app ID (e.g. "elohim", "elohim-conductor-0-abc123")
+    pub installed_app_id: String,
+    /// Raw 39-byte Holochain agent public key
+    pub agent_pub_key: Vec<u8>,
+}
+
 /// Holochain admin API client using short-lived WebSocket connections.
 ///
 /// Each call opens a fresh connection, sends one request, reads one response,
@@ -140,6 +149,59 @@ impl AdminClient {
         self.check_error_response(&response, "enable_app")?;
 
         Ok(())
+    }
+
+    /// List all installed apps on the conductor.
+    ///
+    /// Returns the installed_app_id and raw 39-byte agent public key for each app.
+    /// Used at startup to discover pre-existing agent→conductor mappings.
+    pub async fn list_apps(&self) -> Result<Vec<InstalledAppInfo>, String> {
+        // Build inner request: { type: "list_apps", value: { status_filter: null } }
+        let data = Value::Map(vec![(Value::String("status_filter".into()), Value::Nil)]);
+
+        let inner = Value::Map(vec![
+            (
+                Value::String("type".into()),
+                Value::String("list_apps".into()),
+            ),
+            (Value::String("value".into()), data),
+        ]);
+
+        let response = self.send_request(&inner).await?;
+        self.check_error_response(&response, "list_apps")?;
+
+        // Response: { type: "apps_listed", value: [AppInfo, ...] }
+        let mut apps = Vec::new();
+        if let Value::Map(ref map) = response {
+            if let Some(Value::Array(ref app_list)) = get_field(map, "value") {
+                for app_info in app_list {
+                    if let Value::Map(ref info) = app_info {
+                        let installed_app_id =
+                            get_string_field(info, "installed_app_id").unwrap_or_default();
+
+                        // Try top-level agent_pub_key (Holochain 0.4+)
+                        let agent_key =
+                            if let Some(Value::Binary(key)) = get_field(info, "agent_pub_key") {
+                                Some(key.clone())
+                            } else {
+                                // Fallback: extract from cell_info
+                                extract_agent_from_cell_info(info)
+                            };
+
+                        if let Some(key) = agent_key {
+                            if !installed_app_id.is_empty() {
+                                apps.push(InstalledAppInfo {
+                                    installed_app_id,
+                                    agent_pub_key: key,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(apps)
     }
 
     /// Uninstall an app from the conductor (cleanup).
@@ -355,6 +417,33 @@ fn get_field<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
     None
 }
 
+/// Extract agent pub key from cell_info when not available at top level.
+///
+/// Handles older Holochain versions where AppInfo lacks a top-level agent_pub_key.
+/// Digs into cell_info → first role → first Provisioned cell → cell_id[1] (AgentPubKey).
+fn extract_agent_from_cell_info(app_info: &[(Value, Value)]) -> Option<Vec<u8>> {
+    let cell_info = get_field(app_info, "cell_info")?;
+    if let Value::Map(ref roles) = cell_info {
+        for (_, cells) in roles {
+            if let Value::Array(ref cell_list) = cells {
+                for cell in cell_list {
+                    if let Value::Map(ref cell_map) = cell {
+                        // CellInfo::Provisioned contains cell_id: [DnaHash, AgentPubKey]
+                        if let Some(Value::Array(ref cell_id)) = get_field(cell_map, "cell_id") {
+                            if cell_id.len() >= 2 {
+                                if let Value::Binary(ref key) = cell_id[1] {
+                                    return Some(key.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -478,5 +567,48 @@ mod tests {
         let result = client.check_error_response(&err_response, "install_app");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("app not found"));
+    }
+
+    #[test]
+    fn test_extract_agent_from_cell_info() {
+        let agent_key = vec![
+            0x84u8, 0x20, 0x24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+            20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+        ];
+
+        // Simulate cell_info: { "role_name": [{ "cell_id": [dna_hash, agent_key] }] }
+        let app_info = vec![
+            (
+                Value::String("installed_app_id".into()),
+                Value::String("elohim".into()),
+            ),
+            (
+                Value::String("cell_info".into()),
+                Value::Map(vec![(
+                    Value::String("content_store".into()),
+                    Value::Array(vec![Value::Map(vec![(
+                        Value::String("cell_id".into()),
+                        Value::Array(vec![
+                            Value::Binary(vec![0u8; 39]),     // DnaHash
+                            Value::Binary(agent_key.clone()), // AgentPubKey
+                        ]),
+                    )])]),
+                )]),
+            ),
+        ];
+
+        let result = extract_agent_from_cell_info(&app_info);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), agent_key);
+    }
+
+    #[test]
+    fn test_extract_agent_from_cell_info_missing() {
+        let app_info = vec![(
+            Value::String("installed_app_id".into()),
+            Value::String("elohim".into()),
+        )];
+
+        assert!(extract_agent_from_cell_info(&app_info).is_none());
     }
 }
