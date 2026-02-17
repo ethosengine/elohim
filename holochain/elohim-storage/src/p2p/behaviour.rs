@@ -174,12 +174,12 @@ impl ElohimStorageBehaviour {
         keypair: Keypair,
         config: P2PConfig,
         relay_client: relay::client::Behaviour,
+        sled_db: sled::Db,
     ) -> Self {
         let peer_id = PeerId::from(keypair.public());
 
-        // Kademlia DHT with sled persistence
-        let kad_db_path = config.storage_dir.join("sync.sled");
-        let store = SledRecordStore::new(&kad_db_path)
+        // Kademlia DHT with sled persistence (shared DB handle with DocStore)
+        let store = SledRecordStore::from_db(sled_db)
             .expect("Failed to open sled Kademlia store");
         let kademlia = Kademlia::new(peer_id, store);
 
