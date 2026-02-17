@@ -57,7 +57,7 @@ metadata:
     environment: alpha
 spec:
   serviceName: elohim-edgenode-alpha-headless
-  replicas: 2
+  replicas: 1  # Single conductor until doorway app-ws proxy supports conductor affinity
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate

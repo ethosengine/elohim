@@ -57,7 +57,7 @@ metadata:
     environment: staging
 spec:
   serviceName: elohim-edgenode-staging-headless
-  replicas: 2
+  replicas: 1  # Single conductor until doorway app-ws proxy supports conductor affinity
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
