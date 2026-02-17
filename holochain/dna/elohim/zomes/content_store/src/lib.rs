@@ -11151,3 +11151,116 @@ pub fn resolve_blob(blob_hash: String) -> ExternResult<Option<BlobResolutionOutp
 }
 
 // Qahal relationship functions moved to: holochain/dna/imagodei/zomes/imagodei/
+
+// =============================================================================
+// Content Succession (Renewal Protocol)
+// =============================================================================
+
+/// Output from content succession operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentSuccessionOutput {
+    pub action_hash: ActionHash,
+    pub entry: ContentSuccession,
+}
+
+/// Input for creating a content succession
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateContentSuccessionInput {
+    pub id: String,
+    pub original_content_id: String,
+    pub original_author_key: String,
+    pub successor_author_key: String,
+    pub human_id: String,
+    pub renewal_attestation_id: String,
+    pub content_hash: Option<String>,
+    pub succession_type: String,
+}
+
+/// Create a content succession record — re-attributes content to renewed identity
+#[hdk_extern]
+pub fn create_content_succession(input: CreateContentSuccessionInput) -> ExternResult<ContentSuccessionOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let succession = ContentSuccession {
+        id: input.id.clone(),
+        original_content_id: input.original_content_id.clone(),
+        original_author_key: input.original_author_key,
+        successor_author_key: input.successor_author_key,
+        human_id: input.human_id,
+        renewal_attestation_id: input.renewal_attestation_id,
+        content_hash: input.content_hash,
+        succession_type: input.succession_type,
+        created_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ContentSuccession(succession.clone()))?;
+
+    // Link: ID → ContentSuccession
+    let id_anchor = StringAnchor::new("succession_id", &input.id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToContentSuccession, ())?;
+
+    // Link: Content → Succession (find all successions for a piece of content)
+    let content_anchor = StringAnchor::new("content_id", &input.original_content_id);
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(content_anchor))?;
+    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToSuccession, ())?;
+
+    // Link: Successor author → Succession (find all content inherited by new key)
+    let successor_anchor = StringAnchor::new("successor_author", &succession.successor_author_key);
+    let successor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(successor_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(successor_anchor))?;
+    create_link(successor_anchor_hash, action_hash.clone(), LinkTypes::SuccessorAuthorToSuccession, ())?;
+
+    Ok(ContentSuccessionOutput {
+        action_hash,
+        entry: succession,
+    })
+}
+
+/// Get all successions for a given content ID
+#[hdk_extern]
+pub fn get_successions_for_content(content_id: String) -> ExternResult<Vec<ContentSuccessionOutput>> {
+    let content_anchor = StringAnchor::new("content_id", &content_id);
+    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
+
+    let query = LinkQuery::try_new(content_anchor_hash, LinkTypes::ContentToSuccession)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid succession hash".to_string())))?;
+
+        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            if let Ok(Some(succession)) = record.entry().to_app_option::<ContentSuccession>() {
+                results.push(ContentSuccessionOutput {
+                    action_hash,
+                    entry: succession,
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Get the current author key for a piece of content by following the succession chain.
+/// Returns the most recent successor_author_key, or None if no successions exist.
+#[hdk_extern]
+pub fn get_current_author_for_content(content_id: String) -> ExternResult<Option<String>> {
+    let successions = get_successions_for_content(content_id)?;
+
+    if successions.is_empty() {
+        return Ok(None);
+    }
+
+    // Find the most recent succession by created_at timestamp
+    let latest = successions
+        .iter()
+        .max_by(|a, b| a.entry.created_at.cmp(&b.entry.created_at));
+
+    Ok(latest.map(|s| s.entry.successor_author_key.clone()))
+}

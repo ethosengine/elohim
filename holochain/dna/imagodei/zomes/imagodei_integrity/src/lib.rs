@@ -216,6 +216,27 @@ pub const SIGNING_POLICIES: [&str; 3] = [
 ];
 
 // =============================================================================
+// Renewal Protocol Constants
+// =============================================================================
+
+/// Reasons for identity renewal (life transitions)
+pub const RENEWAL_REASONS: [&str; 5] = [
+    "device_destruction", // Device lost/destroyed, key irrecoverable
+    "graduation",         // Life transition (child→adult, student→graduate)
+    "key_compromise",     // Key known or suspected compromised
+    "custodianship",      // Steward taking over for incapacitated human
+    "legacy",             // Death or permanent incapacitation
+];
+
+/// Renewal attestation status lifecycle
+pub const RENEWAL_STATUSES: [&str; 4] = [
+    "pending",   // Awaiting witness votes
+    "witnessed", // M-of-N threshold reached
+    "rejected",  // Stewards rejected the renewal
+    "expired",   // Time limit reached without threshold
+];
+
+// =============================================================================
 // Mastery Constants
 // =============================================================================
 
@@ -842,6 +863,92 @@ pub struct IdentityFreeze {
 }
 
 // =============================================================================
+// Renewal Protocol Entry Types
+// =============================================================================
+
+/// RenewalAttestation - Core witness entry for identity renewal.
+///
+/// When a steward's devices are destroyed, the Holochain agent key dies.
+/// Rather than fighting lair's constraints (keys aren't exportable), the
+/// community witnesses a social ceremony and helps re-author the human's
+/// world under a new identity.
+///
+/// This is the same protocol for ALL life transitions:
+/// - Device loss → new key
+/// - Graduation → new key (child→adult autonomy)
+/// - Key compromise → new key (emergency rotation)
+/// - Custodianship → steward takes over
+/// - Legacy → community preserves after death
+///
+/// Signed by creating agent (a steward voter).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RenewalAttestation {
+    pub id: String,
+    pub human_id: String,                    // Stable identity being renewed
+    pub old_agent_key: String,               // Agent key being retired (base64)
+    pub new_agent_key: String,               // New agent key taking over (base64)
+    pub renewal_reason: String,              // See RENEWAL_REASONS
+    pub doorway_id: Option<String>,          // Doorway facilitating the renewal
+    pub recovery_request_id: Option<String>, // Link to RecoveryRequest if applicable
+    pub votes_json: String,                  // Serialized Vec<RenewalVote> — voter_id, approved, weight, intimacy, voted_at
+    pub required_approvals: u32,             // M threshold
+    pub current_approvals: u32,              // How many approved so far
+    pub confidence_score: f64,               // 0.0-1.0 weighted confidence
+    pub status: String,                      // See RENEWAL_STATUSES
+    pub witnessed_at: Option<String>,        // When threshold was reached
+    pub created_at: String,
+    pub expires_at: String,
+}
+
+/// AgentRetirement - Marks an agent key as superseded.
+///
+/// Once a renewal is witnessed, the old key is retired and a new key takes
+/// over. This creates an immutable chain: old→new→newer that queries can
+/// follow to resolve "who is this agent now?"
+///
+/// The data plane (blobs, shards) survives fine — it's content-addressed.
+/// This retirement record bridges the identity/control plane gap.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AgentRetirement {
+    pub id: String,
+    pub human_id: String,
+    pub retired_agent_key: String,           // The dead key
+    pub renewed_into_agent_key: String,      // The new key
+    pub renewal_attestation_id: String,      // Proof of social witness
+    pub retirement_reason: String,           // See RENEWAL_REASONS
+    pub retired_at: String,
+    pub created_at: String,
+}
+
+/// RelationshipRenewal - Bilateral reaffirmation of relationship under new key.
+///
+/// When a human gets a new agent key, all their HumanRelationships need to
+/// be re-established with the new key. This is a bilateral process:
+/// 1. The renewed human creates RelationshipRenewal entries
+/// 2. Each counterparty co-signs to reaffirm
+///
+/// This ensures the social graph survives key rotation with explicit consent.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RelationshipRenewal {
+    pub id: String,
+    pub original_relationship_id: String,    // The HumanRelationship being renewed
+    pub renewal_attestation_id: String,      // Proof of social witness
+    pub human_id: String,                    // The human whose key changed
+    pub new_agent_key: String,               // Their new key
+    pub counterparty_id: String,             // The other party's human_id
+    pub counterparty_agent_key: String,      // The other party's current key
+    pub relationship_type: String,           // Carried forward from original
+    pub intimacy_level: String,              // Carried forward or renegotiated
+    pub emergency_access_enabled: bool,      // Reaffirmed
+    pub reaffirmed_by_counterparty: bool,    // True when other party co-signs
+    pub reaffirmed_at: Option<String>,       // When counterparty confirmed
+    pub created_at: String,
+}
+
+// =============================================================================
 // Anchor Entry (for link indexing)
 // =============================================================================
 
@@ -897,6 +1004,10 @@ pub enum EntryTypes {
     PolicyInheritance(PolicyInheritance),
     StewardshipAppeal(StewardshipAppeal),
     ActivityLog(ActivityLog),
+    // Renewal protocol entry types
+    RenewalAttestation(RenewalAttestation),
+    AgentRetirement(AgentRetirement),
+    RelationshipRenewal(RelationshipRenewal),
 }
 
 // =============================================================================
@@ -1037,6 +1148,16 @@ pub enum LinkTypes {
     IdToActivityLog,             // Anchor(log_id) -> ActivityLog
     SubjectToActivityLog,        // Anchor(subject_id) -> ActivityLog
     SessionToActivityLog,        // Anchor(session_id) -> ActivityLog
+
+    // Renewal protocol links
+    IdToRenewalAttestation,          // Anchor(renewal_id) -> RenewalAttestation
+    HumanToRenewalAttestation,       // Anchor(human_id) -> RenewalAttestation
+    OldAgentToRetirement,            // Anchor(retired_agent_key) -> AgentRetirement
+    NewAgentFromRetirement,          // Anchor(renewed_into_key) -> AgentRetirement
+    IdToAgentRetirement,             // Anchor(retirement_id) -> AgentRetirement
+    IdToRelationshipRenewal,         // Anchor(rel_renewal_id) -> RelationshipRenewal
+    OriginalRelToRenewal,            // Anchor(original_relationship_id) -> RelationshipRenewal
+    RenewalAttestationByStatus,      // Anchor(renewal_status) -> RenewalAttestation
 }
 
 // =============================================================================
@@ -1077,6 +1198,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::PolicyInheritance(inheritance) => validate_policy_inheritance(&inheritance),
                 EntryTypes::StewardshipAppeal(appeal) => validate_stewardship_appeal(&appeal),
                 EntryTypes::ActivityLog(log) => validate_activity_log(&log),
+                // Renewal protocol validation
+                EntryTypes::RenewalAttestation(attestation) => validate_renewal_attestation(&attestation),
+                EntryTypes::AgentRetirement(retirement) => validate_agent_retirement(&retirement),
+                EntryTypes::RelationshipRenewal(renewal) => validate_relationship_renewal(&renewal),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -1779,6 +1904,168 @@ fn validate_identity_freeze(freeze: &IdentityFreeze) -> ExternResult<ValidateCal
         return Ok(ValidateCallbackResult::Invalid(format!(
             "Invalid requires_verification '{}'. Must be one of: {:?}",
             freeze.requires_verification, UNFREEZE_REQUIREMENTS
+        )));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Renewal Protocol Validation Functions
+// =============================================================================
+
+/// Validate RenewalAttestation entry
+fn validate_renewal_attestation(attestation: &RenewalAttestation) -> ExternResult<ValidateCallbackResult> {
+    if attestation.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RenewalAttestation ID cannot be empty".to_string(),
+        ));
+    }
+
+    if attestation.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RenewalAttestation human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if attestation.old_agent_key.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RenewalAttestation old_agent_key cannot be empty".to_string(),
+        ));
+    }
+
+    if attestation.new_agent_key.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RenewalAttestation new_agent_key cannot be empty".to_string(),
+        ));
+    }
+
+    if attestation.old_agent_key == attestation.new_agent_key {
+        return Ok(ValidateCallbackResult::Invalid(
+            "old_agent_key and new_agent_key must be different".to_string(),
+        ));
+    }
+
+    if !RENEWAL_REASONS.contains(&attestation.renewal_reason.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid renewal_reason '{}'. Must be one of: {:?}",
+            attestation.renewal_reason, RENEWAL_REASONS
+        )));
+    }
+
+    if !RENEWAL_STATUSES.contains(&attestation.status.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid status '{}'. Must be one of: {:?}",
+            attestation.status, RENEWAL_STATUSES
+        )));
+    }
+
+    if attestation.required_approvals < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "required_approvals must be at least 2 for security".to_string(),
+        ));
+    }
+
+    if attestation.confidence_score < 0.0 || attestation.confidence_score > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "confidence_score must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate AgentRetirement entry
+fn validate_agent_retirement(retirement: &AgentRetirement) -> ExternResult<ValidateCallbackResult> {
+    if retirement.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentRetirement ID cannot be empty".to_string(),
+        ));
+    }
+
+    if retirement.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentRetirement human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if retirement.retired_agent_key.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentRetirement retired_agent_key cannot be empty".to_string(),
+        ));
+    }
+
+    if retirement.renewed_into_agent_key.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentRetirement renewed_into_agent_key cannot be empty".to_string(),
+        ));
+    }
+
+    if retirement.retired_agent_key == retirement.renewed_into_agent_key {
+        return Ok(ValidateCallbackResult::Invalid(
+            "retired_agent_key and renewed_into_agent_key must be different".to_string(),
+        ));
+    }
+
+    if retirement.renewal_attestation_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentRetirement renewal_attestation_id cannot be empty".to_string(),
+        ));
+    }
+
+    if !RENEWAL_REASONS.contains(&retirement.retirement_reason.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid retirement_reason '{}'. Must be one of: {:?}",
+            retirement.retirement_reason, RENEWAL_REASONS
+        )));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate RelationshipRenewal entry
+fn validate_relationship_renewal(renewal: &RelationshipRenewal) -> ExternResult<ValidateCallbackResult> {
+    if renewal.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RelationshipRenewal ID cannot be empty".to_string(),
+        ));
+    }
+
+    if renewal.original_relationship_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RelationshipRenewal original_relationship_id cannot be empty".to_string(),
+        ));
+    }
+
+    if renewal.renewal_attestation_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RelationshipRenewal renewal_attestation_id cannot be empty".to_string(),
+        ));
+    }
+
+    if renewal.human_id.is_empty() || renewal.counterparty_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Both human_id and counterparty_id are required".to_string(),
+        ));
+    }
+
+    if renewal.human_id == renewal.counterparty_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot renew relationship with self".to_string(),
+        ));
+    }
+
+    if !HUMAN_RELATIONSHIP_TYPES.contains(&renewal.relationship_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid relationship_type '{}'. Must be one of: {:?}",
+            renewal.relationship_type, HUMAN_RELATIONSHIP_TYPES
+        )));
+    }
+
+    if !INTIMACY_LEVELS.contains(&renewal.intimacy_level.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid intimacy_level '{}'. Must be one of: {:?}",
+            renewal.intimacy_level, INTIMACY_LEVELS
         )));
     }
 

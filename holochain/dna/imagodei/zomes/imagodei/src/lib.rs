@@ -1924,6 +1924,368 @@ pub fn complete_recovery(request_id: String) -> ExternResult<RecoveryRequestOutp
 }
 
 // =============================================================================
+// Renewal Protocol Types
+// =============================================================================
+
+/// Output from renewal attestation operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenewalAttestationOutput {
+    pub action_hash: ActionHash,
+    pub entry: RenewalAttestation,
+}
+
+/// Output from agent retirement operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRetirementOutput {
+    pub action_hash: ActionHash,
+    pub entry: AgentRetirement,
+}
+
+/// Output from relationship renewal operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationshipRenewalOutput {
+    pub action_hash: ActionHash,
+    pub entry: RelationshipRenewal,
+}
+
+/// Input for creating a renewal attestation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRenewalAttestationInput {
+    pub human_id: String,
+    pub old_agent_key: String,
+    pub new_agent_key: String,
+    pub renewal_reason: String,
+    pub doorway_id: Option<String>,
+    pub recovery_request_id: Option<String>,
+    pub required_approvals: u32,
+    pub expires_in_hours: Option<u32>,
+}
+
+/// Input for creating an agent retirement
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateAgentRetirementInput {
+    pub human_id: String,
+    pub retired_agent_key: String,
+    pub renewed_into_agent_key: String,
+    pub renewal_attestation_id: String,
+    pub retirement_reason: String,
+}
+
+/// Input for creating a relationship renewal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRelationshipRenewalInput {
+    pub original_relationship_id: String,
+    pub renewal_attestation_id: String,
+    pub human_id: String,
+    pub new_agent_key: String,
+    pub counterparty_id: String,
+    pub counterparty_agent_key: String,
+    pub relationship_type: String,
+    pub intimacy_level: String,
+    pub emergency_access_enabled: bool,
+}
+
+// =============================================================================
+// Renewal Protocol Functions
+// =============================================================================
+
+/// Create a renewal attestation (initiates the social witness ceremony)
+#[hdk_extern]
+pub fn create_renewal_attestation(input: CreateRenewalAttestationInput) -> ExternResult<RenewalAttestationOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let hours = input.expires_in_hours.unwrap_or(72);
+    let expiry_ms = hours as u64 * 60 * 60 * 1000 * 1000;
+    let expires_at = format!("{:?}", now.checked_add(&Duration::from_micros(expiry_ms)).unwrap_or(now));
+
+    let attestation_id = format!("renewal-{}-{}", input.human_id, timestamp.replace([':', ' ', '(', ')'], "-"));
+
+    let attestation = RenewalAttestation {
+        id: attestation_id.clone(),
+        human_id: input.human_id.clone(),
+        old_agent_key: input.old_agent_key,
+        new_agent_key: input.new_agent_key,
+        renewal_reason: input.renewal_reason,
+        doorway_id: input.doorway_id,
+        recovery_request_id: input.recovery_request_id,
+        votes_json: "[]".to_string(),
+        required_approvals: input.required_approvals,
+        current_approvals: 0,
+        confidence_score: 0.0,
+        status: "pending".to_string(),
+        witnessed_at: None,
+        created_at: timestamp,
+        expires_at,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RenewalAttestation(attestation.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("renewal_id", &attestation_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRenewalAttestation, ())?;
+
+    // Create human lookup link
+    let human_anchor = StringAnchor::new("human_renewals", &input.human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToRenewalAttestation, ())?;
+
+    // Create status link
+    let status_anchor = StringAnchor::new("renewal_status", "pending");
+    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
+    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::RenewalAttestationByStatus, ())?;
+
+    Ok(RenewalAttestationOutput { action_hash, entry: attestation })
+}
+
+/// Get a renewal attestation by ID
+#[hdk_extern]
+pub fn get_renewal_attestation_by_id(id: String) -> ExternResult<Option<RenewalAttestationOutput>> {
+    let id_anchor = StringAnchor::new("renewal_id", &id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToRenewalAttestation)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(entry) = record.entry().to_app_option::<RenewalAttestation>().ok().flatten() {
+                    return Ok(Some(RenewalAttestationOutput { action_hash, entry }));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get all renewal attestations for a human
+#[hdk_extern]
+pub fn get_renewal_attestations_for_human(human_id: String) -> ExternResult<Vec<RenewalAttestationOutput>> {
+    let human_anchor = StringAnchor::new("human_renewals", &human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+
+    let query = LinkQuery::try_new(human_anchor_hash, LinkTypes::HumanToRenewalAttestation)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(entry) = record.entry().to_app_option::<RenewalAttestation>().ok().flatten() {
+                    results.push(RenewalAttestationOutput { action_hash, entry });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Create an agent retirement (marks old key as superseded)
+#[hdk_extern]
+pub fn create_agent_retirement(input: CreateAgentRetirementInput) -> ExternResult<AgentRetirementOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let retirement_id = format!("retirement-{}-{}", input.retired_agent_key.chars().take(8).collect::<String>(),
+        timestamp.replace([':', ' ', '(', ')'], "-"));
+
+    let retirement = AgentRetirement {
+        id: retirement_id.clone(),
+        human_id: input.human_id,
+        retired_agent_key: input.retired_agent_key.clone(),
+        renewed_into_agent_key: input.renewed_into_agent_key.clone(),
+        renewal_attestation_id: input.renewal_attestation_id,
+        retirement_reason: input.retirement_reason,
+        retired_at: timestamp.clone(),
+        created_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::AgentRetirement(retirement.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("retirement_id", &retirement_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAgentRetirement, ())?;
+
+    // Create old agent → retirement link (for "who is this agent now?" queries)
+    let old_agent_anchor = StringAnchor::new("retired_agent", &input.retired_agent_key);
+    let old_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_agent_anchor))?;
+    create_link(old_agent_anchor_hash, action_hash.clone(), LinkTypes::OldAgentToRetirement, ())?;
+
+    // Create new agent ← retirement link (for "where did this agent come from?" queries)
+    let new_agent_anchor = StringAnchor::new("renewed_from", &input.renewed_into_agent_key);
+    let new_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_agent_anchor))?;
+    create_link(new_agent_anchor_hash, action_hash.clone(), LinkTypes::NewAgentFromRetirement, ())?;
+
+    Ok(AgentRetirementOutput { action_hash, entry: retirement })
+}
+
+/// Get retirement record for a specific agent key
+#[hdk_extern]
+pub fn get_retirement_for_agent(agent_key: String) -> ExternResult<Option<AgentRetirementOutput>> {
+    let old_agent_anchor = StringAnchor::new("retired_agent", &agent_key);
+    let old_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_agent_anchor))?;
+
+    let query = LinkQuery::try_new(old_agent_anchor_hash, LinkTypes::OldAgentToRetirement)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(entry) = record.entry().to_app_option::<AgentRetirement>().ok().flatten() {
+                    return Ok(Some(AgentRetirementOutput { action_hash, entry }));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Follow the retirement chain: old_agent → retirement → new_agent → retirement → newer_agent
+/// This is how queries resolve "who is this agent now?"
+#[hdk_extern]
+pub fn get_retirement_chain(agent_key: String) -> ExternResult<Vec<AgentRetirementOutput>> {
+    let mut chain = Vec::new();
+    let mut current_key = agent_key;
+
+    // Safety limit to prevent infinite loops (max 100 retirements deep)
+    for _ in 0..100 {
+        match get_retirement_for_agent(current_key.clone())? {
+            Some(retirement) => {
+                current_key = retirement.entry.renewed_into_agent_key.clone();
+                chain.push(retirement);
+            }
+            None => break,
+        }
+    }
+
+    Ok(chain)
+}
+
+/// Create a relationship renewal (initiated by the renewed human)
+#[hdk_extern]
+pub fn create_relationship_renewal(input: CreateRelationshipRenewalInput) -> ExternResult<RelationshipRenewalOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    let renewal_id = format!("rel-renewal-{}-{}", input.original_relationship_id,
+        timestamp.replace([':', ' ', '(', ')'], "-"));
+
+    let renewal = RelationshipRenewal {
+        id: renewal_id.clone(),
+        original_relationship_id: input.original_relationship_id.clone(),
+        renewal_attestation_id: input.renewal_attestation_id,
+        human_id: input.human_id,
+        new_agent_key: input.new_agent_key,
+        counterparty_id: input.counterparty_id,
+        counterparty_agent_key: input.counterparty_agent_key,
+        relationship_type: input.relationship_type,
+        intimacy_level: input.intimacy_level,
+        emergency_access_enabled: input.emergency_access_enabled,
+        reaffirmed_by_counterparty: false,
+        reaffirmed_at: None,
+        created_at: timestamp,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RelationshipRenewal(renewal.clone()))?;
+
+    // Create ID lookup link
+    let id_anchor = StringAnchor::new("rel_renewal_id", &renewal_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRelationshipRenewal, ())?;
+
+    // Create original relationship → renewal link
+    let rel_anchor = StringAnchor::new("original_rel", &input.original_relationship_id);
+    let rel_anchor_hash = hash_entry(&EntryTypes::StringAnchor(rel_anchor))?;
+    create_link(rel_anchor_hash, action_hash.clone(), LinkTypes::OriginalRelToRenewal, ())?;
+
+    Ok(RelationshipRenewalOutput { action_hash, entry: renewal })
+}
+
+/// Get all renewals for a specific original relationship
+#[hdk_extern]
+pub fn get_renewals_for_relationship(original_rel_id: String) -> ExternResult<Vec<RelationshipRenewalOutput>> {
+    let rel_anchor = StringAnchor::new("original_rel", &original_rel_id);
+    let rel_anchor_hash = hash_entry(&EntryTypes::StringAnchor(rel_anchor))?;
+
+    let query = LinkQuery::try_new(rel_anchor_hash, LinkTypes::OriginalRelToRenewal)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(entry) = record.entry().to_app_option::<RelationshipRenewal>().ok().flatten() {
+                    results.push(RelationshipRenewalOutput { action_hash, entry });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Counterparty reaffirms a relationship renewal (co-signs)
+#[hdk_extern]
+pub fn reaffirm_relationship_renewal(renewal_id: String) -> ExternResult<RelationshipRenewalOutput> {
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Get existing renewal
+    let id_anchor = StringAnchor::new("rel_renewal_id", &renewal_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToRelationshipRenewal)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "RelationshipRenewal not found".to_string()
+    )))?;
+
+    let old_action_hash = link.target.clone().into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid renewal hash".to_string())))?;
+
+    let record = get(old_action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Renewal record not found".to_string())))?;
+
+    let mut renewal: RelationshipRenewal = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(e))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize renewal".to_string()
+        )))?;
+
+    if renewal.reaffirmed_by_counterparty {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Relationship renewal already reaffirmed".to_string()
+        )));
+    }
+
+    renewal.reaffirmed_by_counterparty = true;
+    renewal.reaffirmed_at = Some(timestamp);
+
+    let action_hash = create_entry(&EntryTypes::RelationshipRenewal(renewal.clone()))?;
+
+    // Update ID link to point to new entry
+    let old_links = get_links(
+        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToRelationshipRenewal)?,
+        GetStrategy::default(),
+    )?;
+    for link in old_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRelationshipRenewal, ())?;
+
+    Ok(RelationshipRenewalOutput { action_hash, entry: renewal })
+}
+
+// =============================================================================
 // Init
 // =============================================================================
 
