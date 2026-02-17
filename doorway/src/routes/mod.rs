@@ -52,7 +52,9 @@ pub use blob::{
 pub use dashboard_ws::handle_dashboard_ws;
 pub use db::handle_db_request;
 pub use debug_stream::{handle_debug_stream, DebugEvent, DebugHub};
-pub use federation::{handle_doorway_keys, handle_federation_doorways, handle_federation_p2p_peers};
+pub use federation::{
+    handle_doorway_keys, handle_federation_doorways, handle_federation_p2p_peers,
+};
 pub use health::{health_check, readiness_check, version_info};
 pub use identity::{handle_did_document, handle_did_endpoint};
 pub use import::{handle_import_request, match_import_route};

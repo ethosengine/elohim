@@ -482,6 +482,7 @@ impl P2PNode {
             behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
                 peer_id,
                 info,
+                ..
             }) => {
                 info!(
                     peer = %peer_id,
@@ -495,7 +496,7 @@ impl P2PNode {
                     swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
                 }
             }
-            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Sent { peer_id }) => {
+            behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Sent { peer_id, .. }) => {
                 debug!(peer = %peer_id, "Identify: sent our info to peer");
             }
             behaviour::ElohimStorageBehaviourEvent::Identify(event) => {

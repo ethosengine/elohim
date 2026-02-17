@@ -449,7 +449,10 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     // Start P2P health polling task (every 30 seconds)
     {
         let p2p_health = Arc::clone(&state.p2p_health);
-        let storage_url = state.args.storage_url.clone()
+        let storage_url = state
+            .args
+            .storage_url
+            .clone()
             .unwrap_or_else(|| "http://localhost:8090".to_string());
         tokio::spawn(async move {
             let client = reqwest::Client::builder()
