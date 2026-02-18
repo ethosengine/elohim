@@ -65,72 +65,38 @@ impl AgentProvisioner {
 
     /// Provision an agent for the given user (idempotent).
     ///
-    /// If the deterministic app ID already exists on a conductor, reuses
-    /// the existing installation instead of re-installing. This handles
-    /// the logout→re-login case where the registry lookup by JWT agent key
-    /// misses (registry stores the conductor-generated key, not the JWT key).
+    /// Searches ALL conductors for an existing app before installing a new one.
+    /// The app ID is deterministic per (app_id, conductor_id, user_identifier),
+    /// so we check each conductor's expected app ID. This handles the logout→
+    /// re-login case where `find_least_loaded()` returns a different conductor
+    /// than the one the app was originally installed on.
     ///
     /// Flow:
-    /// 1. `registry.find_least_loaded()` — fail if no conductors or all at capacity
-    /// 2. `AdminClient::new(admin_url)` — short-lived connection
-    /// 3. Check if app already installed (idempotency) — reuse if found
-    /// 4. `admin.generate_agent_pub_key()` — 39-byte agent key (only if new)
-    /// 5. `admin.install_app(app_id, agent_key, bundle_path)` — only if new
-    /// 6. `admin.enable_app(app_id)` — if fails, attempt `uninstall_app` cleanup
-    /// 7. `registry.register_agent(...)` — persist to DashMap + MongoDB
+    /// 1. Search all conductors for existing app (idempotency)
+    /// 2. If not found, pick least loaded conductor
+    /// 3. Generate agent key, install, enable, register
     pub async fn provision_agent(&self, user_identifier: &str) -> Result<ProvisionedAgent, String> {
-        // 1. Find least loaded conductor
+        // 1. Search ALL conductors for an existing app for this user
+        if let Some(result) = self.find_existing_app(user_identifier).await {
+            return Ok(result);
+        }
+
+        // 2. No existing app found — provision on least loaded conductor
         let conductor = self
             .registry
             .find_least_loaded()
             .ok_or("No conductors available for provisioning")?;
 
-        let installed_app_id =
-            generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
-
-        // 2. Create admin client
-        let admin = AdminClient::new(conductor.admin_url.clone());
-
-        // 3. Check if app already exists (idempotent re-login)
-        if let Ok(existing) = admin.get_app_info(&installed_app_id).await {
-            let agent_pub_key_b64 = base64::Engine::encode(
-                &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-                &existing.agent_pub_key,
-            );
-
-            info!(
-                conductor = %conductor.conductor_id,
-                agent = %agent_pub_key_b64,
-                app_id = %installed_app_id,
-                user = %user_identifier,
-                "Reusing existing app installation (idempotent provision)"
-            );
-
-            // Re-register in case the registry lost the mapping
-            let _ = self
-                .registry
-                .register_agent(
-                    &agent_pub_key_b64,
-                    &conductor.conductor_id,
-                    &installed_app_id,
-                )
-                .await;
-
-            return Ok(ProvisionedAgent {
-                agent_pub_key: agent_pub_key_b64,
-                conductor_id: conductor.conductor_id,
-                conductor_url: conductor.conductor_url,
-                installed_app_id,
-            });
-        }
-
-        // Check capacity (only for new installations)
         if conductor.capacity_used >= conductor.capacity_max {
             return Err(format!(
                 "Conductor {} at capacity ({}/{})",
                 conductor.conductor_id, conductor.capacity_used, conductor.capacity_max
             ));
         }
+
+        let installed_app_id =
+            generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
+        let admin = AdminClient::new(conductor.admin_url.clone());
 
         info!(
             conductor = %conductor.conductor_id,
@@ -140,7 +106,7 @@ impl AgentProvisioner {
             "Provisioning new agent on conductor"
         );
 
-        // 4. Generate agent key
+        // 3. Generate agent key
         let agent_key = admin.generate_agent_pub_key().await.map_err(|e| {
             format!(
                 "Failed to generate agent key on {}: {}",
@@ -148,28 +114,24 @@ impl AgentProvisioner {
             )
         })?;
 
-        // Use URL_SAFE_NO_PAD to match the format from zome discovery (discovery.rs:520)
-        // which is what ends up in JWT claims via get_agent_pub_key()
         let agent_pub_key_b64 = base64::Engine::encode(
             &base64::engine::general_purpose::URL_SAFE_NO_PAD,
             &agent_key,
         );
 
-        // 5. Install app
+        // 4. Install app
         if let Err(e) = admin
             .install_app(&installed_app_id, &agent_key, &self.bundle_path)
             .await
         {
-            // Install failed — orphaned key is harmless, no cleanup needed
             return Err(format!(
                 "Failed to install app on {}: {}",
                 conductor.conductor_id, e
             ));
         }
 
-        // 6. Enable app
+        // 5. Enable app
         if let Err(e) = admin.enable_app(&installed_app_id).await {
-            // Enable failed — attempt uninstall cleanup
             warn!(
                 "Enable failed, attempting uninstall cleanup for {}: {}",
                 installed_app_id, e
@@ -183,7 +145,7 @@ impl AgentProvisioner {
             ));
         }
 
-        // 7. Register agent→conductor mapping (both encodings for format compat)
+        // 6. Register agent→conductor mapping (both encodings for format compat)
         if let Err(e) = self
             .registry
             .register_agent(
@@ -193,7 +155,6 @@ impl AgentProvisioner {
             )
             .await
         {
-            // Registration failed — attempt uninstall cleanup
             warn!(
                 "Agent registration failed, attempting uninstall cleanup for {}: {}",
                 installed_app_id, e
@@ -204,8 +165,6 @@ impl AgentProvisioner {
             return Err(format!("Failed to register agent mapping: {e}"));
         }
 
-        // Also register under base64-standard encoding (covers any code path that
-        // might use STANDARD instead of URL_SAFE_NO_PAD for the JWT agent key)
         let agent_pub_key_std =
             base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &agent_key);
         if agent_pub_key_std != agent_pub_key_b64 {
@@ -232,6 +191,55 @@ impl AgentProvisioner {
             conductor_url: conductor.conductor_url,
             installed_app_id,
         })
+    }
+
+    /// Search all conductors for an existing app for this user.
+    ///
+    /// Since `generate_app_id` includes the conductor_id, we check each conductor
+    /// with its own deterministic app ID. Returns the first match found.
+    async fn find_existing_app(&self, user_identifier: &str) -> Option<ProvisionedAgent> {
+        let conductors = self.registry.list_conductors();
+        if conductors.is_empty() {
+            return None;
+        }
+
+        for conductor in &conductors {
+            let app_id = generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
+            let admin = AdminClient::new(conductor.admin_url.clone());
+
+            match admin.get_app_info(&app_id).await {
+                Ok(existing) => {
+                    let agent_pub_key_b64 = base64::Engine::encode(
+                        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                        &existing.agent_pub_key,
+                    );
+
+                    info!(
+                        conductor = %conductor.conductor_id,
+                        agent = %agent_pub_key_b64,
+                        app_id = %app_id,
+                        user = %user_identifier,
+                        "Reusing existing app installation (idempotent provision)"
+                    );
+
+                    // Re-register in case the registry lost the mapping
+                    let _ = self
+                        .registry
+                        .register_agent(&agent_pub_key_b64, &conductor.conductor_id, &app_id)
+                        .await;
+
+                    return Some(ProvisionedAgent {
+                        agent_pub_key: agent_pub_key_b64,
+                        conductor_id: conductor.conductor_id.clone(),
+                        conductor_url: conductor.conductor_url.clone(),
+                        installed_app_id: app_id,
+                    });
+                }
+                Err(_) => continue,
+            }
+        }
+
+        None
     }
 
     /// Deprovision an agent — uninstall the app from its conductor.
