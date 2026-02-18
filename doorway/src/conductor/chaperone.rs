@@ -167,7 +167,7 @@ pub async fn handle_hc_connect(
         };
         (entry.conductor_id, info.admin_url, entry.app_id)
     } else {
-        // Auto-provision
+        // Auto-provision (idempotent — handles logout→re-login)
         let provisioner = AgentProvisioner::new(Arc::clone(&registry))
             .with_app_id(state.args.installed_app_id.clone());
         match provisioner.provision_agent(&claims.identifier).await {
@@ -181,6 +181,16 @@ pub async fn handle_hc_connect(
                         );
                     }
                 };
+
+                // Also register the JWT's agent_pub_key so Path 2 works on future connects
+                // (the provisioner registers the conductor-generated key, but the JWT
+                // carries the auth-system key — both need to resolve to the same conductor)
+                if claims.agent_pub_key != p.agent_pub_key {
+                    let _ = registry
+                        .register_agent(&claims.agent_pub_key, &p.conductor_id, &p.installed_app_id)
+                        .await;
+                }
+
                 (p.conductor_id, info.admin_url, p.installed_app_id)
             }
             Err(e) => {
