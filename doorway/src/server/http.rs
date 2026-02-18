@@ -628,9 +628,27 @@ async fn handle_request(
         // Legacy paths: /, /admin, /app/{port} (kept for backwards compatibility)
         // ====================================================================
 
+        // Chaperone: server-side Holochain connection setup (replaces admin WS dance)
+        (Method::POST, "/hc/connect") => {
+            return Ok(to_boxed(
+                crate::conductor::chaperone::handle_hc_connect(req, Arc::clone(&state)).await,
+            ));
+        }
+
         // WebSocket upgrade for admin interface (NEW: /hc/admin)
+        // Gated to dev-mode only — production clients use POST /hc/connect (Chaperone)
         (Method::GET, "/hc/admin") => {
-            if hyper_tungstenite::is_upgrade_request(&req) {
+            if !state.args.dev_mode {
+                to_boxed(
+                    Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                        )))
+                        .unwrap(),
+                )
+            } else if hyper_tungstenite::is_upgrade_request(&req) {
                 to_boxed(websocket::handle_admin_upgrade(state, req).await)
             } else {
                 to_boxed(bad_request_response(
@@ -658,8 +676,19 @@ async fn handle_request(
         }
 
         // WebSocket upgrade for admin interface (LEGACY: /, /admin - deprecated, use /hc/admin)
+        // Gated to dev-mode only — production clients use POST /hc/connect (Chaperone)
         (Method::GET, "/") | (Method::GET, "/admin") => {
-            if hyper_tungstenite::is_upgrade_request(&req) {
+            if !state.args.dev_mode {
+                to_boxed(
+                    Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                        )))
+                        .unwrap(),
+                )
+            } else if hyper_tungstenite::is_upgrade_request(&req) {
                 debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
                 to_boxed(websocket::handle_admin_upgrade(state, req).await)
             } else {

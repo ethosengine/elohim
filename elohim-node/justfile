@@ -1,0 +1,50 @@
+# Elohim Node - P2P Runtime
+#
+# RUSTFLAGS is cleared — just `just build` and go.
+
+set dotenv-load := false
+
+export RUSTFLAGS := ""
+
+# List available recipes
+default:
+    @just --list
+
+# Build release binary
+build:
+    cargo build --release
+
+# Build debug binary
+build-dev:
+    cargo build
+
+# Run the node
+run *args:
+    cargo run -- {{args}}
+
+# Run tests
+test:
+    cargo test
+
+# Type-check without building
+check:
+    cargo check
+
+# Lint with clippy
+clippy:
+    cargo clippy -- -D warnings
+
+# Format code
+fmt:
+    cargo fmt
+
+# Check formatting without modifying
+fmt-check:
+    cargo fmt --check
+
+# Remove build artifacts
+clean:
+    cargo clean
+
+# Quality gate: fmt-check + clippy + test
+gate: fmt-check clippy test

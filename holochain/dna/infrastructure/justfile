@@ -1,0 +1,51 @@
+# Infrastructure DNA - Doorway Federation & Network Operations
+#
+# RUSTFLAGS is baked in — just `just build` and go.
+
+set dotenv-load := false
+
+export RUSTFLAGS := '--cfg getrandom_backend="custom"'
+
+wasm_target := "wasm32-unknown-unknown"
+dna_name    := "infrastructure"
+workdir     := justfile_directory() / "../elohim/workdir"
+
+# List available recipes
+default:
+    @just --list
+
+# Build WASM zomes (release)
+build:
+    cargo build --release --target {{wasm_target}}
+
+# Run tests
+test:
+    cargo test
+
+# Type-check without building
+check:
+    cargo check --target {{wasm_target}}
+
+# Lint with clippy
+clippy:
+    cargo clippy --target {{wasm_target}} -- -D warnings
+
+# Format code
+fmt:
+    cargo fmt
+
+# Check formatting without modifying
+fmt-check:
+    cargo fmt --check
+
+# Remove build artifacts
+clean:
+    cargo clean
+
+# Build WASM zomes (alias for build)
+wasm: build
+
+# Build WASM + pack DNA
+pack: build
+    mkdir -p {{workdir}}
+    hc dna pack . -o {{workdir}}/{{dna_name}}.dna

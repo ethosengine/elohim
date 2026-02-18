@@ -3963,6 +3963,45 @@ pub const IMPORT_BATCH_STATUSES: [&str; 4] = [
 ];
 
 // =============================================================================
+// Renewal Protocol Constants (Content Succession)
+// =============================================================================
+
+/// Content succession types — how content is re-authored under renewed identity
+pub const SUCCESSION_TYPES: [&str; 3] = [
+    "renewal",       // Standard device loss/key rotation
+    "graduation",    // Life transition (child→adult autonomy)
+    "custodianship", // Steward taking over for incapacitated human
+];
+
+// =============================================================================
+// Renewal Protocol Entry Types (Content Succession)
+// =============================================================================
+
+/// ContentSuccession - Re-authoring content under a renewed identity.
+///
+/// When a human gets a new agent key through the renewal protocol,
+/// their authored content needs to be re-attributed to the new key.
+/// The data plane (blobs, shards) survives fine — it's content-addressed.
+/// This entry bridges the authorship gap.
+///
+/// ContentSuccession does NOT copy content — it creates a succession
+/// record that links the original content to the new author key,
+/// with proof of social witness (renewal_attestation_id).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ContentSuccession {
+    pub id: String,
+    pub original_content_id: String,         // Content.id being succeeded
+    pub original_author_key: String,         // Old agent key (base64)
+    pub successor_author_key: String,        // New agent key (base64)
+    pub human_id: String,                    // Stable identity
+    pub renewal_attestation_id: String,      // Proof of social witness
+    pub content_hash: Option<String>,        // SHA256 of content body (verify unchanged)
+    pub succession_type: String,             // See SUCCESSION_TYPES
+    pub created_at: String,
+}
+
+// =============================================================================
 // Anchor Entries (for link indexing)
 // =============================================================================
 
@@ -4102,6 +4141,9 @@ pub enum EntryTypes {
 
     // Infrastructure: Import Batch Processing
     ImportBatch(ImportBatch),
+
+    // Renewal Protocol: Content succession
+    ContentSuccession(ContentSuccession),
 
     // Infrastructure: Anchors
     StringAnchor(StringAnchor),
@@ -4542,6 +4584,13 @@ pub enum LinkTypes {
     // ImportBatchToContent - already defined in Lamad section (line ~4058)
 
     // =========================================================================
+    // Renewal Protocol: Content Succession links
+    // =========================================================================
+    IdToContentSuccession,           // Anchor(succession_id) -> ContentSuccession
+    ContentToSuccession,             // Anchor(content_id) -> ContentSuccession
+    SuccessorAuthorToSuccession,     // Anchor(successor_author_key) -> ContentSuccession
+
+    // =========================================================================
     // REMOVED: Doorway links now in infrastructure DNA
     // - IdToDoorway, OperatorToDoorway, DoorwayToHeartbeat, DoorwayToSummary
     // See: holochain/dna/infrastructure/zomes/infrastructure_integrity
@@ -4596,9 +4645,66 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
         EntryTypes::PathStep(step) => adapt_validation(step.validate()),
         EntryTypes::ContentMastery(mastery) => adapt_validation(mastery.validate()),
 
+        // Renewal protocol: Content succession
+        EntryTypes::ContentSuccession(succession) => validate_content_succession(succession),
+
         // Other entry types: accept for now (can add validation incrementally)
         _ => Ok(ValidateCallbackResult::Valid),
     }
+}
+
+/// Validate ContentSuccession entry
+fn validate_content_succession(succession: &ContentSuccession) -> ExternResult<ValidateCallbackResult> {
+    if succession.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContentSuccession ID cannot be empty".to_string(),
+        ));
+    }
+
+    if succession.original_content_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContentSuccession original_content_id cannot be empty".to_string(),
+        ));
+    }
+
+    if succession.original_author_key.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContentSuccession original_author_key cannot be empty".to_string(),
+        ));
+    }
+
+    if succession.successor_author_key.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContentSuccession successor_author_key cannot be empty".to_string(),
+        ));
+    }
+
+    if succession.original_author_key == succession.successor_author_key {
+        return Ok(ValidateCallbackResult::Invalid(
+            "original_author_key and successor_author_key must be different".to_string(),
+        ));
+    }
+
+    if succession.human_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContentSuccession human_id cannot be empty".to_string(),
+        ));
+    }
+
+    if succession.renewal_attestation_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ContentSuccession renewal_attestation_id cannot be empty (must have social proof)".to_string(),
+        ));
+    }
+
+    if !SUCCESSION_TYPES.contains(&succession.succession_type.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid succession_type '{}'. Must be one of: {:?}",
+            succession.succession_type, SUCCESSION_TYPES
+        )));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate entry update operations

@@ -101,6 +101,9 @@ pub struct AuthResponse {
     /// Doorway URL for cross-doorway validation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doorway_url: Option<String>,
+    /// Holochain installed app ID for this user (multi-conductor routing)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub installed_app_id: Option<String>,
     /// Human profile (returned on registration)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<HumanProfileResponse>,
@@ -736,6 +739,8 @@ async fn handle_register(
             StatusCode::CREATED,
             profile,
             PermissionLevel::Authenticated,
+            None,
+            None, // No conductor_id yet for dev-mode register
         );
     }
 
@@ -897,6 +902,8 @@ async fn handle_register(
         StatusCode::CREATED,
         profile,
         user_permission_level,
+        None,
+        provisioned.as_ref().map(|p| p.conductor_id.clone()),
     )
 }
 
@@ -954,6 +961,8 @@ async fn handle_login(
             StatusCode::OK,
             None,
             PermissionLevel::Admin, // Dev mode gets admin access
+            None,
+            None, // No conductor_id in dev mode
         );
     }
 
@@ -1068,6 +1077,57 @@ async fn handle_login(
         }
     }
 
+    // Auto-provision on conductor if user has no conductor assignment
+    let (final_agent_pub_key, installed_app_id, login_conductor_id) = if user.conductor_id.is_none()
+    {
+        if let Some(ref registry) = state.conductor_registry {
+            if !state.args.dev_mode {
+                let provisioner = AgentProvisioner::new(Arc::clone(registry))
+                    .with_app_id(state.args.installed_app_id.clone());
+                match provisioner.provision_agent(&body.identifier).await {
+                    Ok(p) => {
+                        info!(
+                            "Auto-provisioned {} on {} (app: {})",
+                            body.identifier, p.conductor_id, p.installed_app_id
+                        );
+                        // Update UserDoc with conductor assignment
+                        let update = doc! {
+                            "$set": {
+                                "conductor_id": &p.conductor_id,
+                                "agent_pub_key": &p.agent_pub_key,
+                            }
+                        };
+                        if let Err(e) = collection
+                            .update_one(doc! { "identifier": &body.identifier }, update)
+                            .await
+                        {
+                            warn!("Failed to update user doc after provisioning: {}", e);
+                        }
+                        let cid = p.conductor_id.clone();
+                        (p.agent_pub_key, Some(p.installed_app_id), Some(cid))
+                    }
+                    Err(e) => {
+                        warn!("Auto-provisioning failed for {}: {}", body.identifier, e);
+                        (user.agent_pub_key.clone(), None, None)
+                    }
+                }
+            } else {
+                (user.agent_pub_key.clone(), None, None)
+            }
+        } else {
+            (user.agent_pub_key.clone(), None, None)
+        }
+    } else {
+        // Already provisioned — look up installed_app_id from registry
+        let (app_id, cid) = state
+            .conductor_registry
+            .as_ref()
+            .and_then(|r| r.get_conductor_for_agent(&user.agent_pub_key))
+            .map(|e| (Some(e.app_id), Some(e.conductor_id)))
+            .unwrap_or((None, user.conductor_id.clone()));
+        (user.agent_pub_key.clone(), app_id, cid)
+    };
+
     info!(
         "Login successful: {} (permission: {:?})",
         body.identifier, user.permission_level
@@ -1077,12 +1137,14 @@ async fn handle_login(
         &jwt,
         &state,
         &user.human_id,
-        &user.agent_pub_key,
+        &final_agent_pub_key,
         &user.identifier,
         Some(session_id),
         StatusCode::OK,
         None,
         user.permission_level,
+        installed_app_id,
+        login_conductor_id,
     )
 }
 
@@ -1154,6 +1216,8 @@ async fn handle_refresh(
         StatusCode::OK,
         None,
         old_claims.permission_level, // Preserve permission from old token
+        old_claims.installed_app_id,
+        old_claims.conductor_id, // Preserve conductor_id from old token
     )
 }
 
@@ -2889,6 +2953,8 @@ fn generate_oauth_token_response(
         session_id: None,
         doorway_id: doorway_id.clone(),
         doorway_url: doorway_url.clone(),
+        conductor_id: None,
+        installed_app_id: None,
     };
 
     match jwt.generate_token(input) {
@@ -2968,6 +3034,8 @@ fn generate_auth_response(
     status: StatusCode,
     profile: Option<HumanProfileResponse>,
     permission_level: PermissionLevel,
+    installed_app_id: Option<String>,
+    conductor_id: Option<String>,
 ) -> Response<BoxBody> {
     // Get doorway identity from config
     let doorway_id = state.args.doorway_id.clone();
@@ -2981,6 +3049,8 @@ fn generate_auth_response(
         session_id,
         doorway_id: doorway_id.clone(),
         doorway_url: doorway_url.clone(),
+        conductor_id,
+        installed_app_id: installed_app_id.clone(),
     };
 
     match jwt.generate_token(input) {
@@ -2998,6 +3068,7 @@ fn generate_auth_response(
                     expires_at,
                     doorway_id,
                     doorway_url,
+                    installed_app_id,
                     profile,
                 },
             )
