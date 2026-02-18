@@ -200,9 +200,10 @@ pub async fn handle_app_upgrade(
 
 /// Resolve the conductor host and port for an app WebSocket request.
 ///
-/// If the request contains a valid JWT with an `agent_pub_key` that is assigned
-/// to a specific conductor in the registry, returns that conductor's host and port.
-/// Otherwise falls back to the default conductor URL and the client-requested port.
+/// Routing priority:
+/// 1. Agent is in conductor registry → use assigned conductor's host and port
+/// 2. Agent has session affinity (set by admin WS) → reuse it
+/// 3. Fall back to default conductor URL and client-requested port
 fn resolve_conductor_for_app(
     state: &AppState,
     req: &Request<Incoming>,
@@ -225,14 +226,9 @@ fn resolve_conductor_for_app(
         None => return fallback(),
     };
 
-    let entry = match registry.get_conductor_for_agent(&claims.agent_pub_key) {
-        Some(e) => e,
-        None => return fallback(),
-    };
-
-    // Extract host and port from the conductor's app URL (e.g. "ws://host:8445")
-    match extract_host_and_port(&entry.conductor_url) {
-        Some((host, port)) => {
+    // Priority 1: Agent is in the registry (provisioned)
+    if let Some(entry) = registry.get_conductor_for_agent(&claims.agent_pub_key) {
+        if let Some((host, port)) = extract_host_and_port(&entry.conductor_url) {
             info!(
                 agent = %claims.agent_pub_key,
                 conductor = %entry.conductor_id,
@@ -240,31 +236,81 @@ fn resolve_conductor_for_app(
                 port = port,
                 "App WS routed to assigned conductor"
             );
-            (host, port)
+            return (host, port);
         }
-        None => fallback(),
     }
+
+    // Priority 2: Check session affinity cache (set by admin WS connection)
+    if let Some(affinity) = state.session_affinity.get(&claims.agent_pub_key) {
+        info!(
+            agent = %claims.agent_pub_key,
+            host = %affinity.conductor_host,
+            port = affinity.app_port,
+            "App WS using session affinity"
+        );
+        return (affinity.conductor_host.clone(), affinity.app_port);
+    }
+
+    fallback()
 }
 
 /// Resolve the admin URL for an admin WebSocket request.
 ///
-/// If the request contains a valid JWT with an `agent_pub_key` assigned to a
-/// specific conductor, returns that conductor's `admin_url`.
-/// Returns `None` to indicate "use the default admin pool".
+/// Routing priority:
+/// 1. Agent is in conductor registry → use assigned conductor's admin_url
+/// 2. Agent has session affinity (from previous admin connection) → reuse it
+/// 3. Registry has conductors → pick least-loaded, cache in session affinity
+/// 4. No registry → return None (fall through to admin pool or default)
 fn resolve_admin_url(state: &AppState, req: &Request<Incoming>) -> Option<String> {
     let registry = state.conductor_registry.as_ref()?;
     let claims = extract_claims(state, req)?;
-    let entry = registry.get_conductor_for_agent(&claims.agent_pub_key)?;
-    let conductor_info = registry.get_conductor_info(&entry.conductor_id)?;
 
-    info!(
-        agent = %claims.agent_pub_key,
-        conductor = %entry.conductor_id,
-        admin_url = %conductor_info.admin_url,
-        "Admin WS routed to assigned conductor"
-    );
+    // Priority 1: Agent is in the registry (provisioned)
+    if let Some(entry) = registry.get_conductor_for_agent(&claims.agent_pub_key) {
+        if let Some(conductor_info) = registry.get_conductor_info(&entry.conductor_id) {
+            info!(
+                agent = %claims.agent_pub_key,
+                conductor = %entry.conductor_id,
+                admin_url = %conductor_info.admin_url,
+                "Admin WS routed to assigned conductor"
+            );
+            return Some(conductor_info.admin_url);
+        }
+    }
 
-    Some(conductor_info.admin_url)
+    // Priority 2: Check session affinity cache
+    if let Some(affinity) = state.session_affinity.get(&claims.agent_pub_key) {
+        info!(
+            agent = %claims.agent_pub_key,
+            admin_url = %affinity.admin_url,
+            "Admin WS using session affinity"
+        );
+        return Some(affinity.admin_url.clone());
+    }
+
+    // Priority 3: Pick least-loaded conductor and cache for session affinity
+    if let Some(conductor) = registry.find_least_loaded() {
+        let app_port = extract_host_and_port(&conductor.conductor_url)
+            .map(|(_, port)| port)
+            .unwrap_or(4445);
+        let affinity = crate::server::http::SessionAffinityEntry {
+            admin_url: conductor.admin_url.clone(),
+            conductor_host: extract_conductor_host(&conductor.conductor_url),
+            app_port,
+        };
+        info!(
+            agent = %claims.agent_pub_key,
+            conductor = %conductor.conductor_id,
+            admin_url = %conductor.admin_url,
+            "Admin WS: session affinity assigned to least-loaded conductor"
+        );
+        state
+            .session_affinity
+            .insert(claims.agent_pub_key.clone(), affinity);
+        return Some(conductor.admin_url);
+    }
+
+    None
 }
 
 /// Extract JWT claims from a request (query string or Authorization header).
