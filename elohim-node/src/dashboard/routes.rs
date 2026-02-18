@@ -18,7 +18,7 @@ use super::{
 };
 use crate::update::{UpdateStatus, CURRENT_VERSION};
 use crate::network::{
-    NetworkMembership, RegistrationStatus, Operator,
+    RegistrationStatus, Operator,
     SyncProgress, ConnectedApp, sync_state::ConnectedAppsSummary,
 };
 

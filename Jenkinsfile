@@ -634,6 +634,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
                                 sh "npm run build -- --configuration=${buildConfig}"
+
+                                // Generate version.json for deployment verification
+                                sh """
+cat > dist/elohim-app/browser/version.json << VEOF
+{
+  "commit": "${GIT_COMMIT_HASH}",
+  "version": "${BASE_VERSION}",
+  "buildTime": "\$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "environment": "${buildConfig}",
+  "service": "elohim-app"
+}
+VEOF
+"""
                                 sh 'ls -la dist/'
                             }
                         }

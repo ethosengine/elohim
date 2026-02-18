@@ -102,16 +102,34 @@
 
     <!-- Build Info -->
     <div class="build-info">
-      <a
-        [href]="githubCommitUrl"
-        data-cy="git-hash"
-        class="git-hash"
-        target="_blank"
-        rel="noopener noreferrer"
-        [attr.aria-label]="'View commit ' + gitHash + ' on GitHub'"
-      >
-        {{ gitHash }}
-      </a>
+      @if (buildInfo(); as info) {
+        <span class="build-version">v{{ info.version }}</span>
+        <span class="build-separator">&middot;</span>
+        <a
+          [href]="githubCommitUrl"
+          data-cy="git-hash"
+          class="git-hash"
+          target="_blank"
+          rel="noopener noreferrer"
+          [title]="'Built ' + info.buildTime"
+          [attr.aria-label]="'View commit ' + info.commit + ' on GitHub'"
+        >
+          {{ info.commit }}
+        </a>
+        <span class="build-separator">&middot;</span>
+        <span class="build-env">{{ info.environment }}</span>
+      } @else {
+        <a
+          [href]="githubCommitUrl"
+          data-cy="git-hash"
+          class="git-hash"
+          target="_blank"
+          rel="noopener noreferrer"
+          [attr.aria-label]="'View commit ' + gitHash + ' on GitHub'"
+        >
+          {{ gitHash }}
+        </a>
+      }
     </div>
   </div>
 </footer>

@@ -160,11 +160,10 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       return url;
     }
 
-    // Deployed: use configured URL with /hc/admin path and optional API key
+    // Deployed: use configured URL with /hc/admin path, optional API key, and JWT for affinity
     const baseUrl = config.adminUrl.replace(/\/$/, '');
-    const url = config.proxyApiKey
-      ? `${baseUrl}/hc/admin?apiKey=${encodeURIComponent(config.proxyApiKey)}`
-      : `${baseUrl}/hc/admin`;
+    const params = this.buildQueryParams(config);
+    const url = params ? `${baseUrl}/hc/admin?${params}` : `${baseUrl}/hc/admin`;
     console.log('[DoorwayStrategy] Admin URL (doorway):', url);
     return url;
   }
@@ -183,10 +182,8 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     // Route app interface through doorway using /hc/app/:port path
     if (config.adminUrl && !config.adminUrl.includes('localhost')) {
       const baseUrl = config.adminUrl.replace(/\/$/, '');
-      const apiKeyParam = config.proxyApiKey
-        ? `?apiKey=${encodeURIComponent(config.proxyApiKey)}`
-        : '';
-      const url = `${baseUrl}/hc/app/${port}${apiKeyParam}`;
+      const params = this.buildQueryParams(config);
+      const url = params ? `${baseUrl}/hc/app/${port}?${params}` : `${baseUrl}/hc/app/${port}`;
       console.log('[DoorwayStrategy] App URL (doorway):', url);
       return url;
     }
@@ -278,9 +275,145 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   // Connection Lifecycle
   // ==========================================================================
 
+  /**
+   * Connect to Holochain conductor.
+   *
+   * Uses the Chaperone pattern (POST /hc/connect) in production when a
+   * doorwayToken is present. Falls back to the admin WebSocket flow for
+   * dev mode (Eclipse Che) or when no token is available.
+   */
   async connect(config: ConnectionConfig): Promise<ConnectionResult> {
+    const useChaperone = !this.isCheEnvironment() && !!config.doorwayToken;
+
+    if (useChaperone) {
+      return this.connectViaChaperone(config);
+    }
+
+    // Dev mode / Eclipse Che: use admin WebSocket flow
+    return this.connectViaAdminWs(config);
+  }
+
+  // ==========================================================================
+  // Chaperone Connection (Production)
+  // ==========================================================================
+
+  /**
+   * Connect via the Chaperone endpoint (POST /hc/connect).
+   *
+   * The browser generates signing keys locally, sends the public key +
+   * cap secret to doorway, which handles all admin operations server-side.
+   * Returns a single app auth token for the AppWebsocket connection.
+   *
+   * Eliminates: two-WebSocket routing, session affinity, admin protocol exposure.
+   */
+  private async connectViaChaperone(config: ConnectionConfig): Promise<ConnectionResult> {
     try {
-      console.log('[DoorwayStrategy] Starting connection...');
+      console.log('[DoorwayStrategy] Chaperone: starting connection...');
+
+      // Step 1: Generate signing credentials locally
+      const [keyPair, signingKey] = await generateSigningKeyPair();
+      const capSecret = await randomCapSecret();
+      this.credentials = { capSecret, keyPair, signingKey };
+
+      // Step 2: Call POST /hc/connect
+      const baseUrl = config.adminUrl
+        .replace('wss://', 'https://')
+        .replace('ws://', 'http://')
+        .replace(/\/$/, '');
+
+      const response = await fetch(`${baseUrl}/hc/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.doorwayToken}`,
+        },
+        body: JSON.stringify({
+          signingKey: this.toBase64(signingKey),
+          capSecret: this.toBase64(capSecret),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Chaperone failed (${response.status}): ${errorBody}`);
+      }
+
+      const data = await response.json();
+
+      // Step 3: Register signing credentials for each cell
+      const cellIds = new Map<string, CellId>();
+      for (const [roleName, [dnaHashB64, agentKeyB64]] of Object.entries(
+        data.cellIds as Record<string, [string, string]>
+      )) {
+        const dnaHash = this.fromBase64(dnaHashB64);
+        const agentKey = this.fromBase64(agentKeyB64);
+        const cellId: CellId = [dnaHash, agentKey];
+
+        cellIds.set(roleName, cellId);
+        setSigningCredentials(cellId, { capSecret, keyPair, signingKey });
+      }
+
+      if (cellIds.size === 0) {
+        throw new Error('Chaperone returned no cells');
+      }
+
+      // Step 4: Update stored JWT if chaperone returned a refreshed token
+      if (data.token && data.token !== config.doorwayToken) {
+        this.updateStoredToken(data.token);
+      }
+
+      // Step 5: Connect to App WebSocket (single connection)
+      const appUrl = this.resolveAppUrl(config, data.appPort);
+      console.log('[DoorwayStrategy] Chaperone: connecting to app interface:', appUrl);
+
+      // Decode the base64 app token back to bytes for AppWebsocket
+      const appTokenBytes = this.fromBase64(data.appToken);
+      this.appWs = await AppWebsocket.connect({
+        url: new URL(appUrl),
+        token: Array.from(appTokenBytes),
+      });
+
+      this.connected = true;
+
+      const agentPubKey = this.fromBase64(data.agentPubKey) as AgentPubKey;
+
+      console.log('[DoorwayStrategy] Chaperone: connected', {
+        conductor: data.conductorId,
+        cells: cellIds.size,
+        appPort: data.appPort,
+      });
+
+      return {
+        success: true,
+        appWs: this.appWs,
+        cellIds,
+        agentPubKey,
+        appPort: data.appPort,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
+      console.error('[DoorwayStrategy] Chaperone connection failed:', errorMessage);
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  // ==========================================================================
+  // Admin WebSocket Connection (Dev / Eclipse Che)
+  // ==========================================================================
+
+  /**
+   * Connect via the full admin WebSocket flow.
+   *
+   * This is the legacy 11-step connection used in dev mode and Eclipse Che
+   * where the admin WS proxy is available.
+   */
+  private async connectViaAdminWs(config: ConnectionConfig): Promise<ConnectionResult> {
+    try {
+      console.log('[DoorwayStrategy] AdminWS: starting connection...');
 
       // Step 1: Connect to Admin WebSocket (through proxy or direct)
       const adminUrl = this.resolveAdminUrl(config);
@@ -302,6 +435,12 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       // Step 4: Check if app is installed, install if needed
       let appInfo = await this.getInstalledApp(this.adminWs, config.appId);
+
+      // If per-user app not found, fall back to base app name
+      if (!appInfo && config.appId !== 'elohim') {
+        console.warn(`[DoorwayStrategy] App '${config.appId}' not found, falling back to 'elohim'`);
+        appInfo = await this.getInstalledApp(this.adminWs, 'elohim');
+      }
 
       if (!appInfo) {
         console.log(`[DoorwayStrategy] App ${config.appId} not installed. Installing...`);
@@ -332,31 +471,49 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       console.log('[DoorwayStrategy] Found', cellIds.size, 'cells:', Array.from(cellIds.keys()));
 
       // Step 6: Grant zome call capability for ALL cells
-      // Use retry helper since cap grants write to source chain and can race
+      // Use retry helper since cap grants write to source chain and can race.
+      // CellMissing errors are non-fatal — skip that cell and continue.
+      const grantedCells = new Map<string, CellId>();
       for (const [roleName, cellId] of cellIds) {
-        await this.withSourceChainRetry(
-          () =>
-            this.adminWs!.grantZomeCallCapability({
-              cell_id: cellId,
-              cap_grant: {
-                tag: `browser-signing-${roleName}`,
-                functions: { type: 'all' },
-                access: {
-                  type: 'assigned',
-                  value: {
-                    secret: capSecret,
-                    assignees: [signingKey],
+        try {
+          await this.withSourceChainRetry(
+            () =>
+              this.adminWs!.grantZomeCallCapability({
+                cell_id: cellId,
+                cap_grant: {
+                  tag: `browser-signing-${roleName}`,
+                  functions: { type: 'all' },
+                  access: {
+                    type: 'assigned',
+                    value: {
+                      secret: capSecret,
+                      assignees: [signingKey],
+                    },
                   },
                 },
-              },
-            }),
-          `cap grant for ${roleName}`
-        );
-        console.log(`[DoorwayStrategy] Granted cap for role '${roleName}'`);
+              }),
+            `cap grant for ${roleName}`
+          );
+          grantedCells.set(roleName, cellId);
+          console.log(`[DoorwayStrategy] Granted cap for role '${roleName}'`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('CellMissing')) {
+            console.warn(`[DoorwayStrategy] Skipping cap grant for '${roleName}': CellMissing`);
+          } else {
+            throw err;
+          }
+        }
       }
 
-      // Step 7: Register signing credentials for ALL cells
-      for (const [, cellId] of cellIds) {
+      if (grantedCells.size === 0) {
+        throw new Error('Failed to grant capabilities for any cell');
+      }
+
+      console.log(`[DoorwayStrategy] Granted caps for ${grantedCells.size}/${cellIds.size} cells`);
+
+      // Step 7: Register signing credentials for cells that got caps granted
+      for (const [, cellId] of grantedCells) {
         setSigningCredentials(cellId, {
           capSecret,
           keyPair,
@@ -380,19 +537,30 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         console.log(`[DoorwayStrategy] Created new app interface on port ${appPort}`);
       }
 
-      // Step 9: Authorize signing credentials for ALL cells
+      // Step 9: Authorize signing credentials for cells that got caps granted
       // Use retry helper since authorization writes to source chain
-      for (const [roleName, cellId] of cellIds) {
-        await this.withSourceChainRetry(
-          () => this.adminWs!.authorizeSigningCredentials(cellId),
-          `authorize credentials for ${roleName}`
-        );
-        console.log(`[DoorwayStrategy] Authorized credentials for role '${roleName}'`);
+      for (const [roleName, cellId] of grantedCells) {
+        try {
+          await this.withSourceChainRetry(
+            () => this.adminWs!.authorizeSigningCredentials(cellId),
+            `authorize credentials for ${roleName}`
+          );
+          console.log(`[DoorwayStrategy] Authorized credentials for role '${roleName}'`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('CellMissing')) {
+            console.warn(`[DoorwayStrategy] Skipping authorize for '${roleName}': CellMissing`);
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Step 10: Get app authentication token
+      // Use the actual installed app ID (may differ from config.appId after fallback)
+      const actualAppId = appInfo.installed_app_id;
       const issuedToken = await this.adminWs.issueAppAuthenticationToken({
-        installed_app_id: config.appId,
+        installed_app_id: actualAppId,
         single_use: false,
         expiry_seconds: 3600, // 1 hour
       });
@@ -410,14 +578,15 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       console.log('[DoorwayStrategy] Connection successful', {
         appId: config.appId,
-        cellCount: cellIds.size,
+        cellCount: grantedCells.size,
+        totalCells: cellIds.size,
       });
 
       return {
         success: true,
         adminWs: this.adminWs,
         appWs: this.appWs,
-        cellIds,
+        cellIds: grantedCells,
         agentPubKey,
         appInfo,
         appPort,
@@ -469,6 +638,21 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   // ==========================================================================
 
   /**
+   * Build query string parameters for WebSocket URLs.
+   * Includes API key and JWT token for conductor affinity routing.
+   */
+  private buildQueryParams(config: ConnectionConfig): string {
+    const params: string[] = [];
+    if (config.proxyApiKey) {
+      params.push(`apiKey=${encodeURIComponent(config.proxyApiKey)}`);
+    }
+    if (config.doorwayToken) {
+      params.push(`token=${encodeURIComponent(config.doorwayToken)}`);
+    }
+    return params.join('&');
+  }
+
+  /**
    * Get installed app info from conductor.
    */
   private async getInstalledApp(
@@ -480,6 +664,54 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       return apps.find((app: AppInfo) => app.installed_app_id === appId) || null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Encode a Uint8Array as a base64 string.
+   */
+  private toBase64(bytes: Uint8Array): string {
+    // Use btoa in browser environments
+    if (typeof btoa === 'function') {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+    // Node.js fallback
+    return Buffer.from(bytes).toString('base64');
+  }
+
+  /**
+   * Decode a base64 string to a Uint8Array.
+   */
+  private fromBase64(str: string): Uint8Array {
+    // Use atob in browser environments
+    if (typeof atob === 'function') {
+      const binary = atob(str);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+    // Node.js fallback
+    return new Uint8Array(Buffer.from(str, 'base64'));
+  }
+
+  /**
+   * Update the stored JWT token in localStorage after chaperone refresh.
+   * The refreshed token contains conductor_id for future routing.
+   */
+  private updateStoredToken(token: string): void {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('doorway_token', token);
+        console.log('[DoorwayStrategy] Updated stored JWT with conductor_id');
+      } catch {
+        console.warn('[DoorwayStrategy] Failed to update stored token');
+      }
     }
   }
 

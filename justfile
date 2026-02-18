@@ -16,6 +16,7 @@ hc_dir      := root / "holochain"
 app_dir     := root / "elohim-app"
 steward_dir := root / "steward"
 doorway_dir := root / "doorway"
+node_dir    := root / "elohim-node"
 genesis_dir := root / "genesis"
 sophia_dir  := root / "sophia"
 
@@ -84,9 +85,9 @@ steward-bundle:
 # Storage
 # ─────────────────────────────────────────────────────────────────────
 
-# Build elohim-storage binary
+# Build elohim-storage binary (delegates to per-project justfile)
 storage-build:
-    cd {{hc_dir}}/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
+    just --justfile {{hc_dir}}/elohim-storage/justfile --working-directory {{hc_dir}}/elohim-storage build
 
 # Start elohim-storage (wraps existing script)
 storage-start:
@@ -168,36 +169,38 @@ stack-reset:
 # Build
 # ─────────────────────────────────────────────────────────────────────
 
-# Build all Holochain DNAs + pack hApp
-dna-build:
+# Build all Holochain DNAs + pack hApp (delegates to per-project justfiles)
+dna-build: dna-lamad dna-imagodei dna-infrastructure
     #!/usr/bin/env bash
     set -e
     WORKDIR="{{hc_dir}}/dna/elohim/workdir"
-    mkdir -p "$WORKDIR"
-
-    echo "Building lamad DNA..."
-    cd {{hc_dir}}/dna/elohim
-    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
-    hc dna pack . -o "$WORKDIR/lamad.dna"
-
-    echo "Building imagodei DNA..."
-    cd {{hc_dir}}/dna/imagodei
-    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
-    hc dna pack . -o "$WORKDIR/imagodei.dna"
-
-    echo "Building infrastructure DNA..."
-    cd {{hc_dir}}/dna/infrastructure
-    RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm32-unknown-unknown
-    hc dna pack . -o "$WORKDIR/infrastructure.dna"
-
     echo "Packing elohim.happ..."
     hc app pack "$WORKDIR" -o "$WORKDIR/elohim.happ"
-
     echo "DNAs built (lamad + imagodei + infrastructure)"
 
-# Build doorway gateway
+# Build lamad DNA
+dna-lamad:
+    just --justfile {{hc_dir}}/dna/elohim/justfile --working-directory {{hc_dir}}/dna/elohim pack
+
+# Build imagodei DNA
+dna-imagodei:
+    just --justfile {{hc_dir}}/dna/imagodei/justfile --working-directory {{hc_dir}}/dna/imagodei pack
+
+# Build infrastructure DNA
+dna-infrastructure:
+    just --justfile {{hc_dir}}/dna/infrastructure/justfile --working-directory {{hc_dir}}/dna/infrastructure pack
+
+# Build node-registry DNA
+dna-node-registry:
+    just --justfile {{hc_dir}}/dna/node-registry/justfile --working-directory {{hc_dir}}/dna/node-registry pack
+
+# Build doorway gateway (delegates to per-project justfile)
 doorway-build:
-    cd {{doorway_dir}} && RUSTFLAGS='' cargo build --release
+    just --justfile {{doorway_dir}}/justfile --working-directory {{doorway_dir}} build
+
+# Build elohim-node P2P runtime (delegates to per-project justfile)
+node-build:
+    just --justfile {{node_dir}}/justfile --working-directory {{node_dir}} build
 
 # Build sophia assessment UMD bundle
 sophia-build:

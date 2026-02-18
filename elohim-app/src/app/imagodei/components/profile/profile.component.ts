@@ -210,6 +210,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     void this.loadProfile();
+    void this.loadDoorways();
 
     this.route.fragment.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
       if (fragment === 'network' || fragment === 'upgrade') {
@@ -242,6 +243,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
       await this.identityService.getCurrentHuman();
     } catch (error) {
       console.warn('[Profile] Non-critical profile refresh failed:', error);
+    }
+  }
+
+  private async loadDoorways(): Promise<void> {
+    try {
+      await this.doorwayRegistry.loadDoorways();
+      await this.doorwayRegistry.refreshHealth();
+    } catch (error) {
+      console.warn('[Profile] Non-critical doorway refresh failed:', error);
     }
   }
 

@@ -32,6 +32,9 @@ export const AUTH_HUMAN_ID_KEY = 'elohim-auth-human-id';
 /** localStorage key for agent public key (persisted across page refreshes) */
 export const AUTH_AGENT_PUB_KEY_KEY = 'elohim-auth-agent-pub-key';
 
+/** localStorage key for installed app ID (multi-conductor routing) */
+export const AUTH_INSTALLED_APP_ID_KEY = 'elohim-installed-app-id';
+
 // =============================================================================
 // Auth Provider Types
 // =============================================================================
@@ -114,6 +117,8 @@ export interface AuthSuccess {
   expiresAt: number | string;
   /** User identifier */
   identifier: string;
+  /** Holochain installed app ID for this user (multi-conductor routing) */
+  installedAppId?: string;
 }
 
 /** Failed authentication result */
@@ -274,6 +279,8 @@ export interface AuthResponse {
   /** Token expiration - Unix timestamp (seconds) or ISO string */
   expiresAt: number | string;
   identifier: string;
+  /** Holochain installed app ID for this user (multi-conductor routing) */
+  installedAppId?: string;
   /** Profile info (returned on registration) */
   profile?: HumanProfileResponse;
 }

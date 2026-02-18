@@ -142,10 +142,17 @@ export class DoorwayRegistryService {
   /** Current error */
   readonly error = this.errorSignal.asReadonly();
 
-  /** Doorways with health info attached */
+  /** Doorways with health info attached (always includes selected doorway) */
   readonly doorwaysWithHealth = computed(() => {
     const healthMap = this.healthMapSignal();
-    return this.doorways().map(
+    const doorways = this.doorways();
+    const selected = this.selectedSignal()?.doorway;
+
+    // Ensure the selected doorway is always in the list
+    const hasSelected = selected && doorways.some(d => d.id === selected.id);
+    const allDoorways = hasSelected || !selected ? doorways : [selected, ...doorways];
+
+    return allDoorways.map(
       d =>
         healthMap.get(d.id) ?? {
           ...d,

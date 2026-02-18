@@ -41,6 +41,7 @@ import {
   AUTH_IDENTIFIER_KEY,
   AUTH_HUMAN_ID_KEY,
   AUTH_AGENT_PUB_KEY_KEY,
+  AUTH_INSTALLED_APP_ID_KEY,
   parseExpiryDate,
   isTokenExpiringSoon,
 } from '../models/auth.model';
@@ -423,6 +424,11 @@ export class AuthService {
       result.agentPubKey
     );
 
+    // Store installed app ID for multi-conductor routing
+    if (result.installedAppId) {
+      localStorage.setItem(AUTH_INSTALLED_APP_ID_KEY, result.installedAppId);
+    }
+
     // Schedule token refresh
     this.scheduleRefresh(expiresAt);
   }
@@ -461,6 +467,7 @@ export class AuthService {
     localStorage.removeItem(AUTH_IDENTIFIER_KEY);
     localStorage.removeItem(AUTH_HUMAN_ID_KEY);
     localStorage.removeItem(AUTH_AGENT_PUB_KEY_KEY);
+    localStorage.removeItem(AUTH_INSTALLED_APP_ID_KEY);
     localStorage.removeItem(SIGNING_CREDENTIALS_KEY);
     localStorage.removeItem(DOORWAY_CACHE_KEY);
   }
