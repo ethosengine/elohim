@@ -130,8 +130,11 @@ export class HolochainClientService {
     // In multi-conductor deployments, doorway uses this token to route
     // admin and app WebSocket connections to the same conductor.
     let doorwayToken: string | undefined;
+    let installedAppId: string | undefined;
     try {
       doorwayToken = localStorage.getItem('elohim-auth-token') ?? undefined;
+      // Per-user app ID from login auto-provisioning (multi-conductor)
+      installedAppId = localStorage.getItem('elohim-installed-app-id') ?? undefined;
     } catch {
       // localStorage not available (SSR) — no token
     }
@@ -142,7 +145,7 @@ export class HolochainClientService {
       appUrl: this.config.appUrl,
       proxyApiKey: this.config.proxyApiKey,
       storageUrl: this.config.storageUrl,
-      appId: this.config.appId,
+      appId: installedAppId ?? this.config.appId,
       happPath: this.config.happPath,
       origin: this.config.origin,
       useLocalProxy: this.config.useLocalProxy,

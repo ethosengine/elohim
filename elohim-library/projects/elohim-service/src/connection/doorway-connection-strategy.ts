@@ -300,6 +300,12 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       // Step 4: Check if app is installed, install if needed
       let appInfo = await this.getInstalledApp(this.adminWs, config.appId);
 
+      // If per-user app not found, fall back to base app name
+      if (!appInfo && config.appId !== 'elohim') {
+        console.warn(`[DoorwayStrategy] App '${config.appId}' not found, falling back to 'elohim'`);
+        appInfo = await this.getInstalledApp(this.adminWs, 'elohim');
+      }
+
       if (!appInfo) {
         console.log(`[DoorwayStrategy] App ${config.appId} not installed. Installing...`);
 
@@ -329,31 +335,49 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       console.log('[DoorwayStrategy] Found', cellIds.size, 'cells:', Array.from(cellIds.keys()));
 
       // Step 6: Grant zome call capability for ALL cells
-      // Use retry helper since cap grants write to source chain and can race
+      // Use retry helper since cap grants write to source chain and can race.
+      // CellMissing errors are non-fatal — skip that cell and continue.
+      const grantedCells = new Map<string, CellId>();
       for (const [roleName, cellId] of cellIds) {
-        await this.withSourceChainRetry(
-          () =>
-            this.adminWs!.grantZomeCallCapability({
-              cell_id: cellId,
-              cap_grant: {
-                tag: `browser-signing-${roleName}`,
-                functions: { type: 'all' },
-                access: {
-                  type: 'assigned',
-                  value: {
-                    secret: capSecret,
-                    assignees: [signingKey],
+        try {
+          await this.withSourceChainRetry(
+            () =>
+              this.adminWs!.grantZomeCallCapability({
+                cell_id: cellId,
+                cap_grant: {
+                  tag: `browser-signing-${roleName}`,
+                  functions: { type: 'all' },
+                  access: {
+                    type: 'assigned',
+                    value: {
+                      secret: capSecret,
+                      assignees: [signingKey],
+                    },
                   },
                 },
-              },
-            }),
-          `cap grant for ${roleName}`
-        );
-        console.log(`[DoorwayStrategy] Granted cap for role '${roleName}'`);
+              }),
+            `cap grant for ${roleName}`
+          );
+          grantedCells.set(roleName, cellId);
+          console.log(`[DoorwayStrategy] Granted cap for role '${roleName}'`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('CellMissing')) {
+            console.warn(`[DoorwayStrategy] Skipping cap grant for '${roleName}': CellMissing`);
+          } else {
+            throw err;
+          }
+        }
       }
 
-      // Step 7: Register signing credentials for ALL cells
-      for (const [, cellId] of cellIds) {
+      if (grantedCells.size === 0) {
+        throw new Error('Failed to grant capabilities for any cell');
+      }
+
+      console.log(`[DoorwayStrategy] Granted caps for ${grantedCells.size}/${cellIds.size} cells`);
+
+      // Step 7: Register signing credentials for cells that got caps granted
+      for (const [, cellId] of grantedCells) {
         setSigningCredentials(cellId, {
           capSecret,
           keyPair,
@@ -377,19 +401,30 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         console.log(`[DoorwayStrategy] Created new app interface on port ${appPort}`);
       }
 
-      // Step 9: Authorize signing credentials for ALL cells
+      // Step 9: Authorize signing credentials for cells that got caps granted
       // Use retry helper since authorization writes to source chain
-      for (const [roleName, cellId] of cellIds) {
-        await this.withSourceChainRetry(
-          () => this.adminWs!.authorizeSigningCredentials(cellId),
-          `authorize credentials for ${roleName}`
-        );
-        console.log(`[DoorwayStrategy] Authorized credentials for role '${roleName}'`);
+      for (const [roleName, cellId] of grantedCells) {
+        try {
+          await this.withSourceChainRetry(
+            () => this.adminWs!.authorizeSigningCredentials(cellId),
+            `authorize credentials for ${roleName}`
+          );
+          console.log(`[DoorwayStrategy] Authorized credentials for role '${roleName}'`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('CellMissing')) {
+            console.warn(`[DoorwayStrategy] Skipping authorize for '${roleName}': CellMissing`);
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Step 10: Get app authentication token
+      // Use the actual installed app ID (may differ from config.appId after fallback)
+      const actualAppId = appInfo.installed_app_id;
       const issuedToken = await this.adminWs.issueAppAuthenticationToken({
-        installed_app_id: config.appId,
+        installed_app_id: actualAppId,
         single_use: false,
         expiry_seconds: 3600, // 1 hour
       });
@@ -407,14 +442,15 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       console.log('[DoorwayStrategy] Connection successful', {
         appId: config.appId,
-        cellCount: cellIds.size,
+        cellCount: grantedCells.size,
+        totalCells: cellIds.size,
       });
 
       return {
         success: true,
         adminWs: this.adminWs,
         appWs: this.appWs,
-        cellIds,
+        cellIds: grantedCells,
         agentPubKey,
         appInfo,
         appPort,
