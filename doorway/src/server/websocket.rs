@@ -226,6 +226,24 @@ fn resolve_conductor_for_app(
         None => return fallback(),
     };
 
+    // Priority 0: conductor_id in JWT claims (deterministic, no registry lookup)
+    if let Some(ref conductor_id) = claims.conductor_id {
+        if let Some(ref registry_ref) = state.conductor_registry {
+            if let Some(info) = registry_ref.get_conductor_info(conductor_id) {
+                if let Some((host, port)) = extract_host_and_port(&info.conductor_url) {
+                    info!(
+                        agent = %claims.agent_pub_key,
+                        conductor = %conductor_id,
+                        host = %host,
+                        port = port,
+                        "App WS routed via JWT conductor_id"
+                    );
+                    return (host, port);
+                }
+            }
+        }
+    }
+
     // Priority 1: Agent is in the registry (provisioned)
     if let Some(entry) = registry.get_conductor_for_agent(&claims.agent_pub_key) {
         if let Some((host, port)) = extract_host_and_port(&entry.conductor_url) {
@@ -238,17 +256,6 @@ fn resolve_conductor_for_app(
             );
             return (host, port);
         }
-    }
-
-    // Priority 2: Check session affinity cache (set by admin WS connection)
-    if let Some(affinity) = state.session_affinity.get(&claims.agent_pub_key) {
-        info!(
-            agent = %claims.agent_pub_key,
-            host = %affinity.conductor_host,
-            port = affinity.app_port,
-            "App WS using session affinity"
-        );
-        return (affinity.conductor_host.clone(), affinity.app_port);
     }
 
     fallback()
@@ -265,6 +272,19 @@ fn resolve_admin_url(state: &AppState, req: &Request<Incoming>) -> Option<String
     let registry = state.conductor_registry.as_ref()?;
     let claims = extract_claims(state, req)?;
 
+    // Priority 0: conductor_id in JWT claims (deterministic, no registry lookup)
+    if let Some(ref conductor_id) = claims.conductor_id {
+        if let Some(info) = registry.get_conductor_info(conductor_id) {
+            info!(
+                agent = %claims.agent_pub_key,
+                conductor = %conductor_id,
+                admin_url = %info.admin_url,
+                "Admin WS routed via JWT conductor_id"
+            );
+            return Some(info.admin_url);
+        }
+    }
+
     // Priority 1: Agent is in the registry (provisioned)
     if let Some(entry) = registry.get_conductor_for_agent(&claims.agent_pub_key) {
         if let Some(conductor_info) = registry.get_conductor_info(&entry.conductor_id) {
@@ -278,35 +298,15 @@ fn resolve_admin_url(state: &AppState, req: &Request<Incoming>) -> Option<String
         }
     }
 
-    // Priority 2: Check session affinity cache
-    if let Some(affinity) = state.session_affinity.get(&claims.agent_pub_key) {
-        info!(
-            agent = %claims.agent_pub_key,
-            admin_url = %affinity.admin_url,
-            "Admin WS using session affinity"
-        );
-        return Some(affinity.admin_url.clone());
-    }
-
-    // Priority 3: Pick least-loaded conductor and cache for session affinity
+    // Priority 2: Pick least-loaded conductor (no session affinity needed —
+    // conductor_id in JWT provides deterministic routing after chaperone)
     if let Some(conductor) = registry.find_least_loaded() {
-        let app_port = extract_host_and_port(&conductor.conductor_url)
-            .map(|(_, port)| port)
-            .unwrap_or(4445);
-        let affinity = crate::server::http::SessionAffinityEntry {
-            admin_url: conductor.admin_url.clone(),
-            conductor_host: extract_conductor_host(&conductor.conductor_url),
-            app_port,
-        };
         info!(
             agent = %claims.agent_pub_key,
             conductor = %conductor.conductor_id,
             admin_url = %conductor.admin_url,
-            "Admin WS: session affinity assigned to least-loaded conductor"
+            "Admin WS: routed to least-loaded conductor"
         );
-        state
-            .session_affinity
-            .insert(claims.agent_pub_key.clone(), affinity);
         return Some(conductor.admin_url);
     }
 

@@ -37,6 +37,12 @@ pub struct Claims {
     /// Doorway URL for cross-doorway validation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doorway_url: Option<String>,
+    /// Conductor ID for deterministic routing (Chaperone pattern)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conductor_id: Option<String>,
+    /// Installed app ID on the conductor
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installed_app_id: Option<String>,
     /// Token version (for future invalidation)
     pub version: u32,
     /// Issued at (Unix timestamp)
@@ -58,6 +64,10 @@ pub struct TokenInput {
     pub doorway_id: Option<String>,
     /// Doorway URL for cross-doorway validation
     pub doorway_url: Option<String>,
+    /// Conductor ID for deterministic routing (Chaperone pattern)
+    pub conductor_id: Option<String>,
+    /// Installed app ID on the conductor
+    pub installed_app_id: Option<String>,
 }
 
 /// Result of token validation
@@ -139,6 +149,8 @@ impl JwtValidator {
             session_id: input.session_id,
             doorway_id: input.doorway_id,
             doorway_url: input.doorway_url,
+            conductor_id: input.conductor_id,
+            installed_app_id: input.installed_app_id,
             version: 1,
             iat: now,
             exp: now + self.expiry_seconds,
@@ -172,6 +184,8 @@ impl JwtValidator {
             session_id: input.session_id,
             doorway_id: input.doorway_id,
             doorway_url: input.doorway_url,
+            conductor_id: input.conductor_id,
+            installed_app_id: input.installed_app_id,
             version: 1,
             iat: now,
             exp: now + refresh_expiry,
@@ -296,6 +310,8 @@ mod tests {
             session_id: Some("session-abc".into()),
             doorway_id: Some("alpha-elohim-host".into()),
             doorway_url: Some("https://alpha.elohim.host".into()),
+            conductor_id: None,
+            installed_app_id: None,
         };
 
         let token = validator.generate_token(input).unwrap();
@@ -339,6 +355,8 @@ mod tests {
             session_id: None,
             doorway_id: None,
             doorway_url: None,
+            conductor_id: None,
+            installed_app_id: None,
         };
 
         let token = validator1.generate_token(input).unwrap();
@@ -412,6 +430,8 @@ mod tests {
             session_id: None,
             doorway_id: None,
             doorway_url: None,
+            conductor_id: None,
+            installed_app_id: None,
         };
 
         let token = validator.generate_token(input).unwrap();
@@ -432,6 +452,8 @@ mod tests {
             session_id: None,
             doorway_id: None,
             doorway_url: None,
+            conductor_id: None,
+            installed_app_id: None,
         };
 
         let token = validator.generate_token(input).unwrap();

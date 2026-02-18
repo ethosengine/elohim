@@ -39,24 +39,6 @@ use crate::worker::{WorkerPool, ZomeCallConfig};
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 
-/// Temporary session routing for agents not yet in the conductor registry.
-///
-/// When an agent's pub key isn't found in the conductor registry (e.g., legacy
-/// users or users whose auto-provisioning hasn't completed yet), this struct
-/// provides a temporary conductor assignment so that both admin and app WebSocket
-/// connections route to the SAME conductor. Without this, admin goes to the pool
-/// (random conductor) while app goes to the default conductor, causing "invalid
-/// app authentication token" errors.
-#[derive(Debug, Clone)]
-pub struct SessionAffinityEntry {
-    /// Admin interface URL (e.g., "ws://conductor-0:4444")
-    pub admin_url: String,
-    /// App interface host (e.g., "conductor-0")
-    pub conductor_host: String,
-    /// App interface port (e.g., 4445)
-    pub app_port: u16,
-}
-
 /// Shared application state
 pub struct AppState {
     pub args: Args,
@@ -117,10 +99,6 @@ pub struct AppState {
     pub peer_cache: crate::services::federation::PeerCache,
     /// Cached P2P health from elohim-storage sidecar (polled every 30s)
     pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
-    /// Session affinity cache for unregistered agents.
-    /// Maps agent_pub_key → conductor routing info so admin and app WS
-    /// connections go to the same conductor when registry lookup fails.
-    pub session_affinity: Arc<dashmap::DashMap<String, SessionAffinityEntry>>,
 }
 
 impl AppState {
@@ -183,7 +161,6 @@ impl AppState {
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
-            session_affinity: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -250,7 +227,6 @@ impl AppState {
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
-            session_affinity: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -332,7 +308,6 @@ impl AppState {
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
-            session_affinity: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -408,7 +383,6 @@ impl AppState {
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
-            session_affinity: Arc::new(dashmap::DashMap::new()),
         })
     }
 
@@ -654,9 +628,27 @@ async fn handle_request(
         // Legacy paths: /, /admin, /app/{port} (kept for backwards compatibility)
         // ====================================================================
 
+        // Chaperone: server-side Holochain connection setup (replaces admin WS dance)
+        (Method::POST, "/hc/connect") => {
+            return Ok(to_boxed(
+                crate::conductor::chaperone::handle_hc_connect(req, Arc::clone(&state)).await,
+            ));
+        }
+
         // WebSocket upgrade for admin interface (NEW: /hc/admin)
+        // Gated to dev-mode only — production clients use POST /hc/connect (Chaperone)
         (Method::GET, "/hc/admin") => {
-            if hyper_tungstenite::is_upgrade_request(&req) {
+            if !state.args.dev_mode {
+                to_boxed(
+                    Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                        )))
+                        .unwrap(),
+                )
+            } else if hyper_tungstenite::is_upgrade_request(&req) {
                 to_boxed(websocket::handle_admin_upgrade(state, req).await)
             } else {
                 to_boxed(bad_request_response(
@@ -684,8 +676,19 @@ async fn handle_request(
         }
 
         // WebSocket upgrade for admin interface (LEGACY: /, /admin - deprecated, use /hc/admin)
+        // Gated to dev-mode only — production clients use POST /hc/connect (Chaperone)
         (Method::GET, "/") | (Method::GET, "/admin") => {
-            if hyper_tungstenite::is_upgrade_request(&req) {
+            if !state.args.dev_mode {
+                to_boxed(
+                    Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                        )))
+                        .unwrap(),
+                )
+            } else if hyper_tungstenite::is_upgrade_request(&req) {
                 debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
                 to_boxed(websocket::handle_admin_upgrade(state, req).await)
             } else {

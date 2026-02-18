@@ -740,6 +740,7 @@ async fn handle_register(
             profile,
             PermissionLevel::Authenticated,
             None,
+            None, // No conductor_id yet for dev-mode register
         );
     }
 
@@ -902,6 +903,7 @@ async fn handle_register(
         profile,
         user_permission_level,
         None,
+        provisioned.as_ref().map(|p| p.conductor_id.clone()),
     )
 }
 
@@ -960,6 +962,7 @@ async fn handle_login(
             None,
             PermissionLevel::Admin, // Dev mode gets admin access
             None,
+            None, // No conductor_id in dev mode
         );
     }
 
@@ -1075,7 +1078,8 @@ async fn handle_login(
     }
 
     // Auto-provision on conductor if user has no conductor assignment
-    let (final_agent_pub_key, installed_app_id) = if user.conductor_id.is_none() {
+    let (final_agent_pub_key, installed_app_id, login_conductor_id) = if user.conductor_id.is_none()
+    {
         if let Some(ref registry) = state.conductor_registry {
             if !state.args.dev_mode {
                 let provisioner = AgentProvisioner::new(Arc::clone(registry))
@@ -1099,27 +1103,29 @@ async fn handle_login(
                         {
                             warn!("Failed to update user doc after provisioning: {}", e);
                         }
-                        (p.agent_pub_key, Some(p.installed_app_id))
+                        let cid = p.conductor_id.clone();
+                        (p.agent_pub_key, Some(p.installed_app_id), Some(cid))
                     }
                     Err(e) => {
                         warn!("Auto-provisioning failed for {}: {}", body.identifier, e);
-                        (user.agent_pub_key.clone(), None)
+                        (user.agent_pub_key.clone(), None, None)
                     }
                 }
             } else {
-                (user.agent_pub_key.clone(), None)
+                (user.agent_pub_key.clone(), None, None)
             }
         } else {
-            (user.agent_pub_key.clone(), None)
+            (user.agent_pub_key.clone(), None, None)
         }
     } else {
         // Already provisioned — look up installed_app_id from registry
-        let app_id = state
+        let (app_id, cid) = state
             .conductor_registry
             .as_ref()
             .and_then(|r| r.get_conductor_for_agent(&user.agent_pub_key))
-            .map(|e| e.app_id);
-        (user.agent_pub_key.clone(), app_id)
+            .map(|e| (Some(e.app_id), Some(e.conductor_id)))
+            .unwrap_or((None, user.conductor_id.clone()));
+        (user.agent_pub_key.clone(), app_id, cid)
     };
 
     info!(
@@ -1138,6 +1144,7 @@ async fn handle_login(
         None,
         user.permission_level,
         installed_app_id,
+        login_conductor_id,
     )
 }
 
@@ -1209,7 +1216,8 @@ async fn handle_refresh(
         StatusCode::OK,
         None,
         old_claims.permission_level, // Preserve permission from old token
-        None,
+        old_claims.installed_app_id,
+        old_claims.conductor_id, // Preserve conductor_id from old token
     )
 }
 
@@ -2945,6 +2953,8 @@ fn generate_oauth_token_response(
         session_id: None,
         doorway_id: doorway_id.clone(),
         doorway_url: doorway_url.clone(),
+        conductor_id: None,
+        installed_app_id: None,
     };
 
     match jwt.generate_token(input) {
@@ -3025,6 +3035,7 @@ fn generate_auth_response(
     profile: Option<HumanProfileResponse>,
     permission_level: PermissionLevel,
     installed_app_id: Option<String>,
+    conductor_id: Option<String>,
 ) -> Response<BoxBody> {
     // Get doorway identity from config
     let doorway_id = state.args.doorway_id.clone();
@@ -3038,6 +3049,8 @@ fn generate_auth_response(
         session_id,
         doorway_id: doorway_id.clone(),
         doorway_url: doorway_url.clone(),
+        conductor_id,
+        installed_app_id: installed_app_id.clone(),
     };
 
     match jwt.generate_token(input) {
