@@ -370,7 +370,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       const appTokenBytes = this.fromBase64(data.appToken);
       this.appWs = await AppWebsocket.connect({
         url: new URL(appUrl),
-        token: appTokenBytes,
+        token: Array.from(appTokenBytes),
       });
 
       this.connected = true;
