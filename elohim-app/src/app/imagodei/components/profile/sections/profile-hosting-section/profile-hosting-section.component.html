@@ -1,0 +1,102 @@
+<div class="hosting-section">
+  <span class="section-title">
+    <span class="material-icons section-title-icon">cloud</span>
+    Hosting Account
+  </span>
+
+  <!-- Usage Gauges -->
+  <div class="usage-gauges">
+    <div class="usage-gauge">
+      <div class="gauge-header">
+        <span class="gauge-label">Storage</span>
+        <span class="gauge-value">
+          {{ formatBytes(account().storageBytes) }} / {{ formatBytes(account().storageLimit) }}
+        </span>
+      </div>
+      <div class="gauge-bar">
+        <div
+          class="gauge-fill"
+          [class.normal]="storageLevel() === 'normal'"
+          [class.warning]="storageLevel() === 'warning'"
+          [class.critical]="storageLevel() === 'critical'"
+          [style.width.%]="account().storagePercent"
+        ></div>
+      </div>
+    </div>
+
+    <div class="usage-gauge">
+      <div class="gauge-header">
+        <span class="gauge-label">Queries (daily)</span>
+        <span class="gauge-value">
+          {{ formatNumber(account().projectionQueries) }} /
+          {{ formatNumber(account().dailyQueryLimit) }}
+        </span>
+      </div>
+      <div class="gauge-bar">
+        <div
+          class="gauge-fill"
+          [class.normal]="queriesLevel() === 'normal'"
+          [class.warning]="queriesLevel() === 'warning'"
+          [class.critical]="queriesLevel() === 'critical'"
+          [style.width.%]="account().queriesPercent"
+        ></div>
+      </div>
+    </div>
+
+    <div class="usage-gauge">
+      <div class="gauge-header">
+        <span class="gauge-label">Bandwidth (daily)</span>
+        <span class="gauge-value">
+          {{ formatBytes(account().bandwidthBytes) }} /
+          {{ formatBytes(account().dailyBandwidthLimit) }}
+        </span>
+      </div>
+      <div class="gauge-bar">
+        <div
+          class="gauge-fill"
+          [class.normal]="bandwidthLevel() === 'normal'"
+          [class.warning]="bandwidthLevel() === 'warning'"
+          [class.critical]="bandwidthLevel() === 'critical'"
+          [style.width.%]="account().bandwidthPercent"
+        ></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Details -->
+  <div class="account-details">
+    <div class="detail-row">
+      <span class="detail-label">Permission</span>
+      <span class="detail-value">{{ account().permissionLevel }}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Member since</span>
+      <span class="detail-value">{{ formatDate(account().createdAt) }}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Last login</span>
+      <span class="detail-value">{{ formatDate(account().lastLoginAt) }}</span>
+    </div>
+  </div>
+
+  <!-- Agency Pipeline Stepper -->
+  <div class="agency-stepper">
+    <span class="stepper-title">Stewardship Progress</span>
+    <div class="stepper-track">
+      @for (step of agencySteps(); track step.label) {
+        <div class="stepper-step" [class.complete]="step.complete" [class.active]="step.active">
+          <span class="step-dot"></span>
+          <span class="step-label">{{ step.label }}</span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Doorway Account Link -->
+  @if (accountUrl(); as url) {
+    <a [href]="url" target="_blank" rel="noopener" class="account-link">
+      Manage account on doorway
+      <span class="material-icons">open_in_new</span>
+    </a>
+  }
+</div>

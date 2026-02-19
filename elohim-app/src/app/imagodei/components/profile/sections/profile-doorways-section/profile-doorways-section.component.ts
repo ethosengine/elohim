@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 
 import { type DoorwayWithHealth } from '../../../../models/doorway.model';
+import { type IdentityMode } from '../../../../models/identity.model';
 
 export interface DoorwayRegistrationContext {
   identifier: string | null;
@@ -19,7 +20,17 @@ export interface DoorwayRegistrationContext {
 export class ProfileDoorwaysSectionComponent {
   readonly doorways = input.required<DoorwayWithHealth[]>();
   readonly activeDoorwayId = input<string | null>(null);
+  readonly identityMode = input<IdentityMode>('hosted');
   readonly registrationContext = input<DoorwayRegistrationContext | null>(null);
+
+  readonly showRecoveryContext = computed(() => {
+    const mode = this.identityMode();
+    return mode === 'steward' || mode === 'migrating';
+  });
+
+  readonly onlineDoorwayCount = computed(() => {
+    return this.doorways().filter(d => d.isReachable).length;
+  });
 
   readonly setAsPrimary = output<string>();
   readonly validateDoorway = output<string>();

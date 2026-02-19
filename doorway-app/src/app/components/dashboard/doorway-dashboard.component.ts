@@ -1,6 +1,9 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { DoorwayAdminService } from '../../services/doorway-admin.service';
+import { PipelineTabComponent } from './tabs/pipeline-tab.component';
+import { FederationTabComponent } from './tabs/federation-tab.component';
+import { GraduationTabComponent } from './tabs/graduation-tab.component';
 import {
   NodeDetails,
   ClusterMetrics,
@@ -34,7 +37,7 @@ type UserSortField = 'identifier' | 'permissionLevel' | 'isActive' | 'storagePer
 @Component({
   selector: 'app-doorway-dashboard',
   standalone: true,
-  imports: [CommonModule, DecimalPipe],
+  imports: [CommonModule, DecimalPipe, PipelineTabComponent, FederationTabComponent, GraduationTabComponent],
   templateUrl: './doorway-dashboard.component.html',
   styleUrl: './doorway-dashboard.component.scss',
 })
@@ -50,7 +53,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   readonly error = signal<string | null>(null);
 
   // UI state
-  readonly activeTab = signal<'overview' | 'nodes' | 'resources' | 'users'>('overview');
+  readonly activeTab = signal<'overview' | 'nodes' | 'resources' | 'users' | 'pipeline' | 'federation' | 'graduation'>('overview');
   readonly sortField = signal<SortField>('combinedScore');
   readonly sortDirection = signal<SortDirection>('desc');
   readonly statusFilter = signal<NodeStatus | 'all'>('all');
@@ -163,7 +166,7 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
     this.adminService.disconnect();
   }
 
-  setTab(tab: 'overview' | 'nodes' | 'resources' | 'users'): void {
+  setTab(tab: 'overview' | 'nodes' | 'resources' | 'users' | 'pipeline' | 'federation' | 'graduation'): void {
     this.activeTab.set(tab);
     // Load users when switching to users tab
     if (tab === 'users' && this.users().length === 0) {

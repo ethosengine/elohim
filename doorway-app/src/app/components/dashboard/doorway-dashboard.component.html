@@ -96,6 +96,24 @@
         (click)="setTab('users')">
         Users ({{ usersTotal() }})
       </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'pipeline'"
+        (click)="setTab('pipeline')">
+        Pipeline
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'federation'"
+        (click)="setTab('federation')">
+        Federation
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'graduation'"
+        (click)="setTab('graduation')">
+        Graduation
+      </button>
     </nav>
 
     <!-- Tab Content -->
@@ -408,6 +426,21 @@
             </div>
           }
         </div>
+      }
+
+      <!-- Pipeline Tab -->
+      @if (activeTab() === 'pipeline') {
+        <app-pipeline-tab />
+      }
+
+      <!-- Federation Tab -->
+      @if (activeTab() === 'federation') {
+        <app-federation-tab />
+      }
+
+      <!-- Graduation Tab -->
+      @if (activeTab() === 'graduation') {
+        <app-graduation-tab />
       }
 
       <!-- Users Tab -->

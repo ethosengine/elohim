@@ -347,6 +347,8 @@ pub async fn handle_hc_connect(
             doorway_url: state.args.doorway_url.clone(),
             conductor_id: Some(conductor_id.clone()),
             installed_app_id: Some(installed_app_id.clone()),
+            is_steward: claims.is_steward,
+            has_local_conductor: claims.has_local_conductor,
         };
         match jwt.generate_token(input) {
             Ok(t) => t,

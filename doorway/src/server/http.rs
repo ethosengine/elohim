@@ -675,24 +675,33 @@ async fn handle_request(
             }
         }
 
-        // WebSocket upgrade for admin interface (LEGACY: /, /admin - deprecated, use /hc/admin)
-        // Gated to dev-mode only — production clients use POST /hc/connect (Chaperone)
+        // Root and /admin: redirect browsers to /threshold, preserve WS upgrade in dev
         (Method::GET, "/") | (Method::GET, "/admin") => {
-            if !state.args.dev_mode {
+            if hyper_tungstenite::is_upgrade_request(&req) {
+                if state.args.dev_mode {
+                    debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
+                    to_boxed(websocket::handle_admin_upgrade(state, req).await)
+                } else {
+                    to_boxed(
+                        Response::builder()
+                            .status(StatusCode::FORBIDDEN)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(
+                                r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                            )))
+                            .unwrap(),
+                    )
+                }
+            } else {
                 to_boxed(
                     Response::builder()
-                        .status(StatusCode::FORBIDDEN)
-                        .header("Content-Type", "application/json")
+                        .status(StatusCode::TEMPORARY_REDIRECT)
+                        .header("Location", "/threshold")
                         .body(Full::new(Bytes::from(
-                            r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                            r#"<html><body>Redirecting to <a href="/threshold">/threshold</a></body></html>"#,
                         )))
                         .unwrap(),
                 )
-            } else if hyper_tungstenite::is_upgrade_request(&req) {
-                debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
-                to_boxed(websocket::handle_admin_upgrade(state, req).await)
-            } else {
-                to_boxed(not_found_response(&path))
             }
         }
 
@@ -754,6 +763,11 @@ async fn handle_request(
         (Method::DELETE, p) if p.starts_with("/admin/hosted-users/") => {
             let agent_key = p.strip_prefix("/admin/hosted-users/").unwrap_or("");
             to_boxed(routes::handle_deprovision_user(Arc::clone(&state), agent_key).await)
+        }
+
+        // Pipeline — user lifecycle funnel counts
+        (Method::GET, "/admin/pipeline") => {
+            to_boxed(routes::handle_admin_pipeline(Arc::clone(&state)).await)
         }
 
         // Graduation endpoints — conductor retirement for steward users

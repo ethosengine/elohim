@@ -575,7 +575,7 @@ export class ThresholdLoginComponent implements OnInit {
         await this.authorizeOAuth(authResult.token, params);
       } else {
         // Direct login (no OAuth) - redirect to dashboard
-        this.router.navigate(['/']);
+        this.router.navigate(['/dashboard']);
       }
     } catch (err) {
       this.state.set('form');

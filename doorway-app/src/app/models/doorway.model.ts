@@ -300,6 +300,137 @@ export function tierColor(tier: StewardTier | null): string {
 }
 
 // ============================================================================
+// Pipeline Models
+// ============================================================================
+
+/**
+ * Agency pipeline stage counts
+ */
+export interface PipelineResponse {
+  registered: number;
+  hosted: number;
+  graduating: number;
+  steward: number;
+}
+
+/**
+ * Pipeline stage for display
+ */
+export type PipelineStage = 'registered' | 'hosted' | 'graduating' | 'steward';
+
+// ============================================================================
+// Federation Models (Admin)
+// ============================================================================
+
+/**
+ * Federated doorway details for admin dashboard
+ */
+export interface FederatedDoorway {
+  id: string;
+  name: string;
+  url: string;
+  region: string | null;
+  status: string;
+  latencyMs: number | null;
+  humansServed: number;
+  contentAvailable: number;
+  capabilities: string[];
+  isSelf: boolean;
+}
+
+/**
+ * P2P peer connection details
+ */
+export interface P2PPeer {
+  peerId: string;
+  address: string;
+  connectionState: string;
+  latencyMs: number | null;
+  connectedSince: string | null;
+  bytesSent: number;
+  bytesReceived: number;
+}
+
+/**
+ * Federation doorways response (admin)
+ */
+export interface FederationDoorwaysAdminResponse {
+  doorways: FederatedDoorway[];
+  total: number;
+}
+
+/**
+ * P2P peers response
+ */
+export interface P2PPeersResponse {
+  peers: P2PPeer[];
+  total: number;
+}
+
+// ============================================================================
+// Graduation Models
+// ============================================================================
+
+/**
+ * User in graduation pipeline
+ */
+export interface GraduationUser {
+  id: string;
+  identifier: string;
+  hasExportedKey: boolean;
+  hasLocalConductor: boolean;
+  isSteward: boolean;
+  keyExportedAt: string | null;
+  graduatedAt: string | null;
+  createdAt: string | null;
+}
+
+/**
+ * Graduation pending response
+ */
+export interface GraduationPendingResponse {
+  users: GraduationUser[];
+  total: number;
+}
+
+/**
+ * Graduation completed response
+ */
+export interface GraduationCompletedResponse {
+  users: GraduationUser[];
+  total: number;
+}
+
+// ============================================================================
+// Account Models
+// ============================================================================
+
+/**
+ * Agency pipeline step for self-service view
+ */
+export type AgencyStep = 'hosted' | 'key_export' | 'install_app' | 'steward';
+
+/**
+ * Account response from GET /auth/account
+ */
+export interface AccountResponse {
+  id: string;
+  identifier: string;
+  identifierType: string;
+  permissionLevel: UserPermissionLevel;
+  isActive: boolean;
+  isSteward: boolean;
+  hasLocalConductor: boolean;
+  hasExportedKey: boolean;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  doorwayName: string;
+  doorwayRegion: string | null;
+  usage: UserUsage;
+  quota: UserQuota;
+}
+
+// ============================================================================
 // User Admin Models
 // ============================================================================
 
@@ -474,4 +605,51 @@ export function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * Get color for pipeline stage
+ */
+export function pipelineStageColor(stage: PipelineStage): string {
+  switch (stage) {
+    case 'registered': return '#6b7280';
+    case 'hosted': return '#3b82f6';
+    case 'graduating': return '#f59e0b';
+    case 'steward': return '#10b981';
+    default: return '#9ca3af';
+  }
+}
+
+/**
+ * Get display name for pipeline stage
+ */
+export function pipelineStageName(stage: PipelineStage): string {
+  switch (stage) {
+    case 'registered': return 'Registered';
+    case 'hosted': return 'Hosted';
+    case 'graduating': return 'Graduating';
+    case 'steward': return 'Steward';
+    default: return stage;
+  }
+}
+
+/**
+ * Get color for connection state
+ */
+export function connectionStateColor(state: string): string {
+  switch (state) {
+    case 'connected': return 'text-green-600';
+    case 'connecting': return 'text-yellow-600';
+    case 'disconnected': return 'text-gray-500';
+    default: return 'text-gray-400';
+  }
+}
+
+/**
+ * Get quota gauge color based on usage percentage
+ */
+export function quotaGaugeColor(percent: number): string {
+  if (percent >= 90) return '#ef4444';
+  if (percent >= 70) return '#f59e0b';
+  return '#10b981';
 }

@@ -4,6 +4,14 @@
     Doorways are your connections to the Elohim network. Multiple doorways provide redundancy for
     identity recovery.
   </p>
+  @if (showRecoveryContext()) {
+    <div class="recovery-banner">
+      <span class="recovery-banner-icon material-icons">security</span>
+      <span class="recovery-banner-text">
+        Recovery Status: {{ onlineDoorwayCount() }} of {{ doorways().length }} doorways online
+      </span>
+    </div>
+  }
   <div class="doorway-cards">
     @for (doorway of doorways(); track doorway.id) {
       <div class="doorway-card" [class.active]="doorway.id === activeDoorwayId()">
@@ -19,11 +27,26 @@
           }
         </div>
         <span class="doorway-url">{{ doorway.url }}</span>
+        @if (showRecoveryContext()) {
+          <span class="recovery-badge" [class.ready]="doorway.isReachable">
+            <span
+              class="recovery-badge-dot"
+              [class.online]="doorway.isReachable"
+              [class.offline]="!doorway.isReachable"
+            ></span>
+            {{ doorway.isReachable ? 'Recovery Ready' : 'Unavailable' }}
+          </span>
+        }
         <div class="doorway-card-actions">
           @if (doorway.latencyMs) {
             <span class="doorway-latency">{{ doorway.latencyMs }}ms</span>
           }
-          <a [href]="doorway.url" target="_blank" rel="noopener" class="doorway-visit-link">
+          <a
+            [href]="doorway.url + '/threshold'"
+            target="_blank"
+            rel="noopener"
+            class="doorway-visit-link"
+          >
             Visit
             <span class="material-icons">open_in_new</span>
           </a>

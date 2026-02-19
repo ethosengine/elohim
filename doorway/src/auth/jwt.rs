@@ -43,6 +43,12 @@ pub struct Claims {
     /// Installed app ID on the conductor
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_app_id: Option<String>,
+    /// Whether the user has migrated to steward key management
+    #[serde(default)]
+    pub is_steward: bool,
+    /// Whether the user has a local conductor (Tauri/native)
+    #[serde(default)]
+    pub has_local_conductor: bool,
     /// Token version (for future invalidation)
     pub version: u32,
     /// Issued at (Unix timestamp)
@@ -68,6 +74,10 @@ pub struct TokenInput {
     pub conductor_id: Option<String>,
     /// Installed app ID on the conductor
     pub installed_app_id: Option<String>,
+    /// Whether the user has migrated to steward key management
+    pub is_steward: bool,
+    /// Whether the user has a local conductor (Tauri/native)
+    pub has_local_conductor: bool,
 }
 
 /// Result of token validation
@@ -151,6 +161,8 @@ impl JwtValidator {
             doorway_url: input.doorway_url,
             conductor_id: input.conductor_id,
             installed_app_id: input.installed_app_id,
+            is_steward: input.is_steward,
+            has_local_conductor: input.has_local_conductor,
             version: 1,
             iat: now,
             exp: now + self.expiry_seconds,
@@ -186,6 +198,8 @@ impl JwtValidator {
             doorway_url: input.doorway_url,
             conductor_id: input.conductor_id,
             installed_app_id: input.installed_app_id,
+            is_steward: input.is_steward,
+            has_local_conductor: input.has_local_conductor,
             version: 1,
             iat: now,
             exp: now + refresh_expiry,
@@ -312,6 +326,8 @@ mod tests {
             doorway_url: Some("https://alpha.elohim.host".into()),
             conductor_id: None,
             installed_app_id: None,
+            is_steward: false,
+            has_local_conductor: false,
         };
 
         let token = validator.generate_token(input).unwrap();
@@ -327,6 +343,8 @@ mod tests {
         assert_eq!(claims.session_id, Some("session-abc".into()));
         assert_eq!(claims.doorway_id, Some("alpha-elohim-host".into()));
         assert_eq!(claims.doorway_url, Some("https://alpha.elohim.host".into()));
+        assert!(!claims.is_steward);
+        assert!(!claims.has_local_conductor);
     }
 
     #[test]
@@ -357,6 +375,8 @@ mod tests {
             doorway_url: None,
             conductor_id: None,
             installed_app_id: None,
+            is_steward: false,
+            has_local_conductor: false,
         };
 
         let token = validator1.generate_token(input).unwrap();
@@ -432,6 +452,8 @@ mod tests {
             doorway_url: None,
             conductor_id: None,
             installed_app_id: None,
+            is_steward: false,
+            has_local_conductor: false,
         };
 
         let token = validator.generate_token(input).unwrap();
@@ -454,6 +476,8 @@ mod tests {
             doorway_url: None,
             conductor_id: None,
             installed_app_id: None,
+            is_steward: false,
+            has_local_conductor: false,
         };
 
         let token = validator.generate_token(input).unwrap();

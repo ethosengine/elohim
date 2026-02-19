@@ -4,10 +4,18 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () =>
+      import('./components/landing/doorway-landing.component').then(
+        m => m.DoorwayLandingComponent
+      ),
+    title: 'Welcome',
+  },
+  {
+    path: 'dashboard',
+    loadComponent: () =>
       import('./components/dashboard/doorway-dashboard.component').then(
         m => m.DoorwayDashboardComponent
       ),
-    title: 'Doorway Operator Dashboard',
+    title: 'Operator Dashboard',
   },
   {
     path: 'login',
@@ -32,6 +40,14 @@ export const routes: Routes = [
         m => m.DoorwayBrowserComponent
       ),
     title: 'Select Doorway',
+  },
+  {
+    path: 'account',
+    loadComponent: () =>
+      import('./components/account/doorway-account.component').then(
+        m => m.DoorwayAccountComponent
+      ),
+    title: 'My Account',
   },
   {
     path: '**',

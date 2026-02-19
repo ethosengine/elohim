@@ -153,6 +153,38 @@ pub struct SuccessResponse {
     pub message: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountResponse {
+    pub human_id: String,
+    pub identifier: String,
+    pub permission_level: String,
+    // Storage
+    pub storage_bytes: u64,
+    pub storage_limit: u64,
+    pub storage_percent: f64,
+    // Queries
+    pub projection_queries: u64,
+    pub daily_query_limit: u64,
+    pub queries_percent: f64,
+    // Bandwidth
+    pub bandwidth_bytes: u64,
+    pub daily_bandwidth_limit: u64,
+    pub bandwidth_percent: f64,
+    // Hosting / stewardship
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conductor_id: Option<String>,
+    pub is_steward: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stewardship_at: Option<String>,
+    pub key_exported: bool,
+    // Timestamps
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_login_at: Option<String>,
+}
+
 // =============================================================================
 // OAuth Request/Response Types
 // =============================================================================
@@ -741,6 +773,8 @@ async fn handle_register(
             PermissionLevel::Authenticated,
             None,
             None, // No conductor_id yet for dev-mode register
+            false,
+            false,
         );
     }
 
@@ -904,6 +938,8 @@ async fn handle_register(
         user_permission_level,
         None,
         provisioned.as_ref().map(|p| p.conductor_id.clone()),
+        false, // New registrations are never stewards
+        false,
     )
 }
 
@@ -962,7 +998,9 @@ async fn handle_login(
             None,
             PermissionLevel::Admin, // Dev mode gets admin access
             None,
-            None, // No conductor_id in dev mode
+            None,  // No conductor_id in dev mode
+            false, // Dev mode: not a steward
+            false,
         );
     }
 
@@ -1145,6 +1183,8 @@ async fn handle_login(
         user.permission_level,
         installed_app_id,
         login_conductor_id,
+        user.is_steward,
+        user.conductor_id.is_some(),
     )
 }
 
@@ -1218,6 +1258,8 @@ async fn handle_refresh(
         old_claims.permission_level, // Preserve permission from old token
         old_claims.installed_app_id,
         old_claims.conductor_id, // Preserve conductor_id from old token
+        old_claims.is_steward,
+        old_claims.has_local_conductor,
     )
 }
 
@@ -1267,6 +1309,149 @@ async fn handle_me(req: Request<hyper::body::Incoming>, state: Arc<AppState>) ->
             permission_level: claims.permission_level.to_string(),
             doorway_id: claims.doorway_id,
             doorway_url: claims.doorway_url,
+        },
+    )
+}
+
+/// GET /auth/account
+///
+/// Get full account context including usage, quotas, hosting status.
+async fn handle_account(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    let auth_header = get_auth_header(&req);
+    let token = match extract_token_from_header(auth_header) {
+        Some(t) => t,
+        None => {
+            return json_response(
+                StatusCode::UNAUTHORIZED,
+                &ErrorResponse {
+                    error: "No token provided".into(),
+                    code: None,
+                },
+            )
+        }
+    };
+
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+
+    let result = jwt.verify_token(token);
+    if !result.valid {
+        return json_response(
+            StatusCode::UNAUTHORIZED,
+            &ErrorResponse {
+                error: result
+                    .error
+                    .unwrap_or_else(|| "Invalid or expired token".into()),
+                code: None,
+            },
+        );
+    }
+
+    let claims = result.claims.unwrap();
+
+    // Look up full user doc from MongoDB
+    let mongo = match &state.mongo {
+        Some(m) => m,
+        None => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &ErrorResponse {
+                    error: "Database not available".into(),
+                    code: Some("DB_UNAVAILABLE".into()),
+                },
+            )
+        }
+    };
+
+    let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+        Ok(c) => c,
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: format!("Database error: {e}"),
+                    code: Some("DB_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    let user = match collection
+        .find_one(doc! { "human_id": &claims.human_id })
+        .await
+    {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            return json_response(
+                StatusCode::NOT_FOUND,
+                &ErrorResponse {
+                    error: "User not found".into(),
+                    code: Some("USER_NOT_FOUND".into()),
+                },
+            )
+        }
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &ErrorResponse {
+                    error: format!("Database error: {e}"),
+                    code: Some("DB_ERROR".into()),
+                },
+            )
+        }
+    };
+
+    let usage = &user.usage;
+    let quota = &user.quota;
+
+    let storage_percent = if quota.storage_limit > 0 {
+        (usage.storage_bytes as f64 / quota.storage_limit as f64) * 100.0
+    } else {
+        0.0
+    };
+    let queries_percent = if quota.daily_query_limit > 0 {
+        (usage.projection_queries as f64 / quota.daily_query_limit as f64) * 100.0
+    } else {
+        0.0
+    };
+    let bandwidth_percent = if quota.daily_bandwidth_limit > 0 {
+        (usage.bandwidth_bytes as f64 / quota.daily_bandwidth_limit as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    let key_exported = user
+        .custodial_key
+        .as_ref()
+        .map(|k| k.exported)
+        .unwrap_or(false);
+
+    json_response(
+        StatusCode::OK,
+        &AccountResponse {
+            human_id: user.human_id,
+            identifier: user.identifier,
+            permission_level: user.permission_level.to_string(),
+            storage_bytes: usage.storage_bytes,
+            storage_limit: quota.storage_limit,
+            storage_percent,
+            projection_queries: usage.projection_queries,
+            daily_query_limit: quota.daily_query_limit,
+            queries_percent,
+            bandwidth_bytes: usage.bandwidth_bytes,
+            daily_bandwidth_limit: quota.daily_bandwidth_limit,
+            bandwidth_percent,
+            conductor_id: user.conductor_id,
+            is_steward: user.is_steward,
+            stewardship_at: user.stewardship_at.map(|d| d.to_string()),
+            key_exported,
+            created_at: user.metadata.created_at.map(|d| d.to_string()),
+            last_login_at: user.last_login_at.map(|d| d.to_string()),
         },
     )
 }
@@ -2955,6 +3140,8 @@ fn generate_oauth_token_response(
         doorway_url: doorway_url.clone(),
         conductor_id: None,
         installed_app_id: None,
+        is_steward: false,
+        has_local_conductor: false,
     };
 
     match jwt.generate_token(input) {
@@ -3036,6 +3223,8 @@ fn generate_auth_response(
     permission_level: PermissionLevel,
     installed_app_id: Option<String>,
     conductor_id: Option<String>,
+    is_steward: bool,
+    has_local_conductor: bool,
 ) -> Response<BoxBody> {
     // Get doorway identity from config
     let doorway_id = state.args.doorway_id.clone();
@@ -3051,6 +3240,8 @@ fn generate_auth_response(
         doorway_url: doorway_url.clone(),
         conductor_id,
         installed_app_id: installed_app_id.clone(),
+        is_steward,
+        has_local_conductor,
     };
 
     match jwt.generate_token(input) {
@@ -3117,6 +3308,7 @@ pub async fn handle_auth_request(
         (&Method::POST, "/auth/logout") => handle_logout(req, state).await,
         (&Method::POST, "/auth/refresh") => handle_refresh(req, state).await,
         (&Method::GET, "/auth/me") => handle_me(req, state).await,
+        (&Method::GET, "/auth/account") => handle_account(req, state).await,
 
         // OAuth 2.0 endpoints
         (&Method::GET, "/auth/authorize") => handle_authorize(req, state).await,
@@ -3153,6 +3345,7 @@ pub async fn handle_auth_request(
         | (_, "/auth/logout")
         | (_, "/auth/refresh")
         | (_, "/auth/me")
+        | (_, "/auth/account")
         | (_, "/auth/authorize")
         | (_, "/auth/token")
         | (_, "/auth/native-handoff")
