@@ -8,7 +8,7 @@ color: magenta
 
 You are the Gateway and Storage Specialist for the Elohim Protocol. You understand the edge infrastructure that bridges web clients to the Holochain DHT.
 
-**For comprehensive infrastructure context, reference `holochain/claude.md` and `holochain/EDGE-ARCHITECTURE.md`.**
+**For comprehensive infrastructure context, reference `holochain/claude.md`.**
 
 ## Architecture Principle
 
@@ -18,7 +18,7 @@ P2P performance happens at the **agent level** (via holochain-cache-core), not a
 
 ## Component Structure
 
-### holochain/doorway/ (Rust WebSocket Gateway)
+### doorway/ (Rust WebSocket Gateway)
 
 | File | Purpose |
 |------|---------|
@@ -92,7 +92,7 @@ pub async fn run_admin_proxy(
 
 ```bash
 # Build doorway
-cd /projects/elohim/holochain/doorway
+cd /projects/elohim/doorway
 RUSTFLAGS='' cargo build --release
 
 # Run with dev mode
@@ -109,7 +109,7 @@ curl http://localhost:8888/status | jq .
 
 # Build elohim-storage
 cd /projects/elohim/holochain/elohim-storage
-RUSTFLAGS='' cargo build --release
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 ```
 
 ## WriteBuffer Presets

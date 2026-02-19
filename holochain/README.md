@@ -4,22 +4,22 @@
 
 The Elohim Protocol requires infrastructure that humans can own. Not rent. Own.
 
-Cloud services create dependency. Dependency creates extraction. Extraction erodes sovereignty. Holochain breaks this pattern by enabling truly peer-to-peer applications where:
+Cloud services create dependency. Dependency creates extraction. Extraction erodes agency. Holochain breaks this pattern by enabling truly peer-to-peer applications where:
 
 - **Data lives with its owners** - Your family's data on your family's hardware
 - **Identity is cryptographic** - No platform can lock you out of your own identity
 - **Validation is distributed** - Rules enforced by math, not corporate policy
 - **Networks heal themselves** - No single point of failure
 
-## The Vision: Progressive Sovereignty
+## The Vision: Progressive Agency
 
 People shouldn't need to understand cryptography to own their digital lives. The Elohim Protocol meets people where they are:
 
 ```
 Stage 1: Visitor     → Browse public content via any doorway
 Stage 2: Hosted      → Account on elohim.host (custodial, but exportable)
-Stage 3: App User    → Desktop app with local keys (self-sovereign)
-Stage 4: Node Op     → Family Node serving your household and community
+Stage 3: App Steward → Desktop app with local keys (self-custodied)
+Stage 4: Node Steward → Family Node serving your household and community
 ```
 
 Each stage preserves identity, content, and reputation. No lock-in at any level.
@@ -66,7 +66,7 @@ Your data replicates to people you trust: family, church, neighborhood. Not to a
 
 **4. The DNA is law**
 
-Validation rules in the DNA are cryptographically enforced. No doorway, no admin, no corporation can override them. This is what makes sovereignty real.
+Validation rules in the DNA are cryptographically enforced. No doorway, no admin, no corporation can override them. This is what makes agency real.
 
 ## The Gap We're Bridging
 
@@ -75,7 +75,7 @@ The Holochain DHT promises automatic distributed storage, but in practice:
 - Gossip latency of 200-2000ms
 - No query capability
 
-We're building the **Community Compute Model** - a hybrid that preserves sovereignty while actually working at scale. See:
+We're building the **Community Compute Model** - a hybrid that preserves agency while actually working at scale. See:
 
 - [ARCHITECTURE-GAP.md](./ARCHITECTURE-GAP.md) - Why pure agent-centric doesn't scale
 - [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) - The family node and community replication model
@@ -95,7 +95,7 @@ For deployment options, see [DEPLOYMENT-RUNTIMES.md](./DEPLOYMENT-RUNTIMES.md).
 | Document | Purpose |
 |----------|---------|
 | [P2P-DATAPLANE.md](./P2P-DATAPLANE.md) | **Start here** - Master P2P architecture, layer separation, technology choices |
-| [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) | Vision: family nodes, community replication, sovereignty model |
+| [COMMUNITY-COMPUTE.md](./COMMUNITY-COMPUTE.md) | Vision: family nodes, community replication, agency model |
 | [ARCHITECTURE-GAP.md](./ARCHITECTURE-GAP.md) | Why pure agent-centric DHT doesn't scale |
 | [SYNC-ENGINE.md](./SYNC-ENGINE.md) | Automerge CRDT sync design, stream positions |
 

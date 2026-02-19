@@ -1,59 +1,48 @@
-# ElohimUiPlayground
+# elohim-library
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.19.
+Shared Angular libraries powering the Elohim Protocol's frontend. These libraries exist so that the protocol's core concerns -- content intelligence, learning visualization, assessment rendering, and interactive simulation -- live as reusable, testable modules independent of any single application.
 
-## Development server
+## Projects
 
-To start a local development server, run:
+### elohim-service
 
-```bash
-ng serve
-```
+The content intelligence layer. Transforms raw educational content (markdown, Gherkin scenarios) into structured `ContentNode` graphs, extracts relationships between concepts, and provides a mode-aware client (`ElohimClient`) that abstracts whether data comes from a doorway gateway, a local Tauri sidecar, or a Holochain conductor.
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Key capabilities:
+- **Import pipeline**: Markdown and Gherkin parsers, transformers (epic, scenario, archetype, resource, source), and a CLI (`npx ts-node src/cli/import.ts import`)
+- **Graph database**: Kuzu-backed knowledge graph for content relationships
+- **Reach-aware caching**: Content cache that respects the protocol's graduated privacy levels
+- **ElohimClient**: Unified read/write interface across browser, Tauri, and Holochain modes with Angular DI integration (`provideElohimClient`)
 
-## Code scaffolding
+### lamad-ui
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Visual components for knowledge exploration and protocol concepts. See [lamad-ui README](projects/lamad-ui/README.md) for details.
 
-```bash
-ng generate component component-name
-```
+- `<lamad-hexagon-grid>` -- Canvas-rendered honeycomb grid for content nodes with affinity-based glow
+- `<lamad-observer-diagram>` -- Interactive witness/private mode data observation visualization
+- `<lamad-value-scanner-diagram>` -- Step-through animation of the protocol's value scanning flow
+- `<lamad-governance-diagram>` -- Interactive layered governance model (global through family)
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+### perseus-plugin
 
-```bash
-ng generate --help
-```
+Bridges Khan Academy's Perseus assessment renderer into the Elohim ecosystem as a web component (`<perseus-question>`). Built as a UMD bundle that auto-registers the custom element on load. Angular apps consume it through a wrapper component that handles lazy loading and CSS injection.
 
-## Building
+### html5-app-plugin
 
-To build the project run:
+Framework-agnostic types and utilities for loading interactive HTML5 simulations as sandboxed apps within the platform. Manages Service Worker-based caching, IndexedDB storage, and iframe sandboxing for third-party educational content.
 
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+## Development
 
 ```bash
-ng test
+cd elohim-library
+npm install
+
+# Run tests (elohim-service)
+npx jest
+
+# Build a library for publishing
+ng build lamad-ui
+ng build elohim-service
 ```
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+The workspace uses ng-packagr for library builds and Jest for testing.

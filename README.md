@@ -14,7 +14,7 @@ A manifesto for digital infrastructure organized around love - demonstrating how
 
 The Elohim Protocol represents a radical reimagining of digital infrastructure—one organized around love as a fundamental operating principle, implemented through distributed architecture, and protected by autonomous AI guardians that serve human flourishing rather than institutional power.
 
-This repository contains an Angular application that presents the vision, technical principles, and implementation pathways for building technology that:
+This polyglot monorepo (Rust, Angular, Holochain, Tauri, libp2p) contains the platform that implements the vision, technical principles, and implementation pathways for building technology that:
 
 - **Serves love** rather than engagement metrics
 - **Protects vulnerability** through incorruptible systems  
@@ -126,9 +126,9 @@ The Elohim Protocol meets users where they are, providing a gradual path from cu
 | Stage | Description | Data Location |
 |-------|-------------|---------------|
 | **Visitor** | Anonymous browsing, no account | Browser memory only |
-| **Hosted User** | Account on elohim.host, custodial keys | DHT network (hosted) |
-| **App User** | Desktop app, self-custodied keys | Local device + DHT |
-| **Node Operator** | Always-on infrastructure | Self-hosted + DHT |
+| **Hosted** | Account on elohim.host, custodial keys | DHT network (hosted) |
+| **App Steward** | Desktop app, self-custodied keys | Local device + DHT |
+| **Node Steward** | Always-on infrastructure | Self-hosted + DHT |
 
 This progressive model ensures no one is excluded due to technical barriers, while incentivizing deeper participation over time. Keys can always be exported for migration between stages.
 

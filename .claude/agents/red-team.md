@@ -63,7 +63,7 @@ grep -r "password\|token\|secret\|key" --include="*.ts" elohim-app/src/
 grep -r "validate\|verify\|check" --include="*.rs" holochain/dna/
 
 # Find exposed endpoints
-grep -r "router\|route\|endpoint" --include="*.rs" holochain/doorway/
+grep -r "router\|route\|endpoint" --include="*.rs" doorway/
 ```
 
 ### 2. Threat Modeling (STRIDE)

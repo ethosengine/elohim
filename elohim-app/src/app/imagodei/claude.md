@@ -12,23 +12,23 @@ Four dimensions of human identity:
 - **imagodei-gifts**: Developed capabilities/attestations
 - **imagodei-synthesis**: Growth and meaning-making
 
-## Sovereignty Stage Progression
+## Agency Stage Progression
 
-Humans progress through sovereignty stages as they deepen engagement:
+Humans progress through agency stages as they deepen engagement:
 
 | Stage | Conductor | Keys | Data Location | Hosting |
 |-------|-----------|------|---------------|---------|
 | `visitor` | None | None | Browser localStorage | N/A |
 | `hosted` | Remote edge node | Custodial (edge holds) | DHT via edge node | Costs covered by commons/steward |
-| `app-user` | Local on device | Self-sovereign | DHT + local conductor | Self-hosted |
-| `node-operator` | Always-on local | Self-sovereign | DHT + hosts others | Receives value flows |
+| `app-steward` | Local on device | Self-sovereign | DHT + local conductor | Self-hosted |
+| `node-steward` | Always-on local | Self-sovereign | DHT + hosts others | Receives value flows |
 
 ### Stage Detection Logic
 
-`SovereigntyService.determineStage()` detects stage based on:
+`AgencyService.determineStage()` detects stage based on:
 1. Holochain connection state (connected vs disconnected)
 2. Conductor location (local vs remote URL patterns)
-3. Node operator status (localStorage config for MVP)
+3. Node steward status (localStorage config for MVP)
 
 ### Identity Modes
 
@@ -56,9 +56,9 @@ type KeyLocation =
 
 | Model | Purpose |
 |-------|---------|
-| `identity.model.ts` | IdentityMode, IdentityState, KeyLocation, HostingCostSummary, NodeOperatorHostingIncome, SovereigntyTransition |
+| `identity.model.ts` | IdentityMode, IdentityState, KeyLocation, HostingCostSummary, NodeStewardHostingIncome, AgencyTransition |
 | `session-human.model.ts` | SessionHuman, SessionStats, UpgradeIntent, HostingCostStatus, HOSTING_TIERS |
-| `sovereignty.model.ts` | SovereigntyStage, SovereigntyState, SOVEREIGNTY_STAGES, transition helpers |
+| `agency.model.ts` | AgencyStage, AgencyState, AGENCY_STAGES, transition helpers |
 | `presence.model.ts` | ContributorPresenceView, PresenceState (unclaimed/stewarded/claimed) |
 | `profile.model.ts` | HumanProfile, JourneyStats, TimelineEvent |
 | `attestations.model.ts` | Agent attestations (credentials earned BY humans) |
@@ -70,7 +70,7 @@ type KeyLocation =
 | `IdentityService` | Network identity management, Holochain Human registration, mode detection |
 | `SessionHumanService` | Temporary localStorage identity, hybrid state, upgrade intent tracking |
 | `SessionMigrationService` | Session → Holochain migration with progress data transfer |
-| `SovereigntyService` | Sovereignty stage detection, key info, data residency |
+| `AgencyService` | Agency stage detection, key info, data residency |
 | `PresenceService` | Contributor presence creation, stewardship lifecycle |
 
 ## Guards
@@ -86,7 +86,7 @@ type KeyLocation =
 | Component | Purpose |
 |-----------|---------|
 | `RegisterComponent` | Network identity registration, session migration |
-| `ProfileComponent` | View/edit profile, sovereignty stage display |
+| `ProfileComponent` | View/edit profile, agency stage display |
 | `PresenceListComponent` | List/manage contributor presences |
 
 ## Hosting Economics (Shefa Integration)
@@ -98,7 +98,7 @@ Hosted humans incur sustainable hosting costs covered by:
 - **self**: Human pays their own costs
 - **migrated**: No longer hosted (moved to own device)
 
-Node operators receive value flows for:
+Node stewards receive value flows for:
 - Number of humans hosted
 - Storage provided
 - Uptime percentage
@@ -113,7 +113,7 @@ interface HostingCostSummary {
   migrationRecommended: boolean;
 }
 
-interface NodeOperatorHostingIncome {
+interface NodeStewardHostingIncome {
   hostedHumanCount: number;
   totalStorageProvidedBytes: number;
   currentMonthIncome: number;
@@ -170,12 +170,12 @@ readonly displayName: Signal<string>;
 readonly attestations: Signal<string[]>;
 ```
 
-### SovereigntyService
+### AgencyService
 
 ```typescript
 // Signals
-readonly currentStage: Signal<SovereigntyStage>;
-readonly stageInfo: Signal<SovereigntyStageInfo>;
+readonly currentStage: Signal<AgencyStage>;
+readonly stageInfo: Signal<AgencyStageInfo>;
 readonly connectionStatus: Signal<ConnectionStatus>;
 readonly canUpgrade: Signal<boolean>;
 
@@ -197,7 +197,7 @@ linkToHolochainIdentity(agentPubKey: string, humanId: string): void;
 isLinkedToHolochain(): boolean;
 
 // Upgrade Intent
-startUpgradeIntent(targetStage: 'hosted' | 'app-user' | 'node-operator'): void;
+startUpgradeIntent(targetStage: 'hosted' | 'app-steward' | 'node-steward'): void;
 updateUpgradeProgress(currentStep: string, completedStep?: string): void;
 pauseUpgrade(reason?: string): void;
 resumeUpgrade(): void;
@@ -215,27 +215,3 @@ clearAfterMigration(): void;
 - Use "journey" not "consumption"
 - Use "meaningful encounters" not "views"
 - Use "steward" not "admin"
-
-### Terminology Evolution
-
-~~**TODO:**~~ **COMPLETED (2026-02-05):** The codebase has transitioned from "sovereignty" terminology to "agency" to better align with Elohim Protocol ethos.
-
-**Refactoring completed**:
-- ✅ `sovereignty.model.ts` → `agency.model.ts`
-- ✅ `sovereignty.service.ts` → `agency.service.ts`
-- ✅ `sovereignty-badge` → `agency-badge` component
-- ✅ `SovereigntyStage` → `AgencyStage` (all types)
-- ✅ `SovereigntyState` → `AgencyState`
-- ✅ `SovereigntyTransition` → `AgencyTransition`
-- ✅ `sovereigntyStage` field → `agencyStage` (IdentityState)
-- ✅ `isMoreSovereign()` → `hasGreaterAgency()` (semantic improvement)
-
-**Philosophy**: The concept of individual sovereignty conflicts with the communal, interdependent nature of the Elohim Protocol. "Agency" emphasizes capacity to act within relational networks rather than isolated self-determination.
-
-**Stage names updated**:
-- ✅ "App User" → "App Steward" (2026-02-05)
-- ✅ "Node Operator" → "Node Steward" (2026-02-05)
-- **Final progression**: Visitor → Hosted → App Steward → Node Steward
-- Rationale: Both "User" and "Operator" are transactional; "Steward" emphasizes care, relationship, and responsibility throughout all stages
-
-**Note**: This was an aggressive refactoring with no backward compatibility - clean break to avoid tech debt.
