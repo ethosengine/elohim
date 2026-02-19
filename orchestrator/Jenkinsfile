@@ -1050,8 +1050,8 @@ spec:
         stage('E2E Federation Smoke (Advisory)') {
             when { expression { buildResults.any { it.value.success } } }
             steps {
-                container('builder') {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    container('builder') {
                         script {
                             echo '''
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -1079,8 +1079,8 @@ spec:
         stage('BDD Coverage Gap (Advisory)') {
             when { expression { buildResults.any { it.value.success } } }
             steps {
-                container('builder') {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    container('builder') {
                         script { runBddCoverageGap() }
                     }
                 }
