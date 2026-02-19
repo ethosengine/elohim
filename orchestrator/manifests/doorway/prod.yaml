@@ -1,0 +1,245 @@
+# Doorway Production Deployment — Agency On-Ramp
+#
+# Five roles in one process:
+#   1. DNS/TLS gateway (stateless HTTP routing)
+#   2. Bootstrap/Signal (agent discovery + WebRTC relay)
+#   3. Projection cache (HTTP API for DHT content)
+#   4. Identity host (custodial agent keys for hosted users)
+#   5. Recovery registrar (relationship-based identity recovery)
+#
+# Never owns data — connects to P2P StatefulSet via ClusterIP service.
+# Scaling is via the conductor pool behind doorway, not doorway replicas.
+# See doorway/SCALING.md for the full model.
+#
+# Architecture:
+#   Browser -> Ingress -> Doorway (auth + routing) -> edgenode service (conductor/storage)
+#   Doorway-app (operator dashboard) served from same pod via localhost
+#
+# Ports:
+#   - 8080: Doorway Gateway (public, authenticated)
+#   - 80:   Operator Dashboard (nginx, pod-internal)
+---
+# Secret for Doorway Gateway API keys
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elohim-doorway-prod-secrets
+  namespace: elohim-prod
+type: Opaque
+stringData:
+  # IMPORTANT: These MUST be changed before production deployment!
+  # Use strong, unique keys generated with: openssl rand -hex 32
+  api-key-authenticated: "CHANGE-ME-prod-elohim-auth-2024"
+  api-key-admin: "CHANGE-ME-prod-elohim-admin-2024"
+  jwt-secret: "CHANGE-ME-prod-jwt-secret-use-openssl-rand-hex-32"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-doorway-prod
+  namespace: elohim-prod
+  labels:
+    app: elohim-doorway
+    environment: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elohim-doorway
+      environment: prod
+  template:
+    metadata:
+      labels:
+        app: elohim-doorway
+        environment: prod
+    spec:
+      nodeSelector:
+        node-type: operations
+      containers:
+        # Doorway Gateway - Rust WebSocket gateway with auth, worker pool
+        - name: doorway
+          image: harbor.ethosengine.com/ethosengine/elohim-doorway:DOORWAY_TAG_PLACEHOLDER
+          imagePullPolicy: Always
+          args:
+            - "--listen"
+            - "0.0.0.0:8080"
+            - "--conductor-url"
+            - "ws://elohim-edgenode-prod:4445"
+          ports:
+            - name: gateway-ws
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: DEV_MODE
+              value: "true"
+            - name: RUST_LOG
+              value: "warn,doorway=info"
+            - name: PROJECTION_WRITER
+              value: "true"
+            - name: CONDUCTOR_URLS
+              value: "ws://elohim-edgenode-prod-0.elohim-edgenode-prod-headless:8445"
+            - name: CONDUCTOR_ADMIN_URL
+              value: "ws://elohim-edgenode-prod:4444"
+            - name: STORAGE_URL
+              value: "http://elohim-edgenode-prod:8090"
+            - name: THRESHOLD_URL
+              value: "http://localhost:80"
+            - name: NATS_URL
+              value: "nats://nats.elohim-prod:4222"
+            - name: MONGODB_URI
+              value: "mongodb://mongodb.elohim-prod:27017"
+            - name: MONGODB_DB
+              value: "doorway-prod"
+            - name: DOORWAY_ID
+              value: "prod-elohim-host"
+            - name: DOORWAY_URL
+              value: "https://doorway.elohim.host"
+            - name: BOOTSTRAP_URL
+              value: "https://doorway.elohim.host/bootstrap"
+            - name: SIGNAL_URL
+              value: "wss://signal.doorway.elohim.host"
+            - name: INSTALLED_APP_ID
+              value: "elohim"
+            - name: FEDERATION_PEERS
+              value: "https://doorway-alpha.elohim.host,https://doorway-staging.elohim.host"
+            - name: API_KEY_AUTHENTICATED
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-prod-secrets
+                  key: api-key-authenticated
+            - name: API_KEY_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-prod-secrets
+                  key: api-key-admin
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: elohim-doorway-prod-secrets
+                  key: jwt-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+        # Doorway Operator Dashboard - Angular app for node operators
+        # Provides: federated OAuth, node metrics, configuration UI
+        - name: doorway-app
+          image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
+          imagePullPolicy: Always
+          ports:
+            - name: operator-ui
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: DOORWAY_API_URL
+              value: "http://localhost:8080"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-doorway-prod
+  namespace: elohim-prod
+  labels:
+    app: elohim-doorway
+    environment: prod
+spec:
+  type: ClusterIP
+  ports:
+    # Doorway Gateway (for Ingress -> doorway)
+    - name: gateway-ws
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    # Doorway Operator Dashboard
+    - name: operator-ui
+      port: 8081
+      targetPort: 80
+      protocol: TCP
+  selector:
+    app: elohim-doorway
+    environment: prod
+---
+# Public Ingress - routes all traffic through authenticated Doorway Gateway
+# Supports: /admin, /app/*, /bootstrap/*, /api/v1/*, /operator/*
+# Signal subdomain: signal.doorway.elohim.host (tx5/SBD protocol)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: elohim-doorway-prod
+  namespace: elohim-prod
+  annotations:
+    # WebSocket support for /admin, /app/*, signal subdomain
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
+    nginx.ingress.kubernetes.io/websocket-services: "elohim-doorway-prod"
+    # Required for WebSocket upgrade headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: public
+  tls:
+    - hosts:
+        - doorway.elohim.host
+        - signal.doorway.elohim.host
+      secretName: doorway-prod-tls
+  rules:
+    - host: doorway.elohim.host
+      http:
+        paths:
+          # All traffic through doorway gateway
+          # Doorway handles routing: /threshold/* -> doorway-app, /hc/* -> conductor
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-doorway-prod
+                port:
+                  number: 8080
+    - host: signal.doorway.elohim.host
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-doorway-prod
+                port:
+                  number: 8080
