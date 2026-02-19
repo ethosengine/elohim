@@ -18,7 +18,9 @@
 
     <!-- Peer count badge (when P2P peers connected) -->
     @if (status().peerCount && status().peerCount! > 0) {
-      <span class="peer-count">{{ status().peerCount }} {{ status().peerCount === 1 ? 'peer' : 'peers' }}</span>
+      <span class="peer-count">
+        {{ status().peerCount }} {{ status().peerCount === 1 ? 'peer' : 'peers' }}
+      </span>
     }
 
     <!-- Doorway URL badge (hosted mode) -->

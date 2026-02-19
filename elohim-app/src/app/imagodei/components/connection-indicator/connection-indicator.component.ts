@@ -12,6 +12,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
 import { catchError, of, switchMap, timer } from 'rxjs';
 
 // @coverage: 76.0% (2026-02-05)
@@ -184,7 +185,7 @@ export class ConnectionIndicatorComponent implements OnInit {
             .get<{ p2p?: { peer_count?: number } }>(`${baseUrl}/health`)
             .pipe(catchError(() => of(null)));
         }),
-        takeUntilDestroyed(this.destroyRef),
+        takeUntilDestroyed(this.destroyRef)
       )
       .subscribe(resp => {
         if (!resp) {
