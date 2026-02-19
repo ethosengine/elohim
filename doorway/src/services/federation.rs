@@ -297,12 +297,23 @@ pub fn spawn_heartbeat_task(
                 "Recording heartbeat"
             );
 
+            // Use call_zome directly — the zome returns ActionHash which we don't need.
+            // Using the typed `call` method would fail because ActionHash deserializes
+            // as a tagged map, not a flat sequence.
+            let payload = match rmp_serde::to_vec(&input) {
+                Ok(p) => p,
+                Err(e) => {
+                    warn!(error = %e, "Failed to serialize heartbeat input");
+                    continue;
+                }
+            };
+
             match zome_caller
-                .call::<RecordHeartbeatInput, Vec<u8>>(
+                .call_zome(
                     &config.infrastructure_role,
                     &config.zome_name,
                     "record_heartbeat",
-                    &input,
+                    payload,
                 )
                 .await
             {

@@ -4,6 +4,8 @@
 //! Handles reconnection and provides a thread-safe interface for sending requests.
 
 use futures_util::{SinkExt, StreamExt};
+use std::collections::HashMap;
+use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
@@ -232,7 +234,32 @@ async fn connect_to_conductor(
     Ok(ws.split())
 }
 
-/// Handle messages between request channel and conductor WebSocket
+/// Extract the request ID from a MessagePack envelope.
+///
+/// Holochain response envelopes have `{ id: <u64>, type: "response"|"error", data: ... }`.
+/// Signal messages have `{ type: "signal", data: ... }` with no `id` field.
+fn extract_message_id(data: &[u8]) -> Option<u64> {
+    let mut cursor = Cursor::new(data);
+    let value = rmpv::decode::read_value(&mut cursor).ok()?;
+    if let rmpv::Value::Map(ref map) = value {
+        for (k, v) in map {
+            if let rmpv::Value::String(ref key) = k {
+                if key.as_str() == Some("id") {
+                    if let rmpv::Value::Integer(ref id) = v {
+                        return id.as_u64();
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Handle messages between request channel and conductor WebSocket.
+///
+/// Uses ID-based matching: each outgoing request has an `id` field, and
+/// Holochain echoes that `id` in the response. Unsolicited messages
+/// (signals) have no `id` and are safely skipped.
 async fn handle_messages(
     ws_sink: futures_util::stream::SplitSink<
         tokio_tungstenite::WebSocketStream<
@@ -247,11 +274,13 @@ async fn handle_messages(
     >,
     rx: &mut mpsc::Receiver<(Vec<u8>, oneshot::Sender<Vec<u8>>)>,
 ) -> Result<()> {
-    // Pending responses indexed by request ID
-    // Holochain uses MessagePack with request IDs embedded in messages
-    // For now, we use a simple queue since Holochain responses are ordered
-    let pending: Arc<Mutex<Vec<oneshot::Sender<Vec<u8>>>>> = Arc::new(Mutex::new(Vec::new()));
+    // Pending responses keyed by request ID
+    let pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Vec<u8>>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
     let pending_for_send = Arc::clone(&pending);
+
+    // Monotonic request ID counter
+    let next_id = Arc::new(std::sync::atomic::AtomicU64::new(1));
 
     // Wrap sink in Arc<Mutex> for sharing
     let ws_sink = Arc::new(Mutex::new(ws_sink));
@@ -260,19 +289,25 @@ async fn handle_messages(
     // Task to handle incoming requests
     let request_handler = async {
         while let Some((data, response_tx)) = rx.recv().await {
-            // Queue the response handler
+            // The caller already embeds an `id` in the envelope.
+            // Extract it so we can register the pending response under that ID.
+            let req_id = extract_message_id(&data).unwrap_or_else(|| {
+                // Fallback: assign our own ID (shouldn't happen with well-formed envelopes)
+                next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            });
+
+            // Register pending response
             {
                 let mut pending = pending_for_send.lock().await;
-                pending.push(response_tx);
+                pending.insert(req_id, response_tx);
             }
 
             // Send to conductor
             let mut sink = ws_sink_for_rx.lock().await;
             if let Err(e) = sink.send(Message::Binary(data)).await {
                 error!("Failed to send to conductor: {}", e);
-                // Remove the pending response
                 let mut pending = pending_for_send.lock().await;
-                pending.pop();
+                pending.remove(&req_id);
                 break;
             }
         }
@@ -283,20 +318,28 @@ async fn handle_messages(
         while let Some(msg) = ws_stream.next().await {
             match msg {
                 Ok(Message::Binary(data)) => {
-                    // Get the next pending response handler
-                    let maybe_sender = {
-                        let mut pending = pending.lock().await;
-                        if !pending.is_empty() {
-                            Some(pending.remove(0))
-                        } else {
-                            None
-                        }
-                    };
+                    let data_vec = data.to_vec();
+                    match extract_message_id(&data_vec) {
+                        Some(resp_id) => {
+                            // Response with matching ID — deliver to caller
+                            let maybe_sender = {
+                                let mut pending = pending.lock().await;
+                                pending.remove(&resp_id)
+                            };
 
-                    if let Some(sender) = maybe_sender {
-                        let _ = sender.send(data.to_vec());
-                    } else {
-                        warn!("Received response with no pending request");
+                            if let Some(sender) = maybe_sender {
+                                let _ = sender.send(data_vec);
+                            } else {
+                                debug!(
+                                    id = resp_id,
+                                    "Response for unknown request ID (already timed out?)"
+                                );
+                            }
+                        }
+                        None => {
+                            // No ID = signal or other unsolicited message — skip
+                            debug!(len = data_vec.len(), "Received conductor signal (skipping)");
+                        }
                     }
                 }
                 Ok(Message::Ping(data)) => {

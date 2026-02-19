@@ -190,7 +190,12 @@ fn parse_token_response(data: &[u8]) -> Result<AppAuthToken, String> {
                         return Err(format!("Admin error: {msg}"));
                     }
                 }
-                return Err("Unknown admin error".to_string());
+                if let Some(err_value) = get_field(map, "value") {
+                    return Err(format!(
+                        "Admin error (app_auth): unstructured error: {err_value:?}"
+                    ));
+                }
+                return Err("Admin error (app_auth): empty error (no value field)".to_string());
             }
         }
 

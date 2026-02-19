@@ -97,7 +97,14 @@ impl AdminClient {
                             return Err(format!("Admin error: {msg}"));
                         }
                     }
-                    return Err("Unknown admin error during key generation".to_string());
+                    if let Some(err_value) = get_field(map, "value") {
+                        return Err(format!(
+                            "Admin error (key generation): unstructured error: {err_value:?}"
+                        ));
+                    }
+                    return Err(
+                        "Admin error (key generation): empty error (no value field)".to_string()
+                    );
                 }
             }
 
@@ -627,7 +634,15 @@ impl AdminClient {
                             return Err(format!("Admin error ({operation}): {msg}"));
                         }
                     }
-                    return Err(format!("Unknown admin error during {operation}"));
+                    // Include raw error value for diagnosability
+                    if let Some(err_value) = get_field(map, "value") {
+                        return Err(format!(
+                            "Admin error ({operation}): unstructured error: {err_value:?}"
+                        ));
+                    }
+                    return Err(format!(
+                        "Admin error ({operation}): empty error (no value field)"
+                    ));
                 }
             }
         }
@@ -690,7 +705,12 @@ fn parse_response_envelope(data: &[u8]) -> Result<Value, String> {
                         return Err(format!("Admin error: {msg}"));
                     }
                 }
-                return Err("Unknown admin error".to_string());
+                if let Some(err_value) = get_field(map, "value") {
+                    return Err(format!(
+                        "Admin error (envelope): unstructured error: {err_value:?}"
+                    ));
+                }
+                return Err("Admin error (envelope): empty error (no value field)".to_string());
             }
         }
 
