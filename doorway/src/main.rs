@@ -510,14 +510,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Federation peer discovery (HTTP-based)
     // Queries FEDERATION_PEERS URLs to discover other doorways in the network
+    // Uses shared PeerUrlList so admin API can add/remove peers at runtime
     if !args.federation_peers.is_empty() {
-        let peer_urls = args.federation_peers.clone();
+        let peer_url_list = state.peer_url_list.clone();
         let self_id = args.doorway_id.clone();
         let cache = state.peer_cache.clone();
-        let peer_count = peer_urls.len();
+        let peer_count = args.federation_peers.len();
 
         services::federation::spawn_peer_discovery_task(
-            peer_urls,
+            peer_url_list,
             self_id,
             cache,
             std::time::Duration::from_secs(10), // initial delay (let peers boot)

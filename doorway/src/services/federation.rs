@@ -4,9 +4,30 @@
 //! - DHT registration via infrastructure DNA
 //! - Periodic heartbeat reporting
 //! - Cross-doorway content fetching via DID resolution
+//! - Runtime-mutable peer URL list for admin-managed federation topology
 //!
 //! This is the capstone of the 5-stage agency model, enabling community
 //! doorway stewards to register, publish, and participate in the network.
+//!
+//! # Doorway Lifecycle & Steward Failure (Future Work)
+//!
+//! Doorway operators are **custodians, not owners**. Hosted humans own their
+//! identity (Holochain agent keys) and must never be stranded by steward
+//! failure. The following scenarios must be handled:
+//!
+//! - **Steward death/incapacitation**: Dead-man's switch — if heartbeats stop
+//!   for N days, federation peers treat the doorway as implicitly draining.
+//! - **Capture/compromise**: Federation peers can flag a doorway as compromised,
+//!   triggering automatic migration warnings to hosted humans.
+//! - **Voluntary shutdown (drain protocol)**: Steward signals "shuttering" to
+//!   the federation. Peer doorways absorb hosted humans. Humans who haven't
+//!   exported keys get escalating urgency warnings with a deadline.
+//! - **Admin capability constraints**: Admin APIs must never allow actions that
+//!   strand humans without recourse. All admin mutations are runtime-only
+//!   (reset on restart) as a safety measure.
+//!
+//! The human-scale P2P network (not the federation itself) is the ground truth.
+//! Doorways serve humans; humans do not belong to doorways.
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -566,6 +587,39 @@ pub fn new_peer_cache() -> PeerCache {
     Arc::new(tokio::sync::RwLock::new(Vec::new()))
 }
 
+/// Shared mutable list of federation peer URLs.
+/// Seeded from FEDERATION_PEERS env var, mutable via admin API at runtime.
+pub type PeerUrlList = Arc<tokio::sync::RwLock<Vec<String>>>;
+
+/// Create a new peer URL list from initial seeds
+pub fn new_peer_url_list(initial: Vec<String>) -> PeerUrlList {
+    Arc::new(tokio::sync::RwLock::new(initial))
+}
+
+/// Add a peer URL to the list. Returns true if added (not a duplicate).
+pub async fn add_peer_url(list: &PeerUrlList, url: String) -> bool {
+    let mut urls = list.write().await;
+    if urls.contains(&url) {
+        false
+    } else {
+        urls.push(url);
+        true
+    }
+}
+
+/// Remove a peer URL from the list. Returns true if removed.
+pub async fn remove_peer_url(list: &PeerUrlList, url: &str) -> bool {
+    let mut urls = list.write().await;
+    let len_before = urls.len();
+    urls.retain(|u| u != url);
+    urls.len() < len_before
+}
+
+/// Get a snapshot of the current peer URL list.
+pub async fn get_peer_urls(list: &PeerUrlList) -> Vec<String> {
+    list.read().await.clone()
+}
+
 /// Fetch federation info from a single peer doorway.
 /// Queries `{peer_url}/api/v1/federation/doorways` and returns parsed doorways.
 async fn fetch_single_peer(client: &reqwest::Client, peer_url: &str) -> Vec<PeerDoorway> {
@@ -667,8 +721,9 @@ pub async fn refresh_peer_cache(peer_urls: &[String], self_id: Option<&str>, cac
 
 /// Spawn a background task that periodically refreshes the peer cache.
 /// Initial fetch happens after `initial_delay`, then every `interval`.
+/// Reads peer URLs from the shared mutable list on each iteration.
 pub fn spawn_peer_discovery_task(
-    peer_urls: Vec<String>,
+    peer_urls: PeerUrlList,
     self_id: Option<String>,
     cache: PeerCache,
     initial_delay: std::time::Duration,
@@ -679,7 +734,8 @@ pub fn spawn_peer_discovery_task(
         tokio::time::sleep(initial_delay).await;
 
         loop {
-            refresh_peer_cache(&peer_urls, self_id.as_deref(), &cache).await;
+            let urls = peer_urls.read().await.clone();
+            refresh_peer_cache(&urls, self_id.as_deref(), &cache).await;
             tokio::time::sleep(interval).await;
         }
     })

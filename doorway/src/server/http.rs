@@ -97,6 +97,8 @@ pub struct AppState {
     pub zome_caller: Option<Arc<crate::services::ZomeCaller>>,
     /// Cache of peer doorways discovered via HTTP federation
     pub peer_cache: crate::services::federation::PeerCache,
+    /// Mutable list of federation peer URLs (seeded from env, mutable via admin API)
+    pub peer_url_list: crate::services::federation::PeerUrlList,
     /// Cached P2P health from elohim-storage sidecar (polled every 30s)
     pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
 }
@@ -132,6 +134,9 @@ impl AppState {
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Self {
             args,
             mongo: None,
@@ -160,6 +165,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -198,6 +204,9 @@ impl AppState {
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Self {
             args,
             mongo,
@@ -226,6 +235,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -279,6 +289,9 @@ impl AppState {
         // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Self {
             args,
             mongo,
@@ -307,6 +320,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -354,6 +368,9 @@ impl AppState {
         // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Ok(Self {
             args,
             mongo: Some(mongo),
@@ -382,6 +399,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         })
     }
@@ -780,6 +798,42 @@ async fn handle_request(
         (Method::POST, p) if p.starts_with("/admin/graduation/force/") => {
             let agent_key = p.strip_prefix("/admin/graduation/force/").unwrap_or("");
             to_boxed(routes::handle_force_graduation(Arc::clone(&state), agent_key).await)
+        }
+
+        // Federation peer admin — configured peer URLs with add/remove/refresh
+        (Method::GET, "/admin/federation/peers") => {
+            to_boxed(routes::handle_admin_federation_peers(Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/federation/peers/refresh") => {
+            to_boxed(routes::handle_admin_refresh_federation_peers(Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/federation/peers") => {
+            let body = match req.collect().await {
+                Ok(collected) => collected.to_bytes(),
+                Err(e) => {
+                    warn!("Federation peer add body error: {}", e);
+                    return Ok(to_boxed(bad_request_response(
+                        "Failed to read request body",
+                    )));
+                }
+            };
+            return Ok(to_boxed(
+                routes::handle_admin_add_federation_peer(Arc::clone(&state), body).await,
+            ));
+        }
+        (Method::DELETE, "/admin/federation/peers") => {
+            let body = match req.collect().await {
+                Ok(collected) => collected.to_bytes(),
+                Err(e) => {
+                    warn!("Federation peer remove body error: {}", e);
+                    return Ok(to_boxed(bad_request_response(
+                        "Failed to read request body",
+                    )));
+                }
+            };
+            return Ok(to_boxed(
+                routes::handle_admin_remove_federation_peer(Arc::clone(&state), body).await,
+            ));
         }
 
         // Agent conductor lookup

@@ -23,6 +23,7 @@ import {
   // Pipeline, federation, graduation models
   PipelineResponse,
   FederationDoorwaysAdminResponse,
+  FederationPeersConfigResponse,
   P2PPeersResponse,
   GraduationPendingResponse,
   GraduationCompletedResponse,
@@ -183,6 +184,63 @@ export class DoorwayAdminService {
         peers: [],
         total: 0,
       }))
+    );
+  }
+
+  /**
+   * Get configured federation peer URLs with enriched status
+   */
+  getFederationPeerConfig(): Observable<FederationPeersConfigResponse> {
+    return this.http.get<FederationPeersConfigResponse>(
+      `${this.baseUrl}/admin/federation/peers`
+    ).pipe(
+      timeout(this.timeout),
+      retry(2),
+      catchError(this.handleError<FederationPeersConfigResponse>('getFederationPeerConfig', {
+        peers: [],
+        total: 0,
+        selfId: null,
+      }))
+    );
+  }
+
+  /**
+   * Add a new federation peer URL
+   */
+  addFederationPeer(url: string): Observable<UserMutationResponse> {
+    return this.http.post<UserMutationResponse>(
+      `${this.baseUrl}/admin/federation/peers`,
+      { url }
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('addFederationPeer'))
+    );
+  }
+
+  /**
+   * Remove a federation peer URL
+   */
+  removeFederationPeer(url: string): Observable<UserMutationResponse> {
+    return this.http.request<UserMutationResponse>(
+      'DELETE',
+      `${this.baseUrl}/admin/federation/peers`,
+      { body: { url } }
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('removeFederationPeer'))
+    );
+  }
+
+  /**
+   * Force refresh of all federation peers
+   */
+  refreshFederationPeers(): Observable<UserMutationResponse> {
+    return this.http.post<UserMutationResponse>(
+      `${this.baseUrl}/admin/federation/peers/refresh`,
+      {}
+    ).pipe(
+      timeout(this.timeout),
+      catchError(this.handleMutationError('refreshFederationPeers'))
     );
   }
 

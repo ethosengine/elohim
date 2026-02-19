@@ -368,6 +368,30 @@ export interface P2PPeersResponse {
 }
 
 // ============================================================================
+// Federation Peer Config Models (Admin)
+// ============================================================================
+
+/**
+ * Configured federation peer with enriched status
+ */
+export interface FederationPeerConfig {
+  url: string;
+  reachable: boolean;
+  doorwayId: string | null;
+  region: string | null;
+  capabilities: string[];
+}
+
+/**
+ * Response from GET /admin/federation/peers
+ */
+export interface FederationPeersConfigResponse {
+  peers: FederationPeerConfig[];
+  total: number;
+  selfId: string | null;
+}
+
+// ============================================================================
 // Graduation Models
 // ============================================================================
 
