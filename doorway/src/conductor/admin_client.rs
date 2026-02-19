@@ -126,8 +126,16 @@ impl AdminClient {
         agent_key: &[u8],
         bundle_path: &str,
     ) -> Result<(), String> {
-        // Build inner request:
-        // { type: "install_app", data: { installed_app_id, agent_key, path: bundle_path } }
+        // Build inner request matching InstallAppPayload from @holochain/client v0.20:
+        // { type: "install_app", value: { installed_app_id, agent_key, source: { type: "path", value: bundle_path } } }
+        let source = Value::Map(vec![
+            (Value::String("type".into()), Value::String("path".into())),
+            (
+                Value::String("value".into()),
+                Value::String(bundle_path.into()),
+            ),
+        ]);
+
         let data = Value::Map(vec![
             (
                 Value::String("installed_app_id".into()),
@@ -137,10 +145,7 @@ impl AdminClient {
                 Value::String("agent_key".into()),
                 Value::Binary(agent_key.to_vec()),
             ),
-            (
-                Value::String("path".into()),
-                Value::String(bundle_path.into()),
-            ),
+            (Value::String("source".into()), source),
         ]);
 
         let inner = Value::Map(vec![
