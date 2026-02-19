@@ -8,6 +8,8 @@
 #   doorway-app/             → eslint + build
 #   sophia/                  → pnpm lint + typecheck + test
 #   holochain/elohim-storage → cargo check + clippy
+#   elohim-node/             → cargo check + tests
+#   genesis/                 → schema validation + tests
 #
 # This prevents pushing broken code that wastes CI time.
 
@@ -67,6 +69,12 @@ if echo "$CHANGED" | grep -q "^sophia/"; then
 fi
 if echo "$CHANGED" | grep -q "^holochain/elohim-storage/"; then
   PROJECTS="$PROJECTS elohim-storage"
+fi
+if echo "$CHANGED" | grep -q "^elohim-node/"; then
+  PROJECTS="$PROJECTS elohim-node"
+fi
+if echo "$CHANGED" | grep -q "^genesis/"; then
+  PROJECTS="$PROJECTS genesis"
 fi
 
 # Trim leading space
@@ -174,6 +182,36 @@ gate_elohim_storage() {
   return $rc
 }
 
+gate_elohim_node() {
+  cd elohim-node || return 1
+  echo "[elohim-node 1/2] Checking build..."
+  RUSTFLAGS="" cargo check 2>&1
+  rc=$?
+  if [ $rc -ne 0 ]; then cd ..; return 1; fi
+
+  echo "[elohim-node 2/2] Running tests..."
+  RUSTFLAGS="" cargo test 2>&1
+  rc=$?
+  cd ..
+  return $rc
+}
+
+gate_genesis() {
+  echo "[genesis 1/2] Validating seed data schemas..."
+  cd genesis/seeder || return 1
+  npm run validate 2>&1
+  rc=$?
+  cd ../..
+  if [ $rc -ne 0 ]; then return 1; fi
+
+  echo "[genesis 2/2] Running tests..."
+  cd genesis/seeder || return 1
+  npx vitest run 2>&1
+  rc=$?
+  cd ../..
+  return $rc
+}
+
 # ── Run Gates ─────────────────────────────────────────────────────
 
 PROJECT_COUNT=$(echo "$PROJECTS" | wc -w | tr -d ' ')
@@ -201,6 +239,8 @@ for PROJECT in $PROJECTS; do
     doorway-app)     gate_doorway_app     ;;
     sophia)          gate_sophia          ;;
     elohim-storage)  gate_elohim_storage  ;;
+    elohim-node)     gate_elohim_node     ;;
+    genesis)         gate_genesis         ;;
   esac
   GATE_EXIT=$?
 
