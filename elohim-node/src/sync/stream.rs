@@ -10,6 +10,7 @@ pub struct SyncState {
     pub local_position: u64,
 
     /// Last known position of each peer
+    #[allow(dead_code)]
     pub peer_positions: HashMap<String, u64>,
 
     /// Pending events to send

@@ -3,17 +3,21 @@
 //! Discovers other Elohim peers (nodes, apps, doorways) on the local network
 //! using mDNS and broadcasts notifications when new peers are found.
 
-use super::{DiscoveredPeer, PeerType};
+use super::DiscoveredPeer;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use tokio::sync::mpsc;
 
 /// mDNS service types we announce and listen for
+#[allow(dead_code)]
 pub const ELOHIM_NODE_SERVICE: &str = "_elohim-node._tcp.local.";
+#[allow(dead_code)]
 pub const ELOHIM_APP_SERVICE: &str = "_elohim-app._tcp.local.";
+#[allow(dead_code)]
 pub const ELOHIM_DOORWAY_SERVICE: &str = "_elohim-doorway._tcp.local.";
 
 /// Discovery event sent when peers are found
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum DiscoveryEvent {
     /// New peer discovered
@@ -28,6 +32,7 @@ pub enum DiscoveryEvent {
 }
 
 /// Discovery service configuration
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct DiscoveryConfig {
     /// Enable mDNS discovery
@@ -43,12 +48,14 @@ pub struct DiscoveryConfig {
 }
 
 /// Discovery service handle
+#[allow(dead_code)]
 pub struct DiscoveryService {
     config: DiscoveryConfig,
     event_tx: mpsc::Sender<DiscoveryEvent>,
     discovered: HashMap<String, DiscoveredPeer>,
 }
 
+#[allow(dead_code)]
 impl DiscoveryService {
     pub fn new(config: DiscoveryConfig, event_tx: mpsc::Sender<DiscoveryEvent>) -> Self {
         Self {
@@ -94,7 +101,7 @@ impl DiscoveryService {
     }
 
     /// Get MAC address for an IP
-    pub fn get_mac_for_ip(ip: IpAddr) -> Option<String> {
+    pub fn get_mac_for_ip(_ip: IpAddr) -> Option<String> {
         // TODO: Implement ARP lookup
         // On Linux: read /proc/net/arp
         // On macOS: use arp command
@@ -120,8 +127,8 @@ impl DiscoveryService {
     pub async fn accept_pairing(
         &self,
         request_id: &str,
-        operator_keys: &OperatorKeys,
-        network_info: &NetworkInfo,
+        _operator_keys: &OperatorKeys,
+        _network_info: &NetworkInfo,
     ) -> anyhow::Result<()> {
         tracing::info!("Accepting pairing request {}", request_id);
 
@@ -135,6 +142,7 @@ impl DiscoveryService {
 }
 
 /// Operator keys sent during pairing
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct OperatorKeys {
     /// Operator's agent public key
@@ -144,6 +152,7 @@ pub struct OperatorKeys {
 }
 
 /// Network information sent during pairing
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct NetworkInfo {
     /// Cluster name to join
@@ -155,6 +164,7 @@ pub struct NetworkInfo {
 }
 
 /// Message types for pairing protocol
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PairingMessage {
     /// Initial discovery announcement
@@ -182,8 +192,5 @@ pub enum PairingMessage {
     },
 
     /// Reject pairing request
-    PairingReject {
-        request_id: String,
-        reason: String,
-    },
+    PairingReject { request_id: String, reason: String },
 }

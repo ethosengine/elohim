@@ -28,16 +28,16 @@ impl ActionHandler for DebugActionHandler {
     fn can_handle(&self, kind: &ActionKind) -> bool {
         matches!(
             kind,
-            ActionKind::CaptureHeapDump
-                | ActionKind::CollectDiagnostics
-                | ActionKind::ReportBug
+            ActionKind::CaptureHeapDump | ActionKind::CollectDiagnostics | ActionKind::ReportBug
         )
     }
 }
 
 impl DebugActionHandler {
     async fn capture_heap_dump(&self, action: &Action) -> ActionResult {
-        let output_dir = action.params.get("output_dir")
+        let output_dir = action
+            .params
+            .get("output_dir")
             .and_then(|v| v.as_str())
             .unwrap_or("/tmp");
 
@@ -69,23 +69,27 @@ impl DebugActionHandler {
     }
 
     async fn collect_diagnostics(&self, action: &Action) -> ActionResult {
-        let include_logs = action.params.get("include_logs")
+        let include_logs = action
+            .params
+            .get("include_logs")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let include_config = action.params.get("include_config")
+        let include_config = action
+            .params
+            .get("include_config")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let include_metrics = action.params.get("include_metrics")
+        let include_metrics = action
+            .params
+            .get("include_metrics")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
         info!(
             include_logs,
-            include_config,
-            include_metrics,
-            "Diagnostics collection requested"
+            include_config, include_metrics, "Diagnostics collection requested"
         );
 
         // Collect system information
@@ -113,25 +117,27 @@ impl DebugActionHandler {
     }
 
     async fn report_bug(&self, action: &Action) -> ActionResult {
-        let title = action.params.get("title")
+        let title = action
+            .params
+            .get("title")
             .and_then(|v| v.as_str())
             .unwrap_or("Automated bug report");
 
-        let _description = action.params.get("description")
+        let _description = action
+            .params
+            .get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let severity = action.params.get("severity")
+        let severity = action
+            .params
+            .get("severity")
             .and_then(|v| v.as_str())
             .unwrap_or("medium");
 
         let _context = action.params.get("context");
 
-        info!(
-            title,
-            severity,
-            "Bug report submission requested"
-        );
+        info!(title, severity, "Bug report submission requested");
 
         // In a real implementation, this would:
         // 1. Collect diagnostics
@@ -139,10 +145,13 @@ impl DebugActionHandler {
         // 3. Submit to a bug tracking system or telemetry endpoint
         // 4. Return a tracking ID
 
-        let report_id = format!("BUG-{}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs());
+        let report_id = format!(
+            "BUG-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        );
 
         ActionResult {
             success: true,

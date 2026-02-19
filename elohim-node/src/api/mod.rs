@@ -5,7 +5,7 @@
 //! - gRPC API for device clients
 //! - WebSocket for real-time sync
 
-pub mod http;
 pub mod grpc;
+pub mod http;
 
 // TODO: Implement API layer

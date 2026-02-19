@@ -8,8 +8,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
-use crate::dashboard::metrics::{self, NodeMetrics, NodeConditions};
 use super::models::*;
+use crate::dashboard::metrics::{self, NodeConditions, NodeMetrics};
 
 /// Maximum observations to keep in history
 const MAX_OBSERVATION_HISTORY: usize = 1000;
@@ -25,7 +25,9 @@ impl Monitor {
     pub fn new(node_id: String) -> Self {
         Self {
             node_id,
-            observations: Arc::new(RwLock::new(VecDeque::with_capacity(MAX_OBSERVATION_HISTORY))),
+            observations: Arc::new(RwLock::new(VecDeque::with_capacity(
+                MAX_OBSERVATION_HISTORY,
+            ))),
             previous_conditions: None,
         }
     }
@@ -69,6 +71,7 @@ impl Monitor {
     }
 
     /// Get observations since a given timestamp
+    #[allow(dead_code)]
     pub async fn get_observations_since(&self, since: u64) -> Vec<Observation> {
         let obs = self.observations.read().await;
         obs.iter()
@@ -80,11 +83,7 @@ impl Monitor {
     /// Get recent observations (last N)
     pub async fn get_recent(&self, count: usize) -> Vec<Observation> {
         let obs = self.observations.read().await;
-        obs.iter()
-            .rev()
-            .take(count)
-            .cloned()
-            .collect()
+        obs.iter().rev().take(count).cloned().collect()
     }
 
     /// Get the latest metrics observation
@@ -124,11 +123,36 @@ impl Monitor {
 
         // Check each condition for changes
         let checks = [
-            ("memory_pressure", prev.memory_pressure.status, curr.memory_pressure.status, &curr.memory_pressure.reason),
-            ("disk_pressure", prev.disk_pressure.status, curr.disk_pressure.status, &curr.disk_pressure.reason),
-            ("pid_pressure", prev.pid_pressure.status, curr.pid_pressure.status, &curr.pid_pressure.reason),
-            ("network_ready", prev.network_ready.status, curr.network_ready.status, &curr.network_ready.reason),
-            ("ready", prev.ready.status, curr.ready.status, &curr.ready.reason),
+            (
+                "memory_pressure",
+                prev.memory_pressure.status,
+                curr.memory_pressure.status,
+                &curr.memory_pressure.reason,
+            ),
+            (
+                "disk_pressure",
+                prev.disk_pressure.status,
+                curr.disk_pressure.status,
+                &curr.disk_pressure.reason,
+            ),
+            (
+                "pid_pressure",
+                prev.pid_pressure.status,
+                curr.pid_pressure.status,
+                &curr.pid_pressure.reason,
+            ),
+            (
+                "network_ready",
+                prev.network_ready.status,
+                curr.network_ready.status,
+                &curr.network_ready.reason,
+            ),
+            (
+                "ready",
+                prev.ready.status,
+                curr.ready.status,
+                &curr.ready.reason,
+            ),
         ];
 
         for (condition, prev_status, curr_status, reason) in checks {
@@ -186,14 +210,11 @@ impl Monitor {
             },
         });
 
-        Observation::new(
-            &self.node_id,
-            ObservationKind::ServiceHealth,
-            data,
-        )
+        Observation::new(&self.node_id, ObservationKind::ServiceHealth, data)
     }
 
     /// Record an external observation (from peer or user)
+    #[allow(dead_code)]
     pub async fn record(&self, observation: Observation) {
         let mut obs = self.observations.write().await;
         obs.push_back(observation);
@@ -203,6 +224,7 @@ impl Monitor {
     }
 
     /// Record an anomaly
+    #[allow(dead_code)]
     pub async fn record_anomaly(
         &self,
         anomaly_type: AnomalyType,
@@ -239,8 +261,12 @@ mod tests {
 
         // Should have at least system metrics and service health
         assert!(observations.len() >= 2);
-        assert!(observations.iter().any(|o| o.kind == ObservationKind::SystemMetrics));
-        assert!(observations.iter().any(|o| o.kind == ObservationKind::ServiceHealth));
+        assert!(observations
+            .iter()
+            .any(|o| o.kind == ObservationKind::SystemMetrics));
+        assert!(observations
+            .iter()
+            .any(|o| o.kind == ObservationKind::ServiceHealth));
     }
 
     #[tokio::test]

@@ -11,16 +11,13 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     metrics::{collect_metrics, NodeMetrics},
-    setup::{
-        setup_doorway, setup_join_network, DoorwayConfig, JoinNetworkConfig, SetupResult,
-    },
+    setup::{setup_doorway, setup_join_network, DoorwayConfig, JoinNetworkConfig, SetupResult},
     DiscoveredPeer, PairingRequest, PairingStatus, SharedState,
 };
-use crate::update::{UpdateStatus, CURRENT_VERSION};
 use crate::network::{
-    RegistrationStatus, Operator,
-    SyncProgress, ConnectedApp, sync_state::ConnectedAppsSummary,
+    sync_state::ConnectedAppsSummary, ConnectedApp, Operator, RegistrationStatus, SyncProgress,
 };
+use crate::update::{UpdateStatus, CURRENT_VERSION};
 
 /// Dashboard index page
 pub async fn index(State(state): State<SharedState>) -> impl IntoResponse {
@@ -160,6 +157,7 @@ pub async fn api_approve_pairing(
 #[derive(Deserialize)]
 pub struct RejectRequest {
     pub request_id: String,
+    #[allow(dead_code)]
     pub reason: Option<String>,
 }
 
@@ -258,7 +256,7 @@ pub async fn api_update_check(
     State(state): State<SharedState>,
     Json(req): Json<CheckUpdatesRequest>,
 ) -> Json<UpdateStatusResponse> {
-    use crate::update::{UpdateService, UpdateConfig};
+    use crate::update::UpdateService;
 
     let state_guard = state.read().await;
     let config = state_guard.config.update.clone();
@@ -273,7 +271,9 @@ pub async fn api_update_check(
 
     let status = match update_service.check_for_updates().await {
         Ok(s) => s,
-        Err(e) => UpdateStatus::Failed { error: e.to_string() },
+        Err(e) => UpdateStatus::Failed {
+            error: e.to_string(),
+        },
     };
 
     Json(UpdateStatusResponse {
@@ -288,7 +288,7 @@ pub async fn api_update_apply(
     State(state): State<SharedState>,
     Json(req): Json<CheckUpdatesRequest>,
 ) -> Json<UpdateStatusResponse> {
-    use crate::update::{UpdateService, UpdateConfig};
+    use crate::update::UpdateService;
 
     let state_guard = state.read().await;
     let config = state_guard.config.update.clone();
@@ -304,7 +304,9 @@ pub async fn api_update_apply(
     if let Err(e) = update_service.check_for_updates().await {
         return Json(UpdateStatusResponse {
             current_version: CURRENT_VERSION.to_string(),
-            status: UpdateStatus::Failed { error: e.to_string() },
+            status: UpdateStatus::Failed {
+                error: e.to_string(),
+            },
             auto_update_enabled: config.enabled,
         });
     }
@@ -312,7 +314,9 @@ pub async fn api_update_apply(
     // Apply update
     let status = match update_service.apply_update().await {
         Ok(_) => update_service.status().clone(),
-        Err(e) => UpdateStatus::Failed { error: e.to_string() },
+        Err(e) => UpdateStatus::Failed {
+            error: e.to_string(),
+        },
     };
 
     Json(UpdateStatusResponse {
@@ -324,7 +328,7 @@ pub async fn api_update_apply(
 
 /// POST /api/update/rollback - Rollback to previous version
 pub async fn api_update_rollback(State(state): State<SharedState>) -> Json<UpdateStatusResponse> {
-    use crate::update::{UpdateService, UpdateConfig};
+    use crate::update::UpdateService;
 
     let state_guard = state.read().await;
     let config = state_guard.config.update.clone();
@@ -336,7 +340,9 @@ pub async fn api_update_rollback(State(state): State<SharedState>) -> Json<Updat
         Ok(_) => UpdateStatus::PendingRestart {
             version: "previous".to_string(),
         },
-        Err(e) => UpdateStatus::Failed { error: e.to_string() },
+        Err(e) => UpdateStatus::Failed {
+            error: e.to_string(),
+        },
     };
 
     Json(UpdateStatusResponse {
@@ -377,12 +383,16 @@ pub async fn api_network_status(State(state): State<SharedState>) -> Json<Networ
     let state = state.read().await;
     let network = &state.network;
 
-    let doorways: Vec<DoorwaySummary> = network.doorways.iter().map(|d| DoorwaySummary {
-        url: d.url.clone(),
-        is_primary: d.is_primary,
-        status: format!("{:?}", d.status),
-        last_contact: d.last_contact,
-    }).collect();
+    let doorways: Vec<DoorwaySummary> = network
+        .doorways
+        .iter()
+        .map(|d| DoorwaySummary {
+            url: d.url.clone(),
+            is_primary: d.is_primary,
+            status: format!("{:?}", d.status),
+            last_contact: d.last_contact,
+        })
+        .collect();
 
     let cluster_name = network.cluster.as_ref().map(|c| c.name.clone());
     let cluster_role = network.cluster.as_ref().map(|c| format!("{:?}", c.role));
@@ -437,7 +447,11 @@ pub async fn api_node_info(State(state): State<SharedState>) -> Json<NodeInfoRes
     let state = state.read().await;
 
     let cluster_name = state.network.cluster.as_ref().map(|c| c.name.clone());
-    let cluster_role = state.network.cluster.as_ref().map(|c| format!("{:?}", c.role));
+    let cluster_role = state
+        .network
+        .cluster
+        .as_ref()
+        .map(|c| format!("{:?}", c.role));
     let sync_state = format!("{:?}", state.network.sync_progress.state);
 
     Json(NodeInfoResponse {
@@ -505,7 +519,10 @@ pub async fn api_list_nodes(State(state): State<SharedState>) -> Json<Vec<Networ
         if matches!(peer.node_type, super::PeerType::Node) {
             nodes.push(NetworkNodeInfo {
                 node_id: peer.peer_id.clone(),
-                hostname: peer.hostname.clone().unwrap_or_else(|| peer.peer_id.clone()),
+                hostname: peer
+                    .hostname
+                    .clone()
+                    .unwrap_or_else(|| peer.peer_id.clone()),
                 addresses: peer.addresses.clone(),
                 port: state.config.api.http_port, // Assume same port
                 is_local: false,
@@ -535,17 +552,31 @@ pub async fn api_proxy_node(
     let client = Client::new();
     let url = format!("http://{}{}", req.node_address, req.endpoint);
 
-    match client.get(&url).timeout(std::time::Duration::from_secs(5)).send().await {
+    match client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
         Ok(response) => {
             if response.status().is_success() {
                 match response.json::<serde_json::Value>().await {
                     Ok(data) => Ok(Json(data)),
-                    Err(e) => Err((StatusCode::BAD_GATEWAY, format!("Failed to parse response: {}", e))),
+                    Err(e) => Err((
+                        StatusCode::BAD_GATEWAY,
+                        format!("Failed to parse response: {}", e),
+                    )),
                 }
             } else {
-                Err((StatusCode::BAD_GATEWAY, format!("Remote node returned: {}", response.status())))
+                Err((
+                    StatusCode::BAD_GATEWAY,
+                    format!("Remote node returned: {}", response.status()),
+                ))
             }
         }
-        Err(e) => Err((StatusCode::BAD_GATEWAY, format!("Failed to reach node: {}", e))),
+        Err(e) => Err((
+            StatusCode::BAD_GATEWAY,
+            format!("Failed to reach node: {}", e),
+        )),
     }
 }

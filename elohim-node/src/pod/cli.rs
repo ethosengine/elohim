@@ -3,8 +3,7 @@
 //! Provides commands for humans (and eventually elohim agents) to
 //! interact with the pod for manual operations.
 
-use clap::{Args, Subcommand};
-use tracing::info;
+use clap::Subcommand;
 
 use super::models::*;
 use super::Pod;
@@ -215,93 +214,96 @@ pub async fn execute_command(pod: &mut Pod, command: PodCommands) -> Result<Stri
 /// Convert ExecCommand to Action
 fn exec_to_action(cmd: ExecCommands) -> Result<Action, String> {
     match cmd {
-        ExecCommands::SetLogLevel { level, module } => {
-            Ok(Action::new(
-                ActionKind::SetLogLevel,
-                format!("Set log level to {} for {}", level, module.as_deref().unwrap_or("all")),
-                serde_json::json!({
-                    "level": level,
-                    "module": module,
-                }),
-            ))
-        }
+        ExecCommands::SetLogLevel { level, module } => Ok(Action::new(
+            ActionKind::SetLogLevel,
+            format!(
+                "Set log level to {} for {}",
+                level,
+                module.as_deref().unwrap_or("all")
+            ),
+            serde_json::json!({
+                "level": level,
+                "module": module,
+            }),
+        )),
 
-        ExecCommands::FlushCache { cache } => {
-            Ok(Action::new(
-                ActionKind::FlushCache,
-                format!("Flush {} cache", cache),
-                serde_json::json!({"cache": cache}),
-            ))
-        }
+        ExecCommands::FlushCache { cache } => Ok(Action::new(
+            ActionKind::FlushCache,
+            format!("Flush {} cache", cache),
+            serde_json::json!({"cache": cache}),
+        )),
 
-        ExecCommands::ResizeCache { cache, size_mb } => {
-            Ok(Action::new(
-                ActionKind::ResizeCache,
-                format!("Resize {} cache to {} MB", cache, size_mb),
-                serde_json::json!({
-                    "cache": cache,
-                    "size_mb": size_mb,
-                }),
-            ))
-        }
+        ExecCommands::ResizeCache { cache, size_mb } => Ok(Action::new(
+            ActionKind::ResizeCache,
+            format!("Resize {} cache to {} MB", cache, size_mb),
+            serde_json::json!({
+                "cache": cache,
+                "size_mb": size_mb,
+            }),
+        )),
 
-        ExecCommands::RestartService { service } => {
-            Ok(Action::new(
-                ActionKind::RestartService,
-                format!("Restart {} service", service),
-                serde_json::json!({"service": service}),
-            ))
-        }
+        ExecCommands::RestartService { service } => Ok(Action::new(
+            ActionKind::RestartService,
+            format!("Restart {} service", service),
+            serde_json::json!({"service": service}),
+        )),
 
-        ExecCommands::Diagnostics { logs, config } => {
-            Ok(Action::new(
-                ActionKind::CollectDiagnostics,
-                "Collect diagnostics",
-                serde_json::json!({
-                    "include_logs": logs,
-                    "include_config": config,
-                }),
-            ))
-        }
+        ExecCommands::Diagnostics { logs, config } => Ok(Action::new(
+            ActionKind::CollectDiagnostics,
+            "Collect diagnostics",
+            serde_json::json!({
+                "include_logs": logs,
+                "include_config": config,
+            }),
+        )),
 
-        ExecCommands::ReportBug { title, description, severity } => {
-            Ok(Action::new(
-                ActionKind::ReportBug,
-                format!("Report bug: {}", title),
-                serde_json::json!({
-                    "title": title,
-                    "description": description,
-                    "severity": severity,
-                }),
-            ))
-        }
+        ExecCommands::ReportBug {
+            title,
+            description,
+            severity,
+        } => Ok(Action::new(
+            ActionKind::ReportBug,
+            format!("Report bug: {}", title),
+            serde_json::json!({
+                "title": title,
+                "description": description,
+                "severity": severity,
+            }),
+        )),
 
-        ExecCommands::ThrottleSync { max_rate_kbps, max_concurrent, duration_secs } => {
-            Ok(Action::new(
-                ActionKind::ThrottleSync,
-                "Throttle sync operations",
-                serde_json::json!({
-                    "max_rate_kbps": max_rate_kbps,
-                    "max_concurrent": max_concurrent,
-                    "duration_secs": duration_secs,
-                }),
-            ))
-        }
+        ExecCommands::ThrottleSync {
+            max_rate_kbps,
+            max_concurrent,
+            duration_secs,
+        } => Ok(Action::new(
+            ActionKind::ThrottleSync,
+            "Throttle sync operations",
+            serde_json::json!({
+                "max_rate_kbps": max_rate_kbps,
+                "max_concurrent": max_concurrent,
+                "duration_secs": duration_secs,
+            }),
+        )),
 
-        ExecCommands::RebalanceStorage { target_percent, dry_run } => {
-            Ok(Action::new(
-                ActionKind::RebalanceStorage,
-                "Rebalance storage",
-                serde_json::json!({
-                    "target_usage_percent": target_percent,
-                    "dry_run": dry_run,
-                }),
-            ).with_risk(if dry_run {
-                ActionRisk::Safe
-            } else {
-                ActionRisk::Risky { required_approvals: 2, total_evaluators: 3 }
-            }))
-        }
+        ExecCommands::RebalanceStorage {
+            target_percent,
+            dry_run,
+        } => Ok(Action::new(
+            ActionKind::RebalanceStorage,
+            "Rebalance storage",
+            serde_json::json!({
+                "target_usage_percent": target_percent,
+                "dry_run": dry_run,
+            }),
+        )
+        .with_risk(if dry_run {
+            ActionRisk::Safe
+        } else {
+            ActionRisk::Risky {
+                required_approvals: 2,
+                total_evaluators: 3,
+            }
+        })),
 
         ExecCommands::ReplicateBlob { hash, targets } => {
             let target_nodes: Vec<String> = targets
@@ -318,37 +320,43 @@ fn exec_to_action(cmd: ExecCommands) -> Result<Action, String> {
             ))
         }
 
-        ExecCommands::EvictBlob { hash, min_replicas } => {
-            Ok(Action::new(
-                ActionKind::EvictBlob,
-                format!("Evict blob {}", hash),
-                serde_json::json!({
-                    "blob_hash": hash,
-                    "min_replicas": min_replicas,
-                    "verify_replicas": true,
-                }),
-            ).with_risk(ActionRisk::Risky { required_approvals: 2, total_evaluators: 3 }))
-        }
+        ExecCommands::EvictBlob { hash, min_replicas } => Ok(Action::new(
+            ActionKind::EvictBlob,
+            format!("Evict blob {}", hash),
+            serde_json::json!({
+                "blob_hash": hash,
+                "min_replicas": min_replicas,
+                "verify_replicas": true,
+            }),
+        )
+        .with_risk(ActionRisk::Risky {
+            required_approvals: 2,
+            total_evaluators: 3,
+        })),
 
-        ExecCommands::ReconnectPeer { peer } => {
-            Ok(Action::new(
-                ActionKind::ReconnectPeer,
-                format!("Reconnect to peer {}", peer),
-                serde_json::json!({"peer_id": peer}),
-            ))
-        }
+        ExecCommands::ReconnectPeer { peer } => Ok(Action::new(
+            ActionKind::ReconnectPeer,
+            format!("Reconnect to peer {}", peer),
+            serde_json::json!({"peer_id": peer}),
+        )),
 
-        ExecCommands::QuarantineNode { node, reason, duration_secs } => {
-            Ok(Action::new(
-                ActionKind::QuarantineNode,
-                format!("Quarantine node {}: {}", node, reason),
-                serde_json::json!({
-                    "node_id": node,
-                    "reason": reason,
-                    "duration_secs": duration_secs,
-                }),
-            ).with_risk(ActionRisk::Risky { required_approvals: 2, total_evaluators: 3 }))
-        }
+        ExecCommands::QuarantineNode {
+            node,
+            reason,
+            duration_secs,
+        } => Ok(Action::new(
+            ActionKind::QuarantineNode,
+            format!("Quarantine node {}: {}", node, reason),
+            serde_json::json!({
+                "node_id": node,
+                "reason": reason,
+                "duration_secs": duration_secs,
+            }),
+        )
+        .with_risk(ActionRisk::Risky {
+            required_approvals: 2,
+            total_evaluators: 3,
+        })),
     }
 }
 
@@ -361,9 +369,17 @@ fn format_status(status: &PodStatus) -> String {
     output.push_str(&format!("Node ID:        {}\n", status.node_id));
     output.push_str(&format!("Active:         {}\n", status.active));
     output.push_str(&format!("Mode:           {:?}\n", status.mode));
-    output.push_str(&format!("Started:        {}\n", format_timestamp(status.started_at)));
-    output.push_str(&format!("Last Decision:  {}\n",
-        status.last_decision_at.map(format_timestamp).unwrap_or_else(|| "Never".to_string())));
+    output.push_str(&format!(
+        "Started:        {}\n",
+        format_timestamp(status.started_at)
+    ));
+    output.push_str(&format!(
+        "Last Decision:  {}\n",
+        status
+            .last_decision_at
+            .map(format_timestamp)
+            .unwrap_or_else(|| "Never".to_string())
+    ));
     output.push_str(&format!("Actions Exec:   {}\n", status.actions_executed));
     output.push_str(&format!("Actions Pend:   {}\n", status.actions_pending));
     output.push_str(&format!("Active Rules:   {}\n", status.active_rules));

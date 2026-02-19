@@ -10,15 +10,15 @@
 
 mod config;
 mod dashboard;
-mod update;
 mod network;
 mod pod;
+mod update;
 
-mod sync;
-mod cluster;
-mod storage;
-mod p2p;
 mod api;
+mod cluster;
+mod p2p;
+mod storage;
+mod sync;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use tokio::sync::{mpsc, Mutex, RwLock};
-use tracing::{info, error};
+use tracing::{error, info};
 
 use config::Config;
 use dashboard::{create_router, DashboardState};
@@ -63,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("elohim_node=info".parse()?)
+                .add_directive("elohim_node=info".parse()?),
         )
         .init();
 
@@ -158,22 +158,20 @@ async fn main() -> anyhow::Result<()> {
 
             // Create sync engine
             let engine = Arc::new(Mutex::new(
-                sync::SyncEngine::new(data_dir)
-                    .expect("Failed to initialize sync engine"),
+                sync::SyncEngine::new(data_dir).expect("Failed to initialize sync engine"),
             ));
 
             // Create sync coordinator
-            let coordinator = sync::SyncCoordinator::new(
-                engine.clone(),
-                config.sync.sync_interval_ms,
-            );
+            let coordinator =
+                sync::SyncCoordinator::new(engine.clone(), config.sync.sync_interval_ms);
 
             // Channels between swarm event loop and coordinator
             let (swarm_event_tx, swarm_event_rx) = mpsc::channel(256);
-            let (swarm_cmd_tx, mut swarm_cmd_rx) = mpsc::channel::<sync::coordinator::SwarmCommand>(256);
+            let (swarm_cmd_tx, _swarm_cmd_rx) =
+                mpsc::channel::<sync::coordinator::SwarmCommand>(256);
 
             // Spawn swarm event loop
-            let mut swarm_handle = swarm;
+            let swarm_handle = swarm;
             tokio::spawn(async move {
                 // Forward commands to swarm in parallel with event loop
                 // We split: the swarm.run() consumes self and pushes events

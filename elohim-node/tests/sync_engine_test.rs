@@ -6,7 +6,7 @@
 //! - Stream position tracking
 //! - Concurrent document operations
 
-use automerge::{AutoCommit, ReadDoc, transaction::Transactable};
+use automerge::{transaction::Transactable, AutoCommit, ReadDoc};
 use rusqlite::Connection;
 use tempfile::TempDir;
 
@@ -30,8 +30,9 @@ fn test_sqlite_database_creation() {
             doc_id TEXT PRIMARY KEY,
             data BLOB NOT NULL,
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-        );"
-    ).unwrap();
+        );",
+    )
+    .unwrap();
 
     // Verify table exists
     let count: i32 = db
@@ -142,20 +143,29 @@ fn test_automerge_realistic_mastery_data() {
 
     // Set top-level fields
     doc.put(automerge::ROOT, "agentId", "agent-xyz789").unwrap();
-    doc.put(automerge::ROOT, "pathId", "path-manifesto-foundations").unwrap();
+    doc.put(automerge::ROOT, "pathId", "path-manifesto-foundations")
+        .unwrap();
 
     // Create a list to track mastery events
-    let events = doc.put_object(automerge::ROOT, "events", automerge::ObjType::List).unwrap();
+    let events = doc
+        .put_object(automerge::ROOT, "events", automerge::ObjType::List)
+        .unwrap();
 
     // Add mastery event 1
-    let event1 = doc.insert_object(&events, 0, automerge::ObjType::Map).unwrap();
-    doc.put(&event1, "contentId", "concept-free-software").unwrap();
+    let event1 = doc
+        .insert_object(&events, 0, automerge::ObjType::Map)
+        .unwrap();
+    doc.put(&event1, "contentId", "concept-free-software")
+        .unwrap();
     doc.put(&event1, "score", "92").unwrap();
     doc.put(&event1, "timestamp", "1706000000").unwrap();
 
     // Add mastery event 2
-    let event2 = doc.insert_object(&events, 1, automerge::ObjType::Map).unwrap();
-    doc.put(&event2, "contentId", "quiz-manifesto-basics").unwrap();
+    let event2 = doc
+        .insert_object(&events, 1, automerge::ObjType::Map)
+        .unwrap();
+    doc.put(&event2, "contentId", "quiz-manifesto-basics")
+        .unwrap();
     doc.put(&event2, "score", "78").unwrap();
     doc.put(&event2, "timestamp", "1706001000").unwrap();
 
@@ -256,8 +266,9 @@ fn test_document_roundtrip_through_sqlite() {
             doc_id TEXT PRIMARY KEY,
             data BLOB NOT NULL,
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-        );"
-    ).unwrap();
+        );",
+    )
+    .unwrap();
 
     // Create and save a document
     let mut doc = AutoCommit::new();
@@ -267,7 +278,8 @@ fn test_document_roundtrip_through_sqlite() {
     db.execute(
         "INSERT INTO documents (doc_id, data) VALUES (?1, ?2)",
         rusqlite::params!["mastery-agent-1", &data],
-    ).unwrap();
+    )
+    .unwrap();
 
     // Load it back
     let loaded_data: Vec<u8> = db
@@ -294,8 +306,9 @@ fn test_document_upsert() {
             doc_id TEXT PRIMARY KEY,
             data BLOB NOT NULL,
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-        );"
-    ).unwrap();
+        );",
+    )
+    .unwrap();
 
     // Insert
     let mut doc = AutoCommit::new();
@@ -307,7 +320,8 @@ fn test_document_upsert() {
          VALUES (?1, ?2, strftime('%s', 'now'))
          ON CONFLICT(doc_id) DO UPDATE SET data = ?2, updated_at = strftime('%s', 'now')",
         rusqlite::params!["doc-1", &data1],
-    ).unwrap();
+    )
+    .unwrap();
 
     // Update (upsert)
     doc.put(automerge::ROOT, "val", "second").unwrap();
@@ -318,13 +332,16 @@ fn test_document_upsert() {
          VALUES (?1, ?2, strftime('%s', 'now'))
          ON CONFLICT(doc_id) DO UPDATE SET data = ?2, updated_at = strftime('%s', 'now')",
         rusqlite::params!["doc-1", &data2],
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should have latest
     let loaded_data: Vec<u8> = db
-        .query_row("SELECT data FROM documents WHERE doc_id = ?1", ["doc-1"], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT data FROM documents WHERE doc_id = ?1",
+            ["doc-1"],
+            |row| row.get(0),
+        )
         .unwrap();
 
     let loaded = AutoCommit::load(&loaded_data).unwrap();
@@ -343,8 +360,9 @@ fn test_load_nonexistent_document() {
             doc_id TEXT PRIMARY KEY,
             data BLOB NOT NULL,
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-        );"
-    ).unwrap();
+        );",
+    )
+    .unwrap();
 
     let result = db.query_row(
         "SELECT data FROM documents WHERE doc_id = ?1",
@@ -433,7 +451,8 @@ fn test_hex_decode_valid() {
     let bytes = hex_decode("deadbeef").unwrap();
     assert_eq!(bytes, vec![0xde, 0xad, 0xbe, 0xef]);
 
-    let zeros = hex_decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let zeros =
+        hex_decode("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     assert_eq!(zeros.len(), 32);
 
     // Odd length should fail
@@ -460,27 +479,40 @@ fn test_sync_message_roundtrip_msgpack() {
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     enum TestSyncMessage {
-        SyncRequest { since: u64, limit: Option<u32> },
-        SyncResponse { events: Vec<TestSyncEvent>, has_more: bool },
-        DocRequest { doc_id: String, heads: Vec<String> },
-        DocResponse { doc_id: String, changes: Vec<Vec<u8>> },
+        SyncRequest {
+            since: u64,
+            limit: Option<u32>,
+        },
+        SyncResponse {
+            events: Vec<TestSyncEvent>,
+            has_more: bool,
+        },
+        DocRequest {
+            doc_id: String,
+            heads: Vec<String>,
+        },
+        DocResponse {
+            doc_id: String,
+            changes: Vec<Vec<u8>>,
+        },
     }
 
     // Test SyncRequest
-    let req = TestSyncMessage::SyncRequest { since: 42, limit: Some(100) };
+    let req = TestSyncMessage::SyncRequest {
+        since: 42,
+        limit: Some(100),
+    };
     let encoded = rmp_serde::to_vec(&req).unwrap();
     let decoded: TestSyncMessage = rmp_serde::from_slice(&encoded).unwrap();
     assert_eq!(req, decoded);
 
     // Test SyncResponse with events
     let resp = TestSyncMessage::SyncResponse {
-        events: vec![
-            TestSyncEvent {
-                position: 1,
-                doc_id: "mastery-agent-1".to_string(),
-                change_hash: "abc123".to_string(),
-            },
-        ],
+        events: vec![TestSyncEvent {
+            position: 1,
+            doc_id: "mastery-agent-1".to_string(),
+            change_hash: "abc123".to_string(),
+        }],
         has_more: false,
     };
     let encoded = rmp_serde::to_vec(&resp).unwrap();

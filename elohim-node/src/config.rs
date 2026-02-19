@@ -55,8 +55,12 @@ impl Default for PodConfig {
     }
 }
 
-fn default_decision_interval() -> u64 { 10 }
-fn default_max_actions() -> u32 { 20 }
+fn default_decision_interval() -> u64 {
+    10
+}
+fn default_max_actions() -> u32 {
+    20
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeConfig {
@@ -129,19 +133,33 @@ pub struct ApiConfig {
 }
 
 // Defaults
-fn default_max_doc_size() -> usize { 10 * 1024 * 1024 } // 10MB
-fn default_sync_interval() -> u64 { 1000 }
-fn default_true() -> bool { true }
+fn default_max_doc_size() -> usize {
+    10 * 1024 * 1024
+} // 10MB
+fn default_sync_interval() -> u64 {
+    1000
+}
+fn default_true() -> bool {
+    true
+}
 fn default_listen_addrs() -> Vec<String> {
     vec![
         "/ip4/0.0.0.0/tcp/4001".to_string(),
         "/ip4/0.0.0.0/udp/4001/quic-v1".to_string(),
     ]
 }
-fn default_max_capacity() -> String { "500GB".to_string() }
-fn default_shard_redundancy() -> u8 { 3 }
-fn default_http_port() -> u16 { 8080 }
-fn default_grpc_port() -> u16 { 9090 }
+fn default_max_capacity() -> String {
+    "500GB".to_string()
+}
+fn default_shard_redundancy() -> u8 {
+    3
+}
+fn default_http_port() -> u16 {
+    8080
+}
+fn default_grpc_port() -> u16 {
+    9090
+}
 
 impl Default for Config {
     fn default() -> Self {

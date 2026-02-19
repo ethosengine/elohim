@@ -4,8 +4,8 @@
 //! - SHA256 checksum
 //! - Ed25519 signature (if provided)
 
-use std::path::{Path, PathBuf};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
 use super::UpdateError;
@@ -32,10 +32,11 @@ impl UpdateDownloader {
         F: Fn(u8),
     {
         // Ensure update directory exists
-        std::fs::create_dir_all(&self.update_dir)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        std::fs::create_dir_all(&self.update_dir).map_err(|e| UpdateError::Io(e.to_string()))?;
 
-        let download_path = self.update_dir.join(format!("elohim-node-{}.download", version));
+        let download_path = self
+            .update_dir
+            .join(format!("elohim-node-{}.download", version));
         let final_path = self.update_dir.join(format!("elohim-node-{}", version));
 
         // Check if already downloaded and verified
@@ -45,22 +46,23 @@ impl UpdateDownloader {
                 return Ok(final_path);
             } else {
                 // Checksum mismatch, re-download
-                std::fs::remove_file(&final_path)
-                    .map_err(|e| UpdateError::Io(e.to_string()))?;
+                std::fs::remove_file(&final_path).map_err(|e| UpdateError::Io(e.to_string()))?;
             }
         }
 
         info!("Downloading update from {}", url);
 
         let client = reqwest::Client::new();
-        let response = client.get(url)
+        let response = client
+            .get(url)
             .send()
             .await
             .map_err(|e| UpdateError::Network(e.to_string()))?;
 
         if !response.status().is_success() {
             return Err(UpdateError::DownloadFailed(format!(
-                "HTTP {}", response.status()
+                "HTTP {}",
+                response.status()
             )));
         }
 
@@ -68,8 +70,8 @@ impl UpdateDownloader {
         let mut downloaded: u64 = 0;
 
         // Stream to file
-        let mut file = std::fs::File::create(&download_path)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        let mut file =
+            std::fs::File::create(&download_path).map_err(|e| UpdateError::Io(e.to_string()))?;
 
         let mut stream = response.bytes_stream();
         use futures::StreamExt;
@@ -99,8 +101,7 @@ impl UpdateDownloader {
         }
 
         // Rename to final path
-        std::fs::rename(&download_path, &final_path)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        std::fs::rename(&download_path, &final_path).map_err(|e| UpdateError::Io(e.to_string()))?;
 
         // Make executable on Unix
         #[cfg(unix)]
@@ -120,14 +121,12 @@ impl UpdateDownloader {
 
     /// Verify SHA256 checksum of a file
     pub fn verify_checksum(&self, path: &Path, expected: &str) -> Result<bool, UpdateError> {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
 
-        let mut file = std::fs::File::open(path)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        let mut file = std::fs::File::open(path).map_err(|e| UpdateError::Io(e.to_string()))?;
 
         let mut hasher = Sha256::new();
-        std::io::copy(&mut file, &mut hasher)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        std::io::copy(&mut file, &mut hasher).map_err(|e| UpdateError::Io(e.to_string()))?;
 
         let result = hasher.finalize();
         let hex = format!("{:x}", result);
@@ -136,7 +135,7 @@ impl UpdateDownloader {
     }
 
     /// Verify Ed25519 signature
-    pub fn verify_signature(&self, path: &Path, signature: &str) -> Result<(), UpdateError> {
+    pub fn verify_signature(&self, _path: &Path, _signature: &str) -> Result<(), UpdateError> {
         // TODO: Implement Ed25519 signature verification
         // For now, just warn and accept
         warn!("Signature verification not yet implemented");

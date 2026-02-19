@@ -26,12 +26,14 @@ pub enum Reach {
 
 impl Reach {
     /// Can this content be served to a requester?
+    #[allow(dead_code)]
     pub fn can_serve(&self, requester_reach: Reach) -> bool {
         // More permissive reach can serve less permissive
         (*self as u8) >= (requester_reach as u8)
     }
 
     /// Should this content replicate to a peer?
+    #[allow(dead_code)]
     pub fn should_replicate(&self, peer_trust_level: Reach) -> bool {
         match self {
             Reach::Private => false, // Never auto-replicate
@@ -45,6 +47,7 @@ impl Reach {
 }
 
 /// Replication action determined by content reach and peer trust level.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplicationAction {
     /// Replicate content + blobs
@@ -58,6 +61,7 @@ pub enum ReplicationAction {
 }
 
 /// Determine replication policy based on content reach and peer trust level.
+#[allow(dead_code)]
 pub fn replication_policy(content_reach: Reach, peer_trust: Reach) -> ReplicationAction {
     match (content_reach, peer_trust) {
         // Private and invited content never auto-replicates
@@ -88,26 +92,53 @@ mod tests {
 
     #[test]
     fn test_private_never_replicates() {
-        assert_eq!(replication_policy(Reach::Private, Reach::Commons), ReplicationAction::Skip);
-        assert_eq!(replication_policy(Reach::Invited, Reach::Local), ReplicationAction::Skip);
+        assert_eq!(
+            replication_policy(Reach::Private, Reach::Commons),
+            ReplicationAction::Skip
+        );
+        assert_eq!(
+            replication_policy(Reach::Invited, Reach::Local),
+            ReplicationAction::Skip
+        );
     }
 
     #[test]
     fn test_local_syncs_to_trusted() {
-        assert_eq!(replication_policy(Reach::Local, Reach::Local), ReplicationAction::FullSync);
-        assert_eq!(replication_policy(Reach::Local, Reach::Neighborhood), ReplicationAction::FullSync);
-        assert_eq!(replication_policy(Reach::Local, Reach::Private), ReplicationAction::Skip);
+        assert_eq!(
+            replication_policy(Reach::Local, Reach::Local),
+            ReplicationAction::FullSync
+        );
+        assert_eq!(
+            replication_policy(Reach::Local, Reach::Neighborhood),
+            ReplicationAction::FullSync
+        );
+        assert_eq!(
+            replication_policy(Reach::Local, Reach::Private),
+            ReplicationAction::Skip
+        );
     }
 
     #[test]
     fn test_commons_syncs_to_all() {
-        assert_eq!(replication_policy(Reach::Commons, Reach::Private), ReplicationAction::FullSync);
-        assert_eq!(replication_policy(Reach::Commons, Reach::Commons), ReplicationAction::FullSync);
+        assert_eq!(
+            replication_policy(Reach::Commons, Reach::Private),
+            ReplicationAction::FullSync
+        );
+        assert_eq!(
+            replication_policy(Reach::Commons, Reach::Commons),
+            ReplicationAction::FullSync
+        );
     }
 
     #[test]
     fn test_neighborhood_mixed() {
-        assert_eq!(replication_policy(Reach::Neighborhood, Reach::Local), ReplicationAction::FullSync);
-        assert_eq!(replication_policy(Reach::Neighborhood, Reach::Municipal), ReplicationAction::MetadataOnly);
+        assert_eq!(
+            replication_policy(Reach::Neighborhood, Reach::Local),
+            ReplicationAction::FullSync
+        );
+        assert_eq!(
+            replication_policy(Reach::Neighborhood, Reach::Municipal),
+            ReplicationAction::MetadataOnly
+        );
     }
 }

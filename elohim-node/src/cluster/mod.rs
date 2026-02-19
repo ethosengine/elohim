@@ -6,7 +6,7 @@
 //! - Leader election for coordinated operations
 
 pub mod discovery;
-pub mod membership;
 pub mod leader;
+pub mod membership;
 
 // TODO: Implement cluster coordination

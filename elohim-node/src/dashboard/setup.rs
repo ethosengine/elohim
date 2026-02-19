@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Setup mode selection
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "mode")]
 pub enum SetupMode {
@@ -49,15 +50,9 @@ pub enum DnsProvider {
     /// No dynamic DNS (static IP or manual)
     None,
     /// Cloudflare DNS
-    Cloudflare {
-        api_token: String,
-        zone_id: String,
-    },
+    Cloudflare { api_token: String, zone_id: String },
     /// DuckDNS
-    DuckDns {
-        token: String,
-        domain: String,
-    },
+    DuckDns { token: String, domain: String },
     /// No-IP
     NoIp {
         username: String,
@@ -65,9 +60,7 @@ pub enum DnsProvider {
         hostname: String,
     },
     /// Generic ddclient config
-    Ddclient {
-        config: String,
-    },
+    Ddclient { config: String },
 }
 
 /// Setup wizard state machine
@@ -135,7 +128,7 @@ pub async fn setup_join_network(config: JoinNetworkConfig) -> SetupResult {
     }
 
     // 3. Decode join key to get operator info and cluster key
-    let (operator_key, cluster_key, cluster_name) = match decode_join_key(&config.join_key) {
+    let (_operator_key, _cluster_key, cluster_name) = match decode_join_key(&config.join_key) {
         Ok(info) => info,
         Err(e) => {
             return SetupResult {
@@ -170,11 +163,7 @@ pub async fn setup_join_network(config: JoinNetworkConfig) -> SetupResult {
 
     SetupResult {
         success: true,
-        state: if update_applied {
-            SetupState::Complete // Will prompt for restart
-        } else {
-            SetupState::Complete
-        },
+        state: SetupState::Complete,
         message,
         details: Some(SetupDetails {
             node_id: "node-1".to_string(),
@@ -188,7 +177,7 @@ pub async fn setup_join_network(config: JoinNetworkConfig) -> SetupResult {
 
 /// Check for updates from doorway and apply if available
 async fn check_and_apply_updates(doorway_url: &str) -> Result<bool, String> {
-    use crate::update::{UpdateService, UpdateConfig, UpdateStatus};
+    use crate::update::{UpdateConfig, UpdateService, UpdateStatus};
 
     let config = UpdateConfig {
         enabled: true,
@@ -200,15 +189,21 @@ async fn check_and_apply_updates(doorway_url: &str) -> Result<bool, String> {
     update_service.set_doorway(doorway_url.to_string());
 
     // Check for updates
-    let status = update_service.check_for_updates().await
+    let status = update_service
+        .check_for_updates()
+        .await
         .map_err(|e| e.to_string())?;
 
     match status {
-        UpdateStatus::UpdateAvailable { current, latest, .. } => {
+        UpdateStatus::UpdateAvailable {
+            current, latest, ..
+        } => {
             tracing::info!("Update available: {} -> {}", current, latest);
 
             // Apply the update
-            update_service.apply_update().await
+            update_service
+                .apply_update()
+                .await
                 .map_err(|e| e.to_string())?;
 
             Ok(true)
@@ -257,7 +252,7 @@ pub async fn setup_doorway(config: DoorwayConfig) -> SetupResult {
     }
 
     // 4. Generate operator key if not provided
-    let operator_key = config.operator_key.unwrap_or_else(generate_operator_key);
+    let _operator_key = config.operator_key.unwrap_or_else(generate_operator_key);
 
     // 5. Start doorway services
     // TODO: Implement doorway startup
@@ -293,7 +288,7 @@ async fn validate_doorway_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn decode_join_key(key: &str) -> Result<(String, String, String), String> {
+fn decode_join_key(_key: &str) -> Result<(String, String, String), String> {
     // TODO: Implement proper decoding
     Ok((
         "operator-key".to_string(),
@@ -305,22 +300,29 @@ fn decode_join_key(key: &str) -> Result<(String, String, String), String> {
 async fn configure_ddns(provider: &DnsProvider) -> Result<(), String> {
     match provider {
         DnsProvider::None => Ok(()),
-        DnsProvider::Cloudflare { api_token, zone_id } => {
+        DnsProvider::Cloudflare {
+            api_token: _,
+            zone_id: _,
+        } => {
             tracing::info!("Configuring Cloudflare DNS...");
             // TODO: Implement Cloudflare API calls
             Ok(())
         }
-        DnsProvider::DuckDns { token, domain } => {
+        DnsProvider::DuckDns { token: _, domain } => {
             tracing::info!("Configuring DuckDNS for {}...", domain);
             // TODO: Implement DuckDNS update
             Ok(())
         }
-        DnsProvider::NoIp { username, hostname, .. } => {
+        DnsProvider::NoIp {
+            username: _,
+            hostname,
+            ..
+        } => {
             tracing::info!("Configuring No-IP for {}...", hostname);
             // TODO: Implement No-IP update
             Ok(())
         }
-        DnsProvider::Ddclient { config } => {
+        DnsProvider::Ddclient { config: _ } => {
             tracing::info!("Writing ddclient configuration...");
             // TODO: Write ddclient config file
             Ok(())
@@ -328,7 +330,7 @@ async fn configure_ddns(provider: &DnsProvider) -> Result<(), String> {
     }
 }
 
-async fn configure_https(hostname: &str, email: Option<&str>) -> Result<(), String> {
+async fn configure_https(hostname: &str, _email: Option<&str>) -> Result<(), String> {
     tracing::info!("Requesting Let's Encrypt certificate for {}...", hostname);
     // TODO: Implement ACME/Let's Encrypt
     Ok(())

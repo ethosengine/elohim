@@ -94,7 +94,11 @@ grpc_port = 9091
         "1TB"
     );
     assert_eq!(
-        storage.get("shard_redundancy").unwrap().as_integer().unwrap(),
+        storage
+            .get("shard_redundancy")
+            .unwrap()
+            .as_integer()
+            .unwrap(),
         5
     );
 

@@ -3,8 +3,6 @@
 //! Core types for observations, actions, consensus, and agent communication.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::time::Duration;
 
 /// Unique identifier for an action
 pub type ActionId = String;
@@ -13,9 +11,11 @@ pub type ActionId = String;
 pub type AgentId = String;
 
 /// Unique identifier for a peer node
+#[allow(dead_code)]
 pub type PeerId = String;
 
 /// Unique identifier for a request
+#[allow(dead_code)]
 pub type RequestId = String;
 
 //=============================================================================
@@ -82,6 +82,7 @@ pub struct ConditionChangeData {
 }
 
 /// Cache statistics
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheStatsData {
     pub hits: u64,
@@ -378,44 +379,32 @@ pub struct Rule {
     pub cooldown_secs: u64,
     /// Last time this rule was triggered
     #[serde(skip)]
+    #[allow(dead_code)]
     pub last_triggered: Option<u64>,
 }
 
 /// Conditions for rule evaluation
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Condition {
     /// Metric exceeds threshold
-    MetricAbove {
-        metric: MetricName,
-        threshold: f64,
-    },
+    MetricAbove { metric: MetricName, threshold: f64 },
     /// Metric below threshold
-    MetricBelow {
-        metric: MetricName,
-        threshold: f64,
-    },
+    MetricBelow { metric: MetricName, threshold: f64 },
     /// Service in specific state
     ServiceState {
         service: String,
         state: ServiceState,
     },
     /// Node condition active
-    ConditionActive {
-        condition: String,
-    },
+    ConditionActive { condition: String },
     /// Multiple conditions (all must be true)
-    And {
-        conditions: Vec<Condition>,
-    },
+    And { conditions: Vec<Condition> },
     /// Multiple conditions (any must be true)
-    Or {
-        conditions: Vec<Condition>,
-    },
+    Or { conditions: Vec<Condition> },
     /// Negate a condition
-    Not {
-        condition: Box<Condition>,
-    },
+    Not { condition: Box<Condition> },
 }
 
 /// Metrics that can be used in conditions
@@ -528,7 +517,11 @@ pub enum PodMode {
 //=============================================================================
 
 impl Action {
-    pub fn new(kind: ActionKind, description: impl Into<String>, params: serde_json::Value) -> Self {
+    pub fn new(
+        kind: ActionKind,
+        description: impl Into<String>,
+        params: serde_json::Value,
+    ) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -597,6 +590,7 @@ impl Default for PodStatus {
 
 impl Rule {
     /// Check if the rule is on cooldown
+    #[allow(dead_code)]
     pub fn on_cooldown(&self, now: u64) -> bool {
         if let Some(last) = self.last_triggered {
             now < last + self.cooldown_secs

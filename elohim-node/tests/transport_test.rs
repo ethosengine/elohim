@@ -4,8 +4,7 @@
 //! and the /elohim/sync/1.0.0 protocol exchange.
 
 use libp2p::{
-    identity, kad, mdns, noise, tcp, yamux,
-    Multiaddr, PeerId, StreamProtocol, SwarmBuilder,
+    identity, kad, mdns, noise, tcp, yamux, Multiaddr, PeerId, StreamProtocol, SwarmBuilder,
 };
 use std::time::Duration;
 
@@ -56,7 +55,10 @@ fn test_two_different_keypairs_different_peer_ids() {
     let pid1 = PeerId::from(kp1.public());
     let pid2 = PeerId::from(kp2.public());
 
-    assert_ne!(pid1, pid2, "Two random keypairs should have different PeerIds");
+    assert_ne!(
+        pid1, pid2,
+        "Two random keypairs should have different PeerIds"
+    );
 }
 
 // =============================================================================
@@ -148,7 +150,10 @@ fn test_swarm_builder_tcp_transport() {
             yamux::Config::default,
         );
 
-    assert!(result.is_ok(), "TCP transport should configure successfully");
+    assert!(
+        result.is_ok(),
+        "TCP transport should configure successfully"
+    );
 }
 
 #[tokio::test]
@@ -158,14 +163,15 @@ async fn test_swarm_builder_tcp_plus_quic() {
     // Verify QUIC can be added on top of TCP, then build with mDNS only
     let swarm = SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
-        .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)
+        .with_tcp(
+            tcp::Config::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        )
         .unwrap()
         .with_quic()
         .with_behaviour(|key| {
-            mdns::tokio::Behaviour::new(
-                mdns::Config::default(),
-                key.public().to_peer_id(),
-            ).unwrap()
+            mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id()).unwrap()
         })
         .unwrap()
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(5)))
@@ -231,11 +237,8 @@ fn test_kademlia_server_mode() {
 #[test]
 fn test_identify_config() {
     let keypair = identity::Keypair::generate_ed25519();
-    let config = libp2p::identify::Config::new(
-        "/elohim/id/1.0.0".to_string(),
-        keypair.public(),
-    )
-    .with_agent_version("elohim-node/0.1.0".to_string());
+    let config = libp2p::identify::Config::new("/elohim/id/1.0.0".to_string(), keypair.public())
+        .with_agent_version("elohim-node/0.1.0".to_string());
 
     let _behaviour = libp2p::identify::Behaviour::new(config);
     // Just verify it's constructible
@@ -258,14 +261,17 @@ async fn test_two_nodes_build_swarms() {
     // Build swarm 1
     let swarm1 = SwarmBuilder::with_existing_identity(kp1)
         .with_tokio()
-        .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)
+        .with_tcp(
+            tcp::Config::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        )
         .unwrap()
         .with_quic()
         .with_behaviour(|key| {
-            let mdns = mdns::tokio::Behaviour::new(
-                mdns::Config::default(),
-                key.public().to_peer_id(),
-            ).unwrap();
+            let mdns =
+                mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
+                    .unwrap();
             mdns
         })
         .unwrap()
@@ -275,14 +281,17 @@ async fn test_two_nodes_build_swarms() {
     // Build swarm 2
     let swarm2 = SwarmBuilder::with_existing_identity(kp2)
         .with_tokio()
-        .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)
+        .with_tcp(
+            tcp::Config::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        )
         .unwrap()
         .with_quic()
         .with_behaviour(|key| {
-            let mdns = mdns::tokio::Behaviour::new(
-                mdns::Config::default(),
-                key.public().to_peer_id(),
-            ).unwrap();
+            let mdns =
+                mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
+                    .unwrap();
             mdns
         })
         .unwrap()
@@ -300,14 +309,15 @@ async fn test_swarm_listens_on_random_port() {
     let keypair = identity::Keypair::generate_ed25519();
     let mut swarm = SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
-        .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)
+        .with_tcp(
+            tcp::Config::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        )
         .unwrap()
         .with_quic()
         .with_behaviour(|key| {
-            mdns::tokio::Behaviour::new(
-                mdns::Config::default(),
-                key.public().to_peer_id(),
-            ).unwrap()
+            mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id()).unwrap()
         })
         .unwrap()
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(5)))

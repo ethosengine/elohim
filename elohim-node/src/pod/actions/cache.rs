@@ -2,7 +2,7 @@
 //!
 //! Actions for resizing, warming, flushing, and configuring caches.
 
-use tracing::{debug, info, warn};
+use tracing::info;
 
 use crate::pod::executor::ActionHandler;
 use crate::pod::models::*;
@@ -39,19 +39,19 @@ impl ActionHandler for CacheActionHandler {
 
 impl CacheActionHandler {
     async fn resize_cache(&self, action: &Action) -> ActionResult {
-        let cache_name = action.params.get("cache")
+        let cache_name = action
+            .params
+            .get("cache")
             .and_then(|v| v.as_str())
             .unwrap_or("content");
 
-        let new_size_mb = action.params.get("size_mb")
+        let new_size_mb = action
+            .params
+            .get("size_mb")
             .and_then(|v| v.as_u64())
             .unwrap_or(256);
 
-        info!(
-            cache = cache_name,
-            new_size_mb,
-            "Cache resize requested"
-        );
+        info!(cache = cache_name, new_size_mb, "Cache resize requested");
 
         // In a real implementation, this would:
         // 1. Get the cache instance
@@ -72,16 +72,26 @@ impl CacheActionHandler {
     }
 
     async fn warm_cache(&self, action: &Action) -> ActionResult {
-        let cache_name = action.params.get("cache")
+        let cache_name = action
+            .params
+            .get("cache")
             .and_then(|v| v.as_str())
             .unwrap_or("content");
 
-        let content_ids: Vec<String> = action.params.get("content_ids")
+        let content_ids: Vec<String> = action
+            .params
+            .get("content_ids")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let predict_from_recent = action.params.get("predict_from_recent")
+        let predict_from_recent = action
+            .params
+            .get("predict_from_recent")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -99,7 +109,11 @@ impl CacheActionHandler {
 
         ActionResult {
             success: true,
-            message: format!("Cache '{}' warmed with {} entries", cache_name, content_ids.len()),
+            message: format!(
+                "Cache '{}' warmed with {} entries",
+                cache_name,
+                content_ids.len()
+            ),
             duration_ms: 0,
             details: Some(serde_json::json!({
                 "cache": cache_name,
@@ -110,19 +124,19 @@ impl CacheActionHandler {
     }
 
     async fn flush_cache(&self, action: &Action) -> ActionResult {
-        let cache_name = action.params.get("cache")
+        let cache_name = action
+            .params
+            .get("cache")
             .and_then(|v| v.as_str())
             .unwrap_or("content");
 
-        let force = action.params.get("force")
+        let force = action
+            .params
+            .get("force")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        info!(
-            cache = cache_name,
-            force,
-            "Cache flush requested"
-        );
+        info!(cache = cache_name, force, "Cache flush requested");
 
         // In a real implementation, this would:
         // 1. Write any dirty entries to backing store
@@ -142,11 +156,15 @@ impl CacheActionHandler {
     }
 
     async fn change_cache_policy(&self, action: &Action) -> ActionResult {
-        let cache_name = action.params.get("cache")
+        let cache_name = action
+            .params
+            .get("cache")
             .and_then(|v| v.as_str())
             .unwrap_or("content");
 
-        let policy = action.params.get("policy")
+        let policy = action
+            .params
+            .get("policy")
             .and_then(|v| v.as_str())
             .unwrap_or("lru");
 
@@ -155,17 +173,16 @@ impl CacheActionHandler {
         if !valid_policies.contains(&policy) {
             return ActionResult {
                 success: false,
-                message: format!("Invalid cache policy: {}. Valid options: {:?}", policy, valid_policies),
+                message: format!(
+                    "Invalid cache policy: {}. Valid options: {:?}",
+                    policy, valid_policies
+                ),
                 duration_ms: 0,
                 details: None,
             };
         }
 
-        info!(
-            cache = cache_name,
-            policy,
-            "Cache policy change requested"
-        );
+        info!(cache = cache_name, policy, "Cache policy change requested");
 
         // In a real implementation, this would:
         // 1. Create new cache with new policy

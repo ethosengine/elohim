@@ -10,7 +10,7 @@ use automerge::AutoCommit;
 use rusqlite::Connection;
 use tracing::{debug, info};
 
-use super::stream::{SyncState, SyncEvent};
+use super::stream::{SyncEvent, SyncState};
 
 /// Automerge sync engine backed by SQLite for document persistence.
 pub struct SyncEngine {
@@ -34,7 +34,7 @@ impl SyncEngine {
                 doc_id TEXT PRIMARY KEY,
                 data BLOB NOT NULL,
                 updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-            );"
+            );",
         )?;
 
         info!(path = %db_path.display(), "Sync engine initialized");
@@ -47,9 +47,9 @@ impl SyncEngine {
 
     /// Load an Automerge document from the database.
     pub fn load_doc(&self, doc_id: &str) -> Result<Option<AutoCommit>> {
-        let mut stmt = self.db.prepare_cached(
-            "SELECT data FROM documents WHERE doc_id = ?1"
-        )?;
+        let mut stmt = self
+            .db
+            .prepare_cached("SELECT data FROM documents WHERE doc_id = ?1")?;
 
         let result = stmt.query_row([doc_id], |row| {
             let data: Vec<u8> = row.get(0)?;
@@ -58,8 +58,8 @@ impl SyncEngine {
 
         match result {
             Ok(data) => {
-                let doc = AutoCommit::load(&data)
-                    .with_context(|| format!("loading doc {}", doc_id))?;
+                let doc =
+                    AutoCommit::load(&data).with_context(|| format!("loading doc {}", doc_id))?;
                 Ok(Some(doc))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -81,13 +81,8 @@ impl SyncEngine {
     }
 
     /// Apply remote changes to a document (create if it doesn't exist).
-    pub fn apply_remote_changes(
-        &mut self,
-        doc_id: &str,
-        changes: &[Vec<u8>],
-    ) -> Result<()> {
-        let mut doc = self.load_doc(doc_id)?
-            .unwrap_or_else(AutoCommit::new);
+    pub fn apply_remote_changes(&mut self, doc_id: &str, changes: &[Vec<u8>]) -> Result<()> {
+        let mut doc = self.load_doc(doc_id)?.unwrap_or_else(AutoCommit::new);
 
         for change_bytes in changes {
             doc.load_incremental(change_bytes)
@@ -103,7 +98,11 @@ impl SyncEngine {
             self.state.record_local(doc_id.to_string(), hash_str);
         }
 
-        debug!(doc_id, num_changes = changes.len(), "Applied remote changes");
+        debug!(
+            doc_id,
+            num_changes = changes.len(),
+            "Applied remote changes"
+        );
         Ok(())
     }
 
@@ -149,11 +148,8 @@ impl SyncEngine {
     }
 
     /// Record a local change and produce a SyncEvent.
-    pub fn record_local_change(
-        &mut self,
-        doc_id: String,
-        change_hash: String,
-    ) -> SyncEvent {
+    #[allow(dead_code)]
+    pub fn record_local_change(&mut self, doc_id: String, change_hash: String) -> SyncEvent {
         self.state.record_local(doc_id, change_hash)
     }
 
@@ -163,6 +159,7 @@ impl SyncEngine {
     }
 
     /// Get the current local stream position.
+    #[allow(dead_code)]
     pub fn local_position(&self) -> u64 {
         self.state.local_position
     }
@@ -171,7 +168,7 @@ impl SyncEngine {
 /// Hex encoding helper (avoids adding hex crate dependency).
 mod hex {
     pub fn decode(s: &str) -> Result<Vec<u8>, ()> {
-        if s.len() % 2 != 0 {
+        if !s.len().is_multiple_of(2) {
             return Err(());
         }
         (0..s.len())
@@ -184,7 +181,7 @@ mod hex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use automerge::{ReadDoc, transaction::Transactable};
+    use automerge::{transaction::Transactable, ReadDoc};
     use tempfile::TempDir;
 
     #[test]
