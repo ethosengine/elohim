@@ -1,0 +1,25 @@
+# Orchestrator - CI/CD Pipeline Management
+#
+# Central orchestrator that receives GitHub webhooks, analyzes changesets,
+# and triggers downstream pipelines.
+
+set dotenv-load := false
+
+# List available recipes
+default:
+    @just --list
+
+# Install dependencies
+install:
+    npm install
+
+# Lint all Jenkinsfiles in the repo
+lint:
+    npx npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error
+
+# Lint with auto-fix
+lint-fix:
+    npx npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --fix
+
+# Quality gate: lint Jenkinsfiles
+gate: lint

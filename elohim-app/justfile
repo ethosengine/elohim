@@ -1,0 +1,44 @@
+# Elohim App - Angular Frontend
+#
+# Main learning platform UI. Connects to doorway or direct to storage.
+
+set dotenv-load := false
+
+# List available recipes
+default:
+    @just --list
+
+# Install dependencies
+install:
+    npm install
+
+# Start dev server
+dev:
+    npm start
+
+# Build for production
+build:
+    npx ng build --configuration=development
+
+# Run unit tests
+test:
+    npx ng test --watch=false --browsers=ChromeHeadlessCI
+
+# Lint
+lint:
+    npm run lint
+
+# Lint with auto-fix
+lint-fix:
+    npm run lint:fix
+
+# Format check
+fmt-check:
+    npx prettier --check "src/**/*.{ts,html,scss}"
+
+# Format
+fmt:
+    npx prettier --write "src/**/*.{ts,html,scss}"
+
+# Quality gate: build + test
+gate: build test

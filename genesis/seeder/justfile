@@ -1,0 +1,24 @@
+# Genesis Seeder - Content Pipeline & Validation
+#
+# Validates, seeds, and verifies content in Holochain DHT.
+
+set dotenv-load := false
+
+# List available recipes
+default:
+    @just --list
+
+# Validate seed data schemas
+validate:
+    npm run validate
+
+# Run tests
+test:
+    npx vitest run
+
+# Type-check without building
+check:
+    npx tsc --noEmit
+
+# Quality gate: validate + test
+gate: validate test
