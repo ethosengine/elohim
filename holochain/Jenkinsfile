@@ -207,7 +207,7 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
         returnStdout: true
     ).trim()
     sh "kubectl rollout restart ${resourceType}/${resourceName}-${env} -n ${namespace}"
-    sh "kubectl rollout status ${resourceType}/${resourceName}-${env} -n ${namespace} --timeout=300s"
+    sh "kubectl rollout status ${resourceType}/${resourceName}-${env} -n ${namespace} --timeout=600s"
 }
 
 pipeline {
