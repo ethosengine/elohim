@@ -530,6 +530,17 @@ def printDeploymentVerification(commit, results) {
     echo '''╚══════════════════════════════════════════════════════════════════════════════╝'''
 }
 
+/**
+ * Run BDD coverage gap scanner — compares conceptual (genesis) vs executable scenarios.
+ * Produces an advisory JSON report for quality-architect consumption.
+ */
+def runBddCoverageGap() {
+    dir('orchestrator/e2e') {
+        sh 'npm ci'
+        sh 'npx tsx scripts/scan-coverage.ts --ci'
+    }
+}
+
 // =============================================================================
 // PIPELINE
 // =============================================================================
@@ -1032,6 +1043,52 @@ spec:
                                 " | P2P: ${p2pResults.collect { k, v -> "${k}=${v ? 'ok' : 'warn'}" }.join(', ')}"
                         }
                     }
+                }
+            }
+        }
+
+        stage('E2E Federation Smoke (Advisory)') {
+            when { expression { buildResults.any { it.value.success } } }
+            steps {
+                container('builder') {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        script {
+                            echo '''
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     E2E FEDERATION SMOKE TEST (ADVISORY)                      │
+└──────────────────────────────────────────────────────────────────────────────┘'''
+                        }
+                        dir('orchestrator/e2e') {
+                            sh 'npm ci'
+                            sh '''
+                                E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host \
+                                E2E_DOORWAY_STAGING=https://doorway-staging.elohim.host \
+                                npx cucumber-js --tags "@e2e and @federation"
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'orchestrator/e2e/reports/**', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('BDD Coverage Gap (Advisory)') {
+            when { expression { buildResults.any { it.value.success } } }
+            steps {
+                container('builder') {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        script { runBddCoverageGap() }
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'orchestrator/e2e/reports/coverage-gap-report.json',
+                                     allowEmptyArchive: true
                 }
             }
         }

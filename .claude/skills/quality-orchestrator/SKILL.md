@@ -323,6 +323,16 @@ Each file read ≈ 1-3K tokens. Fix + write ≈ similar. Plus agent instructions
 
 ---
 
+## BDD Coverage Gap Reports as Campaign Source
+
+The BDD gap scanner (`cd orchestrator/e2e && npm run scan:coverage`) produces `orchestrator/e2e/reports/coverage-gap-report.json`. This report is also generated in CI as an advisory stage.
+
+**quality-architect can create campaigns from `prioritizedGaps` entries.** Each entry identifies a domain + governance layer with high conceptual density but zero executable tests. These are natural candidates for E2E coverage campaigns.
+
+To generate executable scenarios from gap report entries, use `/generate-scenarios N` where N is the number of top gaps to address.
+
+---
+
 ## Existing Infrastructure (Preserved)
 
 These tools continue to work alongside the team system:
@@ -333,6 +343,7 @@ These tools continue to work alongside the team system:
 | `generate-campaigns.py` | Group issues into campaigns | Phase 1 |
 | `lint-orchestrator.py` | Status tracking, escalation queries | `show-status`, `get-escalations` |
 | `pre-flight-check.py` | Build health validation | Phase 1 |
+| `scan-coverage.ts` | BDD coverage gap scanner | `cd orchestrator/e2e && npm run scan:coverage` |
 | PostToolUse hooks | Auto-lint on every edit | Continuous (automatic) |
 
 ---

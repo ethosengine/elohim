@@ -1,0 +1,23 @@
+{
+  "name": "@elohim/e2e-driver",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "E2E test driver for Elohim Protocol federation and identity flows",
+  "scripts": {
+    "test": "cucumber-js",
+    "test:federation": "cucumber-js --tags '@e2e and @federation'",
+    "typecheck": "tsc --noEmit",
+    "scan:coverage": "tsx scripts/scan-coverage.ts",
+    "scan:coverage:ci": "tsx scripts/scan-coverage.ts --ci"
+  },
+  "dependencies": {
+    "undici": "^7.3.0"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "^11.2.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.7.0"
+  }
+}
