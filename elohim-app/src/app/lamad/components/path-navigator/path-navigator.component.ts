@@ -30,6 +30,7 @@ import {
   PathSection,
 } from '../../models/learning-path.model';
 import { RendererCompletionEvent } from '../../renderers/renderer-registry.service';
+import { ContentMasteryService } from '../../services/content-mastery.service';
 import { PathContextService } from '../../services/path-context.service';
 import { PathService } from '../../services/path.service';
 import { getIconForContent, inferContentTypeFromId } from '../../utils/content-icons';
@@ -139,8 +140,13 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   /** Base route for path navigation */
   private readonly PATH_ROUTE = '/lamad/path';
 
+  /** localStorage key prefix for resume position */
+  private readonly RESUME_KEY_PREFIX = 'lamad-resume-';
+
   private readonly destroy$ = new Subject<void>();
   private readonly seoService = inject(SeoService);
+  private readonly contentMasteryService = inject(ContentMasteryService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   // Learning signal tracking
   private contentViewStartTime: number | null = null;
@@ -152,7 +158,6 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     private readonly agentService: AgentService,
     private readonly governanceSignalService: GovernanceSignalService,
     private readonly pathContextService: PathContextService,
-    private readonly cdr: ChangeDetectorRef,
     @Inject(DOCUMENT) private readonly document: Document
   ) {}
 
@@ -162,6 +167,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       this.pathId = params['pathId'] as string;
       const parsed = Number.parseInt(params['stepIndex'] as string, 10);
       this.stepIndex = Number.isNaN(parsed) ? 0 : parsed;
+      this.saveResumePosition();
       this.loadContext();
     });
   }
@@ -445,7 +451,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
         const concepts: LessonConcept[] = chapterSteps.map((step, idx) => ({
           conceptId: step.resourceId,
           title: step.stepTitle ?? this.formatConceptTitle(step.resourceId),
-          isCompleted: false, // TODO: Load from progress
+          isCompleted:
+            this.contentMasteryService.getMasteryLevelSync(step.resourceId) !== 'not_started',
           isCurrent: idx === currentConceptIndex,
           index: globalIndex + idx,
           icon: getIconForContent(step.resourceId, inferContentTypeFromId(step.resourceId)),
@@ -505,7 +512,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           concepts: chapterSteps.map((step, idx) => ({
             conceptId: step.resourceId,
             title: step.stepTitle ?? this.formatConceptTitle(step.resourceId),
-            isCompleted: false,
+            isCompleted:
+              this.contentMasteryService.getMasteryLevelSync(step.resourceId) !== 'not_started',
             isCurrent: idx === 0,
             index: idx,
             icon: getIconForContent(step.resourceId, inferContentTypeFromId(step.resourceId)),
@@ -612,7 +620,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     const concepts: LessonConcept[] = (params.section.conceptIds ?? []).map((conceptId, idx) => ({
       conceptId,
       title: this.formatConceptTitle(conceptId),
-      isCompleted: false, // TODO: Load from progress
+      isCompleted: this.contentMasteryService.getMasteryLevelSync(conceptId) !== 'not_started',
       isCurrent: idx === params.currentConceptIndex,
       index: params.globalIndex + idx,
       icon: getIconForContent(conceptId, inferContentTypeFromId(conceptId)),
@@ -960,5 +968,16 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       this.contentRefreshKey = Date.now();
       this.cdr.detectChanges();
     }, this.TRANSITION_DURATION);
+  }
+
+  /**
+   * Save the current step index as the resume position for this path.
+   */
+  private saveResumePosition(): void {
+    try {
+      localStorage.setItem(this.RESUME_KEY_PREFIX + this.pathId, String(this.stepIndex));
+    } catch {
+      // Silently ignore localStorage errors
+    }
   }
 }

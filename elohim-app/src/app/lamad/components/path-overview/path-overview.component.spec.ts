@@ -5,6 +5,7 @@ import { PathOverviewComponent } from './path-overview.component';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
+import { ContentMasteryService } from '../../services/content-mastery.service';
 import { LearningPath } from '../../models';
 import { AgentProgress } from '@app/elohim/models/agent.model';
 
@@ -158,6 +159,10 @@ describe('PathOverviewComponent', () => {
       'updateSeo',
       'setTitle',
     ]);
+    const contentMasteryServiceSpy = jasmine.createSpyObj('ContentMasteryService', [
+      'getMasteryLevelSync',
+    ]);
+    contentMasteryServiceSpy.getMasteryLevelSync.and.returnValue('not_started');
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path' });
 
@@ -168,6 +173,7 @@ describe('PathOverviewComponent', () => {
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
+        { provide: ContentMasteryService, useValue: contentMasteryServiceSpy },
         {
           provide: ActivatedRoute,
           useValue: { params: paramsSubject.asObservable() },

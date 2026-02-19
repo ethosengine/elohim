@@ -581,18 +581,12 @@ export class ContentResolverService implements OnDestroy {
     const startTime = performance.now();
 
     const chain = this.resolver!.getResolutionChain('content');
+    let triedIndexedDb = false;
 
     for (const source of chain) {
-      // For conductor, check actual availability (handles race condition during init)
-      if (source.id === 'conductor') {
-        if (!this.holochainContent.isAvailable()) {
-          continue;
-        }
-        // Update the resolver's knowledge now that conductor is available
-        this.resolver!.setSourceAvailable('conductor', true);
-      } else if (!this.resolver!.isSourceAvailable(source.id)) {
-        continue;
-      }
+      if (source.id === 'indexeddb') triedIndexedDb = true;
+
+      if (!this.isSourceReady(source)) continue;
 
       try {
         const data = await this.fetchContentFromSource(contentId, source.id);
@@ -610,7 +604,49 @@ export class ContentResolverService implements OnDestroy {
       }
     }
 
+    // Offline fallback: if IndexedDB wasn't tried in the chain (e.g. not registered
+    // or marked unavailable), try it directly as a last resort before returning null.
+    if (!triedIndexedDb) {
+      return this.offlineFallbackContent(contentId, startTime);
+    }
+
     return null;
+  }
+
+  /**
+   * Last-resort offline fallback: try IndexedDB directly when the chain didn't include it.
+   */
+  private async offlineFallbackContent(
+    contentId: string,
+    startTime: number
+  ): Promise<ContentResolution<ContentNode> | null> {
+    if (!this.idbCache.isAvailable()) return null;
+    try {
+      const cached = await this.idbCache.getContent(contentId);
+      if (cached) {
+        return {
+          data: cached,
+          sourceId: 'indexeddb',
+          tier: SourceTier.Local,
+          durationMs: performance.now() - startTime,
+        };
+      }
+    } catch {
+      // IndexedDB fallback failed
+    }
+    return null;
+  }
+
+  /**
+   * Check if a source in the resolution chain is ready to be queried.
+   */
+  private isSourceReady(source: SourceInfo): boolean {
+    if (source.id === 'conductor') {
+      if (!this.holochainContent.isAvailable()) return false;
+      this.resolver!.setSourceAvailable('conductor', true);
+      return true;
+    }
+    return this.resolver!.isSourceAvailable(source.id);
   }
 
   /**
@@ -649,18 +685,12 @@ export class ContentResolverService implements OnDestroy {
     const startTime = performance.now();
 
     const chain = this.resolver!.getResolutionChain('path');
+    let triedIndexedDb = false;
 
     for (const source of chain) {
-      // For conductor, check actual availability (handles race condition during init)
-      if (source.id === 'conductor') {
-        if (!this.holochainContent.isAvailable()) {
-          continue;
-        }
-        // Update the resolver's knowledge now that conductor is available
-        this.resolver!.setSourceAvailable('conductor', true);
-      } else if (!this.resolver!.isSourceAvailable(source.id)) {
-        continue;
-      }
+      if (source.id === 'indexeddb') triedIndexedDb = true;
+
+      if (!this.isSourceReady(source)) continue;
 
       try {
         const data = await this.fetchPathFromSource(pathId, source.id);
@@ -678,6 +708,35 @@ export class ContentResolverService implements OnDestroy {
       }
     }
 
+    // Offline fallback for paths
+    if (!triedIndexedDb) {
+      return this.offlineFallbackPath(pathId, startTime);
+    }
+
+    return null;
+  }
+
+  /**
+   * Last-resort offline fallback for paths: try IndexedDB directly.
+   */
+  private async offlineFallbackPath(
+    pathId: string,
+    startTime: number
+  ): Promise<ContentResolution<LearningPath> | null> {
+    if (!this.idbCache.isAvailable()) return null;
+    try {
+      const cached = await this.idbCache.getPath(pathId);
+      if (cached) {
+        return {
+          data: cached,
+          sourceId: 'indexeddb',
+          tier: SourceTier.Local,
+          durationMs: performance.now() - startTime,
+        };
+      }
+    } catch {
+      // IndexedDB fallback failed
+    }
     return null;
   }
 
@@ -723,15 +782,7 @@ export class ContentResolverService implements OnDestroy {
     for (const source of chain) {
       if (remaining.size === 0) break;
 
-      // For conductor, check actual availability (handles race condition during init)
-      if (source.id === 'conductor') {
-        if (!this.holochainContent.isAvailable()) {
-          continue;
-        }
-        this.resolver!.setSourceAvailable('conductor', true);
-      } else if (!this.resolver!.isSourceAvailable(source.id)) {
-        continue;
-      }
+      if (!this.isSourceReady(source)) continue;
 
       const toFetch = Array.from(remaining);
       const batchResult = await this.batchFetchFromSource(toFetch, source.id);

@@ -9,7 +9,9 @@ import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/dis
 
 import type { HumanProfile } from '../../models/identity.model';
 import { AgencyService } from '../../services/agency.service';
+import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { HostingAccountService } from '../../services/hosting-account.service';
 import { IdentityService } from '../../services/identity.service';
 import { SessionHumanService } from '../../services/session-human.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
@@ -182,6 +184,23 @@ describe('ProfileComponent', () => {
           },
         },
         { provide: Router, useValue: mockRouter },
+        {
+          provide: AuthService,
+          useValue: {
+            identifier: signal<string | null>(null),
+            token: signal<string | null>(null),
+          },
+        },
+        {
+          provide: HostingAccountService,
+          useValue: {
+            account: signal(null),
+            isLoading: signal(false),
+            error: signal<string | null>(null),
+            loadAccount: jasmine.createSpy('loadAccount').and.returnValue(Promise.resolve(null)),
+            clearAccount: jasmine.createSpy('clearAccount'),
+          },
+        },
       ],
     }).compileComponents();
 

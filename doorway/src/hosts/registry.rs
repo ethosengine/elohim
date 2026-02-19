@@ -141,19 +141,35 @@ impl HostRegistry {
         node_id: &str,
         active_connections: i32,
     ) -> Result<bool, DoorwayError> {
+        self.heartbeat_with_capacity(node_id, active_connections, None, None)
+            .await
+    }
+
+    /// Record a heartbeat with capacity metrics from a host
+    pub async fn heartbeat_with_capacity(
+        &self,
+        node_id: &str,
+        active_connections: i32,
+        agent_count: Option<i32>,
+        conductor_count: Option<i32>,
+    ) -> Result<bool, DoorwayError> {
+        let mut update = doc! {
+            "status": "online",
+            "active_connections": active_connections,
+            "last_heartbeat": DateTime::now(),
+            "metadata.updated_at": DateTime::now(),
+        };
+
+        if let Some(agents) = agent_count {
+            update.insert("agent_count", agents);
+        }
+        if let Some(conductors) = conductor_count {
+            update.insert("conductor_count", conductors);
+        }
+
         let result = self
             .collection
-            .update_one(
-                doc! { "node_id": node_id },
-                doc! {
-                    "$set": {
-                        "status": "online",
-                        "active_connections": active_connections,
-                        "last_heartbeat": DateTime::now(),
-                        "metadata.updated_at": DateTime::now(),
-                    }
-                },
-            )
+            .update_one(doc! { "node_id": node_id }, doc! { "$set": update })
             .await?;
 
         if result.modified_count > 0 {

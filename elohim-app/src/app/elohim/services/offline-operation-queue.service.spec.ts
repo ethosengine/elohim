@@ -5,11 +5,13 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 
 import { HolochainClientService } from './holochain-client.service';
+import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { OfflineOperationQueueService } from './offline-operation-queue.service';
 
 describe('OfflineOperationQueueService', () => {
   let service: OfflineOperationQueueService;
   let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
+  let mockIdbCache: jasmine.SpyObj<IndexedDBCacheService>;
 
   const unknownOperationId = 'unknown-id';
 
@@ -19,10 +21,20 @@ describe('OfflineOperationQueueService', () => {
       'callZome',
     ]);
 
+    mockIdbCache = jasmine.createSpyObj<IndexedDBCacheService>('IndexedDBCacheService', [
+      'init',
+      'getMetadata',
+      'setMetadata',
+    ]);
+    mockIdbCache.init.and.returnValue(Promise.resolve(true));
+    mockIdbCache.getMetadata.and.returnValue(Promise.resolve(null));
+    mockIdbCache.setMetadata.and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
       providers: [
         OfflineOperationQueueService,
         { provide: HolochainClientService, useValue: mockHolochainClient },
+        { provide: IndexedDBCacheService, useValue: mockIdbCache },
       ],
     });
 
@@ -31,8 +43,11 @@ describe('OfflineOperationQueueService', () => {
 
   afterEach(() => {
     // Cancel all pending retry timers to prevent tests from hanging
-    const pendingRetries = (service as any).pendingRetries as Map<string, ReturnType<typeof setTimeout>>;
-    pendingRetries.forEach((timeoutId) => {
+    const pendingRetries = (service as any).pendingRetries as Map<
+      string,
+      ReturnType<typeof setTimeout>
+    >;
+    pendingRetries.forEach(timeoutId => {
       clearTimeout(timeoutId);
     });
     pendingRetries.clear();
@@ -335,9 +350,7 @@ describe('OfflineOperationQueueService', () => {
 
     it('should allow multiple sync complete callbacks', async () => {
       mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: {} })
-      );
+      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
 
       const callback1 = jasmine.createSpy('callback1');
       const callback2 = jasmine.createSpy('callback2');
@@ -1403,11 +1416,7 @@ describe('OfflineOperationQueueService', () => {
       });
 
       // Multiple rapid sync calls
-      const results = await Promise.all([
-        service.syncAll(),
-        service.syncAll(),
-        service.syncAll(),
-      ]);
+      const results = await Promise.all([service.syncAll(), service.syncAll(), service.syncAll()]);
 
       // Only first should succeed, others should return early
       expect(results[0].succeeded).toBe(1);

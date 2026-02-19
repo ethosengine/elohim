@@ -13,6 +13,7 @@ import { AgentService } from '@app/elohim/services/agent.service';
 
 import { SeoService } from '../../../services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
+import { ContentMasteryService } from '../../services/content-mastery.service';
 import { PathService } from '../../services/path.service';
 import {
   getStepTypeIcon,
@@ -156,9 +157,13 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   private readonly seoService = inject(SeoService);
+  private readonly contentMasteryService = inject(ContentMasteryService);
 
   /** Base route for path navigation */
   private readonly PATH_ROUTE = '/lamad/path';
+
+  /** localStorage key for resume position */
+  private readonly RESUME_KEY_PREFIX = 'lamad-resume-';
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -289,10 +294,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Check if user has started this path
+   * Check if user has started this path.
+   * Checks both AgentProgress (step completion) and localStorage (resume position).
    */
   hasStarted(): boolean {
-    return this.progress !== null && this.progress.completedStepIndices.length > 0;
+    if (this.progress !== null && this.progress.completedStepIndices.length > 0) {
+      return true;
+    }
+    return this.getResumePosition() !== null;
   }
 
   /**
@@ -330,11 +339,12 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Continue from current position
+   * Continue from current position.
+   * Prefers localStorage resume position over AgentProgress step index.
    */
   continueJourney(): void {
-    const currentStep = this.getCurrentStepIndex();
-    void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', currentStep]);
+    const resumeStep = this.getResumePosition() ?? this.getCurrentStepIndex();
+    void this.router.navigate([this.PATH_ROUTE, this.pathId, 'step', resumeStep]);
   }
 
   /**
@@ -668,11 +678,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
 
   /**
    * Check if a concept has been completed by the user.
-   * Uses conceptProgress data loaded from the path service.
+   * Checks both conceptProgress data and ContentMasteryService.
    */
   private isConceptCompleted(conceptId: string): boolean {
     const conceptData = this.conceptProgress.find(c => c.conceptId === conceptId);
-    return conceptData ? conceptData.completionPercentage === 100 : false;
+    if (conceptData?.completionPercentage === 100) {
+      return true;
+    }
+    return this.contentMasteryService.getMasteryLevelSync(conceptId) !== 'not_started';
   }
 
   /**
@@ -696,6 +709,21 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   goToSection(conceptId: string | undefined): void {
     if (conceptId) {
       this.goToConcept(conceptId);
+    }
+  }
+
+  /**
+   * Get the resume position from localStorage.
+   * Returns the last-viewed step index for this path, or null if none saved.
+   */
+  private getResumePosition(): number | null {
+    try {
+      const stored = localStorage.getItem(this.RESUME_KEY_PREFIX + this.pathId);
+      if (stored === null) return null;
+      const parsed = Number.parseInt(stored, 10);
+      return Number.isNaN(parsed) ? null : parsed;
+    } catch {
+      return null;
     }
   }
 }

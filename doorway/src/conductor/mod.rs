@@ -12,7 +12,7 @@ pub mod registry;
 pub mod router;
 
 pub use admin_client::{AdminClient, AppInfoDetailed, CellIdPair, InstalledAppInfo};
-pub use pool_map::ConductorPoolMap;
+pub use pool_map::{ConductorPoolMap, ConductorPoolStatus};
 pub use provisioner::{AgentProvisioner, ProvisionedAgent};
 pub use registry::{ConductorEntry, ConductorInfo, ConductorRegistry};
 pub use router::ConductorRouter;

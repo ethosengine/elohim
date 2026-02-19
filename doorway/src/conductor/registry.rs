@@ -317,4 +317,136 @@ mod tests {
         let least_loaded = registry.find_least_loaded().unwrap();
         assert_eq!(least_loaded.conductor_id, "conductor-1");
     }
+
+    /// Multi-user isolation: two users connecting get independent state.
+    /// Progress/mastery data doesn't bleed between users because each
+    /// agent has its own conductor entry with distinct app_id + conductor mapping.
+    #[tokio::test]
+    async fn test_multi_user_isolation_independent_state() {
+        let registry = ConductorRegistry::new(None).await;
+
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://cond-0:4445".to_string(),
+            admin_url: "ws://cond-0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-1".to_string(),
+            conductor_url: "ws://cond-1:4445".to_string(),
+            admin_url: "ws://cond-1:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+
+        // User A assigned to conductor-0
+        registry
+            .register_agent("uhCAk_alice", "conductor-0", "elohim")
+            .await
+            .unwrap();
+
+        // User B assigned to conductor-1
+        registry
+            .register_agent("uhCAk_bob", "conductor-1", "elohim")
+            .await
+            .unwrap();
+
+        // Verify each user has their own independent assignment
+        let alice_entry = registry.get_conductor_for_agent("uhCAk_alice").unwrap();
+        let bob_entry = registry.get_conductor_for_agent("uhCAk_bob").unwrap();
+
+        assert_eq!(alice_entry.conductor_id, "conductor-0");
+        assert_eq!(bob_entry.conductor_id, "conductor-1");
+        assert_ne!(alice_entry.conductor_id, bob_entry.conductor_id);
+
+        // Verify agent lists are isolated per conductor
+        let agents_on_0 = registry.list_agents_on_conductor("conductor-0");
+        let agents_on_1 = registry.list_agents_on_conductor("conductor-1");
+        assert_eq!(agents_on_0.len(), 1);
+        assert_eq!(agents_on_1.len(), 1);
+        assert_eq!(agents_on_0[0].0, "uhCAk_alice");
+        assert_eq!(agents_on_1[0].0, "uhCAk_bob");
+    }
+
+    /// Verify that removing one user doesn't affect the other's state
+    #[tokio::test]
+    async fn test_multi_user_unregister_does_not_affect_other() {
+        let registry = ConductorRegistry::new(None).await;
+
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://cond-0:4445".to_string(),
+            admin_url: "ws://cond-0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+
+        // Both users on same conductor
+        registry
+            .register_agent("uhCAk_alice", "conductor-0", "elohim")
+            .await
+            .unwrap();
+        registry
+            .register_agent("uhCAk_bob", "conductor-0", "elohim")
+            .await
+            .unwrap();
+
+        assert_eq!(registry.agent_count(), 2);
+
+        // Remove alice
+        registry.unregister_agent("uhCAk_alice");
+
+        // Bob's assignment must be unaffected
+        assert!(registry.get_conductor_for_agent("uhCAk_alice").is_none());
+        let bob_entry = registry.get_conductor_for_agent("uhCAk_bob").unwrap();
+        assert_eq!(bob_entry.conductor_id, "conductor-0");
+        assert_eq!(registry.agent_count(), 1);
+    }
+
+    /// Concurrent agent registrations should not interfere with each other
+    #[tokio::test]
+    async fn test_concurrent_agent_registration() {
+        use std::sync::Arc;
+
+        let registry = Arc::new(ConductorRegistry::new(None).await);
+
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://cond-0:4445".to_string(),
+            admin_url: "ws://cond-0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 100,
+        });
+
+        // Spawn 20 concurrent agent registrations
+        let mut handles = Vec::new();
+        for i in 0..20u32 {
+            let reg = Arc::clone(&registry);
+            handles.push(tokio::spawn(async move {
+                let agent = format!("uhCAk_agent_{}", i);
+                reg.register_agent(&agent, "conductor-0", "elohim")
+                    .await
+                    .unwrap();
+            }));
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        // All 20 agents should be registered
+        assert_eq!(registry.agent_count(), 20);
+
+        // Each agent should map to conductor-0
+        for i in 0..20u32 {
+            let agent = format!("uhCAk_agent_{}", i);
+            let entry = registry.get_conductor_for_agent(&agent).unwrap();
+            assert_eq!(entry.conductor_id, "conductor-0");
+        }
+
+        // Capacity should reflect all registrations
+        let info = registry.get_conductor_info("conductor-0").unwrap();
+        assert_eq!(info.capacity_used, 20);
+    }
 }

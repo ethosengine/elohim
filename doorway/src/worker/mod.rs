@@ -12,7 +12,7 @@ pub mod processor;
 pub mod zome_call;
 
 pub use conductor::ConductorConnection;
-pub use pool::{PoolConfig, WorkerPool};
+pub use pool::{PoolConfig, PoolMetrics, WorkerPool};
 pub use processor::{
     Worker, WorkerConfig, WorkerRequest, WorkerResponse, CONSUMER_NAME_PREFIX, STREAM_NAME,
     SUBJECT_PREFIX,
