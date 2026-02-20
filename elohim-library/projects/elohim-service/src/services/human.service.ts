@@ -209,9 +209,11 @@ export function createHuman(params: {
     human.communities = params.communities;
   }
 
-  if (params.isMinor) {
-    human.isMinor = true;
-    human.guardianIds = params.guardianIds || [];
+  if (params.isMinor !== undefined) {
+    human.isMinor = params.isMinor;
+    if (params.isMinor) {
+      human.guardianIds = params.guardianIds || [];
+    }
   }
 
   if (params.isPseudonymous) {
@@ -328,6 +330,11 @@ export function addRelationshipToFile(filePath: string, relationship: HumanRelat
  * Transform human to ContentNode
  */
 export function humanToContentNode(human: Human): ContentNode {
+  const missing = (['id', 'displayName', 'bio', 'category'] as const).filter(f => !human[f]);
+  if (missing.length > 0) {
+    throw new Error(`Human missing required fields: ${missing.join(', ')}`);
+  }
+
   const now = new Date().toISOString();
 
   return {

@@ -586,9 +586,7 @@ describe('Human Service', () => {
         layer: 'municipality',
         name: 'Portland'
       });
-      // createHuman only sets isMinor on the Human when the value is truthy (if (params.isMinor)).
-      // Passing isMinor: false leaves the field undefined on the Human, so metadata reflects that.
-      expect(node.metadata.isMinor).toBeUndefined();
+      expect(node.metadata.isMinor).toBe(false);
       expect(node.metadata.isPseudonymous).toBe(true);
     });
   });
@@ -729,25 +727,9 @@ describe('Human Service', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      // NOTE(quality-deep): importHumansToLamad does not validate that all required Human fields
-      // are present before calling humanToContentNode. humanToContentNode does not throw on
-      // partial/missing fields — it produces a ContentNode with undefined values. As a result,
-      // passing an object with only { id: 'invalid' } succeeds without errors.
-      //
-      // TODO(quality-deep): [MEDIUM] Add input validation to importHumansToLamad
-      // Context: Partial Human objects are silently accepted and written as nodes with undefined fields
-      // Story: Robust import pipeline with detailed error reporting
-      // Suggested approach:
-      //   1. Validate required Human fields (displayName, bio, category) before processing
-      //   2. Collect detailed error context (field names, human ID)
-      //   3. Return partial success with non-empty errors array
-
       const invalidData = {
-        humans: [
-          // Missing required fields (displayName, bio, category) but humanToContentNode does not throw
-          { id: 'invalid' } as any
-        ],
-        relationships: []
+        humans: [{ id: 'invalid' } as any],
+        relationships: [],
       };
 
       fs.writeFileSync(testFilePath, JSON.stringify(invalidData), 'utf-8');
@@ -755,9 +737,9 @@ describe('Human Service', () => {
       const outputDir = path.join(tempDir, 'output');
       const result = await importHumansToLamad(testFilePath, outputDir);
 
-      // Current implementation does not throw or error on partial data — it succeeds silently.
-      expect(result.errors.length).toBe(0);
-      expect(result.humansImported).toBe(1);
+      expect(result.humansImported).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('missing required fields');
     });
   });
 

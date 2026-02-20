@@ -501,7 +501,8 @@ function _generateSummary(
 export async function importContent(
   sourceDir: string,
   outputDir: string,
-  incremental = true
+  incremental = true,
+  dbPath?: string
 ): Promise<ImportResult> {
   return runImportPipeline({
     mode: incremental ? 'incremental' : 'full',
@@ -510,5 +511,7 @@ export async function importContent(
     generateSourceNodes: true,
     generateDerivedNodes: true,
     verbose: true,
+    dbPath,
+    dryRun: !dbPath,
   });
 }

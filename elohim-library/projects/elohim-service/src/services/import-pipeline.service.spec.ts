@@ -446,9 +446,7 @@ describe('import-pipeline.service', () => {
     it('should use full mode when incremental is false', async () => {
       // Arrange
       const { glob } = require('glob');
-      // scanSourceFiles calls glob twice (*.md then *.feature); no files to process.
-      glob.mockResolvedValueOnce([])
-          .mockResolvedValueOnce([]);
+      glob.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const { createEmptyManifest } = require('../models/manifest.model');
       mockManifestService.loadManifest.mockReturnValue(createEmptyManifest());
@@ -456,16 +454,11 @@ describe('import-pipeline.service', () => {
       const { extractRelationships } = require('./relationship-extractor.service');
       extractRelationships.mockReturnValue([]);
 
-      // Act
+      // Act — no dbPath means dryRun defaults to true
       const result = await importContent('/source', '/output', false);
 
       // Assert
-      // importContent does not pass dbPath or dryRun to runImportPipeline, so with no files
-      // to process and no dbPath the pipeline skips the DB write (no files → no throw).
-      // When there are no files at all, extractRelationships is still called and then the
-      // writeToKuzu step is entered without dryRun set. The missing dbPath throws and the
-      // outer catch returns errors = 1. The wrapper result is still defined.
-      expect(result).toBeDefined();
+      expect(result.errors).toBe(0);
     });
   });
 });
