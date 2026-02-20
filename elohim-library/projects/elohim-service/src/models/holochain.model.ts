@@ -342,15 +342,11 @@ export const VALID_RELATIONSHIP_TYPES = [
 ] as const;
 
 /** Valid difficulty levels for learning paths */
-export const VALID_DIFFICULTY_LEVELS = [
-  'beginner',
-  'intermediate',
-  'advanced',
-] as const;
+export const VALID_DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
 
 // Type aliases from constants
-export type ValidContentType = typeof VALID_CONTENT_TYPES[number];
-export type ValidContentFormat = typeof VALID_CONTENT_FORMATS[number];
-export type ValidReachLevel = typeof VALID_REACH_LEVELS[number];
-export type ValidRelationshipType = typeof VALID_RELATIONSHIP_TYPES[number];
-export type ValidDifficultyLevel = typeof VALID_DIFFICULTY_LEVELS[number];
+export type ValidContentType = (typeof VALID_CONTENT_TYPES)[number];
+export type ValidContentFormat = (typeof VALID_CONTENT_FORMATS)[number];
+export type ValidReachLevel = (typeof VALID_REACH_LEVELS)[number];
+export type ValidRelationshipType = (typeof VALID_RELATIONSHIP_TYPES)[number];
+export type ValidDifficultyLevel = (typeof VALID_DIFFICULTY_LEVELS)[number];

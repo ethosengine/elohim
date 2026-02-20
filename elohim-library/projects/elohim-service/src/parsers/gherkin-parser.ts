@@ -6,6 +6,7 @@
  */
 
 import * as crypto from 'crypto';
+
 import { ParsedContent, ParsedScenario } from '../models/import-context.model';
 import { PathMetadata } from '../models/path-metadata.model';
 
@@ -25,7 +26,7 @@ export interface ParsedFeature {
   description: string;
   tags: GherkinTag[];
   background?: {
-    steps: Array<{ keyword: string; text: string }>;
+    steps: { keyword: string; text: string }[];
   };
   scenarios: ParsedScenario[];
 }
@@ -33,10 +34,7 @@ export interface ParsedFeature {
 /**
  * Parse a Gherkin .feature file
  */
-export function parseGherkin(
-  content: string,
-  pathMeta: PathMetadata
-): ParsedContent {
+export function parseGherkin(content: string, pathMeta: PathMetadata): ParsedContent {
   const lines = content.split('\n');
   const feature = parseFeature(lines);
 
@@ -52,7 +50,7 @@ export function parseGherkin(
     rawContent: content,
     scenarios: feature.scenarios,
     title: feature.title,
-    contentHash
+    contentHash,
   };
 }
 
@@ -64,7 +62,7 @@ function parseFeature(lines: string[]): ParsedFeature {
   const tags: GherkinTag[] = [];
   let title = '';
   const descriptionLines: string[] = [];
-  let background: { steps: Array<{ keyword: string; text: string }> } | undefined;
+  let background: { steps: { keyword: string; text: string }[] } | undefined;
   const scenarios: ParsedScenario[] = [];
 
   // Skip empty lines and collect tags
@@ -96,10 +94,12 @@ function parseFeature(lines: string[]): ParsedFeature {
     // Collect description until Background or Scenario
     while (lineIndex < lines.length) {
       const line = lines[lineIndex].trim();
-      if (line.startsWith('Background:') ||
-          line.startsWith('Scenario:') ||
-          line.startsWith('Scenario Outline:') ||
-          line.startsWith('@')) {
+      if (
+        line.startsWith('Background:') ||
+        line.startsWith('Scenario:') ||
+        line.startsWith('Scenario Outline:') ||
+        line.startsWith('@')
+      ) {
         break;
       }
       if (line) {
@@ -112,13 +112,15 @@ function parseFeature(lines: string[]): ParsedFeature {
   // Parse Background if present
   if (lines[lineIndex]?.trim().startsWith('Background:')) {
     lineIndex++;
-    const bgSteps: Array<{ keyword: string; text: string }> = [];
+    const bgSteps: { keyword: string; text: string }[] = [];
 
     while (lineIndex < lines.length) {
       const line = lines[lineIndex].trim();
-      if (line.startsWith('Scenario:') ||
-          line.startsWith('Scenario Outline:') ||
-          line.startsWith('@')) {
+      if (
+        line.startsWith('Scenario:') ||
+        line.startsWith('Scenario Outline:') ||
+        line.startsWith('@')
+      ) {
         break;
       }
 
@@ -150,7 +152,7 @@ function parseFeature(lines: string[]): ParsedFeature {
     description: descriptionLines.join('\n'),
     tags,
     background,
-    scenarios
+    scenarios,
   };
 }
 
@@ -175,7 +177,7 @@ function parseScenario(
 
     if (line.startsWith('@')) {
       const tags = parseTags(line);
-      scenarioTags.push(...tags.map(t => t.value ? `${t.name}:${t.value}` : t.name));
+      scenarioTags.push(...tags.map(t => (t.value ? `${t.name}:${t.value}` : t.name)));
       lineIndex++;
       continue;
     }
@@ -184,7 +186,9 @@ function parseScenario(
   }
 
   // Check for Scenario or Scenario Outline
-  const scenarioMatch = /^(Scenario|Scenario Outline):\s*(.+)$/.exec(lines[lineIndex]?.trim() || '');
+  const scenarioMatch = /^(Scenario|Scenario Outline):\s*(.+)$/.exec(
+    lines[lineIndex]?.trim() || ''
+  );
   if (!scenarioMatch) {
     return null;
   }
@@ -194,16 +198,18 @@ function parseScenario(
   lineIndex++;
 
   // Parse steps
-  const steps: Array<{ keyword: string; text: string }> = [];
+  const steps: { keyword: string; text: string }[] = [];
 
   while (lineIndex < lines.length) {
     const line = lines[lineIndex].trim();
 
     // Stop at next scenario, examples, or tags (next scenario coming)
-    if (line.startsWith('Scenario:') ||
-        line.startsWith('Scenario Outline:') ||
-        line.startsWith('Examples:') ||
-        (line.startsWith('@') && !line.includes(' '))) {
+    if (
+      line.startsWith('Scenario:') ||
+      line.startsWith('Scenario Outline:') ||
+      line.startsWith('Examples:') ||
+      (line.startsWith('@') && !line.includes(' '))
+    ) {
       break;
     }
 
@@ -218,9 +224,11 @@ function parseScenario(
   if (type === 'scenario_outline' && lines[lineIndex]?.trim().startsWith('Examples:')) {
     while (lineIndex < lines.length) {
       const line = lines[lineIndex].trim();
-      if (line.startsWith('Scenario:') ||
-          line.startsWith('Scenario Outline:') ||
-          line.startsWith('@')) {
+      if (
+        line.startsWith('Scenario:') ||
+        line.startsWith('Scenario Outline:') ||
+        line.startsWith('@')
+      ) {
         break;
       }
       lineIndex++;
@@ -232,9 +240,9 @@ function parseScenario(
       title,
       type,
       tags: scenarioTags,
-      steps
+      steps,
     },
-    nextIndex: lineIndex
+    nextIndex: lineIndex,
   };
 }
 
@@ -249,7 +257,7 @@ function parseStep(line: string): { keyword: string; text: string } | null {
 
   return {
     keyword: stepMatch[1],
-    text: stepMatch[2].trim()
+    text: stepMatch[2].trim(),
   };
 }
 
@@ -263,7 +271,7 @@ function parseTags(line: string): GherkinTag[] {
   for (const match of tagMatches) {
     tags.push({
       name: match[1],
-      value: match[2]
+      value: match[2],
     });
   }
 

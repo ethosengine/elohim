@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "lint": "eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src",
+    "lint:fix": "eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src --fix"
   },
   "private": true,
   "dependencies": {
@@ -33,7 +35,20 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "@angular-eslint/eslint-plugin": "^19.3.0",
+    "@angular-eslint/eslint-plugin-template": "^19.3.0",
+    "@angular-eslint/template-parser": "^19.3.0",
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "eslint-plugin-unicorn": "^62.0.0",
     "ng-packagr": "^19.2.0",
-    "typescript": "~5.7.2"
+    "prettier": "^3.8.1",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.50.1"
   }
 }

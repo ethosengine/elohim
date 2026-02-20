@@ -24,12 +24,13 @@ import {
   generateSigningKeyPair,
   randomCapSecret,
   setSigningCredentials,
-  type AgentPubKey,
   type CellId,
   type AppInfo,
 } from '@holochain/client';
 
 import { SourceTier } from '../cache/content-resolver';
+
+import { ConsoleLogger } from './console-logger';
 
 import type {
   IConnectionStrategy,
@@ -39,13 +40,9 @@ import type {
   SigningCredentials,
   Logger,
 } from './connection-strategy';
-import { ConsoleLogger } from './console-logger';
 
 /** Default local conductor admin port */
 const DEFAULT_ADMIN_PORT = 4444;
-
-/** Default local conductor app port */
-const DEFAULT_APP_PORT = 4445;
 
 /** Default elohim-storage sidecar port */
 const DEFAULT_STORAGE_PORT = 8090;
@@ -91,7 +88,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
    * Checks for __TAURI__ global injected by Tauri runtime.
    */
   private isTauriEnvironment(): boolean {
-    return typeof window !== 'undefined' && '__TAURI__' in window;
+    return globalThis.window !== undefined && '__TAURI__' in globalThis;
   }
 
   /**
@@ -216,9 +213,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
             installed_app_id: config.appId,
           });
         } else {
-          throw new Error(
-            `App ${config.appId} not installed and no happPath provided`
-          );
+          throw new Error(`App ${config.appId} not installed and no happPath provided`);
         }
       }
 
@@ -337,7 +332,9 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
         this.adminWs = null;
       }
     } catch (err) {
-      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('Error during disconnect', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     this.credentials = null;
@@ -364,10 +361,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
   /**
    * Get installed app info from conductor.
    */
-  private async getInstalledApp(
-    adminWs: AdminWebsocket,
-    appId: string
-  ): Promise<AppInfo | null> {
+  private async getInstalledApp(adminWs: AdminWebsocket, appId: string): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
       return apps.find((app: AppInfo) => app.installed_app_id === appId) || null;
@@ -384,7 +378,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
 
     for (const [roleName, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
+      const cellArray = cells as { type: string; value: { cell_id: CellId } }[];
       for (const cell of cellArray) {
         if (cell.type === 'provisioned' && cell.value?.cell_id) {
           cellIds.set(roleName, cell.value.cell_id);

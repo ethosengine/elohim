@@ -6,6 +6,7 @@
  */
 
 import * as path from 'path';
+
 import { ServiceContainer } from '../service-container';
 
 /**
@@ -61,7 +62,7 @@ export async function handleImport(
       container.console.log(`  Relationships: ${result.totalRelationships}`);
     } else {
       container.console.error(`\n✗ Import completed with ${result.errors} errors:`);
-      for (const fileResult of result.fileResults.filter((r) => r.status === 'error')) {
+      for (const fileResult of result.fileResults.filter(r => r.status === 'error')) {
         container.console.error(`  - ${fileResult.sourcePath}: ${fileResult.error}`);
       }
       container.process.exit(1);
@@ -199,7 +200,7 @@ export async function handleExplore(
     }
 
     // Apply limit
-    const limit = parseInt(options.limit, 10);
+    const limit = Number.parseInt(options.limit, 10);
     filteredNodes = filteredNodes.slice(0, limit);
 
     container.console.log(`\nFound ${filteredNodes.length} nodes:\n`);
@@ -302,7 +303,7 @@ export async function handleValidateStandards(
     };
 
     for (const [field, data] of Object.entries(report.coverage)) {
-      const target = targets[field] || 0;
+      const _target = targets[field] || 0;
       let status = '✗';
       let label = 'POOR';
 

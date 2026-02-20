@@ -12,7 +12,7 @@ import { extractGovernanceScope } from '../parsers/markdown-parser';
 export function buildBaseMetadata(sourceVersion = '1.0.0'): Record<string, unknown> {
   return {
     source: 'elohim-import',
-    sourceVersion
+    sourceVersion,
   };
 }
 
@@ -25,7 +25,7 @@ export function buildBaseMetadata(sourceVersion = '1.0.0'): Record<string, unkno
 export function addProvenanceMetadata(
   metadata: Record<string, unknown>,
   sourceNodeId: string | undefined,
-  extractionMethod: string = 'direct-import'
+  extractionMethod = 'direct-import'
 ): void {
   if (sourceNodeId) {
     metadata.derivedFrom = sourceNodeId;

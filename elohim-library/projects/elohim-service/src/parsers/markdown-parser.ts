@@ -5,18 +5,17 @@
  * Extracts sections, tags, and metadata for transformation into ContentNodes.
  */
 
-import * as yaml from 'js-yaml';
 import * as crypto from 'crypto';
+
+import * as yaml from 'js-yaml';
+
 import { ParsedContent, ParsedSection } from '../models/import-context.model';
 import { PathMetadata } from '../models/path-metadata.model';
 
 /**
  * Parse a markdown file
  */
-export function parseMarkdown(
-  content: string,
-  pathMeta: PathMetadata
-): ParsedContent {
+export function parseMarkdown(content: string, pathMeta: PathMetadata): ParsedContent {
   const lines = content.split('\n');
 
   // Extract frontmatter
@@ -24,7 +23,6 @@ export function parseMarkdown(
 
   // Get content after frontmatter
   const bodyLines = lines.slice(contentStartIndex);
-  const bodyContent = bodyLines.join('\n');
 
   // Extract title
   const title = extractTitle(bodyLines, frontmatter, pathMeta);
@@ -41,16 +39,17 @@ export function parseMarkdown(
     rawContent: content,
     sections,
     title,
-    contentHash
+    contentHash,
   };
 }
 
 /**
  * Extract YAML frontmatter from markdown
  */
-function extractFrontmatter(
-  lines: string[]
-): { frontmatter: Record<string, unknown>; contentStartIndex: number } {
+function extractFrontmatter(lines: string[]): {
+  frontmatter: Record<string, unknown>;
+  contentStartIndex: number;
+} {
   if (lines[0]?.trim() !== '---') {
     return { frontmatter: {}, contentStartIndex: 0 };
   }
@@ -84,7 +83,7 @@ function extractFrontmatter(
 
   return {
     frontmatter,
-    contentStartIndex: endIndex + 1
+    contentStartIndex: endIndex + 1,
   };
 }
 
@@ -203,17 +202,17 @@ function extractSections(lines: string[]): ParsedSection[] {
         title,
         anchor,
         content: '',
-        children: []
+        children: [],
       };
 
       // Find parent section
-      while (sectionStack.length > 0 && sectionStack[sectionStack.length - 1].level >= level) {
+      while (sectionStack.length > 0 && sectionStack.at(-1)!.level >= level) {
         sectionStack.pop();
       }
 
       if (sectionStack.length > 0) {
         // Add as child of current parent
-        sectionStack[sectionStack.length - 1].children.push(newSection);
+        sectionStack.at(-1)!.children.push(newSection);
       } else {
         // Top-level section
         sections.push(newSection);
@@ -355,7 +354,7 @@ export function extractRelatedUsers(frontmatter: Record<string, unknown>): strin
  */
 export function extractGovernanceScope(frontmatter: Record<string, unknown>): string[] {
   if (Array.isArray(frontmatter.governance_scope)) {
-    return frontmatter.governance_scope.filter(s => typeof s === 'string') as string[];
+    return frontmatter.governance_scope.filter(s => typeof s === 'string');
   }
   return [];
 }

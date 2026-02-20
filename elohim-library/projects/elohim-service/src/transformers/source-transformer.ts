@@ -13,13 +13,13 @@
 
 import { ContentNode } from '../models/content-node.model';
 import { ParsedContent } from '../models/import-context.model';
+import { extractGherkinTags, extractGherkinDescription } from '../parsers/gherkin-parser';
 import {
   extractTags,
   extractDescription,
   extractRelatedUsers,
-  extractGovernanceScope
+  extractGovernanceScope,
 } from '../parsers/markdown-parser';
-import { extractGherkinTags, extractGherkinDescription } from '../parsers/gherkin-parser';
 import { normalizeId, buildContentNode } from '../utils';
 
 /**
@@ -33,17 +33,13 @@ export function transformToSourceNode(parsed: ParsedContent): ContentNode {
   const id = generateSourceId(parsed);
 
   // Extract tags based on content type
-  const tags = isGherkin
-    ? extractGherkinTags(parsed)
-    : extractTags(parsed);
+  const tags = isGherkin ? extractGherkinTags(parsed) : extractTags(parsed);
 
   // Always add 'source' tag
   tags.push('source');
 
   // Extract description
-  const description = isGherkin
-    ? extractGherkinDescription(parsed)
-    : extractDescription(parsed);
+  const description = isGherkin ? extractGherkinDescription(parsed) : extractDescription(parsed);
 
   // Determine source type from path metadata
   const sourceType = determineSourceType(parsed);
@@ -55,7 +51,7 @@ export function transformToSourceNode(parsed: ParsedContent): ContentNode {
     importedAt: now,
     importVersion: '1.0.0',
     contentHash: parsed.contentHash,
-    category: parsed.pathMeta.contentCategory
+    category: parsed.pathMeta.contentCategory,
   };
 
   // Add frontmatter fields
@@ -86,7 +82,7 @@ export function transformToSourceNode(parsed: ParsedContent): ContentNode {
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    createdAt: now
+    createdAt: now,
   });
 }
 
@@ -109,11 +105,11 @@ function generateSourceId(parsed: ParsedContent): string {
 
   // Add base name (unless generic)
   const baseName = parsed.pathMeta.baseName.toLowerCase();
-  if (!['readme', 'epic', 'index'].includes(baseName)) {
-    parts.push(baseName);
-  } else {
+  if (['readme', 'epic', 'index'].includes(baseName)) {
     // For generic names, add content category
     parts.push(parsed.pathMeta.contentCategory);
+  } else {
+    parts.push(baseName);
   }
 
   // Normalize and join
@@ -148,7 +144,9 @@ function determineSourceType(parsed: ParsedContent): string {
  */
 export function shouldCreateSourceNode(parsed: ParsedContent): boolean {
   // Create source nodes for all content from data/content directory
-  return parsed.pathMeta.relativePath.includes('data/content') ||
-         parsed.pathMeta.relativePath.includes('data\\content') ||
-         parsed.pathMeta.domain !== undefined;
+  return (
+    parsed.pathMeta.relativePath.includes('data/content') ||
+    parsed.pathMeta.relativePath.includes(String.raw`data\content`) ||
+    parsed.pathMeta.domain !== undefined
+  );
 }

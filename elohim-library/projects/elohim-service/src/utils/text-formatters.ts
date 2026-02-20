@@ -27,7 +27,11 @@ export function titleCase(text: string, separator: '_' | '-' = '_'): string {
  * @example
  * titleCaseWithSuffix('policy_maker', 'Epic') // returns 'Policy Maker Epic'
  */
-export function titleCaseWithSuffix(text: string, suffix: string, separator: '_' | '-' = '_'): string {
+export function titleCaseWithSuffix(
+  text: string,
+  suffix: string,
+  separator: '_' | '-' = '_'
+): string {
   return titleCase(text, separator) + ` ${suffix}`;
 }
 

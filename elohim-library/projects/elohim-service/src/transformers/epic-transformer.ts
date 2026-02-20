@@ -10,21 +10,20 @@
 
 import { ContentNode } from '../models/content-node.model';
 import { ParsedContent } from '../models/import-context.model';
+import { extractTags, extractDescription, extractRelatedUsers } from '../parsers/markdown-parser';
 import {
-  extractTags,
-  extractDescription,
-  extractRelatedUsers,
-  extractGovernanceScope
-} from '../parsers/markdown-parser';
-import { normalizeId, buildBaseMetadata, addProvenanceMetadata, addGovernanceScopeMetadata, buildContentNode, titleCaseWithSuffix } from '../utils';
+  normalizeId,
+  buildBaseMetadata,
+  addProvenanceMetadata,
+  addGovernanceScopeMetadata,
+  buildContentNode,
+  titleCaseWithSuffix,
+} from '../utils';
 
 /**
  * Transform epic content into an epic ContentNode
  */
-export function transformEpic(
-  parsed: ParsedContent,
-  sourceNodeId?: string
-): ContentNode {
+export function transformEpic(parsed: ParsedContent, sourceNodeId?: string): ContentNode {
   const now = new Date().toISOString();
 
   // Generate epic node ID
@@ -42,7 +41,7 @@ export function transformEpic(
     category: 'epic',
     epicName: parsed.pathMeta.epic,
     domain: parsed.pathMeta.domain,
-    ...buildBaseMetadata()
+    ...buildBaseMetadata(),
   };
 
   // Add provenance link
@@ -81,7 +80,7 @@ export function transformEpic(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    createdAt: now
+    createdAt: now,
   });
 }
 

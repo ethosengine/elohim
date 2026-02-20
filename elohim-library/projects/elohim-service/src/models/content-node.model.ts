@@ -11,20 +11,20 @@
  * Content types supported by the lamad platform
  */
 export type ContentType =
-  | 'source'       // Raw source file (provenance layer)
-  | 'epic'         // Domain narrative
-  | 'feature'      // Feature specification
-  | 'scenario'     // Behavioral specification (gherkin)
-  | 'concept'      // Abstract concept
-  | 'role'         // Archetype/persona definition
-  | 'video'        // Video content
+  | 'source' // Raw source file (provenance layer)
+  | 'epic' // Domain narrative
+  | 'feature' // Feature specification
+  | 'scenario' // Behavioral specification (gherkin)
+  | 'concept' // Abstract concept
+  | 'role' // Archetype/persona definition
+  | 'video' // Video content
   | 'organization' // Organization profile
   | 'book-chapter' // Reference material
-  | 'tool'         // Tool/resource
-  | 'path'         // Learning path (graph integration)
-  | 'assessment'   // Assessment instrument
-  | 'reference'    // External reference (books, articles, etc.)
-  | 'example';     // Code or usage example
+  | 'tool' // Tool/resource
+  | 'path' // Learning path (graph integration)
+  | 'assessment' // Assessment instrument
+  | 'reference' // External reference (books, articles, etc.)
+  | 'example'; // Code or usage example
 
 /**
  * Content format for rendering
@@ -36,18 +36,12 @@ export type ContentFormat =
   | 'plaintext'
   | 'video-embed'
   | 'external-link'
-  | 'perseus-quiz-json';  // Khan Academy Perseus quiz format
+  | 'perseus-quiz-json'; // Khan Academy Perseus quiz format
 
 /**
  * Content reach level - visibility scope
  */
-export type ContentReach =
-  | 'private'
-  | 'invited'
-  | 'local'
-  | 'community'
-  | 'federated'
-  | 'commons';
+export type ContentReach = 'private' | 'invited' | 'local' | 'community' | 'federated' | 'commons';
 
 /**
  * Relationship types between content nodes
@@ -76,7 +70,7 @@ export enum ContentRelationshipType {
   /** Provenance: this content was derived from source */
   DERIVED_FROM = 'DERIVED_FROM',
   /** Provenance: source produced this derived content */
-  SOURCE_OF = 'SOURCE_OF'
+  SOURCE_OF = 'SOURCE_OF',
 }
 
 /**

@@ -11,6 +11,7 @@
 
 import { execSync } from 'child_process';
 import * as fs from 'fs';
+
 import { ContentNode } from '../models/content-node.model';
 
 /**
@@ -34,7 +35,7 @@ const ACTIVITYPUB_TYPE_MAP: Record<string, string> = {
   source: 'Document',
   role: 'Page',
   reference: 'Document',
-  example: 'Note'
+  example: 'Note',
 };
 
 /**
@@ -57,7 +58,7 @@ const SCHEMA_TYPE_MAP: Record<string, string> = {
   role: 'JobPosting',
   concept: 'DefinedTerm',
   reference: 'Article',
-  example: 'CreativeWork'
+  example: 'CreativeWork',
 };
 
 /**
@@ -93,20 +94,22 @@ export function getGitTimestamps(filePath: string): { created: string; modified:
 
   try {
     // Get first commit (creation date)
-    const createdRaw = execSync(
-      `git log --diff-filter=A --format=%aI -- "${filePath}"`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
-    ).trim().split('\n')[0];
+    const createdRaw = execSync(`git log --diff-filter=A --format=%aI -- "${filePath}"`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+      .trim()
+      .split('\n')[0];
 
     // Get last commit (modification date)
-    const modifiedRaw = execSync(
-      `git log -1 --format=%aI -- "${filePath}"`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
-    ).trim();
+    const modifiedRaw = execSync(`git log -1 --format=%aI -- "${filePath}"`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    }).trim();
 
     return {
       created: createdRaw || now,
-      modified: modifiedRaw || now
+      modified: modifiedRaw || now,
     };
   } catch {
     // Fallback to file system timestamps
@@ -147,18 +150,25 @@ export function generateOpenGraphMetadata(
   metadata: Record<string, unknown> = {},
   timestamps: { created: string; modified: string } = { created: '', modified: '' }
 ): OpenGraphMetadata {
-  const articleTypes = ['epic', 'feature', 'scenario', 'concept', 'course-module', 'article'];
+  const articleTypes = new Set([
+    'epic',
+    'feature',
+    'scenario',
+    'concept',
+    'course-module',
+    'article',
+  ]);
 
   const og: OpenGraphMetadata = {
     ogTitle: title,
     ogDescription: (description || title).substring(0, 200),
-    ogType: articleTypes.includes(contentType) ? 'article' : 'website',
+    ogType: articleTypes.has(contentType) ? 'article' : 'website',
     ogUrl: `https://elohim-protocol.org/content/${nodeId}`,
-    ogSiteName: 'Elohim Protocol - Lamad Learning Platform'
+    ogSiteName: 'Elohim Protocol - Lamad Learning Platform',
   };
 
   // Add timestamps for articles
-  if (articleTypes.includes(contentType)) {
+  if (articleTypes.has(contentType)) {
     og.articlePublishedTime = timestamps.created;
     og.articleModifiedTime = timestamps.modified;
     if (metadata.epic) {
@@ -226,15 +236,15 @@ export function generateLinkedData(
     publisher: {
       '@type': 'Organization',
       '@id': 'https://elohim-protocol.org',
-      name: 'Elohim Protocol'
-    }
+      name: 'Elohim Protocol',
+    },
   };
 
   // Add author if available
   if (metadata.author) {
     linkedData.author = {
       '@type': 'Person',
-      name: String(metadata.author)
+      name: String(metadata.author),
     };
   }
 
@@ -242,7 +252,7 @@ export function generateLinkedData(
   if (metadata.epic) {
     linkedData.isPartOf = {
       '@type': 'CreativeWorkSeries',
-      name: String(metadata.epic)
+      name: String(metadata.epic),
     };
   }
 
@@ -262,10 +272,7 @@ export interface StandardsFields {
 /**
  * Generate all standards fields for a ContentNode
  */
-export function generateStandardsFields(
-  node: ContentNode,
-  sourcePath?: string
-): StandardsFields {
+export function generateStandardsFields(node: ContentNode, sourcePath?: string): StandardsFields {
   const effectivePath = sourcePath || node.sourcePath || node.id;
   const did = generateDid(effectivePath, 'content');
   const activityPubType = inferActivityPubType(node.contentType);
@@ -299,7 +306,7 @@ export function generateStandardsFields(
     did,
     activityPubType,
     openGraphMetadata,
-    linkedData
+    linkedData,
   };
 }
 
@@ -314,7 +321,7 @@ export function enrichWithStandards(
 
   return {
     ...node,
-    ...standards
+    ...standards,
   };
 }
 
@@ -338,10 +345,10 @@ export function validateStandardsFields(
   // Validate DID
   const did = node.did as string | undefined;
   if (did) {
-    if (!did.startsWith('did:')) {
-      results.push({ field: 'did', valid: false, error: `Invalid DID format: ${did}` });
-    } else {
+    if (did.startsWith('did:')) {
       results.push({ field: 'did', valid: true });
+    } else {
+      results.push({ field: 'did', valid: false, error: `Invalid DID format: ${did}` });
     }
   } else {
     results.push({ field: 'did', valid: false, error: 'Missing DID' });
@@ -359,10 +366,10 @@ export function validateStandardsFields(
   if (ld) {
     if (!ld['@context']) {
       results.push({ field: 'linkedData', valid: false, error: 'JSON-LD missing @context' });
-    } else if (!ld['@type']) {
-      results.push({ field: 'linkedData', valid: false, error: 'JSON-LD missing @type' });
-    } else {
+    } else if (ld['@type']) {
       results.push({ field: 'linkedData', valid: true });
+    } else {
+      results.push({ field: 'linkedData', valid: false, error: 'JSON-LD missing @type' });
     }
   } else {
     results.push({ field: 'linkedData', valid: false, error: 'Missing linkedData' });
@@ -377,7 +384,7 @@ export function validateStandardsFields(
       results.push({
         field: 'openGraphMetadata',
         valid: false,
-        error: `Open Graph missing: ${missing.join(', ')}`
+        error: `Open Graph missing: ${missing.join(', ')}`,
       });
     } else {
       results.push({ field: 'openGraphMetadata', valid: true });
@@ -402,15 +409,13 @@ export interface StandardsCoverageReport {
 /**
  * Generate coverage report for an array of nodes
  */
-export function generateCoverageReport(
-  nodes: Record<string, unknown>[]
-): StandardsCoverageReport {
+export function generateCoverageReport(nodes: Record<string, unknown>[]): StandardsCoverageReport {
   const total = nodes.length;
   const coverage: Record<string, { count: number; total: number; percentage: number }> = {
     did: { count: 0, total, percentage: 0 },
     activityPubType: { count: 0, total, percentage: 0 },
     linkedData: { count: 0, total, percentage: 0 },
-    openGraphMetadata: { count: 0, total, percentage: 0 }
+    openGraphMetadata: { count: 0, total, percentage: 0 },
   };
   const errors: string[] = [];
 
@@ -428,9 +433,7 @@ export function generateCoverageReport(
 
   // Calculate percentages
   for (const field of Object.keys(coverage)) {
-    coverage[field].percentage = total > 0
-      ? (coverage[field].count / total) * 100
-      : 0;
+    coverage[field].percentage = total > 0 ? (coverage[field].count / total) * 100 : 0;
   }
 
   // Check targets (from original Python script)
@@ -438,7 +441,7 @@ export function generateCoverageReport(
     did: 100,
     activityPubType: 100,
     linkedData: 80,
-    openGraphMetadata: 80
+    openGraphMetadata: 80,
   };
 
   const allTargetsMet = Object.entries(targets).every(

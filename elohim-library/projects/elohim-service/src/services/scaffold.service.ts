@@ -25,61 +25,109 @@ export const EPICS: Record<string, EpicConfig> = {
     id: 'value-scanner',
     description: 'Care Economy - Value recognition and exchange',
     users: [
-      'adult', 'caregiver', 'child', 'elderly', 'grandparent',
-      'idd_community', 'middle_aged', 'parent', 'person_with_disabilities',
-      'preteen', 'retired', 'senior', 'single_parent', 'student',
-      'teen', 'vulnerable_temporary', 'worker', 'young_adult', 'young_child'
-    ]
+      'adult',
+      'caregiver',
+      'child',
+      'elderly',
+      'grandparent',
+      'idd_community',
+      'middle_aged',
+      'parent',
+      'person_with_disabilities',
+      'preteen',
+      'retired',
+      'senior',
+      'single_parent',
+      'student',
+      'teen',
+      'vulnerable_temporary',
+      'worker',
+      'young_adult',
+      'young_child',
+    ],
   },
   public_observer: {
     id: 'public-observer',
     description: 'Civic Democracy - Public oversight and participation',
     users: [
-      'activist', 'board_member', 'citizen', 'community_organizer',
-      'developer_interests', 'journalist', 'parent', 'politician', 'teacher'
-    ]
+      'activist',
+      'board_member',
+      'citizen',
+      'community_organizer',
+      'developer_interests',
+      'journalist',
+      'parent',
+      'politician',
+      'teacher',
+    ],
   },
   autonomous_entity: {
     id: 'autonomous-entity',
     description: 'Workplace Transformation - Distributed ownership and governance',
     users: [
-      'community_investor', 'customer', 'franchise_operator',
-      'manager', 'small_business_owner', 'supplier', 'worker'
-    ]
+      'community_investor',
+      'customer',
+      'franchise_operator',
+      'manager',
+      'small_business_owner',
+      'supplier',
+      'worker',
+    ],
   },
   governance: {
     id: 'governance',
     description: 'AI Governance - Constitutional oversight and appeals',
     users: [
-      'appellant', 'community_leader', 'constitutional_council_member',
-      'policy_maker', 'researcher', 'technical_expert'
-    ]
+      'appellant',
+      'community_leader',
+      'constitutional_council_member',
+      'policy_maker',
+      'researcher',
+      'technical_expert',
+    ],
   },
   social_medium: {
     id: 'social-medium',
     description: 'Digital Communication - Relationship-centered social media',
     users: [
-      'activist', 'child', 'community_moderator', 'content_creator',
-      'displaced_person', 'elder', 'refugee'
-    ]
-  }
+      'activist',
+      'child',
+      'community_moderator',
+      'content_creator',
+      'displaced_person',
+      'elder',
+      'refugee',
+    ],
+  },
 };
 
 /**
  * Geographic governance layers
  */
 export const GEOGRAPHIC_LAYERS = [
-  'individual', 'family', 'neighborhood', 'community', 'district',
-  'municipality', 'county_regional', 'provincial_state', 'nation_state',
-  'continental', 'global'
+  'individual',
+  'family',
+  'neighborhood',
+  'community',
+  'district',
+  'municipality',
+  'county_regional',
+  'provincial_state',
+  'nation_state',
+  'continental',
+  'global',
 ];
 
 /**
  * Functional governance layers
  */
 export const FUNCTIONAL_LAYERS = [
-  'workplace_organizational', 'educational', 'ecological_bioregional',
-  'cultural_linguistic', 'industry_sector', 'affinity_network'
+  'workplace_organizational',
+  'educational',
+  'ecological_bioregional',
+  'cultural_linguistic',
+  'industry_sector',
+  'affinity_network',
 ];
 
 /**
@@ -173,12 +221,12 @@ export function generateTodo(epic: string, userType: string): string {
   const userDisplay = formatUserType(userType);
   const epicDisplay = formatEpic(epic);
 
-  const geographicChecklist = GEOGRAPHIC_LAYERS.map(layer =>
-    `- [ ] \`scenarios/${layer}.md\` - ${formatUserType(layer)} level scenarios`
+  const geographicChecklist = GEOGRAPHIC_LAYERS.map(
+    layer => `- [ ] \`scenarios/${layer}.md\` - ${formatUserType(layer)} level scenarios`
   ).join('\n');
 
-  const functionalChecklist = FUNCTIONAL_LAYERS.map(layer =>
-    `- [ ] \`scenarios/${layer}.md\` - ${formatUserType(layer)} scenarios`
+  const functionalChecklist = FUNCTIONAL_LAYERS.map(
+    layer => `- [ ] \`scenarios/${layer}.md\` - ${formatUserType(layer)} scenarios`
   ).join('\n');
 
   return `# Scenarios TODO - ${userDisplay} (${epicDisplay})
@@ -283,15 +331,11 @@ export interface ScaffoldResult {
 /**
  * Scaffold templates for a specific user type
  */
-export function scaffoldUserType(
-  basePath: string,
-  epic: string,
-  userType: string
-): ScaffoldResult {
+export function scaffoldUserType(basePath: string, epic: string, userType: string): ScaffoldResult {
   const result: ScaffoldResult = {
     created: [],
     skipped: [],
-    errors: []
+    errors: [],
   };
 
   const epicConfig = EPICS[epic];
@@ -309,22 +353,22 @@ export function scaffoldUserType(
 
   // Generate README.md
   const readmePath = path.join(userPath, 'README.md');
-  if (!fs.existsSync(readmePath)) {
+  if (fs.existsSync(readmePath)) {
+    result.skipped.push(readmePath);
+  } else {
     const readme = generateReadme(epic, userType, epicConfig.description);
     fs.writeFileSync(readmePath, readme, 'utf-8');
     result.created.push(readmePath);
-  } else {
-    result.skipped.push(readmePath);
   }
 
   // Generate TODO.md
   const todoPath = path.join(userPath, 'TODO.md');
-  if (!fs.existsSync(todoPath)) {
+  if (fs.existsSync(todoPath)) {
+    result.skipped.push(todoPath);
+  } else {
     const todo = generateTodo(epic, userType);
     fs.writeFileSync(todoPath, todo, 'utf-8');
     result.created.push(todoPath);
-  } else {
-    result.skipped.push(todoPath);
   }
 
   return result;
@@ -337,7 +381,7 @@ export function scaffoldEpic(basePath: string, epic: string): ScaffoldResult {
   const result: ScaffoldResult = {
     created: [],
     skipped: [],
-    errors: []
+    errors: [],
   };
 
   const epicConfig = EPICS[epic];
@@ -363,7 +407,7 @@ export function scaffoldAll(basePath: string): ScaffoldResult {
   const result: ScaffoldResult = {
     created: [],
     skipped: [],
-    errors: []
+    errors: [],
   };
 
   for (const epic of Object.keys(EPICS)) {
@@ -379,11 +423,11 @@ export function scaffoldAll(basePath: string): ScaffoldResult {
 /**
  * List all epics and their user types
  */
-export function listEpicsAndUsers(): Array<{ epic: string; description: string; users: string[] }> {
+export function listEpicsAndUsers(): { epic: string; description: string; users: string[] }[] {
   return Object.entries(EPICS).map(([epic, config]) => ({
     epic,
     description: config.description,
-    users: config.users
+    users: config.users,
   }));
 }
 

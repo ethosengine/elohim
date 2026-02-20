@@ -5,11 +5,12 @@
  * Allows for easy mocking in tests and flexible configuration.
  */
 
+import * as fs from 'fs';
+
 import { KuzuClient } from '../db/kuzu-client';
+import { HolochainImportConfig } from '../models/holochain.model';
 import { HolochainClientService } from '../services/holochain-client.service';
 import { HolochainImportService } from '../services/holochain-import.service';
-import { HolochainImportConfig } from '../models/holochain.model';
-import * as fs from 'fs';
 
 /**
  * File system operations interface (for testability)
@@ -62,13 +63,13 @@ export interface IImportPipelineService {
     totalRelationships: number;
     totalFiles?: number;
     nodes: any[];
-    fileResults: Array<{
+    fileResults: {
       sourcePath: string;
       status: 'created' | 'skipped' | 'error';
       error?: string;
       nodeIds: string[];
       processingTime: number;
-    }>;
+    }[];
   }>;
 }
 
@@ -117,19 +118,29 @@ export interface ITrustService {
     withAttestations: number;
     errors: string[];
   }>;
-  updateContentIndexWithTrust(indexPath: string, attestationsByContent: Record<string, any[]>): void;
+  updateContentIndexWithTrust(
+    indexPath: string,
+    attestationsByContent: Record<string, any[]>
+  ): void;
 }
 
 /**
  * Scaffold service interface
  */
 export interface IScaffoldService {
-  scaffoldUserType(basePath: string, epic: string, userType: string): {
+  scaffoldUserType(
+    basePath: string,
+    epic: string,
+    userType: string
+  ): {
     created: string[];
     skipped: string[];
     errors: string[];
   };
-  scaffoldEpic(basePath: string, epic: string): {
+  scaffoldEpic(
+    basePath: string,
+    epic: string
+  ): {
     created: string[];
     skipped: string[];
     errors: string[];
@@ -139,7 +150,7 @@ export interface IScaffoldService {
     skipped: string[];
     errors: string[];
   };
-  listEpicsAndUsers(): Array<{ epic: string; description: string; users: string[] }>;
+  listEpicsAndUsers(): { epic: string; description: string; users: string[] }[];
 }
 
 /**
@@ -160,7 +171,7 @@ export interface IHumanService {
     errors: string[];
   }>;
   listHumanCategories(): string[];
-  listRelationshipTypes(): Array<{ type: string; layer: string; intimacy: string }>;
+  listRelationshipTypes(): { type: string; layer: string; intimacy: string }[];
 }
 
 /**

@@ -29,6 +29,8 @@ import {
 
 import { SourceTier } from '../cache/content-resolver';
 
+import { ConsoleLogger } from './console-logger';
+
 import type {
   IConnectionStrategy,
   ConnectionConfig,
@@ -37,7 +39,6 @@ import type {
   SigningCredentials,
   Logger,
 } from './connection-strategy';
-import { ConsoleLogger } from './console-logger';
 
 /**
  * Doorway Connection Strategy Implementation
@@ -102,7 +103,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
           this.logger.warn(
             `Source chain conflict during ${description}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
           );
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
 
@@ -130,10 +131,10 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
    * Checks for known Che URL patterns.
    */
   private isCheEnvironment(): boolean {
-    if (typeof window === 'undefined') return false;
+    if (globalThis.window === undefined) return false;
     return (
-      window.location.hostname.includes('.devspaces.') ||
-      window.location.hostname.includes('.code.ethosengine.com')
+      globalThis.location.hostname.includes('.devspaces.') ||
+      globalThis.location.hostname.includes('.code.ethosengine.com')
     );
   }
 
@@ -147,7 +148,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     // In Che, each endpoint gets a unique URL like:
     // https://<workspace>-<endpoint>.code.ethosengine.com
     // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
-    const currentUrl = new URL(window.location.href);
+    const currentUrl = new URL(globalThis.location.href);
     const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
 
     this.logger.debug('Che URL resolution', {
@@ -233,9 +234,11 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       //
       // Note: Empty string doesn't work because Angular's proxy only intercepts
       // HttpClient requests, not browser resource loads like <img> tags.
-      if (typeof window !== 'undefined' && window.location?.origin) {
-        this.logger.debug('Storage base URL (Che via Angular proxy)', { url: window.location.origin });
-        return window.location.origin;
+      if (globalThis.window !== undefined && globalThis.location?.origin) {
+        this.logger.debug('Storage base URL (Che via Angular proxy)', {
+          url: globalThis.location.origin,
+        });
+        return globalThis.location.origin;
       }
       // SSR fallback - return empty and let requests be relative
       return '';
@@ -470,9 +473,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
             installed_app_id: config.appId,
           });
         } else {
-          throw new Error(
-            `App ${config.appId} not installed and no happPath provided`
-          );
+          throw new Error(`App ${config.appId} not installed and no happPath provided`);
         }
       }
 
@@ -491,7 +492,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       for (const [roleName, cellId] of cellIds) {
         try {
           await this.withSourceChainRetry(
-            () =>
+            async () =>
               this.adminWs!.grantZomeCallCapability({
                 cell_id: cellId,
                 cap_grant: {
@@ -556,7 +557,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       for (const [roleName, cellId] of grantedCells) {
         try {
           await this.withSourceChainRetry(
-            () => this.adminWs!.authorizeSigningCredentials(cellId),
+            async () => this.adminWs!.authorizeSigningCredentials(cellId),
             `authorize credentials for ${roleName}`
           );
           this.logger.debug(`Authorized credentials for role '${roleName}'`);
@@ -627,7 +628,9 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         this.adminWs = null;
       }
     } catch (err) {
-      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('Error during disconnect', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     this.credentials = null;
@@ -669,10 +672,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   /**
    * Get installed app info from conductor.
    */
-  private async getInstalledApp(
-    adminWs: AdminWebsocket,
-    appId: string
-  ): Promise<AppInfo | null> {
+  private async getInstalledApp(adminWs: AdminWebsocket, appId: string): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
       return apps.find((app: AppInfo) => app.installed_app_id === appId) || null;
@@ -688,8 +688,8 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     // Use btoa in browser environments
     if (typeof btoa === 'function') {
       let binary = '';
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
+      for (const byte of bytes) {
+        binary += String.fromCodePoint(byte);
       }
       return btoa(binary);
     }
@@ -706,7 +706,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       const binary = atob(str);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
+        bytes[i] = binary.codePointAt(i)!;
       }
       return bytes;
     }
@@ -742,7 +742,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
 
     for (const [roleName, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
+      const cellArray = cells as { type: string; value: { cell_id: CellId } }[];
       for (const cell of cellArray) {
         if (cell.type === 'provisioned' && cell.value?.cell_id) {
           cellIds.set(roleName, cell.value.cell_id);

@@ -11,22 +11,21 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+
 import { glob } from 'glob';
 
+import { KuzuClient } from '../db/kuzu-client';
 import { ContentNode, ContentRelationship } from '../models/content-node.model';
 import {
   ImportOptions,
   ImportResult,
   ImportContext,
   ImportFileResult,
-  ParsedContent
+  ParsedContent,
 } from '../models/import-context.model';
-import { ContentManifest } from '../models/manifest.model';
-
-import { parsePathMetadata } from '../parsers/path-metadata-parser';
-import { parseMarkdown } from '../parsers/markdown-parser';
 import { parseGherkin } from '../parsers/gherkin-parser';
-
+import { parseMarkdown } from '../parsers/markdown-parser';
+import { parsePathMetadata } from '../parsers/path-metadata-parser';
 import {
   transformToSourceNode,
   shouldCreateSourceNode,
@@ -37,30 +36,29 @@ import {
   transformScenarios,
   isScenarioContent,
   transformResource,
-  isResourceContent
+  isResourceContent,
 } from '../transformers';
 
-import { extractRelationships, RelationshipExtractionOptions } from './relationship-extractor.service';
 import {
   loadManifest,
   saveManifest,
   calculateFileHash,
   calculateNodeHash,
-  hasSourceChanged,
   updateSourceHash,
   updateNodeHash,
   getNewOrChangedSources,
   getRemovedSources,
-  removeSource
+  removeSource,
 } from './manifest.service';
-import { KuzuClient } from '../db/kuzu-client';
+import {
+  extractRelationships,
+  RelationshipExtractionOptions,
+} from './relationship-extractor.service';
 
 /**
  * Run the full import pipeline
  */
-export async function runImportPipeline(
-  options: ImportOptions
-): Promise<ImportResult> {
+export async function runImportPipeline(options: ImportOptions): Promise<ImportResult> {
   const startTime = new Date();
   const context = createImportContext(options);
 
@@ -90,7 +88,9 @@ export async function runImportPipeline(
       removedFiles = getRemovedSources(context.previousManifest, new Set(sourceFiles));
       filesToProcess = newOrChanged;
 
-      console.log(`Incremental mode: ${newOrChanged.length} new/changed, ${removedFiles.length} removed`);
+      console.log(
+        `Incremental mode: ${newOrChanged.length} new/changed, ${removedFiles.length} removed`
+      );
     } else {
       filesToProcess = sourceFiles;
       console.log(`Full import mode: ${filesToProcess.length} files`);
@@ -134,7 +134,7 @@ export async function runImportPipeline(
           sourcePath: file,
           status: 'created',
           nodeIds: nodes.map(n => n.id),
-          processingTime: Date.now() - fileStartTime
+          processingTime: Date.now() - fileStartTime,
         });
       } catch (err) {
         const errorMsg = `Error processing ${file}: ${err}`;
@@ -144,7 +144,7 @@ export async function runImportPipeline(
           status: 'error',
           nodeIds: [],
           error: errorMsg,
-          processingTime: Date.now() - fileStartTime
+          processingTime: Date.now() - fileStartTime,
         });
       }
     }
@@ -163,20 +163,20 @@ export async function runImportPipeline(
     context.stage = 'generating';
     let relationships: ContentRelationship[] = [];
 
-    if (!options.skipRelationships) {
+    if (options.skipRelationships) {
+      console.log('Skipping relationship extraction (--skip-relationships flag)');
+    } else {
       console.log('Extracting relationships...');
       const relationshipOptions: RelationshipExtractionOptions = {
         includePath: true,
         includeTags: true,
-        includeContent: false,  // Disabled by default - expensive
+        includeContent: false, // Disabled by default - expensive
         minScore: 0.5,
-        maxPerNode: 10
+        maxPerNode: 10,
       };
       relationships = extractRelationships(mergedNodes, relationshipOptions);
       context.relationships = relationships;
       console.log(`Extracted ${relationships.length} relationships`);
-    } else {
-      console.log('Skipping relationship extraction (--skip-relationships flag)');
     }
 
     // 9. Write to Kuzu database
@@ -210,7 +210,7 @@ export async function runImportPipeline(
       totalRelationships: relationships.length,
       fileResults,
       nodes: mergedNodes,
-      relationships
+      relationships,
     };
 
     console.log(`\nImport complete in ${endTime.getTime() - startTime.getTime()}ms`);
@@ -219,7 +219,6 @@ export async function runImportPipeline(
     console.log(`  Errors: ${result.errors}`);
 
     return result;
-
   } catch (err) {
     const errorMsg = `Pipeline failed: ${err}`;
     console.error(errorMsg);
@@ -234,15 +233,17 @@ export async function runImportPipeline(
       errors: 1,
       totalNodes: 0,
       totalRelationships: 0,
-      fileResults: [{
-        sourcePath: '',
-        status: 'error',
-        nodeIds: [],
-        error: errorMsg,
-        processingTime: 0
-      }],
+      fileResults: [
+        {
+          sourcePath: '',
+          status: 'error',
+          nodeIds: [],
+          error: errorMsg,
+          processingTime: 0,
+        },
+      ],
       nodes: [],
-      relationships: []
+      relationships: [],
     };
   }
 }
@@ -251,9 +252,7 @@ export async function runImportPipeline(
  * Create import context
  */
 function createImportContext(options: ImportOptions): ImportContext {
-  const manifest = options.mode === 'incremental'
-    ? loadManifest(options.outputDir)
-    : undefined;
+  const manifest = options.mode === 'incremental' ? loadManifest(options.outputDir) : undefined;
 
   return {
     options,
@@ -274,9 +273,9 @@ function createImportContext(options: ImportOptions): ImportContext {
       totalRelationships: 0,
       fileResults: [],
       nodes: [],
-      relationships: []
+      relationships: [],
     },
-    previousManifest: manifest
+    previousManifest: manifest,
   };
 }
 
@@ -284,10 +283,7 @@ function createImportContext(options: ImportOptions): ImportContext {
  * Scan source directory for content files
  */
 async function scanSourceFiles(sourceDir: string): Promise<string[]> {
-  const patterns = [
-    path.join(sourceDir, '**/*.md'),
-    path.join(sourceDir, '**/*.feature')
-  ];
+  const patterns = [path.join(sourceDir, '**/*.md'), path.join(sourceDir, '**/*.feature')];
 
   const files: string[] = [];
 
@@ -454,7 +450,7 @@ async function writeToKuzu(
 /**
  * Generate import summary for logging
  */
-function generateSummary(
+function _generateSummary(
   nodes: ContentNode[],
   relationships: ContentRelationship[]
 ): Record<string, unknown> {
@@ -474,7 +470,7 @@ function generateSummary(
   const epics = new Set<string>();
   for (const node of nodes) {
     if (node.metadata?.epic) {
-      epics.add(node.metadata.epic as string);
+      epics.add(node.metadata.epic);
     }
   }
 
@@ -482,7 +478,7 @@ function generateSummary(
   const userTypes = new Set<string>();
   for (const node of nodes) {
     if (node.metadata?.userType) {
-      userTypes.add(node.metadata.userType as string);
+      userTypes.add(node.metadata.userType);
     }
   }
 
@@ -490,12 +486,12 @@ function generateSummary(
     generatedAt: new Date().toISOString(),
     totals: {
       nodes: nodes.length,
-      relationships: relationships.length
+      relationships: relationships.length,
     },
     nodesByType: byType,
     relationshipsByType: relByType,
     epics: Array.from(epics).sort(),
-    userTypes: Array.from(userTypes).sort()
+    userTypes: Array.from(userTypes).sort(),
   };
 }
 
@@ -513,6 +509,6 @@ export async function importContent(
     outputDir,
     generateSourceNodes: true,
     generateDerivedNodes: true,
-    verbose: true
+    verbose: true,
   });
 }

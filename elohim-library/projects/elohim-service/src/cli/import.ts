@@ -14,22 +14,13 @@
  *   NODE_OPTIONS="--max-old-space-size=4096" npx ts-node src/cli/import.ts import
  */
 
-import { Command } from 'commander';
-import * as path from 'path';
 import * as fs from 'fs';
-import { runImportPipeline } from '../services/import-pipeline.service';
-import { loadManifest, getImportStats, validateManifest } from '../services/manifest.service';
+import * as path from 'path';
+
+import { Command } from 'commander';
+
+import { KuzuClient } from '../db/kuzu-client';
 import {
-  generateCoverageReport,
-  validateStandardsFields
-} from '../services/standards.service';
-import {
-  loadAttestations,
-  enrichContentDirectory,
-  updateContentIndexWithTrust
-} from '../services/trust.service';
-import {
-  loadHumansData,
   createHuman,
   createRelationship,
   addHumanToFile,
@@ -37,16 +28,22 @@ import {
   importHumansToLamad,
   listHumanCategories,
   listRelationshipTypes,
-  HumanCategory
+  HumanCategory,
 } from '../services/human.service';
+import { runImportPipeline } from '../services/import-pipeline.service';
+import { loadManifest, getImportStats, validateManifest } from '../services/manifest.service';
 import {
   scaffoldUserType,
   scaffoldEpic,
   scaffoldAll,
   listEpicsAndUsers,
-  EPICS
 } from '../services/scaffold.service';
-import { KuzuClient } from '../db/kuzu-client';
+import { generateCoverageReport } from '../services/standards.service';
+import {
+  loadAttestations,
+  enrichContentDirectory,
+  updateContentIndexWithTrust,
+} from '../services/trust.service';
 
 const program = new Command();
 
@@ -64,7 +61,7 @@ program
   .option('-v, --verbose', 'Verbose output', false)
   .option('--dry-run', 'Dry run - do not write to database', false)
   .option('--skip-relationships', 'Skip relationship extraction (faster, less memory)', false)
-  .action(async (options) => {
+  .action(async options => {
     const sourceDir = path.resolve(options.source);
     const dbPath = path.resolve(options.db);
 
@@ -88,7 +85,7 @@ program
         dryRun: options.dryRun,
         generateSourceNodes: true,
         generateDerivedNodes: true,
-        skipRelationships: options.skipRelationships
+        skipRelationships: options.skipRelationships,
       });
 
       if (result.errors === 0) {
@@ -114,7 +111,7 @@ program
   .command('stats')
   .description('Show import statistics from manifest')
   .option('-o, --output <dir>', 'Output directory', './output/lamad')
-  .action((options) => {
+  .action(options => {
     const outputDir = path.resolve(options.output);
 
     try {
@@ -148,7 +145,7 @@ program
   .command('validate')
   .description('Validate manifest integrity')
   .option('-o, --output <dir>', 'Output directory', './output/lamad')
-  .action((options) => {
+  .action(options => {
     const outputDir = path.resolve(options.output);
 
     try {
@@ -175,12 +172,18 @@ program
   .description('Explore relationships for a specific node or scope')
   .option('-o, --output <dir>', 'Output directory with nodes.json', './output/lamad')
   .option('-n, --node <id>', 'Explore relationships for a specific node ID')
-  .option('-e, --epic <name>', 'Explore nodes within a specific epic (governance, autonomous_entity, etc.)')
-  .option('-u, --user-type <type>', 'Explore nodes for a specific user type (policy_maker, worker, etc.)')
+  .option(
+    '-e, --epic <name>',
+    'Explore nodes within a specific epic (governance, autonomous_entity, etc.)'
+  )
+  .option(
+    '-u, --user-type <type>',
+    'Explore nodes for a specific user type (policy_maker, worker, etc.)'
+  )
   .option('-t, --type <contentType>', 'Filter by content type (scenario, role, epic, etc.)')
   .option('--depth <n>', 'Relationship depth to explore (default: 1)', '1')
   .option('--limit <n>', 'Maximum nodes to return (default: 50)', '50')
-  .action(async (options) => {
+  .action(async options => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -197,28 +200,22 @@ program
 
       // Apply filters
       if (options.epic) {
-        filteredNodes = filteredNodes.filter((n: any) =>
-          n.metadata?.epic === options.epic
-        );
+        filteredNodes = filteredNodes.filter((n: any) => n.metadata?.epic === options.epic);
         console.log(`Filtered to epic: ${options.epic}`);
       }
 
       if (options.userType) {
-        filteredNodes = filteredNodes.filter((n: any) =>
-          n.metadata?.userType === options.userType
-        );
+        filteredNodes = filteredNodes.filter((n: any) => n.metadata?.userType === options.userType);
         console.log(`Filtered to user type: ${options.userType}`);
       }
 
       if (options.type) {
-        filteredNodes = filteredNodes.filter((n: any) =>
-          n.contentType === options.type
-        );
+        filteredNodes = filteredNodes.filter((n: any) => n.contentType === options.type);
         console.log(`Filtered to content type: ${options.type}`);
       }
 
       // Apply limit
-      const limit = parseInt(options.limit, 10);
+      const limit = Number.parseInt(options.limit, 10);
       filteredNodes = filteredNodes.slice(0, limit);
 
       console.log(`\nFound ${filteredNodes.length} nodes:\n`);
@@ -273,7 +270,6 @@ program
         console.log(`  ${node.id}`);
         console.log(`    ${node.title} (${node.contentType})`);
       }
-
     } catch (err) {
       console.error(`Explore failed: ${err}`);
       process.exit(1);
@@ -284,7 +280,7 @@ program
   .command('list-epics')
   .description('List all unique epics in the imported content')
   .option('-o, --output <dir>', 'Output directory with nodes.json', './output/lamad')
-  .action(async (options) => {
+  .action(async options => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -306,11 +302,14 @@ program
           epicCounts[epic] = { total: 0, byType: {} };
         }
         epicCounts[epic].total++;
-        epicCounts[epic].byType[node.contentType] = (epicCounts[epic].byType[node.contentType] || 0) + 1;
+        epicCounts[epic].byType[node.contentType] =
+          (epicCounts[epic].byType[node.contentType] || 0) + 1;
       }
 
       console.log('Epics in imported content:\n');
-      for (const [epic, data] of Object.entries(epicCounts).sort((a, b) => b[1].total - a[1].total)) {
+      for (const [epic, data] of Object.entries(epicCounts).sort(
+        (a, b) => b[1].total - a[1].total
+      )) {
         console.log(`${epic}: ${data.total} nodes`);
         for (const [type, count] of Object.entries(data.byType).sort((a, b) => b[1] - a[1])) {
           console.log(`  ${type}: ${count}`);
@@ -328,7 +327,7 @@ program
   .description('List all unique user types/archetypes in the imported content')
   .option('-o, --output <dir>', 'Output directory with nodes.json', './output/lamad')
   .option('-e, --epic <name>', 'Filter to specific epic')
-  .action(async (options) => {
+  .action(async options => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -363,7 +362,9 @@ program
       }
 
       console.log('User types/Archetypes:\n');
-      for (const [userType, data] of Object.entries(userTypeCounts).sort((a, b) => b[1].total - a[1].total)) {
+      for (const [userType, data] of Object.entries(userTypeCounts).sort(
+        (a, b) => b[1].total - a[1].total
+      )) {
         console.log(`${userType}: ${data.total} nodes`);
         console.log(`  Epics: ${Array.from(data.epics).join(', ')}`);
         console.log('');
@@ -382,7 +383,7 @@ program
   .command('validate-standards')
   .description('Validate standards alignment (DID, JSON-LD, Open Graph)')
   .option('-o, --output <dir>', 'Content directory with nodes.json', './output/lamad')
-  .action(async (options) => {
+  .action(async options => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
 
@@ -407,11 +408,11 @@ program
         did: 100,
         activityPubType: 100,
         linkedData: 80,
-        openGraphMetadata: 80
+        openGraphMetadata: 80,
       };
 
       for (const [field, data] of Object.entries(report.coverage)) {
-        const target = targets[field] || 0;
+        const _target = targets[field] || 0;
         let status = '✗';
         let label = 'POOR';
 
@@ -426,7 +427,9 @@ program
           label = 'NEEDS IMPROVEMENT';
         }
 
-        console.log(`${status} ${field.padEnd(25)} ${data.count}/${data.total} (${data.percentage.toFixed(1)}%) - ${label}`);
+        console.log(
+          `${status} ${field.padEnd(25)} ${data.count}/${data.total} (${data.percentage.toFixed(1)}%) - ${label}`
+        );
       }
 
       if (report.errors.length > 0) {
@@ -467,8 +470,12 @@ program
   .command('enrich-trust')
   .description('Enrich content with trust scores from attestations')
   .option('-o, --output <dir>', 'Content directory', './output/lamad')
-  .option('-a, --attestations <file>', 'Attestations index file', './output/lamad/attestations/index.json')
-  .action(async (options) => {
+  .option(
+    '-a, --attestations <file>',
+    'Attestations index file',
+    './output/lamad/attestations/index.json'
+  )
+  .action(async options => {
     const contentDir = path.resolve(options.output, 'content');
     const attestationsPath = path.resolve(options.attestations);
 
@@ -512,12 +519,16 @@ program
 program
   .command('scaffold')
   .description('Generate README and TODO templates for user types')
-  .option('-b, --base <dir>', 'Base content directory', '/projects/elohim/docs/content/elohim-protocol')
+  .option(
+    '-b, --base <dir>',
+    'Base content directory',
+    '/projects/elohim/docs/content/elohim-protocol'
+  )
   .option('-e, --epic <name>', 'Epic to scaffold (governance, value_scanner, etc.)')
   .option('-u, --user <name>', 'User type to scaffold')
   .option('--all', 'Scaffold all epics and user types', false)
   .option('--list', 'List available epics and user types', false)
-  .action((options) => {
+  .action(options => {
     if (options.list) {
       console.log('Available Epics and User Types:\n');
       for (const { epic, description, users } of listEpicsAndUsers()) {
@@ -582,7 +593,7 @@ program
   .option('--layer <layer>', 'Governance layer')
   .option('--affinities <list>', 'Comma-separated affinities')
   .option('--list-categories', 'List available categories', false)
-  .action((options) => {
+  .action(options => {
     if (options.listCategories) {
       console.log('Available categories:');
       for (const cat of listHumanCategories()) {
@@ -608,11 +619,14 @@ program
         displayName: options.name,
         bio: options.bio,
         category: options.category as HumanCategory,
-        location: options.location && options.layer ? {
-          layer: options.layer,
-          name: options.location
-        } : undefined,
-        affinities: options.affinities?.split(',').map((s: string) => s.trim())
+        location:
+          options.location && options.layer
+            ? {
+                layer: options.layer,
+                name: options.location,
+              }
+            : undefined,
+        affinities: options.affinities?.split(',').map((s: string) => s.trim()),
       });
 
       addHumanToFile(filePath, human);
@@ -635,7 +649,7 @@ program
   .option('--intimacy <level>', 'Intimacy level (intimate, trusted, connection, recognition)')
   .option('--context <orgId>', 'Context organization ID')
   .option('--list-types', 'List available relationship types', false)
-  .action((options) => {
+  .action(options => {
     if (options.listTypes) {
       console.log('Available relationship types:');
       for (const { type, layer, intimacy } of listRelationshipTypes()) {
@@ -660,7 +674,7 @@ program
         targetId: options.to,
         relationshipType: options.type,
         intimacy: options.intimacy,
-        contextOrgId: options.context
+        contextOrgId: options.context,
       });
 
       addRelationshipToFile(filePath, relationship);
@@ -679,7 +693,7 @@ program
   .description('Import humans and relationships from data/humans/')
   .option('-s, --source <file>', 'Humans JSON file', '/projects/elohim/data/humans/humans.json')
   .option('-o, --output <dir>', 'Output directory', './output/lamad')
-  .action(async (options) => {
+  .action(async options => {
     const sourcePath = path.resolve(options.source);
     const outputDir = path.resolve(options.output);
 
@@ -724,12 +738,20 @@ program
   .option('--purpose <purpose>', 'Why learners should follow this path')
   .option('-e, --epic <name>', 'Filter content to specific epic')
   .option('-u, --user-type <type>', 'Filter content to specific user type')
-  .option('-t, --type <contentType>', 'Content types to include (comma-separated)', 'scenario,role,epic')
-  .option('--difficulty <level>', 'Difficulty level (beginner, intermediate, advanced)', 'intermediate')
+  .option(
+    '-t, --type <contentType>',
+    'Content types to include (comma-separated)',
+    'scenario,role,epic'
+  )
+  .option(
+    '--difficulty <level>',
+    'Difficulty level (beginner, intermediate, advanced)',
+    'intermediate'
+  )
   .option('--max-steps <n>', 'Maximum number of steps', '10')
   .option('--chapters', 'Organize into chapters by content type', false)
   .option('--dry-run', 'Preview path without writing', false)
-  .action(async (options) => {
+  .action(async options => {
     const outputDir = path.resolve(options.output);
     const nodesPath = path.join(outputDir, 'nodes.json');
     const pathsDir = path.join(outputDir, 'paths');
@@ -758,21 +780,15 @@ program
 
       // Apply filters
       if (options.epic) {
-        filteredNodes = filteredNodes.filter((n: any) =>
-          n.metadata?.epic === options.epic
-        );
+        filteredNodes = filteredNodes.filter((n: any) => n.metadata?.epic === options.epic);
       }
 
       if (options.userType) {
-        filteredNodes = filteredNodes.filter((n: any) =>
-          n.metadata?.userType === options.userType
-        );
+        filteredNodes = filteredNodes.filter((n: any) => n.metadata?.userType === options.userType);
       }
 
-      const contentTypes = options.type.split(',').map((t: string) => t.trim());
-      filteredNodes = filteredNodes.filter((n: any) =>
-        contentTypes.includes(n.contentType)
-      );
+      const contentTypes = new Set(options.type.split(',').map((t: string) => t.trim()));
+      filteredNodes = filteredNodes.filter((n: any) => contentTypes.has(n.contentType));
 
       // Sort by content type priority and then by title
       const typePriority: Record<string, number> = {
@@ -781,7 +797,7 @@ program
         concept: 3,
         scenario: 4,
         example: 5,
-        reference: 6
+        reference: 6,
       };
 
       filteredNodes.sort((a: any, b: any) => {
@@ -792,11 +808,13 @@ program
       });
 
       // Limit steps
-      const maxSteps = parseInt(options.maxSteps, 10);
+      const maxSteps = Number.parseInt(options.maxSteps, 10);
       filteredNodes = filteredNodes.slice(0, maxSteps);
 
       if (filteredNodes.length === 0) {
-        console.error('No content found matching filters. Try different --epic, --user-type, or --type values.');
+        console.error(
+          'No content found matching filters. Try different --epic, --user-type, or --type values.'
+        );
         process.exit(1);
       }
 
@@ -816,7 +834,6 @@ program
         }
 
         chapters = [];
-        let stepOrder = 1;
         let chapterOrder = 1;
 
         for (const [contentType, nodes] of Object.entries(byType).sort((a, b) => {
@@ -830,7 +847,7 @@ program
             stepNarrative: node.description || `Explore ${node.title}`,
             learningObjectives: [`Understand ${node.title}`],
             optional: false,
-            completionCriteria: ['Review content']
+            completionCriteria: ['Review content'],
           }));
 
           chapters.push({
@@ -839,10 +856,9 @@ program
             description: `Explore ${contentType} content`,
             order: chapterOrder,
             steps: chapterSteps,
-            estimatedDuration: `${chapterSteps.length * 10} minutes`
+            estimatedDuration: `${chapterSteps.length * 10} minutes`,
           });
 
-          stepOrder += nodes.length;
           chapterOrder++;
         }
       } else {
@@ -855,21 +871,23 @@ program
           stepNarrative: node.description || `Explore ${node.title}`,
           learningObjectives: [`Understand ${node.title}`],
           optional: false,
-          completionCriteria: ['Review content']
+          completionCriteria: ['Review content'],
         }));
       }
 
       // Flatten chapter steps into top-level steps array (required by PathService)
-      const flattenedSteps = chapters
-        ? chapters.flatMap((ch: any) => ch.steps)
-        : steps;
+      const flattenedSteps = chapters ? chapters.flatMap((ch: any) => ch.steps) : steps;
 
       const learningPath = {
         id: pathId,
         version: '1.0.0',
         title: options.title,
-        description: options.description || `A learning path exploring ${options.epic || 'Elohim Protocol'} content`,
-        purpose: options.purpose || `To provide a structured introduction to ${options.epic || 'the Elohim Protocol'}`,
+        description:
+          options.description ||
+          `A learning path exploring ${options.epic || 'Elohim Protocol'} content`,
+        purpose:
+          options.purpose ||
+          `To provide a structured introduction to ${options.epic || 'the Elohim Protocol'}`,
         createdBy: 'cli-generator',
         contributors: [],
         createdAt: now,
@@ -880,7 +898,7 @@ program
         difficulty: options.difficulty,
         estimatedDuration: `${filteredNodes.length * 10} minutes`,
         visibility: 'public',
-        pathType: 'journey'
+        pathType: 'journey',
       };
 
       // Display preview
@@ -948,7 +966,7 @@ program
             : steps.length,
           chapterCount: chapters?.length,
           tags: learningPath.tags,
-          pathType: learningPath.pathType
+          pathType: learningPath.pathType,
         });
 
         pathIndex.totalCount = pathIndex.paths.length;
@@ -959,7 +977,6 @@ program
         console.log(`\n✓ Written: ${pathFile}`);
         console.log(`✓ Updated: ${indexFile}`);
       }
-
     } catch (err) {
       console.error(`Generate path failed: ${err}`);
       process.exit(1);
@@ -976,7 +993,7 @@ program
   .option('-i, --input <dir>', 'Input lamad-data directory', './output/lamad')
   .option('-o, --output <file>', 'Output database file', './output/lamad.kuzu')
   .option('--force', 'Overwrite existing database', false)
-  .action(async (options) => {
+  .action(async options => {
     const inputDir = path.resolve(options.input);
     const dbPath = path.resolve(options.output);
 
@@ -1043,7 +1060,8 @@ program
       const pathsDir = path.join(inputDir, 'paths');
       if (fs.existsSync(pathsDir)) {
         console.log('\nImporting learning paths...');
-        const pathFiles = fs.readdirSync(pathsDir)
+        const pathFiles = fs
+          .readdirSync(pathsDir)
           .filter(f => f.endsWith('.json') && f !== 'index.json');
 
         let pathCount = 0;
@@ -1079,7 +1097,6 @@ program
 
       client.close();
       console.log(`\n✓ Database initialized at ${dbPath}`);
-
     } catch (err) {
       console.error(`Database initialization failed: ${err}`);
       process.exit(1);
@@ -1090,7 +1107,7 @@ program
   .command('db:stats')
   .description('Show database statistics')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     if (!fs.existsSync(dbPath)) {
@@ -1121,7 +1138,7 @@ program
   .description('Export database to Cypher seed file (git-friendly)')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .option('-o, --output <file>', 'Output Cypher file', './output/lamad-seed.cypher')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
     const outputFile = path.resolve(options.output);
 
@@ -1142,7 +1159,7 @@ program
         '// ============================================',
         '// Content Nodes',
         '// ============================================',
-        ''
+        '',
       ];
 
       // Export content nodes
@@ -1150,10 +1167,19 @@ program
       const nodes = await client.query<any>('MATCH (n:ContentNode) RETURN n');
       for (const row of nodes) {
         const n = row.n;
-        const escapeCypher = (s: string) => s ? `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"` : '""';
-        const escapeArray = (arr: string[]) => arr?.length ? `[${arr.map(escapeCypher).join(', ')}]` : '[]';
+        const escapeCypher = (s: string) =>
+          s
+            ? `"${String(s)
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, String.raw`\"`)
+                .replace(/\n/g, String.raw`\n`)}"`
+            : '""';
+        const escapeArray = (arr: string[]) =>
+          arr?.length ? `[${arr.map(escapeCypher).join(', ')}]` : '[]';
 
-        lines.push(`CREATE (:ContentNode {id: ${escapeCypher(n.id)}, contentType: ${escapeCypher(n.contentType)}, title: ${escapeCypher(n.title)}, description: ${escapeCypher(n.description || '')}, tags: ${escapeArray(n.tags || [])}});`);
+        lines.push(
+          `CREATE (:ContentNode {id: ${escapeCypher(n.id)}, contentType: ${escapeCypher(n.contentType)}, title: ${escapeCypher(n.title)}, description: ${escapeCypher(n.description || '')}, tags: ${escapeArray(n.tags || [])}});`
+        );
       }
       console.log(`  ${nodes.length} content nodes`);
 
@@ -1168,10 +1194,19 @@ program
       const paths = await client.query<any>('MATCH (p:LearningPath) RETURN p');
       for (const row of paths) {
         const p = row.p;
-        const escapeCypher = (s: string) => s ? `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"` : '""';
-        const escapeArray = (arr: string[]) => arr?.length ? `[${arr.map(escapeCypher).join(', ')}]` : '[]';
+        const escapeCypher = (s: string) =>
+          s
+            ? `"${String(s)
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, String.raw`\"`)
+                .replace(/\n/g, String.raw`\n`)}"`
+            : '""';
+        const escapeArray = (arr: string[]) =>
+          arr?.length ? `[${arr.map(escapeCypher).join(', ')}]` : '[]';
 
-        lines.push(`CREATE (:LearningPath {id: ${escapeCypher(p.id)}, title: ${escapeCypher(p.title)}, description: ${escapeCypher(p.description || '')}, difficulty: ${escapeCypher(p.difficulty || 'intermediate')}, pathType: ${escapeCypher(p.pathType || 'journey')}, tags: ${escapeArray(p.tags || [])}});`);
+        lines.push(
+          `CREATE (:LearningPath {id: ${escapeCypher(p.id)}, title: ${escapeCypher(p.title)}, description: ${escapeCypher(p.description || '')}, difficulty: ${escapeCypher(p.difficulty || 'intermediate')}, pathType: ${escapeCypher(p.pathType || 'journey')}, tags: ${escapeArray(p.tags || [])}});`
+        );
       }
       console.log(`  ${paths.length} learning paths`);
 
@@ -1186,9 +1221,17 @@ program
       const steps = await client.query<any>('MATCH (s:PathStep) RETURN s');
       for (const row of steps) {
         const s = row.s;
-        const escapeCypher = (str: string) => str ? `"${String(str).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"` : '""';
+        const escapeCypher = (str: string) =>
+          str
+            ? `"${String(str)
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, String.raw`\"`)
+                .replace(/\n/g, String.raw`\n`)}"`
+            : '""';
 
-        lines.push(`CREATE (:PathStep {id: ${escapeCypher(s.id)}, pathId: ${escapeCypher(s.pathId)}, orderIndex: ${s.orderIndex}, resourceId: ${escapeCypher(s.resourceId)}, stepTitle: ${escapeCypher(s.stepTitle || '')}});`);
+        lines.push(
+          `CREATE (:PathStep {id: ${escapeCypher(s.id)}, pathId: ${escapeCypher(s.pathId)}, orderIndex: ${s.orderIndex}, resourceId: ${escapeCypher(s.resourceId)}, stepTitle: ${escapeCypher(s.stepTitle || '')}});`
+        );
       }
       console.log(`  ${steps.length} path steps`);
 
@@ -1200,13 +1243,23 @@ program
       lines.push('');
 
       console.log('Exporting relationships...');
-      const relTypes = ['CONTAINS', 'RELATES_TO', 'DEPENDS_ON', 'PATH_HAS_STEP', 'STEP_USES_CONTENT'];
+      const relTypes = [
+        'CONTAINS',
+        'RELATES_TO',
+        'DEPENDS_ON',
+        'PATH_HAS_STEP',
+        'STEP_USES_CONTENT',
+      ];
       let relCount = 0;
       for (const relType of relTypes) {
         try {
-          const rels = await client.query<any>(`MATCH (a)-[r:${relType}]->(b) RETURN a.id as source, b.id as target`);
+          const rels = await client.query<any>(
+            `MATCH (a)-[r:${relType}]->(b) RETURN a.id as source, b.id as target`
+          );
           for (const rel of rels) {
-            lines.push(`MATCH (a {id: "${rel.source}"}), (b {id: "${rel.target}"}) CREATE (a)-[:${relType}]->(b);`);
+            lines.push(
+              `MATCH (a {id: "${rel.source}"}), (b {id: "${rel.target}"}) CREATE (a)-[:${relType}]->(b);`
+            );
             relCount++;
           }
         } catch {
@@ -1222,7 +1275,6 @@ program
       client.close();
       console.log(`\n✓ Exported to ${outputFile}`);
       console.log(`  File size: ${(fs.statSync(outputFile).size / 1024).toFixed(1)} KB`);
-
     } catch (err) {
       console.error(`Failed to dump database: ${err}`);
       process.exit(1);
@@ -1240,7 +1292,7 @@ program
   .option('--difficulty <level>', 'Difficulty (beginner, intermediate, advanced)', 'intermediate')
   .option('--path-type <type>', 'Path type (journey, quest, expedition, practice)', 'journey')
   .option('--tags <tags>', 'Comma-separated tags')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1256,7 +1308,7 @@ program
         pathType: options.pathType,
         tags: options.tags ? options.tags.split(',').map((t: string) => t.trim()) : [],
         visibility: 'public',
-        createdBy: 'cli'
+        createdBy: 'cli',
       };
 
       await client.createPath(pathData);
@@ -1281,7 +1333,7 @@ program
   .option('--title <title>', 'Step title (defaults to content title)')
   .option('--narrative <text>', 'Step narrative/description')
   .option('--optional', 'Mark step as optional', false)
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1294,14 +1346,14 @@ program
       const stepNarrative = options.narrative || content?.description || '';
 
       const step = {
-        order: parseInt(options.position, 10),
+        order: Number.parseInt(options.position, 10),
         stepType: 'content',
         resourceId: options.content,
         stepTitle,
         stepNarrative,
         optional: options.optional,
         learningObjectives: [],
-        completionCriteria: ['Review content']
+        completionCriteria: ['Review content'],
       };
 
       await client.addPathStep(options.path, step);
@@ -1321,7 +1373,7 @@ program
   .command('path:list')
   .description('List all learning paths in the database')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1351,7 +1403,7 @@ program
   .description('Show details of a learning path')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .requiredOption('--id <pathId>', 'Path ID')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1409,7 +1461,7 @@ program
   .option('--format <fmt>', 'Content format', 'markdown')
   .option('--tags <tags>', 'Comma-separated tags')
   .option('--reach <reach>', 'Content reach', 'commons')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1429,7 +1481,7 @@ program
         content,
         contentFormat: options.format,
         tags: options.tags ? options.tags.split(',').map((t: string) => t.trim()) : [],
-        reach: options.reach
+        reach: options.reach,
       };
 
       await client.createContentNode(node);
@@ -1449,7 +1501,7 @@ program
   .description('Show a content node from the database')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .requiredOption('--id <id>', 'Content ID')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     try {
@@ -1488,7 +1540,7 @@ program
   .option('-q, --query <cypher>', 'Cypher query string')
   .option('-f, --file <path>', 'Read query from file')
   .option('--json', 'Output as JSON', false)
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
 
     let query = options.query || '';
@@ -1534,7 +1586,7 @@ program
   .description('Export database to JSON files')
   .option('-d, --db <file>', 'Database file', './output/lamad.kuzu')
   .option('-o, --output <dir>', 'Output directory', './output/lamad-export')
-  .action(async (options) => {
+  .action(async options => {
     const dbPath = path.resolve(options.db);
     const outputDir = path.resolve(options.output);
 
@@ -1552,7 +1604,7 @@ program
       const contentIndex = {
         lastUpdated: new Date().toISOString(),
         totalCount: nodes.length,
-        nodes: nodes.map(row => row.n)
+        nodes: nodes.map(row => row.n),
       };
       fs.writeFileSync(
         path.join(outputDir, 'content', 'index.json'),
@@ -1581,8 +1633,8 @@ program
           description: p.description,
           difficulty: p.difficulty,
           pathType: p.pathType,
-          tags: p.tags
-        }))
+          tags: p.tags,
+        })),
       };
       fs.writeFileSync(
         path.join(outputDir, 'paths', 'index.json'),
@@ -1603,7 +1655,6 @@ program
 
       client.close();
       console.log(`\n✓ Exported to ${outputDir}`);
-
     } catch (err) {
       console.error(`Export failed: ${err}`);
       process.exit(1);

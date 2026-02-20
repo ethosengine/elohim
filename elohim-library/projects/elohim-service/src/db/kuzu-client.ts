@@ -6,14 +6,15 @@
  * that will be shared with the Angular app.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const kuzu = require('kuzu');
-
-import { initializeSchema, getSchemaStats, RELATIONSHIP_TYPE_MAP } from './kuzu-schema';
-import { ContentRelationship } from '../models/content-node.model';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
+
+import { ContentRelationship } from '../models/content-node.model';
+
+import { initializeSchema, getSchemaStats, RELATIONSHIP_TYPE_MAP } from './kuzu-schema';
+
+const kuzu = require('kuzu');
 
 /**
  * Generate a Holochain-style hash ID
@@ -108,13 +109,14 @@ export interface PathChapter {
   attestationGranted?: string;
 }
 
-
 /**
  * Escape a string for use in Cypher queries
  */
 function escapeString(value: string): string {
   if (value === null || value === undefined) return '""';
-  return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `"${String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, String.raw`\"`)}"`;
 }
 
 /**
@@ -131,7 +133,7 @@ function escapeArray(arr: string[] | undefined): string {
 export class KuzuClient {
   private db: any = null;
   private conn: any = null;
-  private dbPath: string;
+  private readonly dbPath: string;
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
@@ -204,7 +206,7 @@ export class KuzuClient {
         tags: ${escapeArray(node.tags)},
         authorId: ${escapeString(node.authorId || '')},
         reach: ${escapeString(node.reach || 'commons')},
-        trustScore: ${node.trustScore || 0.0},
+        trustScore: ${node.trustScore || 0},
         metadata: ${escapeString(JSON.stringify(node.metadata || {}))},
         sourcePath: ${escapeString(node.sourcePath || '')},
         createdAt: timestamp(${escapeString(node.createdAt || now)}),
@@ -266,9 +268,7 @@ export class KuzuClient {
    */
   async deleteContentNode(id: string): Promise<void> {
     const conn = this.getConnection();
-    await conn.query(
-      `MATCH (n:ContentNode) WHERE n.id = ${escapeString(id)} DELETE n`
-    );
+    await conn.query(`MATCH (n:ContentNode) WHERE n.id = ${escapeString(id)} DELETE n`);
   }
 
   // ==========================================================================
@@ -278,7 +278,12 @@ export class KuzuClient {
   /**
    * Create a learning path
    */
-  async createPath(pathData: Omit<LearningPath, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Promise<LearningPath> {
+  async createPath(
+    pathData: Omit<LearningPath, 'createdAt' | 'updatedAt'> & {
+      createdAt?: string;
+      updatedAt?: string;
+    }
+  ): Promise<LearningPath> {
     const conn = this.getConnection();
     const now = new Date().toISOString();
 
@@ -316,7 +321,11 @@ export class KuzuClient {
       }
     }
 
-    return { ...pathData, createdAt: pathData.createdAt || now, updatedAt: pathData.updatedAt || now };
+    return {
+      ...pathData,
+      createdAt: pathData.createdAt || now,
+      updatedAt: pathData.updatedAt || now,
+    };
   }
 
   /**
@@ -432,7 +441,10 @@ export class KuzuClient {
         `);
       } catch (err) {
         // Expected: ContentNode may not exist yet if paths are imported before content
-        console.warn(`Step ${stepId}: ContentNode '${step.resourceId}' not found (will link when content is imported)`);
+        console.warn(
+          `Step ${stepId}: ContentNode '${step.resourceId}' not found (will link when content is imported)`,
+          err
+        );
       }
     }
   }
@@ -584,7 +596,7 @@ export class KuzuClient {
       metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
       sourcePath: row.sourcePath,
       createdAt: row.createdAt?.toString(),
-      updatedAt: row.updatedAt?.toString()
+      updatedAt: row.updatedAt?.toString(),
     };
   }
 
@@ -603,7 +615,7 @@ export class KuzuClient {
       tags: row.tags,
       steps: [],
       createdAt: row.createdAt?.toString(),
-      updatedAt: row.updatedAt?.toString()
+      updatedAt: row.updatedAt?.toString(),
     };
   }
 
@@ -617,7 +629,7 @@ export class KuzuClient {
       optional: row.isOptional,
       attestationRequired: row.attestationRequired,
       attestationGranted: row.attestationGranted,
-      estimatedTime: row.estimatedTime
+      estimatedTime: row.estimatedTime,
     };
   }
 
@@ -629,7 +641,7 @@ export class KuzuClient {
       order: row.orderIndex,
       steps: [],
       estimatedDuration: row.estimatedDuration,
-      attestationGranted: row.attestationGranted
+      attestationGranted: row.attestationGranted,
     };
   }
 }

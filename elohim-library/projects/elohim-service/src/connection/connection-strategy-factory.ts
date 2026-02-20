@@ -23,10 +23,11 @@
  * @packageDocumentation
  */
 
-import type { ConnectionMode, IConnectionStrategy } from './connection-strategy';
-import { DoorwayConnectionStrategy } from './doorway-connection-strategy';
 import { DirectConnectionStrategy } from './direct-connection-strategy';
+import { DoorwayConnectionStrategy } from './doorway-connection-strategy';
 import { TauriConnectionStrategy } from './tauri-connection-strategy';
+
+import type { ConnectionMode, IConnectionStrategy } from './connection-strategy';
 
 /** Extended connection mode type including 'tauri' */
 export type ExtendedConnectionMode = ConnectionMode | 'tauri';
@@ -41,7 +42,7 @@ export type ExtendedConnectionMode = ConnectionMode | 'tauri';
  */
 export function detectConnectionMode(): Exclude<ExtendedConnectionMode, 'auto'> {
   // Check for Tauri environment (native app)
-  if (typeof window !== 'undefined' && '__TAURI__' in window) {
+  if (globalThis.window !== undefined && '__TAURI__' in globalThis) {
     // Tauri environment detected
     return 'tauri';
   }
@@ -75,7 +76,9 @@ export function detectConnectionMode(): Exclude<ExtendedConnectionMode, 'auto'> 
  * const tauriStrategy = createConnectionStrategy('tauri');
  * ```
  */
-export function createConnectionStrategy(mode: ExtendedConnectionMode = 'auto'): IConnectionStrategy {
+export function createConnectionStrategy(
+  mode: ExtendedConnectionMode = 'auto'
+): IConnectionStrategy {
   const resolvedMode = mode === 'auto' ? detectConnectionMode() : mode;
 
   switch (resolvedMode) {
@@ -118,8 +121,8 @@ export function isConnectionModeSupported(mode: Exclude<ExtendedConnectionMode, 
  *
  * @returns Array of supported connection modes
  */
-export function getSupportedConnectionModes(): Array<Exclude<ExtendedConnectionMode, 'auto'>> {
-  const modes: Array<Exclude<ExtendedConnectionMode, 'auto'>> = [];
+export function getSupportedConnectionModes(): Exclude<ExtendedConnectionMode, 'auto'>[] {
+  const modes: Exclude<ExtendedConnectionMode, 'auto'>[] = [];
 
   if (isConnectionModeSupported('tauri')) {
     modes.push('tauri');

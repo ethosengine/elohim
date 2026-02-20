@@ -10,21 +10,20 @@
 
 import { ContentNode } from '../models/content-node.model';
 import { ParsedContent } from '../models/import-context.model';
+import { extractTags, extractDescription, extractRelatedUsers } from '../parsers/markdown-parser';
 import {
-  extractTags,
-  extractDescription,
-  extractRelatedUsers,
-  extractGovernanceScope
-} from '../parsers/markdown-parser';
-import { normalizeId, buildBaseMetadata, addProvenanceMetadata, addGovernanceScopeMetadata, buildContentNode, titleCase } from '../utils';
+  normalizeId,
+  buildBaseMetadata,
+  addProvenanceMetadata,
+  addGovernanceScopeMetadata,
+  buildContentNode,
+  titleCase,
+} from '../utils';
 
 /**
  * Transform archetype content into a role ContentNode
  */
-export function transformArchetype(
-  parsed: ParsedContent,
-  sourceNodeId?: string
-): ContentNode {
+export function transformArchetype(parsed: ParsedContent, sourceNodeId?: string): ContentNode {
   const now = new Date().toISOString();
 
   // Generate role node ID
@@ -42,7 +41,7 @@ export function transformArchetype(
     category: 'archetype',
     epic: parsed.pathMeta.epic,
     userType: parsed.pathMeta.userType,
-    ...buildBaseMetadata()
+    ...buildBaseMetadata(),
   };
 
   // Add provenance link
@@ -84,7 +83,7 @@ export function transformArchetype(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    createdAt: now
+    createdAt: now,
   });
 }
 

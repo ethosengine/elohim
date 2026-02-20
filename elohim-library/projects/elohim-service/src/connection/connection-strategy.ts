@@ -25,15 +25,9 @@
  * @packageDocumentation
  */
 
-import type {
-  AdminWebsocket,
-  AppWebsocket,
-  AgentPubKey,
-  CellId,
-  AppInfo,
-} from '@holochain/client';
-
 import { SourceTier } from '../cache/content-resolver';
+
+import type { AdminWebsocket, AppWebsocket, AgentPubKey, CellId, AppInfo } from '@holochain/client';
 
 // ============================================================================
 // Logger Types

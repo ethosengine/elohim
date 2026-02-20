@@ -16,29 +16,16 @@ export * from './scenario-transformer';
 export * from './resource-transformer';
 
 // Re-export key functions for convenience
-export {
-  transformToSourceNode,
-  shouldCreateSourceNode
-} from './source-transformer';
+export { transformToSourceNode, shouldCreateSourceNode } from './source-transformer';
 
-export {
-  transformArchetype,
-  isArchetypeContent
-} from './archetype-transformer';
+export { transformArchetype, isArchetypeContent } from './archetype-transformer';
 
-export {
-  transformEpic,
-  isEpicContent
-} from './epic-transformer';
+export { transformEpic, isEpicContent } from './epic-transformer';
 
 export {
   transformScenarios,
   transformFeatureFile,
-  isScenarioContent
+  isScenarioContent,
 } from './scenario-transformer';
 
-export {
-  transformResource,
-  isResourceContent,
-  getResourceType
-} from './resource-transformer';
+export { transformResource, isResourceContent, getResourceType } from './resource-transformer';

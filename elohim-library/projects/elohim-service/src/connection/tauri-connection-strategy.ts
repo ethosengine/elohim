@@ -22,12 +22,13 @@ import {
   generateSigningKeyPair,
   randomCapSecret,
   setSigningCredentials,
-  type AgentPubKey,
   type CellId,
   type AppInfo,
 } from '@holochain/client';
 
 import { SourceTier } from '../cache/content-resolver';
+
+import { ConsoleLogger } from './console-logger';
 
 import type {
   IConnectionStrategy,
@@ -37,7 +38,6 @@ import type {
   SigningCredentials,
   Logger,
 } from './connection-strategy';
-import { ConsoleLogger } from './console-logger';
 
 /** Default elohim-storage sidecar port */
 const DEFAULT_STORAGE_PORT = 8090;
@@ -138,7 +138,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
    * Detect if running in Tauri native app.
    */
   private isTauriEnvironment(): boolean {
-    return typeof window !== 'undefined' && '__TAURI__' in window;
+    return globalThis.window !== undefined && '__TAURI__' in globalThis;
   }
 
   // ==========================================================================
@@ -198,7 +198,9 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         bootstrapUrl: session.bootstrap_url,
       };
     } catch (err) {
-      this.logger.warn('Failed to get session', { error: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('Failed to get session', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }
@@ -206,10 +208,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   /**
    * Create a new local session in elohim-storage.
    */
-  async createSession(
-    config: ConnectionConfig,
-    input: CreateSessionInput
-  ): Promise<LocalSession> {
+  async createSession(config: ConnectionConfig, input: CreateSessionInput): Promise<LocalSession> {
     const storageUrl = this.getStorageApiUrl(config);
 
     // Convert camelCase to snake_case for API
@@ -544,7 +543,9 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         this.adminWs = null;
       }
     } catch (err) {
-      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('Error during disconnect', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     this.credentials = null;
@@ -573,10 +574,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   // Helper Methods
   // ==========================================================================
 
-  private async getInstalledApp(
-    adminWs: AdminWebsocket,
-    appId: string
-  ): Promise<AppInfo | null> {
+  private async getInstalledApp(adminWs: AdminWebsocket, appId: string): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
       return apps.find((app: AppInfo) => app.installed_app_id === appId) || null;
@@ -590,7 +588,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
 
     for (const [roleName, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
+      const cellArray = cells as { type: string; value: { cell_id: CellId } }[];
       for (const cell of cellArray) {
         if (cell.type === 'provisioned' && cell.value?.cell_id) {
           cellIds.set(roleName, cell.value.cell_id);

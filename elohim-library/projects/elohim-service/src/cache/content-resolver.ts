@@ -188,7 +188,12 @@ interface WasmContentResolver {
   clear_source_locations(sourceId: string): void;
   resolve(contentType: string, contentId: string): string;
   get_resolution_chain(contentType: string): string;
-  register_app(appId: string, blobHash: string, entryPoint: string, fallbackUrl: string | null): void;
+  register_app(
+    appId: string,
+    blobHash: string,
+    entryPoint: string,
+    fallbackUrl: string | null
+  ): void;
   unregister_app(appId: string): void;
   has_app(appId: string): boolean;
   get_app_blob_hash(appId: string): string | null;
@@ -237,8 +242,8 @@ interface AppRegistration {
  */
 export class TsContentResolver implements IContentResolver {
   private sources: ContentSource[] = [];
-  private contentIndex = new Map<string, Array<{ sourceId: string; lastSeen: number }>>();
-  private appRegistry = new Map<string, AppRegistration>();
+  private readonly contentIndex = new Map<string, { sourceId: string; lastSeen: number }[]>();
+  private readonly appRegistry = new Map<string, AppRegistration>();
   private resolutionCount = 0;
   private cacheHitCount = 0;
 
@@ -445,9 +450,9 @@ export class TsContentResolver implements IContentResolver {
     const url = this.resolveAppUrl(appId, path);
     const reg = this.appRegistry.get(appId);
 
-    const sourceId = this.sources.find(
-      s => s.available && s.contentTypes.includes('app') && s.baseUrl
-    )?.id ?? null;
+    const sourceId =
+      this.sources.find(s => s.available && s.contentTypes.includes('app') && s.baseUrl)?.id ??
+      null;
 
     return {
       url: url || null,
@@ -458,9 +463,8 @@ export class TsContentResolver implements IContentResolver {
   }
 
   getStats(): ResolverStats {
-    const hitRate = this.resolutionCount > 0
-      ? (this.cacheHitCount / this.resolutionCount) * 100
-      : 0;
+    const hitRate =
+      this.resolutionCount > 0 ? (this.cacheHitCount / this.resolutionCount) * 100 : 0;
 
     return {
       resolutionCount: this.resolutionCount,
@@ -501,7 +505,7 @@ export class TsContentResolver implements IContentResolver {
 // ============================================================================
 
 class WasmContentResolverWrapper implements IContentResolver {
-  constructor(private wasm: WasmContentResolver) {}
+  constructor(private readonly wasm: WasmContentResolver) {}
 
   registerSource(
     id: string,
@@ -671,9 +675,7 @@ export async function isWasmResolverAvailable(): Promise<boolean> {
  *
  * Prefers WASM implementation for performance, falls back to TypeScript.
  */
-export async function createContentResolver(
-  config?: ResolverConfig
-): Promise<ResolverInitResult> {
+export async function createContentResolver(config?: ResolverConfig): Promise<ResolverInitResult> {
   const preferWasm = config?.preferWasm ?? true;
 
   if (preferWasm) {

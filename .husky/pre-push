@@ -10,6 +10,7 @@
 #   sophia/                  → pnpm lint + typecheck + test
 #   holochain/elohim-storage → cargo fmt + clippy + tests
 #   elohim-node/             → cargo fmt + clippy + tests
+#   elohim-library/          → tsc type-check + jest tests
 #   genesis/                 → schema validation + tests
 #   orchestrator/            → Jenkinsfile linting (any *Jenkinsfile* change)
 #
@@ -76,6 +77,9 @@ fi
 if echo "$CHANGED" | grep -q "^elohim-node/"; then
   PROJECTS="$PROJECTS elohim-node"
 fi
+if echo "$CHANGED" | grep -q "^elohim-library/"; then
+  PROJECTS="$PROJECTS elohim-library"
+fi
 if echo "$CHANGED" | grep -q "^genesis/"; then
   PROJECTS="$PROJECTS genesis"
 fi
@@ -135,6 +139,12 @@ run_gate() {
         cargo fmt --check 2>&1 && \
         RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy -- -D warnings 2>&1 && \
         RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test 2>&1
+        rc=$?
+        ;;
+      elohim-library)
+        npx eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
+        (cd projects/elohim-service && npx tsc --noEmit) 2>&1 && \
+        npx jest --config projects/elohim-service/jest.config.js --ci 2>&1
         rc=$?
         ;;
       genesis)

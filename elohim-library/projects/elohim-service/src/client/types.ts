@@ -12,9 +12,7 @@
  * Content (heavy R/W) goes through elohim-storage → SQLite.
  * Agent data (attestations, identity) uses separate Holochain connection.
  */
-export type ClientMode =
-  | BrowserMode
-  | TauriMode;
+export type ClientMode = BrowserMode | TauriMode;
 
 /**
  * Doorway configuration

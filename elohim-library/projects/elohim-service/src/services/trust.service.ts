@@ -22,7 +22,7 @@ const REACH_ORDER: Record<ReachLevel, number> = {
   local: 2,
   community: 3,
   federated: 4,
-  commons: 5
+  commons: 5,
 };
 
 /**
@@ -38,7 +38,7 @@ const ATTESTATION_WEIGHTS: Record<string, number> = {
   'safety-reviewed': 0.2,
   'accuracy-verified': 0.3,
   'accessibility-checked': 0.1,
-  'license-cleared': 0.2
+  'license-cleared': 0.2,
 };
 
 /**
@@ -128,7 +128,7 @@ export function calculateTrustScore(attestations: Attestation[]): number {
   }
 
   // Normalize to 0-1 range (max possible ~1.8 if all attestations present)
-  return Math.min(1.0, totalWeight / 1.5);
+  return Math.min(1, totalWeight / 1.5);
 }
 
 /**
@@ -172,7 +172,7 @@ export function generateTrustFields(
     reach: getEffectiveReach(attestations),
     trustScore: Math.round(calculateTrustScore(attestations) * 100) / 100,
     activeAttestationIds,
-    trustComputedAt: new Date().toISOString()
+    trustComputedAt: new Date().toISOString(),
   };
 }
 
@@ -201,7 +201,7 @@ export function enrichWithTrust(
 
   return {
     ...content,
-    ...trustFields
+    ...trustFields,
   };
 }
 
@@ -226,7 +226,7 @@ export async function enrichContentDirectory(
     processed: 0,
     enriched: 0,
     withAttestations: 0,
-    errors: []
+    errors: [],
   };
 
   // Load attestations
@@ -234,8 +234,7 @@ export async function enrichContentDirectory(
   console.log(`Loaded attestations for ${attestationsByContent.size} content nodes`);
 
   // Get all JSON files
-  const files = fs.readdirSync(contentDir)
-    .filter(f => f.endsWith('.json') && f !== 'index.json');
+  const files = fs.readdirSync(contentDir).filter(f => f.endsWith('.json') && f !== 'index.json');
 
   for (const file of files) {
     const filePath = path.join(contentDir, file);
@@ -254,8 +253,9 @@ export async function enrichContentDirectory(
       result.enriched++;
 
       const hasAtt = enriched.activeAttestationIds?.length ? '✓' : '·';
-      console.log(`  ${hasAtt} ${file.substring(0, 50).padEnd(50)} reach=${enriched.reach?.padEnd(12)} score=${enriched.trustScore}`);
-
+      console.log(
+        `  ${hasAtt} ${file.substring(0, 50).padEnd(50)} reach=${enriched.reach?.padEnd(12)} score=${enriched.trustScore}`
+      );
     } catch (err) {
       result.errors.push(`${file}: ${err}`);
     }
@@ -278,7 +278,7 @@ export function updateContentIndexWithTrust(
 
   try {
     const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as {
-      nodes?: Array<{ id: string; reach?: ReachLevel; trustScore?: number; hasAttestations?: boolean }>;
+      nodes?: { id: string; reach?: ReachLevel; trustScore?: number; hasAttestations?: boolean }[];
       lastUpdated?: string;
     };
 

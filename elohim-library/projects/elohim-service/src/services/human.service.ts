@@ -7,7 +7,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ContentNode, ContentRelationship, ContentRelationshipType } from '../models/content-node.model';
+
+import {
+  ContentNode,
+  ContentRelationship,
+  ContentRelationshipType,
+} from '../models/content-node.model';
 
 /**
  * Human categories
@@ -50,7 +55,10 @@ export type GovernanceLayer =
 /**
  * Relationship types with their typical governance layer and intimacy
  */
-export const RELATIONSHIP_TYPES: Record<string, { layer: GovernanceLayer; typicalIntimacy: IntimacyLevel }> = {
+export const RELATIONSHIP_TYPES: Record<
+  string,
+  { layer: GovernanceLayer; typicalIntimacy: IntimacyLevel }
+> = {
   // Family layer
   spouse: { layer: 'family', typicalIntimacy: 'intimate' },
   parent: { layer: 'family', typicalIntimacy: 'intimate' },
@@ -83,7 +91,7 @@ export const RELATIONSHIP_TYPES: Record<string, { layer: GovernanceLayer; typica
   // General
   friend: { layer: 'personal', typicalIntimacy: 'trusted' },
   network_connection: { layer: 'network', typicalIntimacy: 'connection' },
-  other: { layer: 'community', typicalIntimacy: 'recognition' }
+  other: { layer: 'community', typicalIntimacy: 'recognition' },
 };
 
 /**
@@ -163,7 +171,7 @@ export function createHuman(params: {
   profileReach?: ProfileReach;
   location?: { layer: GovernanceLayer; name: string };
   affinities?: string[];
-  organizations?: Array<{ orgId: string; orgName: string; role: string }>;
+  organizations?: { orgId: string; orgName: string; role: string }[];
   communities?: string[];
   isMinor?: boolean;
   guardianIds?: string[];
@@ -179,13 +187,13 @@ export function createHuman(params: {
     category: params.category,
     profileReach: params.profileReach || 'community',
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   };
 
   if (params.location) {
     human.location = {
       layer: params.location.layer,
-      name: params.location.name
+      name: params.location.name,
     };
   }
 
@@ -243,7 +251,7 @@ export function createRelationship(params: {
     intimacy: params.intimacy || relType.typicalIntimacy,
     layer: relType.layer,
     contextOrgId: params.contextOrgId,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -303,9 +311,10 @@ export function addRelationshipToFile(filePath: string, relationship: HumanRelat
 
   // Check for duplicate relationship
   const exists = data.relationships.some(
-    r => r.sourceId === relationship.sourceId &&
-         r.targetId === relationship.targetId &&
-         r.relationshipType === relationship.relationshipType
+    r =>
+      r.sourceId === relationship.sourceId &&
+      r.targetId === relationship.targetId &&
+      r.relationshipType === relationship.relationshipType
   );
   if (exists) {
     throw new Error(`Relationship already exists`);
@@ -332,21 +341,18 @@ export function humanToContentNode(human: Human): ContentNode {
       'human',
       human.category,
       ...(human.affinities || []),
-      ...(human.organizations?.map(o => o.orgId) || [])
+      ...(human.organizations?.map(o => o.orgId) || []),
     ],
-    relatedNodeIds: [
-      ...(human.guardianIds || []),
-      ...(human.communities || [])
-    ],
+    relatedNodeIds: [...(human.guardianIds || []), ...(human.communities || [])],
     metadata: {
       category: human.category,
       profileReach: human.profileReach,
       location: human.location,
       isMinor: human.isMinor,
-      isPseudonymous: human.isPseudonymous
+      isPseudonymous: human.isPseudonymous,
     },
     createdAt: human.createdAt || now,
-    updatedAt: human.updatedAt || now
+    updatedAt: human.updatedAt || now,
   };
 }
 
@@ -361,8 +367,8 @@ export function humanRelationshipToContentRelationship(
     sourceNodeId: rel.sourceId,
     targetNodeId: rel.targetId,
     relationshipType: ContentRelationshipType.RELATES_TO,
-    confidence: 1.0,
-    inferenceSource: 'explicit'
+    confidence: 1,
+    inferenceSource: 'explicit',
   };
 }
 
@@ -385,7 +391,7 @@ export async function importHumansToLamad(
   const result: HumanImportResult = {
     humansImported: 0,
     relationshipsImported: 0,
-    errors: []
+    errors: [],
   };
 
   const data = loadHumansData(humansFilePath);
@@ -451,11 +457,15 @@ export async function importHumansToLamad(
 /**
  * List available relationship types
  */
-export function listRelationshipTypes(): Array<{ type: string; layer: GovernanceLayer; intimacy: IntimacyLevel }> {
+export function listRelationshipTypes(): {
+  type: string;
+  layer: GovernanceLayer;
+  intimacy: IntimacyLevel;
+}[] {
   return Object.entries(RELATIONSHIP_TYPES).map(([type, info]) => ({
     type,
     layer: info.layer,
-    intimacy: info.typicalIntimacy
+    intimacy: info.typicalIntimacy,
   }));
 }
 
@@ -472,6 +482,6 @@ export function listHumanCategories(): HumanCategory[] {
     'newcomer',
     'visitor',
     'red-team',
-    'edge-case'
+    'edge-case',
   ];
 }

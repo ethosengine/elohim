@@ -7,25 +7,16 @@
  */
 
 import * as yaml from 'js-yaml';
+
 import { PathMetadata } from '../models/path-metadata.model';
-import {
-  MarkdownParserResult,
-  ParsedSection,
-  ParserError
-} from './parser-result';
-import {
-  buildParserResult,
-  splitLines,
-  matchLine
-} from './base-parser';
+
+import { buildParserResult, splitLines, matchLine } from './base-parser';
+import { MarkdownParserResult, ParsedSection, ParserError } from './parser-result';
 
 /**
  * Parse a markdown file
  */
-export function parseMarkdown(
-  content: string,
-  pathMeta: PathMetadata
-): MarkdownParserResult {
+export function parseMarkdown(content: string, pathMeta: PathMetadata): MarkdownParserResult {
   try {
     const lines = splitLines(content);
 
@@ -46,7 +37,7 @@ export function parseMarkdown(
 
     return {
       ...baseResult,
-      sections
+      sections,
     };
   } catch (error) {
     if (error instanceof ParserError) {
@@ -103,7 +94,7 @@ function extractFrontmatter(
 
   return {
     frontmatter,
-    contentStartIndex: endIndex + 1
+    contentStartIndex: endIndex + 1,
   };
 }
 
@@ -217,17 +208,17 @@ function extractSections(lines: string[]): ParsedSection[] {
         title,
         anchor,
         content: '',
-        children: []
+        children: [],
       };
 
       // Find parent section
-      while (sectionStack.length > 0 && sectionStack[sectionStack.length - 1].level >= level) {
+      while (sectionStack.length > 0 && sectionStack.at(-1).level >= level) {
         sectionStack.pop();
       }
 
       if (sectionStack.length > 0) {
         // Add as child of current parent
-        sectionStack[sectionStack.length - 1].children.push(newSection);
+        sectionStack.at(-1).children.push(newSection);
       } else {
         // Top-level section
         sections.push(newSection);

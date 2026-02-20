@@ -9,7 +9,11 @@
  * - Content-based: references to other content by ID or name
  */
 
-import { ContentNode, ContentRelationship, ContentRelationshipType } from '../models/content-node.model';
+import {
+  ContentNode,
+  ContentRelationship,
+  ContentRelationshipType,
+} from '../models/content-node.model';
 
 /**
  * Relationship with score for ranking
@@ -44,9 +48,9 @@ export interface RelationshipExtractionOptions {
 const DEFAULT_OPTIONS: RelationshipExtractionOptions = {
   includePath: true,
   includeTags: true,
-  includeContent: false,  // Disabled by default - expensive O(n²) text search
-  minScore: 0.5,  // Higher threshold to reduce relationship count
-  maxPerNode: 10  // Fewer relationships per node
+  includeContent: false, // Disabled by default - expensive O(n²) text search
+  minScore: 0.5, // Higher threshold to reduce relationship count
+  maxPerNode: 10, // Fewer relationships per node
 };
 
 let relationshipIdCounter = 0;
@@ -102,27 +106,27 @@ function extractNodeRelationships(
         sourceNodeId: node.id,
         targetNodeId: relatedId,
         relationshipType: determineRelationshipType(node, nodeMap.get(relatedId)!),
-        score: 1.0,
+        score: 1,
         reason: 'explicit-reference',
-        confidence: 1.0,
-        inferenceSource: 'explicit'
+        confidence: 1,
+        inferenceSource: 'explicit',
       });
     }
   }
 
   // 2. Provenance relationships from metadata
   if (node.metadata?.derivedFrom) {
-    const sourceId = node.metadata.derivedFrom as string;
+    const sourceId = node.metadata.derivedFrom;
     if (nodeMap.has(sourceId)) {
       relationships.push({
         id: generateRelationshipId(),
         sourceNodeId: node.id,
         targetNodeId: sourceId,
         relationshipType: ContentRelationshipType.DERIVED_FROM,
-        score: 1.0,
+        score: 1,
         reason: 'provenance-link',
-        confidence: 1.0,
-        inferenceSource: 'explicit'
+        confidence: 1,
+        inferenceSource: 'explicit',
       });
     }
   }
@@ -163,8 +167,8 @@ function extractPathRelationships(
     return relationships;
   }
 
-  const nodeEpic = node.metadata?.epic as string | undefined;
-  const nodeUserType = node.metadata?.userType as string | undefined;
+  const nodeEpic = node.metadata?.epic;
+  const nodeUserType = node.metadata?.userType;
 
   // Skip if no epic to compare
   if (!nodeEpic || nodeEpic === 'other') {
@@ -177,13 +181,13 @@ function extractPathRelationships(
     // Skip source nodes as targets too
     if (other.contentType === 'source') continue;
 
-    const otherEpic = other.metadata?.epic as string | undefined;
-    const otherUserType = other.metadata?.userType as string | undefined;
+    const otherEpic = other.metadata?.epic;
+    const otherUserType = other.metadata?.userType;
 
     // Must share same epic to be related
     if (!otherEpic || nodeEpic !== otherEpic) continue;
 
-    let score = 0.4;  // Base score for same epic
+    let score = 0.4; // Base score for same epic
     const reasons: string[] = ['same-epic'];
 
     // Same user type adds more weight
@@ -208,7 +212,7 @@ function extractPathRelationships(
         score,
         reason: reasons.join(', '),
         confidence: score,
-        inferenceSource: 'path'
+        inferenceSource: 'path',
       });
     }
   }
@@ -235,7 +239,16 @@ function extractTagRelationships(
   if (nodeTags.size === 0) return relationships;
 
   // Skip common tags that don't indicate meaningful relationships
-  const commonTags = new Set(['source', 'resource', 'scenario', 'epic', 'role', 'archetype', 'feature', 'documentation']);
+  const commonTags = new Set([
+    'source',
+    'resource',
+    'scenario',
+    'epic',
+    'role',
+    'archetype',
+    'feature',
+    'documentation',
+  ]);
 
   // Pre-calculate meaningful tags once
   const meaningfulNodeTags = [...nodeTags].filter(t => !commonTags.has(t));
@@ -269,9 +282,9 @@ function extractTagRelationships(
         targetNodeId: otherId,
         relationshipType: ContentRelationshipType.RELATES_TO,
         score: similarity,
-        reason: `shared-tags: ${intersection.slice(0, 3).join(', ')}`,  // Limit tag list
+        reason: `shared-tags: ${intersection.slice(0, 3).join(', ')}`, // Limit tag list
         confidence: similarity,
-        inferenceSource: 'tag'
+        inferenceSource: 'tag',
       });
     }
   }
@@ -305,7 +318,7 @@ function extractContentRelationships(
         score: 0.6,
         reason: `references-title: ${other.title}`,
         confidence: 0.6,
-        inferenceSource: 'semantic'
+        inferenceSource: 'semantic',
       });
       continue;
     }
@@ -320,7 +333,7 @@ function extractContentRelationships(
         score: 0.8,
         reason: `references-id: ${otherId}`,
         confidence: 0.8,
-        inferenceSource: 'semantic'
+        inferenceSource: 'semantic',
       });
     }
   }
@@ -331,7 +344,10 @@ function extractContentRelationships(
 /**
  * Determine relationship type between two nodes
  */
-function determineRelationshipType(source: ContentNode, target: ContentNode): ContentRelationshipType {
+function determineRelationshipType(
+  source: ContentNode,
+  target: ContentNode
+): ContentRelationshipType {
   // Source to derived content
   if (source.contentType === 'source' || target.metadata?.derivedFrom === source.id) {
     return ContentRelationshipType.SOURCE_OF;
@@ -343,7 +359,10 @@ function determineRelationshipType(source: ContentNode, target: ContentNode): Co
   }
 
   // Epic to role/scenario
-  if (source.contentType === 'epic' && (target.contentType === 'role' || target.contentType === 'scenario')) {
+  if (
+    source.contentType === 'epic' &&
+    (target.contentType === 'role' || target.contentType === 'scenario')
+  ) {
     return ContentRelationshipType.CONTAINS;
   }
 
@@ -400,7 +419,7 @@ function limitRelationshipsPerNode(
   const limited: ContentRelationship[] = [];
 
   for (const [, rels] of bySource) {
-    const sorted = rels.sort((a, b) => b.score - a.score);
+    const sorted = [...rels].sort((a, b) => b.score - a.score);
     const top = sorted.slice(0, maxPerNode);
 
     for (const rel of top) {
@@ -410,7 +429,7 @@ function limitRelationshipsPerNode(
         targetNodeId: rel.targetNodeId,
         relationshipType: rel.relationshipType,
         confidence: rel.confidence,
-        inferenceSource: rel.inferenceSource
+        inferenceSource: rel.inferenceSource,
       });
     }
   }
@@ -444,9 +463,7 @@ export function buildRelationshipGraph(
 /**
  * Find connected components in the graph
  */
-export function findConnectedComponents(
-  graph: Map<string, Set<string>>
-): string[][] {
+export function findConnectedComponents(graph: Map<string, Set<string>>): string[][] {
   const visited = new Set<string>();
   const components: string[][] = [];
 

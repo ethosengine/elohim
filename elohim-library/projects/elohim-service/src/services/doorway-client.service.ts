@@ -36,7 +36,7 @@ export interface DoorwayResponse<T> {
  * Provides methods to query the doorway's generic cache API.
  */
 export class DoorwayClient {
-  private config: DoorwayClientConfig;
+  private readonly config: DoorwayClientConfig;
 
   constructor(config: DoorwayClientConfig) {
     this.config = {
@@ -53,7 +53,9 @@ export class DoorwayClient {
    * @returns The document data or null if not found
    */
   async get<T>(type: string, id: string): Promise<DoorwayResponse<T>> {
-    const url = this.buildUrl(`/api/v1/cache/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);
+    const url = this.buildUrl(
+      `/api/v1/cache/${encodeURIComponent(type)}/${encodeURIComponent(id)}`
+    );
     return this.fetch<T>(url);
   }
 
@@ -130,7 +132,7 @@ export class DoorwayClient {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
         signal: controller.signal,
       });
@@ -162,7 +164,7 @@ export class DoorwayClient {
         };
       }
 
-      const data = await response.json() as T;
+      const data = (await response.json()) as T;
       return {
         data,
         status: response.status,
@@ -206,7 +208,7 @@ export function createDevDoorwayClient(): DoorwayClient {
 export function createDoorwayClientFromEnv(): DoorwayClient {
   const baseUrl = process.env['DOORWAY_URL'] || 'https://doorway-alpha.elohim.host';
   const apiKey = process.env['DOORWAY_API_KEY'] || 'dev-elohim-auth-2024';
-  const timeout = parseInt(process.env['DOORWAY_TIMEOUT'] || '5000', 10);
+  const timeout = Number.parseInt(process.env['DOORWAY_TIMEOUT'] || '5000', 10);
 
   return new DoorwayClient({ baseUrl, apiKey, timeout });
 }

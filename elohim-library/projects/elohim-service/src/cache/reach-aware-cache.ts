@@ -24,10 +24,8 @@ import type {
   ICacheStats,
   CacheEntryMetadata,
   CacheConfig,
-  CacheInitResult,
   PriorityParams,
 } from './types';
-import { ReachLevel } from './types';
 
 // ============================================================================
 // WASM Module Types (imported dynamically)
@@ -60,7 +58,14 @@ interface WasmCacheStats {
 }
 
 interface WasmReachAwareCache {
-  put(hash: string, sizeBytes: bigint, reachLevel: number, domain: string, epic: string, priority: number): number;
+  put(
+    hash: string,
+    sizeBytes: bigint,
+    reachLevel: number,
+    domain: string,
+    epic: string,
+    priority: number
+  ): number;
   has(hash: string, reachLevel: number): boolean;
   touch(hash: string, reachLevel: number): boolean;
   delete(hash: string, reachLevel: number): boolean;
@@ -72,7 +77,14 @@ interface WasmReachAwareCache {
 }
 
 interface WasmBlobCache {
-  put(hash: string, sizeBytes: bigint, reachLevel: number, domain: string, epic: string, priority: number): number;
+  put(
+    hash: string,
+    sizeBytes: bigint,
+    reachLevel: number,
+    domain: string,
+    epic: string,
+    priority: number
+  ): number;
   has(hash: string): boolean;
   touch(hash: string): boolean;
   delete(hash: string): boolean;
@@ -137,7 +149,7 @@ interface InternalEntry {
  * O(1) for all operations.
  */
 class TsBlobCache implements IBlobCache {
-  private entries = new Map<string, InternalEntry>();
+  private readonly entries = new Map<string, InternalEntry>();
   private currentSize = 0n;
   private hits = 0n;
   private misses = 0n;
@@ -283,7 +295,10 @@ class TsBlobCache implements IBlobCache {
  * Pure TypeScript TTL-based chunk cache.
  */
 class TsChunkCache implements IChunkCache {
-  private entries = new Map<string, { hash: string; sizeBytes: bigint; createdAt: number }>();
+  private readonly entries = new Map<
+    string,
+    { hash: string; sizeBytes: bigint; createdAt: number }
+  >();
   private currentSize = 0n;
   private hits = 0n;
   private misses = 0n;
@@ -410,13 +425,10 @@ class TsChunkCache implements IChunkCache {
  * Maintains 8 isolated LRU caches (one per reach level).
  */
 class TsReachAwareCache implements IReachAwareCache {
-  private reachCaches: TsBlobCache[];
+  private readonly reachCaches: TsBlobCache[];
 
   constructor(maxSizePerReach: bigint) {
-    this.reachCaches = Array.from(
-      { length: 8 },
-      () => new TsBlobCache(maxSizePerReach)
-    );
+    this.reachCaches = Array.from({ length: 8 }, () => new TsBlobCache(maxSizePerReach));
   }
 
   put(
@@ -460,11 +472,11 @@ class TsReachAwareCache implements IReachAwareCache {
   }
 
   clear(): void {
-    this.reachCaches.forEach((c) => c.clear());
+    this.reachCaches.forEach(c => c.clear());
   }
 
   dispose(): void {
-    this.reachCaches.forEach((c) => c.dispose());
+    this.reachCaches.forEach(c => c.dispose());
   }
 }
 
@@ -474,7 +486,7 @@ class TsReachAwareCache implements IReachAwareCache {
 
 /** WASM CacheStats wrapper */
 class WasmCacheStatsWrapper implements ICacheStats {
-  constructor(private wasm: WasmCacheStats) {}
+  constructor(private readonly wasm: WasmCacheStats) {}
 
   get itemCount(): number {
     return this.wasm.item_count;
@@ -498,9 +510,16 @@ class WasmCacheStatsWrapper implements ICacheStats {
 
 /** WASM ReachAwareCache wrapper */
 class WasmReachAwareCacheWrapper implements IReachAwareCache {
-  constructor(private wasm: WasmReachAwareCache) {}
+  constructor(private readonly wasm: WasmReachAwareCache) {}
 
-  put(hash: string, sizeBytes: bigint, reachLevel: number, domain: string, epic: string, priority: number): number {
+  put(
+    hash: string,
+    sizeBytes: bigint,
+    reachLevel: number,
+    domain: string,
+    epic: string,
+    priority: number
+  ): number {
     return this.wasm.put(hash, sizeBytes, reachLevel, domain, epic, priority);
   }
 
@@ -539,9 +558,16 @@ class WasmReachAwareCacheWrapper implements IReachAwareCache {
 
 /** WASM BlobCache wrapper */
 class WasmBlobCacheWrapper implements IBlobCache {
-  constructor(private wasm: WasmBlobCache) {}
+  constructor(private readonly wasm: WasmBlobCache) {}
 
-  put(hash: string, sizeBytes: bigint, reachLevel: number, domain: string, epic: string, priority: number): number {
+  put(
+    hash: string,
+    sizeBytes: bigint,
+    reachLevel: number,
+    domain: string,
+    epic: string,
+    priority: number
+  ): number {
     return this.wasm.put(hash, sizeBytes, reachLevel, domain, epic, priority);
   }
 
@@ -594,7 +620,7 @@ class WasmBlobCacheWrapper implements IBlobCache {
 
 /** WASM ChunkCache wrapper */
 class WasmChunkCacheWrapper implements IChunkCache {
-  constructor(private wasm: WasmChunkCache) {}
+  constructor(private readonly wasm: WasmChunkCache) {}
 
   put(hash: string, sizeBytes: bigint): number {
     return this.wasm.put(hash, sizeBytes);
@@ -658,18 +684,34 @@ export function calculatePriority(params: PriorityParams): number {
 
   // Bandwidth bonus
   switch (params.bandwidthClass) {
-    case 4: score += 20; break;  // Ultra
-    case 3: score += 10; break;  // High
-    case 2: score += 5; break;   // Medium
-    case 1: score -= 5; break;   // Low
+    case 4:
+      score += 20;
+      break; // Ultra
+    case 3:
+      score += 10;
+      break; // High
+    case 2:
+      score += 5;
+      break; // Medium
+    case 1:
+      score -= 5;
+      break; // Low
   }
 
   // Steward bonus
   switch (params.stewardTier) {
-    case 4: score += 50; break;  // Pioneer
-    case 3: score += 30; break;  // Expert
-    case 2: score += 15; break;  // Curator
-    case 1: score += 5; break;   // Caretaker
+    case 4:
+      score += 50;
+      break; // Pioneer
+    case 3:
+      score += 30;
+      break; // Expert
+    case 2:
+      score += 15;
+      break; // Curator
+    case 1:
+      score += 5;
+      break; // Caretaker
   }
 
   // Affinity (0-10 points)
@@ -687,14 +729,14 @@ export function calculatePriority(params: PriorityParams): number {
  */
 export function calculateFreshness(masteryLevel: number, ageSeconds: number): number {
   const decayPerDay: Record<number, number> = {
-    0: 0,      // NotStarted - no decay
-    1: 0.05,   // Seen
-    2: 0.03,   // Remember
-    3: 0.02,   // Understand
-    4: 0.015,  // Apply
-    5: 0.01,   // Analyze
-    6: 0.008,  // Evaluate
-    7: 0.005,  // Create
+    0: 0, // NotStarted - no decay
+    1: 0.05, // Seen
+    2: 0.03, // Remember
+    3: 0.02, // Understand
+    4: 0.015, // Apply
+    5: 0.01, // Analyze
+    6: 0.008, // Evaluate
+    7: 0.005, // Create
   };
 
   const decay = decayPerDay[Math.min(7, Math.max(0, masteryLevel))] ?? 0;

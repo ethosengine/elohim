@@ -18,7 +18,6 @@
  */
 
 import { ContentNode } from '../models/content-node.model';
-import { HolochainClientService } from './holochain-client.service';
 import {
   HolochainImportConfig,
   HolochainImportResult,
@@ -31,6 +30,8 @@ import {
   QueryByIdInput,
 } from '../models/holochain.model';
 
+import { HolochainClientService } from './holochain-client.service';
+
 /**
  * Holochain Import Service
  *
@@ -38,8 +39,8 @@ import {
  * verifying content exists, and querying statistics.
  */
 export class HolochainImportService {
-  private client: HolochainClientService;
-  private config: HolochainImportConfig;
+  private readonly client: HolochainClientService;
+  private readonly config: HolochainImportConfig;
 
   constructor(config: HolochainImportConfig) {
     this.config = config;
@@ -77,7 +78,7 @@ export class HolochainImportService {
 
         console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} nodes)...`);
 
-        const inputs = batch.map((node) => this.nodeToHolochainInput(node));
+        const inputs = batch.map(node => this.nodeToHolochainInput(node));
 
         try {
           const result = await this.client.callZome<BulkCreateContentOutput>({
@@ -179,10 +180,7 @@ export class HolochainImportService {
    * @param limit - Maximum number of results (default 100)
    * @returns Array of content outputs
    */
-  async getContentByType(
-    contentType: string,
-    limit = 100
-  ): Promise<HolochainContentOutput[]> {
+  async getContentByType(contentType: string, limit = 100): Promise<HolochainContentOutput[]> {
     try {
       await this.client.connect();
       return await this.client.callZome<HolochainContentOutput[]>({
@@ -235,8 +233,7 @@ export class HolochainImportService {
       content_type: node.contentType,
       title: node.title,
       description: node.description,
-      content:
-        typeof node.content === 'string' ? node.content : JSON.stringify(node.content),
+      content: typeof node.content === 'string' ? node.content : JSON.stringify(node.content),
       content_format: node.contentFormat,
       tags: node.tags || [],
       source_path: node.sourcePath ?? null,

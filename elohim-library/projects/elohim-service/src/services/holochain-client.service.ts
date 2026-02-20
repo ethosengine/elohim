@@ -17,14 +17,9 @@ import {
   type AgentPubKey,
   type CellId,
   type AppInfo,
-  type InstalledAppId,
 } from '@holochain/client';
 
-import {
-  HolochainClientConfig,
-  ZomeCallInput,
-  ZomeCallResult,
-} from '../models/holochain.model';
+import { HolochainClientConfig, ZomeCallInput, ZomeCallResult } from '../models/holochain.model';
 
 /**
  * Holochain Client Service
@@ -49,7 +44,7 @@ export class HolochainClientService {
   private appWs: AppWebsocket | null = null;
   private cellId: CellId | null = null;
   private agentPubKey: AgentPubKey | null = null;
-  private config: HolochainClientConfig;
+  private readonly config: HolochainClientConfig;
   private isConnected = false;
 
   constructor(config: HolochainClientConfig) {
@@ -85,11 +80,13 @@ export class HolochainClientService {
 
       // Step 3: Check if app is installed
       const apps = await this.adminWs.listApps({});
-      let appInfo = apps.find((app) => app.installed_app_id === this.config.appId);
+      let appInfo = apps.find(app => app.installed_app_id === this.config.appId);
 
       if (!appInfo) {
         if (this.config.happPath) {
-          console.log(`App ${this.config.appId} not found, installing from ${this.config.happPath}...`);
+          console.log(
+            `App ${this.config.appId} not found, installing from ${this.config.happPath}...`
+          );
 
           // Generate agent key and install
           this.agentPubKey = await this.adminWs.generateAgentPubKey();
@@ -267,7 +264,7 @@ export class HolochainClientService {
   private extractCellId(appInfo: AppInfo): CellId | null {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
     for (const [, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ provisioned?: { cell_id: CellId } }>;
+      const cellArray = cells as { provisioned?: { cell_id: CellId } }[];
       for (const cell of cellArray) {
         if (cell.provisioned) {
           return cell.provisioned.cell_id;
