@@ -67,7 +67,10 @@ export class DoorwayClient {
    * @returns Array of documents
    */
   async query<T>(type: string, params?: CacheQueryParams): Promise<DoorwayResponse<T[]>> {
-    const url = this.buildUrl(`/api/v1/cache/${encodeURIComponent(type)}`, params);
+    const url = this.buildUrl(
+      `/api/v1/cache/${encodeURIComponent(type)}`,
+      params as Record<string, unknown>
+    );
     return this.fetch<T[]>(url);
   }
 

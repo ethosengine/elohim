@@ -131,7 +131,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
    * Checks for known Che URL patterns.
    */
   private isCheEnvironment(): boolean {
-    if (globalThis.window === undefined) return false;
+    if (globalThis.window === undefined || !globalThis.location) return false;
     return (
       globalThis.location.hostname.includes('.devspaces.') ||
       globalThis.location.hostname.includes('.code.ethosengine.com')
@@ -148,7 +148,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     // In Che, each endpoint gets a unique URL like:
     // https://<workspace>-<endpoint>.code.ethosengine.com
     // We need to replace the endpoint suffix (angular-dev) with (hc-dev)
-    const currentUrl = new URL(globalThis.location.href);
+    const currentUrl = new URL(globalThis.location!.href);
     const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
 
     this.logger.debug('Che URL resolution', {
@@ -355,13 +355,18 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         throw new Error(`Chaperone failed (${response.status}): ${errorBody}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        cellIds: Record<string, [string, string]>;
+        token?: string;
+        appToken: string;
+        appPort: number;
+        agentPubKey: string;
+        conductorId: string;
+      };
 
       // Step 3: Register signing credentials for each cell
       const cellIds = new Map<string, CellId>();
-      for (const [roleName, [dnaHashB64, agentKeyB64]] of Object.entries(
-        data.cellIds as Record<string, [string, string]>
-      )) {
+      for (const [roleName, [dnaHashB64, agentKeyB64]] of Object.entries(data.cellIds)) {
         const dnaHash = this.fromBase64(dnaHashB64);
         const agentKey = this.fromBase64(agentKeyB64);
         const cellId: CellId = [dnaHash, agentKey];
@@ -719,7 +724,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
    * The refreshed token contains conductor_id for future routing.
    */
   private updateStoredToken(token: string): void {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== 'undefined' && localStorage) {
       try {
         localStorage.setItem('doorway_token', token);
         this.logger.debug('Updated stored JWT with conductor_id');

@@ -629,9 +629,9 @@ describe('Relationship Extractor Service', () => {
     });
 
     it('should handle isolated nodes', () => {
-      const graph = new Map([
-        ['isolated-1', new Set()],
-        ['isolated-2', new Set()],
+      const graph = new Map<string, Set<string>>([
+        ['isolated-1', new Set<string>()],
+        ['isolated-2', new Set<string>()],
         ['connected-1', new Set(['connected-2'])],
         ['connected-2', new Set(['connected-1'])]
       ]);

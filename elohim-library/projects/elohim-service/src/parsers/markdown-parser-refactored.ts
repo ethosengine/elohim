@@ -212,13 +212,13 @@ function extractSections(lines: string[]): ParsedSection[] {
       };
 
       // Find parent section
-      while (sectionStack.length > 0 && sectionStack.at(-1).level >= level) {
+      while (sectionStack.length > 0 && sectionStack.at(-1)!.level >= level) {
         sectionStack.pop();
       }
 
       if (sectionStack.length > 0) {
         // Add as child of current parent
-        sectionStack.at(-1).children.push(newSection);
+        sectionStack.at(-1)!.children.push(newSection);
       } else {
         // Top-level section
         sections.push(newSection);

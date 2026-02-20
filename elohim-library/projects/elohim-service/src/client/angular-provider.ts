@@ -81,14 +81,14 @@ export function provideAnonymousBrowserClient(doorwayUrl: string): Provider[] {
 }
 
 // Browser window reference (safely handles SSR/Node environments)
-declare const window: (Window & typeof globalThis) | undefined;
+// `window` type comes from src/types/browser-globals.d.ts
 
 /**
  * Detect if running in Eclipse Che environment
  */
 function isEclipseChe(): boolean {
-  if (window === undefined) return false;
-  const hostname = window.location.hostname;
+  if (globalThis.window === undefined) return false;
+  const hostname = globalThis.window.location.hostname;
   return hostname.includes('.code.ethosengine.com') || hostname.includes('.devspaces.');
 }
 
@@ -104,8 +104,8 @@ function isEclipseChe(): boolean {
  * - hc-dev:  mbd06b-gmail-com-elohim-devspace-hc-dev.code.ethosengine.com
  */
 function getCheHcDevUrl(): string {
-  if (window === undefined) return '';
-  const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
+  if (globalThis.window === undefined) return '';
+  const hostname = globalThis.window.location.hostname.replace(/-angular-dev\./, '-hc-dev.');
   return `https://${hostname}`;
 }
 
@@ -117,8 +117,8 @@ function getCheHcDevUrl(): string {
  * - hc-storage:  mbd06b-gmail-com-elohim-devspace-hc-storage.code.ethosengine.com
  */
 function _getCheStorageUrl(): string {
-  if (window === undefined) return '';
-  const hostname = window.location.hostname.replace(/-angular-dev\./, '-hc-storage.');
+  if (globalThis.window === undefined) return '';
+  const hostname = globalThis.window.location.hostname.replace(/-angular-dev\./, '-hc-storage.');
   return `https://${hostname}`;
 }
 

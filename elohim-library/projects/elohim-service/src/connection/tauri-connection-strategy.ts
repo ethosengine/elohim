@@ -89,6 +89,23 @@ export interface NativeHandoffResponse {
   bootstrapUrl?: string;
 }
 
+/** Wire format for session from elohim-storage HTTP API (snake_case) */
+interface SessionApiResponse {
+  id: string;
+  human_id: string;
+  agent_pub_key: string;
+  doorway_url: string;
+  doorway_id?: string;
+  identifier: string;
+  display_name?: string;
+  profile_image_hash?: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+  last_synced_at?: string;
+  bootstrap_url?: string;
+}
+
 /**
  * OAuth callback payload from Tauri deep link handler
  */
@@ -180,23 +197,8 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         throw new Error(`Session API error: ${response.status}`);
       }
 
-      const session = await response.json();
-      // Convert snake_case to camelCase
-      return {
-        id: session.id,
-        humanId: session.human_id,
-        agentPubKey: session.agent_pub_key,
-        doorwayUrl: session.doorway_url,
-        doorwayId: session.doorway_id,
-        identifier: session.identifier,
-        displayName: session.display_name,
-        profileImageHash: session.profile_image_hash,
-        isActive: session.is_active,
-        createdAt: session.created_at,
-        updatedAt: session.updated_at,
-        lastSyncedAt: session.last_synced_at,
-        bootstrapUrl: session.bootstrap_url,
-      };
+      const session = (await response.json()) as SessionApiResponse;
+      return this.mapSessionResponse(session);
     } catch (err) {
       this.logger.warn('Failed to get session', {
         error: err instanceof Error ? err.message : String(err),
@@ -235,22 +237,8 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       throw new Error(`Failed to create session: ${error}`);
     }
 
-    const session = await response.json();
-    return {
-      id: session.id,
-      humanId: session.human_id,
-      agentPubKey: session.agent_pub_key,
-      doorwayUrl: session.doorway_url,
-      doorwayId: session.doorway_id,
-      identifier: session.identifier,
-      displayName: session.display_name,
-      profileImageHash: session.profile_image_hash,
-      isActive: session.is_active,
-      createdAt: session.created_at,
-      updatedAt: session.updated_at,
-      lastSyncedAt: session.last_synced_at,
-      bootstrapUrl: session.bootstrap_url,
-    };
+    const session = (await response.json()) as SessionApiResponse;
+    return this.mapSessionResponse(session);
   }
 
   /**
@@ -268,7 +256,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       return false;
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as { deleted?: boolean };
     return result.deleted === true;
   }
 
@@ -297,7 +285,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       throw new Error(`Native handoff failed: ${error}`);
     }
 
-    return response.json();
+    return (await response.json()) as NativeHandoffResponse;
   }
 
   /**
@@ -323,7 +311,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       throw new Error(`Token exchange failed: ${error}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { access_token: string };
     return data.access_token;
   }
 
@@ -573,6 +561,25 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   // ==========================================================================
   // Helper Methods
   // ==========================================================================
+
+  /** Convert snake_case API response to camelCase LocalSession */
+  private mapSessionResponse(s: SessionApiResponse): LocalSession {
+    return {
+      id: s.id,
+      humanId: s.human_id,
+      agentPubKey: s.agent_pub_key,
+      doorwayUrl: s.doorway_url,
+      doorwayId: s.doorway_id,
+      identifier: s.identifier,
+      displayName: s.display_name,
+      profileImageHash: s.profile_image_hash,
+      isActive: s.is_active,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at,
+      lastSyncedAt: s.last_synced_at,
+      bootstrapUrl: s.bootstrap_url,
+    };
+  }
 
   private async getInstalledApp(adminWs: AdminWebsocket, appId: string): Promise<AppInfo | null> {
     try {

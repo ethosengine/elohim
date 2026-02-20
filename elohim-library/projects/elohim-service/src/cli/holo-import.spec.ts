@@ -7,9 +7,14 @@
 import { Command } from 'commander';
 
 // Mock dependencies
+// Manual factories needed because these services import @holochain/client (ESM)
 jest.mock('../services/import-pipeline.service');
-jest.mock('../services/holochain-import.service');
-jest.mock('../services/holochain-client.service');
+jest.mock('../services/holochain-import.service', () => ({
+  HolochainImportService: jest.fn(),
+}));
+jest.mock('../services/holochain-client.service', () => ({
+  HolochainClientService: jest.fn(),
+}));
 
 describe('CLI holo-import commands', () => {
   let program: Command;
@@ -85,7 +90,7 @@ describe('CLI holo-import commands', () => {
           });
 
           if (!options.dryRun) {
-            const holoService = new HolochainImportService({
+            const holoService = new HolochainImportServiceModule.HolochainImportService({
               adminUrl: options.adminUrl,
               appId: options.appId,
               batchSize: parseInt(options.batchSize, 10)

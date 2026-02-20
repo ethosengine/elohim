@@ -105,7 +105,7 @@ export class ParserError extends Error {
  */
 export function validateParserResult(result: ParserResult): void {
   if (!result.pathMeta) {
-    throw new ParserError('Missing pathMeta', result.pathMeta?.fullPath || 'unknown');
+    throw new ParserError('Missing pathMeta', 'unknown');
   }
   if (!result.rawContent) {
     throw new ParserError('Missing rawContent', result.pathMeta.fullPath);

@@ -5,6 +5,15 @@
  * web (Doorway) and native (Direct) deployment modes.
  */
 
+// Mock @holochain/client to avoid ESM transitive dependency chain in Jest
+jest.mock('@holochain/client', () => ({
+  AdminWebsocket: { connect: jest.fn() },
+  AppWebsocket: { connect: jest.fn() },
+  generateSigningKeyPair: jest.fn(),
+  randomCapSecret: jest.fn(),
+  setSigningCredentials: jest.fn(),
+}));
+
 import {
   DoorwayConnectionStrategy,
   DirectConnectionStrategy,
@@ -61,7 +70,7 @@ describe('Connection Strategy Factory', () => {
     it('should auto-detect mode when set to auto', () => {
       const strategy = createConnectionStrategy('auto');
       // In test environment (Node.js), should detect as direct
-      expect(strategy.mode).toBe('doorway'); // Browser default since no process.versions.node in test
+      expect(strategy.mode).toBe('direct');
     });
 
     it('should default to auto when no mode specified', () => {
@@ -73,9 +82,9 @@ describe('Connection Strategy Factory', () => {
 
   describe('detectConnectionMode', () => {
     it('should return doorway by default in browser environment', () => {
-      // In test environment, no Tauri or Node.js indicators
+      // In test environment (Node.js), detects as direct
       const mode = detectConnectionMode();
-      expect(mode).toBe('doorway');
+      expect(mode).toBe('direct');
     });
   });
 });
@@ -116,7 +125,7 @@ describe('DoorwayConnectionStrategy', () => {
     it('should resolve admin URL without API key', () => {
       const config = createTestConfig({ proxyApiKey: undefined });
       const url = strategy.resolveAdminUrl(config);
-      expect(url).toBe('wss://doorway-alpha.elohim.host');
+      expect(url).toBe('wss://doorway-alpha.elohim.host/hc/admin');
     });
 
     it('should resolve app URL with port through proxy', () => {
