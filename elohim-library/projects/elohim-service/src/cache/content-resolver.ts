@@ -634,9 +634,13 @@ class WasmContentResolverWrapper implements IContentResolver {
 // ============================================================================
 
 let wasmModule: WasmModule | null = null;
+let wasmLoadAttempted = false;
 
 async function loadWasmModule(): Promise<WasmModule | null> {
   if (wasmModule) return wasmModule;
+  if (wasmLoadAttempted) return null;
+
+  wasmLoadAttempted = true;
 
   try {
     // Dynamic import of WASM module from assets path
@@ -647,10 +651,9 @@ async function loadWasmModule(): Promise<WasmModule | null> {
     const mod: any = await import(/* webpackIgnore: true */ wasmPath);
     await mod.default();
     wasmModule = mod as WasmModule;
-    console.log('[ContentResolver] WASM module loaded successfully');
     return wasmModule;
-  } catch (error) {
-    console.warn('[ContentResolver] WASM module not available:', error);
+  } catch {
+    // WASM unavailability is expected in most environments — TypeScript fallback is used
     return null;
   }
 }

@@ -169,7 +169,8 @@ pub async fn handle_hc_connect(
     } else {
         // Auto-provision (idempotent — handles logout→re-login)
         let provisioner = AgentProvisioner::new(Arc::clone(&registry))
-            .with_app_id(state.args.installed_app_id.clone());
+            .with_app_id(state.args.installed_app_id.clone())
+            .with_bundle_path(state.args.happ_bundle_path.clone());
         match provisioner.provision_agent(&claims.identifier).await {
             Ok(p) => {
                 let info = match registry.get_conductor_info(&p.conductor_id) {
@@ -195,10 +196,7 @@ pub async fn handle_hc_connect(
             }
             Err(e) => {
                 error!("Chaperone auto-provision failed: {}", e);
-                return json_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    &format!("Auto-provision failed: {e}"),
-                );
+                return sanitize_client_error(StatusCode::SERVICE_UNAVAILABLE, "Auto-provision");
             }
         }
     };
@@ -217,10 +215,7 @@ pub async fn handle_hc_connect(
         Ok(info) => info,
         Err(e) => {
             error!("Chaperone: get_app_info failed: {}", e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Failed to get app info: {e}"),
-            );
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info");
         }
     };
 
@@ -262,10 +257,7 @@ pub async fn handle_hc_connect(
                 continue;
             }
             error!("Chaperone: cap grant failed for '{}': {}", role, e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Cap grant failed for '{role}': {e}"),
-            );
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Cap grant");
         }
     }
 
@@ -300,10 +292,7 @@ pub async fn handle_hc_connect(
                 continue;
             }
             error!("Chaperone: authorize failed for '{}': {}", role, e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Authorize failed for '{role}': {e}"),
-            );
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Authorize credentials");
         }
     }
 
@@ -328,10 +317,7 @@ pub async fn handle_hc_connect(
         Ok(token) => BASE64.encode(&token),
         Err(e) => {
             error!("Chaperone: issue_app_authentication_token failed: {}", e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Failed to issue app token: {e}"),
-            );
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Issue app token");
         }
     };
 
@@ -393,6 +379,17 @@ pub async fn handle_hc_connect(
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/// Sanitize internal error details for client-facing responses.
+/// Full errors are already logged server-side via `error!()` / `warn!()`.
+fn sanitize_client_error(status: StatusCode, operation: &str) -> Response<Full<Bytes>> {
+    let message = match status {
+        StatusCode::BAD_GATEWAY => format!("{operation}: service temporarily unavailable"),
+        StatusCode::SERVICE_UNAVAILABLE => "Service temporarily unavailable".to_string(),
+        _ => format!("{operation} failed"),
+    };
+    json_error(status, &message)
+}
 
 fn json_error(status: StatusCode, message: &str) -> Response<Full<Bytes>> {
     let body = serde_json::json!({ "error": message });

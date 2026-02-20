@@ -35,7 +35,9 @@ import type {
   ConnectionResult,
   ContentSourceConfig,
   SigningCredentials,
+  Logger,
 } from './connection-strategy';
+import { ConsoleLogger } from './console-logger';
 
 /** Default elohim-storage sidecar port */
 const DEFAULT_STORAGE_PORT = 8090;
@@ -112,6 +114,17 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   private credentials: SigningCredentials | null = null;
   private connected = false;
   private currentSession: LocalSession | null = null;
+  private logger: Logger = new ConsoleLogger('TauriStrategy');
+
+  /** Resolve logger from config or use default */
+  private resolveLogger(config: ConnectionConfig): Logger {
+    if (config.logger) {
+      this.logger = config.logger;
+    } else if (config.logLevel) {
+      this.logger = new ConsoleLogger('TauriStrategy', config.logLevel);
+    }
+    return this.logger;
+  }
 
   // ==========================================================================
   // Environment Detection
@@ -185,7 +198,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         bootstrapUrl: session.bootstrap_url,
       };
     } catch (err) {
-      console.warn('[TauriStrategy] Failed to get session:', err);
+      this.logger.warn('Failed to get session', { error: err instanceof Error ? err.message : String(err) });
       return null;
     }
   }
@@ -252,7 +265,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
     });
 
     if (!response.ok) {
-      console.warn('[TauriStrategy] Failed to delete session');
+      this.logger.warn('Failed to delete session');
       return false;
     }
 
@@ -324,13 +337,13 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
     // config.adminUrl may contain a doorway URL from environment config,
     // which is not appropriate for direct conductor access.
     const url = 'ws://localhost:4444';
-    console.log('[TauriStrategy] Admin URL:', url);
+    this.logger.debug('Admin URL', { url });
     return url;
   }
 
   resolveAppUrl(_config: ConnectionConfig, port: number): string {
     const url = `ws://localhost:${port}`;
-    console.log('[TauriStrategy] App URL:', url);
+    this.logger.debug('App URL', { url });
     return url;
   }
 
@@ -381,12 +394,13 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   // ==========================================================================
 
   async connect(config: ConnectionConfig): Promise<ConnectionResult> {
+    this.resolveLogger(config);
     try {
-      console.log('[TauriStrategy] Starting connection...');
+      this.logger.info('Starting connection...');
 
       // Step 1: Connect to Admin WebSocket
       const adminUrl = this.resolveAdminUrl(config);
-      console.log('[TauriStrategy] Connecting to admin:', adminUrl);
+      this.logger.debug('Connecting to admin', { adminUrl });
 
       this.adminWs = await AdminWebsocket.connect({
         url: new URL(adminUrl),
@@ -396,7 +410,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       });
 
       // Step 2: Generate signing credentials
-      console.log('[TauriStrategy] Generating signing credentials...');
+      this.logger.debug('Generating signing credentials...');
       const [keyPair, signingKey] = await generateSigningKeyPair();
       const capSecret = await randomCapSecret();
 
@@ -404,13 +418,13 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
 
       // Step 3: Generate agent key
       const agentPubKey = await this.adminWs.generateAgentPubKey();
-      console.log('[TauriStrategy] Agent key generated');
+      this.logger.debug('Agent key generated');
 
       // Step 4: Check if app is installed
       let appInfo = await this.getInstalledApp(this.adminWs, config.appId);
 
       if (!appInfo) {
-        console.log(`[TauriStrategy] App ${config.appId} not installed`);
+        this.logger.info(`App ${config.appId} not installed`);
 
         if (config.happPath) {
           appInfo = await this.adminWs.installApp({
@@ -433,7 +447,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         throw new Error('Could not extract any cell IDs from app info');
       }
 
-      console.log('[TauriStrategy] Found', cellIds.size, 'cells');
+      this.logger.debug('Found cells', { count: cellIds.size });
 
       // Step 6: Grant zome call capability for ALL cells
       for (const [roleName, cellId] of cellIds) {
@@ -485,7 +499,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
 
       // Step 11: Connect to App WebSocket
       const appUrl = this.resolveAppUrl(config, appPort);
-      console.log('[TauriStrategy] Connecting to app interface:', appUrl);
+      this.logger.debug('Connecting to app interface', { appUrl });
 
       this.appWs = await AppWebsocket.connect({
         url: new URL(appUrl),
@@ -497,7 +511,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
 
       this.connected = true;
 
-      console.log('[TauriStrategy] Connection successful');
+      this.logger.info('Connection successful');
 
       return {
         success: true,
@@ -510,7 +524,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[TauriStrategy] Connection failed:', errorMessage);
+      this.logger.error('Connection failed', errorMessage);
 
       return {
         success: false,
@@ -530,13 +544,13 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         this.adminWs = null;
       }
     } catch (err) {
-      console.warn('[TauriStrategy] Error during disconnect:', err);
+      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
     }
 
     this.credentials = null;
     this.connected = false;
     this.currentSession = null;
-    console.log('[TauriStrategy] Disconnected');
+    this.logger.info('Disconnected');
   }
 
   // ==========================================================================

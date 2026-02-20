@@ -35,7 +35,9 @@ import type {
   ConnectionResult,
   ContentSourceConfig,
   SigningCredentials,
+  Logger,
 } from './connection-strategy';
+import { ConsoleLogger } from './console-logger';
 
 /**
  * Doorway Connection Strategy Implementation
@@ -52,6 +54,17 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   private appWs: AppWebsocket | null = null;
   private credentials: SigningCredentials | null = null;
   private connected = false;
+  private logger: Logger = new ConsoleLogger('DoorwayStrategy');
+
+  /** Resolve logger from config or use default */
+  private resolveLogger(config: ConnectionConfig): Logger {
+    if (config.logger) {
+      this.logger = config.logger;
+    } else if (config.logLevel) {
+      this.logger = new ConsoleLogger('DoorwayStrategy', config.logLevel);
+    }
+    return this.logger;
+  }
 
   // ==========================================================================
   // Retry Helper for Source Chain Operations
@@ -86,8 +99,8 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         if (isSourceChainConflict && attempt < maxRetries) {
           // Exponential backoff: 100ms, 200ms, 400ms
           const delay = 100 * Math.pow(2, attempt - 1);
-          console.warn(
-            `[DoorwayStrategy] Source chain conflict during ${description}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
+          this.logger.warn(
+            `Source chain conflict during ${description}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
           );
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
@@ -137,7 +150,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     const currentUrl = new URL(window.location.href);
     const hostname = currentUrl.hostname.replace(/-angular-dev\./, '-hc-dev.');
 
-    console.log('[DoorwayStrategy] Che URL resolution:', {
+    this.logger.debug('Che URL resolution', {
       currentHostname: currentUrl.hostname,
       resolvedHostname: hostname,
       devProxyUrl: `wss://${hostname}`,
@@ -156,7 +169,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     if (cheProxy && config.useLocalProxy) {
       // Che environment: use path-based routing through dev-proxy
       const url = `${cheProxy}/hc/admin`;
-      console.log('[DoorwayStrategy] Admin URL (Che dev-proxy):', url);
+      this.logger.debug('Admin URL (Che dev-proxy)', { url });
       return url;
     }
 
@@ -164,7 +177,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     const baseUrl = config.adminUrl.replace(/\/$/, '');
     const params = this.buildQueryParams(config);
     const url = params ? `${baseUrl}/hc/admin?${params}` : `${baseUrl}/hc/admin`;
-    console.log('[DoorwayStrategy] Admin URL (doorway):', url);
+    this.logger.debug('Admin URL (doorway)', { url });
     return url;
   }
 
@@ -174,7 +187,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     if (cheProxy && config.useLocalProxy) {
       // Che environment: use path-based routing with port through dev-proxy
       const url = `${cheProxy}/hc/app/${port}`;
-      console.log('[DoorwayStrategy] App URL (Che dev-proxy):', url);
+      this.logger.debug('App URL (Che dev-proxy)', { url });
       return url;
     }
 
@@ -184,13 +197,13 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       const baseUrl = config.adminUrl.replace(/\/$/, '');
       const params = this.buildQueryParams(config);
       const url = params ? `${baseUrl}/hc/app/${port}?${params}` : `${baseUrl}/hc/app/${port}`;
-      console.log('[DoorwayStrategy] App URL (doorway):', url);
+      this.logger.debug('App URL (doorway)', { url });
       return url;
     }
 
     // Fallback: direct localhost connection
     const url = `ws://localhost:${port}`;
-    console.log('[DoorwayStrategy] App URL (localhost):', url);
+    this.logger.debug('App URL (localhost)', { url });
     return url;
   }
 
@@ -221,7 +234,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       // Note: Empty string doesn't work because Angular's proxy only intercepts
       // HttpClient requests, not browser resource loads like <img> tags.
       if (typeof window !== 'undefined' && window.location?.origin) {
-        console.log('[DoorwayStrategy] Storage base URL (Che via Angular proxy):', window.location.origin);
+        this.logger.debug('Storage base URL (Che via Angular proxy)', { url: window.location.origin });
         return window.location.origin;
       }
       // SSR fallback - return empty and let requests be relative
@@ -283,6 +296,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
    * dev mode (Eclipse Che) or when no token is available.
    */
   async connect(config: ConnectionConfig): Promise<ConnectionResult> {
+    this.resolveLogger(config);
     const useChaperone = !this.isCheEnvironment() && !!config.doorwayToken;
 
     if (useChaperone) {
@@ -308,7 +322,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
    */
   private async connectViaChaperone(config: ConnectionConfig): Promise<ConnectionResult> {
     try {
-      console.log('[DoorwayStrategy] Chaperone: starting connection...');
+      this.logger.info('Chaperone: starting connection...');
 
       // Step 1: Generate signing credentials locally
       const [keyPair, signingKey] = await generateSigningKeyPair();
@@ -364,7 +378,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       // Step 5: Connect to App WebSocket (single connection)
       const appUrl = this.resolveAppUrl(config, data.appPort);
-      console.log('[DoorwayStrategy] Chaperone: connecting to app interface:', appUrl);
+      this.logger.debug('Chaperone: connecting to app interface', { appUrl });
 
       // Decode the base64 app token back to bytes for AppWebsocket
       const appTokenBytes = this.fromBase64(data.appToken);
@@ -377,7 +391,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       const agentPubKey = this.fromBase64(data.agentPubKey) as AgentPubKey;
 
-      console.log('[DoorwayStrategy] Chaperone: connected', {
+      this.logger.info('Chaperone: connected', {
         conductor: data.conductorId,
         cells: cellIds.size,
         appPort: data.appPort,
@@ -392,7 +406,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
-      console.error('[DoorwayStrategy] Chaperone connection failed:', errorMessage);
+      this.logger.error('Chaperone connection failed', errorMessage);
 
       return {
         success: false,
@@ -413,17 +427,17 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
    */
   private async connectViaAdminWs(config: ConnectionConfig): Promise<ConnectionResult> {
     try {
-      console.log('[DoorwayStrategy] AdminWS: starting connection...');
+      this.logger.info('AdminWS: starting connection...');
 
       // Step 1: Connect to Admin WebSocket (through proxy or direct)
       const adminUrl = this.resolveAdminUrl(config);
-      console.log('[DoorwayStrategy] Connecting to admin:', adminUrl);
+      this.logger.debug('Connecting to admin', { adminUrl });
 
       // Browser uses native WebSocket - wsClientOptions.origin is for Node.js only
       this.adminWs = await AdminWebsocket.connect({ url: new URL(adminUrl) });
 
       // Step 2: Generate signing credentials
-      console.log('[DoorwayStrategy] Generating signing credentials...');
+      this.logger.debug('Generating signing credentials...');
       const [keyPair, signingKey] = await generateSigningKeyPair();
       const capSecret = await randomCapSecret();
 
@@ -431,19 +445,19 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       // Step 3: Generate agent key
       const agentPubKey = await this.adminWs.generateAgentPubKey();
-      console.log('[DoorwayStrategy] Agent key generated');
+      this.logger.debug('Agent key generated');
 
       // Step 4: Check if app is installed, install if needed
       let appInfo = await this.getInstalledApp(this.adminWs, config.appId);
 
       // If per-user app not found, fall back to base app name
       if (!appInfo && config.appId !== 'elohim') {
-        console.warn(`[DoorwayStrategy] App '${config.appId}' not found, falling back to 'elohim'`);
+        this.logger.warn(`App '${config.appId}' not found, falling back to 'elohim'`);
         appInfo = await this.getInstalledApp(this.adminWs, 'elohim');
       }
 
       if (!appInfo) {
-        console.log(`[DoorwayStrategy] App ${config.appId} not installed. Installing...`);
+        this.logger.info(`App ${config.appId} not installed. Installing...`);
 
         if (config.happPath) {
           appInfo = await this.adminWs.installApp({
@@ -468,7 +482,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         throw new Error('Could not extract any cell IDs from app info');
       }
 
-      console.log('[DoorwayStrategy] Found', cellIds.size, 'cells:', Array.from(cellIds.keys()));
+      this.logger.debug('Found cells', { count: cellIds.size, roles: Array.from(cellIds.keys()) });
 
       // Step 6: Grant zome call capability for ALL cells
       // Use retry helper since cap grants write to source chain and can race.
@@ -495,11 +509,11 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
             `cap grant for ${roleName}`
           );
           grantedCells.set(roleName, cellId);
-          console.log(`[DoorwayStrategy] Granted cap for role '${roleName}'`);
+          this.logger.debug(`Granted cap for role '${roleName}'`);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes('CellMissing')) {
-            console.warn(`[DoorwayStrategy] Skipping cap grant for '${roleName}': CellMissing`);
+            this.logger.warn(`Skipping cap grant for '${roleName}': CellMissing`);
           } else {
             throw err;
           }
@@ -510,7 +524,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         throw new Error('Failed to grant capabilities for any cell');
       }
 
-      console.log(`[DoorwayStrategy] Granted caps for ${grantedCells.size}/${cellIds.size} cells`);
+      this.logger.debug(`Granted caps for ${grantedCells.size}/${cellIds.size} cells`);
 
       // Step 7: Register signing credentials for cells that got caps granted
       for (const [, cellId] of grantedCells) {
@@ -527,14 +541,14 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       if (existingInterfaces.length > 0) {
         appPort = existingInterfaces[0].port;
-        console.log(`[DoorwayStrategy] Using existing app interface on port ${appPort}`);
+        this.logger.debug(`Using existing app interface on port ${appPort}`);
       } else {
         // Create new interface with wildcard origins (proxy handles auth)
         const { port } = await this.adminWs.attachAppInterface({
           allowed_origins: '*',
         });
         appPort = port;
-        console.log(`[DoorwayStrategy] Created new app interface on port ${appPort}`);
+        this.logger.debug(`Created new app interface on port ${appPort}`);
       }
 
       // Step 9: Authorize signing credentials for cells that got caps granted
@@ -545,11 +559,11 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
             () => this.adminWs!.authorizeSigningCredentials(cellId),
             `authorize credentials for ${roleName}`
           );
-          console.log(`[DoorwayStrategy] Authorized credentials for role '${roleName}'`);
+          this.logger.debug(`Authorized credentials for role '${roleName}'`);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes('CellMissing')) {
-            console.warn(`[DoorwayStrategy] Skipping authorize for '${roleName}': CellMissing`);
+            this.logger.warn(`Skipping authorize for '${roleName}': CellMissing`);
           } else {
             throw err;
           }
@@ -567,7 +581,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       // Step 11: Connect to App WebSocket
       const appUrl = this.resolveAppUrl(config, appPort);
-      console.log('[DoorwayStrategy] Connecting to app interface:', appUrl);
+      this.logger.debug('Connecting to app interface', { appUrl });
 
       this.appWs = await AppWebsocket.connect({
         url: new URL(appUrl),
@@ -576,7 +590,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
 
       this.connected = true;
 
-      console.log('[DoorwayStrategy] Connection successful', {
+      this.logger.info('Connection successful', {
         appId: config.appId,
         cellCount: grantedCells.size,
         totalCells: cellIds.size,
@@ -593,7 +607,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
-      console.error('[DoorwayStrategy] Connection failed:', errorMessage);
+      this.logger.error('Connection failed', errorMessage);
 
       return {
         success: false,
@@ -613,12 +627,12 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         this.adminWs = null;
       }
     } catch (err) {
-      console.warn('[DoorwayStrategy] Error during disconnect:', err);
+      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
     }
 
     this.credentials = null;
     this.connected = false;
-    console.log('[DoorwayStrategy] Disconnected');
+    this.logger.info('Disconnected');
   }
 
   // ==========================================================================
@@ -708,9 +722,9 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem('doorway_token', token);
-        console.log('[DoorwayStrategy] Updated stored JWT with conductor_id');
+        this.logger.debug('Updated stored JWT with conductor_id');
       } catch {
-        console.warn('[DoorwayStrategy] Failed to update stored token');
+        this.logger.warn('Failed to update stored token');
       }
     }
   }

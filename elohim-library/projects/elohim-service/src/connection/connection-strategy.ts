@@ -36,6 +36,21 @@ import type {
 import { SourceTier } from '../cache/content-resolver';
 
 // ============================================================================
+// Logger Types
+// ============================================================================
+
+/** Log level for connection strategy logging */
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+/** Logger interface for connection strategies */
+export interface Logger {
+  debug(message: string, context?: Record<string, unknown>): void;
+  info(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  error(message: string, error?: unknown, context?: Record<string, unknown>): void;
+}
+
+// ============================================================================
 // Connection Mode Types
 // ============================================================================
 
@@ -79,6 +94,12 @@ export interface ConnectionConfig {
 
   /** Doorway JWT token for conductor affinity routing (multi-conductor) */
   doorwayToken?: string;
+
+  /** Logger instance for structured logging (defaults to console) */
+  logger?: Logger;
+
+  /** Minimum log level (defaults to 'info') */
+  logLevel?: LogLevel;
 }
 
 /**

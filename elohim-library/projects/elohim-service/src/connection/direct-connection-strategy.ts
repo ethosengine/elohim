@@ -37,7 +37,9 @@ import type {
   ConnectionResult,
   ContentSourceConfig,
   SigningCredentials,
+  Logger,
 } from './connection-strategy';
+import { ConsoleLogger } from './console-logger';
 
 /** Default local conductor admin port */
 const DEFAULT_ADMIN_PORT = 4444;
@@ -63,6 +65,17 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
   private appWs: AppWebsocket | null = null;
   private credentials: SigningCredentials | null = null;
   private connected = false;
+  private logger: Logger = new ConsoleLogger('DirectStrategy');
+
+  /** Resolve logger from config or use default */
+  private resolveLogger(config: ConnectionConfig): Logger {
+    if (config.logger) {
+      this.logger = config.logger;
+    } else if (config.logLevel) {
+      this.logger = new ConsoleLogger('DirectStrategy', config.logLevel);
+    }
+    return this.logger;
+  }
 
   // ==========================================================================
   // Environment Detection
@@ -95,14 +108,14 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
   resolveAdminUrl(config: ConnectionConfig): string {
     // Direct mode: use localhost conductor
     const url = config.adminUrl || `ws://localhost:${DEFAULT_ADMIN_PORT}`;
-    console.log('[DirectStrategy] Admin URL:', url);
+    this.logger.debug('Admin URL', { url });
     return url;
   }
 
   resolveAppUrl(_config: ConnectionConfig, port: number): string {
     // Direct mode: connect to localhost app port
     const url = `ws://localhost:${port}`;
-    console.log('[DirectStrategy] App URL:', url);
+    this.logger.debug('App URL', { url });
     return url;
   }
 
@@ -158,12 +171,13 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
   // ==========================================================================
 
   async connect(config: ConnectionConfig): Promise<ConnectionResult> {
+    this.resolveLogger(config);
     try {
-      console.log('[DirectStrategy] Starting connection...');
+      this.logger.info('Starting connection...');
 
       // Step 1: Connect to Admin WebSocket (direct to localhost)
       const adminUrl = this.resolveAdminUrl(config);
-      console.log('[DirectStrategy] Connecting to admin:', adminUrl);
+      this.logger.debug('Connecting to admin', { adminUrl });
 
       // In Node.js/Tauri, we can pass wsClientOptions
       // In browser, this would be ignored anyway
@@ -175,7 +189,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
       });
 
       // Step 2: Generate signing credentials
-      console.log('[DirectStrategy] Generating signing credentials...');
+      this.logger.debug('Generating signing credentials...');
       const [keyPair, signingKey] = await generateSigningKeyPair();
       const capSecret = await randomCapSecret();
 
@@ -183,13 +197,13 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
 
       // Step 3: Generate agent key
       const agentPubKey = await this.adminWs.generateAgentPubKey();
-      console.log('[DirectStrategy] Agent key generated');
+      this.logger.debug('Agent key generated');
 
       // Step 4: Check if app is installed, install if needed
       let appInfo = await this.getInstalledApp(this.adminWs, config.appId);
 
       if (!appInfo) {
-        console.log(`[DirectStrategy] App ${config.appId} not installed. Installing...`);
+        this.logger.info(`App ${config.appId} not installed. Installing...`);
 
         if (config.happPath) {
           appInfo = await this.adminWs.installApp({
@@ -214,7 +228,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
         throw new Error('Could not extract any cell IDs from app info');
       }
 
-      console.log('[DirectStrategy] Found', cellIds.size, 'cells:', Array.from(cellIds.keys()));
+      this.logger.debug('Found cells', { count: cellIds.size, roles: Array.from(cellIds.keys()) });
 
       // Step 6: Grant zome call capability for ALL cells
       for (const [roleName, cellId] of cellIds) {
@@ -232,7 +246,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
             },
           },
         });
-        console.log(`[DirectStrategy] Granted cap for role '${roleName}'`);
+        this.logger.debug(`Granted cap for role '${roleName}'`);
       }
 
       // Step 7: Register signing credentials for ALL cells
@@ -250,20 +264,20 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
 
       if (existingInterfaces.length > 0) {
         appPort = existingInterfaces[0].port;
-        console.log(`[DirectStrategy] Using existing app interface on port ${appPort}`);
+        this.logger.debug(`Using existing app interface on port ${appPort}`);
       } else {
         // Create new interface - in direct mode we can use localhost origin
         const { port } = await this.adminWs.attachAppInterface({
           allowed_origins: 'localhost',
         });
         appPort = port;
-        console.log(`[DirectStrategy] Created new app interface on port ${appPort}`);
+        this.logger.debug(`Created new app interface on port ${appPort}`);
       }
 
       // Step 9: Authorize signing credentials for ALL cells
       for (const [roleName, cellId] of cellIds) {
         await this.adminWs.authorizeSigningCredentials(cellId);
-        console.log(`[DirectStrategy] Authorized credentials for role '${roleName}'`);
+        this.logger.debug(`Authorized credentials for role '${roleName}'`);
       }
 
       // Step 10: Get app authentication token
@@ -275,7 +289,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
 
       // Step 11: Connect to App WebSocket (direct to localhost)
       const appUrl = this.resolveAppUrl(config, appPort);
-      console.log('[DirectStrategy] Connecting to app interface:', appUrl);
+      this.logger.debug('Connecting to app interface', { appUrl });
 
       this.appWs = await AppWebsocket.connect({
         url: new URL(appUrl),
@@ -287,7 +301,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
 
       this.connected = true;
 
-      console.log('[DirectStrategy] Connection successful', {
+      this.logger.info('Connection successful', {
         appId: config.appId,
         cellCount: cellIds.size,
       });
@@ -303,7 +317,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown connection error';
-      console.error('[DirectStrategy] Connection failed:', errorMessage);
+      this.logger.error('Connection failed', errorMessage);
 
       return {
         success: false,
@@ -323,12 +337,12 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
         this.adminWs = null;
       }
     } catch (err) {
-      console.warn('[DirectStrategy] Error during disconnect:', err);
+      this.logger.warn('Error during disconnect', { error: err instanceof Error ? err.message : String(err) });
     }
 
     this.credentials = null;
     this.connected = false;
-    console.log('[DirectStrategy] Disconnected');
+    this.logger.info('Disconnected');
   }
 
   // ==========================================================================

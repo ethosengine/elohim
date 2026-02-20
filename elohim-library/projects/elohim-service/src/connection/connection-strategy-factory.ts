@@ -42,18 +42,18 @@ export type ExtendedConnectionMode = ConnectionMode | 'tauri';
 export function detectConnectionMode(): Exclude<ExtendedConnectionMode, 'auto'> {
   // Check for Tauri environment (native app)
   if (typeof window !== 'undefined' && '__TAURI__' in window) {
-    console.log('[ConnectionStrategy] Detected Tauri environment → tauri mode');
+    // Tauri environment detected
     return 'tauri';
   }
 
   // Check for Node.js environment (CLI tools, tests)
   if (typeof process !== 'undefined' && process.versions?.node !== undefined) {
-    console.log('[ConnectionStrategy] Detected Node.js environment → direct mode');
+    // Node.js environment detected
     return 'direct';
   }
 
   // Default to doorway for browser
-  console.log('[ConnectionStrategy] Detected browser environment → doorway mode');
+  // Browser environment — doorway mode
   return 'doorway';
 }
 
@@ -80,16 +80,16 @@ export function createConnectionStrategy(mode: ExtendedConnectionMode = 'auto'):
 
   switch (resolvedMode) {
     case 'tauri':
-      console.log('[ConnectionStrategy] Creating TauriConnectionStrategy');
+      // Creating TauriConnectionStrategy
       return new TauriConnectionStrategy();
 
     case 'direct':
-      console.log('[ConnectionStrategy] Creating DirectConnectionStrategy');
+      // Creating DirectConnectionStrategy
       return new DirectConnectionStrategy();
 
     case 'doorway':
     default:
-      console.log('[ConnectionStrategy] Creating DoorwayConnectionStrategy');
+      // Creating DoorwayConnectionStrategy
       return new DoorwayConnectionStrategy();
   }
 }

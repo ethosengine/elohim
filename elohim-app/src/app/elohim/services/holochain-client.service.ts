@@ -48,7 +48,7 @@ import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { LoggerService, type LogTimer } from './logger.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
 
-import type { ConnectionConfig } from '@elohim/service/connection';
+import type { ConnectionConfig, Logger } from '@elohim/service/connection';
 
 const CONNECTION_FAILED = 'Connection failed';
 
@@ -139,6 +139,15 @@ export class HolochainClientService {
       // localStorage not available (SSR) — no token
     }
 
+    // Bridge Angular LoggerService to connection strategy Logger interface
+    const strategyLogger: Logger = {
+      debug: (msg: string, ctx?: Record<string, unknown>) => this.logger.debug(msg, ctx),
+      info: (msg: string, ctx?: Record<string, unknown>) => this.logger.info(msg, ctx),
+      warn: (msg: string, ctx?: Record<string, unknown>) => this.logger.warn(msg, ctx),
+      error: (msg: string, err?: unknown, ctx?: Record<string, unknown>) =>
+        this.logger.error(msg, err, ctx),
+    };
+
     return {
       mode: this.strategy.mode,
       adminUrl: this.config.adminUrl,
@@ -150,6 +159,7 @@ export class HolochainClientService {
       origin: this.config.origin,
       useLocalProxy: this.config.useLocalProxy,
       doorwayToken,
+      logger: strategyLogger,
     };
   }
 

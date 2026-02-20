@@ -369,7 +369,8 @@ pub async fn handle_provision_user(
     }
 
     let provisioner = AgentProvisioner::new(Arc::clone(registry))
-        .with_app_id(state.args.installed_app_id.clone());
+        .with_app_id(state.args.installed_app_id.clone())
+        .with_bundle_path(state.args.happ_bundle_path.clone());
 
     match provisioner.provision_agent(&request.identifier).await {
         Ok(p) => {
@@ -464,7 +465,8 @@ pub async fn handle_deprovision_user(
     };
 
     let provisioner = AgentProvisioner::new(Arc::clone(registry))
-        .with_app_id(state.args.installed_app_id.clone());
+        .with_app_id(state.args.installed_app_id.clone())
+        .with_bundle_path(state.args.happ_bundle_path.clone());
 
     match provisioner.deprovision_agent(agent_key).await {
         Ok(()) => {
@@ -748,7 +750,8 @@ pub async fn handle_force_graduation(
     // Deprovision conductor cell (best effort)
     if let Some(ref registry) = state.conductor_registry {
         let provisioner = AgentProvisioner::new(Arc::clone(registry))
-            .with_app_id(state.args.installed_app_id.clone());
+            .with_app_id(state.args.installed_app_id.clone())
+            .with_bundle_path(state.args.happ_bundle_path.clone());
         match provisioner.deprovision_agent(agent_key).await {
             Ok(()) => {
                 info!(

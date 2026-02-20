@@ -38,7 +38,12 @@ export type {
   ContentSourceConfig,
   SigningCredentials,
   IConnectionStrategy,
+  Logger,
+  LogLevel,
 } from './connection-strategy';
+
+// Logger
+export { ConsoleLogger } from './console-logger';
 
 // Strategy implementations
 export { DoorwayConnectionStrategy } from './doorway-connection-strategy';

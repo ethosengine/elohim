@@ -8,7 +8,7 @@ import { Observable, of, shareReplay, map, catchError } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface AppConfig {
-  readonly logLevel: 'debug' | 'info' | 'error';
+  readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
   readonly environment: string;
 }
 
