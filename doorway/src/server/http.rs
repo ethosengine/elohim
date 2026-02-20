@@ -744,6 +744,12 @@ async fn handle_request(
         // Admin API endpoints for Shefa compute resources dashboard
         // ====================================================================
 
+        // Feature flags — which optional services are active on this instance
+        // No auth required: clients use this for upfront capability discovery
+        (Method::GET, "/admin/capabilities") => {
+            to_boxed(routes::handle_capabilities(Arc::clone(&state)).await)
+        }
+
         // Conductor pool visibility (available on ALL instances)
         (Method::GET, "/admin/conductors") => {
             to_boxed(routes::handle_list_conductors(Arc::clone(&state)).await)

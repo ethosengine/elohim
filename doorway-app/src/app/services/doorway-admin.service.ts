@@ -1,8 +1,10 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, Subject, catchError, of, retry, timeout } from 'rxjs';
+import { Observable, Subject, catchError, firstValueFrom, of, retry, timeout } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { environment } from '../../environments/environment';
+import { CircuitBreaker } from '../core/http/circuit-breaker';
+import { DEFAULT_HTTP_CONFIG } from '../core/http/http-config';
 import {
   NodesResponse,
   NodeDetails,
@@ -29,6 +31,8 @@ import {
   GraduationCompletedResponse,
   // Account models
   AccountResponse,
+  // Capabilities
+  CapabilitiesResponse,
 } from '../models/doorway.model';
 
 /**
@@ -65,6 +69,17 @@ export class DoorwayAdminService {
   readonly nodes = this._nodes.asReadonly();
   readonly cluster = this._cluster.asReadonly();
 
+  // Circuit breaker for orchestrator endpoints
+  private readonly orchestratorCircuit = new CircuitBreaker(
+    'orchestrator',
+    DEFAULT_HTTP_CONFIG.circuitBreaker
+  );
+
+  // Server capabilities
+  private readonly _capabilities = signal<CapabilitiesResponse | null>(null);
+  readonly capabilities = this._capabilities.asReadonly();
+  readonly orchestratorAvailable = computed(() => this._capabilities()?.orchestrator ?? false);
+
   // Request timeout
   private readonly timeout = 30000;
 
@@ -73,18 +88,50 @@ export class DoorwayAdminService {
   // ============================================================================
 
   /**
+   * Fetch server capabilities (which features are enabled)
+   */
+  fetchCapabilities(): Observable<CapabilitiesResponse> {
+    return this.http.get<CapabilitiesResponse>(`${this.baseUrl}/admin/capabilities`).pipe(
+      timeout(this.timeout),
+      catchError(this.handleError<CapabilitiesResponse>('fetchCapabilities', {
+        orchestrator: false,
+        federation: false,
+        conductorPool: false,
+        nats: false,
+      }))
+    );
+  }
+
+  /**
+   * Fetch capabilities and store them in the capabilities signal
+   */
+  async loadCapabilities(): Promise<void> {
+    const caps = await firstValueFrom(this.fetchCapabilities());
+    this._capabilities.set(caps);
+  }
+
+  /**
    * Get all nodes with detailed resource and social metrics
    */
   getNodes(): Observable<NodesResponse> {
-    return this.http.get<NodesResponse>(`${this.baseUrl}/admin/nodes`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<NodesResponse>('getNodes', {
-        total: 0,
-        byStatus: { online: 0, degraded: 0, offline: 0, failed: 0, discovering: 0, registering: 0 },
-        nodes: [],
-      }))
-    );
+    const fallback: NodesResponse = {
+      total: 0,
+      byStatus: { online: 0, degraded: 0, offline: 0, failed: 0, discovering: 0, registering: 0 },
+      nodes: [],
+    };
+
+    return new Observable<NodesResponse>(subscriber => {
+      this.orchestratorCircuit.execute(() =>
+        firstValueFrom(
+          this.http.get<NodesResponse>(`${this.baseUrl}/admin/nodes`).pipe(
+            timeout(this.timeout)
+          )
+        )
+      ).then(
+        result => { subscriber.next(result); subscriber.complete(); },
+        () => { subscriber.next(fallback); subscriber.complete(); }
+      );
+    });
   }
 
   /**
@@ -102,22 +149,36 @@ export class DoorwayAdminService {
    * Get cluster-wide aggregated metrics
    */
   getClusterMetrics(): Observable<ClusterMetrics | null> {
-    return this.http.get<ClusterMetrics>(`${this.baseUrl}/admin/cluster`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<ClusterMetrics | null>('getClusterMetrics', null))
-    );
+    return new Observable<ClusterMetrics | null>(subscriber => {
+      this.orchestratorCircuit.execute(() =>
+        firstValueFrom(
+          this.http.get<ClusterMetrics>(`${this.baseUrl}/admin/cluster`).pipe(
+            timeout(this.timeout)
+          )
+        )
+      ).then(
+        result => { subscriber.next(result); subscriber.complete(); },
+        () => { subscriber.next(null); subscriber.complete(); }
+      );
+    });
   }
 
   /**
    * Get resource utilization summary
    */
   getResources(): Observable<ResourceSummary | null> {
-    return this.http.get<ResourceSummary>(`${this.baseUrl}/admin/resources`).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError<ResourceSummary | null>('getResources', null))
-    );
+    return new Observable<ResourceSummary | null>(subscriber => {
+      this.orchestratorCircuit.execute(() =>
+        firstValueFrom(
+          this.http.get<ResourceSummary>(`${this.baseUrl}/admin/resources`).pipe(
+            timeout(this.timeout)
+          )
+        )
+      ).then(
+        result => { subscriber.next(result); subscriber.complete(); },
+        () => { subscriber.next(null); subscriber.complete(); }
+      );
+    });
   }
 
   /**
@@ -303,7 +364,6 @@ export class DoorwayAdminService {
   getAccount(): Observable<AccountResponse | null> {
     return this.http.get<AccountResponse>(`${this.baseUrl}/auth/account`).pipe(
       timeout(this.timeout),
-      retry(1),
       catchError(this.handleError<AccountResponse | null>('getAccount', null))
     );
   }

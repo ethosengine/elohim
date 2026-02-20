@@ -34,41 +34,49 @@
   }
 
   <!-- Main Content -->
-  @if (cluster()) {
+  @if (cluster() || !orchestratorAvailable()) {
     <!-- Quick Stats -->
-    <section class="quick-stats">
-      <div class="stat-card">
-        <div class="stat-value">{{ cluster()?.onlineNodes }}/{{ cluster()?.totalNodes }}</div>
-        <div class="stat-label">Nodes Online</div>
-        <div class="stat-bar">
-          <div class="stat-bar-fill health" [style.width.%]="(cluster()?.healthRatio ?? 0) * 100"></div>
+    @if (orchestratorAvailable()) {
+      <section class="quick-stats">
+        <div class="stat-card">
+          <div class="stat-value">{{ cluster()?.onlineNodes }}/{{ cluster()?.totalNodes }}</div>
+          <div class="stat-label">Nodes Online</div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill health" [style.width.%]="(cluster()?.healthRatio ?? 0) * 100"></div>
+          </div>
         </div>
-      </div>
 
-      <div class="stat-card">
-        <div class="stat-value">{{ formatPercent(cluster()?.avgTrustScore ?? null) }}</div>
-        <div class="stat-label">Avg Trust Score</div>
-        <div class="stat-bar">
-          <div class="stat-bar-fill trust" [style.width.%]="(cluster()?.avgTrustScore ?? 0) * 100"></div>
+        <div class="stat-card">
+          <div class="stat-value">{{ formatPercent(cluster()?.avgTrustScore ?? null) }}</div>
+          <div class="stat-label">Avg Trust Score</div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill trust" [style.width.%]="(cluster()?.avgTrustScore ?? 0) * 100"></div>
+          </div>
         </div>
-      </div>
 
-      <div class="stat-card">
-        <div class="stat-value">{{ formatPercent(cluster()?.avgImpactScore ?? null) }}</div>
-        <div class="stat-label">Avg Impact Score</div>
-        <div class="stat-bar">
-          <div class="stat-bar-fill impact" [style.width.%]="(cluster()?.avgImpactScore ?? 0) * 100"></div>
+        <div class="stat-card">
+          <div class="stat-value">{{ formatPercent(cluster()?.avgImpactScore ?? null) }}</div>
+          <div class="stat-label">Avg Impact Score</div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill impact" [style.width.%]="(cluster()?.avgImpactScore ?? 0) * 100"></div>
+          </div>
         </div>
-      </div>
 
-      <div class="stat-card">
-        <div class="stat-value">{{ formatPercent(cluster()?.clusterDeliverySuccessRate ?? null) }}</div>
-        <div class="stat-label">Delivery Success</div>
-        <div class="stat-bar">
-          <div class="stat-bar-fill success" [style.width.%]="(cluster()?.clusterDeliverySuccessRate ?? 0) * 100"></div>
+        <div class="stat-card">
+          <div class="stat-value">{{ formatPercent(cluster()?.clusterDeliverySuccessRate ?? null) }}</div>
+          <div class="stat-label">Delivery Success</div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill success" [style.width.%]="(cluster()?.clusterDeliverySuccessRate ?? 0) * 100"></div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    } @else {
+      <section class="quick-stats">
+        <div class="stat-card unavailable-notice">
+          <div class="stat-label">Orchestrator not enabled on this doorway</div>
+        </div>
+      </section>
+    }
 
     <!-- Tabs -->
     <nav class="tabs">
@@ -120,7 +128,13 @@
     <div class="tab-content">
       <!-- Overview Tab -->
       @if (activeTab() === 'overview') {
+        @if (!orchestratorAvailable()) {
+          <div class="empty-state">
+            <p>Orchestrator not enabled on this doorway</p>
+          </div>
+        }
         <div class="overview-grid">
+          @if (orchestratorAvailable()) {
           <!-- Capacity Card -->
           <div class="card">
             <h3>Cluster Capacity</h3>
@@ -202,6 +216,8 @@
             }
           </div>
 
+          }
+
           <!-- Custodian Network Card -->
           @if (custodians()) {
             <div class="card">
@@ -228,6 +244,7 @@
           }
 
           <!-- Human Scale Card -->
+          @if (orchestratorAvailable()) {
           <div class="card human-scale">
             <h3>Human Scale Metrics</h3>
             <div class="human-stats">
@@ -241,11 +258,17 @@
               </div>
             </div>
           </div>
+          }
         </div>
       }
 
       <!-- Nodes Tab -->
       @if (activeTab() === 'nodes') {
+        @if (!orchestratorAvailable()) {
+          <div class="empty-state">
+            <p>Orchestrator not enabled on this doorway</p>
+          </div>
+        } @else {
         <div class="nodes-panel">
           <!-- Filters -->
           <div class="filters">
@@ -328,10 +351,16 @@
             </tbody>
           </table>
         </div>
+        }
       }
 
       <!-- Resources Tab -->
       @if (activeTab() === 'resources') {
+        @if (!orchestratorAvailable()) {
+          <div class="empty-state">
+            <p>Orchestrator not enabled on this doorway</p>
+          </div>
+        } @else {
         <div class="resources-panel">
           @if (resources()) {
             <div class="resource-grid">
@@ -426,6 +455,7 @@
             </div>
           }
         </div>
+        }
       }
 
       <!-- Pipeline Tab -->

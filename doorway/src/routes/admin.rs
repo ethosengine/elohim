@@ -770,6 +770,41 @@ pub async fn handle_admin_pipeline(state: Arc<AppState>) -> Response<Full<Bytes>
     )
 }
 
+// ============================================================================
+// Capabilities
+// ============================================================================
+
+/// Feature flags derived from optional AppState fields
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilitiesResponse {
+    /// Orchestrator is available (cluster management, node health, provisioning)
+    pub orchestrator: bool,
+    /// Federation is available (peer doorways, NATS messaging)
+    pub federation: bool,
+    /// Conductor pool is available (hosted agent connections)
+    pub conductor_pool: bool,
+    /// NATS messaging is available
+    pub nats: bool,
+}
+
+/// Handle GET /admin/capabilities
+///
+/// Returns feature flags derived from optional AppState fields so the
+/// dashboard can discover available features upfront instead of hitting
+/// 503 errors on individual endpoints.
+///
+/// This endpoint does NOT require authentication.
+pub async fn handle_capabilities(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let response = CapabilitiesResponse {
+        orchestrator: state.orchestrator.is_some(),
+        federation: state.nats.is_some(),
+        conductor_pool: state.pool.is_some() || state.admin_pool.is_some(),
+        nats: state.nats.is_some(),
+    };
+    json_response(StatusCode::OK, response)
+}
+
 fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Bytes>> {
     match serde_json::to_string_pretty(&body) {
         Ok(json) => Response::builder()

@@ -426,6 +426,20 @@ export interface GraduationCompletedResponse {
 }
 
 // ============================================================================
+// Capabilities Models
+// ============================================================================
+
+/**
+ * Server capabilities from GET /admin/capabilities
+ */
+export interface CapabilitiesResponse {
+  orchestrator: boolean;
+  federation: boolean;
+  conductorPool: boolean;
+  nats: boolean;
+}
+
+// ============================================================================
 // Account Models
 // ============================================================================
 

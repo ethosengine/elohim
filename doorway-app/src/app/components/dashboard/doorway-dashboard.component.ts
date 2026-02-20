@@ -74,6 +74,9 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   readonly selectedUser = signal<UserDetails | null>(null);
   readonly showUserDetail = signal(false);
 
+  // Orchestrator availability from capabilities
+  readonly orchestratorAvailable = this.adminService.orchestratorAvailable;
+
   // Connection state
   readonly connectionState = this.adminService.connectionState;
   readonly isConnected = this.adminService.isConnected;
@@ -156,9 +159,13 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
   readonly Math = Math; // Expose Math for template
 
   async ngOnInit(): Promise<void> {
+    await this.adminService.loadCapabilities();
     await this.loadData();
     this.startRefresh();
-    this.adminService.connect();
+    // Only connect WebSocket if orchestrator is available (WS endpoint requires it)
+    if (this.orchestratorAvailable()) {
+      this.adminService.connect();
+    }
   }
 
   ngOnDestroy(): void {
@@ -355,20 +362,26 @@ export class DoorwayDashboardComponent implements OnInit, OnDestroy {
     this.error.set(null);
 
     try {
-      // Load all data in parallel
-      const [nodesRes, cluster, resources, custodians] = await Promise.all([
-        this.adminService.getNodes().toPromise(),
-        this.adminService.getClusterMetrics().toPromise(),
-        this.adminService.getResources().toPromise(),
-        this.adminService.getCustodians().toPromise(),
-      ]);
+      if (this.orchestratorAvailable()) {
+        // Load all data including orchestrator endpoints
+        const [nodesRes, cluster, resources, custodians] = await Promise.all([
+          this.adminService.getNodes().toPromise(),
+          this.adminService.getClusterMetrics().toPromise(),
+          this.adminService.getResources().toPromise(),
+          this.adminService.getCustodians().toPromise(),
+        ]);
 
-      if (nodesRes) {
-        this.nodes.set(nodesRes.nodes);
+        if (nodesRes) {
+          this.nodes.set(nodesRes.nodes);
+        }
+        this.cluster.set(cluster ?? null);
+        this.resources.set(resources ?? null);
+        this.custodians.set(custodians ?? null);
+      } else {
+        // Only load non-orchestrator data
+        const custodians = await this.adminService.getCustodians().toPromise();
+        this.custodians.set(custodians ?? null);
       }
-      this.cluster.set(cluster ?? null);
-      this.resources.set(resources ?? null);
-      this.custodians.set(custodians ?? null);
     } catch (e) {
       console.error('[Dashboard] Failed to load data:', e);
       this.error.set('Failed to load dashboard data');
