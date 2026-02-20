@@ -707,36 +707,29 @@ export function calculateFreshness(masteryLevel: number, ageSeconds: number): nu
 // ============================================================================
 
 let wasmModule: WasmModule | null = null;
-let wasmInitPromise: Promise<WasmModule | null> | null = null;
+let wasmLoadAttempted = false;
 
 /**
  * Load WASM module (internal).
- * Caches the module for reuse.
+ * Attempts once per session — WASM unavailability is expected in most environments.
  */
 async function loadWasmModule(wasmPath?: string): Promise<WasmModule | null> {
   if (wasmModule) return wasmModule;
-  if (wasmInitPromise) return wasmInitPromise;
+  if (wasmLoadAttempted) return null;
 
-  wasmInitPromise = (async () => {
-    try {
-      // Dynamic import of WASM module from assets path
-      // In browser: loads from /wasm/holochain-cache-core/
-      // Falls back to TypeScript if WASM not available
-      const path = wasmPath || '/wasm/holochain-cache-core/holochain_cache_core.js';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const module: any = await import(/* webpackIgnore: true */ path);
-      await module.default();
-      wasmModule = module as WasmModule;
-      console.log('[elohim-cache] WASM module loaded successfully');
-      return wasmModule;
-    } catch (error) {
-      console.warn('[elohim-cache] WASM module not available, using TypeScript fallback:', error);
-      wasmInitPromise = null;
-      return null;
-    }
-  })();
+  wasmLoadAttempted = true;
 
-  return wasmInitPromise;
+  try {
+    const path = wasmPath || '/wasm/holochain-cache-core/holochain_cache_core.js';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const module: any = await import(/* webpackIgnore: true */ path);
+    await module.default();
+    wasmModule = module as WasmModule;
+    return wasmModule;
+  } catch {
+    // WASM unavailability is expected — TypeScript fallback is used
+    return null;
+  }
 }
 
 /**
