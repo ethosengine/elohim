@@ -1048,7 +1048,7 @@ spec:
         }
 
         stage('E2E Federation Smoke (Advisory)') {
-            when { expression { buildResults.any { it.value.success } } }
+            when { expression { readJSON(text: env.BUILD_RESULTS ?: '{}').any { it.value?.success } } }
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     container('builder') {
@@ -1077,7 +1077,7 @@ spec:
         }
 
         stage('BDD Coverage Gap (Advisory)') {
-            when { expression { buildResults.any { it.value.success } } }
+            when { expression { readJSON(text: env.BUILD_RESULTS ?: '{}').any { it.value?.success } } }
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     container('builder') {
