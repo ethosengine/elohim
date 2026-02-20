@@ -26,7 +26,9 @@ import { IdentityService } from '../../services/identity.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
 
 /** Extended connection status including transient states */
-export type ConnectionMode = IdentityMode | 'connecting' | 'offline';
+export type ConnectionMode = IdentityMode | 'connecting' | 'reconnecting' | 'offline' | 'local';
+
+const CSS_STATUS_CONNECTING = 'status-connecting';
 
 export interface ConnectionStatus {
   mode: ConnectionMode;
@@ -63,7 +65,7 @@ export class ConnectionIndicatorComponent implements OnInit {
     const holochainState = this.holochainService.state();
     const selectedDoorway = this.doorwayRegistry.selected();
 
-    // Graduating state (during stewardship confirmation)
+    // 1. Graduating state (transient override during stewardship confirmation)
     if (this.tauriAuth.graduationStatus() === 'confirming') {
       return {
         mode: 'migrating' as ConnectionMode,
@@ -74,31 +76,78 @@ export class ConnectionIndicatorComponent implements OnInit {
       };
     }
 
-    // Connecting state
+    // 2. Session mode — doesn't depend on holochain
+    if (identityMode === 'session') {
+      return {
+        mode: 'session',
+        label: 'Human Session',
+        icon: 'face',
+        color: '#8b5cf6',
+        cssClass: 'status-session',
+      };
+    }
+
+    // 3. Connecting / authenticating
     if (holochainState === 'connecting' || holochainState === 'authenticating') {
       return {
         mode: 'connecting',
         label: 'Connecting',
         icon: 'sync',
         color: '#eab308',
-        cssClass: 'status-connecting',
+        cssClass: CSS_STATUS_CONNECTING,
       };
     }
 
-    // Steward mode (local node connected)
-    if (identityMode === 'steward' && holochainState === 'connected') {
+    // 4. Error — context-aware label (no longer hidden by hosted check)
+    if (holochainState === 'error') {
+      const doorwayName = selectedDoorway?.doorway?.name;
+      return {
+        mode: 'offline',
+        label: doorwayName ? `${doorwayName} (Error)` : 'Offline',
+        icon: 'cloud_off',
+        color: '#ef4444',
+        cssClass: 'status-offline',
+        doorwayName: doorwayName ?? undefined,
+      };
+    }
+
+    // 5. Reconnecting
+    if (holochainState === 'reconnecting') {
+      return {
+        mode: 'reconnecting',
+        label: 'Reconnecting',
+        icon: 'sync',
+        color: '#eab308',
+        cssClass: CSS_STATUS_CONNECTING,
+      };
+    }
+
+    // 6. Steward + connected + peers > 0
+    if (identityMode === 'steward' && holochainState === 'connected' && this.peerCount() > 0) {
       return {
         mode: 'steward',
         label: 'Steward',
-        icon: 'shield',
+        icon: 'hub',
         color: '#22c55e',
         cssClass: 'status-local',
         peerCount: this.peerCount(),
       };
     }
 
-    // Hosted mode (via doorway)
-    if (identityMode === 'hosted') {
+    // 7. Steward + connected + no peers (local only)
+    if (identityMode === 'steward' && holochainState === 'connected') {
+      return {
+        mode: 'local',
+        label: 'Steward (Local)',
+        icon: 'laptop_mac',
+        color: '#64748b',
+        cssClass: 'status-local-only',
+        peerCount: 0,
+      };
+    }
+
+    // 8. Hosted + connected (gated on connected — was the root bug)
+    if (identityMode === 'hosted' && holochainState === 'connected') {
       const doorwayName = selectedDoorway?.doorway?.name ?? 'Doorway';
       return {
         mode: 'hosted',
@@ -111,35 +160,13 @@ export class ConnectionIndicatorComponent implements OnInit {
       };
     }
 
-    // Offline/error mode
-    if (holochainState === 'error') {
-      return {
-        mode: 'offline',
-        label: 'Offline',
-        icon: 'cloud_off',
-        color: '#ef4444',
-        cssClass: 'status-offline',
-      };
-    }
-
-    // Human Session mode (participant with browser-based identity)
-    if (identityMode === 'session') {
-      return {
-        mode: 'session',
-        label: 'Human Session',
-        icon: 'face',
-        color: '#8b5cf6', // Purple for session - valued but not yet on-chain
-        cssClass: 'status-session',
-      };
-    }
-
-    // Default connecting state
+    // 9. Default connecting state
     return {
       mode: 'connecting',
       label: 'Connecting',
       icon: 'sync',
       color: '#eab308',
-      cssClass: 'status-connecting',
+      cssClass: CSS_STATUS_CONNECTING,
     };
   });
 

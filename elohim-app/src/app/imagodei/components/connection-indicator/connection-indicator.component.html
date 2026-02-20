@@ -9,7 +9,10 @@
     <span class="status-dot" [style.backgroundColor]="status().color"></span>
 
     <!-- Icon -->
-    <span class="material-icons status-icon" [class.spinning]="status().mode === 'connecting'">
+    <span
+      class="material-icons status-icon"
+      [class.spinning]="status().mode === 'connecting' || status().mode === 'reconnecting'"
+    >
       {{ status().icon }}
     </span>
 
@@ -38,7 +41,10 @@
         <p class="tooltip-description">
           @switch (status().mode) {
             @case ('steward') {
-              Running on your local Holochain node. Full stewardship of your identity.
+              Connected to the P2P network via your local node.
+            }
+            @case ('local') {
+              Local node running. Syncing will resume when peers are available.
             }
             @case ('hosted') {
               Connected via {{ status().doorwayName ?? 'doorway' }}. Hosted identity.
@@ -46,11 +52,18 @@
             @case ('connecting') {
               Establishing connection to the network...
             }
+            @case ('reconnecting') {
+              Connection lost. Attempting to reconnect...
+            }
             @case ('session') {
               You're exploring as a human in session. Your journey is saved locally.
             }
             @case ('offline') {
-              Not connected. Some features may be limited.
+              @if (status().doorwayName) {
+                Unable to reach {{ status().doorwayName }}. Some features may be limited.
+              } @else {
+                Not connected. Some features may be limited.
+              }
             }
             @default {
               Checking connection status...

@@ -19,7 +19,7 @@ use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::auth::{extract_token_from_header, JwtValidator, TokenInput};
 use crate::conductor::{AdminClient, AgentProvisioner};
@@ -208,20 +208,54 @@ pub async fn handle_hc_connect(
         "Chaperone: resolved conductor"
     );
 
-    // --- Step 3: Create AdminClient and get app info ---
+    // --- Step 3: Create AdminClient and get app info (with cell readiness polling) ---
     let admin = AdminClient::new(admin_url);
 
-    let app_info = match admin.get_app_info(&installed_app_id).await {
-        Ok(info) => info,
-        Err(e) => {
-            error!("Chaperone: get_app_info failed: {}", e);
-            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info");
+    let app_info = {
+        let max_polls = 10;
+        let poll_interval = std::time::Duration::from_millis(500);
+        let mut last_info = None;
+
+        for attempt in 1..=max_polls {
+            match admin.get_app_info(&installed_app_id).await {
+                Ok(info) => {
+                    if !info.cell_ids.is_empty() {
+                        last_info = Some(info);
+                        break;
+                    }
+                    // Cells not ready yet — keep polling
+                    if attempt < max_polls {
+                        debug!(app = %installed_app_id, attempt, "Waiting for cells to initialize...");
+                        tokio::time::sleep(poll_interval).await;
+                    } else {
+                        last_info = Some(info); // Last attempt — use whatever we got
+                    }
+                }
+                Err(e) => {
+                    if attempt == max_polls {
+                        error!(
+                            "Chaperone: get_app_info failed after {} attempts: {}",
+                            max_polls, e
+                        );
+                        return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info");
+                    }
+                    debug!(app = %installed_app_id, attempt, "get_app_info not ready yet, retrying...");
+                    tokio::time::sleep(poll_interval).await;
+                }
+            }
+        }
+
+        match last_info {
+            Some(info) if !info.cell_ids.is_empty() => info,
+            Some(_) => {
+                return json_error(
+                    StatusCode::BAD_GATEWAY,
+                    "No cells found in app after polling",
+                )
+            }
+            None => return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info"),
         }
     };
-
-    if app_info.cell_ids.is_empty() {
-        return json_error(StatusCode::BAD_GATEWAY, "No cells found in app");
-    }
 
     // --- Step 4: Grant capabilities per cell ---
     for (role_name, (ref dna_hash, ref agent_key)) in &app_info.cell_ids {

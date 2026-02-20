@@ -145,6 +145,9 @@ impl AgentProvisioner {
             ));
         }
 
+        // Brief pause to let cell genesis begin before chaperone checks cells
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
         // 6. Register agent→conductor mapping (both encodings for format compat)
         if let Err(e) = self
             .registry
