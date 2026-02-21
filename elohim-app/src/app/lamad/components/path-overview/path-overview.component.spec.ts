@@ -144,6 +144,8 @@ describe('PathOverviewComponent', () => {
   ];
 
   beforeEach(async () => {
+    localStorage.clear();
+
     const pathServiceSpy = jasmine.createSpyObj('PathService', [
       'getPath',
       'getAccessibleSteps',

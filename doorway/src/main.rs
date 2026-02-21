@@ -9,8 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use doorway::{
     conductor::{
-        admin_client::AdminClient, ConductorInfo, ConductorPoolMap, ConductorRegistry,
-        ConductorRouter,
+        ConductorInfo, ConductorPoolMap, ConductorRegistry, ConductorRouter, TypedAdminClient,
     },
     config::Args,
     db::MongoClient,
@@ -625,7 +624,31 @@ async fn discover_existing_agents(registry: &ConductorRegistry, conductor_urls: 
     for (i, url) in conductor_urls.iter().enumerate() {
         let conductor_id = format!("conductor-{i}");
         let admin_url = derive_admin_url_from_app(url);
-        let admin = AdminClient::new(admin_url.clone()).with_timeout(Duration::from_secs(10));
+        let admin = match tokio::time::timeout(
+            Duration::from_secs(10),
+            TypedAdminClient::connect(&admin_url),
+        )
+        .await
+        {
+            Ok(Ok(client)) => client,
+            Ok(Err(e)) => {
+                warn!(
+                    conductor = %conductor_id,
+                    admin_url = %admin_url,
+                    error = %e,
+                    "Agent discovery: failed to connect to conductor"
+                );
+                continue;
+            }
+            Err(_) => {
+                warn!(
+                    conductor = %conductor_id,
+                    admin_url = %admin_url,
+                    "Agent discovery: connection timed out"
+                );
+                continue;
+            }
+        };
 
         match admin.list_apps().await {
             Ok(apps) => {

@@ -343,6 +343,22 @@ export class HolochainClientService {
         error: errorMessage,
       });
 
+      // Schedule reconnect for retriable chaperone/conductor errors
+      // instead of leaving the user in a terminal error state
+      const isRetriable =
+        errorMessage.includes('502') ||
+        errorMessage.includes('503') ||
+        errorMessage.includes('genesis') ||
+        errorMessage.includes('temporarily unavailable') ||
+        errorMessage.includes('No cells found');
+      if (isRetriable && this.reconnectConfig.enabled && !this.isReconnecting) {
+        this.logger.info('Retriable connection error — scheduling reconnect', {
+          error: errorMessage,
+        });
+        this.scheduleReconnect();
+        return; // Don't throw — let reconnect handle it
+      }
+
       throw err;
     }
   }

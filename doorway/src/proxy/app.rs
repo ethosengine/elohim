@@ -27,12 +27,13 @@ pub async fn run_proxy(
     conductor_host: &str,
 ) -> Result<()> {
     // Build app interface URL using the conductor host (not hardcoded localhost)
-    // Strip Doorway-specific params (apiKey) but keep conductor params
+    // Strip Doorway-specific params (apiKey, token) — these are for doorway auth/routing only.
+    // The real Holochain app auth token is sent by AppWebsocket in the WS handshake, not the URL.
     let mut app_url = format!("ws://{conductor_host}:{port}");
     if let Some(q) = query {
         let filtered: Vec<&str> = q
             .split('&')
-            .filter(|param| !param.starts_with("apiKey="))
+            .filter(|param| !param.starts_with("apiKey=") && !param.starts_with("token="))
             .collect();
         if !filtered.is_empty() {
             app_url = format!("{}?{}", app_url, filtered.join("&"));
