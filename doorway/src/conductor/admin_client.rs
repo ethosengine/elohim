@@ -41,6 +41,8 @@ pub struct AppInfoDetailed {
     pub agent_pub_key: Vec<u8>,
     /// Cell IDs keyed by role name
     pub cell_ids: Vec<(String, CellIdPair)>,
+    /// App status from conductor (e.g. "running", "disabled", "paused")
+    pub status: Option<String>,
 }
 
 /// Holochain admin API client using short-lived WebSocket connections.
@@ -275,10 +277,21 @@ impl AdminClient {
                         // Extract all cell IDs from cell_info
                         let cell_ids = extract_all_cells_from_cell_info(info);
 
+                        // Extract app status (e.g. "running", "disabled", "paused")
+                        let status = get_string_field(info, "status").or_else(|| {
+                            // Status may be nested: { "status": { "type": "running" } }
+                            if let Some(Value::Map(ref status_map)) = get_field(info, "status") {
+                                get_string_field(status_map, "type")
+                            } else {
+                                None
+                            }
+                        });
+
                         return Ok(AppInfoDetailed {
                             installed_app_id: app_id,
                             agent_pub_key,
                             cell_ids,
+                            status,
                         });
                     }
                 }
@@ -757,15 +770,68 @@ fn get_field<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
     None
 }
 
+/// Try to extract cell_id [dna_hash, agent_key] from a map that has a "cell_id" field.
+///
+/// Looks for `{ "cell_id": [<dna_bytes>, <agent_bytes>] }`.
+fn try_extract_cell_id(map: &[(Value, Value)]) -> Option<CellIdPair> {
+    if let Some(Value::Array(ref cell_id)) = get_field(map, "cell_id") {
+        if cell_id.len() >= 2 {
+            if let (Value::Binary(ref dna), Value::Binary(ref agent)) = (&cell_id[0], &cell_id[1]) {
+                return Some((dna.clone(), agent.clone()));
+            }
+        }
+    }
+    None
+}
+
+/// Extract a cell ID from a single CellInfo entry, handling multiple serialization formats.
+///
+/// Holochain's CellInfo enum can serialize in three ways depending on conductor version:
+/// 1. **Flat**: `{ "cell_id": [dna, agent] }` — direct cell info map
+/// 2. **Enum wrapper**: `{ "Provisioned": { "cell_id": [dna, agent] } }` — serde default for enums
+/// 3. **Tagged**: `{ "type": "provisioned", "value": { "cell_id": [dna, agent] } }` — alternate serde
+fn extract_cell_id_from_cell_entry(cell: &Value) -> Option<CellIdPair> {
+    let Value::Map(ref cell_map) = cell else {
+        return None;
+    };
+
+    // Format 1: Flat — { "cell_id": [dna, agent] }
+    if let Some(pair) = try_extract_cell_id(cell_map) {
+        return Some(pair);
+    }
+
+    // Format 2: Enum wrapper — { "Provisioned": { "cell_id": [dna, agent] } }
+    if let Some(Value::Map(ref inner)) = get_field(cell_map, "Provisioned") {
+        if let Some(pair) = try_extract_cell_id(inner) {
+            return Some(pair);
+        }
+    }
+
+    // Format 3: Tagged — { "type": "provisioned", "value": { "cell_id": [dna, agent] } }
+    if let Some(type_str) = get_string_field(cell_map, "type") {
+        if type_str.eq_ignore_ascii_case("provisioned") {
+            if let Some(Value::Map(ref inner)) = get_field(cell_map, "value") {
+                if let Some(pair) = try_extract_cell_id(inner) {
+                    return Some(pair);
+                }
+            }
+        }
+    }
+
+    None
+}
+
 /// Extract all provisioned cells from cell_info, returning (role_name, (dna_hash, agent_key)).
 ///
 /// Digs into cell_info → each role → Provisioned cells → cell_id [DnaHash, AgentPubKey].
+/// Handles flat, enum-wrapper, and tagged serialization formats.
 fn extract_all_cells_from_cell_info(app_info: &[(Value, Value)]) -> Vec<(String, CellIdPair)> {
     let mut cells = Vec::new();
     let Some(cell_info) = get_field(app_info, "cell_info") else {
         return cells;
     };
     if let Value::Map(ref roles) = cell_info {
+        let role_count = roles.len();
         for (role_key, role_cells) in roles {
             let role_name = if let Value::String(ref s) = role_key {
                 s.as_str().unwrap_or("unknown").to_string()
@@ -773,21 +839,29 @@ fn extract_all_cells_from_cell_info(app_info: &[(Value, Value)]) -> Vec<(String,
                 continue;
             };
             if let Value::Array(ref cell_list) = role_cells {
+                let mut found = false;
                 for cell in cell_list {
-                    if let Value::Map(ref cell_map) = cell {
-                        if let Some(Value::Array(ref cell_id)) = get_field(cell_map, "cell_id") {
-                            if cell_id.len() >= 2 {
-                                if let (Value::Binary(ref dna), Value::Binary(ref agent)) =
-                                    (&cell_id[0], &cell_id[1])
-                                {
-                                    cells.push((role_name.clone(), (dna.clone(), agent.clone())));
-                                    break; // First provisioned cell per role
-                                }
-                            }
-                        }
+                    if let Some(pair) = extract_cell_id_from_cell_entry(cell) {
+                        cells.push((role_name.clone(), pair));
+                        found = true;
+                        break; // First provisioned cell per role
                     }
                 }
+                if !found && !cell_list.is_empty() {
+                    tracing::warn!(
+                        role = %role_name,
+                        cell_entry = ?cell_list[0],
+                        "Failed to extract cell_id from cell_info entry — unknown format"
+                    );
+                }
             }
+        }
+        // Diagnostic: roles exist but no cells extracted
+        if role_count > 0 && cells.is_empty() {
+            tracing::warn!(
+                role_count,
+                "cell_info has roles but no cells could be extracted"
+            );
         }
     }
     cells
@@ -797,21 +871,15 @@ fn extract_all_cells_from_cell_info(app_info: &[(Value, Value)]) -> Vec<(String,
 ///
 /// Handles older Holochain versions where AppInfo lacks a top-level agent_pub_key.
 /// Digs into cell_info → first role → first Provisioned cell → cell_id[1] (AgentPubKey).
+/// Supports flat, enum-wrapper, and tagged serialization formats.
 fn extract_agent_from_cell_info(app_info: &[(Value, Value)]) -> Option<Vec<u8>> {
     let cell_info = get_field(app_info, "cell_info")?;
     if let Value::Map(ref roles) = cell_info {
         for (_, cells) in roles {
             if let Value::Array(ref cell_list) = cells {
                 for cell in cell_list {
-                    if let Value::Map(ref cell_map) = cell {
-                        // CellInfo::Provisioned contains cell_id: [DnaHash, AgentPubKey]
-                        if let Some(Value::Array(ref cell_id)) = get_field(cell_map, "cell_id") {
-                            if cell_id.len() >= 2 {
-                                if let Value::Binary(ref key) = cell_id[1] {
-                                    return Some(key.clone());
-                                }
-                            }
-                        }
+                    if let Some((_dna, agent)) = extract_cell_id_from_cell_entry(cell) {
+                        return Some(agent);
                     }
                 }
             }
@@ -1134,7 +1202,8 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_all_cells_from_cell_info() {
+    fn test_extract_all_cells_flat_format() {
+        // Format 1: Flat — { "cell_id": [dna, agent] }
         let dna1 = vec![0x01u8; 39];
         let dna2 = vec![0x02u8; 39];
         let agent = vec![0x84u8; 39];
@@ -1171,6 +1240,99 @@ mod tests {
         let role_names: Vec<&str> = cells.iter().map(|(name, _)| name.as_str()).collect();
         assert!(role_names.contains(&"lamad"));
         assert!(role_names.contains(&"imagodei"));
+    }
+
+    #[test]
+    fn test_extract_all_cells_enum_wrapper_format() {
+        // Format 2: Enum wrapper — { "Provisioned": { "cell_id": [dna, agent] } }
+        let dna = vec![0x01u8; 39];
+        let agent = vec![0x84u8; 39];
+
+        let app_info = vec![(
+            Value::String("cell_info".into()),
+            Value::Map(vec![(
+                Value::String("lamad".into()),
+                Value::Array(vec![Value::Map(vec![(
+                    Value::String("Provisioned".into()),
+                    Value::Map(vec![(
+                        Value::String("cell_id".into()),
+                        Value::Array(vec![
+                            Value::Binary(dna.clone()),
+                            Value::Binary(agent.clone()),
+                        ]),
+                    )]),
+                )])]),
+            )]),
+        )];
+
+        let cells = extract_all_cells_from_cell_info(&app_info);
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].0, "lamad");
+        assert_eq!(cells[0].1 .0, dna);
+        assert_eq!(cells[0].1 .1, agent);
+    }
+
+    #[test]
+    fn test_extract_all_cells_tagged_format() {
+        // Format 3: Tagged — { "type": "provisioned", "value": { "cell_id": [dna, agent] } }
+        let dna = vec![0x01u8; 39];
+        let agent = vec![0x84u8; 39];
+
+        let app_info = vec![(
+            Value::String("cell_info".into()),
+            Value::Map(vec![(
+                Value::String("lamad".into()),
+                Value::Array(vec![Value::Map(vec![
+                    (
+                        Value::String("type".into()),
+                        Value::String("provisioned".into()),
+                    ),
+                    (
+                        Value::String("value".into()),
+                        Value::Map(vec![(
+                            Value::String("cell_id".into()),
+                            Value::Array(vec![
+                                Value::Binary(dna.clone()),
+                                Value::Binary(agent.clone()),
+                            ]),
+                        )]),
+                    ),
+                ])]),
+            )]),
+        )];
+
+        let cells = extract_all_cells_from_cell_info(&app_info);
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].0, "lamad");
+        assert_eq!(cells[0].1 .0, dna);
+        assert_eq!(cells[0].1 .1, agent);
+    }
+
+    #[test]
+    fn test_extract_agent_enum_wrapper_format() {
+        // Extract agent from enum wrapper format
+        let agent_key = vec![0x84u8; 39];
+
+        let app_info = vec![(
+            Value::String("cell_info".into()),
+            Value::Map(vec![(
+                Value::String("content_store".into()),
+                Value::Array(vec![Value::Map(vec![(
+                    Value::String("Provisioned".into()),
+                    Value::Map(vec![(
+                        Value::String("cell_id".into()),
+                        Value::Array(vec![
+                            Value::Binary(vec![0u8; 39]),
+                            Value::Binary(agent_key.clone()),
+                        ]),
+                    )]),
+                )])]),
+            )]),
+        )];
+
+        let result = extract_agent_from_cell_info(&app_info);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), agent_key);
     }
 
     #[tokio::test]

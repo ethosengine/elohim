@@ -212,20 +212,52 @@ pub async fn handle_hc_connect(
     let admin = AdminClient::new(admin_url);
 
     let app_info = {
-        let max_polls = 10;
-        let poll_interval = std::time::Duration::from_millis(500);
+        let max_polls = 20;
+        let poll_interval = std::time::Duration::from_secs(1);
         let mut last_info = None;
+        let mut app_found = false;
 
         for attempt in 1..=max_polls {
             match admin.get_app_info(&installed_app_id).await {
                 Ok(info) => {
+                    app_found = true;
+
                     if !info.cell_ids.is_empty() {
+                        debug!(
+                            app = %installed_app_id,
+                            cells = info.cell_ids.len(),
+                            polls = attempt,
+                            "Cells ready"
+                        );
                         last_info = Some(info);
                         break;
                     }
+
+                    // App found but no cells yet — check if disabled
+                    if let Some(ref status) = info.status {
+                        if status.eq_ignore_ascii_case("disabled") {
+                            warn!(
+                                app = %installed_app_id,
+                                "App is disabled — attempting re-enable"
+                            );
+                            if let Err(e) = admin.enable_app(&installed_app_id).await {
+                                warn!(
+                                    app = %installed_app_id,
+                                    error = %e,
+                                    "Failed to re-enable disabled app"
+                                );
+                            }
+                        }
+                    }
+
                     // Cells not ready yet — keep polling
                     if attempt < max_polls {
-                        debug!(app = %installed_app_id, attempt, "Waiting for cells to initialize...");
+                        debug!(
+                            app = %installed_app_id,
+                            attempt,
+                            status = ?info.status,
+                            "Waiting for cells to initialize..."
+                        );
                         tokio::time::sleep(poll_interval).await;
                     } else {
                         last_info = Some(info); // Last attempt — use whatever we got
@@ -234,12 +266,20 @@ pub async fn handle_hc_connect(
                 Err(e) => {
                     if attempt == max_polls {
                         error!(
-                            "Chaperone: get_app_info failed after {} attempts: {}",
-                            max_polls, e
+                            conductor = %conductor_id,
+                            app = %installed_app_id,
+                            error = %e,
+                            attempts = max_polls,
+                            "Chaperone: get_app_info failed after all attempts"
                         );
                         return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info");
                     }
-                    debug!(app = %installed_app_id, attempt, "get_app_info not ready yet, retrying...");
+                    debug!(
+                        app = %installed_app_id,
+                        attempt,
+                        error = %e,
+                        "get_app_info not ready yet, retrying..."
+                    );
                     tokio::time::sleep(poll_interval).await;
                 }
             }
@@ -247,13 +287,32 @@ pub async fn handle_hc_connect(
 
         match last_info {
             Some(info) if !info.cell_ids.is_empty() => info,
-            Some(_) => {
+            Some(info) => {
+                warn!(
+                    conductor = %conductor_id,
+                    app = %installed_app_id,
+                    status = ?info.status,
+                    cell_count = info.cell_ids.len(),
+                    "Chaperone: no cells after {}s polling",
+                    max_polls
+                );
                 return json_error(
                     StatusCode::BAD_GATEWAY,
-                    "No cells found in app after polling",
-                )
+                    &format!(
+                        "No cells found in app '{}' on conductor '{}' after {}s (status: {:?})",
+                        installed_app_id, conductor_id, max_polls, info.status
+                    ),
+                );
             }
-            None => return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info"),
+            None => {
+                warn!(
+                    conductor = %conductor_id,
+                    app = %installed_app_id,
+                    app_found,
+                    "Chaperone: app info unavailable after polling"
+                );
+                return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info");
+            }
         }
     };
 

@@ -338,21 +338,66 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         .replace('ws://', 'http://')
         .replace(/\/$/, '');
 
-      const response = await fetch(`${baseUrl}/hc/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.doorwayToken}`,
-        },
-        body: JSON.stringify({
-          signingKey: this.toBase64(signingKey),
-          capSecret: this.toBase64(capSecret),
-        }),
+      const chaperoneUrl = `${baseUrl}/hc/connect`;
+      const chaperoneBody = JSON.stringify({
+        signingKey: this.toBase64(signingKey),
+        capSecret: this.toBase64(capSecret),
       });
+      const chaperoneHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.doorwayToken}`,
+      };
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Chaperone failed (${response.status}): ${errorBody}`);
+      // Retry on 502/503 (conductor not ready) and network errors
+      const maxRetries = 3;
+      const retryDelays = [2000, 4000, 8000];
+      let response: Response | undefined;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          response = await fetch(chaperoneUrl, {
+            method: 'POST',
+            headers: chaperoneHeaders,
+            body: chaperoneBody,
+          });
+
+          if (response.ok) {
+            break;
+          }
+
+          // Only retry on 502/503 — other errors are terminal
+          if (response.status !== 502 && response.status !== 503) {
+            const errorBody = await response.text();
+            throw new Error(`Chaperone failed (${response.status}): ${errorBody}`);
+          }
+
+          if (attempt < maxRetries) {
+            const errorBody = await response.text();
+            this.logger.warn(
+              `Chaperone returned ${response.status}, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${maxRetries}): ${errorBody}`
+            );
+            await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+          } else {
+            const errorBody = await response.text();
+            throw new Error(
+              `Chaperone failed after ${maxRetries} retries (${response.status}): ${errorBody}`
+            );
+          }
+        } catch (err) {
+          // Retry on network errors (TypeError from fetch)
+          if (err instanceof TypeError && attempt < maxRetries) {
+            this.logger.warn(
+              `Chaperone network error, retrying in ${retryDelays[attempt]}ms (attempt ${attempt + 1}/${maxRetries}): ${err.message}`
+            );
+            await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!response?.ok) {
+        throw new Error('Chaperone failed: no successful response after retries');
       }
 
       const data = (await response.json()) as {

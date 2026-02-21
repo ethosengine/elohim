@@ -10,7 +10,7 @@
 //! Provisioning failure is non-fatal — registration falls back to local key generation.
 
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use super::admin_client::AdminClient;
 use super::registry::ConductorRegistry;
@@ -145,10 +145,71 @@ impl AgentProvisioner {
             ));
         }
 
-        // Brief pause to let cell genesis begin before chaperone checks cells
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        // 6. Verify cells are ready before returning (cell genesis can take seconds)
+        {
+            let max_polls = 30;
+            let poll_interval = std::time::Duration::from_millis(500);
+            let mut cells_ready = false;
 
-        // 6. Register agent→conductor mapping (both encodings for format compat)
+            for attempt in 1..=max_polls {
+                match admin.get_app_info(&installed_app_id).await {
+                    Ok(info) if !info.cell_ids.is_empty() => {
+                        let role_names: Vec<&str> =
+                            info.cell_ids.iter().map(|(r, _)| r.as_str()).collect();
+                        info!(
+                            conductor = %conductor.conductor_id,
+                            app_id = %installed_app_id,
+                            cell_count = info.cell_ids.len(),
+                            roles = ?role_names,
+                            polls = attempt,
+                            "Cell genesis complete — cells ready"
+                        );
+                        cells_ready = true;
+                        break;
+                    }
+                    Ok(_) => {
+                        debug!(
+                            app_id = %installed_app_id,
+                            attempt,
+                            max_polls,
+                            "Waiting for cell genesis..."
+                        );
+                    }
+                    Err(e) => {
+                        debug!(
+                            app_id = %installed_app_id,
+                            attempt,
+                            error = %e,
+                            "get_app_info not ready yet during genesis poll"
+                        );
+                    }
+                }
+                tokio::time::sleep(poll_interval).await;
+            }
+
+            if !cells_ready {
+                warn!(
+                    conductor = %conductor.conductor_id,
+                    app_id = %installed_app_id,
+                    "Cell genesis timed out after {}s — cleaning up",
+                    max_polls as f64 * poll_interval.as_secs_f64()
+                );
+                if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
+                    warn!(
+                        "Cleanup uninstall after genesis timeout failed: {}",
+                        cleanup_err
+                    );
+                }
+                return Err(format!(
+                    "Cell genesis timed out on {} for app '{}' after {}s",
+                    conductor.conductor_id,
+                    installed_app_id,
+                    max_polls as f64 * poll_interval.as_secs_f64()
+                ));
+            }
+        }
+
+        // 7. Register agent→conductor mapping (both encodings for format compat)
         if let Err(e) = self
             .registry
             .register_agent(
