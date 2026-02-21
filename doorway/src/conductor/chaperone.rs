@@ -316,6 +316,10 @@ pub async fn handle_hc_connect(
         }
     };
 
+    // Track whether we've already attempted a re-enable for CellDisabled errors.
+    // Only try once per connect — if it doesn't help, the cells need manual attention.
+    let mut reenable_attempted = false;
+
     // --- Step 4: Grant capabilities per cell ---
     for (role_name, (ref dna_hash, ref agent_key)) in &app_info.cell_ids {
         let role = role_name.clone();
@@ -325,7 +329,7 @@ pub async fn handle_hc_connect(
         let sk = signing_key.clone();
         let cs = cap_secret.clone();
 
-        if let Err(e) = AdminClient::with_source_chain_retry(
+        let grant_result = AdminClient::with_source_chain_retry(
             || {
                 let admin_inner = AdminClient::new(admin.admin_url().to_string());
                 let dna = dna.clone();
@@ -342,13 +346,72 @@ pub async fn handle_hc_connect(
             &format!("cap grant for {role}"),
             3,
         )
-        .await
-        {
+        .await;
+
+        if let Err(e) = grant_result {
             // CellMissing is non-fatal — skip that cell
             if e.contains("CellMissing") {
                 warn!("Chaperone: skipping cap grant for '{}': CellMissing", role);
                 continue;
             }
+
+            // CellDisabled — attempt to re-enable the app and retry once
+            if e.contains("CellDisabled") && !reenable_attempted {
+                reenable_attempted = true;
+                warn!(
+                    app = %installed_app_id,
+                    role = %role,
+                    "Cell is disabled — attempting app re-enable and retry"
+                );
+                if let Err(enable_err) = admin.enable_app(&installed_app_id).await {
+                    warn!(
+                        app = %installed_app_id,
+                        error = %enable_err,
+                        "Failed to re-enable app after CellDisabled"
+                    );
+                } else {
+                    // Wait briefly for cells to come back online
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+                    // Retry the cap grant for this cell
+                    let retry_admin = AdminClient::new(admin.admin_url().to_string());
+                    match retry_admin
+                        .grant_zome_call_capability((dna_hash, agent_key), &cs, &sk, &tag)
+                        .await
+                    {
+                        Ok(()) => {
+                            info!(role = %role, "Cap grant succeeded after re-enable");
+                            continue;
+                        }
+                        Err(retry_err) => {
+                            if retry_err.contains("CellMissing")
+                                || retry_err.contains("CellDisabled")
+                            {
+                                warn!(
+                                    "Chaperone: skipping cap grant for '{}' after re-enable: {}",
+                                    role, retry_err
+                                );
+                                continue;
+                            }
+                            error!(
+                                "Chaperone: cap grant still failed for '{}' after re-enable: {}",
+                                role, retry_err
+                            );
+                            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Cap grant");
+                        }
+                    }
+                }
+            }
+
+            // CellDisabled after re-enable already attempted — skip
+            if e.contains("CellDisabled") {
+                warn!(
+                    "Chaperone: skipping cap grant for '{}': CellDisabled (re-enable already attempted)",
+                    role
+                );
+                continue;
+            }
+
             error!("Chaperone: cap grant failed for '{}': {}", role, e);
             return sanitize_client_error(StatusCode::BAD_GATEWAY, "Cap grant");
         }
@@ -362,7 +425,7 @@ pub async fn handle_hc_connect(
         let sk = signing_key.clone();
         let cs = cap_secret.clone();
 
-        if let Err(e) = AdminClient::with_source_chain_retry(
+        let auth_result = AdminClient::with_source_chain_retry(
             || {
                 let admin_inner = AdminClient::new(admin.admin_url().to_string());
                 let dna = dna.clone();
@@ -378,10 +441,12 @@ pub async fn handle_hc_connect(
             &format!("authorize credentials for {role}"),
             3,
         )
-        .await
-        {
-            if e.contains("CellMissing") {
-                warn!("Chaperone: skipping authorize for '{}': CellMissing", role);
+        .await;
+
+        if let Err(e) = auth_result {
+            // CellMissing or CellDisabled — non-fatal, skip
+            if e.contains("CellMissing") || e.contains("CellDisabled") {
+                warn!("Chaperone: skipping authorize for '{}': {}", role, e);
                 continue;
             }
             error!("Chaperone: authorize failed for '{}': {}", role, e);
