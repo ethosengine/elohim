@@ -68,9 +68,12 @@ components:
           value: /projects/.sonarqube-mcp
         - name: SONARQUBE_URL
           value: "https://sonarqube.ethosengine.com"
-        # GitHub CLI integration (GITHUB_TOKEN comes from K8s secret)
+        # GitHub CLI integration (from K8s secret)
         - name: GH_TOKEN
-          value: "${GITHUB_TOKEN}"
+          valueFrom:
+            secretKeyRef:
+              name: github-credentials
+              key: GH_TOKEN
         # Chrome for Angular testing
         - name: CHROME_BIN
           value: /usr/local/bin/chrome
