@@ -8,7 +8,7 @@
 #   4. Allow DNS resolution (kube-system)
 #
 # Apply per cluster:
-#   kubectl apply -f orchestrator/manifests/network-policies.yaml
+#   kubectl apply -f genesis/orchestrator/manifests/network-policies.yaml
 #
 # Prerequisites:
 #   - CNI plugin must support NetworkPolicy (Calico, Cilium, etc.)

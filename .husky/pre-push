@@ -12,7 +12,8 @@
 #   elohim-node/             → cargo fmt + clippy + tests
 #   elohim-library/          → tsc type-check + jest tests
 #   genesis/                 → schema validation + tests
-#   orchestrator/            → Jenkinsfile linting (any *Jenkinsfile* change)
+#   genesis/a2o/             → E2E lint + typecheck
+#   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
 # Falls back to inline commands if `just` is not installed.
 # This prevents pushing broken code that wastes CI time.
@@ -88,8 +89,8 @@ if echo "$CHANGED" | grep -q "Jenkinsfile"; then
   PROJECTS="$PROJECTS orchestrator"
 fi
 # E2E framework changes trigger TypeScript linting
-if echo "$CHANGED" | grep -q "^orchestrator/e2e/"; then
-  PROJECTS="$PROJECTS orchestrator-e2e"
+if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
+  PROJECTS="$PROJECTS genesis-a2o"
 fi
 
 # Trim leading space
@@ -159,7 +160,7 @@ run_gate() {
         npx npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
         rc=$?
         ;;
-      orchestrator-e2e)
+      genesis-a2o)
         npm run lint 2>&1 && npm run format:check 2>&1 && npm run typecheck 2>&1
         rc=$?
         ;;
@@ -199,7 +200,8 @@ for PROJECT in $PROJECTS; do
   case "$PROJECT" in
     elohim-storage)   PROJECT_DIR="holochain/elohim-storage" ;;
     genesis)          PROJECT_DIR="genesis/seeder" ;;
-    orchestrator-e2e) PROJECT_DIR="orchestrator/e2e" ;;
+    genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
+    orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
     *)                PROJECT_DIR="$PROJECT" ;;
   esac
 

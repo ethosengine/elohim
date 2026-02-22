@@ -8,7 +8,7 @@
 # ADVISORY ONLY — warns but never deletes. Always exits 0.
 #
 # Usage:
-#   bash orchestrator/scripts/detect-stale-resources.sh elohim-alpha abc1234 edgenode
+#   bash genesis/orchestrator/scripts/detect-stale-resources.sh elohim-alpha abc1234 edgenode
 #
 # Requires app.kubernetes.io/part-of and app.kubernetes.io/name labels
 # to be present on resources (added by the labeling improvement).

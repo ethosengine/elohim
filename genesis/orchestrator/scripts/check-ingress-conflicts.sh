@@ -6,7 +6,7 @@
 # Prevents the exact scenario where stale ingresses capture traffic.
 #
 # Usage:
-#   bash orchestrator/scripts/check-ingress-conflicts.sh manifest.yaml elohim-staging
+#   bash genesis/orchestrator/scripts/check-ingress-conflicts.sh manifest.yaml elohim-staging
 #
 # Exit codes:
 #   0 = no conflicts (or no ingress resources in manifest)

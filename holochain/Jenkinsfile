@@ -22,7 +22,7 @@
  *   - Fetches elohim.happ from elohim-holochain pipeline
  *   - Fallback: current branch → dev → main
  *
- * @see orchestrator/Jenkinsfile for central trigger logic
+ * @see genesis/orchestrator/Jenkinsfile for central trigger logic
  * @see holochain/dna/Jenkinsfile for DNA builds
  */
 
@@ -204,7 +204,7 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
     """
 
     // Pre-deploy: check for ingress hostname conflicts
-    sh "bash orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
+    sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
 
     sh "kubectl apply -f ${outputFile}"
     def resourceType = sh(
@@ -216,7 +216,7 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
 
     // Post-deploy: detect stale resources (advisory only)
     def componentName = resourceName.replace('elohim-', '')
-    sh "bash orchestrator/scripts/detect-stale-resources.sh ${namespace} ${deployVersion} ${componentName} || true"
+    sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${namespace} ${deployVersion} ${componentName} || true"
 }
 
 pipeline {
@@ -914,7 +914,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                             // Write environment manifest with current build tags
                             // (preserve SITE_TAG from git — app pipeline manages that independently)
-                            def envFile = 'orchestrator/environments/alpha.env'
+                            def envFile = 'genesis/orchestrator/environments/alpha.env'
                             def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
                             writeFile file: envFile, text: """# Alpha Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
@@ -927,11 +927,11 @@ DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
                             // Deploy infra (MongoDB + NATS) — idempotent
-                            sh "kubectl apply -f orchestrator/manifests/infra/alpha-mongodb.yaml"
-                            sh "kubectl apply -f orchestrator/manifests/infra/alpha-nats.yaml"
+                            sh "kubectl apply -f genesis/orchestrator/manifests/infra/alpha-mongodb.yaml"
+                            sh "kubectl apply -f genesis/orchestrator/manifests/infra/alpha-nats.yaml"
 
-                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/edgenode/alpha.yaml', envFile)
-                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'orchestrator/manifests/doorway/alpha.yaml', envFile, 'elohim-doorway')
+                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/edgenode/alpha.yaml', envFile)
+                            deployEdgeWithManifest('alpha', 'elohim-alpha', 'genesis/orchestrator/manifests/doorway/alpha.yaml', envFile, 'elohim-doorway')
 
                             sh 'sleep 15'
 
@@ -965,7 +965,7 @@ HAPP_TAG=${HAPP_TAG}
 
                         withBuildVars(props) {
                             echo "Deploying Edge Node to Staging: ${IMAGE_TAG}"
-                            def envFile = 'orchestrator/environments/staging.env'
+                            def envFile = 'genesis/orchestrator/environments/staging.env'
                             def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
                             writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
@@ -978,12 +978,12 @@ DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
                             // Deploy infra (MongoDB + NATS) — idempotent
-                            sh "kubectl apply -f orchestrator/manifests/infra/staging-mongodb.yaml"
-                            sh "kubectl apply -f orchestrator/manifests/infra/staging-nats.yaml"
+                            sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-mongodb.yaml"
+                            sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-nats.yaml"
 
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/edgenode/staging.yaml', envFile)
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/doorway/staging.yaml', envFile, 'elohim-doorway')
-                            deployEdgeWithManifest('staging', 'elohim-staging', 'orchestrator/manifests/doorway/staging-read.yaml', envFile, 'elohim-doorway-read')
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/edgenode/staging.yaml', envFile)
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/doorway/staging.yaml', envFile, 'elohim-doorway')
+                            deployEdgeWithManifest('staging', 'elohim-staging', 'genesis/orchestrator/manifests/doorway/staging-read.yaml', envFile, 'elohim-doorway-read')
                             sh 'sleep 15'
                             if (checkEdgeNodeHealth('https://doorway-staging.elohim.host')) {
                                 echo "Edge Node Staging deployed and healthy"
@@ -1061,7 +1061,7 @@ HAPP_TAG=${HAPP_TAG}
                             ═══════════════════════════════════════════════════════════
                             """
 
-                            def envFile = 'orchestrator/environments/prod.env'
+                            def envFile = 'genesis/orchestrator/environments/prod.env'
                             def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
                             writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
@@ -1073,7 +1073,7 @@ HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
 DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 """
-                            deployEdgeWithManifest('prod', 'elohim-prod', 'orchestrator/manifests/edgenode/prod.yaml', envFile)
+                            deployEdgeWithManifest('prod', 'elohim-prod', 'genesis/orchestrator/manifests/edgenode/prod.yaml', envFile)
 
                             sh 'sleep 15'
 

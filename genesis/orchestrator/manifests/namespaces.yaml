@@ -2,7 +2,7 @@
 #
 # Declarative namespace definitions for all environments.
 # Apply once per cluster:
-#   kubectl apply -f orchestrator/manifests/namespaces.yaml
+#   kubectl apply -f genesis/orchestrator/manifests/namespaces.yaml
 #
 # Environments:
 #   - alpha:   Development builds from dev branch

@@ -1,7 +1,7 @@
 /**
  * Parse executable feature files from the unified E2E location.
  *
- * All executable features now live in orchestrator/e2e/features/.
+ * All executable features now live in genesis/a2o/features/.
  * (Cypress has been migrated and removed.)
  *
  * Extracts @tag lines and Scenario: names.
@@ -17,7 +17,7 @@ interface FeatureSource {
   framework: 'cucumber-js';
 }
 
-const SOURCES: FeatureSource[] = [{ dir: 'orchestrator/e2e/features', framework: 'cucumber-js' }];
+const SOURCES: FeatureSource[] = [{ dir: 'genesis/a2o/features', framework: 'cucumber-js' }];
 
 async function walkFeatureFiles(dir: string): Promise<string[]> {
   try {

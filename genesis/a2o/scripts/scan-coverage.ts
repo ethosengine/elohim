@@ -387,7 +387,7 @@ function buildPrioritizedGaps(
     domain: c.epic,
     governanceLayer: c.layer,
     conceptualDensity: c.density,
-    suggestedFeatureFile: `orchestrator/e2e/features/${c.epic}/${c.layer}.feature`,
+    suggestedFeatureFile: `genesis/a2o/features/${c.epic}/${c.layer}.feature`,
     rationale: `${c.epic} has ${c.density} conceptual scenarios at the ${c.layer} layer with zero executable tests. High density = high value for first coverage.`,
   }));
 }

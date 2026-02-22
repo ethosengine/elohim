@@ -20,7 +20,7 @@
  * Artifact dependency:
  *   - Fetches holochain-cache-core WASM from elohim-holochain pipeline
  *
- * @see orchestrator/Jenkinsfile for central trigger logic
+ * @see genesis/orchestrator/Jenkinsfile for central trigger logic
  */
 
 // ============================================================================
@@ -101,7 +101,7 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
     """
 
     // Pre-deploy: check for ingress hostname conflicts
-    sh "bash orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
+    sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
 
     // Deploy and rollout
     sh "kubectl apply -f ${outputFile}"
@@ -117,7 +117,7 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
     """
 
     // Post-deploy: detect stale resources (advisory only)
-    sh "bash orchestrator/scripts/detect-stale-resources.sh ${namespace} ${imageTag} elohim-site || true"
+    sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${namespace} ${imageTag} elohim-site || true"
 
     echo "${environment} deployment completed!"
 }
@@ -900,7 +900,7 @@ VEOF
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('staging', 'elohim-staging', 'elohim-site-staging',
-                                'orchestrator/manifests/elohim-app/staging.yaml', IMAGE_TAG)
+                                'genesis/orchestrator/manifests/elohim-app/staging.yaml', IMAGE_TAG)
                         }
                     }
                 }
@@ -930,7 +930,7 @@ VEOF
                             """
 
                             deployAppToEnvironment('alpha', 'elohim-alpha', 'elohim-site-alpha',
-                                'orchestrator/manifests/elohim-app/alpha.yaml', IMAGE_TAG)
+                                'genesis/orchestrator/manifests/elohim-app/alpha.yaml', IMAGE_TAG)
 
                             echo """
                             ═══════════════════════════════════════════════════════════
@@ -1103,7 +1103,7 @@ VEOF
                         def props = loadBuildVars()
                         withBuildVars(props) {
                             deployAppToEnvironment('prod', 'elohim-prod', 'elohim-site',
-                                'orchestrator/manifests/elohim-app/prod.yaml', IMAGE_TAG)
+                                'genesis/orchestrator/manifests/elohim-app/prod.yaml', IMAGE_TAG)
                         }
                     }
                 }

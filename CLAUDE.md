@@ -155,7 +155,7 @@ Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for reque
 
 ## CI/CD
 
-Central orchestrator pattern: only `orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Pipeline definitions are in `orchestrator/Jenkinsfile`'s `PIPELINES` map.
+Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Pipeline definitions are in `genesis/orchestrator/Jenkinsfile`'s `PIPELINES` map.
 
 | Pipeline | Jenkinsfile | Trigger |
 |----------|-------------|---------|

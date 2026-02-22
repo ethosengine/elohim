@@ -47,10 +47,14 @@ This manifesto proposes technology that actively defends against corruption whil
 ├── Jenkinsfile               # CI/CD pipeline definition
 ├── VERSION                   # Semantic versioning
 │
-├── orchestrator/             # CI/CD Orchestrator
-│   ├── Jenkinsfile           # Central pipeline controller
-│   ├── environments/         # Environment configurations
-│   └── manifests/            # Orchestrator deployments
+├── genesis/
+│   ├── orchestrator/         # CI/CD Orchestrator
+│   │   ├── Jenkinsfile       # Central pipeline controller
+│   │   ├── environments/     # Environment configurations
+│   │   └── manifests/        # Orchestrator deployments
+│   ├── a2o/                  # Alpha-to-omega E2E validation
+│   ├── docs/                 # Genesis content (BDD scenarios)
+│   └── seeder/               # Content seeding tools
 │
 ├── genesis/                  # Content Pipeline: source → seed → validate
 │   ├── Jenkinsfile           # Seed + validate pipeline
@@ -211,7 +215,7 @@ Key abstractions: **Moment** (unit of content, not just "question") and **Recogn
 
 The repository uses a central orchestrator pattern. All GitHub webhooks go to the orchestrator, which analyzes changesets and triggers appropriate pipelines.
 
-See [`orchestrator/README.md`](./orchestrator/README.md) for pipeline architecture and configuration.
+See [`genesis/orchestrator/README.md`](./genesis/orchestrator/README.md) for pipeline architecture and configuration.
 
 ## Development
 

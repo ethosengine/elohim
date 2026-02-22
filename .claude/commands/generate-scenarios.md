@@ -8,12 +8,12 @@ Read the BDD coverage gap report and generate executable feature files + step de
 
 1. Read the gap report:
 ```
-orchestrator/e2e/reports/coverage-gap-report.json
+genesis/a2o/reports/coverage-gap-report.json
 ```
 
 If the report doesn't exist, run the scanner first:
 ```bash
-cd orchestrator/e2e && npx tsx scripts/scan-coverage.ts
+cd genesis/a2o && npx tsx scripts/scan-coverage.ts
 ```
 
 2. For the top N gaps (from `prioritizedGaps`, where N = `$ARGUMENTS` or 3):
@@ -28,8 +28,8 @@ Read these files to understand the conceptual scenarios.
 
 ### b. Read Existing Executable Features as Style Reference
 Read these files to match the executable style:
-- `orchestrator/e2e/features/federation/cross-doorway-content.feature` — feature file pattern
-- `orchestrator/e2e/steps/federation.steps.ts` — step definition pattern
+- `genesis/a2o/features/federation/cross-doorway-content.feature` — feature file pattern
+- `genesis/a2o/steps/federation.steps.ts` — step definition pattern
 
 ### c. Generate Feature Files
 Create `.feature` files at the `suggestedFeatureFile` path from the gap report.
@@ -46,7 +46,7 @@ Each generated feature should:
 - Add `@wip` tag to scenarios that need step definitions not yet implemented
 
 ### d. Generate Step Definition Skeletons
-Create skeleton step files at `orchestrator/e2e/steps/{epic}.steps.ts`.
+Create skeleton step files at `genesis/a2o/steps/{epic}.steps.ts`.
 
 Each skeleton should:
 - Import from `@cucumber/cucumber` (Given, When, Then)

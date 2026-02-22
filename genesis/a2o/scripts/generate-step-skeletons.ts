@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const E2E_ROOT = join(__dirname, '..');
 const GENERATED_DIR = join(E2E_ROOT, 'steps', 'generated');
-const GENESIS_PATHS = '../../genesis/docs/content/elohim-protocol/**/*.feature';
+const GENESIS_PATHS = '../docs/content/elohim-protocol/**/*.feature';
 
 interface ParsedSnippet {
   keyword: string; // Given, When, Then

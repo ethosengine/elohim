@@ -503,13 +503,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
 
                         // Install E2E driver dependencies
-                        dir('orchestrator/e2e') {
+                        dir('genesis/a2o') {
                             sh 'npm ci --prefer-offline 2>/dev/null || npm install'
                         }
 
                         // Always run API-level tests (@e2e tag, fast, no browser)
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                            dir('orchestrator/e2e') {
+                            dir('genesis/a2o') {
                                 sh """#!/bin/bash
                                     set -euo pipefail
 
@@ -533,7 +533,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         // Run BDD coverage gap scan (advisory)
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            dir('orchestrator/e2e') {
+                            dir('genesis/a2o') {
                                 sh """#!/bin/bash
                                     set -euo pipefail
 
@@ -546,7 +546,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         // Archive reports
                         archiveArtifacts(
-                            artifacts: 'orchestrator/e2e/reports/**',
+                            artifacts: 'genesis/a2o/reports/**',
                             allowEmptyArchive: true
                         )
                     }

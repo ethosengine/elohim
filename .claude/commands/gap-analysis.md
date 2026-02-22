@@ -6,12 +6,12 @@ Run the BDD coverage gap scanner and interpret the results for sprint planning.
 
 1. Run the scanner:
 ```bash
-cd orchestrator/e2e && npx tsx scripts/scan-coverage.ts
+cd genesis/a2o && npx tsx scripts/scan-coverage.ts
 ```
 
 2. Read the generated report:
 ```
-orchestrator/e2e/reports/coverage-gap-report.json
+genesis/a2o/reports/coverage-gap-report.json
 ```
 
 3. Present an interpreted analysis with:
