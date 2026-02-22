@@ -24,11 +24,8 @@
     "posttest:headless": "python3 scripts/update-coverage-annotations.py",
     "test:ci": "ng test --watch=false --browsers=ChromeHeadlessCI --code-coverage",
     "posttest:ci": "python3 scripts/update-coverage-annotations.py",
-    "cypress:open": "cypress open",
-    "cypress:run": "cypress run",
-    "e2e:local": "cypress run --env baseUrl=http://localhost:4200",
-    "e2e:dev": "cypress open --env baseUrl=http://localhost:4200",
-    "e2e:staging": "CYPRESS_baseUrl=https://staging.elohim.host cypress run",
+    "e2e": "cd ../orchestrator/e2e && npm test",
+    "e2e:browser": "cd ../orchestrator/e2e && npm run test:browser",
     "dev": "./scripts/hc-start.sh && ng serve --disable-host-check",
     "dev:seed": "./scripts/hc-start.sh --seed && ng serve --disable-host-check",
     "hc:start": "./scripts/hc-start.sh",
@@ -99,15 +96,11 @@
     "@angular-eslint/template-parser": "^19.3.0",
     "@angular/cli": "^19.2.15",
     "@angular/compiler-cli": "^19.2.0",
-    "@badeball/cypress-cucumber-preprocessor": "^22.1.0",
-    "@bahmutov/cypress-esbuild-preprocessor": "^2.2.2",
-    "@cypress/browserify-preprocessor": "^3.0.2",
     "@double-great/stylelint-a11y": "^3.0.3",
     "@eslint/js": "^9.39.2",
     "@types/jasmine": "~5.1.0",
     "@typescript-eslint/eslint-plugin": "^8.50.1",
     "@typescript-eslint/parser": "^8.50.1",
-    "cypress": "^13.15.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -129,18 +122,5 @@
     "stylelint-config-standard-scss": "^17.0.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.50.1"
-  },
-  "cypress-cucumber-preprocessor": {
-    "json": {
-      "enabled": true,
-      "output": "cypress/reports/cucumber-report.json"
-    },
-    "html": {
-      "enabled": true,
-      "output": "cypress/reports/cucumber-report.html"
-    },
-    "stepDefinitions": [
-      "cypress/e2e/step_definitions/**/*.js"
-    ]
   }
 }

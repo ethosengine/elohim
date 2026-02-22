@@ -1,8 +1,11 @@
-@epic:elohim-p2p-infrastructure @category:deployment @status:implemented
+@e2e @deployment @epic:elohim-p2p-infrastructure
 Feature: P2P Peer Validation
   As a deployment pipeline
   I want to validate that P2P peers are connected and syncing
   So that I can verify the distributed data layer is operational
+
+  Background:
+    Given doorway "alpha" is healthy at env "E2E_DOORWAY_ALPHA"
 
   Scenario: Doorway reports connected P2P peers
     Given the doorway health endpoint is accessible

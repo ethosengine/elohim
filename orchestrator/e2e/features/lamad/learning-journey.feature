@@ -1,10 +1,13 @@
+@e2e @lamad @browser-only
 Feature: Lamad Learning Journey
   As a learner (Traveler)
   I want to follow a curated path through the Elohim Protocol
   So that I can build understanding systematically without overwhelm
 
   Background:
-    Given I am a new traveler "Alice"
+    Given doorway "alpha" is healthy at env "E2E_DOORWAY_ALPHA"
+    And human "Alice" is on doorway "alpha" with device
+    And I am a new traveler "Alice"
     And the "Elohim Protocol" path exists
 
   Scenario: Starting a Journey

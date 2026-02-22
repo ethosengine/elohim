@@ -495,6 +495,65 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('E2E Verification') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+
+                        // Install E2E driver dependencies
+                        dir('orchestrator/e2e') {
+                            sh 'npm ci --prefer-offline 2>/dev/null || npm install'
+                        }
+
+                        // Always run API-level tests (@e2e tag, fast, no browser)
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('orchestrator/e2e') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "🧪 E2E VERIFICATION (API)"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo ""
+
+                                    E2E_DOORWAY_ALPHA="${doorwayHost}" \
+                                    E2E_DOORWAY_STAGING="${doorwayHost}" \
+                                        npx cucumber-js --tags '@e2e and not @browser-only' \
+                                        --format progress-bar \
+                                        --format json:reports/cucumber-report.json \
+                                        --format html:reports/cucumber-report.html
+
+                                    echo "✅ API E2E tests passed"
+                                """
+                            }
+                        }
+
+                        // Run BDD coverage gap scan (advisory)
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            dir('orchestrator/e2e') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+
+                                    echo ""
+                                    echo "📊 BDD Coverage Gap Scan"
+                                    npx tsx scripts/scan-coverage.ts --ci --suggest 5
+                                """
+                            }
+                        }
+
+                        // Archive reports
+                        archiveArtifacts(
+                            artifacts: 'orchestrator/e2e/reports/**',
+                            allowEmptyArchive: true
+                        )
+                    }
+                }
+            }
+        }
+
     }
 
     post {
