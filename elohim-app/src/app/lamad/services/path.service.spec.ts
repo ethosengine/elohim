@@ -3,6 +3,7 @@ import { of, throwError } from 'rxjs';
 import { PathService, AccessCheckResult } from './path.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from '@app/elohim/services/agent.service';
+import { ContentMasteryService } from './content-mastery.service';
 import { LearningPath, PathStep, PathStepView, PathIndex, ContentNode } from '../models';
 import { AgentProgress } from '@app/elohim/models/agent.model';
 
@@ -10,6 +11,7 @@ describe('PathService', () => {
   let service: PathService;
   let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
   let agentServiceSpy: jasmine.SpyObj<AgentService>;
+  let contentMasterySpy: jasmine.SpyObj<ContentMasteryService>;
 
   const mockPath: LearningPath = {
     id: 'test-path',
@@ -126,18 +128,25 @@ describe('PathService', () => {
       'getProgressForPath',
       'getAttestations',
     ]);
+    const contentMasterySpyObj = jasmine.createSpyObj('ContentMasteryService', [
+      'getMasteryLevelSync',
+    ]);
 
     TestBed.configureTestingModule({
       providers: [
         PathService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: AgentService, useValue: agentServiceSpyObj },
+        { provide: ContentMasteryService, useValue: contentMasterySpyObj },
       ],
     });
 
     service = TestBed.inject(PathService);
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
     agentServiceSpy = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+    contentMasterySpy = TestBed.inject(
+      ContentMasteryService
+    ) as jasmine.SpyObj<ContentMasteryService>;
 
     // Default spy return values
     dataLoaderSpy.getPath.and.returnValue(of(mockPath));
@@ -145,6 +154,7 @@ describe('PathService', () => {
     dataLoaderSpy.getPathIndex.and.returnValue(of(mockPathIndex));
     agentServiceSpy.getProgressForPath.and.returnValue(of(mockProgress));
     agentServiceSpy.getAttestations.and.returnValue([]);
+    contentMasterySpy.getMasteryLevelSync.and.returnValue('not_started');
   });
 
   it('should be created', () => {

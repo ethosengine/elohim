@@ -105,7 +105,13 @@ interface DoorwayStatus {
   hasKeyBundle: boolean;
 }
 
-export type TauriAuthStatus = 'idle' | 'checking' | 'needs_login' | 'needs_unlock' | 'authenticated' | 'error';
+export type TauriAuthStatus =
+  | 'idle'
+  | 'checking'
+  | 'needs_login'
+  | 'needs_unlock'
+  | 'authenticated'
+  | 'error';
 export type GraduationStatus = 'idle' | 'confirming' | 'confirmed' | 'error';
 
 @Injectable({
@@ -488,7 +494,12 @@ export class TauriAuthService {
   }> {
     // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     if (!window.__TAURI__?.core) {
-      return { success: false, needsRestart: false, isSteward: false, error: 'Tauri IPC not available' };
+      return {
+        success: false,
+        needsRestart: false,
+        isSteward: false,
+        error: 'Tauri IPC not available',
+      };
     }
 
     try {
@@ -542,10 +553,9 @@ export class TauriAuthService {
 
     try {
       // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
-      const result = await window.__TAURI__.core.invoke<DoorwayUnlockResult>(
-        'doorway_unlock',
-        { password }
-      );
+      const result = await window.__TAURI__.core.invoke<DoorwayUnlockResult>('doorway_unlock', {
+        password,
+      });
 
       this.isSteward.set(result.isSteward);
 
@@ -675,10 +685,9 @@ export class TauriAuthService {
     }
 
     // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
-    return await window.__TAURI__.core.invoke<{ needsRestart: boolean }>(
-      'doorway_switch_account',
-      { humanId }
-    );
+    return await window.__TAURI__.core.invoke<{ needsRestart: boolean }>('doorway_switch_account', {
+      humanId,
+    });
   }
 
   // ==========================================================================

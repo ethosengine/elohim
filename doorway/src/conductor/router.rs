@@ -51,18 +51,48 @@ impl ConductorRouter {
     /// Route an authenticated request to the correct conductor pool.
     ///
     /// 1. Look up agent_pub_key in ConductorRegistry
-    /// 2. If found, return that conductor's WorkerPool
-    /// 3. If not found, auto-assign to least-loaded conductor and persist
-    /// 4. If no conductors available, fall back to default pool
+    /// 2. If found and conductor has capacity, return that conductor's WorkerPool
+    /// 3. If conductor is at capacity (50-agent limit), overflow to healthiest pool
+    /// 4. If not found, auto-assign to least-loaded conductor with capacity
+    /// 5. If no conductors available, fall back to default pool
     pub async fn route(&self, agent_pub_key: &str) -> Arc<WorkerPool> {
         // Step 1: Check registry for existing assignment
         if let Some(entry) = self.registry.get_conductor_for_agent(agent_pub_key) {
             // Step 2: Get the pool for this conductor
             if let Some(pool) = self.pools.get_pool(&entry.conductor_id) {
-                debug!(
+                // Check if assigned conductor still has capacity
+                if self.pools.has_capacity(&entry.conductor_id) {
+                    debug!(
+                        agent = %agent_pub_key,
+                        conductor = %entry.conductor_id,
+                        "Routed to assigned conductor"
+                    );
+                    return pool;
+                }
+
+                // Step 3: Conductor at capacity — overflow to healthiest
+                warn!(
                     agent = %agent_pub_key,
                     conductor = %entry.conductor_id,
-                    "Routed to assigned conductor"
+                    agent_count = self.pools.agent_count(&entry.conductor_id),
+                    max = self.pools.max_agents_per_conductor(),
+                    "Conductor at capacity, attempting overflow routing"
+                );
+
+                if let Some((overflow_id, overflow_pool)) = self.pools.get_healthiest_pool() {
+                    info!(
+                        agent = %agent_pub_key,
+                        from_conductor = %entry.conductor_id,
+                        to_conductor = %overflow_id,
+                        "Overflow routed to healthiest conductor"
+                    );
+                    return overflow_pool;
+                }
+
+                // All conductors at capacity — still use assigned one
+                warn!(
+                    agent = %agent_pub_key,
+                    "All conductors at capacity, using assigned conductor anyway"
                 );
                 return pool;
             }
@@ -74,10 +104,8 @@ impl ConductorRouter {
             );
         }
 
-        // Step 3: Auto-assign to least-loaded conductor
-        if let Some(conductor) = self.registry.find_least_loaded() {
-            let conductor_id = conductor.conductor_id.clone();
-
+        // Step 4: Auto-assign to least-loaded conductor with capacity
+        if let Some((conductor_id, pool)) = self.pools.get_healthiest_pool() {
             // Persist the assignment
             match self
                 .registry
@@ -85,10 +113,12 @@ impl ConductorRouter {
                 .await
             {
                 Ok(()) => {
+                    self.pools.increment_agents(&conductor_id);
                     info!(
                         agent = %agent_pub_key,
                         conductor = %conductor_id,
-                        "Auto-assigned agent to least-loaded conductor"
+                        agent_count = self.pools.agent_count(&conductor_id),
+                        "Auto-assigned agent to healthiest conductor"
                     );
                 }
                 Err(e) => {
@@ -101,12 +131,42 @@ impl ConductorRouter {
                 }
             }
 
+            return pool;
+        }
+
+        // Fallback: try registry's find_least_loaded (covers conductors without pools)
+        if let Some(conductor) = self.registry.find_least_loaded() {
+            let conductor_id = conductor.conductor_id.clone();
+
+            match self
+                .registry
+                .register_agent(agent_pub_key, &conductor_id, &self.default_app_id)
+                .await
+            {
+                Ok(()) => {
+                    self.pools.increment_agents(&conductor_id);
+                    info!(
+                        agent = %agent_pub_key,
+                        conductor = %conductor_id,
+                        "Auto-assigned agent via registry fallback"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        agent = %agent_pub_key,
+                        conductor = %conductor_id,
+                        error = %e,
+                        "Failed to persist agent assignment"
+                    );
+                }
+            }
+
             if let Some(pool) = self.pools.get_pool(&conductor_id) {
                 return pool;
             }
         }
 
-        // Step 4: No conductor available — use default pool
+        // Step 5: No conductor available — use default pool
         debug!(
             agent = %agent_pub_key,
             "No conductor assignment possible, using default pool"

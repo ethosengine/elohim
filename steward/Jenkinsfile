@@ -186,8 +186,6 @@ spec:
                                     versionMap[parts[0].trim()] = parts[1].trim()
                                 }
                             }
-                            def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
-
                             // Use floating tag from DNA pipeline, or explicit override
                             def happVersion
                             if (params.HAPP_VERSION && params.HAPP_VERSION != 'dev-latest') {

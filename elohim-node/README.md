@@ -57,37 +57,78 @@ See [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) for the full architectural separatio
 ```
 elohim-node/
 ├── src/
-│   ├── main.rs           # Daemon entry point
-│   ├── config.rs         # Node configuration
+│   ├── main.rs              # Daemon entry point (clap CLI + tokio runtime)
+│   ├── config.rs            # Node configuration (TOML + env + CLI overrides)
 │   │
-│   ├── sync/             # Automerge sync engine
+│   ├── sync/                # Automerge sync engine
+│   │   ├── mod.rs           # SyncEngine core
+│   │   ├── coordinator.rs   # SyncCoordinator (swarm event loop bridge)
+│   │   ├── stream.rs        # Stream positions (Matrix-inspired)
+│   │   ├── merge.rs         # CRDT conflict resolution
+│   │   └── protocol.rs      # Sync wire protocol
+│   │
+│   ├── p2p/                 # libp2p networking (0.53)
+│   │   ├── mod.rs           # Swarm builder + ElohimBehaviour
+│   │   ├── transport.rs     # QUIC/TCP transport
+│   │   ├── protocols.rs     # /elohim/sync, /elohim/shard protocols
+│   │   └── nat.rs           # NAT traversal
+│   │
+│   ├── pod/                 # Autonomous operations manager
+│   │   ├── mod.rs           # Pod core (decision loop)
+│   │   ├── cli.rs           # Pod subcommands (status, trigger, history)
+│   │   ├── analyzer.rs      # Metrics analysis
+│   │   ├── consensus.rs     # Multi-node pod consensus
+│   │   ├── decider.rs       # Rule-based decision engine
+│   │   ├── executor.rs      # Action execution
+│   │   ├── monitor.rs       # Health monitoring
+│   │   ├── models.rs        # Pod data models
+│   │   ├── protocol.rs      # Pod P2P protocol
+│   │   └── actions/         # Executable actions
+│   │       ├── cache.rs     # Cache management
+│   │       ├── config.rs    # Config adjustments
+│   │       ├── debug.rs     # Debug actions
+│   │       ├── recovery.rs  # Recovery procedures
+│   │       └── storage.rs   # Storage operations
+│   │
+│   ├── network/             # Network operator layer
 │   │   ├── mod.rs
-│   │   ├── stream.rs     # Stream positions (Matrix-inspired)
-│   │   ├── merge.rs      # CRDT conflict resolution
-│   │   └── protocol.rs   # Sync wire protocol
+│   │   ├── operator.rs      # Network operator lifecycle
+│   │   ├── registration.rs  # Node registration
+│   │   └── sync_state.rs    # Network sync state
 │   │
-│   ├── cluster/          # Family cluster orchestration
+│   ├── dashboard/           # Web dashboard (axum)
 │   │   ├── mod.rs
-│   │   ├── discovery.rs  # mDNS local discovery
-│   │   ├── membership.rs # Cluster join/leave
-│   │   └── leader.rs     # Leader election (if needed)
+│   │   ├── routes.rs        # HTTP routes
+│   │   ├── setup.rs         # Dashboard state setup
+│   │   ├── discovery.rs     # Peer discovery UI
+│   │   └── metrics.rs       # Metrics endpoints
 │   │
-│   ├── storage/          # Content-addressed storage
+│   ├── update/              # Over-the-air updates
 │   │   ├── mod.rs
-│   │   ├── blobs.rs      # Blob store
-│   │   ├── sharding.rs   # Reed-Solomon encoding
-│   │   └── reach.rs      # Reach-based access control
+│   │   ├── manifest.rs      # Update manifest parsing
+│   │   ├── download.rs      # Binary download
+│   │   └── apply.rs         # Update application
 │   │
-│   ├── p2p/              # libp2p networking
+│   ├── cluster/             # Family cluster orchestration
 │   │   ├── mod.rs
-│   │   ├── transport.rs  # QUIC/TCP/WebRTC
-│   │   ├── protocols.rs  # /elohim/sync, /elohim/shard
-│   │   └── nat.rs        # NAT traversal
+│   │   ├── discovery.rs     # mDNS local discovery
+│   │   ├── membership.rs    # Cluster join/leave
+│   │   └── leader.rs        # Leader election
 │   │
-│   └── api/              # Control APIs
+│   ├── storage/             # Content-addressed storage
+│   │   ├── mod.rs
+│   │   ├── blobs.rs         # Blob store
+│   │   └── reach.rs         # Reach-based access control
+│   │
+│   └── api/                 # Control APIs
 │       ├── mod.rs
-│       ├── http.rs       # REST API for management
-│       └── grpc.rs       # gRPC for device clients
+│       ├── http.rs          # REST API for management
+│       └── grpc.rs          # gRPC for device clients
+│
+├── tests/
+│   ├── config_test.rs       # Configuration loading tests
+│   ├── sync_engine_test.rs  # Sync engine integration tests
+│   └── transport_test.rs    # P2P transport tests
 │
 ├── Cargo.toml
 └── README.md
@@ -229,8 +270,12 @@ grpc_port = 9090
 ## Getting Started
 
 ```bash
-# Build
-cargo build --release
+# Build (RUSTFLAGS="" override required -- system sets getrandom_backend for Holochain WASM
+# which breaks native Rust builds)
+RUSTFLAGS="" cargo build --release
+
+# Run tests
+RUSTFLAGS="" cargo test
 
 # Run with config
 ./target/release/elohim-node --config elohim-node.toml
@@ -239,6 +284,11 @@ cargo build --release
 ELOHIM_DATA_DIR=/var/lib/elohim \
 ELOHIM_CLUSTER_NAME=my-family \
 ./target/release/elohim-node
+
+# Pod subcommands
+./target/release/elohim-node pod status
+./target/release/elohim-node pod trigger
+./target/release/elohim-node pod history
 ```
 
 ## Deployment Options
@@ -320,13 +370,22 @@ nix build .#dockerImage
 
 ## Development Status
 
-**Current**: Architecture design phase
+**Current**: Partially implemented -- core modules built, integration testing and production deployment pending.
+
+**Implemented**:
+- Sync engine (Automerge CRDT integration, stream positions, merge resolution, coordinator)
+- P2P transport (libp2p 0.53 with QUIC/TCP, mDNS, Kademlia, relay, request-response)
+- Pod autonomous operations (decision loop, rule engine, consensus, CLI, recovery/cache/storage/config actions)
+- Network operator layer (registration, sync state)
+- Web dashboard (axum-based with metrics, discovery, routes)
+- Over-the-air update system (manifest parsing, download, apply)
+- Configuration system (TOML + environment + CLI overrides)
 
 **Next Steps**:
-1. Implement core sync engine (Automerge integration)
-2. Implement cluster discovery (mDNS)
-3. Implement P2P transport (libp2p)
-4. Integrate with elohim-storage for blob handling
-5. Build device client SDK
+1. Integration testing across sync + P2P + pod layers
+2. Cluster-to-cluster replication with reach enforcement
+3. Device client SDK
+4. Production deployment on family hardware
+5. Reed-Solomon sharding for blob storage
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for implementation details.

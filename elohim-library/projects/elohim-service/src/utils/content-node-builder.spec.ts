@@ -47,11 +47,11 @@ describe('content-node-builder', () => {
         sourcePath: '/path',
         relatedNodeIds: [],
         metadata: {},
-        reach: 'personal' as const
+        reach: 'private' as const
       };
 
       const result = buildContentNode(config);
-      expect(result.reach).toBe('personal');
+      expect(result.reach).toBe('private');
     });
 
     it('should use provided timestamp values', () => {

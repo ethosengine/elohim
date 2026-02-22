@@ -240,7 +240,11 @@ interface WasmWriteBuffer {
 }
 
 interface WasmModule {
-  WriteBuffer: new (batchSize: number, flushIntervalMs: bigint, maxRetries: number) => WasmWriteBuffer;
+  WriteBuffer: new (
+    batchSize: number,
+    flushIntervalMs: bigint,
+    maxRetries: number
+  ) => WasmWriteBuffer;
   WritePriority: { High: number; Normal: number; Bulk: number };
   WriteOpType: {
     CreateEntry: number;
@@ -264,8 +268,8 @@ export class TsWriteBuffer implements IWriteBuffer {
   private bulkQueue: WriteOperation[] = [];
   private retryQueue: WriteOperation[] = [];
 
-  private dedupIndex = new Map<string, string>(); // dedupKey -> opId
-  private inFlight = new Map<string, WriteBatch>();
+  private readonly dedupIndex = new Map<string, string>(); // dedupKey -> opId
+  private readonly inFlight = new Map<string, WriteBatch>();
 
   private lastFlushAt: number;
   private nextBatchId = 0;
@@ -278,9 +282,9 @@ export class TsWriteBuffer implements IWriteBuffer {
   private maxQueueSize: number;
 
   constructor(
-    private batchSize: number = 50,
-    private flushIntervalMs: number = 100,
-    private maxRetries: number = 3
+    private readonly batchSize = 50,
+    private readonly flushIntervalMs = 100,
+    private readonly maxRetries = 3
   ) {
     this.lastFlushAt = Date.now();
     this.maxQueueSize = batchSize * 100;
@@ -522,12 +526,7 @@ export class TsWriteBuffer implements IWriteBuffer {
   }
 
   drainAll(): WriteOperation[] {
-    const all = [
-      ...this.highQueue,
-      ...this.normalQueue,
-      ...this.bulkQueue,
-      ...this.retryQueue,
-    ];
+    const all = [...this.highQueue, ...this.normalQueue, ...this.bulkQueue, ...this.retryQueue];
     this.highQueue = [];
     this.normalQueue = [];
     this.bulkQueue = [];
@@ -573,7 +572,7 @@ export class TsWriteBuffer implements IWriteBuffer {
 // ============================================================================
 
 class WasmWriteBufferWrapper implements IWriteBuffer {
-  constructor(private wasm: WasmWriteBuffer) {}
+  constructor(private readonly wasm: WasmWriteBuffer) {}
 
   queueWrite(opId: string, opType: WriteOpType, payload: string, priority: WritePriority): boolean {
     return this.wasm.queue_write(opId, opType, payload, priority);
@@ -604,23 +603,25 @@ class WasmWriteBufferWrapper implements IWriteBuffer {
     const rawBatch = parsed.batch;
     const batch: WriteBatch = {
       batchId: rawBatch.batch_id,
-      operations: rawBatch.operations.map((op: {
-        op_id: string;
-        op_type: number;
-        payload: string;
-        priority: number;
-        queued_at: number;
-        retry_count: number;
-        dedup_key: string | null;
-      }) => ({
-        opId: op.op_id,
-        opType: op.op_type as WriteOpType,
-        payload: op.payload,
-        priority: op.priority as WritePriority,
-        queuedAt: op.queued_at,
-        retryCount: op.retry_count,
-        dedupKey: op.dedup_key,
-      })),
+      operations: rawBatch.operations.map(
+        (op: {
+          op_id: string;
+          op_type: number;
+          payload: string;
+          priority: number;
+          queued_at: number;
+          retry_count: number;
+          dedup_key: string | null;
+        }) => ({
+          opId: op.op_id,
+          opType: op.op_type as WriteOpType,
+          payload: op.payload,
+          priority: op.priority as WritePriority,
+          queuedAt: op.queued_at,
+          retryCount: op.retry_count,
+          dedupKey: op.dedup_key,
+        })
+      ),
       createdAt: rawBatch.created_at,
       priority: rawBatch.priority as WritePriority,
     };
@@ -691,23 +692,25 @@ class WasmWriteBufferWrapper implements IWriteBuffer {
   drainAll(): WriteOperation[] {
     const json = this.wasm.drain_all();
     const parsed = JSON.parse(json);
-    return parsed.map((op: {
-      op_id: string;
-      op_type: number;
-      payload: string;
-      priority: number;
-      queued_at: number;
-      retry_count: number;
-      dedup_key: string | null;
-    }) => ({
-      opId: op.op_id,
-      opType: op.op_type as WriteOpType,
-      payload: op.payload,
-      priority: op.priority as WritePriority,
-      queuedAt: op.queued_at,
-      retryCount: op.retry_count,
-      dedupKey: op.dedup_key,
-    }));
+    return parsed.map(
+      (op: {
+        op_id: string;
+        op_type: number;
+        payload: string;
+        priority: number;
+        queued_at: number;
+        retry_count: number;
+        dedup_key: string | null;
+      }) => ({
+        opId: op.op_id,
+        opType: op.op_type as WriteOpType,
+        payload: op.payload,
+        priority: op.priority as WritePriority,
+        queuedAt: op.queued_at,
+        retryCount: op.retry_count,
+        dedupKey: op.dedup_key,
+      })
+    );
   }
 
   restore(operations: WriteOperation[]): void {
@@ -765,11 +768,12 @@ export async function isWasmBufferAvailable(): Promise<boolean> {
 }
 
 /** Preset configurations */
-const PRESETS: Record<string, { batchSize: number; flushIntervalMs: number; maxRetries: number }> = {
-  seeding: { batchSize: 100, flushIntervalMs: 50, maxRetries: 5 },
-  interactive: { batchSize: 20, flushIntervalMs: 100, maxRetries: 3 },
-  recovery: { batchSize: 200, flushIntervalMs: 25, maxRetries: 10 },
-};
+const PRESETS: Record<string, { batchSize: number; flushIntervalMs: number; maxRetries: number }> =
+  {
+    seeding: { batchSize: 100, flushIntervalMs: 50, maxRetries: 5 },
+    interactive: { batchSize: 20, flushIntervalMs: 100, maxRetries: 3 },
+    recovery: { batchSize: 200, flushIntervalMs: 25, maxRetries: 10 },
+  };
 
 /**
  * Create a write buffer instance.

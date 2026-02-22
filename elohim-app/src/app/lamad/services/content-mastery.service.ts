@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, effect } from '@angular/core';
 
 // @coverage: 58.2% (2026-02-05)
 
@@ -69,6 +69,9 @@ export class ContentMasteryService {
   /** Emits when a content node's mastery level increases. */
   public readonly levelUp$: Observable<LevelUpEvent> = this.levelUpSubject.asObservable();
 
+  /** Tracks whether we've already synced since the last reconnect */
+  private hasSyncedSinceConnect = false;
+
   constructor(
     private readonly sourceChain: LocalSourceChainService,
     private readonly sessionHuman: SessionHumanService,
@@ -79,6 +82,20 @@ export class ContentMasteryService {
     this.sessionHuman.session$.subscribe(session => {
       if (session) {
         this.initializeForSession(session.sessionId);
+      }
+    });
+
+    // Auto-sync mastery to backend when connection is restored
+    effect(() => {
+      const connected = this.holochainClient.isConnected();
+      if (connected && !this.hasSyncedSinceConnect && this.masteryCache.size > 0) {
+        this.hasSyncedSinceConnect = true;
+        this.syncAllToBackend().catch(() => {
+          // Reset flag so sync retries on next connection change
+          this.hasSyncedSinceConnect = false;
+        });
+      } else if (!connected) {
+        this.hasSyncedSinceConnect = false;
       }
     });
   }
@@ -573,6 +590,18 @@ export class ContentMasteryService {
         return of(null);
       })
     );
+  }
+
+  /**
+   * Sync all cached mastery records to backend.
+   * Called automatically when connection is restored.
+   */
+  private async syncAllToBackend(): Promise<void> {
+    for (const mastery of this.masteryCache.values()) {
+      if (mastery.level !== 'not_started') {
+        await this.syncMasteryToBackend(mastery);
+      }
+    }
   }
 
   /**

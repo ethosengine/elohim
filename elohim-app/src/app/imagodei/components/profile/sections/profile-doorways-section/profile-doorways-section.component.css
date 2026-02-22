@@ -165,6 +165,52 @@
   white-space: nowrap;
 }
 
+/* Recovery Context */
+.recovery-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  margin-bottom: 0.75rem;
+  background: var(--green-50, #f0fdf4);
+  border: 1px solid var(--green-200, #bbf7d0);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--green-800, #166534);
+}
+
+.recovery-banner-icon {
+  font-size: 1.125rem;
+  color: var(--green-600, #16a34a);
+}
+
+.recovery-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary, #6c757d);
+}
+
+.recovery-badge.ready {
+  color: var(--green-700, #15803d);
+}
+
+.recovery-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.recovery-badge-dot.online {
+  background: #22c55e;
+}
+
+.recovery-badge-dot.offline {
+  background: #9ca3af;
+}
+
 /* Add Doorway Form */
 .add-doorway-form {
   display: flex;

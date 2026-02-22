@@ -67,6 +67,7 @@ spec:
                 - "db.adminCommand('ping')"
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 10
           livenessProbe:
             exec:
               command:
@@ -75,6 +76,7 @@ spec:
                 - "db.adminCommand('ping')"
             initialDelaySeconds: 15
             periodSeconds: 30
+            timeoutSeconds: 10
       volumes:
         - name: mongodb-data
           persistentVolumeClaim:

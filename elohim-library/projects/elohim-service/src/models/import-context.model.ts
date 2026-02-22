@@ -11,8 +11,8 @@ import { PathMetadata } from './path-metadata.model';
  * Import mode
  */
 export type ImportMode =
-  | 'full'           // Import everything from scratch
-  | 'incremental'    // Only import changed files
+  | 'full' // Import everything from scratch
+  | 'incremental' // Only import changed files
   | 'schema-migrate'; // Update existing to new schema
 
 /**
@@ -103,10 +103,10 @@ export interface ParsedScenario {
   title: string;
   type: 'scenario' | 'scenario_outline';
   tags: string[];
-  steps: Array<{
+  steps: {
     keyword: string;
     text: string;
-  }>;
+  }[];
 }
 
 /**

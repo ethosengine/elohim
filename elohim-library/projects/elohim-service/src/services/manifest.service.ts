@@ -8,16 +8,15 @@
  * - Schema versions for migration tracking
  */
 
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
+
 import {
   ContentManifest,
-  SourceHashEntry,
-  NodeHashEntry,
   SchemaMigration,
   MigrationRule,
-  createEmptyManifest
+  createEmptyManifest,
 } from '../models/manifest.model';
 
 const MANIFEST_FILENAME = 'content-manifest.json';
@@ -69,11 +68,15 @@ export function calculateFileHash(filePath: string): string {
 /**
  * Calculate hash for node content
  */
-export function calculateNodeHash(node: { id: string; content?: string; metadata?: unknown }): string {
+export function calculateNodeHash(node: {
+  id: string;
+  content?: string;
+  metadata?: unknown;
+}): string {
   const hashContent = JSON.stringify({
     id: node.id,
     content: node.content,
-    metadata: node.metadata
+    metadata: node.metadata,
   });
   return crypto.createHash('sha256').update(hashContent).digest('hex');
 }
@@ -108,7 +111,7 @@ export function updateSourceHash(
   manifest.sourceHashes[sourcePath] = {
     hash,
     lastModified: new Date().toISOString(),
-    generatedNodeIds: nodeIds
+    generatedNodeIds: nodeIds,
   };
   manifest.totalSourceFiles = Object.keys(manifest.sourceHashes).length;
 }
@@ -127,7 +130,7 @@ export function updateNodeHash(
     hash,
     sourcePath,
     contentType,
-    generatedAt: new Date().toISOString()
+    generatedAt: new Date().toISOString(),
   };
   manifest.totalNodes = Object.keys(manifest.nodeHashes).length;
 }
@@ -192,10 +195,7 @@ export function getRemovedSources(
 /**
  * Remove source from manifest
  */
-export function removeSource(
-  manifest: ContentManifest,
-  sourcePath: string
-): string[] {
+export function removeSource(manifest: ContentManifest, sourcePath: string): string[] {
   const entry = manifest.sourceHashes[sourcePath];
 
   if (!entry) {
@@ -236,7 +236,7 @@ export function addMigration(
     toVersion,
     appliedAt: new Date().toISOString(),
     nodesMigrated,
-    rules
+    rules,
   };
 
   manifest.migrations.push(migration);
@@ -288,7 +288,7 @@ export function getImportStats(manifest: ContentManifest): {
     totalNodes: manifest.totalNodes,
     lastImport: manifest.lastUpdated,
     schemaVersion: manifest.schemaVersion,
-    migrationCount: manifest.migrations.length
+    migrationCount: manifest.migrations.length,
   };
 }
 
@@ -329,6 +329,6 @@ export function validateManifest(manifest: ContentManifest): {
 
   return {
     valid: errors.length === 0,
-    errors
+    errors,
   };
 }

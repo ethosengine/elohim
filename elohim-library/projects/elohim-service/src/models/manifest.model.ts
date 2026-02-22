@@ -124,19 +124,25 @@ export interface ContentManifest {
   /**
    * Import statistics by domain
    */
-  domainStats: Record<string, {
-    sourceFiles: number;
-    nodes: number;
-    lastImported: string;
-  }>;
+  domainStats: Record<
+    string,
+    {
+      sourceFiles: number;
+      nodes: number;
+      lastImported: string;
+    }
+  >;
 
   /**
    * Import statistics by content type
    */
-  contentTypeStats: Record<string, {
-    count: number;
-    lastUpdated: string;
-  }>;
+  contentTypeStats: Record<
+    string,
+    {
+      count: number;
+      lastUpdated: string;
+    }
+  >;
 }
 
 /**
@@ -155,6 +161,6 @@ export function createEmptyManifest(): ContentManifest {
     nodeHashes: {},
     migrations: [],
     domainStats: {},
-    contentTypeStats: {}
+    contentTypeStats: {},
   };
 }

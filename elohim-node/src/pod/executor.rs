@@ -6,8 +6,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, warn};
+use tokio::sync::RwLock;
+use tracing::{error, info, warn};
 
 use super::actions;
 use super::models::*;
@@ -17,6 +17,7 @@ const MAX_QUEUE_SIZE: usize = 100;
 
 /// Action executor with priority queue
 pub struct Executor {
+    #[allow(dead_code)]
     node_id: String,
     /// Pending actions by priority
     queue: Arc<RwLock<VecDeque<Action>>>,
@@ -128,6 +129,7 @@ impl Executor {
     }
 
     /// Get action by ID
+    #[allow(dead_code)]
     pub async fn get_action(&self, id: &str) -> Option<Action> {
         // Check queue
         {
@@ -163,6 +165,7 @@ impl Executor {
     }
 
     /// Mark an action as approved (after consensus)
+    #[allow(dead_code)]
     pub async fn approve(&self, id: &str) -> Result<(), String> {
         let mut queue = self.queue.write().await;
 
@@ -180,6 +183,7 @@ impl Executor {
     }
 
     /// Reject an action (after consensus failure)
+    #[allow(dead_code)]
     pub async fn reject(&self, id: &str, reason: &str) -> Result<(), String> {
         let mut queue = self.queue.write().await;
 
@@ -204,6 +208,7 @@ impl Executor {
     }
 
     /// Cancel a pending action
+    #[allow(dead_code)]
     pub async fn cancel(&self, id: &str) -> Result<(), String> {
         let mut queue = self.queue.write().await;
 
@@ -346,11 +351,8 @@ impl Executor {
     pub async fn process_queue(&self) -> Vec<ActionResult> {
         let mut results = Vec::new();
 
-        loop {
-            match self.execute_next().await {
-                Some(result) => results.push(result),
-                None => break,
-            }
+        while let Some(result) = self.execute_next().await {
+            results.push(result);
         }
 
         results

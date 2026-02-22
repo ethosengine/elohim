@@ -22,7 +22,8 @@ pub mod threshold;
 pub mod zome_helpers;
 
 pub use admin::{
-    handle_cluster_metrics, handle_custodians, handle_node_by_id, handle_nodes, handle_resources,
+    handle_admin_pipeline, handle_capabilities, handle_cluster_metrics, handle_custodians,
+    handle_node_by_id, handle_nodes, handle_resources,
 };
 pub use admin_conductors::{
     handle_agent_conductor, handle_assign_agent, handle_conductor_agents, handle_deprovision_user,
@@ -53,6 +54,8 @@ pub use dashboard_ws::handle_dashboard_ws;
 pub use db::handle_db_request;
 pub use debug_stream::{handle_debug_stream, DebugEvent, DebugHub};
 pub use federation::{
+    handle_admin_add_federation_peer, handle_admin_federation_peers,
+    handle_admin_refresh_federation_peers, handle_admin_remove_federation_peer,
     handle_doorway_keys, handle_federation_doorways, handle_federation_p2p_peers,
 };
 pub use health::{health_check, readiness_check, version_info};

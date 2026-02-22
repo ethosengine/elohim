@@ -1,7 +1,7 @@
 # Build stage
 # NOTE: Build context should be repo root directory
 # Run: docker build -f doorway/Dockerfile -t doorway .
-FROM rust:1.83-slim-bookworm AS builder
+FROM rust:1.93-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -9,6 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy manifests and local crates first for dependency caching

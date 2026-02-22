@@ -14,6 +14,8 @@
 //! - **Projection**: DHT → MongoDB projection engine for fast reads
 //! - **Orchestrator**: Plug-n-play node management with mDNS discovery
 
+pub mod getrandom_custom;
+
 pub mod auth;
 pub mod bootstrap;
 pub mod cache;

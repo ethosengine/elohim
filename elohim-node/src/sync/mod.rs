@@ -6,12 +6,12 @@
 //! - CRDT conflict resolution via Automerge
 //! - Sync coordination across multiple peers
 
-pub mod stream;
+pub mod coordinator;
 pub mod merge;
 pub mod protocol;
-pub mod coordinator;
+pub mod stream;
 
 // Re-exports
-pub use stream::{SyncState, SyncEvent, EventKind};
-pub use merge::SyncEngine;
 pub use coordinator::SyncCoordinator;
+pub use merge::SyncEngine;
+pub use stream::SyncEvent;

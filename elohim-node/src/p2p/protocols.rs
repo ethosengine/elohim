@@ -13,7 +13,9 @@ use crate::sync::protocol::SyncMessage;
 
 /// Protocol identifiers
 pub const SYNC_PROTOCOL: &str = "/elohim/sync/1.0.0";
+#[allow(dead_code)]
 pub const SHARD_PROTOCOL: &str = "/elohim/shard/1.0.0";
+#[allow(dead_code)]
 pub const CLUSTER_PROTOCOL: &str = "/elohim/cluster/1.0.0";
 
 /// Maximum message size (10 MB)
@@ -28,6 +30,7 @@ const LENGTH_PREFIX_SIZE: usize = 4;
 pub struct SyncCodec;
 
 impl SyncCodec {
+    #[allow(dead_code)]
     pub fn protocol() -> StreamProtocol {
         StreamProtocol::new(SYNC_PROTOCOL)
     }
@@ -98,16 +101,18 @@ where
     if len > MAX_MESSAGE_SIZE {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("message too large: {} bytes (max {})", len, MAX_MESSAGE_SIZE),
+            format!(
+                "message too large: {} bytes (max {})",
+                len, MAX_MESSAGE_SIZE
+            ),
         ));
     }
 
     let mut buf = vec![0u8; len];
     io.read_exact(&mut buf).await?;
 
-    rmp_serde::from_slice(&buf).map_err(|e| {
-        io::Error::new(io::ErrorKind::InvalidData, format!("msgpack decode: {}", e))
-    })
+    rmp_serde::from_slice(&buf)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("msgpack decode: {}", e)))
 }
 
 /// Write a length-prefixed MessagePack message to the stream.
@@ -122,7 +127,11 @@ where
     if payload.len() > MAX_MESSAGE_SIZE {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("message too large: {} bytes (max {})", payload.len(), MAX_MESSAGE_SIZE),
+            format!(
+                "message too large: {} bytes (max {})",
+                payload.len(),
+                MAX_MESSAGE_SIZE
+            ),
         ));
     }
 

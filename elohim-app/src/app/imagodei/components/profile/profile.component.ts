@@ -30,6 +30,7 @@ import { AGENCY_STAGES, type AgencyStageInfo } from '../../models/agency.model';
 import { AgencyService } from '../../services/agency.service';
 import { AuthService } from '../../services/auth.service';
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
+import { HostingAccountService } from '../../services/hosting-account.service';
 import { IdentityService } from '../../services/identity.service';
 import { SessionHumanService } from '../../services/session-human.service';
 import { TauriAuthService } from '../../services/tauri-auth.service';
@@ -40,6 +41,7 @@ import { ProfileDataSectionComponent } from './sections/profile-data-section/pro
 import { ProfileDiscoverySectionComponent } from './sections/profile-discovery-section/profile-discovery-section.component';
 import { ProfileDoorwaysSectionComponent } from './sections/profile-doorways-section/profile-doorways-section.component';
 import { ProfileHeaderComponent } from './sections/profile-header/profile-header.component';
+import { ProfileHostingSectionComponent } from './sections/profile-hosting-section/profile-hosting-section.component';
 import { ProfileIdentitySectionComponent } from './sections/profile-identity-section/profile-identity-section.component';
 import { ProfileNetworkSectionComponent } from './sections/profile-network-section/profile-network-section.component';
 
@@ -58,6 +60,7 @@ export type ProfileTab = 'identity' | 'network' | 'data';
     ProfileAttestationsSectionComponent,
     ProfileAgencySectionComponent,
     ProfileDoorwaysSectionComponent,
+    ProfileHostingSectionComponent,
     ProfileNetworkSectionComponent,
     ProfileDataSectionComponent,
   ],
@@ -70,6 +73,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   private readonly agencyService = inject(AgencyService);
   private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly doorwayRegistry = inject(DoorwayRegistryService);
+  private readonly hostingAccountService = inject(HostingAccountService);
   private readonly tauriAuth = inject(TauriAuthService);
   private readonly holochainService = inject(HolochainClientService);
   private readonly sessionHumanService = inject(SessionHumanService);
@@ -137,6 +141,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
   // ==========================================================================
 
   readonly allDiscoveryResults = this.discoveryService.results;
+
+  // ==========================================================================
+  // Hosting Account Signals
+  // ==========================================================================
+
+  readonly hostingAccount = this.hostingAccountService.account;
 
   // ==========================================================================
   // Doorway Signals
@@ -211,6 +221,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     void this.loadProfile();
     void this.loadDoorways();
+    void this.loadHostingAccount();
 
     this.route.fragment.pipe(takeUntil(this.destroy$)).subscribe(fragment => {
       if (fragment === 'network' || fragment === 'upgrade') {
@@ -243,6 +254,17 @@ export class ProfileComponent implements OnInit, OnDestroy {
       await this.identityService.getCurrentHuman();
     } catch (error) {
       console.warn('[Profile] Non-critical profile refresh failed:', error);
+    }
+  }
+
+  private async loadHostingAccount(): Promise<void> {
+    try {
+      const mode = this.mode();
+      if (mode === 'hosted') {
+        await this.hostingAccountService.loadAccount();
+      }
+    } catch (error) {
+      console.warn('[Profile] Non-critical hosting account refresh failed:', error);
     }
   }
 

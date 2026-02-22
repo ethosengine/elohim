@@ -6,7 +6,9 @@
  */
 
 import * as crypto from 'crypto';
+
 import { PathMetadata } from '../models/path-metadata.model';
+
 import { ParserResult, ParserError } from './parser-result';
 
 /**
@@ -16,11 +18,7 @@ export function calculateContentHash(content: string): string {
   try {
     return crypto.createHash('sha256').update(content).digest('hex');
   } catch (error) {
-    throw new ParserError(
-      'Failed to calculate content hash',
-      'unknown',
-      error as Error
-    );
+    throw new ParserError('Failed to calculate content hash', 'unknown', error as Error);
   }
 }
 
@@ -39,7 +37,7 @@ export function buildParserResult(
     rawContent: content,
     title,
     contentHash: calculateContentHash(content),
-    extension: pathMeta.extension
+    extension: pathMeta.extension,
   };
 }
 

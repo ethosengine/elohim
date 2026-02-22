@@ -3,11 +3,15 @@
 //! HTTP endpoints for doorway federation:
 //! - `GET /api/v1/federation/doorways` — list known doorways from DHT
 //! - `GET /.well-known/doorway-keys` — public signing key in JWKS format
+//! - `GET /admin/federation/peers` — configured peer URLs with status
+//! - `POST /admin/federation/peers` — add a federation peer
+//! - `DELETE /admin/federation/peers` — remove a federation peer
+//! - `POST /admin/federation/peers/refresh` — force peer cache refresh
 
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::server::AppState;
@@ -358,6 +362,213 @@ fn build_self_only_doorway(state: &AppState) -> Vec<DoorwaySummary> {
 fn base64_url_encode(data: &[u8]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(data)
+}
+
+// =============================================================================
+// Admin Federation Peer Management
+// =============================================================================
+
+/// A configured federation peer with enriched status from the peer cache
+#[derive(Serialize)]
+pub struct FederationPeerConfigEntry {
+    pub url: String,
+    pub reachable: bool,
+    pub doorway_id: Option<String>,
+    pub region: Option<String>,
+    pub capabilities: Vec<String>,
+}
+
+/// Response for GET /admin/federation/peers
+#[derive(Serialize)]
+pub struct FederationPeersConfigResponse {
+    pub peers: Vec<FederationPeerConfigEntry>,
+    pub total: usize,
+    pub self_id: Option<String>,
+}
+
+/// Request body for POST /admin/federation/peers
+#[derive(Deserialize)]
+pub struct AddPeerRequest {
+    pub url: String,
+}
+
+/// Request body for DELETE /admin/federation/peers
+#[derive(Deserialize)]
+pub struct RemovePeerRequest {
+    pub url: String,
+}
+
+/// Generic mutation response for admin operations
+#[derive(Serialize)]
+pub struct AdminMutationResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+/// Handle GET /admin/federation/peers
+///
+/// Returns configured peer URLs enriched with reachability and identity
+/// from the peer cache.
+pub async fn handle_admin_federation_peers(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let urls = federation::get_peer_urls(&state.peer_url_list).await;
+    let cached_peers = federation::get_cached_peers(&state.peer_cache).await;
+
+    let peers: Vec<FederationPeerConfigEntry> = urls
+        .iter()
+        .map(|url| {
+            // Cross-reference with cached peer data to enrich
+            let normalized = url.trim_end_matches('/');
+            let matching_peer = cached_peers.iter().find(|p| {
+                p.source_peer.trim_end_matches('/') == normalized
+                    || p.url.trim_end_matches('/') == normalized
+            });
+
+            FederationPeerConfigEntry {
+                url: url.clone(),
+                reachable: matching_peer.is_some(),
+                doorway_id: matching_peer.map(|p| p.id.clone()),
+                region: matching_peer.and_then(|p| p.region.clone()),
+                capabilities: matching_peer
+                    .map(|p| p.capabilities.clone())
+                    .unwrap_or_default(),
+            }
+        })
+        .collect();
+
+    let total = peers.len();
+    let response = FederationPeersConfigResponse {
+        peers,
+        total,
+        self_id: state.args.doorway_id.clone(),
+    };
+
+    json_response(&response)
+}
+
+/// Handle POST /admin/federation/peers
+///
+/// Add a new federation peer URL. Triggers immediate discovery for the new peer.
+pub async fn handle_admin_add_federation_peer(
+    state: Arc<AppState>,
+    body: Bytes,
+) -> Response<Full<Bytes>> {
+    let request: AddPeerRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(e) => {
+            return json_error_response(StatusCode::BAD_REQUEST, &format!("Invalid JSON: {e}"));
+        }
+    };
+
+    // Basic URL validation
+    if !request.url.starts_with("http://") && !request.url.starts_with("https://") {
+        return json_error_response(
+            StatusCode::BAD_REQUEST,
+            "URL must start with http:// or https://",
+        );
+    }
+
+    let added = federation::add_peer_url(&state.peer_url_list, request.url.clone()).await;
+    if !added {
+        return json_response(&AdminMutationResponse {
+            success: false,
+            message: "Peer URL already configured".to_string(),
+        });
+    }
+
+    // Trigger immediate refresh for the new peer
+    federation::refresh_peer_cache(
+        std::slice::from_ref(&request.url),
+        state.args.doorway_id.as_deref(),
+        &state.peer_cache,
+    )
+    .await;
+
+    json_response(&AdminMutationResponse {
+        success: true,
+        message: format!("Peer added: {}", request.url),
+    })
+}
+
+/// Handle DELETE /admin/federation/peers
+///
+/// Remove a federation peer URL and clean matching entries from the peer cache.
+pub async fn handle_admin_remove_federation_peer(
+    state: Arc<AppState>,
+    body: Bytes,
+) -> Response<Full<Bytes>> {
+    let request: RemovePeerRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(e) => {
+            return json_error_response(StatusCode::BAD_REQUEST, &format!("Invalid JSON: {e}"));
+        }
+    };
+
+    let removed = federation::remove_peer_url(&state.peer_url_list, &request.url).await;
+    if !removed {
+        return json_response(&AdminMutationResponse {
+            success: false,
+            message: "Peer URL not found in configuration".to_string(),
+        });
+    }
+
+    // Clean matching entries from the peer cache
+    {
+        let normalized = request.url.trim_end_matches('/');
+        let mut cache = state.peer_cache.write().await;
+        cache.retain(|p| p.source_peer.trim_end_matches('/') != normalized);
+    }
+
+    json_response(&AdminMutationResponse {
+        success: true,
+        message: format!("Peer removed: {}", request.url),
+    })
+}
+
+/// Handle POST /admin/federation/peers/refresh
+///
+/// Force an immediate refresh of the peer cache from all configured peer URLs.
+pub async fn handle_admin_refresh_federation_peers(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let urls = federation::get_peer_urls(&state.peer_url_list).await;
+
+    federation::refresh_peer_cache(&urls, state.args.doorway_id.as_deref(), &state.peer_cache)
+        .await;
+
+    let cached = federation::get_cached_peers(&state.peer_cache).await;
+
+    json_response(&AdminMutationResponse {
+        success: true,
+        message: format!(
+            "Refreshed {} peer URL(s), discovered {} doorway(s)",
+            urls.len(),
+            cached.len()
+        ),
+    })
+}
+
+/// Helper: serialize to JSON response
+fn json_response<T: Serialize>(data: &T) -> Response<Full<Bytes>> {
+    match serde_json::to_string_pretty(data) {
+        Ok(json) => Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap(),
+        Err(e) => json_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Serialization failed: {e}"),
+        ),
+    }
+}
+
+/// Helper: JSON error response
+fn json_error_response(status: StatusCode, message: &str) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(format!(
+            r#"{{"error": "{message}"}}"#
+        ))))
+        .unwrap()
 }
 
 #[cfg(test)]

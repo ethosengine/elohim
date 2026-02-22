@@ -42,6 +42,12 @@ output/
 # Seed data is now version-controlled for CI access
 # data/lamad/**/*.json
 
+# Holochain runtime
+.hc_live_*
+
+# E2E test artifacts (generated per run, archived in CI)
+orchestrator/e2e/reports/
+
 # Rust/Holochain
 target/
 *.happ

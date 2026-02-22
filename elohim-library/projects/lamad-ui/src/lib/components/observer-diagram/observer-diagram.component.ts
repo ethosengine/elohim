@@ -3,20 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 
 @Component({
   selector: 'lamad-observer-diagram',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './observer-diagram.component.html',
-  styleUrls: ['./observer-diagram.component.css']
+  styleUrls: ['./observer-diagram.component.css'],
 })
 export class ObserverDiagramComponent implements OnInit, OnDestroy {
   mode: 'witness' | 'private' = 'witness';
   dataStream: number[] = [];
-  private intervalId: any;
+  private intervalId: ReturnType<typeof setInterval> | undefined;
 
   ngOnInit() {
     this.startDataStream();

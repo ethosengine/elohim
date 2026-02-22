@@ -1,16 +1,13 @@
 //! Sync wire protocol
 
-use serde::{Deserialize, Serialize};
 use super::SyncEvent;
+use serde::{Deserialize, Serialize};
 
 /// Messages in the sync protocol
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SyncMessage {
     /// Request events since position
-    SyncRequest {
-        since: u64,
-        limit: Option<u32>,
-    },
+    SyncRequest { since: u64, limit: Option<u32> },
 
     /// Response with events
     SyncResponse {
@@ -33,7 +30,5 @@ pub enum SyncMessage {
     },
 
     /// Announce new local event
-    Announce {
-        event: SyncEvent,
-    },
+    Announce { event: SyncEvent },
 }

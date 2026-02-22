@@ -6,9 +6,8 @@
 //! - Peer discovery (mDNS, Kademlia)
 //! - NAT traversal (future)
 
-pub mod transport;
-pub mod protocols;
 pub mod nat;
+pub mod protocols;
+pub mod transport;
 
-pub use transport::{build_swarm, ElohimSwarm, SwarmEvent};
-pub use protocols::{SyncCodec, SYNC_PROTOCOL, SHARD_PROTOCOL, CLUSTER_PROTOCOL};
+pub use transport::build_swarm;

@@ -13,13 +13,15 @@
  *   npx ts-node src/cli/holo-import.ts holo:test
  */
 
-import { Command } from 'commander';
-import * as path from 'path';
 import * as fs from 'fs';
-import { runImportPipeline } from '../services/import-pipeline.service';
-import { HolochainImportService } from '../services/holochain-import.service';
-import { HolochainClientService } from '../services/holochain-client.service';
+import * as path from 'path';
+
+import { Command } from 'commander';
+
 import { HolochainImportConfig } from '../models/holochain.model';
+import { HolochainClientService } from '../services/holochain-client.service';
+import { HolochainImportService } from '../services/holochain-import.service';
+import { runImportPipeline } from '../services/import-pipeline.service';
 
 const program = new Command();
 
@@ -30,10 +32,7 @@ const DEFAULT_CONFIG: HolochainImportConfig = {
   batchSize: 50,
 };
 
-program
-  .name('elohim-holo')
-  .description('Import content to Holochain conductor')
-  .version('1.0.0');
+program.name('elohim-holo').description('Import content to Holochain conductor').version('1.0.0');
 
 // =============================================================================
 // holo:import - Import content from source files to Holochain
@@ -50,7 +49,7 @@ program
   .option('-v, --verbose', 'Verbose output', false)
   .option('--dry-run', 'Parse and transform but do not write to Holochain', false)
   .option('--skip-relationships', 'Skip relationship extraction', false)
-  .action(async (options) => {
+  .action(async options => {
     const sourceDir = path.resolve(options.source);
 
     console.log('Holochain Content Import');
@@ -81,8 +80,12 @@ program
         skipRelationships: options.skipRelationships,
       });
 
-      console.log(`\nParsed ${pipelineResult.totalNodes} nodes from ${pipelineResult.totalFiles} files`);
-      console.log(`  Types: ${[...new Set(pipelineResult.nodes.map(n => n.contentType))].join(', ')}`);
+      console.log(
+        `\nParsed ${pipelineResult.totalNodes} nodes from ${pipelineResult.totalFiles} files`
+      );
+      console.log(
+        `  Types: ${[...new Set(pipelineResult.nodes.map(n => n.contentType))].join(', ')}`
+      );
 
       if (options.dryRun) {
         console.log('\n[Dry run - no Holochain writes]');
@@ -105,7 +108,7 @@ program
         adminUrl: options.adminUrl,
         appId: options.appId,
         happPath: options.happPath,
-        batchSize: parseInt(options.batchSize, 10),
+        batchSize: Number.parseInt(options.batchSize, 10),
       });
 
       console.log('\nConnecting to Holochain conductor...');
@@ -139,7 +142,7 @@ program
   .description('Show Holochain content statistics')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
   .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
-  .action(async (options) => {
+  .action(async options => {
     try {
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
@@ -179,7 +182,7 @@ program
   .option('-f, --file <path>', 'File with IDs (one per line)')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
   .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
-  .action(async (options) => {
+  .action(async options => {
     let ids: string[] = [];
 
     if (options.ids) {
@@ -188,7 +191,7 @@ program
       ids = fs
         .readFileSync(options.file, 'utf-8')
         .split('\n')
-        .map((s) => s.trim())
+        .map(s => s.trim())
         .filter(Boolean);
     } else {
       console.error('Provide --ids or --file');
@@ -245,7 +248,7 @@ program
   .option('-l, --limit <n>', 'Maximum entries', '20')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
   .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
-  .action(async (options) => {
+  .action(async options => {
     try {
       const holoService = new HolochainImportService({
         adminUrl: options.adminUrl,
@@ -256,7 +259,7 @@ program
       console.log(`Fetching content of type '${options.type}'...\n`);
       const results = await holoService.getContentByType(
         options.type,
-        parseInt(options.limit, 10)
+        Number.parseInt(options.limit, 10)
       );
 
       console.log(`Content (type: ${options.type})`);
@@ -343,7 +346,7 @@ program
   .description('Test Holochain connection')
   .option('--admin-url <url>', 'Holochain admin WebSocket URL', DEFAULT_CONFIG.adminUrl)
   .option('--app-id <id>', 'Holochain app ID', DEFAULT_CONFIG.appId)
-  .action(async (options) => {
+  .action(async options => {
     console.log('Testing Holochain connection...');
     console.log(`Admin URL: ${options.adminUrl}`);
     console.log(`App ID: ${options.appId}`);

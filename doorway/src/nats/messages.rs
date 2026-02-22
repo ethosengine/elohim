@@ -192,6 +192,26 @@ pub struct HostHeartbeat {
     /// Software version
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+
+    /// Number of agents currently hosted across all conductors
+    #[serde(default)]
+    pub agent_count: usize,
+
+    /// Number of conductors in the pool
+    #[serde(default)]
+    pub conductor_count: usize,
+
+    /// Number of healthy conductor pools
+    #[serde(default)]
+    pub healthy_conductors: usize,
+
+    /// Worker pool error rate (0.0 - 1.0)
+    #[serde(default)]
+    pub error_rate: f64,
+
+    /// Worker pool queue depth
+    #[serde(default)]
+    pub queue_depth: usize,
 }
 
 impl HostHeartbeat {
@@ -204,6 +224,11 @@ impl HostHeartbeat {
             max_connections,
             region: None,
             version: None,
+            agent_count: 0,
+            conductor_count: 0,
+            healthy_conductors: 0,
+            error_rate: 0.0,
+            queue_depth: 0,
         }
     }
 

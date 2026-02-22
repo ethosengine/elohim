@@ -87,6 +87,7 @@ impl Default for OperatorPermissions {
     }
 }
 
+#[allow(dead_code)]
 impl OperatorPermissions {
     /// Full permissions for owner
     pub fn owner() -> Self {
@@ -141,6 +142,7 @@ impl OperatorPermissions {
     }
 }
 
+#[allow(dead_code)]
 impl Operator {
     /// Create owner operator from join key data
     pub fn from_join_key(agent_pub_key: String, display_name: Option<String>) -> Self {
@@ -179,6 +181,7 @@ impl Operator {
     }
 }
 
+#[allow(dead_code)]
 fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

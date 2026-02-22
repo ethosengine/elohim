@@ -35,12 +35,16 @@ impl Analyzer {
         for obs in observations {
             match obs.kind {
                 ObservationKind::SystemMetrics => {
-                    if let Ok(metrics) = serde_json::from_value::<SystemMetricsData>(obs.data.clone()) {
+                    if let Ok(metrics) =
+                        serde_json::from_value::<SystemMetricsData>(obs.data.clone())
+                    {
                         anomalies.extend(self.analyze_system_metrics(&metrics));
                     }
                 }
                 ObservationKind::NodeConditions => {
-                    if let Ok(change) = serde_json::from_value::<ConditionChangeData>(obs.data.clone()) {
+                    if let Ok(change) =
+                        serde_json::from_value::<ConditionChangeData>(obs.data.clone())
+                    {
                         if let Some(anomaly) = self.analyze_condition_change(&change) {
                             anomalies.push(anomaly);
                         }
@@ -64,9 +68,15 @@ impl Analyzer {
         if let Some(spike) = self.detect_spike("cpu", metrics.cpu_percent as f64) {
             anomalies.push(AnomalyData {
                 anomaly_type: AnomalyType::ResourceSpike,
-                severity: if spike > 90.0 { Severity::Critical } else { Severity::Warning },
+                severity: if spike > 90.0 {
+                    Severity::Critical
+                } else {
+                    Severity::Warning
+                },
                 description: format!("CPU spike detected: {:.1}%", spike),
-                suggested_action: Some("Consider throttling sync or redirecting clients".to_string()),
+                suggested_action: Some(
+                    "Consider throttling sync or redirecting clients".to_string(),
+                ),
             });
         }
 
@@ -123,7 +133,9 @@ impl Analyzer {
     fn analyze_condition_change(&self, change: &ConditionChangeData) -> Option<AnomalyData> {
         // Only alert on negative changes (condition becoming true for pressure, or ready becoming false)
         let is_negative = match change.condition.as_str() {
-            "memory_pressure" | "disk_pressure" | "pid_pressure" => !change.previous && change.current,
+            "memory_pressure" | "disk_pressure" | "pid_pressure" => {
+                !change.previous && change.current
+            }
             "network_ready" | "ready" => change.previous && !change.current,
             _ => false,
         };
@@ -141,7 +153,10 @@ impl Analyzer {
         Some(AnomalyData {
             anomaly_type: AnomalyType::ResourceSpike,
             severity,
-            description: format!("Condition changed: {} - {}", change.condition, change.reason),
+            description: format!(
+                "Condition changed: {} - {}",
+                change.condition, change.reason
+            ),
             suggested_action: Some(format!("Address {} condition", change.condition)),
         })
     }
@@ -179,7 +194,7 @@ impl Analyzer {
 
     /// Record a metric value for trend analysis
     fn record_metric(&mut self, name: &str, value: f64) {
-        let history = self.metric_history.entry(name.to_string()).or_insert_with(Vec::new);
+        let history = self.metric_history.entry(name.to_string()).or_default();
         history.push(value);
 
         // Keep only the window size
@@ -203,14 +218,24 @@ impl Analyzer {
         let std_dev = variance.sqrt();
 
         // Check if current value is a spike
-        if std_dev > 0.0 && (value - mean).abs() > SPIKE_THRESHOLD * std_dev {
-            Some(value)
+        if std_dev > 0.0 {
+            if (value - mean).abs() > SPIKE_THRESHOLD * std_dev {
+                Some(value)
+            } else {
+                None
+            }
         } else {
-            None
+            // All values identical — any significant deviation is a spike
+            if (value - mean).abs() > mean.abs() * 0.1 + 1.0 {
+                Some(value)
+            } else {
+                None
+            }
         }
     }
 
     /// Get trend direction for a metric (-1 = decreasing, 0 = stable, 1 = increasing)
+    #[allow(dead_code)]
     pub fn get_trend(&self, name: &str) -> Option<i8> {
         let history = self.metric_history.get(name)?;
 
@@ -236,6 +261,7 @@ impl Analyzer {
     }
 
     /// Analyze patterns across multiple observations
+    #[allow(dead_code)]
     pub fn analyze_patterns(&self, observations: &[Observation]) -> Vec<String> {
         let mut patterns = Vec::new();
 
@@ -256,7 +282,10 @@ impl Analyzer {
         }
 
         // Check for metric trends
-        for (name, trend) in [("cpu", self.get_trend("cpu")), ("memory", self.get_trend("memory"))] {
+        for (name, trend) in [
+            ("cpu", self.get_trend("cpu")),
+            ("memory", self.get_trend("memory")),
+        ] {
             if let Some(1) = trend {
                 patterns.push(format!("{} usage is trending upward", name));
             }

@@ -5,9 +5,10 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
   transform: {
     '^.+\\.ts$': 'ts-jest',
+    '^.+\\.m?js$': 'ts-jest',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@holochain/client)/)',
+    'node_modules/(?!(@holochain|emittery)/)',
   ],
   collectCoverageFrom: [
     'src/**/*.ts',

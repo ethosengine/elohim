@@ -346,11 +346,13 @@ describe('StorageClient', () => {
 
   describe('getShard()', () => {
     it('should retrieve shard data', async () => {
-      const data = Buffer.from('shard data');
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode('shard data');
+      const arrayBuffer = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength);
 
       (global.fetch as any).mockResolvedValue({
         ok: true,
-        arrayBuffer: async () => data.buffer,
+        arrayBuffer: async () => arrayBuffer,
       });
 
       const result = await client.getShard('sha256-abc123');

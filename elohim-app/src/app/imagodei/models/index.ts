@@ -81,4 +81,5 @@ export {
   INITIAL_SECURITY_STATUS,
 } from './identity-attestation.model';
 export * from './stewardship.model';
+export * from './hosting-account.model';
 // Note: Node status types are in shefa/models/shefa-dashboard.model.ts

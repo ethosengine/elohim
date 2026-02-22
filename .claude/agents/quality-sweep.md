@@ -104,8 +104,8 @@ Post-hooks run linting automatically on tool use. If hooks report violations in 
 ### TypeScript/Angular
 | Tool | Purpose | Config |
 |------|---------|--------|
-| ESLint | Code quality rules | `.eslintrc.json` |
-| Prettier | Code formatting | `.prettierrc` |
+| ESLint | Code quality rules | `eslint.config.js` (flat config) |
+| Prettier | Code formatting | `.prettierrc.js` |
 | TypeScript | Type checking | `tsconfig.json` |
 
 ### Rust
@@ -157,7 +157,7 @@ npx tsc -p tsconfig.app.json --noEmit
 ### Clippy (Rust)
 ```bash
 # Run clippy
-cd /projects/elohim/holochain/doorway
+cd /projects/elohim/doorway
 RUSTFLAGS='' cargo clippy
 
 # With all warnings
@@ -350,29 +350,11 @@ Remaining: Y manual issues
 
 ## Configuration Files
 
-### ESLint (.eslintrc.json)
-```json
-{
-  "extends": [
-    "eslint:recommended",
-    "@angular-eslint/recommended"
-  ],
-  "rules": {
-    "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/explicit-function-return-type": "warn"
-  }
-}
-```
+### ESLint (eslint.config.js)
+Uses ESLint 9 flat config format. See `elohim-app/eslint.config.js` for the full configuration.
 
-### Prettier (.prettierrc)
-```json
-{
-  "semi": true,
-  "singleQuote": true,
-  "tabWidth": 2,
-  "printWidth": 100
-}
-```
+### Prettier (.prettierrc.js)
+See `elohim-app/.prettierrc.js` for the full configuration (100 char width, single quotes, trailing commas).
 
 ### Clippy (clippy.toml)
 ```toml

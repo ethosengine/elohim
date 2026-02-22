@@ -1,0 +1,26 @@
+# Doorway App - Angular Admin UI
+
+set dotenv-load := false
+
+# List available recipes
+default:
+    @just --list
+
+# Install dependencies
+install:
+    npm install
+
+# Start dev server
+dev:
+    npm start
+
+# Build
+build:
+    npx ng build --configuration=development
+
+# Lint
+lint:
+    npx eslint src --ext .ts,.html
+
+# Quality gate: lint + build
+gate: lint build

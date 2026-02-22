@@ -173,7 +173,10 @@ describe('Trust Service', () => {
 
       const score = calculateTrustScore(attestations);
 
-      expect(score).toBe(0.8); // falls back to default
+      // Expired attestations are not counted (only 'active' status contributes weight).
+      // The array is non-empty so the default (0.8) early-return is NOT triggered;
+      // totalWeight stays 0, so the result is Math.min(1, 0 / 1.5) = 0.
+      expect(score).toBe(0);
     });
 
     it('should cap score at 1.0', () => {

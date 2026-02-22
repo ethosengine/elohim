@@ -19,10 +19,11 @@ use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::auth::{extract_token_from_header, JwtValidator, TokenInput};
-use crate::conductor::{AdminClient, AgentProvisioner};
+use crate::conductor::typed_admin::TypedAdminClient;
+use crate::conductor::AgentProvisioner;
 use crate::server::http::AppState;
 
 /// Request body for `POST /hc/connect`.
@@ -169,7 +170,8 @@ pub async fn handle_hc_connect(
     } else {
         // Auto-provision (idempotent — handles logout→re-login)
         let provisioner = AgentProvisioner::new(Arc::clone(&registry))
-            .with_app_id(state.args.installed_app_id.clone());
+            .with_app_id(state.args.installed_app_id.clone())
+            .with_bundle_path(state.args.happ_bundle_path.clone());
         match provisioner.provision_agent(&claims.identifier).await {
             Ok(p) => {
                 let info = match registry.get_conductor_info(&p.conductor_id) {
@@ -195,10 +197,7 @@ pub async fn handle_hc_connect(
             }
             Err(e) => {
                 error!("Chaperone auto-provision failed: {}", e);
-                return json_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    &format!("Auto-provision failed: {e}"),
-                );
+                return sanitize_client_error(StatusCode::SERVICE_UNAVAILABLE, "Auto-provision");
             }
         }
     };
@@ -210,23 +209,123 @@ pub async fn handle_hc_connect(
         "Chaperone: resolved conductor"
     );
 
-    // --- Step 3: Create AdminClient and get app info ---
-    let admin = AdminClient::new(admin_url);
-
-    let app_info = match admin.get_app_info(&installed_app_id).await {
-        Ok(info) => info,
+    // --- Step 3: Connect TypedAdminClient and get app info (with cell readiness polling) ---
+    let admin = match TypedAdminClient::connect(&admin_url).await {
+        Ok(a) => a,
         Err(e) => {
-            error!("Chaperone: get_app_info failed: {}", e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Failed to get app info: {e}"),
-            );
+            error!("Chaperone: admin connect failed: {}", e);
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Admin connect");
         }
     };
 
-    if app_info.cell_ids.is_empty() {
-        return json_error(StatusCode::BAD_GATEWAY, "No cells found in app");
-    }
+    let app_info = {
+        let max_polls = 20;
+        let poll_interval = std::time::Duration::from_secs(1);
+        let mut last_info = None;
+        let mut app_found = false;
+
+        for attempt in 1..=max_polls {
+            match admin.get_app_info(&installed_app_id).await {
+                Ok(info) => {
+                    app_found = true;
+
+                    if !info.cell_ids.is_empty() {
+                        debug!(
+                            app = %installed_app_id,
+                            cells = info.cell_ids.len(),
+                            polls = attempt,
+                            "Cells ready"
+                        );
+                        last_info = Some(info);
+                        break;
+                    }
+
+                    // App found but no cells yet — check if disabled
+                    if let Some(ref status) = info.status {
+                        if status.eq_ignore_ascii_case("disabled") {
+                            warn!(
+                                app = %installed_app_id,
+                                "App is disabled — attempting re-enable"
+                            );
+                            if let Err(e) = admin.enable_app(&installed_app_id).await {
+                                warn!(
+                                    app = %installed_app_id,
+                                    error = %e,
+                                    "Failed to re-enable disabled app"
+                                );
+                            }
+                        }
+                    }
+
+                    // Cells not ready yet — keep polling
+                    if attempt < max_polls {
+                        debug!(
+                            app = %installed_app_id,
+                            attempt,
+                            status = ?info.status,
+                            "Waiting for cells to initialize..."
+                        );
+                        tokio::time::sleep(poll_interval).await;
+                    } else {
+                        last_info = Some(info); // Last attempt — use whatever we got
+                    }
+                }
+                Err(e) => {
+                    if attempt == max_polls {
+                        error!(
+                            conductor = %conductor_id,
+                            app = %installed_app_id,
+                            error = %e,
+                            attempts = max_polls,
+                            "Chaperone: get_app_info failed after all attempts"
+                        );
+                        return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info");
+                    }
+                    debug!(
+                        app = %installed_app_id,
+                        attempt,
+                        error = %e,
+                        "get_app_info not ready yet, retrying..."
+                    );
+                    tokio::time::sleep(poll_interval).await;
+                }
+            }
+        }
+
+        match last_info {
+            Some(info) if !info.cell_ids.is_empty() => info,
+            Some(info) => {
+                warn!(
+                    conductor = %conductor_id,
+                    app = %installed_app_id,
+                    status = ?info.status,
+                    cell_count = info.cell_ids.len(),
+                    "Chaperone: no cells after {}s polling",
+                    max_polls
+                );
+                return json_error(
+                    StatusCode::BAD_GATEWAY,
+                    &format!(
+                        "No cells found in app '{}' on conductor '{}' after {}s (status: {:?})",
+                        installed_app_id, conductor_id, max_polls, info.status
+                    ),
+                );
+            }
+            None => {
+                warn!(
+                    conductor = %conductor_id,
+                    app = %installed_app_id,
+                    app_found,
+                    "Chaperone: app info unavailable after polling"
+                );
+                return sanitize_client_error(StatusCode::BAD_GATEWAY, "Get app info");
+            }
+        }
+    };
+
+    // Track whether we've already attempted a re-enable for CellDisabled errors.
+    // Only try once per connect — if it doesn't help, the cells need manual attention.
+    let mut reenable_attempted = false;
 
     // --- Step 4: Grant capabilities per cell ---
     for (role_name, (ref dna_hash, ref agent_key)) in &app_info.cell_ids {
@@ -237,16 +336,17 @@ pub async fn handle_hc_connect(
         let sk = signing_key.clone();
         let cs = cap_secret.clone();
 
-        if let Err(e) = AdminClient::with_source_chain_retry(
+        let grant_result = TypedAdminClient::with_source_chain_retry(
             || {
-                let admin_inner = AdminClient::new(admin.admin_url().to_string());
+                let url = admin.admin_url().to_string();
                 let dna = dna.clone();
                 let agent = agent.clone();
                 let cs = cs.clone();
                 let sk = sk.clone();
                 let tag = tag.clone();
                 async move {
-                    admin_inner
+                    let client = TypedAdminClient::connect(&url).await?;
+                    client
                         .grant_zome_call_capability((&dna, &agent), &cs, &sk, &tag)
                         .await
                 }
@@ -254,60 +354,87 @@ pub async fn handle_hc_connect(
             &format!("cap grant for {role}"),
             3,
         )
-        .await
-        {
+        .await;
+
+        if let Err(e) = grant_result {
             // CellMissing is non-fatal — skip that cell
             if e.contains("CellMissing") {
                 warn!("Chaperone: skipping cap grant for '{}': CellMissing", role);
                 continue;
             }
-            error!("Chaperone: cap grant failed for '{}': {}", role, e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Cap grant failed for '{role}': {e}"),
-            );
-        }
-    }
 
-    // --- Step 5: Authorize signing credentials per cell ---
-    for (role_name, (ref dna_hash, ref agent_key)) in &app_info.cell_ids {
-        let role = role_name.clone();
-        let dna = dna_hash.clone();
-        let agent = agent_key.clone();
-        let sk = signing_key.clone();
-        let cs = cap_secret.clone();
+            // CellDisabled — attempt to re-enable the app and retry once
+            if e.contains("CellDisabled") && !reenable_attempted {
+                reenable_attempted = true;
+                warn!(
+                    app = %installed_app_id,
+                    role = %role,
+                    "Cell is disabled — attempting app re-enable and retry"
+                );
+                if let Err(enable_err) = admin.enable_app(&installed_app_id).await {
+                    warn!(
+                        app = %installed_app_id,
+                        error = %enable_err,
+                        "Failed to re-enable app after CellDisabled"
+                    );
+                } else {
+                    // Wait briefly for cells to come back online
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-        if let Err(e) = AdminClient::with_source_chain_retry(
-            || {
-                let admin_inner = AdminClient::new(admin.admin_url().to_string());
-                let dna = dna.clone();
-                let agent = agent.clone();
-                let sk = sk.clone();
-                let cs = cs.clone();
-                async move {
-                    admin_inner
-                        .authorize_signing_credentials((&dna, &agent), &sk, &cs)
-                        .await
+                    // Retry the cap grant for this cell
+                    let retry_result = match TypedAdminClient::connect(admin.admin_url()).await {
+                        Ok(retry_admin) => {
+                            retry_admin
+                                .grant_zome_call_capability((dna_hash, agent_key), &cs, &sk, &tag)
+                                .await
+                        }
+                        Err(e) => Err(e),
+                    };
+                    match retry_result {
+                        Ok(()) => {
+                            info!(role = %role, "Cap grant succeeded after re-enable");
+                            continue;
+                        }
+                        Err(retry_err) => {
+                            if retry_err.contains("CellMissing")
+                                || retry_err.contains("CellDisabled")
+                            {
+                                warn!(
+                                    "Chaperone: skipping cap grant for '{}' after re-enable: {}",
+                                    role, retry_err
+                                );
+                                continue;
+                            }
+                            error!(
+                                "Chaperone: cap grant still failed for '{}' after re-enable: {}",
+                                role, retry_err
+                            );
+                            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Cap grant");
+                        }
+                    }
                 }
-            },
-            &format!("authorize credentials for {role}"),
-            3,
-        )
-        .await
-        {
-            if e.contains("CellMissing") {
-                warn!("Chaperone: skipping authorize for '{}': CellMissing", role);
+            }
+
+            // CellDisabled after re-enable already attempted — skip
+            if e.contains("CellDisabled") {
+                warn!(
+                    "Chaperone: skipping cap grant for '{}': CellDisabled (re-enable already attempted)",
+                    role
+                );
                 continue;
             }
-            error!("Chaperone: authorize failed for '{}': {}", role, e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Authorize failed for '{role}': {e}"),
-            );
+
+            error!("Chaperone: cap grant failed for '{}': {}", role, e);
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Cap grant");
         }
     }
 
-    // --- Step 6: Get app interface port ---
+    // NOTE: authorize_signing_credentials is a client-SDK helper that generates
+    // keypairs via Lair — it is NOT a conductor admin API call. The browser
+    // generates its own signing keys, and grant_zome_call_capability (Step 4)
+    // is the actual admin call that authorizes them. No Step 5 needed.
+
+    // --- Step 5: Get app interface port ---
     let app_port = match admin.list_app_interfaces().await {
         Ok(ports) if !ports.is_empty() => ports[0],
         Ok(_) => {
@@ -320,7 +447,7 @@ pub async fn handle_hc_connect(
         }
     };
 
-    // --- Step 7: Issue app authentication token ---
+    // --- Step 6: Issue app authentication token ---
     let app_token = match admin
         .issue_app_authentication_token(&installed_app_id, 3600)
         .await
@@ -328,14 +455,11 @@ pub async fn handle_hc_connect(
         Ok(token) => BASE64.encode(&token),
         Err(e) => {
             error!("Chaperone: issue_app_authentication_token failed: {}", e);
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("Failed to issue app token: {e}"),
-            );
+            return sanitize_client_error(StatusCode::BAD_GATEWAY, "Issue app token");
         }
     };
 
-    // --- Step 8: Re-issue JWT with conductor_id ---
+    // --- Step 7: Re-issue JWT with conductor_id ---
     let refreshed_token = if claims.conductor_id.is_none() || claims.installed_app_id.is_none() {
         let input = TokenInput {
             human_id: claims.human_id.clone(),
@@ -347,6 +471,8 @@ pub async fn handle_hc_connect(
             doorway_url: state.args.doorway_url.clone(),
             conductor_id: Some(conductor_id.clone()),
             installed_app_id: Some(installed_app_id.clone()),
+            is_steward: claims.is_steward,
+            has_local_conductor: claims.has_local_conductor,
         };
         match jwt.generate_token(input) {
             Ok(t) => t,
@@ -359,7 +485,7 @@ pub async fn handle_hc_connect(
         token_str.clone()
     };
 
-    // --- Step 9: Build response ---
+    // --- Step 8: Build response ---
     let mut cell_ids_map = HashMap::new();
     for (role_name, (ref dna_hash, ref agent_key)) in &app_info.cell_ids {
         cell_ids_map.insert(
@@ -391,6 +517,17 @@ pub async fn handle_hc_connect(
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/// Sanitize internal error details for client-facing responses.
+/// Full errors are already logged server-side via `error!()` / `warn!()`.
+fn sanitize_client_error(status: StatusCode, operation: &str) -> Response<Full<Bytes>> {
+    let message = match status {
+        StatusCode::BAD_GATEWAY => format!("{operation}: service temporarily unavailable"),
+        StatusCode::SERVICE_UNAVAILABLE => "Service temporarily unavailable".to_string(),
+        _ => format!("{operation} failed"),
+    };
+    json_error(status, &message)
+}
 
 fn json_error(status: StatusCode, message: &str) -> Response<Full<Bytes>> {
     let body = serde_json::json!({ "error": message });

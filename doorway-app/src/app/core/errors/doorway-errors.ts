@@ -13,7 +13,7 @@ export abstract class DoorwayError extends Error {
     message: string,
     public readonly code: string,
     public readonly recoverable: boolean = false,
-    public readonly cause?: Error
+    public override readonly cause?: Error
   ) {
     super(message);
     this.name = this.constructor.name;

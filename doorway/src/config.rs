@@ -152,6 +152,10 @@ pub struct Args {
     #[arg(long, env = "INSTALLED_APP_ID", default_value = "elohim")]
     pub installed_app_id: String,
 
+    /// Path to the hApp bundle for auto-provisioning new agents
+    #[arg(long, env = "HAPP_BUNDLE_PATH", default_value = "/app/elohim.happ")]
+    pub happ_bundle_path: String,
+
     /// Admin port for orchestrator mDNS advertisement (defaults to conductor admin port)
     #[arg(long, env = "ORCHESTRATOR_ADMIN_PORT", default_value = "8888")]
     pub orchestrator_admin_port: u16,

@@ -151,10 +151,18 @@
               (confirmGraduation)="confirmGraduation($event)"
             />
 
+            @if (mode() === 'hosted' && hostingAccount(); as acct) {
+              <app-profile-hosting-section
+                [account]="acct"
+                [doorwayUrl]="activeDoorway()?.url ?? null"
+              />
+            }
+
             @if (isNetworkUser()) {
               <app-profile-doorways-section
                 [doorways]="registeredDoorways()"
                 [activeDoorwayId]="activeDoorway()?.id ?? null"
+                [identityMode]="mode()"
                 [registrationContext]="doorwayRegistrationContext()"
                 (setAsPrimary)="setDoorwayAsPrimary($event)"
                 (validateDoorway)="validateDoorway($event)"

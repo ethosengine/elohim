@@ -80,6 +80,14 @@ pub struct HostDoc {
     #[serde(default = "default_max_connections")]
     pub max_connections: i32,
 
+    /// Number of agents currently hosted across all conductors
+    #[serde(default)]
+    pub agent_count: i32,
+
+    /// Number of conductors in the pool
+    #[serde(default)]
+    pub conductor_count: i32,
+
     /// Optional description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -118,6 +126,8 @@ impl HostDoc {
             region: None,
             active_connections: 0,
             max_connections: default_max_connections(),
+            agent_count: 0,
+            conductor_count: 0,
             description: None,
             version: None,
         }

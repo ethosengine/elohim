@@ -14,12 +14,14 @@
 //! and human-scale metrics (trust, reach, stewardship tier) to give
 //! operators a holistic view of their network.
 
+use bson::doc;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::{Response, StatusCode};
 use serde::Serialize;
 use std::sync::Arc;
 
+use crate::db::schemas::{UserDoc, USER_COLLECTION};
 use crate::orchestrator::{NodeHealthStatus, SocialMetrics};
 use crate::server::AppState;
 
@@ -695,6 +697,112 @@ fn extract_social_metrics(
         ),
         None => (None, None, None, None, None, None, None, None, None, None),
     }
+}
+
+// ============================================================================
+// Pipeline (User Lifecycle Funnel)
+// ============================================================================
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineResponse {
+    pub registered_total: u64,
+    pub registered_active: u64,
+    pub hosted_total: u64,
+    pub graduating_count: u64,
+    pub steward_count: u64,
+}
+
+/// Handle GET /admin/pipeline
+pub async fn handle_admin_pipeline(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let mongo = match &state.mongo {
+        Some(m) => m,
+        None => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                serde_json::json!({"error": "Database not available"}),
+            )
+        }
+    };
+
+    let collection = match mongo.collection::<UserDoc>(USER_COLLECTION).await {
+        Ok(c) => c,
+        Err(e) => {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                serde_json::json!({"error": format!("Database error: {e}")}),
+            )
+        }
+    };
+
+    let inner = collection.inner();
+
+    let registered_total = inner.count_documents(doc! {}).await.unwrap_or(0);
+    let registered_active = inner
+        .count_documents(doc! { "is_active": true })
+        .await
+        .unwrap_or(0);
+    let hosted_total = inner
+        .count_documents(doc! { "conductor_id": { "$ne": null } })
+        .await
+        .unwrap_or(0);
+    let graduating_count = inner
+        .count_documents(doc! {
+            "custodial_key.exported": true,
+            "is_steward": false,
+        })
+        .await
+        .unwrap_or(0);
+    let steward_count = inner
+        .count_documents(doc! { "is_steward": true })
+        .await
+        .unwrap_or(0);
+
+    json_response(
+        StatusCode::OK,
+        PipelineResponse {
+            registered_total,
+            registered_active,
+            hosted_total,
+            graduating_count,
+            steward_count,
+        },
+    )
+}
+
+// ============================================================================
+// Capabilities
+// ============================================================================
+
+/// Feature flags derived from optional AppState fields
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilitiesResponse {
+    /// Orchestrator is available (cluster management, node health, provisioning)
+    pub orchestrator: bool,
+    /// Federation is available (peer doorways, NATS messaging)
+    pub federation: bool,
+    /// Conductor pool is available (hosted agent connections)
+    pub conductor_pool: bool,
+    /// NATS messaging is available
+    pub nats: bool,
+}
+
+/// Handle GET /admin/capabilities
+///
+/// Returns feature flags derived from optional AppState fields so the
+/// dashboard can discover available features upfront instead of hitting
+/// 503 errors on individual endpoints.
+///
+/// This endpoint does NOT require authentication.
+pub async fn handle_capabilities(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let response = CapabilitiesResponse {
+        orchestrator: state.orchestrator.is_some(),
+        federation: state.nats.is_some(),
+        conductor_pool: state.pool.is_some() || state.admin_pool.is_some(),
+        nats: state.nats.is_some(),
+    };
+    json_response(StatusCode::OK, response)
 }
 
 fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Bytes>> {

@@ -11,7 +11,6 @@
  */
 
 // Using any type since kuzu doesn't have proper TypeScript types
-type Connection = any;
 
 /**
  * Schema definition for all node and relationship tables
@@ -116,7 +115,7 @@ export const SCHEMA_DDL = {
       description STRING,
       estimatedDuration STRING,
       attestationGranted STRING
-    )`
+    )`,
   ],
 
   relationships: [
@@ -185,8 +184,8 @@ export const SCHEMA_DDL = {
 
     `CREATE REL TABLE IF NOT EXISTS ATTESTED_BY (
       FROM ContentAttestation TO Agent
-    )`
-  ]
+    )`,
+  ],
 };
 
 /**
@@ -194,22 +193,22 @@ export const SCHEMA_DDL = {
  * Maps from JSON relationship.type to Cypher relationship table
  */
 export const RELATIONSHIP_TYPE_MAP: Record<string, string> = {
-  'CONTAINS': 'CONTAINS',
-  'BELONGS_TO': 'BELONGS_TO',
-  'RELATES_TO': 'RELATES_TO',
-  'DEPENDS_ON': 'DEPENDS_ON',
-  'REFERENCES': 'REFERENCES',
-  'IMPLEMENTS': 'IMPLEMENTS',
-  'DESCRIBES': 'RELATES_TO',  // Map similar types
-  'VALIDATES': 'RELATES_TO',
-  'FOLLOWS': 'DEPENDS_ON'
+  CONTAINS: 'CONTAINS',
+  BELONGS_TO: 'BELONGS_TO',
+  RELATES_TO: 'RELATES_TO',
+  DEPENDS_ON: 'DEPENDS_ON',
+  REFERENCES: 'REFERENCES',
+  IMPLEMENTS: 'IMPLEMENTS',
+  DESCRIBES: 'RELATES_TO', // Map similar types
+  VALIDATES: 'RELATES_TO',
+  FOLLOWS: 'DEPENDS_ON',
 };
 
 /**
  * Initialize the Kuzu database schema
  * Creates all node and relationship tables if they don't exist
  */
-export async function initializeSchema(conn: Connection): Promise<void> {
+export async function initializeSchema(conn: any): Promise<void> {
   console.log('Initializing Kuzu schema...');
 
   // Create node tables
@@ -237,15 +236,32 @@ export async function initializeSchema(conn: Connection): Promise<void> {
 /**
  * Drop all tables (use with caution - for testing/reset)
  */
-export async function dropAllTables(conn: Connection): Promise<void> {
+export async function dropAllTables(conn: any): Promise<void> {
   const tables = [
     // Drop relationships first (they depend on nodes)
-    'ATTESTED_BY', 'ATTESTS', 'PROGRESS_ON_PATH', 'HAS_PROGRESS', 'AUTHORED',
-    'STEP_USES_CONTENT', 'PATH_HAS_STEP', 'CHAPTER_HAS_STEP', 'PATH_HAS_CHAPTER',
-    'BELONGS_TO', 'IMPLEMENTS', 'REFERENCES', 'DEPENDS_ON', 'RELATES_TO', 'CONTAINS',
+    'ATTESTED_BY',
+    'ATTESTS',
+    'PROGRESS_ON_PATH',
+    'HAS_PROGRESS',
+    'AUTHORED',
+    'STEP_USES_CONTENT',
+    'PATH_HAS_STEP',
+    'CHAPTER_HAS_STEP',
+    'PATH_HAS_CHAPTER',
+    'BELONGS_TO',
+    'IMPLEMENTS',
+    'REFERENCES',
+    'DEPENDS_ON',
+    'RELATES_TO',
+    'CONTAINS',
     // Then drop nodes
-    'PathChapter', 'ContentAttestation', 'AgentProgress', 'Agent',
-    'PathStep', 'LearningPath', 'ContentNode'
+    'PathChapter',
+    'ContentAttestation',
+    'AgentProgress',
+    'Agent',
+    'PathStep',
+    'LearningPath',
+    'ContentNode',
   ];
 
   for (const table of tables) {
@@ -260,10 +276,18 @@ export async function dropAllTables(conn: Connection): Promise<void> {
 /**
  * Get schema statistics
  */
-export async function getSchemaStats(conn: Connection): Promise<Record<string, number>> {
+export async function getSchemaStats(conn: any): Promise<Record<string, number>> {
   const stats: Record<string, number> = {};
 
-  const nodeTables = ['ContentNode', 'LearningPath', 'PathStep', 'Agent', 'AgentProgress', 'ContentAttestation', 'PathChapter'];
+  const nodeTables = [
+    'ContentNode',
+    'LearningPath',
+    'PathStep',
+    'Agent',
+    'AgentProgress',
+    'ContentAttestation',
+    'PathChapter',
+  ];
 
   for (const table of nodeTables) {
     try {

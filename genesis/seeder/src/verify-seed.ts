@@ -186,13 +186,94 @@ async function main(): Promise<void> {
       console.log(`   ✓ All ${SAMPLE_CONTENT_IDS.length} samples verified`);
     }
 
+    // Step 5: Validate all paths load with steps
+    console.log('\n5. Validating path step integrity...');
+    let pathStepErrors = 0;
+    for (const pathSummary of paths.paths) {
+      try {
+        const pathData = await appWs.callZome({
+          cell_id: cellId,
+          zome_name: ZOME_NAME,
+          fn_name: 'get_path_by_id',
+          payload: { id: pathSummary.id },
+        }) as { path: { id: string; steps: { resource_id: string }[] } } | null;
+
+        if (!pathData) {
+          console.log(`   ✗ ${pathSummary.id} (path not found)`);
+          pathStepErrors++;
+          continue;
+        }
+
+        const stepCount = pathData.path.steps?.length ?? 0;
+        if (stepCount === 0) {
+          console.log(`   ✗ ${pathSummary.id} (0 steps)`);
+          pathStepErrors++;
+        } else {
+          console.log(`   ✓ ${pathSummary.id} (${stepCount} steps)`);
+        }
+      } catch (error) {
+        console.log(`   ✗ ${pathSummary.id} (error: ${error})`);
+        pathStepErrors++;
+      }
+    }
+
+    // Step 6: Check for blob references in sample content
+    console.log('\n6. Checking blob references...');
+    let blobRefsFound = 0;
+    let blobRefsBroken = 0;
+    for (const id of SAMPLE_CONTENT_IDS) {
+      try {
+        const content = await appWs.callZome({
+          cell_id: cellId,
+          zome_name: ZOME_NAME,
+          fn_name: 'get_content_by_id',
+          payload: { id },
+        }) as { content: { content: string; content_format: string } } | null;
+
+        if (!content) continue;
+        const body = content.content.content;
+
+        // Check if content body is a blob reference
+        if (body && (body.startsWith('sha256:') || body.startsWith('sha256-'))) {
+          blobRefsFound++;
+          // Verify the blob exists via get_blob zome call
+          try {
+            const blob = await appWs.callZome({
+              cell_id: cellId,
+              zome_name: ZOME_NAME,
+              fn_name: 'get_blob',
+              payload: { hash: body },
+            });
+            if (blob) {
+              console.log(`   ✓ ${id} blob ref ${body.slice(0, 20)}... resolved`);
+            } else {
+              console.log(`   ✗ ${id} blob ref ${body.slice(0, 20)}... NOT found`);
+              blobRefsBroken++;
+            }
+          } catch {
+            // get_blob may not exist as a zome fn; skip gracefully
+            console.log(`   ~ ${id} blob ref ${body.slice(0, 20)}... (skipped, no get_blob fn)`);
+          }
+        }
+      } catch {
+        // Skip content that can't be loaded
+      }
+    }
+    if (blobRefsFound === 0) {
+      console.log('   (no blob references found in sample content)');
+    } else if (blobRefsBroken === 0) {
+      console.log(`   ✓ All ${blobRefsFound} blob references resolved`);
+    }
+
     // Summary
     console.log('\n' + '═'.repeat(70));
     console.log('📊 VERIFICATION SUMMARY');
     console.log('═'.repeat(70));
-    console.log(`   Content: ${stats.total_count} (min: ${MIN_CONTENT_COUNT}) ✓`);
-    console.log(`   Paths:   ${paths.total_count} (min: ${MIN_PATH_COUNT}) ✓`);
-    console.log(`   Samples: ${samplesPassed}/${SAMPLE_CONTENT_IDS.length}`);
+    console.log(`   Content:    ${stats.total_count} (min: ${MIN_CONTENT_COUNT}) ✓`);
+    console.log(`   Paths:      ${paths.total_count} (min: ${MIN_PATH_COUNT}) ✓`);
+    console.log(`   Samples:    ${samplesPassed}/${SAMPLE_CONTENT_IDS.length}`);
+    console.log(`   Path steps: ${pathStepErrors === 0 ? '✓ all valid' : `${pathStepErrors} errors`}`);
+    console.log(`   Blob refs:  ${blobRefsFound === 0 ? 'none found' : blobRefsBroken === 0 ? `✓ ${blobRefsFound} resolved` : `${blobRefsBroken} broken`}`);
 
     // Content type breakdown
     if (stats.by_type) {
@@ -208,7 +289,9 @@ async function main(): Promise<void> {
     // Determine success
     const success = stats.total_count >= MIN_CONTENT_COUNT &&
                    paths.total_count >= MIN_PATH_COUNT &&
-                   samplesFailed.length <= 2; // Allow up to 2 missing samples
+                   samplesFailed.length <= 2 && // Allow up to 2 missing samples
+                   pathStepErrors === 0 &&
+                   blobRefsBroken === 0;
 
     if (success) {
       console.log('\n   ✅ VERIFICATION PASSED');

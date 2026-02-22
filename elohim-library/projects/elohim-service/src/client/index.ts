@@ -107,11 +107,7 @@ export type {
 } from './types';
 
 // Value exports (enums, consts) - normal export
-export {
-  WritePriority,
-  WriteBufferDefaults,
-  ReachLevel,
-} from './types';
+export { WritePriority, WriteBufferDefaults, ReachLevel } from './types';
 
 // Angular integration
 export {

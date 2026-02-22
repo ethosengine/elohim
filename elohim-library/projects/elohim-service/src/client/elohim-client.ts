@@ -38,8 +38,8 @@ import {
  * overwhelming the backend during bulk operations.
  */
 export class WriteBuffer {
-  private config: WriteBufferConfig;
-  private queues: Map<WritePriority, Map<string, WriteOp>> = new Map();
+  private readonly config: WriteBufferConfig;
+  private readonly queues = new Map<WritePriority, Map<string, WriteOp>>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(config: WriteBufferConfig = WriteBufferDefaults.default) {
@@ -106,7 +106,7 @@ export class WriteBuffer {
  * Reach enforcer for access control
  */
 export class ReachEnforcer {
-  constructor(private agentReach: ReachLevel = ReachLevel.Commons) {}
+  constructor(private readonly agentReach: ReachLevel = ReachLevel.Commons) {}
 
   /** Create enforcer for anonymous access (commons only) */
   static anonymous(): ReachEnforcer {
@@ -127,13 +127,20 @@ export class ReachEnforcer {
   /** Parse reach level from string */
   static parseReach(s: string): ReachLevel {
     switch (s.toLowerCase()) {
-      case 'private': return ReachLevel.Private;
-      case 'invited': return ReachLevel.Invited;
-      case 'local': return ReachLevel.Local;
-      case 'neighborhood': return ReachLevel.Neighborhood;
-      case 'municipal': return ReachLevel.Municipal;
-      case 'bioregional': return ReachLevel.Bioregional;
-      case 'regional': return ReachLevel.Regional;
+      case 'private':
+        return ReachLevel.Private;
+      case 'invited':
+        return ReachLevel.Invited;
+      case 'local':
+        return ReachLevel.Local;
+      case 'neighborhood':
+        return ReachLevel.Neighborhood;
+      case 'municipal':
+        return ReachLevel.Municipal;
+      case 'bioregional':
+        return ReachLevel.Bioregional;
+      case 'regional':
+        return ReachLevel.Regional;
       case 'commons':
       case 'public':
       default:
@@ -152,10 +159,10 @@ export class ReachEnforcer {
  * Agent operations: separate holochain connection (if configured)
  */
 export class ElohimClient {
-  private mode: ClientMode;
-  private writeBuffer: WriteBuffer;
-  private reachEnforcer: ReachEnforcer;
-  private holochain?: HolochainConnection;
+  private readonly mode: ClientMode;
+  private readonly writeBuffer: WriteBuffer;
+  private readonly reachEnforcer: ReachEnforcer;
+  private readonly holochain?: HolochainConnection;
 
   constructor(config: ElohimClientConfig) {
     this.mode = config.mode;
@@ -210,13 +217,12 @@ export class ElohimClient {
     if (!this.holochain?.enabled) return null;
 
     switch (this.mode.type) {
-      case 'browser':
+      case 'browser': {
         // Browser mode: Holochain WebSocket proxied through doorway
         const doorwayUrl = this.mode.doorway.url;
-        const wsUrl = doorwayUrl
-          .replace('https://', 'wss://')
-          .replace('http://', 'ws://');
+        const wsUrl = doorwayUrl.replace('https://', 'wss://').replace('http://', 'ws://');
         return `${wsUrl}/conductor`;
+      }
 
       case 'tauri':
         // Tauri mode: direct connection to local conductor
@@ -377,9 +383,7 @@ export class ElohimClient {
     options?: RequestInit
   ): Promise<T | null> {
     // Use storageUrl directly for /db/* routes if configured (local dev bypass)
-    const baseUrl = (path.startsWith('/db/') && mode.storageUrl)
-      ? mode.storageUrl
-      : mode.doorway.url;
+    const baseUrl = path.startsWith('/db/') && mode.storageUrl ? mode.storageUrl : mode.doorway.url;
     const url = `${baseUrl}${path}`;
 
     const headers: Record<string, string> = {
@@ -506,7 +510,7 @@ export class ElohimClient {
     }
 
     // elohim-storage returns { items: [...], count, limit, offset }
-    const result = await response.json() as { items: T[], count: number };
+    const result = (await response.json()) as { items: T[]; count: number };
     return result.items ?? [];
   }
 
@@ -559,10 +563,7 @@ export class ElohimClient {
     return mode.invoke<T | null>('get_content', { contentType, id });
   }
 
-  private async queryFromTauri<T>(
-    mode: TauriMode,
-    query: ContentQuery
-  ): Promise<T[]> {
+  private async queryFromTauri<T>(mode: TauriMode, query: ContentQuery): Promise<T[]> {
     return mode.invoke<T[]>('query_content', { query });
   }
 

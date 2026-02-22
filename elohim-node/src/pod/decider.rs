@@ -4,12 +4,13 @@
 //! LLM integration is stubbed for future implementation.
 
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use super::models::*;
 
 /// Decider makes decisions based on rules and observations
 pub struct Decider {
+    #[allow(dead_code)]
     node_id: String,
     /// Active rules
     rules: Vec<Rule>,
@@ -31,8 +32,8 @@ impl Decider {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read rules file: {}", e))?;
 
-        let rules: Vec<Rule> = serde_yaml::from_str(&content)
-            .map_err(|e| format!("Failed to parse rules: {}", e))?;
+        let rules: Vec<Rule> =
+            serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse rules: {}", e))?;
 
         self.rules = rules;
         info!(count = self.rules.len(), path, "Loaded rules");
@@ -45,6 +46,7 @@ impl Decider {
     }
 
     /// Add a rule
+    #[allow(dead_code)]
     pub fn add_rule(&mut self, rule: Rule) {
         self.rules.push(rule);
     }
@@ -67,7 +69,7 @@ impl Decider {
         let mut sorted_rules: Vec<_> = self.rules.iter().enumerate().collect();
         sorted_rules.sort_by(|a, b| b.1.priority.cmp(&a.1.priority));
 
-        for (idx, rule) in sorted_rules {
+        for (_idx, rule) in sorted_rules {
             if !rule.enabled {
                 continue;
             }
@@ -81,7 +83,8 @@ impl Decider {
             }
 
             // Evaluate condition
-            let triggered = self.evaluate_condition(&rule.condition, latest_metrics, service_health);
+            let triggered =
+                self.evaluate_condition(&rule.condition, latest_metrics, service_health);
 
             if triggered {
                 info!(rule = %rule.name, "Rule triggered");
@@ -91,7 +94,8 @@ impl Decider {
                     rule.action_template.kind.clone(),
                     &rule.action_template.description,
                     rule.action_template.params.clone(),
-                ).with_risk(rule.action_template.risk.clone());
+                )
+                .with_risk(rule.action_template.risk.clone());
 
                 actions.push(action);
 
@@ -102,7 +106,7 @@ impl Decider {
 
         // Also generate actions from anomalies with suggestions
         for anomaly in anomalies {
-            if let Some(suggestion) = &anomaly.suggested_action {
+            if let Some(_suggestion) = &anomaly.suggested_action {
                 // Convert suggestion to action if severity is high enough
                 if matches!(anomaly.severity, Severity::Error | Severity::Critical) {
                     if let Some(action) = self.anomaly_to_action(anomaly) {
@@ -150,15 +154,13 @@ impl Decider {
                 // Would check node conditions
                 false
             }
-            Condition::And { conditions } => {
-                conditions.iter().all(|c| self.evaluate_condition(c, metrics, services))
-            }
-            Condition::Or { conditions } => {
-                conditions.iter().any(|c| self.evaluate_condition(c, metrics, services))
-            }
-            Condition::Not { condition } => {
-                !self.evaluate_condition(condition, metrics, services)
-            }
+            Condition::And { conditions } => conditions
+                .iter()
+                .all(|c| self.evaluate_condition(c, metrics, services)),
+            Condition::Or { conditions } => conditions
+                .iter()
+                .any(|c| self.evaluate_condition(c, metrics, services)),
+            Condition::Not { condition } => !self.evaluate_condition(condition, metrics, services),
         }
     }
 
@@ -181,37 +183,49 @@ impl Decider {
             AnomalyType::ServiceFailure => {
                 // Extract service name from description if possible
                 if anomaly.description.contains("holochain") {
-                    Some(Action::new(
-                        ActionKind::RestartService,
-                        "Restart holochain service",
-                        serde_json::json!({"service": "holochain"}),
-                    ).with_risk(ActionRisk::Risky {
-                        required_approvals: 2,
-                        total_evaluators: 3,
-                    }))
+                    Some(
+                        Action::new(
+                            ActionKind::RestartService,
+                            "Restart holochain service",
+                            serde_json::json!({"service": "holochain"}),
+                        )
+                        .with_risk(ActionRisk::Risky {
+                            required_approvals: 2,
+                            total_evaluators: 3,
+                        }),
+                    )
                 } else if anomaly.description.contains("sync") {
-                    Some(Action::new(
-                        ActionKind::RestartService,
-                        "Restart sync service",
-                        serde_json::json!({"service": "sync"}),
-                    ).with_risk(ActionRisk::Safe))
+                    Some(
+                        Action::new(
+                            ActionKind::RestartService,
+                            "Restart sync service",
+                            serde_json::json!({"service": "sync"}),
+                        )
+                        .with_risk(ActionRisk::Safe),
+                    )
                 } else {
                     None
                 }
             }
             AnomalyType::ResourceSpike => {
                 if anomaly.description.contains("Disk space") {
-                    Some(Action::new(
-                        ActionKind::RebalanceStorage,
-                        "Rebalance storage to free disk space",
-                        serde_json::json!({"dry_run": true}),
-                    ).with_risk(ActionRisk::Safe))
+                    Some(
+                        Action::new(
+                            ActionKind::RebalanceStorage,
+                            "Rebalance storage to free disk space",
+                            serde_json::json!({"dry_run": true}),
+                        )
+                        .with_risk(ActionRisk::Safe),
+                    )
                 } else if anomaly.description.contains("Memory") {
-                    Some(Action::new(
-                        ActionKind::FlushCache,
-                        "Flush caches to reduce memory pressure",
-                        serde_json::json!({"cache": "content"}),
-                    ).with_risk(ActionRisk::Safe))
+                    Some(
+                        Action::new(
+                            ActionKind::FlushCache,
+                            "Flush caches to reduce memory pressure",
+                            serde_json::json!({"cache": "content"}),
+                        )
+                        .with_risk(ActionRisk::Safe),
+                    )
                 } else {
                     None
                 }
@@ -230,10 +244,11 @@ impl Decider {
     /// 1. Connect to local llama.cpp or remote Claude API
     /// 2. Send the context and observations
     /// 3. Get back a structured decision
+    #[allow(dead_code)]
     pub async fn request_llm_evaluation(
         &self,
-        context: &ClusterContext,
-        observations: &[Observation],
+        _context: &ClusterContext,
+        _observations: &[Observation],
         question: &str,
     ) -> LlmEvaluationResult {
         info!(question, "LLM evaluation requested (stubbed)");
@@ -249,6 +264,7 @@ impl Decider {
     }
 
     /// Check if LLM inference is available
+    #[allow(dead_code)]
     pub fn has_llm(&self) -> bool {
         // Stubbed - would check if llama.cpp or API is configured
         false
@@ -256,6 +272,7 @@ impl Decider {
 }
 
 /// Result of an LLM evaluation request
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct LlmEvaluationResult {
     /// Whether LLM was available
@@ -296,7 +313,6 @@ fn default_rules() -> Vec<Rule> {
             cooldown_secs: 300, // 5 minutes
             last_triggered: None,
         },
-
         // High CPU rule
         Rule {
             name: "high-cpu-throttle".to_string(),
@@ -318,7 +334,6 @@ fn default_rules() -> Vec<Rule> {
             cooldown_secs: 60,
             last_triggered: None,
         },
-
         // Memory pressure rule
         Rule {
             name: "memory-pressure-flush".to_string(),
@@ -339,7 +354,6 @@ fn default_rules() -> Vec<Rule> {
             cooldown_secs: 120,
             last_triggered: None,
         },
-
         // Service restart rule
         Rule {
             name: "service-restart-p2p".to_string(),
@@ -389,7 +403,9 @@ mod tests {
         let actions = decider.evaluate(Some(&metrics), &services, &anomalies);
 
         // Should trigger high-cpu-throttle rule
-        assert!(actions.iter().any(|a| matches!(a.kind, ActionKind::ThrottleSync)));
+        assert!(actions
+            .iter()
+            .any(|a| matches!(a.kind, ActionKind::ThrottleSync)));
     }
 
     #[test]

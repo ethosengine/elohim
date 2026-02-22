@@ -6,16 +6,15 @@
 //! - Apps connecting and syncing to this node
 //! - Sync state and progress
 
-pub mod registration;
 pub mod operator;
+pub mod registration;
 pub mod sync_state;
 
-pub use registration::{NetworkRegistration, RegistrationStatus};
-pub use operator::{Operator, OperatorPermissions};
-pub use sync_state::{SyncProgress, ConnectedApp, SyncDirection};
+pub use operator::Operator;
+pub use registration::RegistrationStatus;
+pub use sync_state::{ConnectedApp, SyncProgress};
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Complete network membership state for this node
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -153,10 +152,14 @@ impl NetworkMembership {
 
     /// Check if node is part of a network
     pub fn is_registered(&self) -> bool {
-        matches!(self.status, RegistrationStatus::Registered | RegistrationStatus::Active)
+        matches!(
+            self.status,
+            RegistrationStatus::Registered | RegistrationStatus::Active
+        )
     }
 
     /// Get primary doorway URL
+    #[allow(dead_code)]
     pub fn primary_doorway(&self) -> Option<&str> {
         self.doorways
             .iter()
@@ -165,6 +168,7 @@ impl NetworkMembership {
     }
 
     /// Get connected doorway count
+    #[allow(dead_code)]
     pub fn connected_doorway_count(&self) -> usize {
         self.doorways
             .iter()
@@ -173,10 +177,8 @@ impl NetworkMembership {
     }
 
     /// Get count of actively syncing apps
+    #[allow(dead_code)]
     pub fn syncing_app_count(&self) -> usize {
-        self.connected_apps
-            .iter()
-            .filter(|a| a.is_syncing)
-            .count()
+        self.connected_apps.iter().filter(|a| a.is_syncing).count()
     }
 }

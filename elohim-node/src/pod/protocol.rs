@@ -7,15 +7,19 @@ use serde::{Deserialize, Serialize};
 use super::models::*;
 
 /// Protocol version
+#[allow(dead_code)]
 pub const PROTOCOL_VERSION: &str = "1.0.0";
 
 /// Protocol ID for libp2p
+#[allow(dead_code)]
 pub const PROTOCOL_ID: &str = "/elohim/agent/1.0.0";
 
 /// Maximum message size in bytes
+#[allow(dead_code)]
 pub const MAX_MESSAGE_SIZE: usize = 1024 * 1024; // 1MB
 
 /// Wire message for pod-to-pod communication
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WireMessage {
     /// Protocol version
@@ -32,6 +36,7 @@ pub struct WireMessage {
     pub payload: AgentMessage,
 }
 
+#[allow(dead_code)]
 impl WireMessage {
     pub fn new(sender: impl Into<String>, payload: AgentMessage) -> Self {
         let now = std::time::SystemTime::now()
@@ -49,7 +54,11 @@ impl WireMessage {
         }
     }
 
-    pub fn response(request: &WireMessage, sender: impl Into<String>, payload: AgentMessage) -> Self {
+    pub fn response(
+        request: &WireMessage,
+        sender: impl Into<String>,
+        payload: AgentMessage,
+    ) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -82,6 +91,7 @@ impl WireMessage {
 }
 
 /// Message envelope for framing on the wire
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageFrame {
     /// Length of the message in bytes
@@ -92,6 +102,7 @@ pub struct MessageFrame {
     pub data: Vec<u8>,
 }
 
+#[allow(dead_code)]
 impl MessageFrame {
     pub fn new(message: &WireMessage) -> Result<Self, String> {
         let data = message.to_bytes()?;
@@ -126,8 +137,10 @@ impl MessageFrame {
 }
 
 /// Utility for creating common messages
+#[allow(dead_code)]
 pub struct MessageBuilder;
 
+#[allow(dead_code)]
 impl MessageBuilder {
     /// Create a ping message
     pub fn ping(sender: &str) -> WireMessage {

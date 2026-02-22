@@ -10,11 +10,14 @@
 
 import { ContentNode, ContentType } from '../models/content-node.model';
 import { ParsedContent } from '../models/import-context.model';
+import { extractTags, extractDescription } from '../parsers/markdown-parser';
 import {
-  extractTags,
-  extractDescription
-} from '../parsers/markdown-parser';
-import { normalizeId, buildBaseMetadata, addProvenanceMetadata, buildContentNode, formatWithDelimiters } from '../utils';
+  normalizeId,
+  buildBaseMetadata,
+  addProvenanceMetadata,
+  buildContentNode,
+  formatWithDelimiters,
+} from '../utils';
 
 /**
  * Resource type mapping to content types
@@ -33,16 +36,13 @@ const RESOURCE_TYPE_MAP: Record<string, ContentType> = {
   template: 'reference',
   templates: 'reference',
   example: 'example',
-  examples: 'example'
+  examples: 'example',
 };
 
 /**
  * Transform resource content into a ContentNode
  */
-export function transformResource(
-  parsed: ParsedContent,
-  sourceNodeId?: string
-): ContentNode {
+export function transformResource(parsed: ParsedContent, sourceNodeId?: string): ContentNode {
   const now = new Date().toISOString();
 
   // Generate resource node ID
@@ -68,7 +68,7 @@ export function transformResource(
     resourceType,
     epic: parsed.pathMeta.epic,
     userType: parsed.pathMeta.userType,
-    ...buildBaseMetadata()
+    ...buildBaseMetadata(),
   };
 
   // Add provenance link
@@ -145,7 +145,7 @@ export function transformResource(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    createdAt: now
+    createdAt: now,
   });
 }
 
