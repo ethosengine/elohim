@@ -3,6 +3,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 // @coverage: 94.3% (2026-02-05)
 
 import { HolochainClientService } from './holochain-client.service';
+import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 
 /**
@@ -54,6 +55,7 @@ export interface OfflineOperation {
 export class OfflineOperationQueueService {
   private readonly logger = inject(LoggerService).createChild('OfflineQueue');
   private readonly holochainClient = inject(HolochainClientService);
+  private readonly idbCache = inject(IndexedDBCacheService);
 
   /** Queue of pending operations */
   private readonly queue = signal<OfflineOperation[]>([]);
@@ -90,36 +92,49 @@ export class OfflineOperationQueueService {
     // For now, this is a placeholder that could be enhanced
   }
 
+  /** IndexedDB metadata key for the persisted queue */
+  private static readonly STORAGE_KEY = 'offline-operation-queue';
+
   /**
    * Load previously queued operations from IndexedDB
    */
   private loadQueueFromStorage(): void {
-    try {
-      // This would load from IndexedDB in production
-      // For now, queue starts empty
-      this.logger.debug('Loaded queue from storage');
-    } catch (err) {
-      this.logger.error(
-        'Failed to load queue from storage',
-        err instanceof Error ? err : new Error(String(err))
-      );
-    }
+    // Initialize IDB cache then load persisted queue
+    this.idbCache
+      .init()
+      .then(async available => {
+        if (!available) return;
+        const stored = await this.idbCache.getMetadata<OfflineOperation[]>(
+          OfflineOperationQueueService.STORAGE_KEY
+        );
+        if (stored && Array.isArray(stored) && stored.length > 0) {
+          this.queue.set(stored);
+          this.notifyQueueChanged();
+          this.logger.debug('Loaded queue from storage', { count: stored.length });
+        }
+      })
+      .catch((err: unknown) => {
+        this.logger.error(
+          'Failed to load queue from storage',
+          err instanceof Error ? err : new Error(String(err))
+        );
+      });
   }
 
   /**
    * Save queue to IndexedDB for persistence
    */
   private saveQueueToStorage(): void {
-    try {
-      // This would save to IndexedDB in production
-      const queueData = this.queue();
-      this.logger.debug('Saved queue to storage', { count: queueData.length });
-    } catch (err) {
-      this.logger.error(
-        'Failed to save queue to storage',
-        err instanceof Error ? err : new Error(String(err))
-      );
-    }
+    const queueData = this.queue();
+    this.idbCache
+      .setMetadata(OfflineOperationQueueService.STORAGE_KEY, queueData)
+      .catch((err: unknown) => {
+        this.logger.error(
+          'Failed to save queue to storage',
+          err instanceof Error ? err : new Error(String(err))
+        );
+      });
+    this.logger.debug('Saved queue to storage', { count: queueData.length });
   }
 
   /**

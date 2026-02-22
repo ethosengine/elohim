@@ -1,15 +1,13 @@
 <div class="canvas-wrapper" #wrapper>
-  <canvas #hexCanvas
-          (mousemove)="onMouseMove($event)"
-          (mouseleave)="onMouseLeave()"
-          (click)="onClick($event)">
-  </canvas>
-  
+  <canvas
+    #hexCanvas
+    (mousemove)="onMouseMove($event)"
+    (mouseleave)="onMouseLeave()"
+    (click)="onClick($event)"
+  ></canvas>
+
   <!-- Custom Tooltip -->
-  <div class="hex-tooltip" 
-       *ngIf="hoveredNode"
-       [style.left.px]="tooltipX" 
-       [style.top.px]="tooltipY">
+  <div class="hex-tooltip" *ngIf="hoveredNode" [style.left.px]="tooltipX" [style.top.px]="tooltipY">
     <span class="tooltip-title">{{ hoveredNode.title }}</span>
     <span class="tooltip-affinity">{{ getAffinityPercentage(hoveredNode.affinity) }}%</span>
   </div>

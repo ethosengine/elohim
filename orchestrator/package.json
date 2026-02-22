@@ -1,0 +1,12 @@
+{
+  "name": "elohim-orchestrator",
+  "private": true,
+  "description": "CI/CD orchestrator - Jenkinsfile linting and pipeline management",
+  "scripts": {
+    "lint:jenkinsfiles": "npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --failon error",
+    "lint:jenkinsfiles:fix": "npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --fix"
+  },
+  "devDependencies": {
+    "npm-groovy-lint": "^16.1.1"
+  }
+}

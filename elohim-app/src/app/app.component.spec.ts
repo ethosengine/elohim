@@ -8,6 +8,7 @@ import { Observable, Subject } from 'rxjs';
 import { AppComponent } from './app.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { HolochainContentService } from './elohim/services/holochain-content.service';
+import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
@@ -16,6 +17,7 @@ describe('AppComponent', () => {
   let mockRouter: { events: Observable<NavigationEnd>; url: string; navigate: jasmine.Spy };
   let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
   let mockHolochainContent: jasmine.SpyObj<HolochainContentService>;
+  let mockAuthService: { isAuthenticated: ReturnType<typeof signal<boolean>> };
   let mockTauriAuth: jasmine.SpyObj<TauriAuthService>;
   let mockBlobBootstrap: jasmine.SpyObj<BlobBootstrapService>;
 
@@ -40,6 +42,7 @@ describe('AppComponent', () => {
       status: signal('idle'),
     });
     mockBlobBootstrap = jasmine.createSpyObj('BlobBootstrapService', ['startBootstrap']);
+    mockAuthService = { isAuthenticated: signal(true) };
 
     // Default mock behavior
     mockHolochainClient.connect.and.returnValue(Promise.resolve());
@@ -59,6 +62,7 @@ describe('AppComponent', () => {
         { provide: Router, useValue: mockRouter },
         { provide: HolochainClientService, useValue: mockHolochainClient },
         { provide: HolochainContentService, useValue: mockHolochainContent },
+        { provide: AuthService, useValue: mockAuthService },
         { provide: TauriAuthService, useValue: mockTauriAuth },
         { provide: BlobBootstrapService, useValue: mockBlobBootstrap },
       ],

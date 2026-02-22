@@ -4,9 +4,9 @@
 //! similar to `kubectl describe node`
 
 use serde::{Deserialize, Serialize};
-use sysinfo::{System, Disks, Networks, Components, CpuRefreshKind, RefreshKind};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
+use sysinfo::{Components, Disks, Networks, System};
 
 /// Global system info cache (refreshed periodically)
 static SYSTEM: OnceLock<std::sync::Mutex<CachedSystem>> = OnceLock::new();
@@ -350,7 +350,7 @@ fn get_hostname() -> String {
         .unwrap_or_else(|_| "unknown".to_string())
 }
 
-fn get_uptime(sys: &System) -> u64 {
+fn get_uptime(_sys: &System) -> u64 {
     System::uptime()
 }
 
@@ -365,7 +365,8 @@ fn collect_cpu_metrics(sys: &System) -> CpuMetrics {
 
     let load_avg = System::load_average();
     let frequency = cpus.first().map(|c| c.frequency()).unwrap_or(0);
-    let model = cpus.first()
+    let model = cpus
+        .first()
         .map(|c| c.brand().to_string())
         .unwrap_or_else(|| "Unknown".to_string());
 
@@ -406,9 +407,16 @@ fn collect_memory_metrics(sys: &System) -> MemoryMetrics {
 
 fn collect_disk_metrics(disks: &Disks) -> DiskMetrics {
     // Find the primary data volume (prefer /var/lib/elohim, fallback to root)
-    let primary = disks.list().iter()
+    let primary = disks
+        .list()
+        .iter()
         .find(|d| d.mount_point().to_string_lossy().contains("elohim"))
-        .or_else(|| disks.list().iter().find(|d| d.mount_point().to_string_lossy() == "/"))
+        .or_else(|| {
+            disks
+                .list()
+                .iter()
+                .find(|d| d.mount_point().to_string_lossy() == "/")
+        })
         .or_else(|| disks.list().first());
 
     if let Some(disk) = primary {
@@ -455,10 +463,10 @@ fn collect_network_metrics(networks: &Networks) -> NetworkMetrics {
 
     for (name, data) in networks.list() {
         // Skip loopback and virtual interfaces for primary IP detection
-        let is_physical = !name.starts_with("lo") &&
-                          !name.starts_with("veth") &&
-                          !name.starts_with("docker") &&
-                          !name.starts_with("br-");
+        let is_physical = !name.starts_with("lo")
+            && !name.starts_with("veth")
+            && !name.starts_with("docker")
+            && !name.starts_with("br-");
 
         // sysinfo v0.30 doesn't expose IP addresses directly on NetworkData
         // We'll leave this empty for now (would need netlink or /proc/net parsing)
@@ -466,7 +474,8 @@ fn collect_network_metrics(networks: &Networks) -> NetworkMetrics {
 
         // Use first non-loopback IPv4 as primary (when we can get IPs)
         if is_physical && primary_ip.is_none() && !ip_addresses.is_empty() {
-            primary_ip = ip_addresses.iter()
+            primary_ip = ip_addresses
+                .iter()
                 .find(|ip: &&String| !ip.starts_with("127.") && !ip.contains(':'))
                 .cloned();
         }
@@ -505,46 +514,54 @@ fn collect_network_metrics(networks: &Networks) -> NetworkMetrics {
 }
 
 fn collect_temperatures(components: &Components) -> Vec<TemperatureSensor> {
-    components.list().iter().map(|c| {
-        let current = c.temperature();
-        let max = c.max();
-        let critical = c.critical();
+    components
+        .list()
+        .iter()
+        .map(|c| {
+            let current = c.temperature();
+            let max = c.max();
+            let critical = c.critical();
 
-        TemperatureSensor {
-            label: c.label().to_string(),
-            current_celsius: current,
-            max_celsius: Some(max),
-            critical_celsius: critical,
-            is_critical: critical.map(|crit| current >= crit).unwrap_or(false),
-        }
-    }).collect()
+            TemperatureSensor {
+                label: c.label().to_string(),
+                current_celsius: current,
+                max_celsius: Some(max),
+                critical_celsius: critical,
+                is_critical: critical.map(|crit| current >= crit).unwrap_or(false),
+            }
+        })
+        .collect()
 }
 
 fn collect_volumes(disks: &Disks) -> Vec<VolumeInfo> {
-    disks.list().iter().map(|d| {
-        let total = d.total_space();
-        let available = d.available_space();
-        let used = total.saturating_sub(available);
-        let usage_percent = if total > 0 {
-            (used as f32 / total as f32) * 100.0
-        } else {
-            0.0
-        };
+    disks
+        .list()
+        .iter()
+        .map(|d| {
+            let total = d.total_space();
+            let available = d.available_space();
+            let used = total.saturating_sub(available);
+            let usage_percent = if total > 0 {
+                (used as f32 / total as f32) * 100.0
+            } else {
+                0.0
+            };
 
-        VolumeInfo {
-            name: d.name().to_string_lossy().to_string(),
-            mount_point: d.mount_point().to_string_lossy().to_string(),
-            filesystem: d.file_system().to_string_lossy().to_string(),
-            total_bytes: total,
-            used_bytes: used,
-            available_bytes: available,
-            usage_percent,
-            is_removable: d.is_removable(),
-        }
-    }).collect()
+            VolumeInfo {
+                name: d.name().to_string_lossy().to_string(),
+                mount_point: d.mount_point().to_string_lossy().to_string(),
+                filesystem: d.file_system().to_string_lossy().to_string(),
+                total_bytes: total,
+                used_bytes: used,
+                available_bytes: available,
+                usage_percent,
+                is_removable: d.is_removable(),
+            }
+        })
+        .collect()
 }
 
-fn collect_system_info(sys: &System) -> SystemInfo {
+fn collect_system_info(_sys: &System) -> SystemInfo {
     SystemInfo {
         machine_id: get_machine_id(),
         kernel_version: System::kernel_version().unwrap_or_else(|| "unknown".to_string()),
@@ -559,7 +576,9 @@ fn get_machine_id() -> String {
     // Try to read machine-id from standard Linux location
     std::fs::read_to_string("/etc/machine-id")
         .map(|s| s.trim().to_string())
-        .or_else(|_| std::fs::read_to_string("/var/lib/dbus/machine-id").map(|s| s.trim().to_string()))
+        .or_else(|_| {
+            std::fs::read_to_string("/var/lib/dbus/machine-id").map(|s| s.trim().to_string())
+        })
         .unwrap_or_else(|_| "unknown".to_string())
 }
 
@@ -582,11 +601,18 @@ fn evaluate_conditions(memory: &MemoryMetrics, disk: &DiskMetrics, sys: &System)
     NodeConditions {
         memory_pressure: ConditionStatus {
             status: !memory_pressure,
-            reason: if memory_pressure { "MemoryPressure" } else { "MemorySufficient" }.to_string(),
+            reason: if memory_pressure {
+                "MemoryPressure"
+            } else {
+                "MemorySufficient"
+            }
+            .to_string(),
             message: if memory_pressure {
-                format!("Memory usage at {:.1}%, available: {} MB",
+                format!(
+                    "Memory usage at {:.1}%, available: {} MB",
                     memory.usage_percent,
-                    memory.available_bytes / 1024 / 1024)
+                    memory.available_bytes / 1024 / 1024
+                )
             } else {
                 "kubelet has sufficient memory available".to_string()
             },
@@ -594,11 +620,18 @@ fn evaluate_conditions(memory: &MemoryMetrics, disk: &DiskMetrics, sys: &System)
         },
         disk_pressure: ConditionStatus {
             status: !disk_pressure,
-            reason: if disk_pressure { "DiskPressure" } else { "DiskSufficient" }.to_string(),
+            reason: if disk_pressure {
+                "DiskPressure"
+            } else {
+                "DiskSufficient"
+            }
+            .to_string(),
             message: if disk_pressure {
-                format!("Disk usage at {:.1}%, available: {} GB",
+                format!(
+                    "Disk usage at {:.1}%, available: {} GB",
                     disk.usage_percent,
-                    disk.available_bytes / 1024 / 1024 / 1024)
+                    disk.available_bytes / 1024 / 1024 / 1024
+                )
             } else {
                 "kubelet has no disk pressure".to_string()
             },
@@ -606,7 +639,12 @@ fn evaluate_conditions(memory: &MemoryMetrics, disk: &DiskMetrics, sys: &System)
         },
         pid_pressure: ConditionStatus {
             status: !pid_pressure,
-            reason: if pid_pressure { "PIDPressure" } else { "PIDSufficient" }.to_string(),
+            reason: if pid_pressure {
+                "PIDPressure"
+            } else {
+                "PIDSufficient"
+            }
+            .to_string(),
             message: if pid_pressure {
                 format!("Process count at {}", pid_count)
             } else {
@@ -626,7 +664,8 @@ fn evaluate_conditions(memory: &MemoryMetrics, disk: &DiskMetrics, sys: &System)
                 "Ready"
             } else {
                 "NotReady"
-            }.to_string(),
+            }
+            .to_string(),
             message: if !memory_pressure && !disk_pressure && !pid_pressure {
                 "Node is healthy and ready".to_string()
             } else {
@@ -644,7 +683,11 @@ fn collect_service_health(setup_complete: bool) -> ServiceHealth {
             name: "holochain".to_string(),
             running: setup_complete,
             healthy: setup_complete,
-            message: if setup_complete { None } else { Some("Not configured".to_string()) },
+            message: if setup_complete {
+                None
+            } else {
+                Some("Not configured".to_string())
+            },
             uptime_secs: None,
             restart_count: 0,
         },

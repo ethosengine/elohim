@@ -18,9 +18,9 @@
  * Content domains in the repository
  */
 export type ContentDomain =
-  | 'elohim-protocol'  // Main protocol content
-  | 'fct'              // Foundations for Christian Technology
-  | 'ethosengine';     // EthosEngine content
+  | 'elohim-protocol' // Main protocol content
+  | 'fct' // Foundations for Christian Technology
+  | 'ethosengine'; // EthosEngine content
 
 /**
  * Epic/pillar categories within elohim-protocol
@@ -39,12 +39,12 @@ export type EpicCategory =
  * Content categories determined by file location/type
  */
 export type ContentCategory =
-  | 'epic'           // Domain-level narrative (epic.md)
-  | 'archetype'      // Role/persona definition (README.md in role dir)
-  | 'scenario'       // Behavioral spec (.feature file)
-  | 'resource'       // Supporting resource (books, videos, orgs)
-  | 'concept'        // Abstract concept
-  | 'documentation'  // General documentation
+  | 'epic' // Domain-level narrative (epic.md)
+  | 'archetype' // Role/persona definition (README.md in role dir)
+  | 'scenario' // Behavioral spec (.feature file)
+  | 'resource' // Supporting resource (books, videos, orgs)
+  | 'concept' // Abstract concept
+  | 'documentation' // General documentation
   | 'other';
 
 /**

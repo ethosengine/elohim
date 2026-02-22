@@ -38,6 +38,6 @@ export function buildContentNode(config: {
     metadata: config.metadata,
     reach: config.reach ?? 'commons',
     createdAt: now,
-    updatedAt: config.updatedAt ?? now
+    updatedAt: config.updatedAt ?? now,
   };
 }

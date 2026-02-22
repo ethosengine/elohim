@@ -2,7 +2,7 @@
 //!
 //! Actions for changing log levels, updating settings, and reloading configuration.
 
-use tracing::{debug, info, warn, Level};
+use tracing::info;
 
 use crate::pod::executor::ActionHandler;
 use crate::pod::models::*;
@@ -39,12 +39,13 @@ impl ActionHandler for ConfigActionHandler {
 
 impl ConfigActionHandler {
     async fn set_log_level(&self, action: &Action) -> ActionResult {
-        let level = action.params.get("level")
+        let level = action
+            .params
+            .get("level")
             .and_then(|v| v.as_str())
             .unwrap_or("info");
 
-        let module = action.params.get("module")
-            .and_then(|v| v.as_str());
+        let module = action.params.get("module").and_then(|v| v.as_str());
 
         // Note: Actually changing log level requires tracing-subscriber reload support
         // For now we log the intent and return success
@@ -73,19 +74,19 @@ impl ConfigActionHandler {
     }
 
     async fn enable_tracing(&self, action: &Action) -> ActionResult {
-        let enabled = action.params.get("enabled")
+        let enabled = action
+            .params
+            .get("enabled")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let target = action.params.get("target")
+        let target = action
+            .params
+            .get("target")
             .and_then(|v| v.as_str())
             .unwrap_or("elohim_node");
 
-        info!(
-            enabled,
-            target,
-            "Tracing configuration change requested"
-        );
+        info!(enabled, target, "Tracing configuration change requested");
 
         // In a real implementation, this would configure opentelemetry export
         // or similar tracing infrastructure
@@ -151,7 +152,9 @@ impl ConfigActionHandler {
     }
 
     async fn reload_config(&self, action: &Action) -> ActionResult {
-        let config_path = action.params.get("path")
+        let config_path = action
+            .params
+            .get("path")
             .and_then(|v| v.as_str())
             .unwrap_or("elohim-node.toml");
 

@@ -10,10 +10,10 @@
 //! Provisioning failure is non-fatal — registration falls back to local key generation.
 
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
-use super::admin_client::AdminClient;
 use super::registry::ConductorRegistry;
+use super::typed_admin::TypedAdminClient;
 
 /// Default app ID prefix for provisioned agents.
 const DEFAULT_APP_ID: &str = "elohim";
@@ -96,7 +96,14 @@ impl AgentProvisioner {
 
         let installed_app_id =
             generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
-        let admin = AdminClient::new(conductor.admin_url.clone());
+        let admin = TypedAdminClient::connect(&conductor.admin_url)
+            .await
+            .map_err(|e| {
+                format!(
+                    "Failed to connect to admin on {}: {}",
+                    conductor.conductor_id, e
+                )
+            })?;
 
         info!(
             conductor = %conductor.conductor_id,
@@ -145,7 +152,71 @@ impl AgentProvisioner {
             ));
         }
 
-        // 6. Register agent→conductor mapping (both encodings for format compat)
+        // 6. Verify cells are ready before returning (cell genesis can take seconds)
+        {
+            let max_polls = 30;
+            let poll_interval = std::time::Duration::from_millis(500);
+            let mut cells_ready = false;
+
+            for attempt in 1..=max_polls {
+                match admin.get_app_info(&installed_app_id).await {
+                    Ok(info) if !info.cell_ids.is_empty() => {
+                        let role_names: Vec<&str> =
+                            info.cell_ids.iter().map(|(r, _)| r.as_str()).collect();
+                        info!(
+                            conductor = %conductor.conductor_id,
+                            app_id = %installed_app_id,
+                            cell_count = info.cell_ids.len(),
+                            roles = ?role_names,
+                            polls = attempt,
+                            "Cell genesis complete — cells ready"
+                        );
+                        cells_ready = true;
+                        break;
+                    }
+                    Ok(_) => {
+                        debug!(
+                            app_id = %installed_app_id,
+                            attempt,
+                            max_polls,
+                            "Waiting for cell genesis..."
+                        );
+                    }
+                    Err(e) => {
+                        debug!(
+                            app_id = %installed_app_id,
+                            attempt,
+                            error = %e,
+                            "get_app_info not ready yet during genesis poll"
+                        );
+                    }
+                }
+                tokio::time::sleep(poll_interval).await;
+            }
+
+            if !cells_ready {
+                warn!(
+                    conductor = %conductor.conductor_id,
+                    app_id = %installed_app_id,
+                    "Cell genesis timed out after {}s — cleaning up",
+                    max_polls as f64 * poll_interval.as_secs_f64()
+                );
+                if let Err(cleanup_err) = admin.uninstall_app(&installed_app_id).await {
+                    warn!(
+                        "Cleanup uninstall after genesis timeout failed: {}",
+                        cleanup_err
+                    );
+                }
+                return Err(format!(
+                    "Cell genesis timed out on {} for app '{}' after {}s",
+                    conductor.conductor_id,
+                    installed_app_id,
+                    max_polls as f64 * poll_interval.as_secs_f64()
+                ));
+            }
+        }
+
+        // 7. Register agent→conductor mapping (both encodings for format compat)
         if let Err(e) = self
             .registry
             .register_agent(
@@ -205,7 +276,10 @@ impl AgentProvisioner {
 
         for conductor in &conductors {
             let app_id = generate_app_id(&self.app_id, &conductor.conductor_id, user_identifier);
-            let admin = AdminClient::new(conductor.admin_url.clone());
+            let admin = match TypedAdminClient::connect(&conductor.admin_url).await {
+                Ok(a) => a,
+                Err(_) => continue,
+            };
 
             match admin.get_app_info(&app_id).await {
                 Ok(existing) => {
@@ -264,7 +338,14 @@ impl AgentProvisioner {
             "Deprovisioning agent"
         );
 
-        let admin = AdminClient::new(conductor.admin_url.clone());
+        let admin = TypedAdminClient::connect(&conductor.admin_url)
+            .await
+            .map_err(|e| {
+                format!(
+                    "Failed to connect to admin on {}: {}",
+                    entry.conductor_id, e
+                )
+            })?;
         admin.uninstall_app(&entry.app_id).await.map_err(|e| {
             format!(
                 "Failed to uninstall app {} on {}: {}",

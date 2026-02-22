@@ -643,7 +643,7 @@ export class ThresholdRegisterComponent implements OnInit {
         await this.authorizeOAuth(authResult.token, params);
       } else {
         // Direct registration (no OAuth) - redirect to dashboard
-        this.router.navigate(['/']);
+        this.router.navigate(['/dashboard']);
       }
     } catch (err) {
       this.state.set('form');

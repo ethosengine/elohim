@@ -98,23 +98,15 @@ impl UpdateManifest {
     }
 
     /// Find the latest release for a channel and platform
-    pub fn find_release(
-        &self,
-        channel: &ReleaseChannel,
-        arch: &str,
-        os: &str,
-    ) -> Option<&Release> {
+    pub fn find_release(&self, channel: &ReleaseChannel, arch: &str, os: &str) -> Option<&Release> {
         self.releases
             .iter()
-            .filter(|r| {
-                r.channel == *channel
-                    && r.arch == arch
-                    && r.os == os
-            })
+            .filter(|r| r.channel == *channel && r.arch == arch && r.os == os)
             .max_by(|a, b| compare_versions(&a.version, &b.version))
     }
 
     /// Check if a version is below minimum supported
+    #[allow(dead_code)]
     pub fn is_version_supported(&self, version: &str) -> bool {
         match &self.minimum_version {
             Some(min) => !is_older_version(version, min),
@@ -128,15 +120,19 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
     let parse = |v: &str| -> (u32, u32, u32) {
         let parts: Vec<&str> = v.trim_start_matches('v').split('.').collect();
         (
-            parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(0),
+            parts.first().and_then(|s| s.parse().ok()).unwrap_or(0),
             parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0),
-            parts.get(2).and_then(|s| s.split('-').next()?.parse().ok()).unwrap_or(0),
+            parts
+                .get(2)
+                .and_then(|s| s.split('-').next()?.parse().ok())
+                .unwrap_or(0),
         )
     };
 
     parse(a).cmp(&parse(b))
 }
 
+#[allow(dead_code)]
 fn is_older_version(version: &str, than: &str) -> bool {
     compare_versions(version, than) == std::cmp::Ordering::Less
 }

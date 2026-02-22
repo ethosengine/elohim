@@ -4,9 +4,9 @@ Last updated: 2026-02-12
 
 ## Vision Statement
 
-The Elohim Protocol is a distributed learning platform where a person can register an account, navigate curated learning paths, complete assessments that reveal something about themselves, and track their mastery over time -- all through a gateway (doorway) that custodially manages their Holochain identity. The second person can join, and both can eventually run offline desktop nodes that sync peer-to-peer. The economics layer (shefa) enables cooperative resource stewardship, built on REA patterns, but only becomes relevant once the learning experience works end-to-end for real people.
+The Elohim Protocol is distributed civilization infrastructure organized around love, encompassing five pillars: identity (imagodei), learning (lamad), community (qahal), economy (shefa), and core protocol coordination (elohim). Lamad is the first demonstrable vertical -- people learn the protocol by using it to learn. The initial deliverable: a person can register an account, establish an identity, navigate curated learning paths, complete assessments that reveal something about themselves, and track their mastery over time -- all through a gateway (doorway) that custodially manages their Holochain identity. The second person can join, and both can eventually run offline desktop nodes that sync peer-to-peer. The economics layer (shefa) enables cooperative resource stewardship, built on REA patterns, but only becomes relevant once the learning experience works end-to-end for real people.
 
-"Done" means: two humans can independently log in, learn through paths with assessments, see their progress persist, and eventually sync through an offline-capable node. The economic and governance layers activate as the community forms.
+"Done" means: two humans can independently establish identity, log in, learn through paths with assessments, see their progress persist, and eventually sync through an offline-capable node. The economic and governance layers activate as the community forms.
 
 ---
 
@@ -397,7 +397,7 @@ Token generation from economic events. Insurance mutual claim filing. P2P sync b
    - Wire existing stewardship.service.ts to real data
    - Size: M (2 points)
 
-4. **As a node operator, I want the doorway-app to show connected users and resource usage, so that I can manage my doorway.**
+4. **As a node steward, I want the doorway-app to show connected users and resource usage, so that I can manage my doorway.**
    - Acceptance: Doorway dashboard shows active sessions, storage used, bandwidth consumed
    - Wire doorway-admin.service.ts to doorway API endpoints
    - Size: L (3 points)

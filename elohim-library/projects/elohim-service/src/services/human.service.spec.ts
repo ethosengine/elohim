@@ -727,20 +727,9 @@ describe('Human Service', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      // TODO(test-generator): [MEDIUM] Improve error handling in importHumansToLamad
-      // Context: Current implementation catches errors per-human but doesn't validate input
-      // Story: Robust import pipeline with detailed error reporting
-      // Suggested approach:
-      //   1. Add input validation before processing
-      //   2. Collect detailed error context (line numbers, field names)
-      //   3. Return partial success with detailed error array
-
       const invalidData = {
-        humans: [
-          // Missing required fields - should this throw or skip?
-          { id: 'invalid' } as any
-        ],
-        relationships: []
+        humans: [{ id: 'invalid' } as any],
+        relationships: [],
       };
 
       fs.writeFileSync(testFilePath, JSON.stringify(invalidData), 'utf-8');
@@ -748,8 +737,9 @@ describe('Human Service', () => {
       const outputDir = path.join(tempDir, 'output');
       const result = await importHumansToLamad(testFilePath, outputDir);
 
-      // Current implementation may succeed with partial data
-      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.humansImported).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('missing required fields');
     });
   });
 

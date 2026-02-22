@@ -71,18 +71,10 @@ export {
 } from './reach-aware-cache';
 
 // Utility functions
-export {
-  calculatePriority,
-  calculateFreshness,
-} from './reach-aware-cache';
+export { calculatePriority, calculateFreshness } from './reach-aware-cache';
 
 // TypeScript implementations (for direct use without async factory)
-export {
-  TsBlobCache,
-  TsChunkCache,
-  TsReachAwareCache,
-  TsCacheStats,
-} from './reach-aware-cache';
+export { TsBlobCache, TsChunkCache, TsReachAwareCache, TsCacheStats } from './reach-aware-cache';
 
 // Content Resolver - Unified tiered source resolution
 export {

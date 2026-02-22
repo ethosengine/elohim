@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
 
 interface GovernanceLayer {
   id: number;
@@ -18,17 +18,37 @@ interface GovernanceLayer {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './governance-diagram.component.html',
-  styleUrls: ['./governance-diagram.component.css']
+  styleUrls: ['./governance-diagram.component.css'],
 })
 export class GovernanceDiagramComponent {
   activeLayer = 2;
 
   layers: GovernanceLayer[] = [
-    { id: 0, name: "Global", desc: "Universal Principles (No Extinction)", consensus: "All Elohim + Human Council" },
-    { id: 1, name: "Governing States", desc: "Constitutional Interpretations", consensus: "State Elohim + Citizenry" },
-    { id: 2, name: "Regional", desc: "Local Communities, Municipal, and Bioregional Norms & Policies", consensus: "Local Elohim + Residents" },
-    { id: 3, name: "Family", desc: "Traditions & Private Governance", consensus: "Family Elohim + Consensus" },
-    { id: 4, name: "Individual", desc: "Maximum Autonomy", consensus: "Sovereign Choice" },
+    {
+      id: 0,
+      name: 'Global',
+      desc: 'Universal Principles (No Extinction)',
+      consensus: 'All Elohim + Human Council',
+    },
+    {
+      id: 1,
+      name: 'Governing States',
+      desc: 'Constitutional Interpretations',
+      consensus: 'State Elohim + Citizenry',
+    },
+    {
+      id: 2,
+      name: 'Regional',
+      desc: 'Local Communities, Municipal, and Bioregional Norms & Policies',
+      consensus: 'Local Elohim + Residents',
+    },
+    {
+      id: 3,
+      name: 'Family',
+      desc: 'Traditions & Private Governance',
+      consensus: 'Family Elohim + Consensus',
+    },
+    { id: 4, name: 'Individual', desc: 'Maximum Autonomy', consensus: 'Sovereign Choice' },
   ];
 
   setActiveLayer(id: number) {

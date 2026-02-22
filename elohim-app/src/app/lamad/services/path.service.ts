@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 // @coverage: 20.0% (2026-02-05)
 
@@ -23,6 +23,8 @@ import {
   PathChapter,
   ContentNode,
 } from '../models';
+
+import { ContentMasteryService } from './content-mastery.service';
 
 /**
  * Access check result for fog-of-war system.
@@ -56,6 +58,8 @@ interface ChapterMetricsResult {
  */
 @Injectable({ providedIn: 'root' })
 export class PathService {
+  private readonly contentMastery = inject(ContentMasteryService);
+
   constructor(
     private readonly dataLoader: DataLoaderService,
     private readonly agentService: AgentService
@@ -316,11 +320,15 @@ export class PathService {
         const totalUniqueContent = pathContentIds.size;
 
         // Calculate how many unique content nodes are completed
+        // Checks both AgentProgress (step completion) and ContentMasteryService
         let completedUniqueContent = 0;
         let sharedContentCompleted = 0;
 
         for (const contentId of pathContentIds) {
-          if (completedContentIds.has(contentId)) {
+          const inProgressSet = completedContentIds.has(contentId);
+          const hasMastery = this.contentMastery.getMasteryLevelSync(contentId) !== 'not_started';
+
+          if (inProgressSet || hasMastery) {
             completedUniqueContent++;
 
             // Check if completed in THIS path vs other paths
@@ -993,7 +1001,9 @@ export class PathService {
     let sharedContentCompleted = 0;
 
     for (const contentId of chapterContentIds) {
-      if (completedContentIds.has(contentId)) {
+      const inSet = completedContentIds.has(contentId);
+      const hasMastery = this.contentMastery.getMasteryLevelSync(contentId) !== 'not_started';
+      if (inSet || hasMastery) {
         completedUniqueContent++;
         // For hierarchical paths, all completions count as shared (cross-path mastery)
         sharedContentCompleted++;

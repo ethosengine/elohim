@@ -8,9 +8,9 @@
 //! 5. Maintain heartbeat
 
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
-use super::{RegisteredDoorway, DoorwayStatus, ClusterInfo, ClusterRole};
+use super::{ClusterInfo, DoorwayStatus, RegisteredDoorway};
 use crate::update::CURRENT_VERSION;
 
 /// Registration status
@@ -31,6 +31,7 @@ pub enum RegistrationStatus {
 }
 
 /// Registration request sent to doorway
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistrationRequest {
     /// Node's unique ID
@@ -50,6 +51,7 @@ pub struct RegistrationRequest {
 }
 
 /// Hardware information for capacity planning
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HardwareInfo {
     pub cpu_cores: usize,
@@ -60,6 +62,7 @@ pub struct HardwareInfo {
 }
 
 /// Registration response from doorway
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistrationResponse {
     /// Whether registration succeeded
@@ -77,6 +80,7 @@ pub struct RegistrationResponse {
 }
 
 /// Information about a doorway
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DoorwayInfo {
     pub url: String,
@@ -86,6 +90,7 @@ pub struct DoorwayInfo {
 }
 
 /// Network registration service
+#[allow(dead_code)]
 pub struct NetworkRegistration {
     node_id: String,
     hostname: String,
@@ -93,6 +98,7 @@ pub struct NetworkRegistration {
     doorways: Vec<RegisteredDoorway>,
 }
 
+#[allow(dead_code)]
 impl NetworkRegistration {
     pub fn new(node_id: String, hostname: String) -> Self {
         Self {
@@ -135,7 +141,9 @@ impl NetworkRegistration {
 
         if !response.status().is_success() {
             let error = format!("Registration failed: HTTP {}", response.status());
-            self.status = RegistrationStatus::Failed { error: error.clone() };
+            self.status = RegistrationStatus::Failed {
+                error: error.clone(),
+            };
             return Err(RegistrationError::Rejected(error));
         }
 
@@ -145,8 +153,12 @@ impl NetworkRegistration {
             .map_err(|e| RegistrationError::InvalidResponse(e.to_string()))?;
 
         if !reg_response.success {
-            let error = reg_response.error.unwrap_or_else(|| "Unknown error".to_string());
-            self.status = RegistrationStatus::Failed { error: error.clone() };
+            let error = reg_response
+                .error
+                .unwrap_or_else(|| "Unknown error".to_string());
+            self.status = RegistrationStatus::Failed {
+                error: error.clone(),
+            };
             return Err(RegistrationError::Rejected(error));
         }
 
@@ -182,14 +194,18 @@ impl NetworkRegistration {
 
     /// Send heartbeat to primary doorway
     pub async fn heartbeat(&mut self) -> Result<(), RegistrationError> {
-        let primary = self.doorways
+        let primary = self
+            .doorways
             .iter_mut()
             .find(|d| d.is_primary)
             .ok_or(RegistrationError::NoDoorway)?;
 
         let client = reqwest::Client::new();
         let response = client
-            .post(format!("{}/api/nodes/{}/heartbeat", primary.url, self.node_id))
+            .post(format!(
+                "{}/api/nodes/{}/heartbeat",
+                primary.url, self.node_id
+            ))
             .json(&HeartbeatRequest {
                 node_id: self.node_id.clone(),
                 version: CURRENT_VERSION.to_string(),
@@ -251,7 +267,7 @@ impl NetworkRegistration {
     fn collect_hardware_info(&self) -> HardwareInfo {
         HardwareInfo {
             cpu_cores: num_cpus::get(),
-            memory_bytes: 0, // TODO: Get from sysinfo
+            memory_bytes: 0,  // TODO: Get from sysinfo
             storage_bytes: 0, // TODO: Get from sysinfo
             arch: std::env::consts::ARCH.to_string(),
             os: std::env::consts::OS.to_string(),
@@ -260,6 +276,7 @@ impl NetworkRegistration {
 }
 
 /// Heartbeat request
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct HeartbeatRequest {
     node_id: String,
@@ -269,6 +286,7 @@ struct HeartbeatRequest {
 }
 
 /// Registration errors
+#[allow(dead_code)]
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum RegistrationError {
     #[error("No doorway configured")]
@@ -290,6 +308,7 @@ pub enum RegistrationError {
     KeyGeneration,
 }
 
+#[allow(dead_code)]
 fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -297,6 +316,7 @@ fn now() -> u64 {
         .as_secs()
 }
 
+#[allow(dead_code)]
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -307,6 +327,7 @@ fn now_ms() -> u64 {
 // ---------- Doorway Bootstrap Client ----------
 
 /// Peer info returned from bootstrap discovery.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct BootstrapPeerInfo {
     pub agent: Vec<u8>,
@@ -321,6 +342,7 @@ pub struct BootstrapPeerInfo {
 ///
 /// Uses `rmpv` manual encoding to match doorway's expected binary format
 /// (string-keyed maps, not struct serialization).
+#[allow(dead_code)]
 pub async fn bootstrap_put(
     doorway_url: &str,
     space: &[u8; 36],
@@ -403,6 +425,7 @@ pub async fn bootstrap_put(
 ///
 /// Sends `POST /bootstrap/random` with a MessagePack query and parses the
 /// response array of `SignedAgentInfo` envelopes.
+#[allow(dead_code)]
 pub async fn bootstrap_random(
     doorway_url: &str,
     space: &[u8; 36],
@@ -465,14 +488,16 @@ pub async fn bootstrap_random(
         }
     };
 
-    info!(num_peers = peers.len(), "Bootstrap random discovery complete");
+    info!(
+        num_peers = peers.len(),
+        "Bootstrap random discovery complete"
+    );
     Ok(peers)
 }
 
 /// Get the current server timestamp from doorway bootstrap.
-pub async fn bootstrap_now(
-    doorway_url: &str,
-) -> Result<u64, RegistrationError> {
+#[allow(dead_code)]
+pub async fn bootstrap_now(doorway_url: &str) -> Result<u64, RegistrationError> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/bootstrap/now", doorway_url))
@@ -507,6 +532,7 @@ pub async fn bootstrap_now(
 }
 
 /// Parse a SignedAgentInfo MessagePack value into BootstrapPeerInfo.
+#[allow(dead_code)]
 fn parse_signed_agent_info(value: &rmpv::Value) -> Option<BootstrapPeerInfo> {
     let map = value.as_map()?;
 

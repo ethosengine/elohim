@@ -6,17 +6,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, RwLock};
-use tokio::time::timeout;
-use tracing::{debug, info, warn, error};
+use tokio::sync::RwLock;
+use tracing::{debug, info, warn};
 
 use super::models::*;
-use super::protocol::*;
 
 /// Default timeout for consensus gathering
 const CONSENSUS_TIMEOUT_SECS: u64 = 30;
 
 /// Consensus manager handles gathering approvals for risky actions
+#[allow(dead_code)]
 pub struct ConsensusManager {
     node_id: String,
     /// Pending consensus requests
@@ -44,6 +43,7 @@ impl ConsensusManager {
     }
 
     /// Register a peer agent
+    #[allow(dead_code)]
     pub async fn register_peer(&self, peer: PeerPodInfo) {
         let mut peers = self.peer_agents.write().await;
 
@@ -56,6 +56,7 @@ impl ConsensusManager {
     }
 
     /// Remove a peer agent
+    #[allow(dead_code)]
     pub async fn unregister_peer(&self, peer_id: &str) {
         let mut peers = self.peer_agents.write().await;
         peers.retain(|p| p.peer_id != peer_id);
@@ -67,6 +68,7 @@ impl ConsensusManager {
     }
 
     /// Check if we have enough peers for consensus
+    #[allow(dead_code)]
     pub async fn can_reach_consensus(&self, required: u8) -> bool {
         let peers = self.peer_agents.read().await;
         peers.len() >= required as usize
@@ -85,9 +87,10 @@ impl ConsensusManager {
                     reasoning: "Safe action, no consensus required".to_string(),
                 });
             }
-            ActionRisk::Risky { required_approvals, total_evaluators } => {
-                (*required_approvals, *total_evaluators)
-            }
+            ActionRisk::Risky {
+                required_approvals,
+                total_evaluators,
+            } => (*required_approvals, *total_evaluators),
         };
 
         // Check if we have enough peers
@@ -161,11 +164,12 @@ impl ConsensusManager {
     }
 
     /// Receive a consensus response from a peer
+    #[allow(dead_code)]
     pub async fn receive_response(&self, response: ConsensusResponse) -> Result<(), String> {
         let mut pending_map = self.pending.write().await;
 
         // Find the pending request that matches
-        for (_, pending) in pending_map.iter_mut() {
+        if let Some((_, pending)) = pending_map.iter_mut().next() {
             if pending.request.action.id == response.evaluator {
                 // This check is wrong - should match action somehow
                 // For now, accept any response
@@ -188,15 +192,20 @@ impl ConsensusManager {
     async fn check_consensus(&self, action_id: &str) -> Result<ConsensusOutcome, String> {
         let pending_map = self.pending.read().await;
 
-        let pending = pending_map.get(action_id)
+        let pending = pending_map
+            .get(action_id)
             .ok_or_else(|| format!("No pending consensus for action {}", action_id))?;
 
-        let approvals: Vec<_> = pending.responses.iter()
+        let approvals: Vec<_> = pending
+            .responses
+            .iter()
             .filter(|r| r.approved)
             .cloned()
             .collect();
 
-        let rejections: Vec<_> = pending.responses.iter()
+        let rejections: Vec<_> = pending
+            .responses
+            .iter()
             .filter(|r| !r.approved)
             .cloned()
             .collect();
@@ -206,7 +215,9 @@ impl ConsensusManager {
                 approvals,
                 reasoning: "Required approvals reached".to_string(),
             })
-        } else if rejections.len() > (pending.total_evaluators - pending.required_approvals) as usize {
+        } else if rejections.len()
+            > (pending.total_evaluators - pending.required_approvals) as usize
+        {
             // Too many rejections to possibly reach consensus
             Ok(ConsensusOutcome::Rejected {
                 rejections,
@@ -215,7 +226,8 @@ impl ConsensusManager {
         } else if std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs() > pending.deadline
+            .as_secs()
+            > pending.deadline
         {
             Ok(ConsensusOutcome::Timeout {
                 received: pending.responses.len() as u8,
@@ -232,6 +244,7 @@ impl ConsensusManager {
     /// Evaluate a consensus request from another agent
     ///
     /// This is where the local agent (or LLM) decides whether to approve.
+    #[allow(dead_code)]
     pub async fn evaluate_request(&self, request: &ConsensusRequest) -> ConsensusResponse {
         // In the future, this would:
         // 1. Check local state and observations
@@ -239,7 +252,8 @@ impl ConsensusManager {
         // 3. Apply policy rules
 
         // For now, use simple heuristics
-        let (approved, reasoning, confidence) = self.evaluate_action(&request.action, &request.context);
+        let (approved, reasoning, confidence) =
+            self.evaluate_action(&request.action, &request.context);
 
         ConsensusResponse {
             evaluator: self.node_id.clone(),
@@ -250,32 +264,55 @@ impl ConsensusManager {
     }
 
     /// Simple rule-based evaluation of an action
+    #[allow(dead_code)]
     fn evaluate_action(&self, action: &Action, context: &ClusterContext) -> (bool, String, f32) {
         // Evaluate based on action type and context
         match &action.kind {
             ActionKind::QuarantineNode => {
                 // Be cautious about quarantining
                 if context.healthy_nodes < 3 {
-                    (false, "Cluster too small to quarantine a node safely".to_string(), 0.9)
+                    (
+                        false,
+                        "Cluster too small to quarantine a node safely".to_string(),
+                        0.9,
+                    )
                 } else {
-                    (true, "Cluster has enough redundancy for quarantine".to_string(), 0.7)
+                    (
+                        true,
+                        "Cluster has enough redundancy for quarantine".to_string(),
+                        0.7,
+                    )
                 }
             }
             ActionKind::EvictBlob => {
                 // Check if we have enough replicas
-                (true, "Blob eviction generally safe with proper replica check".to_string(), 0.8)
+                (
+                    true,
+                    "Blob eviction generally safe with proper replica check".to_string(),
+                    0.8,
+                )
             }
             ActionKind::FailoverService => {
                 // Failover is risky but often necessary
                 if context.healthy_nodes > 1 {
-                    (true, "Healthy nodes available for failover".to_string(), 0.75)
+                    (
+                        true,
+                        "Healthy nodes available for failover".to_string(),
+                        0.75,
+                    )
                 } else {
-                    (false, "No healthy nodes available for failover".to_string(), 0.95)
+                    (
+                        false,
+                        "No healthy nodes available for failover".to_string(),
+                        0.95,
+                    )
                 }
             }
             ActionKind::RebalanceStorage => {
                 // Generally safe with dry_run
-                let is_dry_run = action.params.get("dry_run")
+                let is_dry_run = action
+                    .params
+                    .get("dry_run")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
 
@@ -289,9 +326,11 @@ impl ConsensusManager {
                 // Default: approve safe actions, be cautious about others
                 match &action.risk {
                     ActionRisk::Safe => (true, "Safe action approved".to_string(), 0.9),
-                    ActionRisk::Risky { .. } => {
-                        (true, "Risky action approved with standard checks".to_string(), 0.6)
-                    }
+                    ActionRisk::Risky { .. } => (
+                        true,
+                        "Risky action approved with standard checks".to_string(),
+                        0.6,
+                    ),
                 }
             }
         }
@@ -299,6 +338,7 @@ impl ConsensusManager {
 }
 
 /// Outcome of a consensus request
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ConsensusOutcome {
     /// Action approved with sufficient votes
@@ -312,20 +352,11 @@ pub enum ConsensusOutcome {
         reasoning: String,
     },
     /// Waiting for more responses
-    Pending {
-        received: u8,
-        required: u8,
-    },
+    Pending { received: u8, required: u8 },
     /// Consensus timed out
-    Timeout {
-        received: u8,
-        required: u8,
-    },
+    Timeout { received: u8, required: u8 },
     /// Not enough peers to reach consensus
-    InsufficientPeers {
-        available: u8,
-        required: u8,
-    },
+    InsufficientPeers { available: u8, required: u8 },
 }
 
 impl ConsensusOutcome {
@@ -333,6 +364,7 @@ impl ConsensusOutcome {
         matches!(self, ConsensusOutcome::Approved { .. })
     }
 
+    #[allow(dead_code)]
     pub fn is_final(&self) -> bool {
         matches!(
             self,
@@ -387,7 +419,8 @@ mod tests {
             ActionKind::RebalanceStorage,
             "Test rebalance",
             serde_json::json!({"dry_run": true}),
-        ).with_risk(ActionRisk::Risky {
+        )
+        .with_risk(ActionRisk::Risky {
             required_approvals: 2,
             total_evaluators: 3,
         });

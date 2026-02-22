@@ -45,7 +45,6 @@ pub fn get_required_permission(operation: &str) -> Option<PermissionLevel> {
         "generate_agent_pub_key"
         | "grant_zome_call_capability"
         | "revoke_zome_call_capability"
-        | "authorize_signing_credentials"
         | "attach_app_interface"
         | "issue_app_authentication_token"
         | "list_capability_grants"
@@ -92,7 +91,6 @@ pub fn get_operation_description(operation: &str) -> &'static str {
         "generate_agent_pub_key" => "Generate agent public key",
         "grant_zome_call_capability" => "Grant zome call capability",
         "revoke_zome_call_capability" => "Revoke zome call capability",
-        "authorize_signing_credentials" => "Authorize signing credentials",
         "attach_app_interface" => "Attach app interface",
         "issue_app_authentication_token" => "Issue app auth token",
         "list_capability_grants" => "List capability grants",

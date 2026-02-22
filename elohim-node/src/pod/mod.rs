@@ -28,15 +28,15 @@
 //! - **Debug & Diagnostics**: Log levels, heap dumps, bug reports
 //! - **Health Recovery**: Restart services, failover, quarantine
 
-pub mod models;
-pub mod monitor;
+pub mod actions;
 pub mod analyzer;
+pub mod cli;
+pub mod consensus;
 pub mod decider;
 pub mod executor;
-pub mod actions;
+pub mod models;
+pub mod monitor;
 pub mod protocol;
-pub mod consensus;
-pub mod cli;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -45,13 +45,12 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::time::interval;
 use tracing::{debug, error, info, warn};
 
-use crate::config::Config;
-use models::*;
-use monitor::Monitor;
 use analyzer::Analyzer;
+use consensus::ConsensusManager;
 use decider::Decider;
 use executor::Executor;
-use consensus::ConsensusManager;
+use models::*;
+use monitor::Monitor;
 
 /// Pod configuration
 #[derive(Debug, Clone)]
@@ -63,6 +62,7 @@ pub struct PodConfig {
     /// Path to rules file
     pub rules_file: Option<String>,
     /// Maximum actions per hour
+    #[allow(dead_code)]
     pub max_actions_per_hour: u32,
     /// Dry run mode (don't execute actions)
     pub dry_run: bool,
@@ -127,6 +127,7 @@ impl Pod {
     }
 
     /// Set setup complete flag
+    #[allow(dead_code)]
     pub fn set_setup_complete(&mut self, complete: bool) {
         self.setup_complete = complete;
     }
@@ -199,6 +200,7 @@ impl Pod {
     }
 
     /// Stop the pod
+    #[allow(dead_code)]
     pub async fn stop(&self) {
         if let Some(tx) = &self.shutdown_tx {
             let _ = tx.send(()).await;
@@ -239,11 +241,9 @@ impl Pod {
         let service_health = self.get_service_health();
 
         // 5. Make decisions (evaluate rules)
-        let actions = self.decider.evaluate(
-            latest_metrics.as_ref(),
-            &service_health,
-            &anomalies,
-        );
+        let actions = self
+            .decider
+            .evaluate(latest_metrics.as_ref(), &service_health, &anomalies);
 
         if !actions.is_empty() {
             info!(count = actions.len(), "Generated actions from rules");
@@ -268,11 +268,18 @@ impl Pod {
                         warn!(error = %e, "Failed to queue action");
                     }
                 }
-                ActionRisk::Risky { required_approvals, total_evaluators } => {
+                ActionRisk::Risky {
+                    required_approvals: _,
+                    total_evaluators: _,
+                } => {
                     // Request consensus
                     let context = self.build_cluster_context().await;
 
-                    match self.consensus.request_consensus(action.clone(), context).await {
+                    match self
+                        .consensus
+                        .request_consensus(action.clone(), context)
+                        .await
+                    {
                         Ok(outcome) => {
                             if outcome.is_approved() {
                                 if let Err(e) = self.executor.queue(action).await {
@@ -340,9 +347,18 @@ impl Pod {
             healthy_nodes: peers.len() + 1, // Simplified
             recent_observations: observations,
             resource_summary: ResourceSummary {
-                avg_cpu_percent: latest_metrics.as_ref().map(|m| m.cpu_percent).unwrap_or(0.0),
-                avg_memory_percent: latest_metrics.as_ref().map(|m| m.memory_percent).unwrap_or(0.0),
-                avg_disk_percent: latest_metrics.as_ref().map(|m| m.disk_percent).unwrap_or(0.0),
+                avg_cpu_percent: latest_metrics
+                    .as_ref()
+                    .map(|m| m.cpu_percent)
+                    .unwrap_or(0.0),
+                avg_memory_percent: latest_metrics
+                    .as_ref()
+                    .map(|m| m.memory_percent)
+                    .unwrap_or(0.0),
+                avg_disk_percent: latest_metrics
+                    .as_ref()
+                    .map(|m| m.disk_percent)
+                    .unwrap_or(0.0),
                 total_storage_bytes: 0,
                 used_storage_bytes: 0,
                 total_blob_count: 0,
@@ -398,16 +414,19 @@ mod tests {
         let pod = Pod::new("test-node".to_string(), PodConfig::default());
         let status = pod.status().await;
 
-        assert_eq!(status.node_id, "");  // Not started yet
+        assert_eq!(status.node_id, ""); // Not started yet
         assert!(!status.active);
     }
 
     #[tokio::test]
     async fn test_pod_status() {
-        let mut pod = Pod::new("test-node".to_string(), PodConfig {
-            enabled: false, // Don't start the loop
-            ..Default::default()
-        });
+        let mut pod = Pod::new(
+            "test-node".to_string(),
+            PodConfig {
+                enabled: false, // Don't start the loop
+                ..Default::default()
+            },
+        );
 
         let status = pod.status().await;
         assert!(!status.active);

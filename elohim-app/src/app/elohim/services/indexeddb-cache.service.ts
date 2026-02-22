@@ -69,6 +69,7 @@ export class IndexedDBCacheService {
   private db: IDBDatabase | null = null;
   private initPromise: Promise<boolean> | null = null;
   private accessCount = 0;
+  private readonly _quotaExceeded = { value: false };
 
   /**
    * Initialize the IndexedDB database.
@@ -92,6 +93,13 @@ export class IndexedDBCacheService {
    */
   isAvailable(): boolean {
     return this.db !== null;
+  }
+
+  /**
+   * Whether the last write failed due to quota exceeded.
+   */
+  get quotaExceeded(): boolean {
+    return this._quotaExceeded.value;
   }
 
   // ===========================================================================
@@ -333,6 +341,49 @@ export class IndexedDBCacheService {
     }
   }
 
+  // ===========================================================================
+  // Metadata (generic key-value storage)
+  // ===========================================================================
+
+  /**
+   * Get a value from the metadata store.
+   * Used for non-TTL data like offline queue persistence.
+   */
+  async getMetadata<T>(key: string): Promise<T | null> {
+    if (!this.db) return null;
+
+    try {
+      return await new Promise<T | null>((resolve, reject) => {
+        const tx = this.db!.transaction(STORES.METADATA, 'readonly');
+        const store = tx.objectStore(STORES.METADATA);
+        const request = store.get(key);
+        request.onsuccess = () => resolve((request.result as T) ?? null);
+        request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Set a value in the metadata store.
+   */
+  async setMetadata<T>(key: string, value: T): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = this.db!.transaction(STORES.METADATA, 'readwrite');
+        const store = tx.objectStore(STORES.METADATA);
+        const request = store.put(value, key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
+      });
+    } catch {
+      // Silently fail - metadata is non-critical
+    }
+  }
+
   /**
    * Clean up expired entries from all stores.
    */
@@ -472,8 +523,16 @@ export class IndexedDBCacheService {
       const store = tx.objectStore(storeName);
       const request = store.put(value, key);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(new Error(String(request.error ?? 'IDB error')));
+      request.onsuccess = () => {
+        this._quotaExceeded.value = false;
+        resolve();
+      };
+      request.onerror = () => {
+        if (request.error?.name === 'QuotaExceededError') {
+          this._quotaExceeded.value = true;
+        }
+        reject(new Error(String(request.error ?? 'IDB error')));
+      };
     });
   }
 

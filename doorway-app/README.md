@@ -1,59 +1,35 @@
-# DoorwayApp
+# doorway-app
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.19.
+Operator dashboard for doorway stewards. In the Elohim Protocol, doorways are community-run gateways that bridge hosted users to the distributed network. This Angular app gives the humans who run those gateways visibility into what they are stewarding -- the nodes, the people served, the trust relationships, and the path toward full agency.
 
-## Development server
+## Features
 
-To start a local development server, run:
+- **Operator Dashboard** -- Real-time node health, cluster metrics, resource utilization, and custodian network status via WebSocket. Displays both technical metrics (CPU, memory, storage, bandwidth) and human-scale metrics (trust scores, humans served, impact scores, steward tiers).
+- **Federation** -- View federated doorway peers and P2P connections across the network.
+- **Graduation Pipeline** -- Track users progressing from hosted accounts toward full stewardship (registered, hosted, graduating, steward).
+- **User Management** -- Administer accounts, quotas, and permissions for hosted users.
+- **Account Self-Service** -- Users can view their own agency pipeline progress and usage.
 
-```bash
-ng serve
-```
+## Routes
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+| Path | View |
+|------|------|
+| `/` | Landing page |
+| `/dashboard` | Operator dashboard (nodes, cluster, resources, federation, graduation) |
+| `/login` | Threshold login |
+| `/register` | Account creation |
+| `/doorways` | Doorway browser (select gateway) |
+| `/account` | User account and quota status |
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+## Development
 
 ```bash
-ng build
+cd doorway-app
+npm install
+npm start          # Dev server at localhost:4200
+npm run build      # Production build
+npm run lint       # ESLint
+npm run format:check  # Prettier check
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+The app connects to a running doorway Rust service for its `/admin/*` and `/auth/*` API endpoints.

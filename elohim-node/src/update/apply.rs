@@ -15,9 +15,9 @@
 //!         ├── elohim-node.0.1.0  # Previous version (for rollback)
 //!         └── elohim-node.0.0.9  # Older version
 
-use std::path::{Path, PathBuf};
 use std::fs;
-use tracing::{info, warn, error};
+use std::path::{Path, PathBuf};
+use tracing::{error, info, warn};
 
 use super::UpdateError;
 
@@ -47,20 +47,19 @@ impl UpdateApplier {
         info!("Applying update {} from {:?}", version, update_path);
 
         // Ensure directories exist
-        fs::create_dir_all(&self.staging_dir)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
-        fs::create_dir_all(&self.versions_dir)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        fs::create_dir_all(&self.staging_dir).map_err(|e| UpdateError::Io(e.to_string()))?;
+        fs::create_dir_all(&self.versions_dir).map_err(|e| UpdateError::Io(e.to_string()))?;
 
         // Get current binary path
-        let current_exe = std::env::current_exe()
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        let current_exe = std::env::current_exe().map_err(|e| UpdateError::Io(e.to_string()))?;
 
         info!("Current executable: {:?}", current_exe);
 
         // Step 1: Backup current version
         let current_version = super::CURRENT_VERSION;
-        let backup_path = self.versions_dir.join(format!("elohim-node.{}", current_version));
+        let backup_path = self
+            .versions_dir
+            .join(format!("elohim-node.{}", current_version));
 
         if current_exe.exists() && !backup_path.exists() {
             info!("Backing up current version to {:?}", backup_path);
@@ -83,8 +82,7 @@ impl UpdateApplier {
                 .map_err(|e| UpdateError::Io(e.to_string()))?
                 .permissions();
             perms.set_mode(0o755);
-            fs::set_permissions(&staged_path, perms)
-                .map_err(|e| UpdateError::Io(e.to_string()))?;
+            fs::set_permissions(&staged_path, perms).map_err(|e| UpdateError::Io(e.to_string()))?;
         }
 
         // Step 3: Atomic swap
@@ -123,7 +121,8 @@ impl UpdateApplier {
                     fs::rename(&old_path, &current_exe).ok();
                 }
                 return Err(UpdateError::ApplyFailed(format!(
-                    "Failed to install new binary: {}", e
+                    "Failed to install new binary: {}",
+                    e
                 )));
             }
         }
@@ -133,8 +132,7 @@ impl UpdateApplier {
 
         // Mark update complete - create a marker file
         let marker_path = self.update_dir.join(".update-pending-restart");
-        fs::write(&marker_path, version)
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        fs::write(&marker_path, version).map_err(|e| UpdateError::Io(e.to_string()))?;
 
         info!("Update to {} complete, restart required", version);
         Ok(())
@@ -146,13 +144,13 @@ impl UpdateApplier {
 
         // Find the most recent backup
         let backups = self.list_backups()?;
-        let latest_backup = backups.first()
-            .ok_or(UpdateError::RollbackFailed("No backup available".to_string()))?;
+        let latest_backup = backups.first().ok_or(UpdateError::RollbackFailed(
+            "No backup available".to_string(),
+        ))?;
 
         info!("Rolling back to {:?}", latest_backup);
 
-        let current_exe = std::env::current_exe()
-            .map_err(|e| UpdateError::Io(e.to_string()))?;
+        let current_exe = std::env::current_exe().map_err(|e| UpdateError::Io(e.to_string()))?;
 
         // Same atomic swap pattern
         let old_path = current_exe.with_extension("old");
@@ -212,12 +210,14 @@ impl UpdateApplier {
     }
 
     /// Check if an update is pending restart
+    #[allow(dead_code)]
     pub fn is_restart_pending(&self) -> Option<String> {
         let marker_path = self.update_dir.join(".update-pending-restart");
         fs::read_to_string(&marker_path).ok()
     }
 
     /// Clear the restart pending marker (called after successful restart)
+    #[allow(dead_code)]
     pub fn clear_restart_pending(&self) {
         let marker_path = self.update_dir.join(".update-pending-restart");
         fs::remove_file(&marker_path).ok();
@@ -233,6 +233,7 @@ impl UpdateApplier {
 }
 
 /// Request a restart of the service
+#[allow(dead_code)]
 pub fn request_restart() -> Result<(), UpdateError> {
     info!("Requesting service restart");
 

@@ -19,5 +19,8 @@ export { DoorwayRegistryService } from './doorway-registry.service';
 export { PasswordAuthProvider } from './providers/password-auth.provider';
 export { OAuthAuthProvider } from './providers/oauth-auth.provider';
 
+// Hosting
+export { HostingAccountService } from './hosting-account.service';
+
 // Banner providers
 export { UpgradeBannerProvider } from './providers/upgrade-banner.provider';

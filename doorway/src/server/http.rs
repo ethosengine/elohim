@@ -97,6 +97,8 @@ pub struct AppState {
     pub zome_caller: Option<Arc<crate::services::ZomeCaller>>,
     /// Cache of peer doorways discovered via HTTP federation
     pub peer_cache: crate::services::federation::PeerCache,
+    /// Mutable list of federation peer URLs (seeded from env, mutable via admin API)
+    pub peer_url_list: crate::services::federation::PeerUrlList,
     /// Cached P2P health from elohim-storage sidecar (polled every 30s)
     pub p2p_health: Arc<tokio::sync::RwLock<Option<crate::routes::health::P2PHealth>>>,
 }
@@ -132,6 +134,9 @@ impl AppState {
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Self {
             args,
             mongo: None,
@@ -160,6 +165,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -198,6 +204,9 @@ impl AppState {
         // Delivery relay for CDN-style caching (complements agent-side cache-core)
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Self {
             args,
             mongo,
@@ -226,6 +235,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -279,6 +289,9 @@ impl AppState {
         // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Self {
             args,
             mongo,
@@ -307,6 +320,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -354,6 +368,9 @@ impl AppState {
         // Note: Write batching is handled by agent's holochain-cache-core WriteBuffer, NOT here
         let delivery_relay = Arc::new(DeliveryRelay::with_defaults());
 
+        let peer_url_list =
+            crate::services::federation::new_peer_url_list(args.federation_peers.clone());
+
         Ok(Self {
             args,
             mongo: Some(mongo),
@@ -382,6 +399,7 @@ impl AppState {
             node_verifying_key: None,
             zome_caller: None,
             peer_cache: crate::services::federation::new_peer_cache(),
+            peer_url_list,
             p2p_health: Arc::new(tokio::sync::RwLock::new(None)),
         })
     }
@@ -675,24 +693,33 @@ async fn handle_request(
             }
         }
 
-        // WebSocket upgrade for admin interface (LEGACY: /, /admin - deprecated, use /hc/admin)
-        // Gated to dev-mode only — production clients use POST /hc/connect (Chaperone)
+        // Root and /admin: redirect browsers to /threshold, preserve WS upgrade in dev
         (Method::GET, "/") | (Method::GET, "/admin") => {
-            if !state.args.dev_mode {
+            if hyper_tungstenite::is_upgrade_request(&req) {
+                if state.args.dev_mode {
+                    debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
+                    to_boxed(websocket::handle_admin_upgrade(state, req).await)
+                } else {
+                    to_boxed(
+                        Response::builder()
+                            .status(StatusCode::FORBIDDEN)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(
+                                r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                            )))
+                            .unwrap(),
+                    )
+                }
+            } else {
                 to_boxed(
                     Response::builder()
-                        .status(StatusCode::FORBIDDEN)
-                        .header("Content-Type", "application/json")
+                        .status(StatusCode::TEMPORARY_REDIRECT)
+                        .header("Location", "/threshold")
                         .body(Full::new(Bytes::from(
-                            r#"{"error":"Admin WebSocket disabled in production. Use POST /hc/connect."}"#,
+                            r#"<html><body>Redirecting to <a href="/threshold">/threshold</a></body></html>"#,
                         )))
                         .unwrap(),
                 )
-            } else if hyper_tungstenite::is_upgrade_request(&req) {
-                debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
-                to_boxed(websocket::handle_admin_upgrade(state, req).await)
-            } else {
-                to_boxed(not_found_response(&path))
             }
         }
 
@@ -716,6 +743,12 @@ async fn handle_request(
         // ====================================================================
         // Admin API endpoints for Shefa compute resources dashboard
         // ====================================================================
+
+        // Feature flags — which optional services are active on this instance
+        // No auth required: clients use this for upfront capability discovery
+        (Method::GET, "/admin/capabilities") => {
+            to_boxed(routes::handle_capabilities(Arc::clone(&state)).await)
+        }
 
         // Conductor pool visibility (available on ALL instances)
         (Method::GET, "/admin/conductors") => {
@@ -756,6 +789,11 @@ async fn handle_request(
             to_boxed(routes::handle_deprovision_user(Arc::clone(&state), agent_key).await)
         }
 
+        // Pipeline — user lifecycle funnel counts
+        (Method::GET, "/admin/pipeline") => {
+            to_boxed(routes::handle_admin_pipeline(Arc::clone(&state)).await)
+        }
+
         // Graduation endpoints — conductor retirement for steward users
         (Method::GET, "/admin/graduation/pending") => {
             to_boxed(routes::handle_graduation_pending(Arc::clone(&state)).await)
@@ -766,6 +804,42 @@ async fn handle_request(
         (Method::POST, p) if p.starts_with("/admin/graduation/force/") => {
             let agent_key = p.strip_prefix("/admin/graduation/force/").unwrap_or("");
             to_boxed(routes::handle_force_graduation(Arc::clone(&state), agent_key).await)
+        }
+
+        // Federation peer admin — configured peer URLs with add/remove/refresh
+        (Method::GET, "/admin/federation/peers") => {
+            to_boxed(routes::handle_admin_federation_peers(Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/federation/peers/refresh") => {
+            to_boxed(routes::handle_admin_refresh_federation_peers(Arc::clone(&state)).await)
+        }
+        (Method::POST, "/admin/federation/peers") => {
+            let body = match req.collect().await {
+                Ok(collected) => collected.to_bytes(),
+                Err(e) => {
+                    warn!("Federation peer add body error: {}", e);
+                    return Ok(to_boxed(bad_request_response(
+                        "Failed to read request body",
+                    )));
+                }
+            };
+            return Ok(to_boxed(
+                routes::handle_admin_add_federation_peer(Arc::clone(&state), body).await,
+            ));
+        }
+        (Method::DELETE, "/admin/federation/peers") => {
+            let body = match req.collect().await {
+                Ok(collected) => collected.to_bytes(),
+                Err(e) => {
+                    warn!("Federation peer remove body error: {}", e);
+                    return Ok(to_boxed(bad_request_response(
+                        "Failed to read request body",
+                    )));
+                }
+            };
+            return Ok(to_boxed(
+                routes::handle_admin_remove_federation_peer(Arc::clone(&state), body).await,
+            ));
         }
 
         // Agent conductor lookup

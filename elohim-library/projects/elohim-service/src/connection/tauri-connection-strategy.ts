@@ -22,12 +22,13 @@ import {
   generateSigningKeyPair,
   randomCapSecret,
   setSigningCredentials,
-  type AgentPubKey,
   type CellId,
   type AppInfo,
 } from '@holochain/client';
 
 import { SourceTier } from '../cache/content-resolver';
+
+import { ConsoleLogger } from './console-logger';
 
 import type {
   IConnectionStrategy,
@@ -35,6 +36,7 @@ import type {
   ConnectionResult,
   ContentSourceConfig,
   SigningCredentials,
+  Logger,
 } from './connection-strategy';
 
 /** Default elohim-storage sidecar port */
@@ -87,6 +89,23 @@ export interface NativeHandoffResponse {
   bootstrapUrl?: string;
 }
 
+/** Wire format for session from elohim-storage HTTP API (snake_case) */
+interface SessionApiResponse {
+  id: string;
+  human_id: string;
+  agent_pub_key: string;
+  doorway_url: string;
+  doorway_id?: string;
+  identifier: string;
+  display_name?: string;
+  profile_image_hash?: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+  last_synced_at?: string;
+  bootstrap_url?: string;
+}
+
 /**
  * OAuth callback payload from Tauri deep link handler
  */
@@ -112,6 +131,17 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   private credentials: SigningCredentials | null = null;
   private connected = false;
   private currentSession: LocalSession | null = null;
+  private logger: Logger = new ConsoleLogger('TauriStrategy');
+
+  /** Resolve logger from config or use default */
+  private resolveLogger(config: ConnectionConfig): Logger {
+    if (config.logger) {
+      this.logger = config.logger;
+    } else if (config.logLevel) {
+      this.logger = new ConsoleLogger('TauriStrategy', config.logLevel);
+    }
+    return this.logger;
+  }
 
   // ==========================================================================
   // Environment Detection
@@ -125,7 +155,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
    * Detect if running in Tauri native app.
    */
   private isTauriEnvironment(): boolean {
-    return typeof window !== 'undefined' && '__TAURI__' in window;
+    return globalThis.window !== undefined && '__TAURI__' in globalThis;
   }
 
   // ==========================================================================
@@ -167,25 +197,12 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         throw new Error(`Session API error: ${response.status}`);
       }
 
-      const session = await response.json();
-      // Convert snake_case to camelCase
-      return {
-        id: session.id,
-        humanId: session.human_id,
-        agentPubKey: session.agent_pub_key,
-        doorwayUrl: session.doorway_url,
-        doorwayId: session.doorway_id,
-        identifier: session.identifier,
-        displayName: session.display_name,
-        profileImageHash: session.profile_image_hash,
-        isActive: session.is_active,
-        createdAt: session.created_at,
-        updatedAt: session.updated_at,
-        lastSyncedAt: session.last_synced_at,
-        bootstrapUrl: session.bootstrap_url,
-      };
+      const session = (await response.json()) as SessionApiResponse;
+      return this.mapSessionResponse(session);
     } catch (err) {
-      console.warn('[TauriStrategy] Failed to get session:', err);
+      this.logger.warn('Failed to get session', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }
@@ -193,10 +210,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   /**
    * Create a new local session in elohim-storage.
    */
-  async createSession(
-    config: ConnectionConfig,
-    input: CreateSessionInput
-  ): Promise<LocalSession> {
+  async createSession(config: ConnectionConfig, input: CreateSessionInput): Promise<LocalSession> {
     const storageUrl = this.getStorageApiUrl(config);
 
     // Convert camelCase to snake_case for API
@@ -223,22 +237,8 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       throw new Error(`Failed to create session: ${error}`);
     }
 
-    const session = await response.json();
-    return {
-      id: session.id,
-      humanId: session.human_id,
-      agentPubKey: session.agent_pub_key,
-      doorwayUrl: session.doorway_url,
-      doorwayId: session.doorway_id,
-      identifier: session.identifier,
-      displayName: session.display_name,
-      profileImageHash: session.profile_image_hash,
-      isActive: session.is_active,
-      createdAt: session.created_at,
-      updatedAt: session.updated_at,
-      lastSyncedAt: session.last_synced_at,
-      bootstrapUrl: session.bootstrap_url,
-    };
+    const session = (await response.json()) as SessionApiResponse;
+    return this.mapSessionResponse(session);
   }
 
   /**
@@ -252,11 +252,11 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
     });
 
     if (!response.ok) {
-      console.warn('[TauriStrategy] Failed to delete session');
+      this.logger.warn('Failed to delete session');
       return false;
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as { deleted?: boolean };
     return result.deleted === true;
   }
 
@@ -285,7 +285,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       throw new Error(`Native handoff failed: ${error}`);
     }
 
-    return response.json();
+    return (await response.json()) as NativeHandoffResponse;
   }
 
   /**
@@ -311,7 +311,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       throw new Error(`Token exchange failed: ${error}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { access_token: string };
     return data.access_token;
   }
 
@@ -324,13 +324,13 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
     // config.adminUrl may contain a doorway URL from environment config,
     // which is not appropriate for direct conductor access.
     const url = 'ws://localhost:4444';
-    console.log('[TauriStrategy] Admin URL:', url);
+    this.logger.debug('Admin URL', { url });
     return url;
   }
 
   resolveAppUrl(_config: ConnectionConfig, port: number): string {
     const url = `ws://localhost:${port}`;
-    console.log('[TauriStrategy] App URL:', url);
+    this.logger.debug('App URL', { url });
     return url;
   }
 
@@ -381,12 +381,13 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   // ==========================================================================
 
   async connect(config: ConnectionConfig): Promise<ConnectionResult> {
+    this.resolveLogger(config);
     try {
-      console.log('[TauriStrategy] Starting connection...');
+      this.logger.info('Starting connection...');
 
       // Step 1: Connect to Admin WebSocket
       const adminUrl = this.resolveAdminUrl(config);
-      console.log('[TauriStrategy] Connecting to admin:', adminUrl);
+      this.logger.debug('Connecting to admin', { adminUrl });
 
       this.adminWs = await AdminWebsocket.connect({
         url: new URL(adminUrl),
@@ -396,7 +397,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       });
 
       // Step 2: Generate signing credentials
-      console.log('[TauriStrategy] Generating signing credentials...');
+      this.logger.debug('Generating signing credentials...');
       const [keyPair, signingKey] = await generateSigningKeyPair();
       const capSecret = await randomCapSecret();
 
@@ -404,13 +405,13 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
 
       // Step 3: Generate agent key
       const agentPubKey = await this.adminWs.generateAgentPubKey();
-      console.log('[TauriStrategy] Agent key generated');
+      this.logger.debug('Agent key generated');
 
       // Step 4: Check if app is installed
       let appInfo = await this.getInstalledApp(this.adminWs, config.appId);
 
       if (!appInfo) {
-        console.log(`[TauriStrategy] App ${config.appId} not installed`);
+        this.logger.info(`App ${config.appId} not installed`);
 
         if (config.happPath) {
           appInfo = await this.adminWs.installApp({
@@ -433,7 +434,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         throw new Error('Could not extract any cell IDs from app info');
       }
 
-      console.log('[TauriStrategy] Found', cellIds.size, 'cells');
+      this.logger.debug('Found cells', { count: cellIds.size });
 
       // Step 6: Grant zome call capability for ALL cells
       for (const [roleName, cellId] of cellIds) {
@@ -485,7 +486,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
 
       // Step 11: Connect to App WebSocket
       const appUrl = this.resolveAppUrl(config, appPort);
-      console.log('[TauriStrategy] Connecting to app interface:', appUrl);
+      this.logger.debug('Connecting to app interface', { appUrl });
 
       this.appWs = await AppWebsocket.connect({
         url: new URL(appUrl),
@@ -497,7 +498,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
 
       this.connected = true;
 
-      console.log('[TauriStrategy] Connection successful');
+      this.logger.info('Connection successful');
 
       return {
         success: true,
@@ -510,7 +511,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[TauriStrategy] Connection failed:', errorMessage);
+      this.logger.error('Connection failed', errorMessage);
 
       return {
         success: false,
@@ -530,13 +531,15 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
         this.adminWs = null;
       }
     } catch (err) {
-      console.warn('[TauriStrategy] Error during disconnect:', err);
+      this.logger.warn('Error during disconnect', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     this.credentials = null;
     this.connected = false;
     this.currentSession = null;
-    console.log('[TauriStrategy] Disconnected');
+    this.logger.info('Disconnected');
   }
 
   // ==========================================================================
@@ -559,10 +562,26 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
   // Helper Methods
   // ==========================================================================
 
-  private async getInstalledApp(
-    adminWs: AdminWebsocket,
-    appId: string
-  ): Promise<AppInfo | null> {
+  /** Convert snake_case API response to camelCase LocalSession */
+  private mapSessionResponse(s: SessionApiResponse): LocalSession {
+    return {
+      id: s.id,
+      humanId: s.human_id,
+      agentPubKey: s.agent_pub_key,
+      doorwayUrl: s.doorway_url,
+      doorwayId: s.doorway_id,
+      identifier: s.identifier,
+      displayName: s.display_name,
+      profileImageHash: s.profile_image_hash,
+      isActive: s.is_active,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at,
+      lastSyncedAt: s.last_synced_at,
+      bootstrapUrl: s.bootstrap_url,
+    };
+  }
+
+  private async getInstalledApp(adminWs: AdminWebsocket, appId: string): Promise<AppInfo | null> {
     try {
       const apps = await adminWs.listApps({});
       return apps.find((app: AppInfo) => app.installed_app_id === appId) || null;
@@ -576,7 +595,7 @@ export class TauriConnectionStrategy implements IConnectionStrategy {
     const cellInfoEntries = Object.entries(appInfo.cell_info);
 
     for (const [roleName, cells] of cellInfoEntries) {
-      const cellArray = cells as Array<{ type: string; value: { cell_id: CellId } }>;
+      const cellArray = cells as { type: string; value: { cell_id: CellId } }[];
       for (const cell of cellArray) {
         if (cell.type === 'provisioned' && cell.value?.cell_id) {
           cellIds.set(roleName, cell.value.cell_id);

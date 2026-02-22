@@ -137,6 +137,110 @@ spec:
 
 ---
 # ============================================================================
+# P2P Cross-Namespace Rules (alpha/staging <-> prod on port 9876)
+# ============================================================================
+
+# Allow P2P traffic: prod -> alpha
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-from-prod
+  namespace: elohim-alpha
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              elohim/environment: prod
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+
+---
+# Allow P2P traffic: prod -> staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-from-prod
+  namespace: elohim-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              elohim/environment: prod
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+
+---
+# Allow P2P traffic: alpha -> prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-from-alpha
+  namespace: elohim-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              elohim/environment: alpha
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+
+---
+# Allow P2P traffic: staging -> prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-p2p-from-staging
+  namespace: elohim-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: elohim-edgenode
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              elohim/environment: staging
+          podSelector:
+            matchLabels:
+              app: elohim-edgenode
+      ports:
+        - protocol: TCP
+          port: 9876
+
+---
+# ============================================================================
 # Production Environment
 # ============================================================================
 apiVersion: networking.k8s.io/v1

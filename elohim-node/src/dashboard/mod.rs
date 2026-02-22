@@ -6,10 +6,10 @@
 //! - Setup wizard (join network or become doorway)
 //! - Cluster health overview
 
-pub mod metrics;
 pub mod discovery;
-pub mod setup;
+pub mod metrics;
 pub mod routes;
+pub mod setup;
 
 use axum::{
     routing::{get, post},
@@ -42,6 +42,7 @@ pub struct DiscoveredPeer {
 }
 
 /// Type of discovered peer
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum PeerType {
     /// elohim-node (always-on node)
@@ -64,6 +65,7 @@ pub struct PairingRequest {
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
+#[allow(dead_code)]
 pub enum PairingStatus {
     Pending,
     Approved,
@@ -79,7 +81,6 @@ pub fn create_router(state: SharedState) -> Router {
         // Dashboard pages
         .route("/", get(routes::index))
         .route("/setup", get(routes::setup_page))
-
         // API endpoints
         .route("/api/status", get(routes::api_status))
         .route("/api/metrics", get(routes::api_metrics))
@@ -90,28 +91,22 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/pairing/reject", post(routes::api_reject_pairing))
         .route("/api/setup/join", post(routes::api_setup_join))
         .route("/api/setup/doorway", post(routes::api_setup_doorway))
-
         // Update API
         .route("/api/update/status", get(routes::api_update_status))
         .route("/api/update/check", post(routes::api_update_check))
         .route("/api/update/apply", post(routes::api_update_apply))
         .route("/api/update/rollback", post(routes::api_update_rollback))
-
         // Network API
         .route("/api/network/status", get(routes::api_network_status))
         .route("/api/network/apps", get(routes::api_connected_apps))
         .route("/api/node/info", get(routes::api_node_info))
-
         // Multi-node dashboard API
         .route("/api/nodes", get(routes::api_list_nodes))
         .route("/api/proxy", post(routes::api_proxy_node))
-
         // Health check
         .route("/health", get(routes::health))
-
         // Static files
         .nest_service("/static", tower_http::services::ServeDir::new("static"))
-
         .with_state(state)
 }
 

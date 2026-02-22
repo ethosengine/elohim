@@ -63,6 +63,14 @@
   color: #22c55e;
 }
 
+.status-local-only {
+  --indicator-color: #64748b;
+}
+
+.status-local-only .status-icon {
+  color: #64748b;
+}
+
 .status-doorway {
   --indicator-color: #3b82f6;
 }

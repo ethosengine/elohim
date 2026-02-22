@@ -51,12 +51,20 @@ impl StorageActionHandler {
             }
         };
 
-        let target_nodes: Vec<String> = action.params.get("target_nodes")
+        let target_nodes: Vec<String> = action
+            .params
+            .get("target_nodes")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        let priority = action.params.get("priority")
+        let priority = action
+            .params
+            .get("priority")
             .and_then(|v| v.as_str())
             .unwrap_or("normal");
 
@@ -75,7 +83,11 @@ impl StorageActionHandler {
 
         ActionResult {
             success: true,
-            message: format!("Blob {} replicated to {} nodes", blob_hash, target_nodes.len()),
+            message: format!(
+                "Blob {} replicated to {} nodes",
+                blob_hash,
+                target_nodes.len()
+            ),
             duration_ms: 0,
             details: Some(serde_json::json!({
                 "blob_hash": blob_hash,
@@ -99,19 +111,21 @@ impl StorageActionHandler {
             }
         };
 
-        let verify_replicas = action.params.get("verify_replicas")
+        let verify_replicas = action
+            .params
+            .get("verify_replicas")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let min_replicas = action.params.get("min_replicas")
+        let min_replicas = action
+            .params
+            .get("min_replicas")
             .and_then(|v| v.as_u64())
             .unwrap_or(2) as usize;
 
         info!(
             blob_hash,
-            verify_replicas,
-            min_replicas,
-            "Blob eviction requested"
+            verify_replicas, min_replicas, "Blob eviction requested"
         );
 
         // In a real implementation, this would:
@@ -145,7 +159,9 @@ impl StorageActionHandler {
             }
         };
 
-        let shard_index = action.params.get("shard_index")
+        let shard_index = action
+            .params
+            .get("shard_index")
             .and_then(|v| v.as_u64())
             .map(|i| i as usize);
 
@@ -179,19 +195,19 @@ impl StorageActionHandler {
     }
 
     async fn rebalance_storage(&self, action: &Action) -> ActionResult {
-        let target_usage = action.params.get("target_usage_percent")
+        let target_usage = action
+            .params
+            .get("target_usage_percent")
             .and_then(|v| v.as_f64())
             .unwrap_or(75.0);
 
-        let dry_run = action.params.get("dry_run")
+        let dry_run = action
+            .params
+            .get("dry_run")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        info!(
-            target_usage,
-            dry_run,
-            "Storage rebalance requested"
-        );
+        info!(target_usage, dry_run, "Storage rebalance requested");
 
         // In a real implementation, this would:
         // 1. Calculate current usage across cluster nodes

@@ -8,6 +8,7 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
+use crate::conductor::ConductorPoolMap;
 use crate::nats::messages::HostHeartbeat;
 use crate::nats::NatsClient;
 use crate::types::DoorwayError;
@@ -31,6 +32,8 @@ pub struct HeartbeatService {
     version: Option<String>,
     /// Whether the service is running
     running: Arc<RwLock<bool>>,
+    /// Conductor pool map for capacity metrics (optional)
+    conductor_pools: Option<Arc<ConductorPoolMap>>,
 }
 
 impl HeartbeatService {
@@ -44,6 +47,7 @@ impl HeartbeatService {
             region: None,
             version: None,
             running: Arc::new(RwLock::new(false)),
+            conductor_pools: None,
         }
     }
 
@@ -56,6 +60,12 @@ impl HeartbeatService {
     /// Set the version
     pub fn with_version(mut self, version: String) -> Self {
         self.version = Some(version);
+        self
+    }
+
+    /// Set the conductor pool map for capacity metrics in heartbeats
+    pub fn with_conductor_pools(mut self, pools: Arc<ConductorPoolMap>) -> Self {
+        self.conductor_pools = Some(pools);
         self
     }
 
@@ -81,7 +91,7 @@ impl HeartbeatService {
         Arc::clone(&self.active_connections)
     }
 
-    /// Create a heartbeat message
+    /// Create a heartbeat message including capacity metrics
     fn create_heartbeat(&self) -> HostHeartbeat {
         let mut heartbeat = HostHeartbeat::new(
             self.node_id.clone(),
@@ -90,6 +100,22 @@ impl HeartbeatService {
         );
         heartbeat.region = self.region.clone();
         heartbeat.version = self.version.clone();
+
+        // Include conductor pool capacity metrics when available
+        if let Some(ref pools) = self.conductor_pools {
+            let statuses = pools.all_pool_statuses();
+            heartbeat.agent_count = statuses.iter().map(|s| s.agent_count).sum();
+            heartbeat.conductor_count = pools.total_count();
+            heartbeat.healthy_conductors = pools.healthy_count();
+
+            // Aggregate error rate and queue depth across all pools
+            if !statuses.is_empty() {
+                let total_err: f64 = statuses.iter().map(|s| s.pool_metrics.error_rate).sum();
+                heartbeat.error_rate = total_err / statuses.len() as f64;
+                heartbeat.queue_depth = statuses.iter().map(|s| s.pool_metrics.queue_depth).sum();
+            }
+        }
+
         heartbeat
     }
 
@@ -204,5 +230,17 @@ mod tests {
         assert_eq!(heartbeat.max_connections, 100);
         assert_eq!(heartbeat.region, Some("us-west".to_string()));
         assert_eq!(heartbeat.version, Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_heartbeat_without_pools_has_zero_capacity() {
+        let service = HeartbeatService::new("test-node".to_string(), None, 100);
+
+        let heartbeat = service.create_heartbeat();
+        assert_eq!(heartbeat.agent_count, 0);
+        assert_eq!(heartbeat.conductor_count, 0);
+        assert_eq!(heartbeat.healthy_conductors, 0);
+        assert_eq!(heartbeat.error_rate, 0.0);
+        assert_eq!(heartbeat.queue_depth, 0);
     }
 }

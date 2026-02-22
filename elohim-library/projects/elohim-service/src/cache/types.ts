@@ -35,7 +35,7 @@ export const ReachLevel = {
   COMMONS: 7,
 } as const;
 
-export type ReachLevelType = typeof ReachLevel[keyof typeof ReachLevel];
+export type ReachLevelType = (typeof ReachLevel)[keyof typeof ReachLevel];
 
 // ============================================================================
 // Mastery Levels (Bloom's Taxonomy for content freshness)
@@ -52,7 +52,7 @@ export const MasteryLevel = {
   CREATE: 7,
 } as const;
 
-export type MasteryLevelType = typeof MasteryLevel[keyof typeof MasteryLevel];
+export type MasteryLevelType = (typeof MasteryLevel)[keyof typeof MasteryLevel];
 
 // ============================================================================
 // Cache Entry Metadata

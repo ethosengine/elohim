@@ -9,17 +9,17 @@
 //!
 //! Updates happen BEFORE sync to ensure version compatibility.
 
-pub mod manifest;
-pub mod download;
 pub mod apply;
+pub mod download;
+pub mod manifest;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tracing::{info, warn, error};
+use tracing::info;
 
-pub use manifest::{UpdateManifest, ReleaseChannel};
-pub use download::UpdateDownloader;
 pub use apply::UpdateApplier;
+pub use download::UpdateDownloader;
+pub use manifest::{ReleaseChannel, UpdateManifest};
 
 /// Current version of this binary
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -80,10 +80,18 @@ pub struct UpdateConfig {
     pub keep_versions: usize,
 }
 
-fn default_true() -> bool { true }
-fn default_check_interval() -> u64 { 3600 } // 1 hour
-fn default_update_dir() -> PathBuf { PathBuf::from("/var/lib/elohim/updates") }
-fn default_keep_versions() -> usize { 2 }
+fn default_true() -> bool {
+    true
+}
+fn default_check_interval() -> u64 {
+    3600
+} // 1 hour
+fn default_update_dir() -> PathBuf {
+    PathBuf::from("/var/lib/elohim/updates")
+}
+fn default_keep_versions() -> usize {
+    2
+}
 
 impl Default for UpdateConfig {
     fn default() -> Self {
@@ -132,8 +140,7 @@ impl UpdateService {
 
     /// Check for updates from doorway
     pub async fn check_for_updates(&mut self) -> Result<UpdateStatus, UpdateError> {
-        let doorway_url = self.doorway_url.as_ref()
-            .ok_or(UpdateError::NoDoorway)?;
+        let doorway_url = self.doorway_url.as_ref().ok_or(UpdateError::NoDoorway)?;
 
         info!("Checking for updates from {}", doorway_url);
 
@@ -145,7 +152,8 @@ impl UpdateService {
         let arch = std::env::consts::ARCH;
         let os = std::env::consts::OS;
 
-        let release = manifest.find_release(&self.config.channel, arch, os)
+        let release = manifest
+            .find_release(&self.config.channel, arch, os)
             .ok_or(UpdateError::NoReleaseForPlatform)?;
 
         // Compare versions
@@ -171,8 +179,7 @@ impl UpdateService {
 
     /// Download and apply update
     pub async fn apply_update(&mut self) -> Result<(), UpdateError> {
-        let doorway_url = self.doorway_url.as_ref()
-            .ok_or(UpdateError::NoDoorway)?;
+        let doorway_url = self.doorway_url.as_ref().ok_or(UpdateError::NoDoorway)?;
 
         // Get the manifest again to get download URL
         let manifest_url = format!("{}/api/updates/manifest", doorway_url);
@@ -181,28 +188,39 @@ impl UpdateService {
         let arch = std::env::consts::ARCH;
         let os = std::env::consts::OS;
 
-        let release = manifest.find_release(&self.config.channel, arch, os)
+        let release = manifest
+            .find_release(&self.config.channel, arch, os)
             .ok_or(UpdateError::NoReleaseForPlatform)?;
 
         // Download update
-        info!("Downloading update {} ({} bytes)", release.version, release.size_bytes);
-        self.status = UpdateStatus::Downloading { progress_percent: 0 };
+        info!(
+            "Downloading update {} ({} bytes)",
+            release.version, release.size_bytes
+        );
+        self.status = UpdateStatus::Downloading {
+            progress_percent: 0,
+        };
 
-        let download_url = format!("{}/api/updates/download/{}/{}/{}",
-            doorway_url, release.version, os, arch);
+        let download_url = format!(
+            "{}/api/updates/download/{}/{}/{}",
+            doorway_url, release.version, os, arch
+        );
 
-        let update_path = self.downloader.download(
-            &download_url,
-            &release.version,
-            &release.checksum,
-            |progress| {
-                // Update progress (TODO: need async status updates)
-                info!("Download progress: {}%", progress);
-            }
-        ).await?;
+        let update_path = self
+            .downloader
+            .download(
+                &download_url,
+                &release.version,
+                &release.checksum,
+                |progress| {
+                    // Update progress (TODO: need async status updates)
+                    info!("Download progress: {}%", progress);
+                },
+            )
+            .await?;
 
         self.status = UpdateStatus::ReadyToApply {
-            version: release.version.clone()
+            version: release.version.clone(),
         };
 
         // Verify signature
@@ -232,6 +250,7 @@ impl UpdateService {
     }
 
     /// Check and auto-apply if configured
+    #[allow(dead_code)]
     pub async fn check_and_auto_apply(&mut self) -> Result<bool, UpdateError> {
         if !self.config.enabled {
             return Ok(false);
@@ -251,7 +270,8 @@ impl UpdateService {
 
     async fn fetch_manifest(&self, url: &str) -> Result<UpdateManifest, UpdateError> {
         let client = reqwest::Client::new();
-        let response = client.get(url)
+        let response = client
+            .get(url)
             .timeout(std::time::Duration::from_secs(30))
             .send()
             .await
@@ -259,11 +279,13 @@ impl UpdateService {
 
         if !response.status().is_success() {
             return Err(UpdateError::Network(format!(
-                "Failed to fetch manifest: {}", response.status()
+                "Failed to fetch manifest: {}",
+                response.status()
             )));
         }
 
-        let manifest: UpdateManifest = response.json()
+        let manifest: UpdateManifest = response
+            .json()
             .await
             .map_err(|e| UpdateError::InvalidManifest(e.to_string()))?;
 
@@ -292,6 +314,7 @@ pub enum UpdateError {
     #[error("Checksum mismatch")]
     ChecksumMismatch,
 
+    #[allow(dead_code)]
     #[error("Invalid signature")]
     InvalidSignature,
 
@@ -310,9 +333,12 @@ fn is_newer_version(new: &str, current: &str) -> bool {
     let parse = |v: &str| -> (u32, u32, u32) {
         let parts: Vec<&str> = v.trim_start_matches('v').split('.').collect();
         (
-            parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(0),
+            parts.first().and_then(|s| s.parse().ok()).unwrap_or(0),
             parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0),
-            parts.get(2).and_then(|s| s.split('-').next()?.parse().ok()).unwrap_or(0),
+            parts
+                .get(2)
+                .and_then(|s| s.split('-').next()?.parse().ok())
+                .unwrap_or(0),
         )
     };
 

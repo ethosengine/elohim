@@ -2,7 +2,7 @@
 //!
 //! Actions for restarting services, reconnecting peers, failover, and quarantine.
 
-use tracing::{debug, info, warn, error};
+use tracing::{info, warn};
 
 use crate::pod::executor::ActionHandler;
 use crate::pod::models::*;
@@ -57,15 +57,13 @@ impl RecoveryActionHandler {
             }
         };
 
-        let grace_period_secs = action.params.get("grace_period_secs")
+        let grace_period_secs = action
+            .params
+            .get("grace_period_secs")
             .and_then(|v| v.as_u64())
             .unwrap_or(5);
 
-        info!(
-            service,
-            grace_period_secs,
-            "Service restart requested"
-        );
+        info!(service, grace_period_secs, "Service restart requested");
 
         // In a real implementation, this would:
         // 1. Signal the service to shutdown gracefully
@@ -100,9 +98,15 @@ impl RecoveryActionHandler {
             }
         };
 
-        let addresses: Vec<String> = action.params.get("addresses")
+        let addresses: Vec<String> = action
+            .params
+            .get("addresses")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         info!(
@@ -143,8 +147,7 @@ impl RecoveryActionHandler {
             }
         };
 
-        let target_node = action.params.get("target_node")
-            .and_then(|v| v.as_str());
+        let target_node = action.params.get("target_node").and_then(|v| v.as_str());
 
         info!(
             service,
@@ -188,12 +191,13 @@ impl RecoveryActionHandler {
             }
         };
 
-        let reason = action.params.get("reason")
+        let reason = action
+            .params
+            .get("reason")
             .and_then(|v| v.as_str())
             .unwrap_or("unspecified");
 
-        let duration_secs = action.params.get("duration_secs")
-            .and_then(|v| v.as_u64());
+        let duration_secs = action.params.get("duration_secs").and_then(|v| v.as_u64());
 
         warn!(
             node_id,
@@ -223,14 +227,11 @@ impl RecoveryActionHandler {
     }
 
     async fn redirect_clients(&self, action: &Action) -> ActionResult {
-        let from_node = action.params.get("from_node")
-            .and_then(|v| v.as_str());
+        let from_node = action.params.get("from_node").and_then(|v| v.as_str());
 
-        let to_node = action.params.get("to_node")
-            .and_then(|v| v.as_str());
+        let to_node = action.params.get("to_node").and_then(|v| v.as_str());
 
-        let client_count = action.params.get("client_count")
-            .and_then(|v| v.as_u64());
+        let client_count = action.params.get("client_count").and_then(|v| v.as_u64());
 
         info!(
             from_node = ?from_node,
@@ -258,14 +259,11 @@ impl RecoveryActionHandler {
     }
 
     async fn throttle_sync(&self, action: &Action) -> ActionResult {
-        let max_rate_kbps = action.params.get("max_rate_kbps")
-            .and_then(|v| v.as_u64());
+        let max_rate_kbps = action.params.get("max_rate_kbps").and_then(|v| v.as_u64());
 
-        let max_concurrent = action.params.get("max_concurrent")
-            .and_then(|v| v.as_u64());
+        let max_concurrent = action.params.get("max_concurrent").and_then(|v| v.as_u64());
 
-        let duration_secs = action.params.get("duration_secs")
-            .and_then(|v| v.as_u64());
+        let duration_secs = action.params.get("duration_secs").and_then(|v| v.as_u64());
 
         info!(
             max_rate_kbps = ?max_rate_kbps,
@@ -292,20 +290,24 @@ impl RecoveryActionHandler {
     }
 
     async fn shard_query(&self, action: &Action) -> ActionResult {
-        let query_id = action.params.get("query_id")
+        let query_id = action
+            .params
+            .get("query_id")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
-        let nodes: Vec<String> = action.params.get("nodes")
+        let nodes: Vec<String> = action
+            .params
+            .get("nodes")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
-        info!(
-            query_id,
-            nodes = nodes.len(),
-            "Query sharding requested"
-        );
+        info!(query_id, nodes = nodes.len(), "Query sharding requested");
 
         // In a real implementation, this would:
         // 1. Divide the query across specified nodes

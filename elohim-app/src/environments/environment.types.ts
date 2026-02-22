@@ -5,7 +5,7 @@
 /**
  * Log level type for environment configuration
  */
-export type LogLevel = 'debug' | 'info' | 'error';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 /**
  * Connection mode for Holochain deployment

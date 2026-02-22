@@ -8,17 +8,17 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use libp2p::{
-    identity, kad, mdns, noise, request_response, tcp, yamux,
-    Multiaddr, PeerId, StreamProtocol, Swarm, SwarmBuilder,
-};
 use libp2p::swarm::NetworkBehaviour;
+use libp2p::{
+    identity, kad, mdns, noise, request_response, tcp, yamux, Multiaddr, PeerId, StreamProtocol,
+    Swarm, SwarmBuilder,
+};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
+use super::protocols::SyncCodec;
 use crate::config::P2PConfig;
 use crate::sync::protocol::SyncMessage;
-use super::protocols::SyncCodec;
 
 /// Combined libp2p behaviour for Elohim nodes.
 #[derive(NetworkBehaviour)]
@@ -33,7 +33,11 @@ pub struct ElohimBehaviour {
 #[derive(Debug)]
 pub enum SwarmEvent {
     /// A new peer was discovered (mDNS or Kademlia).
-    PeerDiscovered { peer_id: PeerId, addrs: Vec<Multiaddr> },
+    PeerDiscovered {
+        peer_id: PeerId,
+        #[allow(dead_code)]
+        addrs: Vec<Multiaddr>,
+    },
     /// A peer disconnected or expired.
     PeerExpired { peer_id: PeerId },
     /// Incoming sync request from a peer.
@@ -45,12 +49,14 @@ pub enum SwarmEvent {
     /// Response received from a peer for an outbound request.
     ResponseReceived {
         peer_id: PeerId,
+        #[allow(dead_code)]
         request_id: request_response::OutboundRequestId,
         response: SyncMessage,
     },
     /// An outbound request failed.
     OutboundFailure {
         peer_id: PeerId,
+        #[allow(dead_code)]
         request_id: request_response::OutboundRequestId,
         error: String,
     },
@@ -69,6 +75,7 @@ impl ElohimSwarm {
     }
 
     /// Add a known peer to the Kademlia routing table.
+    #[allow(dead_code)]
     pub fn add_peer(&mut self, peer_id: PeerId, addrs: Vec<Multiaddr>) {
         for addr in addrs {
             self.swarm
@@ -79,6 +86,7 @@ impl ElohimSwarm {
     }
 
     /// Send a sync request to a peer. Returns the outbound request ID.
+    #[allow(dead_code)]
     pub fn send_sync_request(
         &mut self,
         peer: PeerId,
@@ -91,6 +99,7 @@ impl ElohimSwarm {
     }
 
     /// Send a response back on a response channel.
+    #[allow(dead_code)]
     pub fn send_sync_response(
         &mut self,
         channel: request_response::ResponseChannel<SyncMessage>,
@@ -113,9 +122,9 @@ impl ElohimSwarm {
 
             match event {
                 // mDNS discovery
-                LibSwarmEvent::Behaviour(ElohimBehaviourEvent::Mdns(
-                    mdns::Event::Discovered(peers),
-                )) => {
+                LibSwarmEvent::Behaviour(ElohimBehaviourEvent::Mdns(mdns::Event::Discovered(
+                    peers,
+                ))) => {
                     for (peer_id, addr) in peers {
                         debug!(%peer_id, %addr, "mDNS: peer discovered");
                         self.swarm
@@ -130,14 +139,12 @@ impl ElohimSwarm {
                             .await;
                     }
                 }
-                LibSwarmEvent::Behaviour(ElohimBehaviourEvent::Mdns(
-                    mdns::Event::Expired(peers),
-                )) => {
+                LibSwarmEvent::Behaviour(ElohimBehaviourEvent::Mdns(mdns::Event::Expired(
+                    peers,
+                ))) => {
                     for (peer_id, _addr) in peers {
                         debug!(%peer_id, "mDNS: peer expired");
-                        let _ = event_tx
-                            .send(SwarmEvent::PeerExpired { peer_id })
-                            .await;
+                        let _ = event_tx.send(SwarmEvent::PeerExpired { peer_id }).await;
                     }
                 }
 
@@ -244,8 +251,8 @@ pub fn build_swarm(config: &P2PConfig, data_dir: &Path) -> Result<ElohimSwarm> {
         .with_behaviour(|key| {
             // Request-response for sync protocol
             let sync_protocol = StreamProtocol::new(super::protocols::SYNC_PROTOCOL);
-            let rr_config = request_response::Config::default()
-                .with_request_timeout(Duration::from_secs(30));
+            let rr_config =
+                request_response::Config::default().with_request_timeout(Duration::from_secs(30));
             let request_response = request_response::Behaviour::with_codec(
                 SyncCodec,
                 [(sync_protocol, request_response::ProtocolSupport::Full)],
@@ -253,11 +260,9 @@ pub fn build_swarm(config: &P2PConfig, data_dir: &Path) -> Result<ElohimSwarm> {
             );
 
             // mDNS for local peer discovery
-            let mdns = mdns::tokio::Behaviour::new(
-                mdns::Config::default(),
-                key.public().to_peer_id(),
-            )
-            .expect("mDNS behaviour");
+            let mdns =
+                mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
+                    .expect("mDNS behaviour");
 
             // Kademlia DHT
             let store = kad::store::MemoryStore::new(key.public().to_peer_id());
@@ -266,11 +271,8 @@ pub fn build_swarm(config: &P2PConfig, data_dir: &Path) -> Result<ElohimSwarm> {
 
             // Identify protocol
             let identify = libp2p::identify::Behaviour::new(
-                libp2p::identify::Config::new(
-                    "/elohim/id/1.0.0".to_string(),
-                    key.public(),
-                )
-                .with_agent_version(format!("elohim-node/{}", env!("CARGO_PKG_VERSION"))),
+                libp2p::identify::Config::new("/elohim/id/1.0.0".to_string(), key.public())
+                    .with_agent_version(format!("elohim-node/{}", env!("CARGO_PKG_VERSION"))),
             );
 
             ElohimBehaviour {

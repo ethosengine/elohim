@@ -17,10 +17,7 @@ import { normalizeId, buildBaseMetadata, addProvenanceMetadata, buildContentNode
  * Transform Gherkin feature into scenario ContentNodes
  * Returns an array because one .feature file may contain multiple scenarios
  */
-export function transformScenarios(
-  parsed: ParsedContent,
-  sourceNodeId?: string
-): ContentNode[] {
+export function transformScenarios(parsed: ParsedContent, sourceNodeId?: string): ContentNode[] {
   const nodes: ContentNode[] = [];
   const now = new Date().toISOString();
 
@@ -31,13 +28,7 @@ export function transformScenarios(
   // Create individual scenario nodes
   if (parsed.scenarios && parsed.scenarios.length > 0) {
     for (const scenario of parsed.scenarios) {
-      const scenarioNode = createScenarioNode(
-        parsed,
-        scenario,
-        featureNode.id,
-        sourceNodeId,
-        now
-      );
+      const scenarioNode = createScenarioNode(parsed, scenario, featureNode.id, sourceNodeId, now);
       nodes.push(scenarioNode);
     }
   }
@@ -64,7 +55,7 @@ function createFeatureNode(
     epic: parsed.pathMeta.epic,
     userType: parsed.pathMeta.userType,
     scenarioCount: parsed.scenarios?.length || 0,
-    ...buildBaseMetadata()
+    ...buildBaseMetadata(),
   };
 
   addProvenanceMetadata(metadata, sourceNodeId, 'gherkin-parse');
@@ -107,7 +98,7 @@ function createFeatureNode(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    createdAt: timestamp
+    createdAt: timestamp,
   });
 }
 
@@ -142,7 +133,7 @@ function createScenarioNode(
     userType: parsed.pathMeta.userType,
     featureId: featureNodeId,
     stepCount: scenario.steps.length,
-    ...buildBaseMetadata()
+    ...buildBaseMetadata(),
   };
 
   addProvenanceMetadata(metadata, sourceNodeId, 'gherkin-parse');
@@ -164,7 +155,7 @@ function createScenarioNode(
     sourcePath: parsed.pathMeta.fullPath,
     relatedNodeIds,
     metadata,
-    createdAt: timestamp
+    createdAt: timestamp,
   });
 }
 
@@ -222,17 +213,18 @@ function generateScenarioId(parsed: ParsedContent, scenario: ParsedScenario): st
 /**
  * Format scenario steps as readable content
  */
-function formatSteps(steps: Array<{ keyword: string; text: string }>): string {
-  return steps
-    .map(step => `${step.keyword} ${step.text}`)
-    .join('\n');
+function formatSteps(steps: { keyword: string; text: string }[]): string {
+  return steps.map(step => `${step.keyword} ${step.text}`).join('\n');
 }
 
 /**
  * Generate description from scenario
  */
 function generateScenarioDescription(scenario: ParsedScenario): string {
-  const stepSummary = scenario.steps.slice(0, 3).map(s => s.text).join('; ');
+  const stepSummary = scenario.steps
+    .slice(0, 3)
+    .map(s => s.text)
+    .join('; ');
 
   if (scenario.steps.length > 3) {
     return `${stepSummary}... (${scenario.steps.length} steps total)`;
@@ -251,9 +243,6 @@ export function isScenarioContent(parsed: ParsedContent): boolean {
 /**
  * Transform a single feature file, returning all resulting nodes
  */
-export function transformFeatureFile(
-  parsed: ParsedContent,
-  sourceNodeId?: string
-): ContentNode[] {
+export function transformFeatureFile(parsed: ParsedContent, sourceNodeId?: string): ContentNode[] {
   return transformScenarios(parsed, sourceNodeId);
 }

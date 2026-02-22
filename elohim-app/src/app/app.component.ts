@@ -9,6 +9,7 @@ import { environment } from '../environments/environment';
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { HolochainClientService } from './elohim/services/holochain-client.service';
 import { HolochainContentService } from './elohim/services/holochain-content.service';
+import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
@@ -36,6 +37,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly holochainService = inject(HolochainClientService);
   private readonly holochainContent = inject(HolochainContentService);
   private readonly blobBootstrap = inject(BlobBootstrapService);
+  private readonly authService = inject(AuthService);
   private readonly tauriAuth = inject(TauriAuthService);
 
   /** Retry configuration for connection attempts */
@@ -53,10 +55,23 @@ export class AppComponent implements OnInit, OnDestroy {
   private holochainInitialized = false;
 
   constructor(private readonly router: Router) {
-    // Post-unlock trigger: when status transitions to 'authenticated' after needs_unlock,
+    // Post-unlock trigger (Tauri): when status transitions to 'authenticated' after needs_unlock,
     // initialize Holochain connection (which was deferred during lock gate)
     effect(() => {
       if (this.tauriAuth.status() === 'authenticated' && !this.holochainInitialized) {
+        this.holochainInitialized = true;
+        void this.initializeHolochainConnection();
+      }
+    });
+
+    // Post-login trigger (Browser): when auth state transitions to authenticated,
+    // initialize Holochain connection (deferred until login for browser visitors)
+    effect(() => {
+      if (
+        !this.tauriAuth.isTauriEnvironment() &&
+        this.authService.isAuthenticated() &&
+        !this.holochainInitialized
+      ) {
         this.holochainInitialized = true;
         void this.initializeHolochainConnection();
       }
@@ -101,10 +116,20 @@ export class AppComponent implements OnInit, OnDestroy {
 
       // Authenticated (standalone mode) — mark as initialized so effect doesn't double-fire
       this.holochainInitialized = true;
+      await this.initializeHolochainConnection();
+      return;
     }
 
-    // Auto-connect to Edge Node if holochain config is available
-    await this.initializeHolochainConnection();
+    // Browser path: start content services (doorway + blobs), defer Holochain to post-auth.
+    // Content is served via the doorway projection tier — no Holochain needed for visitors.
+    await this.initializeContentServices();
+
+    // Only connect to Holochain if already authenticated (returning user with valid token)
+    if (this.authService.isAuthenticated()) {
+      this.holochainInitialized = true;
+      await this.initializeHolochainConnection();
+    }
+    // Otherwise: Holochain connection deferred until login (via browser auth effect)
   }
 
   ngOnDestroy(): void {
@@ -118,7 +143,20 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Initialize services on app startup.
+   * Initialize content services that work without Holochain.
+   * Doorway projection tier serves content for all visitors (authenticated or not).
+   */
+  private async initializeContentServices(): Promise<void> {
+    // Test doorway availability (non-blocking, informational)
+    await this.testDoorwayConnection();
+
+    // Start blob bootstrap regardless of connectivity
+    // It will serve cached blobs and upgrade to streaming when services connect
+    this.blobBootstrap.startBootstrap();
+  }
+
+  /**
+   * Initialize Holochain connection for agent-centric data.
    *
    * Architecture:
    * - CONTENT: Served from doorway projection (SQLite) or local storage (Tauri)
@@ -136,13 +174,8 @@ export class AppComponent implements OnInit, OnDestroy {
    * - Neither: Cached content only, no writes
    */
   private async initializeHolochainConnection(): Promise<void> {
-    // Test doorway availability (non-blocking, informational)
-    // Doorway status is used for graceful degradation logic
-    await this.testDoorwayConnection();
-
-    // Start blob bootstrap regardless of connectivity
-    // It will serve cached blobs and upgrade to streaming when services connect
-    this.blobBootstrap.startBootstrap();
+    // Ensure content services are running (idempotent for Tauri path)
+    await this.initializeContentServices();
 
     // Only attempt Holochain connection if config exists
     // Holochain is only for agent-centric data (identity, attestations, points)

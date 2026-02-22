@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::{mpsc, Mutex};
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 use crate::p2p::transport::SwarmEvent;
 use crate::storage::reach::Reach;
@@ -17,8 +17,10 @@ use crate::sync::protocol::SyncMessage;
 
 /// Tracks sync state for a known peer.
 struct PeerSyncState {
+    #[allow(dead_code)]
     peer_id: String,
     last_position: u64,
+    #[allow(dead_code)]
     trust_level: Reach,
     last_sync_time: u64,
 }
@@ -27,12 +29,16 @@ struct PeerSyncState {
 pub enum SwarmCommand {
     /// Send a sync request to a peer.
     SendRequest {
+        #[allow(dead_code)]
         peer_id: libp2p::PeerId,
+        #[allow(dead_code)]
         request: SyncMessage,
     },
     /// Send a response on a channel.
     SendResponse {
+        #[allow(dead_code)]
         channel: libp2p::request_response::ResponseChannel<SyncMessage>,
+        #[allow(dead_code)]
         response: SyncMessage,
     },
 }
@@ -121,20 +127,14 @@ impl SyncCoordinator {
                 self.handle_response(&peer_id.to_string(), response).await;
             }
 
-            SwarmEvent::OutboundFailure {
-                peer_id, error, ..
-            } => {
+            SwarmEvent::OutboundFailure { peer_id, error, .. } => {
                 warn!(%peer_id, %error, "Sync request failed");
             }
         }
     }
 
     /// Handle an incoming sync request and produce a response.
-    async fn handle_request(
-        &self,
-        peer_id: &str,
-        request: SyncMessage,
-    ) -> SyncMessage {
+    async fn handle_request(&self, peer_id: &str, request: SyncMessage) -> SyncMessage {
         match request {
             SyncMessage::SyncRequest { since, limit } => {
                 let engine = self.engine.lock().await;
@@ -150,7 +150,12 @@ impl SyncCoordinator {
                 } else {
                     false
                 };
-                debug!(peer_id, since, num_events = events.len(), "Responding to SyncRequest");
+                debug!(
+                    peer_id,
+                    since,
+                    num_events = events.len(),
+                    "Responding to SyncRequest"
+                );
                 SyncMessage::SyncResponse { events, has_more }
             }
 
@@ -158,7 +163,12 @@ impl SyncCoordinator {
                 let engine = self.engine.lock().await;
                 match engine.get_changes_for_peer(&doc_id, &heads) {
                     Ok(changes) => {
-                        debug!(peer_id, doc_id, num_changes = changes.len(), "Responding to DocRequest");
+                        debug!(
+                            peer_id,
+                            doc_id,
+                            num_changes = changes.len(),
+                            "Responding to DocRequest"
+                        );
                         SyncMessage::DocResponse { doc_id, changes }
                     }
                     Err(e) => {
@@ -197,7 +207,7 @@ impl SyncCoordinator {
                 let max_position = events.iter().map(|e| e.position).max().unwrap_or(0);
 
                 // Apply changes for each doc referenced
-                let mut engine = self.engine.lock().await;
+                let engine = self.engine.lock().await;
                 for event in &events {
                     // For each event, we'd normally fetch the doc changes.
                     // In the stream model, events are metadata; actual doc content
@@ -246,10 +256,7 @@ impl SyncCoordinator {
                     limit: Some(100),
                 };
                 let _ = swarm_commands
-                    .send(SwarmCommand::SendRequest {
-                        peer_id,
-                        request,
-                    })
+                    .send(SwarmCommand::SendRequest { peer_id, request })
                     .await;
             }
         }

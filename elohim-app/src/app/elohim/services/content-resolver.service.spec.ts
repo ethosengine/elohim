@@ -62,6 +62,7 @@ describe('ContentResolverService', () => {
   beforeEach(() => {
     const idbSpy = jasmine.createSpyObj('IndexedDBCacheService', [
       'init',
+      'isAvailable',
       'getStats',
       'getContent',
       'setContent',
@@ -71,14 +72,13 @@ describe('ContentResolverService', () => {
       'setContentBatch',
       'removeContent',
     ]);
-    const projectionSpy = jasmine.createSpyObj('ProjectionAPIService', [
-      'getContent',
-      'batchGetContent',
-      'getPath',
-      'isHealthy',
-    ], {
-      enabled: true, // Property mock - projection API is enabled by default
-    });
+    const projectionSpy = jasmine.createSpyObj(
+      'ProjectionAPIService',
+      ['getContent', 'batchGetContent', 'getPath', 'isHealthy'],
+      {
+        enabled: true, // Property mock - projection API is enabled by default
+      }
+    );
     const holochainSpy = jasmine.createSpyObj('HolochainContentService', [
       'isAvailable',
       'getContent',
@@ -86,6 +86,7 @@ describe('ContentResolverService', () => {
     ]);
 
     idbSpy.init.and.returnValue(Promise.resolve(true));
+    idbSpy.isAvailable.and.returnValue(false);
     idbSpy.getContent.and.returnValue(Promise.resolve(null));
     idbSpy.setContent.and.returnValue(Promise.resolve());
     idbSpy.getPath.and.returnValue(Promise.resolve(null));
@@ -407,11 +408,7 @@ describe('ContentResolverService', () => {
       idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
       projectionMock.batchGetContent.and.returnValue(of(contentMap));
 
-      const result = await service.batchResolveContent([
-        'content-1',
-        'content-2',
-        'content-3',
-      ]);
+      const result = await service.batchResolveContent(['content-1', 'content-2', 'content-3']);
 
       expect(result.size).toBe(3);
       const item = result.get('content-1');
@@ -444,11 +441,7 @@ describe('ContentResolverService', () => {
       idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(cachedMap));
       projectionMock.batchGetContent.and.returnValue(of(fetchedMap));
 
-      const result = await service.batchResolveContent([
-        'content-1',
-        'content-2',
-        'content-3',
-      ]);
+      const result = await service.batchResolveContent(['content-1', 'content-2', 'content-3']);
 
       expect(result.size).toBe(3);
       expect(projectionMock.batchGetContent).toHaveBeenCalledWith(['content-2', 'content-3']);
@@ -521,9 +514,7 @@ describe('ContentResolverService', () => {
     });
 
     it('should handle IndexedDB errors and fall back', async () => {
-      idbCacheMock.getContent.and.returnValue(
-        Promise.reject(new Error('IndexedDB unavailable'))
-      );
+      idbCacheMock.getContent.and.returnValue(Promise.reject(new Error('IndexedDB unavailable')));
       projectionMock.getContent.and.returnValue(of(mockContent));
 
       const result = await service.resolveContent('test-content');
@@ -558,9 +549,7 @@ describe('ContentResolverService', () => {
 
     it('should handle partial batch failures', async () => {
       idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-      projectionMock.batchGetContent.and.returnValue(
-        throwError(() => new Error('Batch error'))
-      );
+      projectionMock.batchGetContent.and.returnValue(throwError(() => new Error('Batch error')));
 
       // Wrap in try-catch since error may propagate
       try {
@@ -725,9 +714,7 @@ describe('ContentResolverService', () => {
 
       const ids = ['content-1', 'content-1', 'content-2', 'content-2'];
       idbCacheMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-      projectionMock.batchGetContent.and.returnValue(
-        of(new Map([['content-1', mockContent]]))
-      );
+      projectionMock.batchGetContent.and.returnValue(of(new Map([['content-1', mockContent]])));
 
       const result = await service.batchResolveContent(ids);
 

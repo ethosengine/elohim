@@ -186,6 +186,7 @@ impl Default for SyncProgress {
     }
 }
 
+#[allow(dead_code)]
 impl SyncProgress {
     /// Check if node is fully synced
     pub fn is_synced(&self) -> bool {
@@ -203,22 +204,22 @@ impl SyncProgress {
 
     /// Update collection sync status
     pub fn update_collection(&mut self, name: &str, item_count: u64, position: u64, synced: bool) {
-        self.collections.insert(name.to_string(), CollectionSync {
-            name: name.to_string(),
-            item_count,
-            position,
-            synced,
-        });
+        self.collections.insert(
+            name.to_string(),
+            CollectionSync {
+                name: name.to_string(),
+                item_count,
+                position,
+                synced,
+            },
+        );
     }
 }
 
+#[allow(dead_code)]
 impl ConnectedApp {
     /// Create a new connected app entry
-    pub fn new(
-        app_id: String,
-        device_type: DeviceType,
-        owner_agent_key: String,
-    ) -> Self {
+    pub fn new(app_id: String, device_type: DeviceType, owner_agent_key: String) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -313,19 +314,20 @@ impl ConnectedAppsSummary {
                 let device = format!("{:?}", app.device_type);
                 *by_device.entry(device).or_insert(0) += 1;
 
-                let owner = app.owner_name.clone()
+                let owner = app
+                    .owner_name
+                    .clone()
                     .unwrap_or_else(|| app.owner_agent_key.clone());
                 *by_owner.entry(owner).or_insert(0) += 1;
             }
         }
 
         Self {
-            total: apps.iter()
+            total: apps
+                .iter()
                 .filter(|a| a.connection_status == ConnectionStatus::Connected)
                 .count(),
-            syncing: apps.iter()
-                .filter(|a| a.is_syncing)
-                .count(),
+            syncing: apps.iter().filter(|a| a.is_syncing).count(),
             by_device,
             by_owner,
         }

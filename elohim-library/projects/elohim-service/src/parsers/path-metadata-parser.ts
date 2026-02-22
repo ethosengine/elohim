@@ -21,32 +21,32 @@
  */
 
 import * as path from 'path';
+
 import {
   PathMetadata,
   PathParserOptions,
   ContentDomain,
   EpicCategory,
-  ContentCategory,
-  ResourceType
+  ResourceType,
 } from '../models/path-metadata.model';
 
 /**
  * Known epic categories in the elohim-protocol domain
  */
-const EPIC_CATEGORIES: Set<string> = new Set([
+const EPIC_CATEGORIES = new Set<string>([
   'governance',
   'autonomous_entity',
   'public_observer',
   'social_medium',
   'value_scanner',
   'economic_coordination',
-  'lamad'
+  'lamad',
 ]);
 
 /**
  * Resource directory names that indicate resource content
  */
-const RESOURCE_DIRECTORIES: Set<string> = new Set([
+const RESOURCE_DIRECTORIES = new Set<string>([
   'books',
   'video',
   'videos',
@@ -55,35 +55,32 @@ const RESOURCE_DIRECTORIES: Set<string> = new Set([
   'articles',
   'documents',
   'tools',
-  'resources'
+  'resources',
 ]);
 
 /**
  * Map directory names to resource types
  */
 const RESOURCE_TYPE_MAP: Record<string, ResourceType> = {
-  'books': 'book',
-  'book': 'book',
-  'video': 'video',
-  'videos': 'video',
-  'audio': 'audio',
-  'organizations': 'organization',
-  'organisation': 'organization',
-  'articles': 'article',
-  'article': 'article',
-  'documents': 'document',
-  'document': 'document',
-  'tools': 'tool',
-  'tool': 'tool'
+  books: 'book',
+  book: 'book',
+  video: 'video',
+  videos: 'video',
+  audio: 'audio',
+  organizations: 'organization',
+  organisation: 'organization',
+  articles: 'article',
+  article: 'article',
+  documents: 'document',
+  document: 'document',
+  tools: 'tool',
+  tool: 'tool',
 };
 
 /**
  * Parse a file path to extract metadata
  */
-export function parsePathMetadata(
-  filePath: string,
-  options: PathParserOptions
-): PathMetadata {
+export function parsePathMetadata(filePath: string, options: PathParserOptions): PathMetadata {
   const { contentRoot, normalizeIds = true, idPrefix = '' } = options;
 
   // Normalize paths
@@ -102,7 +99,7 @@ export function parsePathMetadata(
   const parts = relativePath.split(path.sep).filter(p => p.length > 0);
 
   // Extract file info
-  const fileName = parts[parts.length - 1] || '';
+  const fileName = parts.at(-1) || '';
   const extension = path.extname(fileName).toLowerCase();
   const baseName = path.basename(fileName, extension);
 
@@ -121,7 +118,7 @@ export function parsePathMetadata(
     isEpicNarrative: false,
     isScenario: false,
     isResource: false,
-    suggestedId: ''
+    suggestedId: '',
   };
 
   // Parse path parts
@@ -133,9 +130,7 @@ export function parsePathMetadata(
   if (parts.length >= 2) {
     // Second part is epic (governance, autonomous_entity, etc.)
     const epicPart = parts[1];
-    metadata.epic = EPIC_CATEGORIES.has(epicPart)
-      ? epicPart as EpicCategory
-      : epicPart;
+    metadata.epic = EPIC_CATEGORIES.has(epicPart) ? (epicPart as EpicCategory) : epicPart;
   }
 
   // Determine content category and extract additional metadata
@@ -151,7 +146,6 @@ export function parsePathMetadata(
  * Determine content category from path parts
  */
 function determineContentCategory(parts: string[], metadata: PathMetadata): void {
-  const fileName = parts[parts.length - 1] || '';
   const baseName = metadata.baseName.toLowerCase();
 
   // Check for epic narrative (epic.md at domain level)
@@ -195,15 +189,13 @@ function determineContentCategory(parts: string[], metadata: PathMetadata): void
   }
 
   // Check for README.md (archetype definition)
-  if (baseName === 'readme' && metadata.extension === '.md') {
-    // README in a subdirectory under epic = archetype definition
-    if (parts.length > 3) {
-      metadata.contentCategory = 'archetype';
-      metadata.isArchetypeDefinition = true;
-      // User type is the directory containing README
-      metadata.userType = parts[parts.length - 2];
-      return;
-    }
+  // README in a subdirectory under epic = archetype definition
+  if (baseName === 'readme' && metadata.extension === '.md' && parts.length > 3) {
+    metadata.contentCategory = 'archetype';
+    metadata.isArchetypeDefinition = true;
+    // User type is the directory containing README
+    metadata.userType = parts.at(-2);
+    return;
   }
 
   // Check for concept files
@@ -229,11 +221,7 @@ function determineContentCategory(parts: string[], metadata: PathMetadata): void
 /**
  * Generate a suggested node ID from metadata
  */
-function generateSuggestedId(
-  metadata: PathMetadata,
-  normalize: boolean,
-  prefix: string
-): string {
+function generateSuggestedId(metadata: PathMetadata, normalize: boolean, prefix: string): string {
   const parts: string[] = [];
 
   // Add prefix if provided
@@ -301,7 +289,9 @@ export function filterProcessableFiles(files: string[]): string[] {
  */
 export function isSourceContent(metadata: PathMetadata): boolean {
   // Source content comes from the data/content directory
-  return metadata.relativePath.startsWith('data/content') ||
-         metadata.relativePath.startsWith('data\\content') ||
-         !metadata.relativePath.includes('assets');
+  return (
+    metadata.relativePath.startsWith('data/content') ||
+    metadata.relativePath.startsWith(String.raw`data\content`) ||
+    !metadata.relativePath.includes('assets')
+  );
 }
