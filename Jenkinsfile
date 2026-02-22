@@ -83,9 +83,9 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
     // Validate ConfigMap exists
     sh "kubectl get configmap elohim-config-${environment} -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
 
-    // Update deployment manifest with image tag (SITE_TAG_PLACEHOLDER)
+    // Update deployment manifest with image tag and deploy version label
     def outputFile = manifestPath.replace('.yaml', "-${environment}.rendered.yaml")
-    sh "sed 's/SITE_TAG_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
+    sh "sed -e 's/SITE_TAG_PLACEHOLDER/${imageTag}/g' -e 's/DEPLOY_VERSION_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
 
     // Fail fast if any placeholders remain
     def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
@@ -96,9 +96,12 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
     // Preview manifest
     sh """
         echo '==== Deployment manifest preview ===='
-        grep 'image:' ${outputFile}
+        grep 'image:\\|app.kubernetes.io/version:' ${outputFile}
         echo '===================================='
     """
+
+    // Pre-deploy: check for ingress hostname conflicts
+    sh "bash orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
 
     // Deploy and rollout
     sh "kubectl apply -f ${outputFile}"
@@ -112,6 +115,9 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
         echo ''
         echo '=================================='
     """
+
+    // Post-deploy: detect stale resources (advisory only)
+    sh "bash orchestrator/scripts/detect-stale-resources.sh ${namespace} ${imageTag} elohim-site || true"
 
     echo "${environment} deployment completed!"
 }

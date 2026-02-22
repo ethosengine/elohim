@@ -20,6 +20,12 @@ metadata:
   labels:
     app: elohim-doorway-read
     environment: staging
+    app.kubernetes.io/name: doorway-read
+    app.kubernetes.io/instance: doorway-read-staging
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 2
   selector:
@@ -31,6 +37,12 @@ spec:
       labels:
         app: elohim-doorway-read
         environment: staging
+        app.kubernetes.io/name: doorway-read
+        app.kubernetes.io/instance: doorway-read-staging
+        app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
     spec:
       nodeSelector:
         node-type: operations
@@ -115,6 +127,12 @@ metadata:
   labels:
     app: elohim-doorway-read
     environment: staging
+    app.kubernetes.io/name: doorway-read
+    app.kubernetes.io/instance: doorway-read-staging
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   type: ClusterIP
   ports:

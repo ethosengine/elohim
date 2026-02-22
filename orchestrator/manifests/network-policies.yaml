@@ -24,6 +24,11 @@ kind: NetworkPolicy
 metadata:
   name: default-deny-cross-env
   namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector: {}
   policyTypes:
@@ -57,6 +62,11 @@ kind: NetworkPolicy
 metadata:
   name: default-deny-cross-env
   namespace: elohim-staging
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector: {}
   policyTypes:
@@ -92,6 +102,11 @@ kind: NetworkPolicy
 metadata:
   name: allow-p2p-from-staging
   namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector:
     matchLabels:
@@ -117,6 +132,11 @@ kind: NetworkPolicy
 metadata:
   name: allow-p2p-from-alpha
   namespace: elohim-staging
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector:
     matchLabels:
@@ -146,6 +166,11 @@ kind: NetworkPolicy
 metadata:
   name: allow-p2p-from-prod
   namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector:
     matchLabels:
@@ -171,6 +196,11 @@ kind: NetworkPolicy
 metadata:
   name: allow-p2p-from-prod
   namespace: elohim-staging
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector:
     matchLabels:
@@ -196,6 +226,11 @@ kind: NetworkPolicy
 metadata:
   name: allow-p2p-from-alpha
   namespace: elohim-prod
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector:
     matchLabels:
@@ -221,6 +256,11 @@ kind: NetworkPolicy
 metadata:
   name: allow-p2p-from-staging
   namespace: elohim-prod
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector:
     matchLabels:
@@ -248,6 +288,11 @@ kind: NetworkPolicy
 metadata:
   name: default-deny-cross-env
   namespace: elohim-prod
+  labels:
+    app.kubernetes.io/name: network-policy
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: manual
 spec:
   podSelector: {}
   policyTypes:

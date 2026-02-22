@@ -3,6 +3,12 @@ kind: Service
 metadata:
   name: elohim-site-alpha-service
   namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/name: elohim-site
+    app.kubernetes.io/instance: elohim-site-alpha
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   selector:
     app: elohim-site-alpha
@@ -17,6 +23,12 @@ kind: Service
 metadata:
   name: elohim-ui-playground-alpha-service
   namespace: elohim-alpha
+  labels:
+    app.kubernetes.io/name: elohim-site
+    app.kubernetes.io/instance: elohim-site-alpha
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   selector:
     app: elohim-ui-playground-alpha

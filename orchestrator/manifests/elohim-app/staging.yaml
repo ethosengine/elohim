@@ -5,6 +5,12 @@ metadata:
   namespace: elohim-staging
   labels:
     app: elohim-site-staging
+    app.kubernetes.io/name: elohim-site
+    app.kubernetes.io/instance: elohim-site-staging
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
   selector:
@@ -14,6 +20,12 @@ spec:
     metadata:
       labels:
         app: elohim-site-staging
+        app.kubernetes.io/name: elohim-site
+        app.kubernetes.io/instance: elohim-site-staging
+        app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
     spec:
       containers:
       - name: elohim-site-staging

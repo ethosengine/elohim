@@ -25,6 +25,15 @@ kind: Secret
 metadata:
   name: elohim-doorway-prod-secrets
   namespace: elohim-prod
+  labels:
+    app: elohim-doorway
+    environment: prod
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 type: Opaque
 stringData:
   # IMPORTANT: These MUST be changed before production deployment!
@@ -41,6 +50,12 @@ metadata:
   labels:
     app: elohim-doorway
     environment: prod
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
   selector:
@@ -52,6 +67,12 @@ spec:
       labels:
         app: elohim-doorway
         environment: prod
+        app.kubernetes.io/name: doorway
+        app.kubernetes.io/instance: doorway-prod
+        app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
     spec:
       nodeSelector:
         node-type: operations
@@ -178,6 +199,12 @@ metadata:
   labels:
     app: elohim-doorway
     environment: prod
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   type: ClusterIP
   ports:
@@ -203,6 +230,15 @@ kind: Ingress
 metadata:
   name: elohim-doorway-prod
   namespace: elohim-prod
+  labels:
+    app: elohim-doorway
+    environment: prod
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
   annotations:
     # WebSocket support for /admin, /app/*, signal subdomain
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"

@@ -19,6 +19,15 @@ kind: ConfigMap
 metadata:
   name: elohim-edgenode-prod-config
   namespace: elohim-prod
+  labels:
+    app: elohim-edgenode
+    environment: prod
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: edgenode-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 data:
   # hApp version to fetch from Harbor (explicit version for prod)
   happ-version: "HAPP_TAG_PLACEHOLDER"
@@ -55,6 +64,12 @@ metadata:
   labels:
     app: elohim-edgenode
     environment: prod
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: edgenode-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   serviceName: elohim-edgenode-prod-headless
   replicas: 1
@@ -70,6 +85,12 @@ spec:
       labels:
         app: elohim-edgenode
         environment: prod
+        app.kubernetes.io/name: edgenode
+        app.kubernetes.io/instance: edgenode-prod
+        app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+        app.kubernetes.io/component: data
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
     spec:
       securityContext:
         fsGroup: 1000
@@ -314,6 +335,12 @@ metadata:
   labels:
     app: elohim-edgenode
     environment: prod
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: edgenode-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   clusterIP: None
   selector:
@@ -341,6 +368,12 @@ metadata:
   labels:
     app: elohim-edgenode
     environment: prod
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: edgenode-prod
+    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   type: ClusterIP
   ports:

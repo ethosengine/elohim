@@ -3,6 +3,12 @@ kind: Service
 metadata:
   name: elohim-site-service
   namespace: elohim-prod
+  labels:
+    app.kubernetes.io/name: elohim-site
+    app.kubernetes.io/instance: elohim-site-prod
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   selector:
     app: elohim-site

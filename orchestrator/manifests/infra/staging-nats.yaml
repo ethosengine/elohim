@@ -16,6 +16,11 @@ metadata:
   labels:
     app: nats
     environment: staging
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/instance: nats-staging
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
   selector:
@@ -27,6 +32,11 @@ spec:
       labels:
         app: nats
         environment: staging
+        app.kubernetes.io/name: nats
+        app.kubernetes.io/instance: nats-staging
+        app.kubernetes.io/component: infra
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
     spec:
       nodeSelector:
         node-type: operations
@@ -72,6 +82,11 @@ metadata:
   labels:
     app: nats
     environment: staging
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/instance: nats-staging
+    app.kubernetes.io/component: infra
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 spec:
   type: ClusterIP
   ports:

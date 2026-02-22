@@ -3,10 +3,16 @@ kind: ConfigMap
 metadata:
   name: elohim-config-staging
   namespace: elohim-staging
+  labels:
+    app.kubernetes.io/name: elohim-site
+    app.kubernetes.io/instance: elohim-site-staging
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
 data:
   config.json: |
     {
       "logLevel": "info",
       "environment": "staging",
-      "doorwayUrl": "https://doorway-staging.elohim.host"
+      "doorwayUrl": "https://doorway-alpha.elohim.host"
     }

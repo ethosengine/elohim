@@ -176,20 +176,22 @@ def runSimulationTest() {
  */
 def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile, String resourceName = 'elohim-edgenode') {
     def versions = readProperties(file: envFile)
+    def deployVersion = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     def sedArgs = [
         "s/EDGENODE_TAG_PLACEHOLDER/${versions.EDGENODE_TAG}/g",
         "s/DOORWAY_TAG_PLACEHOLDER/${versions.DOORWAY_TAG}/g",
         "s/STORAGE_TAG_PLACEHOLDER/${versions.STORAGE_TAG}/g",
         "s/HAPP_INSTALLER_TAG_PLACEHOLDER/${versions.HAPP_INSTALLER_TAG}/g",
         "s/DOORWAY_APP_TAG_PLACEHOLDER/${versions.DOORWAY_APP_TAG}/g",
-        "s/HAPP_TAG_PLACEHOLDER/${versions.HAPP_TAG}/g"
+        "s/HAPP_TAG_PLACEHOLDER/${versions.HAPP_TAG}/g",
+        "s/DEPLOY_VERSION_PLACEHOLDER/${deployVersion}/g"
     ].collect { "-e '${it}'" }.join(' ')
 
     def outputFile = manifestTemplate.replace('.yaml', "-${env}.rendered.yaml")
     sh "sed ${sedArgs} ${manifestTemplate} > ${outputFile}"
 
     // Fail fast if any placeholders remain
-    def remaining = sh(script: "grep -c '_TAG_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
+    def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
     if (remaining != '0') {
         error "Unresolved placeholders in ${outputFile}!"
     }
@@ -197,9 +199,12 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
     // Preview what we're deploying
     sh """
         echo '==== Manifest preview: ${resourceName}-${env} ===='
-        grep 'image:\\|happ-version:' ${outputFile}
+        grep 'image:\\|happ-version:\\|app.kubernetes.io/version:' ${outputFile} | head -5
         echo '==============================='
     """
+
+    // Pre-deploy: check for ingress hostname conflicts
+    sh "bash orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
 
     sh "kubectl apply -f ${outputFile}"
     def resourceType = sh(
@@ -208,6 +213,10 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
     ).trim()
     sh "kubectl rollout restart ${resourceType}/${resourceName}-${env} -n ${namespace}"
     sh "kubectl rollout status ${resourceType}/${resourceName}-${env} -n ${namespace} --timeout=600s"
+
+    // Post-deploy: detect stale resources (advisory only)
+    def componentName = resourceName.replace('elohim-', '')
+    sh "bash orchestrator/scripts/detect-stale-resources.sh ${namespace} ${deployVersion} ${componentName} || true"
 }
 
 pipeline {
