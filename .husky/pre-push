@@ -153,7 +153,7 @@ run_gate() {
         rc=$?
         ;;
       genesis)
-        npm run validate 2>&1 && npx vitest run 2>&1
+        npm ci --ignore-scripts 2>&1 && npm run validate 2>&1 && npx vitest run 2>&1
         rc=$?
         ;;
       orchestrator)
