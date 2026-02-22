@@ -1,11 +1,13 @@
 /**
- * Common step definitions — health checks and doorway readiness.
+ * Common step definitions — health checks, doorway readiness, lifecycle hooks.
  */
 
-import { Given, After, setWorldConstructor } from '@cucumber/cucumber';
 import { strict as assert } from 'node:assert';
-import { E2EWorld } from '../src/framework/world.js';
+
+import { Given, After, AfterAll, setWorldConstructor } from '@cucumber/cucumber';
+
 import { retry } from '../src/framework/utils/retry.js';
+import { E2EWorld } from '../src/framework/world.js';
 
 setWorldConstructor(E2EWorld);
 
@@ -24,11 +26,14 @@ Given(
     await retry(
       async () => {
         const health = await entry.client.health();
-        assert.ok(health.healthy, `Doorway "${doorwayId}" at ${url} is not healthy: status=${health.status}`);
+        assert.ok(
+          health.healthy,
+          `Doorway "${doorwayId}" at ${url} is not healthy: status=${health.status}`
+        );
       },
-      { maxAttempts: 5, initialDelayMs: 2000, timeoutMs: 30_000 },
+      { maxAttempts: 5, initialDelayMs: 2000, timeoutMs: 30_000 }
     );
-  },
+  }
 );
 
 /**
@@ -36,4 +41,11 @@ Given(
  */
 After(async function (this: E2EWorld) {
   await this.runCleanup();
+});
+
+/**
+ * Close the shared Playwright browser after all scenarios complete.
+ */
+AfterAll(async function () {
+  await E2EWorld.closeBrowser();
 });

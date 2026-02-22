@@ -12,7 +12,7 @@ import { retry, type RetryOptions } from '../utils/retry.js';
 export async function waitForContent(
   client: DoorwayClient,
   contentId: string,
-  opts: RetryOptions = {},
+  opts: RetryOptions = {}
 ): Promise<Record<string, unknown>> {
   return retry(async () => {
     const content = await client.getContent(contentId);
@@ -27,7 +27,7 @@ export async function waitForContent(
 export async function waitForContentByTags(
   client: DoorwayClient,
   tags: string[],
-  opts: RetryOptions = {},
+  opts: RetryOptions = {}
 ): Promise<Record<string, unknown>[]> {
   return retry(async () => {
     const results = await client.searchContent(tags);

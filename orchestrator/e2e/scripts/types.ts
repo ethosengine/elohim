@@ -19,7 +19,7 @@ export interface ExecutableScenario {
   name: string;
   featureFile: string;
   tags: string[];
-  framework: 'cypress' | 'cucumber-js';
+  framework: 'cucumber-js';
 }
 
 export interface DomainGap {
@@ -48,6 +48,13 @@ export interface PrioritizedGap {
   rationale: string;
 }
 
+export interface FeatureReadiness {
+  featureFile: string;
+  totalSteps: number;
+  matchedSteps: number;
+  readinessPercent: number;
+}
+
 export interface CoverageGapReport {
   generatedAt: string;
   gitCommit: string;
@@ -57,8 +64,10 @@ export interface CoverageGapReport {
     coveragePercent: number;
     epicsWithZeroTests: string[];
     governanceLayersWithZeroTests: string[];
+    totalDefinedStepPatterns?: number;
   };
   domainGaps: DomainGap[];
   governanceGaps: GovernanceGap[];
   prioritizedGaps: PrioritizedGap[];
+  featureReadiness?: FeatureReadiness[];
 }

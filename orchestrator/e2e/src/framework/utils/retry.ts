@@ -23,10 +23,7 @@ const DEFAULTS: Required<RetryOptions> = {
   timeoutMs: 60_000,
 };
 
-export async function retry<T>(
-  fn: () => Promise<T>,
-  opts: RetryOptions = {},
-): Promise<T> {
+export async function retry<T>(fn: () => Promise<T>, opts: RetryOptions = {}): Promise<T> {
   const config = { ...DEFAULTS, ...opts };
   const deadline = Date.now() + config.timeoutMs;
   let delay = config.initialDelayMs;
@@ -45,11 +42,9 @@ export async function retry<T>(
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`Retry exhausted: ${String(lastError)}`);
+  throw lastError instanceof Error ? lastError : new Error(`Retry exhausted: ${String(lastError)}`);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

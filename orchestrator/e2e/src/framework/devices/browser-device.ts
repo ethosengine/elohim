@@ -2,13 +2,13 @@
  * BrowserDevice — simulates a browser interacting with a doorway via HTTP.
  */
 
-import { Device, type DeviceType } from '../device.js';
 import {
   DoorwayClient,
   type AuthResponse,
   type RegisterRequest,
   type LoginRequest,
 } from '../api/doorway-client.js';
+import { Device, type DeviceType } from '../device.js';
 
 export class BrowserDevice extends Device {
   readonly type: DeviceType = 'browser';
@@ -19,7 +19,7 @@ export class BrowserDevice extends Device {
 
   constructor(
     label: string,
-    private readonly doorwayUrl: string,
+    private readonly doorwayUrl: string
   ) {
     super();
     this.label = label;

@@ -2,13 +2,15 @@
  * Federation step definitions — registration, content CRUD, cross-doorway sync.
  */
 
-import { Given, When, Then } from '@cucumber/cucumber';
 import { strict as assert } from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { E2EWorld } from '../src/framework/world.js';
-import { Human } from '../src/framework/human.js';
-import { BrowserDevice } from '../src/framework/devices/browser-device.js';
+
+import { Given, When, Then } from '@cucumber/cucumber';
+
 import { waitForContentByTags } from '../src/framework/assertions/content-sync.js';
+import { BrowserDevice } from '../src/framework/devices/browser-device.js';
+import { Human } from '../src/framework/human.js';
+import { E2EWorld } from '../src/framework/world.js';
 
 /**
  * Generate unique test credentials so parallel runs don't collide.
@@ -46,7 +48,7 @@ Given(
     human.setToken(doorwayId, auth.token);
 
     this.addHuman(humanName, human);
-  },
+  }
 );
 
 /**
@@ -57,7 +59,7 @@ When(
   '{word} creates content {string} on doorway {string}',
   async function (this: E2EWorld, humanName: string, contentAlias: string, doorwayId: string) {
     const human = this.getHuman(humanName);
-    const doorway = this.getDoorway(doorwayId);
+    this.getDoorway(doorwayId); // validate doorway exists
 
     const device = human.devices[0] as BrowserDevice;
     assert.ok(device, `${humanName} has no device`);
@@ -74,9 +76,9 @@ When(
       tags: ['e2e', 'federation', runTag],
     });
 
-    const id = (content as Record<string, unknown>).id as string;
+    const id = content.id as string;
     this.contentIds.set(contentAlias, id);
-  },
+  }
 );
 
 /**
@@ -90,7 +92,7 @@ Then(
     humanName: string,
     contentAlias: string,
     doorwayId: string,
-    timeoutSeconds: number,
+    timeoutSeconds: number
   ) {
     const human = this.getHuman(humanName);
     const doorway = this.getDoorway(doorwayId);
@@ -108,11 +110,15 @@ Then(
       maxDelayMs: 10_000,
     });
 
-    assert.ok(results.length > 0, `Content "${contentAlias}" not found on doorway "${doorwayId}" within ${timeoutSeconds}s`);
-
-    const match = results.find(
-      (r) => (r as Record<string, unknown>).title === contentAlias,
+    assert.ok(
+      results.length > 0,
+      `Content "${contentAlias}" not found on doorway "${doorwayId}" within ${timeoutSeconds}s`
     );
-    assert.ok(match, `Content with title "${contentAlias}" not found in results on doorway "${doorwayId}"`);
-  },
+
+    const match = results.find(r => r.title === contentAlias);
+    assert.ok(
+      match,
+      `Content with title "${contentAlias}" not found in results on doorway "${doorwayId}"`
+    );
+  }
 );

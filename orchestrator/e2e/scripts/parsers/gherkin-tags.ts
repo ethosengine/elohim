@@ -8,6 +8,7 @@
 
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
+
 import type { ConceptualScenario } from '../types.js';
 
 const GENESIS_ROOT = 'genesis/docs/content/elohim-protocol';
@@ -28,7 +29,7 @@ async function walkFeatureFiles(dir: string): Promise<string[]> {
 
 function parseTagValue(lines: string[], key: string): string {
   for (const line of lines) {
-    const match = line.match(new RegExp(`^@${key}:(.+)$`));
+    const match = new RegExp(`^@${key}:(.+)$`).exec(line);
     if (match) return match[1].trim();
   }
   return 'unknown';
@@ -37,7 +38,7 @@ function parseTagValue(lines: string[], key: string): string {
 function parseScenarioNames(content: string): string[] {
   const names: string[] = [];
   for (const line of content.split('\n')) {
-    const match = line.match(/^\s*Scenario:\s*(.+)$/);
+    const match = /^\s*Scenario(?:\s+Outline)?:\s*(.+)$/.exec(line); // eslint-disable-line sonarjs/slow-regex
     if (match) names.push(match[1].trim());
   }
   return names;

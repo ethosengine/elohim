@@ -5,19 +5,46 @@
   "type": "module",
   "description": "E2E test driver for Elohim Protocol federation and identity flows",
   "scripts": {
-    "test": "cucumber-js",
+    "test": "cucumber-js --tags '@e2e'",
+    "test:practical": "cucumber-js --tags '@e2e'",
     "test:federation": "cucumber-js --tags '@e2e and @federation'",
+    "test:browser": "E2E_DEVICE_MODE=playwright cucumber-js --tags '@e2e'",
+    "test:local": "E2E_MODE=local cucumber-js --tags '@e2e'",
+    "test:steward": "E2E_MODE=steward cucumber-js --tags '@e2e'",
+    "test:genesis:dry": "cucumber-js --dry-run '../../genesis/docs/content/elohim-protocol/**/*.feature'",
+    "test:genesis:epic": "cucumber-js --dry-run --tags '@epic:$npm_config_name' '../../genesis/docs/content/elohim-protocol/**/*.feature'",
+    "test:genesis:layer": "cucumber-js --dry-run --tags '@governance_layer:$npm_config_name' '../../genesis/docs/content/elohim-protocol/**/*.feature'",
+    "generate:skeletons": "tsx scripts/generate-step-skeletons.ts",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format:check": "prettier --check \"**/*.{ts,js,json,mjs}\"",
+    "format": "prettier --write \"**/*.{ts,js,json,mjs}\"",
     "scan:coverage": "tsx scripts/scan-coverage.ts",
-    "scan:coverage:ci": "tsx scripts/scan-coverage.ts --ci"
+    "scan:coverage:ci": "tsx scripts/scan-coverage.ts --ci",
+    "explore": "tsx scripts/explore-session.ts",
+    "publish:results": "tsx scripts/publish-results.ts",
+    "local:check": "tsx scripts/local-stack.ts",
+    "local:seed": "tsx scripts/local-stack.ts --seed"
   },
   "dependencies": {
+    "playwright": "^1.50.0",
     "undici": "^7.3.0"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^11.2.0",
+    "@eslint/js": "^9.39.2",
     "@types/node": "^22.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "prettier": "^3.8.1",
     "tsx": "^4.19.0",
-    "typescript": "~5.7.0"
+    "typescript": "~5.7.0",
+    "typescript-eslint": "^8.50.1"
   }
 }

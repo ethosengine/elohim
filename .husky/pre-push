@@ -87,6 +87,10 @@ fi
 if echo "$CHANGED" | grep -q "Jenkinsfile"; then
   PROJECTS="$PROJECTS orchestrator"
 fi
+# E2E framework changes trigger TypeScript linting
+if echo "$CHANGED" | grep -q "^orchestrator/e2e/"; then
+  PROJECTS="$PROJECTS orchestrator-e2e"
+fi
 
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
@@ -155,6 +159,10 @@ run_gate() {
         npx npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
         rc=$?
         ;;
+      orchestrator-e2e)
+        npm run lint 2>&1 && npm run format:check 2>&1 && npm run typecheck 2>&1
+        rc=$?
+        ;;
       *)
         echo "  Unknown project: $PROJECT_NAME"
         rc=1
@@ -189,9 +197,10 @@ for PROJECT in $PROJECTS; do
 
   # Map project name to directory
   case "$PROJECT" in
-    elohim-storage)  PROJECT_DIR="holochain/elohim-storage" ;;
-    genesis)         PROJECT_DIR="genesis/seeder" ;;
-    *)               PROJECT_DIR="$PROJECT" ;;
+    elohim-storage)   PROJECT_DIR="holochain/elohim-storage" ;;
+    genesis)          PROJECT_DIR="genesis/seeder" ;;
+    orchestrator-e2e) PROJECT_DIR="orchestrator/e2e" ;;
+    *)                PROJECT_DIR="$PROJECT" ;;
   esac
 
   run_gate "$PROJECT" "$PROJECT_DIR"

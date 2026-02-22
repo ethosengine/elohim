@@ -21,5 +21,9 @@ lint:
 lint-fix:
     npx npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --fix
 
-# Quality gate: lint Jenkinsfiles
-gate: lint
+# Lint E2E TypeScript (eslint + prettier + typecheck)
+e2e-lint:
+    cd e2e && npm run lint && npm run format:check && npm run typecheck
+
+# Quality gate: lint Jenkinsfiles + E2E code
+gate: lint e2e-lint

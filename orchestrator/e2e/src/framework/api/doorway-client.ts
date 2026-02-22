@@ -84,8 +84,8 @@ export interface HealthResponse {
 
 export class DoorwayClient {
   constructor(
-    private baseUrl: string,
-    private token?: string,
+    private readonly baseUrl: string,
+    private token?: string
   ) {}
 
   get url(): string {
