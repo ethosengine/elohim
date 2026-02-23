@@ -495,6 +495,33 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Seed Humans') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        dir('genesis/seeder') {
+                            withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'API_KEY_ADMIN')]) {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED HUMANS"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo ""
+                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         stage('E2E Verification') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {

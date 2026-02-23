@@ -55,4 +55,10 @@ export class BrowserDevice extends Device {
     this.client.setToken(res.token);
     return res;
   }
+
+  async logout(): Promise<void> {
+    await this.client.logout();
+    this.authResponse = undefined;
+    this.client.clearToken();
+  }
 }

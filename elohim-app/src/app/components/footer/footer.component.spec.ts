@@ -43,7 +43,7 @@ describe('FooterComponent', () => {
 
   it('should render git hash link in template', () => {
     const compiled = fixture.nativeElement;
-    const gitHashLink = compiled.querySelector('[data-cy="git-hash"]');
+    const gitHashLink = compiled.querySelector('[data-testid="git-hash"]');
     expect(gitHashLink).toBeTruthy();
     expect(gitHashLink.textContent.trim()).toBe(environment.gitHash);
     expect(gitHashLink.getAttribute('href')).toBe(component.githubCommitUrl);
@@ -163,7 +163,7 @@ describe('FooterComponent (with version.json)', () => {
     expect(env).toBeTruthy();
     expect(env.textContent).toContain('alpha');
 
-    const gitLink = compiled.querySelector('[data-cy="git-hash"]');
+    const gitLink = compiled.querySelector('[data-testid="git-hash"]');
     expect(gitLink.textContent.trim()).toBe('abc1234f');
     expect(gitLink.getAttribute('title')).toContain('2026-02-17T12:00:00Z');
   });
@@ -175,7 +175,7 @@ describe('FooterComponent (with version.json)', () => {
 
     expect(component.buildInfo()).toBeNull();
     const compiled = fixture.nativeElement;
-    const gitLink = compiled.querySelector('[data-cy="git-hash"]');
+    const gitLink = compiled.querySelector('[data-testid="git-hash"]');
     expect(gitLink).toBeTruthy();
   });
 });

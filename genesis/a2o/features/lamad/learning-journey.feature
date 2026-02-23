@@ -5,9 +5,8 @@ Feature: Lamad Learning Journey
   So that I can build understanding systematically without overwhelm
 
   Background:
-    Given doorway "alpha" is healthy at env "E2E_DOORWAY_ALPHA"
-    And human "Alice" is on doorway "alpha" with device
-    And I am a new traveler "Alice"
+    Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
+    And human "Matthew" is logged in on doorway "alpha" with device
     And the "Elohim Protocol" path exists
 
   Scenario: Starting a Journey

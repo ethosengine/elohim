@@ -163,7 +163,7 @@ Then('the footer should be present', async function (this: E2EWorld) {
 
 Then('the footer should display the expected git hash', async function (this: E2EWorld) {
   const device = getPlaywrightDevice(this);
-  const hashEl = device.page.locator('[data-cy="git-hash"], .git-hash');
+  const hashEl = device.page.locator('[data-testid="git-hash"], .git-hash');
   await hashEl.first().waitFor({ state: 'attached' });
 });
 
@@ -174,7 +174,7 @@ Then('the git hash should match the deployed version', async function (this: E2E
     return;
   }
   const device = getPlaywrightDevice(this);
-  const hashEl = device.page.locator('[data-cy="git-hash"]');
+  const hashEl = device.page.locator('[data-testid="git-hash"]');
   const actual = await hashEl.first().textContent();
   assert.ok(actual?.includes(expected), `Expected git hash "${expected}" but found "${actual}"`);
 });

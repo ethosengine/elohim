@@ -16,6 +16,26 @@
       "affinities": ["governance", "ai-ethics", "holochain", "family-systems", "christian-theology"]
     },
     {
+      "id": "human-adam-firstman",
+      "displayName": "Adam",
+      "bio": "The original gardener. Tending the network like he once tended the garden. Still naming things.",
+      "category": "core-family",
+      "profileReach": "community",
+      "location": {"layer": "neighborhood", "name": "Eden Valley"},
+      "communities": ["community-garden-club", "community-regen-ag-network"],
+      "affinities": ["gardening", "naming-things", "stewardship", "ecology", "beginnings"]
+    },
+    {
+      "id": "human-eve-firstwoman",
+      "displayName": "Eve",
+      "bio": "Curious by nature. First to reach for knowledge. Still asking the hard questions nobody else will.",
+      "category": "core-family",
+      "profileReach": "community",
+      "location": {"layer": "neighborhood", "name": "Eden Valley"},
+      "communities": ["community-garden-club", "community-homeschool-coop"],
+      "affinities": ["knowledge-seeking", "courage", "family-systems", "truth-seeking", "new-beginnings"]
+    },
+    {
       "id": "human-susan-spouse",
       "displayName": "Susan",
       "bio": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
@@ -313,6 +333,7 @@
     }
   ],
   "relationships": [
+    {"source": "human-adam-firstman", "target": "human-eve-firstwoman", "type": "spouse", "intimacy": "intimate"},
     {"source": "human-matthew-manager", "target": "human-susan-spouse", "type": "spouse", "intimacy": "intimate"},
     {"source": "human-matthew-manager", "target": "human-sammy-son", "type": "parent", "intimacy": "intimate"},
     {"source": "human-susan-spouse", "target": "human-sammy-son", "type": "parent", "intimacy": "intimate"},
@@ -338,7 +359,7 @@
     {"source": "human-tommy-teacher", "target": "human-janice-janitor", "type": "coworker", "intimacy": "connection", "context": "org-valley-school-district"}
   ],
   "categories": {
-    "core-family": {"description": "Matthew's household", "count": 4},
+    "core-family": {"description": "Matthew's household and the originals", "count": 6},
     "workplace": {"description": "EthosEngine team", "count": 1},
     "community": {"description": "Neighborhood connections", "count": 3},
     "affinity": {"description": "Faith, education, and interest networks", "count": 4},
@@ -348,8 +369,8 @@
     "red-team": {"description": "Adversarial actors for testing", "count": 5}
   },
   "summary": {
-    "totalHumans": 27,
-    "totalRelationships": 23,
-    "byIntimacy": {"intimate": 5, "trusted": 5, "connection": 12, "recognition": 1}
+    "totalHumans": 29,
+    "totalRelationships": 24,
+    "byIntimacy": {"intimate": 6, "trusted": 5, "connection": 12, "recognition": 1}
   }
 }

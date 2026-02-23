@@ -68,10 +68,11 @@ When(
     this.contentIds.set(`${contentAlias}:tag`, runTag);
 
     const content = await device.client.createContent({
+      id: `e2e-${randomUUID()}`,
       contentType: 'article',
       title: contentAlias,
       description: `E2E test content created by ${humanName} on ${doorwayId}`,
-      content: `This is automated test content for federation validation.`,
+      contentBody: `This is automated test content for federation validation.`,
       contentFormat: 'text',
       tags: ['e2e', 'federation', runTag],
     });

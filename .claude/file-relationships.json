@@ -93,6 +93,28 @@
         }
       ]
     },
+    "testid-sync": {
+      "description": "data-testid attributes in Angular templates must stay in sync with page object selectors",
+      "skill": ".claude/skills/page-model/SKILL.md",
+      "selectors": "genesis/a2o/src/framework/pages/selectors.ts",
+      "sync_rules": [
+        {
+          "trigger_pattern": "doorway-app/src/app/components/login/threshold-login.component.ts",
+          "notify": ["skill"],
+          "message": "Threshold login template changed - check data-testid attributes and update selectors.ts if needed"
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/elohim/components/elohim-navigator/*.html",
+          "notify": ["skill"],
+          "message": "Navigator template changed - check data-testid attributes and update selectors.ts if needed"
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/imagodei/components/login/*.html",
+          "notify": ["skill"],
+          "message": "Login template changed - check data-testid attributes and update selectors.ts if needed"
+        }
+      ]
+    },
     "model-sync": {
       "description": "ContentNode models must stay in sync between service and app",
       "pairs": [

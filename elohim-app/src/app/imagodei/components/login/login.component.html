@@ -13,7 +13,7 @@
       </div>
 
       @if (error()) {
-        <div class="error-banner" role="alert">
+        <div class="error-banner" data-testid="login-error" role="alert">
           <span class="error-icon" aria-hidden="true">&#x2715;</span>
           <span>{{ error() }}</span>
           <button
@@ -33,6 +33,7 @@
           <input
             id="federatedId"
             type="text"
+            data-testid="login-federated-id"
             [(ngModel)]="federatedIdentifier"
             name="federatedId"
             placeholder="you@your-doorway.host"
@@ -80,7 +81,7 @@
       </div>
 
       @if (error()) {
-        <div class="error-banner" role="alert">
+        <div class="error-banner" data-testid="login-error" role="alert">
           <span class="error-icon" aria-hidden="true">&#x2715;</span>
           <span>{{ error() }}</span>
           <button
@@ -213,7 +214,7 @@
 
       <!-- Error Display -->
       @if (error()) {
-        <div class="error-banner" role="alert">
+        <div class="error-banner" data-testid="login-error" role="alert">
           <span class="error-icon" aria-hidden="true">&#x2715;</span>
           <span>{{ error() }}</span>
           <button
@@ -235,6 +236,7 @@
           <input
             id="identifier"
             type="text"
+            data-testid="login-identifier"
             [(ngModel)]="form.identifier"
             name="identifier"
             placeholder="you@example.com"
@@ -250,6 +252,7 @@
           <div class="password-input-wrapper">
             <input
               id="password"
+              data-testid="login-password"
               [type]="showPassword() ? 'text' : 'password'"
               [(ngModel)]="form.password"
               name="password"
@@ -287,6 +290,7 @@
           <button
             type="submit"
             class="btn btn-primary"
+            data-testid="login-submit"
             [disabled]="isLoading() || !form.identifier.trim() || !form.password"
           >
             @if (isLoading()) {

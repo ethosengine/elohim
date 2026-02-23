@@ -15,22 +15,8 @@ import { Given } from '@cucumber/cucumber';
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
 import { Human } from '../src/framework/human.js';
+import { doorwayToAppUrl } from '../src/framework/utils/url.js';
 import { E2EWorld } from '../src/framework/world.js';
-
-/**
- * Resolve the app URL from a doorway URL.
- * doorway-alpha.elohim.host -> alpha.elohim.host
- * doorway-staging.elohim.host -> staging.elohim.host
- * doorway.elohim.host -> elohim.host
- * localhost:8888 -> localhost:4200
- */
-function doorwayToAppUrl(doorwayUrl: string): string {
-  if (doorwayUrl.includes('localhost:8888')) return 'http://localhost:4200';
-  return doorwayUrl
-    .replace('doorway-alpha.', 'alpha.')
-    .replace('doorway-staging.', 'staging.')
-    .replace('doorway.', '');
-}
 
 /**
  * Register a human with a device appropriate for the current mode.

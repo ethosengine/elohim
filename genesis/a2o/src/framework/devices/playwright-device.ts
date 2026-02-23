@@ -4,6 +4,10 @@
  * Wraps Playwright's Browser + BrowserContext + Page. Also holds a
  * DoorwayClient for API-level setup/fallback (e.g. registering users
  * via API before driving the UI).
+ *
+ * Observability: captures console logs, uncaught JS errors, and failed
+ * network requests throughout the page lifecycle. Use `getErrors()` to
+ * retrieve captured data for assertions or artifact reports.
  */
 
 import {
@@ -18,7 +22,7 @@ import { Device, type DeviceType } from '../device.js';
  * Minimal Playwright type stubs to avoid requiring playwright at compile time.
  * The real Playwright types are used at runtime via dynamic import.
  */
-interface PWPage {
+export interface PWPage {
   goto(url: string, options?: Record<string, unknown>): Promise<unknown>;
   screenshot(options?: Record<string, unknown>): Promise<Buffer>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,29 +31,75 @@ interface PWPage {
   title(): Promise<string>;
   waitForLoadState(state?: string): Promise<void>;
   waitForTimeout(ms: number): Promise<void>;
+  waitForURL(
+    url: string | RegExp | ((url: URL) => boolean),
+    options?: Record<string, unknown>
+  ): Promise<void>;
   getByText(text: string, options?: Record<string, unknown>): PWLocator;
   getByRole(role: string, options?: Record<string, unknown>): PWLocator;
   locator(selector: string): PWLocator;
   reload(options?: Record<string, unknown>): Promise<unknown>;
+  on(event: string, handler: (...args: unknown[]) => void): void;
+  fill(selector: string, value: string): Promise<void>;
 }
 
-interface PWLocator {
-  click(): Promise<void>;
+export interface PWLocator {
+  click(options?: Record<string, unknown>): Promise<void>;
   count(): Promise<number>;
   first(): PWLocator;
   waitFor(options?: Record<string, unknown>): Promise<void>;
   textContent(): Promise<string | null>;
+  fill(value: string): Promise<void>;
   getByText(text: string, options?: Record<string, unknown>): PWLocator;
+  isVisible(): Promise<boolean>;
 }
 
 interface PWBrowserContext {
   newPage(): Promise<PWPage>;
   close(): Promise<void>;
+  tracing: PWTracing;
+}
+
+interface PWTracing {
+  start(options?: Record<string, unknown>): Promise<void>;
+  stop(options?: Record<string, unknown>): Promise<void>;
 }
 
 interface PWBrowser {
   newContext(options?: Record<string, unknown>): Promise<PWBrowserContext>;
   close(): Promise<void>;
+}
+
+/** Captured console message. */
+export interface CapturedConsoleLog {
+  level: string;
+  text: string;
+  url: string;
+  timestamp: number;
+}
+
+/** Captured uncaught JS error. */
+export interface CapturedPageError {
+  message: string;
+  stack?: string;
+  url: string;
+  timestamp: number;
+}
+
+/** Captured failed network request. */
+export interface CapturedFailedRequest {
+  url: string;
+  method: string;
+  status?: number;
+  failure?: string;
+  timestamp: number;
+}
+
+/** All captured browser errors for a device session. */
+export interface CapturedErrors {
+  console: CapturedConsoleLog[];
+  page: CapturedPageError[];
+  network: CapturedFailedRequest[];
 }
 
 export class PlaywrightDevice extends Device {
@@ -60,6 +110,15 @@ export class PlaywrightDevice extends Device {
   private context?: PWBrowserContext;
   private _page?: PWPage;
   private authResponse?: AuthResponse;
+
+  /** Captured console messages (all levels). */
+  consoleLogs: CapturedConsoleLog[] = [];
+
+  /** Captured uncaught JS errors. */
+  pageErrors: CapturedPageError[] = [];
+
+  /** Captured failed network requests. */
+  failedRequests: CapturedFailedRequest[] = [];
 
   constructor(
     label: string,
@@ -93,13 +152,56 @@ export class PlaywrightDevice extends Device {
     return this._page;
   }
 
-  /** Create a fresh browser context and page. */
+  /** Create a fresh browser context and page with observability wired up. */
   async init(): Promise<void> {
     this.context = await this.browser.newContext({
       viewport: { width: 1280, height: 720 },
       ignoreHTTPSErrors: true,
     });
+
+    // Start tracing if requested
+    if (process.env['E2E_TRACE'] === 'true') {
+      await this.context.tracing.start({ screenshots: true, snapshots: true });
+    }
+
     this._page = await this.context.newPage();
+
+    // Console capture — all levels (log, warn, error, info, debug)
+    this._page.on('console', (...args: unknown[]) => {
+      const msg = args[0] as { type(): string; text(): string };
+      this.consoleLogs.push({
+        level: msg.type(),
+        text: msg.text(),
+        url: this._page?.url() ?? '',
+        timestamp: Date.now(),
+      });
+    });
+
+    // Uncaught JS errors (window.onerror / unhandled rejections)
+    this._page.on('pageerror', (...args: unknown[]) => {
+      const err = args[0] as { message: string; stack?: string };
+      this.pageErrors.push({
+        message: err.message,
+        stack: err.stack,
+        url: this._page?.url() ?? '',
+        timestamp: Date.now(),
+      });
+    });
+
+    // Failed network requests (DNS failures, connection refused, etc.)
+    this._page.on('requestfailed', (...args: unknown[]) => {
+      const req = args[0] as {
+        url(): string;
+        method(): string;
+        failure(): { errorText: string } | null;
+      };
+      this.failedRequests.push({
+        url: req.url(),
+        method: req.method(),
+        failure: req.failure()?.errorText,
+        timestamp: Date.now(),
+      });
+    });
   }
 
   /** Navigate to a path relative to the app URL. */
@@ -130,6 +232,36 @@ export class PlaywrightDevice extends Device {
   async screenshot(name: string): Promise<string> {
     const path = `reports/screenshots/${name}.png`;
     await this.page.screenshot({ path, fullPage: true });
+    return path;
+  }
+
+  /** Get all captured errors/warnings from the browser session. */
+  getErrors(): CapturedErrors {
+    return {
+      console: this.consoleLogs.filter(l => l.level === 'error' || l.level === 'warning'),
+      page: [...this.pageErrors],
+      network: [...this.failedRequests],
+    };
+  }
+
+  /** Quick check: were any errors or warnings captured? */
+  hasErrors(): boolean {
+    const errors = this.getErrors();
+    return errors.console.length > 0 || errors.page.length > 0 || errors.network.length > 0;
+  }
+
+  /** Reset all capture arrays (call between scenarios). */
+  clearCapture(): void {
+    this.consoleLogs = [];
+    this.pageErrors = [];
+    this.failedRequests = [];
+  }
+
+  /** Stop tracing and save to a zip file. Returns path or undefined if tracing not enabled. */
+  async saveTrace(name: string): Promise<string | undefined> {
+    if (!this.context || process.env['E2E_TRACE'] !== 'true') return undefined;
+    const path = `reports/traces/${name}.zip`;
+    await this.context.tracing.stop({ path });
     return path;
   }
 

@@ -70,7 +70,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
 
         <!-- Error message -->
         @if (error()) {
-          <div class="error-banner">
+          <div class="error-banner" data-testid="threshold-error">
             <span>{{ error() }}</span>
             <button class="dismiss" (click)="clearError()">×</button>
           </div>
@@ -86,6 +86,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                   type="text"
                   id="identifier"
                   name="identifier"
+                  data-testid="threshold-identifier"
                   [(ngModel)]="form.identifier"
                   required
                   autocomplete="username"
@@ -103,6 +104,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
                 type="password"
                 id="password"
                 name="password"
+                data-testid="threshold-password"
                 [(ngModel)]="form.password"
                 required
                 autocomplete="current-password"
@@ -110,7 +112,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
               />
             </div>
 
-            <button type="submit" class="btn-primary" [disabled]="!loginForm.valid">
+            <button type="submit" class="btn-primary" data-testid="threshold-submit" [disabled]="!loginForm.valid">
               Sign In
             </button>
 

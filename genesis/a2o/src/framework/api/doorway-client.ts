@@ -51,6 +51,15 @@ export interface HumanProfileResponse {
   updatedAt: string;
 }
 
+export interface MeResponse {
+  humanId: string;
+  agentPubKey: string;
+  identifier: string;
+  permissionLevel: string;
+  doorwayId?: string;
+  doorwayUrl?: string;
+}
+
 export interface ConductorHealth {
   connected: boolean;
   connectedWorkers: number;
@@ -96,6 +105,10 @@ export class DoorwayClient {
     this.token = token;
   }
 
+  clearToken(): void {
+    this.token = undefined;
+  }
+
   // -- Health ---------------------------------------------------------------
 
   async health(): Promise<HealthResponse> {
@@ -121,6 +134,14 @@ export class DoorwayClient {
     return this.post<AuthResponse>('/auth/login', req);
   }
 
+  async logout(): Promise<{ success: boolean; message: string }> {
+    return this.post<{ success: boolean; message: string }>('/auth/logout', {});
+  }
+
+  async me(): Promise<MeResponse> {
+    return this.get<MeResponse>('/auth/me');
+  }
+
   // -- Content CRUD ---------------------------------------------------------
 
   async createContent(content: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -128,13 +149,15 @@ export class DoorwayClient {
   }
 
   async getContent(id: string): Promise<Record<string, unknown>> {
-    return this.get<Record<string, unknown>>(`/api/v1/cache/content/${id}`);
+    return this.get<Record<string, unknown>>(`/db/content/${id}`);
   }
 
   async searchContent(tags: string[]): Promise<Record<string, unknown>[]> {
-    const params = new URLSearchParams();
-    for (const tag of tags) params.append('tags', tag);
-    return this.get<Record<string, unknown>[]>(`/api/v1/cache/content?${params}`);
+    const tagsCsv = tags.map(t => encodeURIComponent(t)).join(',');
+    const envelope = await this.get<{ items: Record<string, unknown>[] }>(
+      `/db/content?tags=${tagsCsv}`
+    );
+    return envelope.items;
   }
 
   // -- HTTP helpers ---------------------------------------------------------
