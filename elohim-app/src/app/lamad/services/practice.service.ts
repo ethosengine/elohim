@@ -18,13 +18,19 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 37.9% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { map, tap, catchError } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
 
 import { LearnerBackendService } from '@app/elohim/services/learner-backend.service';
+
+import {
+  getActiveContentIds,
+  getDiscoveryCandidates,
+  getRefreshQueueIds,
+} from '../models/practice.model';
 
 import type {
   PracticePool,
@@ -348,12 +354,7 @@ export class PracticeService {
   getActiveCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    try {
-      const ids = JSON.parse(pool.active_content_ids_json) as string[];
-      return ids.length;
-    } catch {
-      return 0;
-    }
+    return getActiveContentIds(pool).length;
   }
 
   /**
@@ -362,12 +363,7 @@ export class PracticeService {
   getRefreshCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    try {
-      const ids = JSON.parse(pool.refresh_queue_ids_json) as string[];
-      return ids.length;
-    } catch {
-      return 0;
-    }
+    return getRefreshQueueIds(pool).length;
   }
 
   /**
@@ -376,12 +372,7 @@ export class PracticeService {
   getDiscoveryCount(): number {
     const pool = this.poolSubject.value;
     if (!pool) return 0;
-    try {
-      const candidates = JSON.parse(pool.discovery_candidates_json) as unknown[];
-      return candidates.length;
-    } catch {
-      return 0;
-    }
+    return getDiscoveryCandidates(pool).length;
   }
 
   /**

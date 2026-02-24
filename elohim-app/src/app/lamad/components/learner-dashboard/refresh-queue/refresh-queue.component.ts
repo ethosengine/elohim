@@ -1,3 +1,4 @@
+import { AsyncPipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
@@ -14,7 +15,7 @@ import type { ContentMastery } from '../../../models';
 @Component({
   selector: 'app-refresh-queue',
   standalone: true,
-  imports: [RouterModule],
+  imports: [AsyncPipe, RouterModule],
   template: `
     <div class="refresh-queue">
       <h3 class="queue-title">Practice Queue</h3>

@@ -21,6 +21,18 @@
     </div>
   </header>
 
+  <!-- Stats Overview -->
+  <app-stats-row
+    [masteredNodes]="profile.totalMasteredNodes"
+    [aboveGate]="profile.nodesAboveGate"
+    [freshnessHealthPercent]="freshnessStats.healthPercent"
+    [freshCount]="freshnessStats.fresh"
+    [staleCount]="freshnessStats.stale"
+    [criticalCount]="freshnessStats.critical"
+    [totalXp]="profile.totalXP"
+    [xpEarnedThisWeek]="xpEarnedThisWeek"
+  />
+
   <div class="dashboard-grid">
     <!-- Streak Card -->
     <section class="card streak-card">
@@ -83,7 +95,9 @@
       <h2>Active Paths</h2>
       <div *ngIf="profile.paths.inProgress.length === 0" class="empty-state">
         <p>No paths in progress</p>
-        <a routerLink="/lamad" class="btn btn-primary">Explore Paths</a>
+        <a routerLink="/lamad" class="btn btn-primary" data-testid="dashboard-explore-paths">
+          Explore Paths
+        </a>
       </div>
       <div *ngFor="let path of profile.paths.inProgress" class="path-entry">
         <div class="path-info">
@@ -139,6 +153,11 @@
         </div>
       </div>
     </section>
+
+    <!-- Practice Queue -->
+    <section class="card refresh-card">
+      <app-refresh-queue />
+    </section>
   </div>
 </div>
 
@@ -146,5 +165,7 @@
 <div *ngIf="!isLoading && !profile" class="dashboard-empty">
   <h1>My Learning</h1>
   <p>Start exploring to build your learning profile.</p>
-  <a routerLink="/lamad" class="btn btn-primary">Explore Paths</a>
+  <a routerLink="/lamad" class="btn btn-primary" data-testid="dashboard-empty-explore">
+    Explore Paths
+  </a>
 </div>

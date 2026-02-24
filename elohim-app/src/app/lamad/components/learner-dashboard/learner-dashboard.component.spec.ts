@@ -2,20 +2,31 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { By } from '@angular/platform-browser';
 
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 
+import { AgentService } from '@app/elohim/services/agent.service';
+
+import { ContentMasteryService } from '../../services/content-mastery.service';
 import { MasteryStatsService } from '../../services/mastery-stats.service';
+import { PathService } from '../../services/path.service';
 
 import { LearnerDashboardComponent } from './learner-dashboard.component';
 
+import type { AgentProgress } from '@app/elohim/models/agent.model';
+import type { ContentMastery } from '../../models/content-mastery.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
 import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile.model';
+import type { PathIndex } from '../../models/learning-path.model';
 
 describe('LearnerDashboardComponent', () => {
   let component: LearnerDashboardComponent;
   let fixture: ComponentFixture<LearnerDashboardComponent>;
   let mockMasteryStats: jasmine.SpyObj<MasteryStatsService>;
+  let mockContentMastery: jasmine.SpyObj<ContentMasteryService>;
+  let mockPathService: jasmine.SpyObj<PathService>;
+  let mockAgentService: jasmine.SpyObj<AgentService>;
   let profileSubject: BehaviorSubject<LearnerMasteryProfile | null>;
+  let masterySubject: BehaviorSubject<ContentMastery[]>;
 
   const buildProfile = (overrides: Partial<LearnerMasteryProfile> = {}): LearnerMasteryProfile => ({
     learnerLevel: { level: 3, label: 'Student', icon: 'school', xpThreshold: 500, color: '#ffc107' },
@@ -79,16 +90,37 @@ describe('LearnerDashboardComponent', () => {
     ...overrides,
   });
 
+  const emptyPathIndex: PathIndex = { lastUpdated: '', totalCount: 0, paths: [] };
+
   beforeEach(async () => {
     profileSubject = new BehaviorSubject<LearnerMasteryProfile | null>(null);
+    masterySubject = new BehaviorSubject<ContentMastery[]>([]);
 
     mockMasteryStats = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
       learnerProfile$: profileSubject.asObservable(),
     });
 
+    mockContentMastery = jasmine.createSpyObj('ContentMasteryService', [
+      'getAllMastery',
+      'getContentNeedingRefresh',
+    ]);
+    mockContentMastery.getAllMastery.and.returnValue(masterySubject.asObservable());
+    mockContentMastery.getContentNeedingRefresh.and.returnValue(of([]));
+
+    mockPathService = jasmine.createSpyObj('PathService', ['listPaths']);
+    mockPathService.listPaths.and.returnValue(of(emptyPathIndex));
+
+    mockAgentService = jasmine.createSpyObj('AgentService', ['getAgentProgress']);
+    mockAgentService.getAgentProgress.and.returnValue(of([]));
+
     await TestBed.configureTestingModule({
       imports: [LearnerDashboardComponent, RouterTestingModule],
-      providers: [{ provide: MasteryStatsService, useValue: mockMasteryStats }],
+      providers: [
+        { provide: MasteryStatsService, useValue: mockMasteryStats },
+        { provide: ContentMasteryService, useValue: mockContentMastery },
+        { provide: PathService, useValue: mockPathService },
+        { provide: AgentService, useValue: mockAgentService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LearnerDashboardComponent);
@@ -223,7 +255,42 @@ describe('LearnerDashboardComponent', () => {
   });
 
   describe('Active paths', () => {
+    const mockProgressForPath1: AgentProgress = {
+      agentId: 'test-agent',
+      pathId: 'path-1',
+      currentStepIndex: 6,
+      completedStepIndices: [0, 1, 2, 3, 4, 5],
+      startedAt: '2026-02-10T10:00:00.000Z',
+      lastActivityAt: '2026-02-15T10:00:00.000Z',
+      stepAffinity: {},
+      stepNotes: {},
+      reflectionResponses: {},
+      attestationsEarned: [],
+    };
+
+    const mockPathIndex: PathIndex = {
+      lastUpdated: '2026-02-15T12:00:00.000Z',
+      totalCount: 1,
+      paths: [
+        {
+          id: 'path-1',
+          title: 'Test Path',
+          description: 'A test path',
+          difficulty: 'beginner',
+          estimatedDuration: '30m',
+          stepCount: 10,
+          tags: [],
+        },
+      ],
+    };
+
+    function configurePathMocks(): void {
+      mockAgentService.getAgentProgress.and.returnValue(of([mockProgressForPath1]));
+      mockPathService.listPaths.and.returnValue(of(mockPathIndex));
+    }
+
     it('should display path entries when paths exist', () => {
+      configurePathMocks();
       profileSubject.next(buildProfile());
       fixture.detectChanges();
       const pathEntry = fixture.debugElement.query(By.css('.path-entry'));
@@ -231,6 +298,7 @@ describe('LearnerDashboardComponent', () => {
     });
 
     it('should show path title', () => {
+      configurePathMocks();
       profileSubject.next(buildProfile());
       fixture.detectChanges();
       const title = fixture.debugElement.query(By.css('.path-title'));
@@ -238,6 +306,7 @@ describe('LearnerDashboardComponent', () => {
     });
 
     it('should show step count', () => {
+      configurePathMocks();
       profileSubject.next(buildProfile());
       fixture.detectChanges();
       const steps = fixture.debugElement.query(By.css('.path-steps'));
@@ -245,10 +314,42 @@ describe('LearnerDashboardComponent', () => {
     });
 
     it('should show explore paths link when no active paths', () => {
-      profileSubject.next(buildProfile({ paths: { inProgress: [], completed: [] } }));
+      profileSubject.next(buildProfile());
       fixture.detectChanges();
       const emptyState = fixture.debugElement.query(By.css('.paths-card .empty-state'));
       expect(emptyState).toBeTruthy();
+    });
+
+    it('should categorize completed paths correctly', () => {
+      const completedProgress: AgentProgress = {
+        ...mockProgressForPath1,
+        completedStepIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        completedAt: '2026-02-15T10:00:00.000Z',
+      };
+      mockAgentService.getAgentProgress.and.returnValue(of([completedProgress]));
+      mockPathService.listPaths.and.returnValue(of(mockPathIndex));
+
+      profileSubject.next(buildProfile());
+      fixture.detectChanges();
+
+      // Completed path should not appear in inProgress section
+      const pathEntry = fixture.debugElement.query(By.css('.path-entry'));
+      expect(pathEntry).toBeFalsy();
+    });
+
+    it('should skip __global__ pseudo-path', () => {
+      const globalProgress: AgentProgress = {
+        ...mockProgressForPath1,
+        pathId: '__global__',
+      };
+      mockAgentService.getAgentProgress.and.returnValue(of([globalProgress]));
+      mockPathService.listPaths.and.returnValue(of(mockPathIndex));
+
+      profileSubject.next(buildProfile());
+      fixture.detectChanges();
+
+      const pathEntry = fixture.debugElement.query(By.css('.path-entry'));
+      expect(pathEntry).toBeFalsy();
     });
   });
 
@@ -350,6 +451,103 @@ describe('LearnerDashboardComponent', () => {
       component.ngOnDestroy();
       // Verify no errors on subsequent emissions
       expect(() => profileSubject.next(null)).not.toThrow();
+    });
+  });
+
+  describe('Stats row', () => {
+    it('should render stats row component', () => {
+      profileSubject.next(buildProfile());
+      fixture.detectChanges();
+      const statsRow = fixture.debugElement.query(By.css('app-stats-row'));
+      expect(statsRow).toBeTruthy();
+    });
+
+    it('should pass profile data to stats row inputs', () => {
+      profileSubject.next(buildProfile());
+      fixture.detectChanges();
+      const statsRow = fixture.debugElement.query(By.css('app-stats-row'));
+      expect(statsRow.componentInstance.masteredNodes).toBe(15);
+      expect(statsRow.componentInstance.aboveGate).toBe(5);
+      expect(statsRow.componentInstance.totalXp).toBe(700);
+    });
+
+    it('should compute freshness stats from mastery data', () => {
+      profileSubject.next(buildProfile());
+      masterySubject.next([
+        { freshness: 0.9 } as ContentMastery,
+        { freshness: 0.8 } as ContentMastery,
+        { freshness: 0.5 } as ContentMastery,
+        { freshness: 0.1 } as ContentMastery,
+      ]);
+      fixture.detectChanges();
+      expect(component.freshnessStats.fresh).toBe(2);
+      expect(component.freshnessStats.stale).toBe(1);
+      expect(component.freshnessStats.critical).toBe(1);
+      expect(component.freshnessStats.healthPercent).toBe(50);
+    });
+
+    it('should default freshness to 100% when no mastery data', () => {
+      profileSubject.next(buildProfile());
+      masterySubject.next([]);
+      fixture.detectChanges();
+      expect(component.freshnessStats.healthPercent).toBe(100);
+    });
+  });
+
+  describe('xpEarnedThisWeek', () => {
+    it('should sum points from recent level-ups within the last 7 days', () => {
+      const now = new Date();
+      const twoDaysAgo = new Date(now);
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      const tenDaysAgo = new Date(now);
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+      profileSubject.next(
+        buildProfile({
+          recentLevelUps: [
+            {
+              id: 'lu-recent',
+              contentId: 'c-1',
+              fromLevel: 'seen' as MasteryLevel,
+              toLevel: 'remember' as MasteryLevel,
+              timestamp: twoDaysAgo.toISOString(),
+              pointsEarned: 20,
+              isGateLevel: false,
+            },
+            {
+              id: 'lu-old',
+              contentId: 'c-2',
+              fromLevel: 'seen' as MasteryLevel,
+              toLevel: 'remember' as MasteryLevel,
+              timestamp: tenDaysAgo.toISOString(),
+              pointsEarned: 30,
+              isGateLevel: false,
+            },
+          ],
+        })
+      );
+      fixture.detectChanges();
+      expect(component.xpEarnedThisWeek).toBe(20);
+    });
+
+    it('should return 0 when profile is null', () => {
+      expect(component.xpEarnedThisWeek).toBe(0);
+    });
+  });
+
+  describe('Refresh queue', () => {
+    it('should render refresh queue component', () => {
+      profileSubject.next(buildProfile());
+      fixture.detectChanges();
+      const refreshQueue = fixture.debugElement.query(By.css('app-refresh-queue'));
+      expect(refreshQueue).toBeTruthy();
+    });
+
+    it('should render refresh queue inside refresh-card section', () => {
+      profileSubject.next(buildProfile());
+      fixture.detectChanges();
+      const card = fixture.debugElement.query(By.css('.refresh-card app-refresh-queue'));
+      expect(card).toBeTruthy();
     });
   });
 });
