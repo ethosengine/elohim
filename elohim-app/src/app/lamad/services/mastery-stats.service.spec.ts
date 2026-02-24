@@ -14,6 +14,7 @@ import type { SessionHuman } from '@app/imagodei/models/session-human.model';
 
 import type { ContentMastery } from '../models';
 import type { LevelUpEvent } from '../models/learner-mastery-profile.model';
+import type { PracticePool } from '../models/practice.model';
 
 describe('MasteryStatsService', () => {
   let service: MasteryStatsService;
@@ -27,7 +28,6 @@ describe('MasteryStatsService', () => {
   let totalPointsSubject: BehaviorSubject<number>;
   let levelUpSubject: Subject<LevelUpEvent>;
   let sessionSubject: BehaviorSubject<SessionHuman | null>;
-  let poolSubject: BehaviorSubject<unknown>;
 
   const createMockMastery = (
     contentId: string,
@@ -73,7 +73,6 @@ describe('MasteryStatsService', () => {
     totalPointsSubject = new BehaviorSubject<number>(0);
     levelUpSubject = new Subject<LevelUpEvent>();
     sessionSubject = new BehaviorSubject<SessionHuman | null>(createMockSession());
-    poolSubject = new BehaviorSubject<unknown>(null);
 
     mockMasteryService = jasmine.createSpyObj(
       'ContentMasteryService',
@@ -95,11 +94,12 @@ describe('MasteryStatsService', () => {
 
     mockPracticeService = jasmine.createSpyObj(
       'PracticeService',
-      [],
+      ['getPoolSync'],
       {
-        pool$: poolSubject,
+        pool$: of(null),
       }
     );
+    mockPracticeService.getPoolSync.and.returnValue(null);
 
     mockSessionHuman = jasmine.createSpyObj(
       'SessionHumanService',
@@ -451,7 +451,7 @@ describe('MasteryStatsService', () => {
 
   describe('Practice Summary', () => {
     it('should return empty summary when pool is null', done => {
-      poolSubject.next(null);
+      mockPracticeService.getPoolSync.and.returnValue(null);
 
       setTimeout(() => {
         service.learnerProfile$.subscribe(profile => {
@@ -464,16 +464,16 @@ describe('MasteryStatsService', () => {
       }, 50);
     });
 
-    it('should extract practice stats from pool', done => {
-      // Update pool before mastery/points to ensure it's there when profile computes
-      poolSubject.next({
+    it('should extract practice stats from pool via getPoolSync', done => {
+      // Configure getPoolSync to return pool data
+      mockPracticeService.getPoolSync.and.returnValue({
         total_challenges_taken: 25,
         total_level_ups: 10,
         total_level_downs: 3,
         discoveries_unlocked: 5,
         active_content_ids_json: '["c1","c2","c3"]',
         refresh_queue_ids_json: '["c4","c5"]',
-      });
+      } as PracticePool);
 
       // Trigger profile recomputation by updating mastery
       masterySubject.next(new Map([['content-1', createMockMastery('content-1', 'seen')]]));

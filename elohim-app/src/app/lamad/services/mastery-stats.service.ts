@@ -396,11 +396,9 @@ export class MasteryStatsService implements OnDestroy {
   // ===========================================================================
 
   private getPracticeSummary(): PracticeSummary {
-    // Access pool via synchronous BehaviorSubject value
-    const poolSubject = this.practice.pool$ as unknown as BehaviorSubject<unknown>;
-    const pool = poolSubject?.value;
+    const pool = this.practice.getPoolSync();
 
-    if (!pool || typeof pool !== 'object') {
+    if (!pool) {
       return {
         totalChallenges: 0,
         totalLevelUps: 0,
@@ -411,22 +409,13 @@ export class MasteryStatsService implements OnDestroy {
       };
     }
 
-    const p = pool as {
-      total_challenges_taken?: number;
-      total_level_ups?: number;
-      total_level_downs?: number;
-      discoveries_unlocked?: number;
-      active_content_ids_json?: string;
-      refresh_queue_ids_json?: string;
-    };
-
     return {
-      totalChallenges: p.total_challenges_taken ?? 0,
-      totalLevelUps: p.total_level_ups ?? 0,
-      totalLevelDowns: p.total_level_downs ?? 0,
-      totalDiscoveries: p.discoveries_unlocked ?? 0,
-      activePoolSize: this.parseJsonArray(p.active_content_ids_json).length,
-      refreshQueueSize: this.parseJsonArray(p.refresh_queue_ids_json).length,
+      totalChallenges: pool.total_challenges_taken,
+      totalLevelUps: pool.total_level_ups,
+      totalLevelDowns: pool.total_level_downs,
+      totalDiscoveries: pool.discoveries_unlocked,
+      activePoolSize: this.parseJsonArray(pool.active_content_ids_json).length,
+      refreshQueueSize: this.parseJsonArray(pool.refresh_queue_ids_json).length,
     };
   }
 
