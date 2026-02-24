@@ -16,6 +16,8 @@
  * - Social (Social Medium): Building healthier digital spaces, online communication
  */
 
+import { registerInstrument } from './instrument-registry';
+
 import type {
   SubscaleDefinition,
   ResultTypeDefinition,
@@ -252,3 +254,13 @@ export function sortEpicDomainsByScore(subscaleTotals: Record<string, number>): 
 
   return mapped.sort((a, b) => b.score - a.score);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Self-Registration
+// ─────────────────────────────────────────────────────────────────────────────
+
+registerInstrument({
+  config: EPIC_DOMAIN_INSTRUMENT_CONFIG,
+  subscales: EPIC_DOMAIN_SUBSCALES,
+  resultTypes: EPIC_DOMAIN_RESULT_TYPES,
+});

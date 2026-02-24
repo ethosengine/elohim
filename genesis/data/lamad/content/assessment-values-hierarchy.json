@@ -6,42 +6,22 @@
   "content": [
     {
       "id": "val-q1",
-      "question": {
-        "content": "CREATIVITY - uniqueness, imagination, independent thinking\n\n[[☃ widget 1]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "CREATIVITY - uniqueness, imagination, independent thinking\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
-          "widget 1": {
+          "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
+                { "content": "1 - Not Important", "id": "val-q1-choice-0" },
+                { "content": "2", "id": "val-q1-choice-1" },
+                { "content": "3", "id": "val-q1-choice-2" },
+                { "content": "4", "id": "val-q1-choice-3" },
+                { "content": "5", "id": "val-q1-choice-4" },
+                { "content": "6", "id": "val-q1-choice-5" },
+                { "content": "7 - Supreme Importance", "id": "val-q1-choice-6" }
               ],
               "randomize": false,
               "multipleSelect": false,
@@ -50,61 +30,49 @@
               "deselectEnabled": false
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "radio 1": {
+          "0": { "openness": 1, "conservation": 0, "self-transcendence": 0, "self-enhancement": 0 },
+          "1": { "openness": 2, "conservation": 0, "self-transcendence": 0, "self-enhancement": 0 },
+          "2": { "openness": 3, "conservation": 0, "self-transcendence": 0, "self-enhancement": 0 },
+          "3": { "openness": 4, "conservation": 0, "self-transcendence": 0, "self-enhancement": 0 },
+          "4": { "openness": 5, "conservation": 0, "self-transcendence": 0, "self-enhancement": 0 },
+          "5": { "openness": 6, "conservation": 0, "self-transcendence": 0, "self-enhancement": 0 },
+          "6": { "openness": 7, "conservation": 0, "self-transcendence": 0, "self-enhancement": 0 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "openness"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q2",
-      "question": {
-        "content": "SECURITY - safety, harmony, stability of society and relationships\n\n[[☃ widget 2]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "SECURITY - safety, harmony, stability of society and relationships\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
-          "widget 2": {
+          "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
+                { "content": "1 - Not Important", "id": "val-q2-choice-0" },
+                { "content": "2", "id": "val-q2-choice-1" },
+                { "content": "3", "id": "val-q2-choice-2" },
+                { "content": "4", "id": "val-q2-choice-3" },
+                { "content": "5", "id": "val-q2-choice-4" },
+                { "content": "6", "id": "val-q2-choice-5" },
+                { "content": "7 - Supreme Importance", "id": "val-q2-choice-6" }
               ],
               "randomize": false,
               "multipleSelect": false,
@@ -113,61 +81,49 @@
               "deselectEnabled": false
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "radio 1": {
+          "0": { "openness": 0, "conservation": 1, "self-transcendence": 0, "self-enhancement": 0 },
+          "1": { "openness": 0, "conservation": 2, "self-transcendence": 0, "self-enhancement": 0 },
+          "2": { "openness": 0, "conservation": 3, "self-transcendence": 0, "self-enhancement": 0 },
+          "3": { "openness": 0, "conservation": 4, "self-transcendence": 0, "self-enhancement": 0 },
+          "4": { "openness": 0, "conservation": 5, "self-transcendence": 0, "self-enhancement": 0 },
+          "5": { "openness": 0, "conservation": 6, "self-transcendence": 0, "self-enhancement": 0 },
+          "6": { "openness": 0, "conservation": 7, "self-transcendence": 0, "self-enhancement": 0 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "conservation"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q3",
-      "question": {
-        "content": "BENEVOLENCE - preserving and enhancing the welfare of people close to you\n\n[[☃ widget 3]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "BENEVOLENCE - preserving and enhancing the welfare of people close to you\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
-          "widget 3": {
+          "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
+                { "content": "1 - Not Important", "id": "val-q3-choice-0" },
+                { "content": "2", "id": "val-q3-choice-1" },
+                { "content": "3", "id": "val-q3-choice-2" },
+                { "content": "4", "id": "val-q3-choice-3" },
+                { "content": "5", "id": "val-q3-choice-4" },
+                { "content": "6", "id": "val-q3-choice-5" },
+                { "content": "7 - Supreme Importance", "id": "val-q3-choice-6" }
               ],
               "randomize": false,
               "multipleSelect": false,
@@ -176,61 +132,49 @@
               "deselectEnabled": false
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "radio 1": {
+          "0": { "openness": 0, "conservation": 0, "self-transcendence": 1, "self-enhancement": 0 },
+          "1": { "openness": 0, "conservation": 0, "self-transcendence": 2, "self-enhancement": 0 },
+          "2": { "openness": 0, "conservation": 0, "self-transcendence": 3, "self-enhancement": 0 },
+          "3": { "openness": 0, "conservation": 0, "self-transcendence": 4, "self-enhancement": 0 },
+          "4": { "openness": 0, "conservation": 0, "self-transcendence": 5, "self-enhancement": 0 },
+          "5": { "openness": 0, "conservation": 0, "self-transcendence": 6, "self-enhancement": 0 },
+          "6": { "openness": 0, "conservation": 0, "self-transcendence": 7, "self-enhancement": 0 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "self-transcendence"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q4",
-      "question": {
-        "content": "ACHIEVEMENT - personal success through demonstrating competence\n\n[[☃ widget 4]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "ACHIEVEMENT - personal success through demonstrating competence\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
-          "widget 4": {
+          "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
+                { "content": "1 - Not Important", "id": "val-q4-choice-0" },
+                { "content": "2", "id": "val-q4-choice-1" },
+                { "content": "3", "id": "val-q4-choice-2" },
+                { "content": "4", "id": "val-q4-choice-3" },
+                { "content": "5", "id": "val-q4-choice-4" },
+                { "content": "6", "id": "val-q4-choice-5" },
+                { "content": "7 - Supreme Importance", "id": "val-q4-choice-6" }
               ],
               "randomize": false,
               "multipleSelect": false,
@@ -239,61 +183,49 @@
               "deselectEnabled": false
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "radio 1": {
+          "0": { "openness": 0, "conservation": 0, "self-transcendence": 0, "self-enhancement": 1 },
+          "1": { "openness": 0, "conservation": 0, "self-transcendence": 0, "self-enhancement": 2 },
+          "2": { "openness": 0, "conservation": 0, "self-transcendence": 0, "self-enhancement": 3 },
+          "3": { "openness": 0, "conservation": 0, "self-transcendence": 0, "self-enhancement": 4 },
+          "4": { "openness": 0, "conservation": 0, "self-transcendence": 0, "self-enhancement": 5 },
+          "5": { "openness": 0, "conservation": 0, "self-transcendence": 0, "self-enhancement": 6 },
+          "6": { "openness": 0, "conservation": 0, "self-transcendence": 0, "self-enhancement": 7 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "self-enhancement"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-q5",
-      "question": {
-        "content": "UNIVERSALISM - understanding, tolerance, and protection for all people\n\n[[☃ widget 5]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "UNIVERSALISM - understanding, tolerance, and protection for all people\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
-          "widget 5": {
+          "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "1 - Not Important",
-                  "correct": true
-                },
-                {
-                  "content": "2",
-                  "correct": true
-                },
-                {
-                  "content": "3",
-                  "correct": true
-                },
-                {
-                  "content": "4",
-                  "correct": true
-                },
-                {
-                  "content": "5",
-                  "correct": true
-                },
-                {
-                  "content": "6",
-                  "correct": true
-                },
-                {
-                  "content": "7 - Supreme Importance",
-                  "correct": true
-                }
+                { "content": "1 - Not Important", "id": "val-q5-choice-0" },
+                { "content": "2", "id": "val-q5-choice-1" },
+                { "content": "3", "id": "val-q5-choice-2" },
+                { "content": "4", "id": "val-q5-choice-3" },
+                { "content": "5", "id": "val-q5-choice-4" },
+                { "content": "6", "id": "val-q5-choice-5" },
+                { "content": "7 - Supreme Importance", "id": "val-q5-choice-6" }
               ],
               "randomize": false,
               "multipleSelect": false,
@@ -302,30 +234,39 @@
               "deselectEnabled": false
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "radio 1": {
+          "0": { "openness": 0, "conservation": 0, "self-transcendence": 1, "self-enhancement": 0 },
+          "1": { "openness": 0, "conservation": 0, "self-transcendence": 2, "self-enhancement": 0 },
+          "2": { "openness": 0, "conservation": 0, "self-transcendence": 3, "self-enhancement": 0 },
+          "3": { "openness": 0, "conservation": 0, "self-transcendence": 4, "self-enhancement": 0 },
+          "4": { "openness": 0, "conservation": 0, "self-transcendence": 5, "self-enhancement": 0 },
+          "5": { "openness": 0, "conservation": 0, "self-transcendence": 6, "self-enhancement": 0 },
+          "6": { "openness": 0, "conservation": 0, "self-transcendence": 7, "self-enhancement": 0 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "self-transcendence"
-        ],
-        "scaleType": "likert-7",
-        "reverseScored": false
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "core",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     },
     {
       "id": "val-rank",
-      "question": {
-        "content": "Rank the following values:\n\n*Rank these in order of importance to you:*\n\n[[☃ widget 6]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "Rank the following values:\n\n*Rank these in order of importance to you:*\n\n[[☃ sorter 1]]",
         "images": {},
         "widgets": {
-          "widget 6": {
+          "sorter 1": {
             "type": "sorter",
             "options": {
               "correct": [
@@ -339,45 +280,43 @@
               "padding": true
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "priorities"
-        ]
+        "sourceContentId": "assessment-values-hierarchy",
+        "bloomsLevel": "evaluate",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 60,
+        "questionType": "ranking",
+        "tags": ["assessment", "values", "psychometric"],
+        "instrumentId": "values-hierarchy-discovery"
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
+  "contentFormat": "sophia",
   "tags": [
     "assessment",
+    "discovery",
     "values",
     "self-knowledge",
     "psychometric"
   ],
-  "sourcePath": "generated/assessment-values-hierarchy.json",
   "relatedNodeIds": [
     "know-thyself-path"
   ],
   "metadata": {
-    "instrumentType": "discovery",
+    "assessmentType": "discovery",
     "domain": "values",
     "estimatedTime": "20-30 minutes",
     "attestationId": "values-examined",
+    "instrumentId": "values-hierarchy-discovery",
+    "questionCount": 6,
     "validation": {
       "inspired_by": "Schwartz Values Survey",
       "reliability": "Adapted for educational purposes"
     },
-    "sourceFormat": "assessment-json",
-    "migratedAt": "2025-12-26T05:45:22.690Z",
-    "questionCount": 6,
     "interpretation": {
       "method": "profile",
       "dimensions": [
@@ -386,8 +325,9 @@
         "self-transcendence",
         "self-enhancement"
       ]
-    }
+    },
+    "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479929",
-  "updatedAt": "2025-11-28T00:09:03.479932"
+  "updatedAt": "2026-02-24T00:00:00.000Z"
 }

@@ -6,11 +6,12 @@
   "content": [
     {
       "id": "pv-q1",
-      "question": {
-        "content": "How important is recognition for your contributions?\n\n**Not Important** ← [[☃ widget 1]] → **Very Important**",
+      "purpose": "discovery",
+      "content": {
+        "content": "How important is recognition for your contributions?\n\n**Not Important** <- [[☃ numeric-input 1]] -> **Very Important**",
         "images": {},
         "widgets": {
-          "widget 1": {
+          "numeric-input 1": {
             "type": "numeric-input",
             "options": {
               "value": 50,
@@ -21,36 +22,30 @@
               "labelText": "(0-100)"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "recognition"
-        ],
-        "scaleAnchors": {
-          "low": "Not Important",
-          "high": "Very Important"
-        },
-        "range": {
-          "min": 0,
-          "max": 100
-        }
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "slider",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery",
+        "scaleAnchors": { "low": "Not Important", "high": "Very Important" },
+        "range": { "min": 0, "max": 100 }
       }
     },
     {
       "id": "pv-q2",
-      "question": {
-        "content": "How much do you value helping others even when no one notices?\n\n**Rarely** ← [[☃ widget 2]] → **Always**",
+      "purpose": "discovery",
+      "content": {
+        "content": "How much do you value helping others even when no one notices?\n\n**Rarely** <- [[☃ numeric-input 1]] -> **Always**",
         "images": {},
         "widgets": {
-          "widget 2": {
+          "numeric-input 1": {
             "type": "numeric-input",
             "options": {
               "value": 50,
@@ -61,59 +56,38 @@
               "labelText": "(0-100)"
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "altruism"
-        ],
-        "scaleAnchors": {
-          "low": "Rarely",
-          "high": "Always"
-        },
-        "range": {
-          "min": 0,
-          "max": 100
-        }
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "slider",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery",
+        "scaleAnchors": { "low": "Rarely", "high": "Always" },
+        "range": { "min": 0, "max": 100 }
       }
     },
     {
       "id": "pv-q3",
-      "question": {
-        "content": "Which forms of contribution feel most meaningful to you?\n\n[[☃ widget 3]]",
+      "purpose": "discovery",
+      "content": {
+        "content": "Which forms of contribution feel most meaningful to you?\n\n[[☃ radio 1]]",
         "images": {},
         "widgets": {
-          "widget 3": {
+          "radio 1": {
             "type": "radio",
             "options": {
               "choices": [
-                {
-                  "content": "Caring for family members",
-                  "correct": true
-                },
-                {
-                  "content": "Mentoring or teaching others",
-                  "correct": true
-                },
-                {
-                  "content": "Creating things that help people",
-                  "correct": true
-                },
-                {
-                  "content": "Organizing community efforts",
-                  "correct": true
-                },
-                {
-                  "content": "Being present and listening to others",
-                  "correct": true
-                }
+                { "content": "Caring for family members", "id": "pv-q3-choice-0" },
+                { "content": "Mentoring or teaching others", "id": "pv-q3-choice-1" },
+                { "content": "Creating things that help people", "id": "pv-q3-choice-2" },
+                { "content": "Organizing community efforts", "id": "pv-q3-choice-3" },
+                { "content": "Being present and listening to others", "id": "pv-q3-choice-4" }
               ],
               "randomize": false,
               "multipleSelect": true,
@@ -122,42 +96,50 @@
               "deselectEnabled": true
             },
             "graded": false,
-            "version": {
-              "major": 0,
-              "minor": 0
-            }
+            "version": { "major": 0, "minor": 0 }
           }
         }
       },
-      "hints": [],
+      "subscaleContributions": {
+        "radio 1": {
+          "0": { "contribution-types": 1 },
+          "1": { "contribution-types": 1 },
+          "2": { "contribution-types": 1 },
+          "3": { "contribution-types": 1 },
+          "4": { "contribution-types": 1 }
+        }
+      },
       "metadata": {
-        "instrumentType": "discovery",
-        "subscales": [
-          "contribution-types"
-        ]
+        "sourceContentId": "assessment-personal-values",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 30,
+        "questionType": "multi-select",
+        "tags": ["assessment", "values", "reflection"],
+        "instrumentId": "personal-values-discovery"
       }
     }
   ],
-  "contentFormat": "perseus-quiz-json",
+  "contentFormat": "sophia",
   "tags": [
     "assessment",
+    "discovery",
     "values",
     "reflection",
     "value-scanner"
   ],
-  "sourcePath": "generated/assessment-personal-values.json",
   "relatedNodeIds": [
     "value-scanner-journey"
   ],
   "metadata": {
-    "instrumentType": "discovery",
+    "assessmentType": "discovery",
     "domain": "values",
     "estimatedTime": "10-15 minutes",
     "attestationId": "values-explorer",
-    "sourceFormat": "assessment-json",
-    "migratedAt": "2025-12-26T05:42:25.374Z",
-    "questionCount": 3
+    "instrumentId": "personal-values-discovery",
+    "questionCount": 3,
+    "migratedAt": "2026-02-24T00:00:00.000Z"
   },
   "createdAt": "2025-11-28T00:09:03.479960",
-  "updatedAt": "2025-11-28T00:09:03.479961"
+  "updatedAt": "2026-02-24T00:00:00.000Z"
 }
