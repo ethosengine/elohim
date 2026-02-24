@@ -248,7 +248,8 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
               completionCriteria: [],
             },
             content: content,
-            isCompleted: false,
+            isCompleted:
+              this.contentMasteryService.getMasteryLevelSync(conceptId) !== 'not_started',
             hasPrevious: this.stepIndex > 0,
             hasNext: this.stepIndex < this.getTotalConcepts() - 1,
             previousStepIndex: this.stepIndex > 0 ? this.stepIndex - 1 : undefined,
@@ -279,6 +280,10 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
                   console.error('Failed to mark content as seen:', err);
                 },
               });
+
+            // Record view in ContentMasteryService (source of truth for sidebar checkmarks)
+            this.contentMasteryService.recordView(conceptId);
+
             this.agentService
               .getContentMastery(conceptId)
               .pipe(takeUntil(this.destroy$))
@@ -335,7 +340,11 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.stepView = stepView;
+    this.stepView = {
+      ...stepView,
+      isCompleted:
+        this.contentMasteryService.getMasteryLevelSync(stepView.step.resourceId) !== 'not_started',
+    };
 
     const stepTitle = stepView.content?.title ?? stepView.step.stepTitle;
     this.seoService.updateSeo({
@@ -357,6 +366,10 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
             console.error('Failed to mark content as seen:', err);
           },
         });
+
+      // Record view in ContentMasteryService (source of truth for sidebar checkmarks)
+      this.contentMasteryService.recordView(stepView.step.resourceId);
+
       this.agentService
         .getContentMastery(stepView.step.resourceId)
         .pipe(takeUntil(this.destroy$))
@@ -728,8 +741,18 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     const nextIndex = (currentIndex + 1) % this.BLOOM_LEVELS.length;
     this.currentBloomLevel = this.BLOOM_LEVELS[nextIndex];
 
-    // Persist basic completion to backend if we reach a 'completed' state
-    // For prototype, let's say 'remember' is enough to mark the step complete navigation-wise
+    const conceptId = this.stepView?.step.resourceId;
+    if (!conceptId) return;
+
+    // Persist mastery level to ContentMasteryService (source of truth for sidebar checkmarks)
+    this.contentMasteryService.setMasteryLevel(conceptId, this.currentBloomLevel, 'practice');
+
+    // Update stepView completion state
+    if (this.stepView) {
+      this.stepView = { ...this.stepView, isCompleted: this.currentBloomLevel !== 'not_started' };
+    }
+
+    // Persist step completion to AgentService at 'remember' or 'apply' threshold
     if (this.currentBloomLevel === 'remember' || this.currentBloomLevel === 'apply') {
       this.agentService
         .completeStep(this.pathId, this.stepIndex)
@@ -744,6 +767,16 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
           },
         });
     }
+
+    // Keep AgentService mastery in sync
+    this.agentService
+      .updateContentMastery(conceptId, this.currentBloomLevel)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: (err: unknown) => {
+          console.error('Failed to update content mastery:', err);
+        },
+      });
   }
 
   /**

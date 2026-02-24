@@ -8,6 +8,7 @@ import { PathService } from '../../services/path.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { PathContextService } from '../../services/path-context.service';
+import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SeoService } from '../../../services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
 import { provideElohimClient } from '@app/elohim/providers/elohim-client.provider';
@@ -17,6 +18,7 @@ describe('PathNavigatorComponent', () => {
   let fixture: ComponentFixture<PathNavigatorComponent>;
   let pathService: jasmine.SpyObj<PathService>;
   let agentService: jasmine.SpyObj<AgentService>;
+  let contentMasteryService: jasmine.SpyObj<ContentMasteryService>;
   let router: Router;
   let paramsSubject: BehaviorSubject<any>;
 
@@ -102,6 +104,12 @@ describe('PathNavigatorComponent', () => {
       'completeStep',
       'markContentSeen',
       'getContentMastery',
+      'updateContentMastery',
+    ]);
+    const contentMasteryServiceSpy = jasmine.createSpyObj('ContentMasteryService', [
+      'recordView',
+      'setMasteryLevel',
+      'getMasteryLevelSync',
     ]);
     const pathContextServiceSpy = jasmine.createSpyObj('PathContextService', [
       'enterPath',
@@ -131,6 +139,7 @@ describe('PathNavigatorComponent', () => {
         }),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
+        { provide: ContentMasteryService, useValue: contentMasteryServiceSpy },
         { provide: PathContextService, useValue: pathContextServiceSpy },
         { provide: SeoService, useValue: seoServiceSpy },
         { provide: GovernanceSignalService, useValue: governanceSignalServiceSpy },
@@ -143,6 +152,7 @@ describe('PathNavigatorComponent', () => {
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+    contentMasteryService = TestBed.inject(ContentMasteryService) as jasmine.SpyObj<ContentMasteryService>;
     router = TestBed.inject(Router);
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
 
@@ -152,6 +162,8 @@ describe('PathNavigatorComponent', () => {
     agentService.completeStep.and.returnValue(of(undefined));
     agentService.markContentSeen.and.returnValue(of(undefined));
     agentService.getContentMastery.and.returnValue(of('not_started'));
+    agentService.updateContentMastery.and.returnValue(of(undefined));
+    contentMasteryServiceSpy.getMasteryLevelSync.and.returnValue('not_started');
     governanceSignalServiceSpy.recordLearningSignal.and.returnValue(of(undefined));
     governanceSignalServiceSpy.recordInteractiveCompletion.and.returnValue(of(undefined));
 
@@ -259,6 +271,44 @@ describe('PathNavigatorComponent', () => {
     component.markComplete(); // remember - triggers reload
 
     expect(pathService.getPath).toHaveBeenCalled();
+  });
+
+  it('should persist mastery level to ContentMasteryService on markComplete', () => {
+    fixture.detectChanges();
+
+    component.markComplete(); // not_started -> seen
+
+    expect(contentMasteryService.setMasteryLevel).toHaveBeenCalledWith('node-2', 'seen', 'practice');
+  });
+
+  it('should sync mastery to AgentService on markComplete', () => {
+    fixture.detectChanges();
+
+    component.markComplete(); // not_started -> seen
+
+    expect(agentService.updateContentMastery).toHaveBeenCalledWith('node-2', 'seen');
+  });
+
+  it('should update stepView.isCompleted after markComplete', () => {
+    fixture.detectChanges();
+    expect(component.stepView?.isCompleted).toBe(false);
+
+    component.markComplete(); // not_started -> seen
+
+    expect(component.stepView?.isCompleted).toBe(true);
+  });
+
+  it('should record view in ContentMasteryService when loading concept content', () => {
+    fixture.detectChanges();
+
+    expect(contentMasteryService.recordView).toHaveBeenCalled();
+  });
+
+  it('should set stepView.isCompleted from mastery state', () => {
+    contentMasteryService.getMasteryLevelSync.and.returnValue('seen');
+    fixture.detectChanges();
+
+    expect(component.stepView?.isCompleted).toBe(true);
   });
 
   it('should calculate progress percentage when path has chapters', () => {
