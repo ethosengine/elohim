@@ -9,8 +9,10 @@ export {
   registerInstrument,
   getInstrument,
   getRegisteredInstrumentIds,
+  getDisplayConfigByFramework,
+  registerFromDefinition,
 } from './instrument-registry';
-export type { InstrumentRegistryEntry } from './instrument-registry';
+export type { InstrumentRegistryEntry, InstrumentDisplayConfig } from './instrument-registry';
 
 // Instruments (each self-registers on import)
 export {

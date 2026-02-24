@@ -75,7 +75,7 @@ export type AuthCredentials = PasswordCredentials | PasskeyCredentials | OAuthCr
 // ProfileReach imported from identity.model.ts to avoid duplication
 import type { ProfileReach } from './identity.model';
 
-// @coverage: 71.4% (2026-02-05)
+// @coverage: 75.0% (2026-02-24)
 
 /** Registration credentials (for creating new auth) */
 export interface RegisterCredentials {

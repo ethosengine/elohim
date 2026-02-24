@@ -187,6 +187,8 @@ export interface FlowPlan {
  * Note: Different from AllocationBlock (in StewardedResource) which is descriptive.
  * FlowBudget is prescriptive (what we plan to spend).
  */
+export type BudgetHealthStatus = 'healthy' | 'warning' | 'critical';
+
 export interface FlowBudget {
   id: string;
   budgetNumber: string; // FB-XXXXXXXXXX
@@ -211,7 +213,7 @@ export interface FlowBudget {
 
   // Status
   status: BudgetStatus;
-  healthStatus: 'healthy' | 'warning' | 'critical';
+  healthStatus: BudgetHealthStatus;
 
   // Tracking
   createdAt: string;

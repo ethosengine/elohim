@@ -22,7 +22,7 @@
 
 import { Injectable, computed, signal, inject } from '@angular/core';
 
-// @coverage: 4.5% (2026-02-05)
+// @coverage: 4.5% (2026-02-24)
 
 import { catchError, shareReplay } from 'rxjs/operators';
 
@@ -804,7 +804,7 @@ export class HolochainContentService {
   // Request coalescing for batch loading
   private readonly pendingBatchRequests = new Map<
     string,
-    { resolve: (content: ContentNode | null) => void; reject: (err: any) => void }[]
+    { resolve: (content: ContentNode | null) => void; reject: (err: unknown) => void }[]
   >();
   private batchRequestTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly BATCH_DEBOUNCE_MS = 50; // Collect requests for 50ms before batching
@@ -878,7 +878,11 @@ export class HolochainContentService {
     this.pendingBatchRequests.clear();
 
     try {
-      const { found, notFound } = await this.batchGetContent(ids);
+      const uncachedIds = this.separateUncachedIds(ids);
+      const { found, notFound } =
+        uncachedIds.length === 0
+          ? await this.resolveCachedItems(ids)
+          : await this.fetchUncachedAndMerge(ids, uncachedIds);
 
       // Resolve found content
       for (const [id, content] of found) {

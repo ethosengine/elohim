@@ -12,7 +12,7 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import {
   type PendingRecoveryRequest,

@@ -13,6 +13,8 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 
+// @coverage: 68.2% (2026-02-24)
+
 import { takeUntil } from 'rxjs/operators';
 
 import { Subject } from 'rxjs';

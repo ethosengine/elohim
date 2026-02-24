@@ -7,7 +7,7 @@
 
 import { ContentType, ContentFormat } from '../models/content-node.model';
 
-// @coverage: 69.4% (2026-02-05)
+// @coverage: 69.4% (2026-02-24)
 
 /**
  * Icon mappings for content types.
@@ -28,6 +28,7 @@ const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   role: '👤',
   path: '🛤️',
   placeholder: '⚠️',
+  instrument: '🧪',
 };
 
 /**
@@ -47,6 +48,7 @@ const CONTENT_FORMAT_ICONS: Record<ContentFormat, string> = {
   gherkin: '✓',
   html: '📄',
   plaintext: '📄',
+  'instrument-json': '🧪',
 };
 
 /**

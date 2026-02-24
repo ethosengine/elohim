@@ -1,6 +1,6 @@
 import { Injectable, Optional, OnDestroy } from '@angular/core';
 
-// @coverage: 90.8% (2026-02-05)
+// @coverage: 90.8% (2026-02-24)
 
 import { takeUntil } from 'rxjs/operators';
 

@@ -1,5 +1,7 @@
 import { Component, input, output } from '@angular/core';
 
+// @coverage: 20.0% (2026-02-24)
+
 import {
   type DiscoveryResult,
   getFrameworkDisplayName,

@@ -20,7 +20,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter, TemplateRef, OnInit } from '@angular/core';
 
-// @coverage: 38.8% (2026-02-05)
+// @coverage: 38.8% (2026-02-24)
 
 /**
  * Alert severity levels
@@ -59,7 +59,7 @@ export interface AlertData {
   dismissible?: boolean;
 
   // Additional data for custom rendering
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @Component({
@@ -103,17 +103,17 @@ export class AlertBannerComponent implements OnInit {
   /**
    * Custom icon template
    */
-  @Input() iconTemplate?: TemplateRef<any>;
+  @Input() iconTemplate?: TemplateRef<unknown>;
 
   /**
    * Custom content template
    */
-  @Input() contentTemplate?: TemplateRef<any>;
+  @Input() contentTemplate?: TemplateRef<unknown>;
 
   /**
    * Custom actions template
    */
-  @Input() actionsTemplate?: TemplateRef<any>;
+  @Input() actionsTemplate?: TemplateRef<unknown>;
 
   /**
    * Auto-dismiss after milliseconds (0 = no auto-dismiss)

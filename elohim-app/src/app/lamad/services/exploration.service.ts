@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 92.3% (2026-02-05)
+// @coverage: 92.5% (2026-02-24)
 
 import { map, switchMap, catchError, take } from 'rxjs/operators';
 

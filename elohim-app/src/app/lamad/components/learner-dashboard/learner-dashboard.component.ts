@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 94.9% (2026-02-24)
+
 import { Subscription, forkJoin } from 'rxjs';
 
 import { AgentService } from '@app/elohim/services/agent.service';

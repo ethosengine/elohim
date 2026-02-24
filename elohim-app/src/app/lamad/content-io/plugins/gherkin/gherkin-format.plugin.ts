@@ -1,6 +1,6 @@
 import { Injectable, Type } from '@angular/core';
 
-// @coverage: 0.8% (2026-02-05)
+// @coverage: 0.8% (2026-02-24)
 
 import { GherkinParser, GherkinStep } from '../../../parsers/gherkin-parser';
 import { GherkinRendererComponent } from '../../../renderers/gherkin-renderer/gherkin-renderer.component';
@@ -285,12 +285,7 @@ export class GherkinFormatPlugin implements ContentFormatPlugin {
   // ═══════════════════════════════════════════════════════════════════════════
 
   private async readFile(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read file'));
-      reader.readAsText(file);
-    });
+    return file.text();
   }
 
   private inferCategory(sourcePath: string): string {

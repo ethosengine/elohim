@@ -342,8 +342,8 @@ describe('DataLoaderService', () => {
 
       service.getContentIndex().subscribe(index => {
         expect(index.totalCount).toBe(5);
-        expect(index.byType.concept).toBe(3);
-        expect(index.byType.exercise).toBe(2);
+        expect(index.byType!['concept']).toBe(3);
+        expect(index.byType!['exercise']).toBe(2);
         done();
       });
     });

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 94.6% (2026-02-05)
+// @coverage: 94.6% (2026-02-24)
 
 import { Observable } from 'rxjs';
 
@@ -43,6 +43,16 @@ export interface ComputeContext {
   doorwayNodes: RegisteredNode[];
   /** When this context was last detected */
   detectedAt: Date;
+}
+
+/** Raw node record as returned from the node_registry_coordinator zome (snake_case) */
+interface RawRegisteredNode {
+  node_id: string;
+  display_name?: string;
+  node_type?: string;
+  status?: string;
+  last_heartbeat?: string;
+  doorway_url?: string;
 }
 
 /**
@@ -212,7 +222,7 @@ export class RunningContextService {
   private async getRegisteredNodes(): Promise<RegisteredNode[]> {
     // Try to get nodes from node_registry_coordinator
     try {
-      const result = await this.holochainClient.callZome<any[]>({
+      const result = await this.holochainClient.callZome<RawRegisteredNode[]>({
         zomeName: 'node_registry_coordinator',
         fnName: 'get_my_nodes',
         payload: null,
@@ -223,7 +233,7 @@ export class RunningContextService {
       }
 
       return (result.data || []).map(n => {
-        const nodeType = n.node_type ?? 'self-hosted';
+        const nodeType = (n.node_type ?? 'self-hosted') as RegisteredNode['nodeType'];
         const doorwayUrl = n.doorway_url ?? null;
 
         // Holoports always have doorway capability

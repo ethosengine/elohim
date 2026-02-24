@@ -16,7 +16,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { SeoService } from '../../../services/seo.service';
 import { AuthService } from '../../services/auth.service';

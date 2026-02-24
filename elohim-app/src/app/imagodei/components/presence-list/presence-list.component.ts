@@ -13,7 +13,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 38.3% (2026-02-05)
+// @coverage: 38.3% (2026-02-24)
 
 import {
   type ContributorPresenceView,

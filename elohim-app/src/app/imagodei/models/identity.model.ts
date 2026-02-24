@@ -28,7 +28,7 @@
 
 import type { AgencyStage } from './agency.model';
 
-// @coverage: 93.3% (2026-02-05)
+// @coverage: 86.7% (2026-02-24)
 
 // =============================================================================
 // Identity Mode

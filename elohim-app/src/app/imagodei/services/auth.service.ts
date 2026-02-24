@@ -24,7 +24,7 @@
 
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 93.6% (2026-02-05)
+// @coverage: 93.5% (2026-02-24)
 
 import { SIGNING_CREDENTIALS_KEY } from '../../elohim/models/holochain-connection.model';
 import {

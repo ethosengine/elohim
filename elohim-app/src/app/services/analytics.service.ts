@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { ConfigService } from './config.service';
 

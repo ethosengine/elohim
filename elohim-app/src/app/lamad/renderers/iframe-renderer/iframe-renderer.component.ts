@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
-// @coverage: 80.7% (2026-02-05)
+// @coverage: 80.7% (2026-02-24)
 
 import { environment } from '../../../../environments/environment';
 import { ContentNode } from '../../models/content-node.model';
@@ -195,7 +195,7 @@ export class IframeRendererComponent implements OnChanges {
    * Detect if running in Eclipse Che environment (via Che endpoint URL).
    */
   private isCheEnvironment(): boolean {
-    if (globalThis.window === undefined) return false;
+    if (!('window' in globalThis)) return false;
     return (
       globalThis.location.hostname.includes('.devspaces.') ||
       globalThis.location.hostname.includes('.code.ethosengine.com')
@@ -206,7 +206,7 @@ export class IframeRendererComponent implements OnChanges {
    * Detect local development environment.
    */
   private isLocalDevelopment(): boolean {
-    if (globalThis.window === undefined) return false;
+    if (!('window' in globalThis)) return false;
     return (
       globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1'
     );

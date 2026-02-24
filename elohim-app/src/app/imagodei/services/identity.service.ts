@@ -16,7 +16,7 @@
 
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 
-// @coverage: 63.5% (2026-02-05)
+// @coverage: 59.4% (2026-02-24)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';

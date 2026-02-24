@@ -8,6 +8,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
+// @coverage: 100.0% (2026-02-24)
+
 import { SessionHuman } from '../../models/session-human.model';
 
 @Component({

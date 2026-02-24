@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+// @coverage: 4.3% (2026-02-24)
+
 import {
   type AgencyStageInfo,
   type AgencyState,

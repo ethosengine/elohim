@@ -30,7 +30,7 @@
 import { JsonLdMetadata } from '@app/elohim/models/json-ld.model';
 import { type ReachLevel, type GeographicContext } from '@app/elohim/models/protocol-core.model';
 
-// @coverage: 91.7% (2026-02-05)
+// @coverage: 91.7% (2026-02-24)
 
 import type { Place } from '@app/qahal/models/place.model';
 
@@ -413,6 +413,7 @@ export type ContentType =
   | 'tool'
   | 'role' // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
   | 'path' // Learning path - curated journey through content nodes
+  | 'instrument' // Psychometric instrument definition (subscales, scoring, display)
   | 'placeholder'; // Missing/errored content - shown when content can't be loaded
 
 /**
@@ -524,6 +525,7 @@ export type ContentFormat =
   | 'audio-file'
   | 'perseus-quiz-json' // Khan Academy Perseus quiz format (legacy)
   | 'sophia-quiz-json' // Sophia Moment format with purpose-based assessment
+  | 'instrument-json' // Psychometric instrument definition (subscales, scoring, display config)
   | 'external-link'
   | 'epub'
   | 'gherkin'

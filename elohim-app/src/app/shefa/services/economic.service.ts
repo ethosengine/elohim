@@ -24,7 +24,7 @@
 
 import { Injectable, signal, computed } from '@angular/core';
 
-// @coverage: 29.7% (2026-02-05)
+// @coverage: 29.7% (2026-02-24)
 
 import { catchError, shareReplay } from 'rxjs/operators';
 

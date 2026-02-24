@@ -25,7 +25,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 59.7% (2026-02-05)
+// @coverage: 59.7% (2026-02-24)
 
 import { firstValueFrom } from 'rxjs';
 
@@ -51,6 +51,14 @@ import {
 } from '@app/shefa/models/requests-and-offers.model';
 
 import { EconomicService } from './economic.service';
+
+// ============================================================================
+// STRING CONSTANTS
+// ============================================================================
+
+const SHEFA_COORDINATION = 'shefa-coordination';
+const LAMAD_EVENT_CONTENT_FLAG = 'content-flag';
+const NOT_YET_IMPLEMENTED = 'Not yet implemented';
 
 @Injectable({
   providedIn: 'root',
@@ -141,7 +149,7 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'transfer' as REAAction, // Note: 'propose' not in REAAction
         providerId: requesterId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         resourceConformsTo: 'service-request',
         note: `Service request created: ${request.title}. Requester: ${requesterId}. Services: ${requestDetails.serviceTypeIds.join(
           ', '
@@ -201,9 +209,9 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'modify',
         providerId: requesterId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         note: `Service request updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}. Request ID: ${request.id}.`,
-        lamadEventType: 'content-flag',
+        lamadEventType: LAMAD_EVENT_CONTENT_FLAG,
       })
     );
 
@@ -243,9 +251,9 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'raise',
         providerId: requesterId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         note: `Request archived: ${request.title}. Request ID: ${requestId}.`,
-        lamadEventType: 'content-flag',
+        lamadEventType: LAMAD_EVENT_CONTENT_FLAG,
       })
     );
 
@@ -280,9 +288,9 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'modify',
         providerId: requesterId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         note: `Request deleted: ${request.title}. Request ID: ${requestId}.`,
-        lamadEventType: 'content-flag',
+        lamadEventType: LAMAD_EVENT_CONTENT_FLAG,
       })
     );
 
@@ -398,7 +406,7 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'transfer' as REAAction, // Note: 'propose' not in REAAction
         providerId: offerorId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         resourceConformsTo: 'service-offer',
         note: `Service offer created: ${offer.title}. Offeror: ${offerorId}. Services: ${offerDetails.serviceTypeIds.join(
           ', '
@@ -457,9 +465,9 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'modify',
         providerId: offerorId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         note: `Service offer updated: ${updated.title}. Changes: ${Object.keys(updates).join(', ')}. Offer ID: ${offer.id}.`,
-        lamadEventType: 'content-flag',
+        lamadEventType: LAMAD_EVENT_CONTENT_FLAG,
       })
     );
 
@@ -494,9 +502,9 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'raise',
         providerId: offerorId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         note: `Offer archived: ${offer.title}. Offer ID: ${offerId}.`,
-        lamadEventType: 'content-flag',
+        lamadEventType: LAMAD_EVENT_CONTENT_FLAG,
       })
     );
 
@@ -527,9 +535,9 @@ export class RequestsAndOffersService {
       this.economicService.createEvent({
         action: 'modify',
         providerId: offerorId,
-        receiverId: 'shefa-coordination',
+        receiverId: SHEFA_COORDINATION,
         note: `Offer deleted: ${offer.title}. Offer ID: ${offerId}.`,
-        lamadEventType: 'content-flag',
+        lamadEventType: LAMAD_EVENT_CONTENT_FLAG,
       })
     );
 
@@ -763,7 +771,7 @@ export class RequestsAndOffersService {
     // 3. Create ServiceMatch
     // 4. Create 'service-match-suggested' event
     // 5. Return match
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -771,7 +779,7 @@ export class RequestsAndOffersService {
    */
   async getMatch(_matchId: string): Promise<ServiceMatch | null> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -782,7 +790,7 @@ export class RequestsAndOffersService {
     _status: ServiceMatch['status']
   ): Promise<ServiceMatch> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -817,7 +825,7 @@ export class RequestsAndOffersService {
     // 6. Create 'service-proposal-created' event
     // 7. Mark as 'contacted' in match
     // 8. Return match, proposal, event
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -835,7 +843,7 @@ export class RequestsAndOffersService {
     contactEvent: EconomicEvent;
   }> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -867,7 +875,7 @@ export class RequestsAndOffersService {
     // 5. Create 'service-agreed' event
     // 6. Update match status to 'agreed'
     // 7. Return proposal, commitment, event
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -881,7 +889,7 @@ export class RequestsAndOffersService {
     _reason?: string
   ): Promise<Proposal> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -914,7 +922,7 @@ export class RequestsAndOffersService {
     // 3. Create 'service-work-completed' event
     // 4. Trigger settlement workflow (payment collection)
     // 5. Return commitment and event
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -948,7 +956,7 @@ export class RequestsAndOffersService {
     // 5. Create reputation/recognition event
     // 6. Mark match as 'completed'
     // 7. Return settlement event
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -967,7 +975,7 @@ export class RequestsAndOffersService {
     // TODO: Implementation
     // 1. Create or update UserPreferences
     // 2. Return preferences
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -975,7 +983,7 @@ export class RequestsAndOffersService {
    */
   async getUserPreferences(_userId: string): Promise<UserPreferences | null> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -985,7 +993,7 @@ export class RequestsAndOffersService {
    */
   async getRecommendedRequests(_userId: string, _limit = 10): Promise<ServiceRequest[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -993,7 +1001,7 @@ export class RequestsAndOffersService {
    */
   async getRecommendedOffers(_userId: string, _limit = 10): Promise<ServiceOffer[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -1007,7 +1015,7 @@ export class RequestsAndOffersService {
    */
   async saveRequest(_userId: string, _requestId: string, _reason?: string): Promise<SavedRequest> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1015,7 +1023,7 @@ export class RequestsAndOffersService {
    */
   async saveOffer(_userId: string, _offerId: string, _reason?: string): Promise<SavedOffer> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1023,7 +1031,7 @@ export class RequestsAndOffersService {
    */
   async getSavedRequests(_userId: string): Promise<SavedRequest[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1031,7 +1039,7 @@ export class RequestsAndOffersService {
    */
   async getSavedOffers(_userId: string): Promise<SavedOffer[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1039,7 +1047,7 @@ export class RequestsAndOffersService {
    */
   async unsaveRequest(_userId: string, _savedRequestId: string): Promise<void> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1047,7 +1055,7 @@ export class RequestsAndOffersService {
    */
   async unsaveOffer(_userId: string, _savedOfferId: string): Promise<void> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -1064,7 +1072,7 @@ export class RequestsAndOffersService {
     _typeDetails: Omit<ServiceType, 'id' | 'createdAt' | 'status'>
   ): Promise<ServiceType> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1076,7 +1084,7 @@ export class RequestsAndOffersService {
     _updates: Partial<ServiceType>
   ): Promise<ServiceType> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1084,7 +1092,7 @@ export class RequestsAndOffersService {
    */
   async getServiceTypes(_filters?: { isTechnical?: boolean }): Promise<ServiceType[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1092,7 +1100,7 @@ export class RequestsAndOffersService {
    */
   async getServiceType(_id: string): Promise<ServiceType | null> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -1109,7 +1117,7 @@ export class RequestsAndOffersService {
     _mediumDetails: Omit<MediumOfExchange, 'id' | 'createdAt' | 'status'>
   ): Promise<MediumOfExchange> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1121,7 +1129,7 @@ export class RequestsAndOffersService {
     _updates: Partial<MediumOfExchange>
   ): Promise<MediumOfExchange> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1131,7 +1139,7 @@ export class RequestsAndOffersService {
     exchangeType?: MediumOfExchange['exchangeType'];
   }): Promise<MediumOfExchange[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1139,7 +1147,7 @@ export class RequestsAndOffersService {
    */
   async getMediumOfExchange(_id: string): Promise<MediumOfExchange | null> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -1151,7 +1159,7 @@ export class RequestsAndOffersService {
    */
   async getPendingRequests(): Promise<ServiceRequest[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1159,7 +1167,7 @@ export class RequestsAndOffersService {
    */
   async getPendingOffers(): Promise<ServiceOffer[]> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1175,7 +1183,7 @@ export class RequestsAndOffersService {
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1189,7 +1197,7 @@ export class RequestsAndOffersService {
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1206,7 +1214,7 @@ export class RequestsAndOffersService {
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1221,7 +1229,7 @@ export class RequestsAndOffersService {
     adminStatus: ListingAdminStatus;
   }> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1234,7 +1242,7 @@ export class RequestsAndOffersService {
     _suspendUntil?: string
   ): Promise<ListingAdminStatus> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1247,7 +1255,7 @@ export class RequestsAndOffersService {
     _suspendUntil?: string
   ): Promise<ListingAdminStatus> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================
@@ -1268,7 +1276,7 @@ export class RequestsAndOffersService {
     mostActiveServiceTypes: string[];
   }> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   /**
@@ -1286,7 +1294,7 @@ export class RequestsAndOffersService {
     averageRating: number;
   }> {
     // TODO: Implementation
-    return await Promise.reject(new Error('Not yet implemented'));
+    return await Promise.reject(new Error(NOT_YET_IMPLEMENTED));
   }
 
   // ============================================================================

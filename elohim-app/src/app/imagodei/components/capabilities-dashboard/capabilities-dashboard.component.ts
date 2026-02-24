@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 96.6% (2026-02-05)
+// @coverage: 96.6% (2026-02-24)
 
 import { interval, Subscription } from 'rxjs';
 

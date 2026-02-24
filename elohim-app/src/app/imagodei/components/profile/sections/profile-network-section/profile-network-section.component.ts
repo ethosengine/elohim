@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 
+// @coverage: 7.7% (2026-02-24)
+
 import { type EdgeNodeDisplayInfo } from '@app/elohim/models/holochain-connection.model';
 
 import { type AgencyState, type ConnectionStatus } from '../../../../models/agency.model';

@@ -13,7 +13,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
-// @coverage: 92.2% (2026-02-05)
+// @coverage: 55.8% (2026-02-24)
 
 import { environment } from '../../../environments/environment';
 
@@ -113,6 +113,8 @@ export type TauriAuthStatus =
   | 'authenticated'
   | 'error';
 export type GraduationStatus = 'idle' | 'confirming' | 'confirmed' | 'error';
+
+const TAURI_IPC_UNAVAILABLE = 'Tauri IPC not available';
 
 @Injectable({
   providedIn: 'root',
@@ -453,7 +455,7 @@ export class TauriAuthService {
     // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     if (!window.__TAURI__?.core) {
       this.graduationStatus.set('error');
-      this.graduationError.set('Tauri IPC not available');
+      this.graduationError.set(TAURI_IPC_UNAVAILABLE);
       return false;
     }
 
@@ -498,7 +500,7 @@ export class TauriAuthService {
         success: false,
         needsRestart: false,
         isSteward: false,
-        error: 'Tauri IPC not available',
+        error: TAURI_IPC_UNAVAILABLE,
       };
     }
 
@@ -548,7 +550,7 @@ export class TauriAuthService {
   }> {
     // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     if (!window.__TAURI__?.core) {
-      return { success: false, isSteward: false, error: 'Tauri IPC not available' };
+      return { success: false, isSteward: false, error: TAURI_IPC_UNAVAILABLE };
     }
 
     try {
@@ -751,7 +753,7 @@ export class TauriAuthService {
   async deregister(password: string): Promise<{ success: boolean; error?: string }> {
     // eslint-disable-next-line unicorn/prefer-global-this -- Tauri API is on window
     if (!window.__TAURI__?.core) {
-      return { success: false, error: 'Tauri IPC not available' };
+      return { success: false, error: TAURI_IPC_UNAVAILABLE };
     }
 
     try {

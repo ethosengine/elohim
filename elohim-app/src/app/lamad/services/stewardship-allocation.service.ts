@@ -20,7 +20,7 @@
 
 import { Injectable, signal, inject } from '@angular/core';
 
-// @coverage: 14.8% (2026-02-05)
+// @coverage: 14.8% (2026-02-24)
 
 import { Observable, of, BehaviorSubject, map, catchError, tap } from 'rxjs';
 

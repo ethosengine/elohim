@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-05)
+// @coverage: 100.0% (2026-02-24)
 
 import { takeUntil, map } from 'rxjs/operators';
 
@@ -58,7 +58,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     combineLatest([
       this.dataLoader
         .getContentIndex()
-        .pipe(map(index => (index as { nodes?: ContentNode[] }).nodes ?? [])),
+        .pipe(map(index => (index.nodes as unknown as ContentNode[]) ?? [])),
       this.affinityService.affinity$,
     ])
       .pipe(takeUntil(this.destroy$))

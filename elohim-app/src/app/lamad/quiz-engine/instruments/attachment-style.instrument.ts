@@ -17,6 +17,8 @@
 
 import { registerInstrument } from './instrument-registry';
 
+// @coverage: 38.1% (2026-02-24)
+
 import type {
   SubscaleDefinition,
   ResultTypeDefinition,
@@ -164,4 +166,11 @@ registerInstrument({
   config: ATTACHMENT_STYLE_INSTRUMENT_CONFIG,
   subscales: ATTACHMENT_STYLE_SUBSCALES,
   resultTypes: ATTACHMENT_STYLE_RESULT_TYPES,
+  displayConfig: {
+    framework: 'attachment-style',
+    frameworkDisplayName: 'Attachment Style',
+    autoFeature: false,
+    displayTemplate: '{{primaryType.name}}',
+    shortTemplate: '{{primaryType.shortCode}}',
+  },
 });

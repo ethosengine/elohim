@@ -13,7 +13,7 @@
 
 import type { MasteryLevel } from './content-mastery.model';
 
-// @coverage: 45.2% (2026-02-05)
+// @coverage: 54.8% (2026-02-24)
 
 // =============================================================================
 // Color Palettes

@@ -8,6 +8,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal, output } from '@angular/core';
 
+// @coverage: 4.8% (2026-02-24)
+
 import { TauriAuthService, type AccountSummary } from '../../services/tauri-auth.service';
 
 @Component({
@@ -32,8 +34,8 @@ export class AccountSwitcherComponent implements OnInit {
   /** Emitted when user cancels the switcher */
   readonly cancelled = output<void>();
 
-  async ngOnInit(): Promise<void> {
-    await this.loadAccounts();
+  ngOnInit(): void {
+    void this.loadAccounts();
   }
 
   async loadAccounts(): Promise<void> {

@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, input, output, signal } from '@angular/core';
 
+// @coverage: 2.9% (2026-02-24)
+
 import { type DoorwayWithHealth } from '../../../../models/doorway.model';
 import { type IdentityMode } from '../../../../models/identity.model';
 

@@ -16,6 +16,8 @@
 
 import { registerInstrument } from './instrument-registry';
 
+// @coverage: 100.0% (2026-02-24)
+
 import type {
   SubscaleDefinition,
   ResultTypeDefinition,
@@ -151,4 +153,11 @@ registerInstrument({
   config: VALUES_HIERARCHY_INSTRUMENT_CONFIG,
   subscales: VALUES_HIERARCHY_SUBSCALES,
   resultTypes: VALUES_HIERARCHY_RESULT_TYPES,
+  displayConfig: {
+    framework: 'values-hierarchy',
+    frameworkDisplayName: 'Values Hierarchy',
+    autoFeature: false,
+    displayTemplate: '{{primaryType.name}}',
+    shortTemplate: '{{primaryType.shortCode}}',
+  },
 });

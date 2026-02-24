@@ -1,6 +1,6 @@
 import { Injectable, inject, computed, signal } from '@angular/core';
 
-// @coverage: 91.3% (2026-02-05)
+// @coverage: 91.3% (2026-02-24)
 
 import { CustodianCommitmentService } from './custodian-commitment.service';
 import { HolochainClientService } from './holochain-client.service';

@@ -3,7 +3,7 @@ import { Component, OnInit, OnDestroy, Input, computed, inject } from '@angular/
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router, NavigationEnd } from '@angular/router';
 
-// @coverage: 38.3% (2026-02-05)
+// @coverage: 44.6% (2026-02-24)
 
 import { filter, map, takeUntil } from 'rxjs/operators';
 

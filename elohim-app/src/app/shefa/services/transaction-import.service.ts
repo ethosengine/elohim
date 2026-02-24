@@ -22,7 +22,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 91.8% (2026-02-05)
+// @coverage: 91.8% (2026-02-24)
 
 import { Observable, Subject, BehaviorSubject, firstValueFrom } from 'rxjs';
 

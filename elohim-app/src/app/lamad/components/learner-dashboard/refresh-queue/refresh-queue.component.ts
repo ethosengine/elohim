@@ -2,6 +2,8 @@ import { AsyncPipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+// @coverage: 38.5% (2026-02-24)
+
 import { Observable, map } from 'rxjs';
 
 import { getFreshnessColor, getFreshnessIcon } from '../../../models/mastery-visualization';

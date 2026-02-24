@@ -13,7 +13,7 @@ import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
 
-// @coverage: 90.9% (2026-02-05)
+// @coverage: 88.4% (2026-02-24)
 
 /** Connection retry configuration */
 interface RetryConfig {

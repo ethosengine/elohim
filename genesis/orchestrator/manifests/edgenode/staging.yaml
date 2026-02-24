@@ -12,6 +12,13 @@
 #   - 4445: Conductor App WebSocket (localhost only, bridged via socat :8445)
 #   - 8090: elohim-storage HTTP API
 #   - 9876: P2P libp2p transport (cross-namespace via NetworkPolicy)
+#
+# TODO(p2p-relay): When desktop steward P2P testing begins, add a LoadBalancer
+# service exposing port 9876 for external relay traffic. Currently port 9876 is
+# only ClusterIP — desktop clients behind NAT cannot reach cluster relays.
+# Also update ANNOUNCE_ADDRS env var to include the LoadBalancer's external
+# IP/hostname so relay multiaddrs advertised via federation are externally routable.
+# For K8s-internal peers, the current ClusterIP + headless service is sufficient.
 ---
 # ConfigMap for conductor configuration
 apiVersion: v1

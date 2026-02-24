@@ -1,6 +1,6 @@
 import { Injectable, Type, EventEmitter } from '@angular/core';
 
-// @coverage: 42.9% (2026-02-05)
+// @coverage: 42.9% (2026-02-24)
 
 import { ContentNode } from '../models/content-node.model';
 

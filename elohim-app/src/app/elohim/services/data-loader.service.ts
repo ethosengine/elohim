@@ -1,6 +1,6 @@
 import { Injectable, inject, afterNextRender } from '@angular/core';
 
-// @coverage: 20.7% (2026-02-05)
+// @coverage: 20.6% (2026-02-24)
 
 import { catchError, map, shareReplay, tap, switchMap, timeout } from 'rxjs/operators';
 
@@ -52,6 +52,44 @@ import {
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
+
+// Content index types
+export interface ContentIndexEntry {
+  id: string;
+  title: string;
+  description: string;
+  contentType: string;
+  tags?: string[];
+  reach?: string;
+  trustScore?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ContentIndex {
+  nodes: ContentIndexEntry[];
+  totalCount?: number;
+  byType?: Record<string, number>;
+  lastUpdated?: string;
+}
+
+/** Mutable index maps accumulated during graph traversal. */
+interface GraphIndexes {
+  nodes: Map<string, ContentNode>;
+  relationships: Map<string, ContentRelationship>;
+  nodesByType: Map<string, Set<string>>;
+  nodesByTag: Map<string, Set<string>>;
+  nodesByCategory: Map<string, Set<string>>;
+  adjacency: Map<string, Set<string>>;
+  reverseAdjacency: Map<string, Set<string>>;
+}
+
+/** Recursive graph node shape from simplified Holochain graph responses. */
+interface GraphNodeData {
+  contentId: string;
+  relationshipType: string;
+  children: GraphNodeData[];
+}
 
 // Assessment types (inline until models are expanded)
 export interface AssessmentIndex {
@@ -536,7 +574,7 @@ export class DataLoaderService {
   }
 
   /** Cached content index for search/discovery */
-  private contentIndexCache$: Observable<any> | null = null;
+  private contentIndexCache$: Observable<ContentIndex> | null = null;
 
   /** Cached readiness check */
   private readinessCache$: Observable<boolean> | null = null;
@@ -580,7 +618,7 @@ export class DataLoaderService {
    * NOTE: This is a heavy operation (loads up to 1000 items).
    * Use checkReadiness() if you just need to verify data is available.
    */
-  getContentIndex(): Observable<any> {
+  getContentIndex(): Observable<ContentIndex> {
     this.contentIndexCache$ ??= this.contentService.queryContent({ limit: 1000 }).pipe(
       map(nodes => ({
         nodes: nodes.map(node => ({
@@ -1563,7 +1601,7 @@ export class DataLoaderService {
       contentId: string;
       relationshipType: string;
       confidence: number;
-      children: unknown[];
+      children: GraphNodeData[];
     }[];
     totalNodes: number;
   }): ContentGraph {
@@ -1580,7 +1618,7 @@ export class DataLoaderService {
     // For now, just build the relationship structure.
 
     const processNode = (
-      nodeData: { contentId: string; relationshipType: string; children: any[] },
+      nodeData: { contentId: string; relationshipType: string; children: GraphNodeData[] },
       parentId?: string
     ): void => {
       const nodeId = nodeData.contentId;
@@ -1660,8 +1698,7 @@ export class DataLoaderService {
     }
 
     // Process related nodes recursively
-    this.processHolochainGraphNodes(
-      hcGraph.related,
+    const indexes: GraphIndexes = {
       nodes,
       relationships,
       nodesByType,
@@ -1669,8 +1706,8 @@ export class DataLoaderService {
       nodesByCategory,
       adjacency,
       reverseAdjacency,
-      hcGraph.root?.content.id
-    );
+    };
+    this.processHolochainGraphNodes(hcGraph.related, indexes, hcGraph.root?.content.id);
 
     return {
       nodes,
@@ -1734,31 +1771,25 @@ export class DataLoaderService {
    */
   private processHolochainGraphNodes(
     graphNodes: HolochainContentGraphNode[],
-    nodes: Map<string, ContentNode>,
-    relationships: Map<string, ContentRelationship>,
-    nodesByType: Map<string, Set<string>>,
-    nodesByTag: Map<string, Set<string>>,
-    nodesByCategory: Map<string, Set<string>>,
-    adjacency: Map<string, Set<string>>,
-    reverseAdjacency: Map<string, Set<string>>,
+    indexes: GraphIndexes,
     parentId?: string
   ): void {
     for (const graphNode of graphNodes) {
       const node = this.transformHolochainContentToNode(graphNode.content);
       this.addNodeToGraphIndexes(
         node,
-        nodes,
-        nodesByType,
-        nodesByTag,
-        nodesByCategory,
-        adjacency,
-        reverseAdjacency
+        indexes.nodes,
+        indexes.nodesByType,
+        indexes.nodesByTag,
+        indexes.nodesByCategory,
+        indexes.adjacency,
+        indexes.reverseAdjacency
       );
 
       // Add relationship from parent to this node
       if (parentId) {
         const relId = `${parentId}-${node.id}`;
-        relationships.set(relId, {
+        indexes.relationships.set(relId, {
           id: relId,
           sourceNodeId: parentId,
           targetNodeId: node.id,
@@ -1766,26 +1797,17 @@ export class DataLoaderService {
         });
 
         // Update adjacency
-        if (!adjacency.has(parentId)) adjacency.set(parentId, new Set());
-        adjacency.get(parentId)!.add(node.id);
+        if (!indexes.adjacency.has(parentId)) indexes.adjacency.set(parentId, new Set());
+        indexes.adjacency.get(parentId)!.add(node.id);
 
-        if (!reverseAdjacency.has(node.id)) reverseAdjacency.set(node.id, new Set());
-        reverseAdjacency.get(node.id)!.add(parentId);
+        if (!indexes.reverseAdjacency.has(node.id))
+          indexes.reverseAdjacency.set(node.id, new Set());
+        indexes.reverseAdjacency.get(node.id)!.add(parentId);
       }
 
       // Process children recursively
       if (graphNode.children.length > 0) {
-        this.processHolochainGraphNodes(
-          graphNode.children,
-          nodes,
-          relationships,
-          nodesByType,
-          nodesByTag,
-          nodesByCategory,
-          adjacency,
-          reverseAdjacency,
-          node.id
-        );
+        this.processHolochainGraphNodes(graphNode.children, indexes, node.id);
       }
     }
   }

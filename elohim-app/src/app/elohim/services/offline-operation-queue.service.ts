@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 94.3% (2026-02-05)
+// @coverage: 92.5% (2026-02-24)
 
 import { HolochainClientService } from './holochain-client.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';

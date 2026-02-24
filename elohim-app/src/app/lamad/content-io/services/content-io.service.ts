@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 73.5% (2026-02-05)
+// @coverage: 73.5% (2026-02-24)
 
 import {
   ContentIOImportResult,
@@ -353,12 +353,7 @@ export class ContentIOService {
   }
 
   private async blobToString(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read blob'));
-      reader.readAsText(blob);
-    });
+    return blob.text();
   }
 
   private sanitizeFilename(name: string): string {

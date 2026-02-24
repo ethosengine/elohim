@@ -3,7 +3,7 @@ import { MeaningMapComponent } from './meaning-map.component';
 import { provideHttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { ContentIndex, DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { ContentNode } from '../../models/content-node.model';
 
@@ -81,7 +81,7 @@ describe('MeaningMapComponent', () => {
     routerSpy = TestBed.inject(Router) as jasmine.SpyObj<Router>;
 
     // Default spy returns
-    dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: mockNodes }));
+    dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: mockNodes } as ContentIndex));
     affinityServiceSpy.getAffinity.and.returnValue(0.5);
     affinityServiceSpy.getStats.and.returnValue({
       totalNodes: 3,
@@ -265,7 +265,7 @@ describe('MeaningMapComponent', () => {
         },
       ];
 
-      dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: nodesWithoutCategory }));
+      dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: nodesWithoutCategory } as ContentIndex));
       affinityServiceSpy.getStats.and.returnValue({
         totalNodes: 1,
         averageAffinity: 0,

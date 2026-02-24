@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { SearchService } from './search.service';
-import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { ContentIndex, DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { TrustBadgeService } from '@app/elohim/services/trust-badge.service';
 import { SearchQuery } from '../models/search.model';
 
@@ -551,7 +551,7 @@ describe('SearchService', () => {
     });
 
     it('should handle undefined nodes', done => {
-      dataLoaderSpy.getContentIndex.and.returnValue(of({}));
+      dataLoaderSpy.getContentIndex.and.returnValue(of({} as ContentIndex));
       dataLoaderSpy.getPathIndex.and.returnValue(of({ paths: [], totalCount: 0, lastUpdated: '' }));
 
       service.search({ text: '' }).subscribe(results => {

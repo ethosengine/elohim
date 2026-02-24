@@ -8,6 +8,8 @@
 
 import { Injectable, OnDestroy } from '@angular/core';
 
+// @coverage: 100.0% (2026-02-24)
+
 import { map, takeUntil } from 'rxjs/operators';
 
 import { BehaviorSubject, Observable, Subject } from 'rxjs';

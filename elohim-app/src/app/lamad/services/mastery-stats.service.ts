@@ -18,6 +18,8 @@
 
 import { Injectable, OnDestroy } from '@angular/core';
 
+// @coverage: 96.1% (2026-02-24)
+
 import { BehaviorSubject, Observable, Subscription, combineLatest } from 'rxjs';
 
 import { isAboveGate } from '@app/elohim/models/agent.model';

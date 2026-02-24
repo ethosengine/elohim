@@ -17,6 +17,8 @@
 
 import { registerInstrument } from './instrument-registry';
 
+// @coverage: 100.0% (2026-02-24)
+
 import type {
   SubscaleDefinition,
   ResultTypeDefinition,
@@ -172,4 +174,11 @@ registerInstrument({
   config: STRENGTHS_FINDER_INSTRUMENT_CONFIG,
   subscales: STRENGTHS_FINDER_SUBSCALES,
   resultTypes: STRENGTHS_FINDER_RESULT_TYPES,
+  displayConfig: {
+    framework: 'via-strengths',
+    frameworkDisplayName: 'VIA Character Strengths',
+    autoFeature: false,
+    displayTemplate: '{{primaryType.name}}',
+    shortTemplate: '{{primaryType.shortCode}}',
+  },
 });

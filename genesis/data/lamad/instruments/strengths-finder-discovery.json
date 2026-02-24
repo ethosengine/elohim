@@ -1,0 +1,105 @@
+{
+  "id": "strengths-finder-discovery",
+  "title": "Character Strengths Discovery",
+  "contentType": "instrument",
+  "contentFormat": "instrument-json",
+  "name": "Character Strengths Discovery",
+  "version": "1.0.0",
+  "category": "personality",
+  "framework": "via-strengths",
+  "description": "Discover your signature character strengths",
+  "subscales": [
+    {
+      "id": "creativity",
+      "name": "Creativity",
+      "description": "Finding new ways to look at things, imagination and independent thinking",
+      "dimension": "character-strengths",
+      "color": "#F59E0B",
+      "icon": "\ud83c\udfa8"
+    },
+    {
+      "id": "curiosity",
+      "name": "Curiosity",
+      "description": "Being curious about the world, seeking new experiences and knowledge",
+      "dimension": "character-strengths",
+      "color": "#3B82F6",
+      "icon": "\ud83d\udd0d"
+    },
+    {
+      "id": "fairness",
+      "name": "Fairness",
+      "description": "Treating all people fairly, giving everyone a chance",
+      "dimension": "character-strengths",
+      "color": "#8B5CF6",
+      "icon": "\u2696\ufe0f"
+    },
+    {
+      "id": "kindness",
+      "name": "Kindness",
+      "description": "Being generous and helpful to others, showing compassion",
+      "dimension": "character-strengths",
+      "color": "#EC4899",
+      "icon": "\ud83d\udc9d"
+    },
+    {
+      "id": "perseverance",
+      "name": "Perseverance",
+      "description": "Finishing what you start, persistence through challenges",
+      "dimension": "character-strengths",
+      "color": "#10B981",
+      "icon": "\ud83c\udfd4\ufe0f"
+    },
+    {
+      "id": "hope",
+      "name": "Hope",
+      "description": "Finding the positive in difficult situations, optimism about the future",
+      "dimension": "character-strengths",
+      "color": "#06B6D4",
+      "icon": "\ud83c\udf1f"
+    }
+  ],
+  "resultTypes": [
+    {
+      "id": "creativity",
+      "name": "Creativity",
+      "description": "Your signature strength is creativity. You naturally find new ways to look at things and think outside the box."
+    },
+    {
+      "id": "curiosity",
+      "name": "Curiosity",
+      "description": "Your signature strength is curiosity. You have a natural drive to explore, learn, and understand the world around you."
+    },
+    {
+      "id": "fairness",
+      "name": "Fairness",
+      "description": "Your signature strength is fairness. You believe in treating everyone equitably and giving all people a fair chance."
+    },
+    {
+      "id": "kindness",
+      "name": "Kindness",
+      "description": "Your signature strength is kindness. You naturally look for ways to help others and show compassion."
+    },
+    {
+      "id": "perseverance",
+      "name": "Perseverance",
+      "description": "Your signature strength is perseverance. You finish what you start and persist through challenges."
+    },
+    {
+      "id": "hope",
+      "name": "Hope",
+      "description": "Your signature strength is hope. You can always find the positive in what seems negative and stay optimistic about the future."
+    }
+  ],
+  "scoringConfig": {
+    "method": "highest-subscale",
+    "normalize": true
+  },
+  "display": {
+    "framework": "via-strengths",
+    "frameworkDisplayName": "VIA Character Strengths",
+    "autoFeature": false,
+    "displayTemplate": "{{primaryType.name}}",
+    "shortTemplate": "{{primaryType.shortCode}}"
+  },
+  "estimatedMinutes": 12
+}

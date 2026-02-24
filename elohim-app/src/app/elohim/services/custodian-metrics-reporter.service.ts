@@ -1,9 +1,9 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 15.1% (2026-02-05)
+// @coverage: 14.7% (2026-02-24)
 
 import { PerformanceMetricsService } from './performance-metrics.service';
-import { ShefaService } from './shefa.service';
+import { type CustodianMetrics, ShefaService } from './shefa.service';
 
 /**
  * Custodian Metrics Reporter Service
@@ -192,7 +192,7 @@ export class CustodianMetricsReporterService {
       };
 
       // Report to Shefa
-      const result = await this.shefa.reportMetrics(report as any);
+      const result = await this.shefa.reportMetrics(report as unknown as CustodianMetrics);
 
       if (result.success) {
         s.reportsSuccessful++;

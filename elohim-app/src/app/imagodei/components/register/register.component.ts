@@ -13,7 +13,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 
-// @coverage: 94.7% (2026-02-05)
+// @coverage: 93.1% (2026-02-24)
 
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 

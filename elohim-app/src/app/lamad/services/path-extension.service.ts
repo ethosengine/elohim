@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 80.0% (2026-02-05)
+// @coverage: 80.0% (2026-02-24)
 
 import { map, switchMap, tap } from 'rxjs/operators';
 
@@ -497,7 +497,7 @@ export class PathExtensionService {
     this.checkVersionCompatibility(path, ext, warnings);
 
     // Start with base steps (deep copy)
-    let effectiveSteps = JSON.parse(JSON.stringify(path.steps)) as PathStep[];
+    let effectiveSteps = structuredClone(path.steps);
     const indexMapping = new Map<number, string>();
     effectiveSteps.forEach((_, i) => indexMapping.set(i, `base-${i}`));
 

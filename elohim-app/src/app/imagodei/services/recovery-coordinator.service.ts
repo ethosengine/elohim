@@ -19,7 +19,7 @@
 
 import { Injectable, inject, signal, computed } from '@angular/core';
 
-// @coverage: 98.7% (2026-02-05)
+// @coverage: 98.7% (2026-02-24)
 
 import {
   type RecoveryRequest,

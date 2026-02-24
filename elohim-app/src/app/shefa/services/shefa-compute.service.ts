@@ -21,7 +21,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 36.0% (2026-02-05)
+// @coverage: 36.0% (2026-02-24)
 
 import { map, switchMap, catchError, startWith, shareReplay, tap } from 'rxjs/operators';
 
@@ -1732,7 +1732,7 @@ export class ShefaComputeService {
               'Consider ordering replacement node',
             ]
           : ['Check node status', 'Verify network connectivity'],
-        helpFlowUrl: '/shefa/help-flow/compute-needs',
+        helpFlowUrl: ShefaComputeService.HELP_FLOW_URL,
       }));
   }
 
@@ -1911,7 +1911,7 @@ export class ShefaComputeService {
           priority: 'recommended',
         },
       ],
-      helpFlowUrl: '/shefa/help-flow/compute-needs',
+      helpFlowUrl: ShefaComputeService.HELP_FLOW_URL,
       helpFlowCTA: 'Get started with Holoport',
     };
   }

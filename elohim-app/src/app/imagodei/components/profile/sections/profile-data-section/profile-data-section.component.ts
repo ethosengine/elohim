@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, input, output } from '@angular/core';
 
+// @coverage: 6.2% (2026-02-24)
+
 import {
   type HostingCostSummary,
   type KeyBackupStatus,

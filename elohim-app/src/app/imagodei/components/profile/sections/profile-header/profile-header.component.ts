@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, input, output, computed } from '@angular/core';
 
+// @coverage: 5.9% (2026-02-24)
+
 import {
   type HumanProfile,
   type IdentityMode,

@@ -12,7 +12,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 72.7% (2026-02-05)
+// @coverage: 72.7% (2026-02-24)
 
 import { Observable, of } from 'rxjs';
 

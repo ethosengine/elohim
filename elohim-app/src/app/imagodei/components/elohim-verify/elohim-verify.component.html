@@ -109,7 +109,7 @@
             <textarea
               class="answer-input"
               [value]="getAnswerForQuestion(question.id)"
-              (input)="setAnswer(question.id, $any($event.target).value)"
+              (input)="onAnswerInput(question.id, $event)"
               placeholder="Type your answer..."
               rows="3"
             ></textarea>

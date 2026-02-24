@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 93.1% (2026-02-05)
+// @coverage: 93.1% (2026-02-24)
 
 import { Observable, of, throwError } from 'rxjs';
 

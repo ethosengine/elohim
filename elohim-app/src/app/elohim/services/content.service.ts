@@ -12,14 +12,14 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-// @coverage: 83.1% (2026-02-05)
+// @coverage: 83.2% (2026-02-24)
 
 import { map, catchError, shareReplay, switchMap } from 'rxjs/operators';
 
 import { Observable, from, of } from 'rxjs';
 
 import { ContentNode, ContentType, ContentReach } from '../../lamad/models/content-node.model';
-import { LearningPath } from '../../lamad/models/learning-path.model';
+import { LearningPath, PathStep } from '../../lamad/models/learning-path.model';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
 
 import { StorageClientService } from './storage-client.service';
@@ -66,7 +66,7 @@ export interface Relationship {
   relationshipType: string; // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES
   confidence: number;
   inferenceSource: string; // explicit, path, tag, semantic
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt?: string;
 }
 
@@ -768,25 +768,23 @@ export class ContentService {
   /**
    * Transform a step from snake_case to camelCase
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Bridge type: raw storage steps have extra fields beyond PathStep
-  private transformStep(step: RawStepData): any {
+  private transformStep(step: RawStepData): PathStep {
     return {
-      id: step.id,
-      pathId: step.pathId ?? step.pathId,
+      pathId: step.pathId,
       chapterId: step.chapterId,
-      // Map to both 'title' and 'stepTitle' for compatibility
-      title: step.title ?? '',
       stepTitle: step.title ?? '',
       stepNarrative: step.description ?? '',
-      description: step.description ?? '',
       stepType: step.stepType ?? 'content',
-      resourceId: step.resourceId ?? step.resourceId ?? '',
-      resourceType: step.resourceType ?? step.resourceType ?? 'content',
+      resourceId: step.resourceId ?? '',
       order: step.orderIndex ?? 0,
       orderIndex: step.orderIndex ?? 0,
-      estimatedDuration: step.estimatedDuration ?? step.estimatedDuration,
+      estimatedDuration: step.estimatedDuration,
       metadata: step.metadata,
-    };
+      // Required PathStep fields with safe defaults
+      learningObjectives: [],
+      optional: false,
+      completionCriteria: [],
+    } as PathStep;
   }
 
   /**

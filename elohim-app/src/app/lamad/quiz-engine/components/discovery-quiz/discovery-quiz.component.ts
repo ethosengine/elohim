@@ -36,7 +36,7 @@ import {
   computed,
 } from '@angular/core';
 
-// @coverage: 25.4% (2026-02-05)
+// @coverage: 25.2% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 

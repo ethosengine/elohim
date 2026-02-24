@@ -20,7 +20,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal, computed, inject } from '@angular/core';
 
-// @coverage: 38.8% (2026-02-05)
+// @coverage: 36.2% (2026-02-24)
 
 import {
   AdminWebsocket,

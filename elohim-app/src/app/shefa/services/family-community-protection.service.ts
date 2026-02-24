@@ -33,7 +33,7 @@
 
 import { Injectable } from '@angular/core';
 
-// @coverage: 19.1% (2026-02-05)
+// @coverage: 19.1% (2026-02-24)
 
 import { map, switchMap, catchError, shareReplay, startWith } from 'rxjs/operators';
 

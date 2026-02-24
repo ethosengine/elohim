@@ -38,6 +38,11 @@ import { Intent, Measure } from '@app/elohim/models/rea-bridge.model';
 export type ContactPreference = 'email' | 'phone' | 'in-app' | 'other';
 
 /**
+ * ListingLifecycleStatus - Active/archived/deleted lifecycle for listings and related entities.
+ */
+export type ListingLifecycleStatus = 'active' | 'archived' | 'deleted';
+
+/**
  * TimePreference - When someone prefers to work/interact.
  *
  * Helps match people with compatible schedules.
@@ -149,7 +154,7 @@ export interface ServiceType {
   isAuthorOnly: boolean;
 
   /** Status of this service type */
-  status: 'active' | 'archived' | 'deleted';
+  status: ListingLifecycleStatus;
 
   /** Arbitrary metadata */
   metadata?: Record<string, unknown>;
@@ -196,7 +201,7 @@ export interface MediumOfExchange {
   isAuthorOnly: boolean;
 
   /** Status */
-  status: 'active' | 'archived' | 'deleted';
+  status: ListingLifecycleStatus;
 
   /** Arbitrary metadata */
   metadata?: Record<string, unknown>;
@@ -291,7 +296,7 @@ export interface ServiceRequest extends Omit<Intent, 'id' | 'createdAt'> {
   // ─────────────────────────────────────────────────────────────────
 
   /** Status of request */
-  status: 'active' | 'archived' | 'deleted';
+  status: ListingLifecycleStatus;
 
   /** Is this request visible/searchable? */
   isPublic: boolean;
@@ -415,7 +420,7 @@ export interface ServiceOffer extends Omit<Intent, 'id' | 'createdAt'> {
   // ─────────────────────────────────────────────────────────────────
 
   /** Status of offer */
-  status: 'active' | 'archived' | 'deleted';
+  status: ListingLifecycleStatus;
 
   /** Is this offer visible/searchable? */
   isPublic: boolean;
@@ -593,6 +598,13 @@ export interface SavedOffer {
  * Different from request.status (active/archived/deleted).
  * This tracks administrative moderation state.
  */
+export type ListingStatusType =
+  | 'pending' // Awaiting admin review
+  | 'accepted' // Approved and visible
+  | 'rejected' // Rejected by admin
+  | 'suspended-temporarily' // Suspended with end date
+  | 'suspended-indefinitely'; // Suspended without end date
+
 export interface ListingAdminStatus {
   /** Unique identifier */
   id: string;
@@ -604,12 +616,7 @@ export interface ListingAdminStatus {
   listingId: string;
 
   /** Status of the listing */
-  statusType:
-    | 'pending' // Awaiting admin review
-    | 'accepted' // Approved and visible
-    | 'rejected' // Rejected by admin
-    | 'suspended-temporarily' // Suspended with end date
-    | 'suspended-indefinitely'; // Suspended without end date
+  statusType: ListingStatusType;
 
   /** Reason for status (especially for suspended/rejected) */
   reason?: string;
