@@ -73,6 +73,7 @@
     "@angular/platform-browser": "^19.2.0",
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
+    "buffer": "^5.2.1",
     "@elohim/storage-client": "file:../holochain/sdk/storage-client-ts",
     "@holochain/client": "0.20.0",
     "@phosphor-icons/core": "^2.1.1",
