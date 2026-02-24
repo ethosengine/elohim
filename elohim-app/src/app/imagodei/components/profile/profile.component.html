@@ -92,6 +92,31 @@
               <app-profile-identity-section [profile]="p" />
             }
 
+            <!-- Featured Discovery Badges -->
+            @if (featuredDiscoveryResults().length > 0) {
+              <div class="featured-discoveries">
+                <span class="section-title">Discoveries</span>
+                <div class="hex-badge-strip">
+                  @for (result of featuredDiscoveryResults(); track result.id) {
+                    <button
+                      type="button"
+                      class="hex-badge"
+                      [style.--badge-color]="getBadgeColor(result)"
+                      [title]="result.displayString"
+                      [disabled]="!result.contentNodeId"
+                      (click)="
+                        result.contentNodeId ? navigateToResource(result.contentNodeId) : null
+                      "
+                      data-testid="hex-badge"
+                    >
+                      <span class="hex-badge__icon">{{ getDiscoveryCategoryIcon(result) }}</span>
+                      <span class="hex-badge__label">{{ result.shortDisplay }}</span>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+
             <app-profile-discovery-section
               [results]="allDiscoveryResults()"
               (navigateToDiscovery)="navigateToDiscovery()"

@@ -231,6 +231,17 @@ describe('DiscoveryAttestationService', () => {
       expect(result.category).toBe('personality');
     });
 
+    it('should copy contentNodeId from assessment to result', () => {
+      const result = recordDefault();
+      expect(result.contentNodeId).toBe('content-enneagram-001');
+    });
+
+    it('should persist contentNodeId to localStorage', () => {
+      recordDefault();
+      const stored = JSON.parse(localStorage.getItem('elohim:discovery-results')!);
+      expect(stored[0].contentNodeId).toBe('content-enneagram-001');
+    });
+
     it('should generate an ID containing the assessment ID', () => {
       const result = recordDefault();
       expect(result.id).toMatch(/^discovery-assessment-enneagram-\d+$/);

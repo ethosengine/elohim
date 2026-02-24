@@ -27,12 +27,9 @@ For the learning experience to feel alive rather than linear, something needs to
 
 ---
 
-## 2. Discovery Attestation at 17.4% Coverage
+## Completed (continued)
 
-`discovery-attestation.service` handles psychometric recognition - when a learner takes a values hierarchy assessment, this service records what they discovered about themselves. At 17.4%, almost nothing is tested. The service connects Sophia assessment results to the learner's self-knowledge profile, which is the emotional heart of "Know Thyself" (M3).
-
-**Impact**: High for M3, low for M1.
-**Effort**: Medium. Needs understanding of the attestation model.
+- **#2 Discovery Attestation at 17.4% Coverage** — Now at 100% statement/line/function coverage, 95.3% branches, with 170+ test cases across 1,602 lines of spec. All public methods, computed signals, format functions, template interpolation, registry integration, storage migration, error handling, consent/reach hierarchies, and community aggregation filtering are covered. Only untested: IdentityService integration (TODO in service), Holochain syncing (not implemented), and clifton-strengths retake (latent format bug).
 
 ---
 

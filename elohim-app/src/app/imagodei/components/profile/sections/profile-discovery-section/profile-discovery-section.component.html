@@ -3,19 +3,39 @@
     <span class="section-title">Self-Discovery</span>
     <div class="discovery-results">
       @for (result of results(); track result.id) {
-        <div class="discovery-card">
+        <button
+          type="button"
+          class="discovery-card"
+          [class.discovery-card--linked]="hasLink(result)"
+          (click)="navigateToResult(result)"
+          [attr.aria-label]="getFrameworkName(result) + ': ' + result.displayString"
+          data-testid="discovery-card"
+        >
           <div class="discovery-icon">{{ getCategoryIcon(result) }}</div>
           <div class="discovery-content">
             <span class="discovery-framework">{{ getFrameworkName(result) }}</span>
             <span class="discovery-result">{{ result.displayString }}</span>
           </div>
-          <span class="discovery-short" [title]="result.displayString">
+          <span
+            class="discovery-hex-badge"
+            [style.--badge-color]="getBadgeColor(result)"
+            [title]="result.displayString"
+            data-testid="discovery-hex-badge"
+          >
             {{ result.shortDisplay }}
           </span>
-        </div>
+          @if (hasLink(result)) {
+            <span class="material-icons discovery-link-icon">open_in_new</span>
+          }
+        </button>
       }
     </div>
-    <button type="button" class="discovery-add-btn" (click)="navigateToDiscovery.emit()">
+    <button
+      type="button"
+      class="discovery-add-btn"
+      (click)="navigateToDiscovery.emit()"
+      data-testid="discovery-add-btn"
+    >
       + Take a Discovery Assessment
     </button>
   </div>
@@ -25,7 +45,12 @@
     <p class="discovery-empty-text">
       Learn about yourself through personality, strengths, and values assessments.
     </p>
-    <button type="button" class="btn btn-secondary" (click)="navigateToDiscovery.emit()">
+    <button
+      type="button"
+      class="btn btn-secondary"
+      (click)="navigateToDiscovery.emit()"
+      data-testid="discovery-start-btn"
+    >
       Start a Discovery Assessment
     </button>
   </div>

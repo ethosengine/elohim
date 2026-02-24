@@ -269,6 +269,9 @@ export interface DiscoveryResult {
 
   /** Content node ID for viewing full results */
   resultContentId?: string;
+
+  /** Content node ID of the source assessment (denormalized from DiscoveryAssessment) */
+  contentNodeId?: string;
 }
 
 /**

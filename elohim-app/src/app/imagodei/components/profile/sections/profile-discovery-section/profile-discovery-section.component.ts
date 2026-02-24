@@ -1,4 +1,5 @@
-import { Component, input, output } from '@angular/core';
+import { Component, inject, input, output } from '@angular/core';
+import { Router } from '@angular/router';
 
 // @coverage: 20.0% (2026-02-24)
 
@@ -7,6 +8,7 @@ import {
   getFrameworkDisplayName,
   getCategoryIcon,
 } from '@app/lamad/quiz-engine/models/discovery-assessment.model';
+import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
 @Component({
   selector: 'app-profile-discovery-section',
@@ -15,6 +17,9 @@ import {
   styleUrls: ['./profile-discovery-section.component.css'],
 })
 export class ProfileDiscoverySectionComponent {
+  private readonly discoveryService = inject(DiscoveryAttestationService);
+  private readonly router = inject(Router);
+
   readonly results = input.required<DiscoveryResult[]>();
 
   readonly navigateToDiscovery = output<void>();
@@ -25,5 +30,21 @@ export class ProfileDiscoverySectionComponent {
 
   getCategoryIcon(result: DiscoveryResult): string {
     return getCategoryIcon(result.category);
+  }
+
+  getBadgeColor(result: DiscoveryResult): string {
+    return this.discoveryService.getBadgeDisplay(result).color;
+  }
+
+  hasLink(result: DiscoveryResult): boolean {
+    return !!result.contentNodeId;
+  }
+
+  navigateToResult(result: DiscoveryResult): void {
+    if (result.contentNodeId) {
+      void this.router.navigate(['/lamad/resource', result.contentNodeId]);
+    } else {
+      this.navigateToDiscovery.emit();
+    }
   }
 }

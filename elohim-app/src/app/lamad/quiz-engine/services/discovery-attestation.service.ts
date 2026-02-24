@@ -181,6 +181,7 @@ export class DiscoveryAttestationService {
       id,
       assessmentId: assessment.id,
       assessmentTitle: assessment.title,
+      contentNodeId: assessment.contentNodeId,
       framework: assessment.framework,
       category: assessment.category,
       humanId: this.getCurrentHumanId(),

@@ -112,9 +112,18 @@ describe('ProfileComponent', () => {
       }),
     });
 
-    mockDiscoveryService = jasmine.createSpyObj('DiscoveryAttestationService', ['toggleFeatured'], {
-      featuredResults: signal([]),
-      results: signal([]),
+    mockDiscoveryService = jasmine.createSpyObj(
+      'DiscoveryAttestationService',
+      ['toggleFeatured', 'getBadgeDisplay'],
+      {
+        featuredResults: signal([]),
+        results: signal([]),
+      }
+    );
+    mockDiscoveryService.getBadgeDisplay.and.returnValue({
+      label: 'ISTP',
+      icon: '🎭',
+      color: '#8B5CF6',
     });
 
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
@@ -332,6 +341,46 @@ describe('ProfileComponent', () => {
       component.navigateToDiscovery();
 
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/discovery']);
+    });
+
+    it('should navigate to resource by contentNodeId', () => {
+      component.navigateToResource('content-enneagram-001');
+
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/resource', 'content-enneagram-001']);
+    });
+  });
+
+  describe('Discovery Badge Helpers', () => {
+    const mockResult = {
+      id: 'discovery-1',
+      assessmentId: 'assessment-mbti',
+      assessmentTitle: 'MBTI Assessment',
+      contentNodeId: 'content-mbti-001',
+      framework: 'mbti',
+      category: 'personality',
+      humanId: 'human-123',
+      completedAt: '2026-01-15T10:00:00.000Z',
+      primaryType: { typeId: 'istp', name: 'ISTP', score: 0.9 },
+      subscaleScores: {},
+      displayString: 'ISTP',
+      shortDisplay: 'ISTP',
+    } as any;
+
+    it('should return badge color from discovery service', () => {
+      const color = component.getBadgeColor(mockResult);
+
+      expect(mockDiscoveryService.getBadgeDisplay).toHaveBeenCalledWith(mockResult);
+      expect(color).toBe('#8B5CF6');
+    });
+
+    it('should return category icon for discovery result', () => {
+      const icon = component.getDiscoveryCategoryIcon(mockResult);
+
+      expect(icon).toBeTruthy();
+    });
+
+    it('should expose featuredDiscoveryResults from service', () => {
+      expect(component.featuredDiscoveryResults()).toEqual([]);
     });
   });
 

@@ -26,6 +26,10 @@ import {
   getReachLabel,
   getReachDescription,
 } from '@app/imagodei/models/identity.model';
+import {
+  type DiscoveryResult,
+  getCategoryIcon,
+} from '@app/lamad/quiz-engine/models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
 import { AGENCY_STAGES, type AgencyStageInfo } from '../../models/agency.model';
@@ -143,6 +147,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   // ==========================================================================
 
   readonly allDiscoveryResults = this.discoveryService.results;
+  readonly featuredDiscoveryResults = this.discoveryService.featuredResults;
 
   // ==========================================================================
   // Hosting Account Signals
@@ -354,6 +359,18 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   navigateToDiscovery(): void {
     void this.router.navigate(['/lamad/discovery']);
+  }
+
+  navigateToResource(contentNodeId: string): void {
+    void this.router.navigate(['/lamad/resource', contentNodeId]);
+  }
+
+  getBadgeColor(result: DiscoveryResult): string {
+    return this.discoveryService.getBadgeDisplay(result).color;
+  }
+
+  getDiscoveryCategoryIcon(result: DiscoveryResult): string {
+    return getCategoryIcon(result.category);
   }
 
   setDoorwayAsPrimary(doorwayUrl: string): void {
