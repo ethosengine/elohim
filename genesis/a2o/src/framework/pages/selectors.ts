@@ -390,3 +390,25 @@ export const ALERT = {
   SHOW_MORE_CARDS: 'alert-show-more-cards',
   INLINE_DISMISS: 'alert-inline-dismiss',
 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Elohim App — Discovery Assessments
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Likert scale widget (sophia: likert-scale.tsx)
+export const LIKERT = {
+  TRACK: 'likert-scale-track',
+  THUMB: 'likert-scale-thumb',
+  TICK: 'likert-scale-tick',
+  VALUE: 'likert-scale-value',
+  MIN_LABEL: 'likert-scale-min-label',
+  MAX_LABEL: 'likert-scale-max-label',
+} as const;
+
+// Discovery assessment results (elohim-app: discovery components)
+export const DISCOVERY = {
+  PROFILE: 'discovery-profile',
+  SUBSCALE_SCORE: 'discovery-subscale-score',
+  PRIMARY_TYPE: 'discovery-primary-type',
+  ATTESTATION_BADGE: 'discovery-attestation-badge',
+} as const;

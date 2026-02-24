@@ -67,5 +67,5 @@
     "displayTemplate": "{{primaryType.name}}",
     "shortTemplate": "{{primaryType.shortCode}}"
   },
-  "estimatedMinutes": 8
+  "estimatedMinutes": 10
 }

@@ -75,6 +75,6 @@
     "displayTemplate": "{{primaryType.name}}",
     "shortTemplate": "{{primaryType.shortCode}}"
   },
-  "estimatedMinutes": 10,
+  "estimatedMinutes": 15,
   "recommendedInterval": "P6M"
 }

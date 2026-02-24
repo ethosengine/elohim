@@ -8,26 +8,17 @@
       "id": "att-q1",
       "purpose": "discovery",
       "content": {
-        "content": "I worry about being abandoned by people close to me.\n\n[[☃ radio 1]]",
+        "content": "I worry about being abandoned by people close to me.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "radio 1": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                { "content": "1 - Strongly Disagree", "id": "att-q1-choice-0" },
-                { "content": "2", "id": "att-q1-choice-1" },
-                { "content": "3", "id": "att-q1-choice-2" },
-                { "content": "4", "id": "att-q1-choice-3" },
-                { "content": "5", "id": "att-q1-choice-4" },
-                { "content": "6", "id": "att-q1-choice-5" },
-                { "content": "7 - Strongly Agree", "id": "att-q1-choice-6" }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
             "version": { "major": 0, "minor": 0 }
@@ -35,21 +26,21 @@
         }
       },
       "subscaleContributions": {
-        "radio 1": {
-          "0": { "anxiety": 1, "avoidance": 0 },
-          "1": { "anxiety": 2, "avoidance": 0 },
-          "2": { "anxiety": 3, "avoidance": 0 },
-          "3": { "anxiety": 4, "avoidance": 0 },
-          "4": { "anxiety": 5, "avoidance": 0 },
-          "5": { "anxiety": 6, "avoidance": 0 },
-          "6": { "anxiety": 7, "avoidance": 0 }
+        "likert-scale 1": {
+          "1": { "anxiety": 1 },
+          "2": { "anxiety": 2 },
+          "3": { "anxiety": 3 },
+          "4": { "anxiety": 4 },
+          "5": { "anxiety": 5 },
+          "6": { "anxiety": 6 },
+          "7": { "anxiety": 7 }
         }
       },
       "metadata": {
         "sourceContentId": "assessment-attachment-style",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "estimatedTimeSeconds": 30,
+        "estimatedTimeSeconds": 15,
         "questionType": "core",
         "tags": ["assessment", "attachment", "relationships"],
         "instrumentId": "attachment-style-discovery"
@@ -59,26 +50,17 @@
       "id": "att-q2",
       "purpose": "discovery",
       "content": {
-        "content": "I find it easy to depend on others.\n\n[[☃ radio 1]]",
+        "content": "I need constant reassurance that I am loved.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "radio 1": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                { "content": "1 - Strongly Disagree", "id": "att-q2-choice-0" },
-                { "content": "2", "id": "att-q2-choice-1" },
-                { "content": "3", "id": "att-q2-choice-2" },
-                { "content": "4", "id": "att-q2-choice-3" },
-                { "content": "5", "id": "att-q2-choice-4" },
-                { "content": "6", "id": "att-q2-choice-5" },
-                { "content": "7 - Strongly Agree", "id": "att-q2-choice-6" }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
             "version": { "major": 0, "minor": 0 }
@@ -86,21 +68,21 @@
         }
       },
       "subscaleContributions": {
-        "radio 1": {
-          "0": { "anxiety": 0, "avoidance": 7 },
-          "1": { "anxiety": 0, "avoidance": 6 },
-          "2": { "anxiety": 0, "avoidance": 5 },
-          "3": { "anxiety": 0, "avoidance": 4 },
-          "4": { "anxiety": 0, "avoidance": 3 },
-          "5": { "anxiety": 0, "avoidance": 2 },
-          "6": { "anxiety": 0, "avoidance": 1 }
+        "likert-scale 1": {
+          "1": { "anxiety": 1 },
+          "2": { "anxiety": 2 },
+          "3": { "anxiety": 3 },
+          "4": { "anxiety": 4 },
+          "5": { "anxiety": 5 },
+          "6": { "anxiety": 6 },
+          "7": { "anxiety": 7 }
         }
       },
       "metadata": {
         "sourceContentId": "assessment-attachment-style",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "estimatedTimeSeconds": 30,
+        "estimatedTimeSeconds": 15,
         "questionType": "core",
         "tags": ["assessment", "attachment", "relationships"],
         "instrumentId": "attachment-style-discovery"
@@ -110,26 +92,17 @@
       "id": "att-q3",
       "purpose": "discovery",
       "content": {
-        "content": "I often worry that my partner doesn't really love me.\n\n[[☃ radio 1]]",
+        "content": "I often worry that my partner will not want to stay with me.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "radio 1": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                { "content": "1 - Strongly Disagree", "id": "att-q3-choice-0" },
-                { "content": "2", "id": "att-q3-choice-1" },
-                { "content": "3", "id": "att-q3-choice-2" },
-                { "content": "4", "id": "att-q3-choice-3" },
-                { "content": "5", "id": "att-q3-choice-4" },
-                { "content": "6", "id": "att-q3-choice-5" },
-                { "content": "7 - Strongly Agree", "id": "att-q3-choice-6" }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
             "version": { "major": 0, "minor": 0 }
@@ -137,21 +110,21 @@
         }
       },
       "subscaleContributions": {
-        "radio 1": {
-          "0": { "anxiety": 1, "avoidance": 0 },
-          "1": { "anxiety": 2, "avoidance": 0 },
-          "2": { "anxiety": 3, "avoidance": 0 },
-          "3": { "anxiety": 4, "avoidance": 0 },
-          "4": { "anxiety": 5, "avoidance": 0 },
-          "5": { "anxiety": 6, "avoidance": 0 },
-          "6": { "anxiety": 7, "avoidance": 0 }
+        "likert-scale 1": {
+          "1": { "anxiety": 1 },
+          "2": { "anxiety": 2 },
+          "3": { "anxiety": 3 },
+          "4": { "anxiety": 4 },
+          "5": { "anxiety": 5 },
+          "6": { "anxiety": 6 },
+          "7": { "anxiety": 7 }
         }
       },
       "metadata": {
         "sourceContentId": "assessment-attachment-style",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "estimatedTimeSeconds": 30,
+        "estimatedTimeSeconds": 15,
         "questionType": "core",
         "tags": ["assessment", "attachment", "relationships"],
         "instrumentId": "attachment-style-discovery"
@@ -161,26 +134,17 @@
       "id": "att-q4",
       "purpose": "discovery",
       "content": {
-        "content": "I feel comfortable opening up to others.\n\n[[☃ radio 1]]",
+        "content": "I feel comfortable depending on others.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "radio 1": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                { "content": "1 - Strongly Disagree", "id": "att-q4-choice-0" },
-                { "content": "2", "id": "att-q4-choice-1" },
-                { "content": "3", "id": "att-q4-choice-2" },
-                { "content": "4", "id": "att-q4-choice-3" },
-                { "content": "5", "id": "att-q4-choice-4" },
-                { "content": "6", "id": "att-q4-choice-5" },
-                { "content": "7 - Strongly Agree", "id": "att-q4-choice-6" }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
             "version": { "major": 0, "minor": 0 }
@@ -188,21 +152,21 @@
         }
       },
       "subscaleContributions": {
-        "radio 1": {
-          "0": { "anxiety": 0, "avoidance": 7 },
-          "1": { "anxiety": 0, "avoidance": 6 },
-          "2": { "anxiety": 0, "avoidance": 5 },
-          "3": { "anxiety": 0, "avoidance": 4 },
-          "4": { "anxiety": 0, "avoidance": 3 },
-          "5": { "anxiety": 0, "avoidance": 2 },
-          "6": { "anxiety": 0, "avoidance": 1 }
+        "likert-scale 1": {
+          "1": { "anxiety": 7 },
+          "2": { "anxiety": 6 },
+          "3": { "anxiety": 5 },
+          "4": { "anxiety": 4 },
+          "5": { "anxiety": 3 },
+          "6": { "anxiety": 2 },
+          "7": { "anxiety": 1 }
         }
       },
       "metadata": {
         "sourceContentId": "assessment-attachment-style",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "estimatedTimeSeconds": 30,
+        "estimatedTimeSeconds": 15,
         "questionType": "core",
         "tags": ["assessment", "attachment", "relationships"],
         "instrumentId": "attachment-style-discovery"
@@ -212,26 +176,17 @@
       "id": "att-q5",
       "purpose": "discovery",
       "content": {
-        "content": "I need a lot of reassurance that I am loved.\n\n[[☃ radio 1]]",
+        "content": "I find that others are reluctant to get as close as I would like.\n\n[[☃ likert-scale 1]]",
         "images": {},
         "widgets": {
-          "radio 1": {
-            "type": "radio",
+          "likert-scale 1": {
+            "type": "likert-scale",
             "options": {
-              "choices": [
-                { "content": "1 - Strongly Disagree", "id": "att-q5-choice-0" },
-                { "content": "2", "id": "att-q5-choice-1" },
-                { "content": "3", "id": "att-q5-choice-2" },
-                { "content": "4", "id": "att-q5-choice-3" },
-                { "content": "5", "id": "att-q5-choice-4" },
-                { "content": "6", "id": "att-q5-choice-5" },
-                { "content": "7 - Strongly Agree", "id": "att-q5-choice-6" }
-              ],
-              "randomize": false,
-              "multipleSelect": false,
-              "displayCount": null,
-              "hasNoneOfTheAbove": false,
-              "deselectEnabled": false
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
             },
             "graded": false,
             "version": { "major": 0, "minor": 0 }
@@ -239,21 +194,399 @@
         }
       },
       "subscaleContributions": {
-        "radio 1": {
-          "0": { "anxiety": 1, "avoidance": 0 },
-          "1": { "anxiety": 2, "avoidance": 0 },
-          "2": { "anxiety": 3, "avoidance": 0 },
-          "3": { "anxiety": 4, "avoidance": 0 },
-          "4": { "anxiety": 5, "avoidance": 0 },
-          "5": { "anxiety": 6, "avoidance": 0 },
-          "6": { "anxiety": 7, "avoidance": 0 }
+        "likert-scale 1": {
+          "1": { "anxiety": 1 },
+          "2": { "anxiety": 2 },
+          "3": { "anxiety": 3 },
+          "4": { "anxiety": 4 },
+          "5": { "anxiety": 5 },
+          "6": { "anxiety": 6 },
+          "7": { "anxiety": 7 }
         }
       },
       "metadata": {
         "sourceContentId": "assessment-attachment-style",
         "bloomsLevel": "remember",
         "difficulty": "medium",
-        "estimatedTimeSeconds": 30,
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q6",
+      "purpose": "discovery",
+      "content": {
+        "content": "I get frustrated when people are not available when I need them.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "anxiety": 1 },
+          "2": { "anxiety": 2 },
+          "3": { "anxiety": 3 },
+          "4": { "anxiety": 4 },
+          "5": { "anxiety": 5 },
+          "6": { "anxiety": 6 },
+          "7": { "anxiety": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q7",
+      "purpose": "discovery",
+      "content": {
+        "content": "I feel confident in others' care for me.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "anxiety": 7 },
+          "2": { "anxiety": 6 },
+          "3": { "anxiety": 5 },
+          "4": { "anxiety": 4 },
+          "5": { "anxiety": 3 },
+          "6": { "anxiety": 2 },
+          "7": { "anxiety": 1 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q8",
+      "purpose": "discovery",
+      "content": {
+        "content": "I prefer not to show others how I feel deep down.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "avoidance": 1 },
+          "2": { "avoidance": 2 },
+          "3": { "avoidance": 3 },
+          "4": { "avoidance": 4 },
+          "5": { "avoidance": 5 },
+          "6": { "avoidance": 6 },
+          "7": { "avoidance": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q9",
+      "purpose": "discovery",
+      "content": {
+        "content": "I feel comfortable sharing my private thoughts with others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "avoidance": 7 },
+          "2": { "avoidance": 6 },
+          "3": { "avoidance": 5 },
+          "4": { "avoidance": 4 },
+          "5": { "avoidance": 3 },
+          "6": { "avoidance": 2 },
+          "7": { "avoidance": 1 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q10",
+      "purpose": "discovery",
+      "content": {
+        "content": "I find it difficult to depend on others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "avoidance": 1 },
+          "2": { "avoidance": 2 },
+          "3": { "avoidance": 3 },
+          "4": { "avoidance": 4 },
+          "5": { "avoidance": 5 },
+          "6": { "avoidance": 6 },
+          "7": { "avoidance": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q11",
+      "purpose": "discovery",
+      "content": {
+        "content": "I am comfortable being close to others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "avoidance": 7 },
+          "2": { "avoidance": 6 },
+          "3": { "avoidance": 5 },
+          "4": { "avoidance": 4 },
+          "5": { "avoidance": 3 },
+          "6": { "avoidance": 2 },
+          "7": { "avoidance": 1 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q12",
+      "purpose": "discovery",
+      "content": {
+        "content": "I prefer not to be too close to others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "avoidance": 1 },
+          "2": { "avoidance": 2 },
+          "3": { "avoidance": 3 },
+          "4": { "avoidance": 4 },
+          "5": { "avoidance": 5 },
+          "6": { "avoidance": 6 },
+          "7": { "avoidance": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q13",
+      "purpose": "discovery",
+      "content": {
+        "content": "I worry about being hurt if I allow myself to become too close to others.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "avoidance": 1 },
+          "2": { "avoidance": 2 },
+          "3": { "avoidance": 3 },
+          "4": { "avoidance": 4 },
+          "5": { "avoidance": 5 },
+          "6": { "avoidance": 6 },
+          "7": { "avoidance": 7 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
+        "questionType": "core",
+        "tags": ["assessment", "attachment", "relationships"],
+        "instrumentId": "attachment-style-discovery"
+      }
+    },
+    {
+      "id": "att-q14",
+      "purpose": "discovery",
+      "content": {
+        "content": "I am comfortable with emotional intimacy in relationships.\n\n[[☃ likert-scale 1]]",
+        "images": {},
+        "widgets": {
+          "likert-scale 1": {
+            "type": "likert-scale",
+            "options": {
+              "min": 1,
+              "max": 7,
+              "step": 1,
+              "minLabel": "Strongly Disagree",
+              "maxLabel": "Strongly Agree"
+            },
+            "graded": false,
+            "version": { "major": 0, "minor": 0 }
+          }
+        }
+      },
+      "subscaleContributions": {
+        "likert-scale 1": {
+          "1": { "avoidance": 7 },
+          "2": { "avoidance": 6 },
+          "3": { "avoidance": 5 },
+          "4": { "avoidance": 4 },
+          "5": { "avoidance": 3 },
+          "6": { "avoidance": 2 },
+          "7": { "avoidance": 1 }
+        }
+      },
+      "metadata": {
+        "sourceContentId": "assessment-attachment-style",
+        "bloomsLevel": "remember",
+        "difficulty": "medium",
+        "estimatedTimeSeconds": 15,
         "questionType": "core",
         "tags": ["assessment", "attachment", "relationships"],
         "instrumentId": "attachment-style-discovery"
@@ -274,12 +607,12 @@
   "metadata": {
     "assessmentType": "discovery",
     "domain": "attachment",
-    "estimatedTime": "25-35 minutes",
+    "estimatedTime": "10-15 minutes",
     "attestationId": "attachment-aware",
     "contentAccess": "gated",
     "prerequisiteAttestation": "values-examined",
     "instrumentId": "attachment-style-discovery",
-    "questionCount": 5,
+    "questionCount": 14,
     "validation": {
       "inspired_by": "Experiences in Close Relationships (ECR-R)",
       "reliability": "Adapted for educational purposes"
