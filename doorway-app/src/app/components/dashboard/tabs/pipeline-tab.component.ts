@@ -37,7 +37,7 @@ interface FunnelStage {
       } @else if (error()) {
         <div class="error-state">
           <p>{{ error() }}</p>
-          <button (click)="loadPipeline()">Retry</button>
+          <button (click)="loadPipeline()" data-testid="pipeline-retry">Retry</button>
         </div>
       } @else {
         <!-- Total -->

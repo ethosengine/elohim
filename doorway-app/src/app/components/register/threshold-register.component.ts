@@ -80,7 +80,7 @@ type RegisterState =
         @if (error()) {
           <div class="error-banner">
             <span>{{ error() }}</span>
-            <button class="dismiss" (click)="clearError()">×</button>
+            <button class="dismiss" (click)="clearError()" data-testid="threshold-register-error-dismiss">×</button>
           </div>
         }
 
@@ -93,6 +93,7 @@ type RegisterState =
                 type="text"
                 id="displayName"
                 name="displayName"
+                data-testid="threshold-register-display-name"
                 [(ngModel)]="form.displayName"
                 required
                 autocomplete="name"
@@ -112,6 +113,7 @@ type RegisterState =
                   autocomplete="email"
                   placeholder="username"
                   class="identifier-input"
+                  data-testid="threshold-register-email"
                 />
                 <span class="domain-suffix">&#64;{{ gatewayDomain() }}</span>
               </div>
@@ -129,6 +131,7 @@ type RegisterState =
                 minlength="8"
                 autocomplete="new-password"
                 placeholder="At least 8 characters"
+                data-testid="threshold-register-password"
               />
             </div>
 
@@ -142,6 +145,7 @@ type RegisterState =
                 required
                 autocomplete="new-password"
                 placeholder="Re-enter your password"
+                data-testid="threshold-register-confirm-password"
               />
               @if (form.password && form.confirmPassword && form.password !== form.confirmPassword) {
                 <span class="field-error">Passwords do not match</span>
@@ -152,6 +156,7 @@ type RegisterState =
               type="submit"
               class="btn-primary"
               [disabled]="!registerForm.valid || form.password !== form.confirmPassword"
+              data-testid="threshold-register-submit"
             >
               Create Account
             </button>
@@ -159,7 +164,7 @@ type RegisterState =
             @if (oauthParams()) {
               <div class="federated-section">
                 <div class="divider"><span>or</span></div>
-                <a [href]="federatedRegisterUrl()" class="federated-link">
+                <a [href]="federatedRegisterUrl()" class="federated-link" data-testid="threshold-register-federated">
                   Register with a different doorway
                 </a>
               </div>
@@ -191,13 +196,13 @@ type RegisterState =
 
         @if (state() === 'error') {
           <div class="error-state">
-            <button class="btn-secondary" (click)="retry()">Try Again</button>
+            <button class="btn-secondary" (click)="retry()" data-testid="threshold-register-retry">Try Again</button>
           </div>
         }
 
         <!-- Footer -->
         <div class="footer">
-          <p>Already have an account? <a [href]="loginUrl()">Sign in</a></p>
+          <p>Already have an account? <a [href]="loginUrl()" data-testid="threshold-register-login-link">Sign in</a></p>
         </div>
       </div>
     </div>

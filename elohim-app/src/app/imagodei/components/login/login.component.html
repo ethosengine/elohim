@@ -46,6 +46,7 @@
             type="submit"
             class="btn btn-primary"
             [disabled]="isLoading() || !federatedIdentifier.trim()"
+            data-testid="login-federated-submit"
           >
             @if (isLoading()) {
               <span class="spinner"></span>
@@ -108,12 +109,14 @@
               required
               autocomplete="current-password"
               [disabled]="isLoading()"
+              data-testid="login-unlock-password"
             />
             <button
               type="button"
               class="password-toggle"
               (click)="togglePasswordVisibility()"
               [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+              data-testid="login-unlock-password-toggle"
             >
               {{ showPassword() ? 'Hide' : 'Show' }}
             </button>
@@ -121,7 +124,12 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary" [disabled]="isLoading() || !unlockPassword">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="isLoading() || !unlockPassword"
+            data-testid="login-unlock-submit"
+          >
             @if (isLoading()) {
               <span class="spinner"></span>
               Unlocking...
@@ -133,10 +141,20 @@
       </form>
 
       <div class="login-footer">
-        <button type="button" class="link-button" (click)="showAccountSwitcher()">
+        <button
+          type="button"
+          class="link-button"
+          (click)="showAccountSwitcher()"
+          data-testid="login-switch-account"
+        >
           Switch account
         </button>
-        <button type="button" class="link-button" (click)="goBackToFederated()">
+        <button
+          type="button"
+          class="link-button"
+          (click)="goBackToFederated()"
+          data-testid="login-back-to-federated"
+        >
           Use a different doorway
         </button>
       </div>
@@ -186,6 +204,7 @@
           class="step-back"
           (click)="goBackToFederated()"
           aria-label="Change doorway"
+          data-testid="login-credentials-back"
         >
           <span class="material-icons">arrow_back</span>
         </button>
@@ -266,6 +285,7 @@
               class="password-toggle"
               (click)="togglePasswordVisibility()"
               [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+              data-testid="login-password-toggle"
             >
               {{ showPassword() ? 'Hide' : 'Show' }}
             </button>
@@ -280,6 +300,7 @@
               [(ngModel)]="form.rememberMe"
               name="rememberMe"
               [disabled]="isLoading()"
+              data-testid="login-remember-me"
             />
             <span>Remember my email</span>
           </label>
@@ -307,9 +328,16 @@
       <div class="login-footer">
         <p class="register-prompt">
           Don't have an account?
-          <button type="button" (click)="goToRegister()" class="register-link">Create one</button>
+          <button
+            type="button"
+            (click)="goToRegister()"
+            class="register-link"
+            data-testid="login-go-to-register"
+          >
+            Create one
+          </button>
         </p>
-        <a routerLink="/" class="back-link">&#x2190; Back to Home</a>
+        <a routerLink="/" class="back-link" data-testid="login-back-home">&#x2190; Back to Home</a>
       </div>
     </div>
   }

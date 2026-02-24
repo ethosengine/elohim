@@ -39,7 +39,7 @@ const AGENCY_STEPS: PipelineStep[] = [
     <div class="account-page">
       <header class="page-header">
         <h1>My Account</h1>
-        <a routerLink="/" class="back-link">Back to doorway</a>
+        <a routerLink="/" class="back-link" data-testid="account-back">Back to doorway</a>
       </header>
 
       <!-- Loading -->
@@ -54,7 +54,7 @@ const AGENCY_STEPS: PipelineStep[] = [
       @if (error()) {
         <div class="error-state">
           <p>{{ error() }}</p>
-          <button class="btn-secondary" (click)="loadAccount()">Retry</button>
+          <button class="btn-secondary" (click)="loadAccount()" data-testid="account-retry">Retry</button>
         </div>
       }
 

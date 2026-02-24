@@ -12,7 +12,7 @@ import {
   computed,
 } from '@angular/core';
 
-// @coverage: 88.6% (2026-02-05)
+// @coverage: 88.6% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -127,7 +127,12 @@ export interface MasteryQuizRequestEvent {
 
           <!-- Quiz button -->
           <div class="gate-actions">
-            <button class="btn-start-quiz" [disabled]="!canAttempt()" (click)="onStartQuiz()">
+            <button
+              class="btn-start-quiz"
+              [disabled]="!canAttempt()"
+              (click)="onStartQuiz()"
+              data-testid="gate-start"
+            >
               @if (inCooldown()) {
                 Cooldown Active
               } @else if (attemptsRemaining() === 0) {
@@ -157,7 +162,9 @@ export interface MasteryQuizRequestEvent {
           </div>
 
           <div class="gate-actions">
-            <button class="btn-continue" (click)="onContinue()">Continue to Next Section</button>
+            <button class="btn-continue" (click)="onContinue()" data-testid="gate-continue">
+              Continue to Next Section
+            </button>
           </div>
         }
       </div>

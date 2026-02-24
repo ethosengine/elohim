@@ -10,7 +10,7 @@ import {
   computed,
 } from '@angular/core';
 
-// @coverage: 22.2% (2026-02-05)
+// @coverage: 22.2% (2026-02-24)
 
 import { SkipAheadResult } from '../../services/path-adaptation.service';
 
@@ -97,8 +97,12 @@ export interface SkipSelectionEvent {
           </div>
 
           <div class="offer-actions">
-            <button class="btn-assess" (click)="onTakeAssessment()">Take Pre-Assessment</button>
-            <button class="btn-skip" (click)="onStartFromBeginning()">Start from Beginning</button>
+            <button class="btn-assess" (click)="onTakeAssessment()" data-testid="assessment-take">
+              Take Pre-Assessment
+            </button>
+            <button class="btn-skip" (click)="onStartFromBeginning()" data-testid="assessment-skip">
+              Start from Beginning
+            </button>
           </div>
 
           <p class="offer-hint">
@@ -159,12 +163,17 @@ export interface SkipSelectionEvent {
                 class="btn-apply"
                 [disabled]="selectedSections().size === 0"
                 (click)="onApplySkips()"
+                data-testid="assessment-apply"
               >
                 Skip Selected ({{ selectedSections().size }})
               </button>
-              <button class="btn-no-skip" (click)="onNoSkip()">Don't Skip Any</button>
+              <button class="btn-no-skip" (click)="onNoSkip()" data-testid="assessment-no-skip">
+                Don't Skip Any
+              </button>
             } @else {
-              <button class="btn-start" (click)="onNoSkip()">Start Learning</button>
+              <button class="btn-start" (click)="onNoSkip()" data-testid="assessment-start">
+                Start Learning
+              </button>
             }
           </div>
 

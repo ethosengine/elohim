@@ -72,7 +72,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
         @if (error()) {
           <div class="error-banner" data-testid="threshold-error">
             <span>{{ error() }}</span>
-            <button class="dismiss" (click)="clearError()">×</button>
+            <button class="dismiss" (click)="clearError()" data-testid="threshold-error-dismiss">×</button>
           </div>
         }
 
@@ -119,7 +119,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
             @if (oauthParams()) {
               <div class="federated-section">
                 <div class="divider"><span>or</span></div>
-                <a [href]="federatedLoginUrl()" class="federated-link">
+                <a [href]="federatedLoginUrl()" class="federated-link" data-testid="threshold-federated-login">
                   Login with a different doorway
                 </a>
               </div>
@@ -150,7 +150,7 @@ type LoginState = 'form' | 'authenticating' | 'authorizing' | 'error';
 
         <!-- Footer -->
         <div class="footer">
-          <p>Don't have an account? <a [href]="registerUrl()">Register here</a></p>
+          <p>Don't have an account? <a [href]="registerUrl()" data-testid="threshold-register-link">Register here</a></p>
         </div>
       </div>
     </div>

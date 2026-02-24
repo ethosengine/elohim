@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
-// @coverage: 46.7% (2026-02-05)
+// @coverage: 46.7% (2026-02-24)
 
 import { ContentNode } from '../../../models/content-node.model';
 import { ContentFormatRegistryService } from '../../services/content-format-registry.service';
@@ -27,6 +27,7 @@ import { ContentIOService } from '../../services/content-io.service';
       (click)="download()"
       [disabled]="downloading"
       [title]="'Download as ' + formatLabel"
+      data-testid="content-download"
     >
       <span class="icon">{{ downloading ? '⏳' : '⬇️' }}</span>
       <span class="label">{{ formatLabel }}</span>

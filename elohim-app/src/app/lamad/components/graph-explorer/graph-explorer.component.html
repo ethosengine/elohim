@@ -23,6 +23,7 @@
           [class.active]="viewMode === 'path-hierarchy'"
           (click)="setViewMode('path-hierarchy')"
           title="View by learning path structure"
+          data-testid="graph-view-hierarchy"
         >
           <span class="icon">&#9672;</span>
           Hierarchy
@@ -33,6 +34,7 @@
           [class.active]="viewMode === 'overview'"
           (click)="setViewMode('overview')"
           title="View flat overview"
+          data-testid="graph-view-overview"
         >
           <span class="icon">&#9679;</span>
           Overview
@@ -45,16 +47,29 @@
           class="control-btn return-to-path"
           (click)="returnToPath()"
           title="Return to path"
+          data-testid="graph-return-to-path"
         >
           <span class="icon">&#8592;</span>
           Return to Path
         </button>
       }
-      <button type="button" class="control-btn" (click)="resetZoom()" title="Reset zoom">
+      <button
+        type="button"
+        class="control-btn"
+        (click)="resetZoom()"
+        title="Reset zoom"
+        data-testid="graph-reset-zoom"
+      >
         <span class="icon">&#8634;</span>
         Reset
       </button>
-      <button type="button" class="control-btn" routerLink="/lamad" title="Back to paths">
+      <button
+        type="button"
+        class="control-btn"
+        routerLink="/lamad"
+        title="Back to paths"
+        data-testid="graph-back-to-paths"
+      >
         <span class="icon">&#8592;</span>
         Paths
       </button>
@@ -74,7 +89,12 @@
     <div class="error-state">
       <h2>Unable to load graph</h2>
       <p>{{ error }}</p>
-      <button type="button" class="btn btn-primary" (click)="loadPathHierarchy(currentPathId)">
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="loadPathHierarchy(currentPathId)"
+        data-testid="graph-retry"
+      >
         Retry
       </button>
     </div>

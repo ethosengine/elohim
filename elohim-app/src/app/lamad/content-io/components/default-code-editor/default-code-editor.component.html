@@ -13,11 +13,18 @@
         (click)="onSave()"
         [disabled]="readonly || isSaving"
         title="Save (Ctrl+S)"
+        data-testid="editor-save"
       >
         <span *ngIf="isSaving">Saving...</span>
         <span *ngIf="!isSaving">Save</span>
       </button>
-      <button type="button" class="btn btn-secondary" (click)="onCancel()" title="Cancel (Escape)">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        (click)="onCancel()"
+        title="Cancel (Escape)"
+        data-testid="editor-cancel"
+      >
         Cancel
       </button>
     </div>
@@ -47,6 +54,7 @@
         (ngModelChange)="onMetadataChange()"
         [disabled]="readonly"
         placeholder="Enter title..."
+        data-testid="editor-title"
       />
     </div>
 
@@ -60,6 +68,7 @@
         [disabled]="readonly"
         placeholder="Brief description..."
         rows="2"
+        data-testid="editor-description"
       ></textarea>
     </div>
 
@@ -73,6 +82,7 @@
         (ngModelChange)="onMetadataChange()"
         [disabled]="readonly"
         placeholder="tag1, tag2, tag3..."
+        data-testid="editor-tags"
       />
       <span class="input-hint">Separate tags with commas</span>
     </div>
@@ -100,6 +110,7 @@
         [disabled]="readonly"
         placeholder="Enter content..."
         spellcheck="false"
+        data-testid="editor-content"
       ></textarea>
     </div>
   </section>

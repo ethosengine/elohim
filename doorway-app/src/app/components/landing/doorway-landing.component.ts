@@ -133,9 +133,9 @@ type LoadingState = 'loading' | 'ready' | 'error';
 
         <!-- Actions -->
         <section class="actions">
-          <a routerLink="/login" class="btn-primary">Sign In</a>
-          <a routerLink="/register" class="btn-secondary">Create Account</a>
-          <a routerLink="/dashboard" class="btn-link">Operator Dashboard</a>
+          <a routerLink="/login" class="btn-primary" data-testid="landing-sign-in">Sign In</a>
+          <a routerLink="/register" class="btn-secondary" data-testid="landing-create-account">Create Account</a>
+          <a routerLink="/dashboard" class="btn-link" data-testid="landing-dashboard">Operator Dashboard</a>
         </section>
       }
 

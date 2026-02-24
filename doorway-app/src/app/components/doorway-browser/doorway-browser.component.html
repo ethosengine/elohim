@@ -11,7 +11,7 @@
     @if (error()) {
       <div class="error-banner">
         <span>{{ error() }}</span>
-        <button class="btn-secondary" (click)="retry()">Retry</button>
+        <button class="btn-secondary" (click)="retry()" data-testid="browser-retry">Retry</button>
       </div>
     }
 
@@ -32,12 +32,14 @@
           placeholder="Search doorways..."
           [(ngModel)]="searchQuery"
           (input)="applySearch()"
+          data-testid="browser-search"
         />
         @if (regions().length > 1) {
           <select
             class="region-select"
             [(ngModel)]="regionFilter"
             (change)="applyRegionFilter()"
+            data-testid="browser-region-filter"
           >
             <option value="">All regions</option>
             @for (region of regions(); track region) {
@@ -106,7 +108,7 @@
 
     <!-- Back link -->
     <div class="footer">
-      <a [href]="loginUrl()" class="back-link">Back to login</a>
+      <a [href]="loginUrl()" class="back-link" data-testid="browser-back-to-login">Back to login</a>
     </div>
   </div>
 </div>

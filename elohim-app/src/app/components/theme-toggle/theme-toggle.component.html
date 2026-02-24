@@ -5,6 +5,7 @@
   (click)="toggleTheme()"
   [title]="getTooltip()"
   [attr.aria-label]="getTooltip()"
+  data-testid="theme-toggle"
 >
   <span class="theme-icon">
     {{ getIcon() }}

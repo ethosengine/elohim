@@ -34,7 +34,7 @@ import {
         <section class="peers-config-section">
           <div class="section-header">
             <h3>Configured Peers ({{ peerConfig().length }})</h3>
-            <button class="btn btn-sm btn-secondary" (click)="refreshPeers()" [disabled]="refreshing()">
+            <button class="btn btn-sm btn-secondary" (click)="refreshPeers()" [disabled]="refreshing()" data-testid="federation-refresh">
               {{ refreshing() ? 'Refreshing...' : 'Refresh' }}
             </button>
           </div>
@@ -48,8 +48,9 @@ import {
               [(ngModel)]="newPeerUrl"
               (keyup.enter)="addPeer()"
               [disabled]="addingPeer()"
+              data-testid="federation-peer-url"
             />
-            <button class="btn btn-sm btn-primary" (click)="addPeer()" [disabled]="addingPeer() || !newPeerUrl">
+            <button class="btn btn-sm btn-primary" (click)="addPeer()" [disabled]="addingPeer() || !newPeerUrl" data-testid="federation-add-peer">
               {{ addingPeer() ? 'Adding...' : 'Add Peer' }}
             </button>
           </div>

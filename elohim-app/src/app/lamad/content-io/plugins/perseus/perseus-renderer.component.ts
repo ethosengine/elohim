@@ -14,7 +14,7 @@ import {
   inject,
 } from '@angular/core';
 
-// @coverage: 22.4% (2026-02-05)
+// @coverage: 22.9% (2026-02-24)
 
 import { Subject } from 'rxjs';
 
@@ -153,7 +153,12 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
 
       <!-- Controls -->
       <footer class="quiz-controls" *ngIf="!reviewMode">
-        <button class="btn btn-secondary" *ngIf="showHintButton && !hintShown" (click)="showHint()">
+        <button
+          class="btn btn-secondary"
+          *ngIf="showHintButton && !hintShown"
+          (click)="showHint()"
+          data-testid="perseus-hint"
+        >
           Show Hint
         </button>
 
@@ -161,11 +166,17 @@ const QUIZ_MODE_PRESETS: Record<QuizMode, QuizModeConfig> = {
           class="btn btn-primary"
           [disabled]="!hasAnswer || isSubmitting"
           (click)="submitAnswer()"
+          data-testid="perseus-submit"
         >
           {{ submitButtonText }}
         </button>
 
-        <button class="btn btn-secondary" *ngIf="showNextButton" (click)="nextQuestion()">
+        <button
+          class="btn btn-secondary"
+          *ngIf="showNextButton"
+          (click)="nextQuestion()"
+          data-testid="perseus-next"
+        >
           {{ isLastQuestion ? 'See Results' : modeConfig.nextButtonText }}
         </button>
       </footer>

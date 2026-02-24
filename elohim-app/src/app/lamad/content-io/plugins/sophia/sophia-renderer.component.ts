@@ -29,7 +29,7 @@ import {
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 92.6% (2026-02-05)
+// @coverage: 92.7% (2026-02-24)
 
 import { Subject } from 'rxjs';
 
@@ -145,7 +145,9 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
                   </div>
                 </div>
               </div>
-              <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
+              <a class="profile-link" routerLink="/lamad/me" data-testid="sophia-dashboard">
+                View your Dashboard →
+              </a>
             }
           } @else {
             <!-- Discovery/Reflection Mode Results -->
@@ -171,19 +173,29 @@ const MODE_PRESETS: Record<AssessmentMode, ModeConfig> = {
                     <span class="preview-detail">{{ profile.totalXP | number }} XP</span>
                   </div>
                 </div>
-                <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
+                <a class="profile-link" routerLink="/lamad/me" data-testid="sophia-dashboard">
+                  View your Dashboard →
+                </a>
               </div>
             } @else {
               <div class="imagodei-preview">
                 <p class="preview-text">Your responses will be saved to your learning profile.</p>
-                <a class="profile-link" routerLink="/lamad/me">View your Dashboard →</a>
+                <a class="profile-link" routerLink="/lamad/me" data-testid="sophia-dashboard">
+                  View your Dashboard →
+                </a>
               </div>
             }
           }
 
           <!-- Continue navigation -->
           <div class="results-actions">
-            <button class="btn btn-primary" (click)="completeAndContinue()">Continue</button>
+            <button
+              class="btn btn-primary"
+              (click)="completeAndContinue()"
+              data-testid="sophia-continue"
+            >
+              Continue
+            </button>
           </div>
         </div>
       } @else {

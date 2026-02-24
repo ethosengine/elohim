@@ -12,7 +12,14 @@
     <div class="error-state">
       <h2>Unable to load path</h2>
       <p>{{ error }}</p>
-      <button type="button" class="btn btn-primary" (click)="goHome()">Back to Home</button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="goHome()"
+        data-testid="overview-error-back"
+      >
+        Back to Home
+      </button>
     </div>
   }
 
@@ -20,7 +27,7 @@
   @if (!isLoading && !error && path) {
     <!-- Back Navigation -->
     <nav class="back-nav">
-      <button type="button" class="btn-back" (click)="goHome()">
+      <button type="button" class="btn-back" (click)="goHome()" data-testid="overview-back-home">
         <span class="icon">&#8592;</span>
         All Paths
       </button>
@@ -364,6 +371,7 @@
           *ngIf="hasStarted() && !isCompleted()"
           class="btn btn-primary btn-large"
           (click)="continueJourney()"
+          data-testid="overview-continue-journey"
         >
           Continue Journey
         </button>
@@ -373,15 +381,25 @@
           *ngIf="!hasStarted()"
           class="btn btn-primary btn-large"
           (click)="beginJourney()"
+          data-testid="overview-begin-journey"
         >
           Begin Journey
         </button>
 
-        <button type="button" class="btn btn-secondary" (click)="goHome()">
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="goHome()"
+          data-testid="overview-back-all-paths"
+        >
           Back to All Paths
         </button>
 
-        <a [routerLink]="['/lamad/resource', 'path-' + pathId]" class="view-resource-link">
+        <a
+          [routerLink]="['/lamad/resource', 'path-' + pathId]"
+          class="view-resource-link"
+          data-testid="overview-view-as-content"
+        >
           <span class="icon">↗</span>
           View as Content
         </a>

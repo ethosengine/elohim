@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
-// @coverage: 72.8% (2026-02-05)
+// @coverage: 72.8% (2026-02-24)
 
 import hljs from 'highlight.js';
 import { Marked } from 'marked';
@@ -46,6 +46,7 @@ export interface TocEntry {
         (click)="toggleToc()"
         [class.toc-open]="tocVisible"
         title="Toggle Table of Contents"
+        data-testid="markdown-toc-toggle"
       >
         <span class="toc-icon">&#9776;</span>
       </button>
@@ -57,7 +58,9 @@ export interface TocEntry {
       <nav *ngIf="tocEntries.length > 0" class="toc-sidebar" [class.toc-visible]="tocVisible">
         <div class="toc-header">
           <span>Contents</span>
-          <button class="toc-close" (click)="toggleToc()">&times;</button>
+          <button class="toc-close" (click)="toggleToc()" data-testid="markdown-toc-close">
+            &times;
+          </button>
         </div>
         <ul class="toc-list">
           <li
@@ -82,7 +85,13 @@ export interface TocEntry {
       </article>
 
       <!-- Back to Top Button -->
-      <button *ngIf="showBackToTop" class="back-to-top" (click)="scrollToTop()" title="Back to top">
+      <button
+        *ngIf="showBackToTop"
+        class="back-to-top"
+        (click)="scrollToTop()"
+        title="Back to top"
+        data-testid="markdown-back-to-top"
+      >
         &uarr;
       </button>
     </div>

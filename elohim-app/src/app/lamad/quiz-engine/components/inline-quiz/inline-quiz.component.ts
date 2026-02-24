@@ -12,7 +12,7 @@ import {
   computed,
 } from '@angular/core';
 
-// @coverage: 48.8% (2026-02-05)
+// @coverage: 48.8% (2026-02-24)
 
 import { Subject, takeUntil } from 'rxjs';
 
@@ -101,6 +101,7 @@ export interface InlineQuizCompletionEvent {
           class="collapse-btn"
           [attr.aria-expanded]="!collapsed()"
           aria-controls="quiz-content"
+          data-testid="quiz-header-toggle"
         >
           {{ collapsed() ? '▼' : '▲' }}
         </button>
@@ -140,7 +141,12 @@ export interface InlineQuizCompletionEvent {
               <!-- Answer controls -->
               <div class="answer-controls">
                 @if (!showFeedback()) {
-                  <button class="btn-check" [disabled]="!hasAnswer()" (click)="checkAnswer()">
+                  <button
+                    class="btn-check"
+                    [disabled]="!hasAnswer()"
+                    (click)="checkAnswer()"
+                    data-testid="quiz-check"
+                  >
                     Check Answer
                   </button>
                 } @else {
@@ -155,7 +161,7 @@ export interface InlineQuizCompletionEvent {
                       }
                     </div>
                     @if (!streakAchieved()) {
-                      <button class="btn-next" (click)="nextQuestion()">
+                      <button class="btn-next" (click)="nextQuestion()" data-testid="quiz-next">
                         {{ getNextButtonLabel() }}
                       </button>
                     }
