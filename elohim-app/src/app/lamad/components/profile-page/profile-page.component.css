@@ -87,6 +87,7 @@
 }
 
 .upgrade-icon {
+  font-family: 'Material Icons';
   font-size: 2rem;
   opacity: 90%;
 }
@@ -164,6 +165,7 @@
 }
 
 .btn-icon {
+  font-family: 'Material Icons';
   font-size: 1rem;
 }
 
