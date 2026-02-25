@@ -129,6 +129,28 @@ The app runs in four modes with different content loading paths:
 - **Production**: Browser direct to doorway.elohim.host
 - **Tauri desktop**: Direct HTTP to local elohim-storage sidecar at :8090
 
+## Development Workflow
+
+### Story-First Default
+
+Before implementing a feature, find or write the a2o scenario that describes the learner's experience. The scenario is your specification. Implementation is done when the scenario passes.
+
+1. **Feel the vision** — read the epic/manifesto context in `genesis/docs/content/elohim-protocol/`
+2. **Find or write the scenario** — check `genesis/a2o/features/` for existing coverage, or write a new `.feature` file
+3. **Implement** to make the scenario pass
+4. **Commit scenario + implementation together**
+
+| Pillar | A2O Features Directory |
+|--------|----------------------|
+| lamad | `genesis/a2o/features/lamad/` |
+| imagodei | `genesis/a2o/features/auth/` |
+| qahal | `genesis/a2o/features/` (governance scenarios) |
+| elohim | `genesis/a2o/features/content/`, `federation/` |
+
+### Exploration Fallback
+
+When story-first isn't practical (prototyping, spikes), capture implementation intent before committing by appending to `.claude/data/dev-intent.jsonl` — a 3-4 sentence summary of what was built, the learner impact, and which a2o feature file needs updating. Then run `/close-loop` to generate scenario updates from your intent.
+
 ## Critical Gotchas
 
 ### RUSTFLAGS Override Required

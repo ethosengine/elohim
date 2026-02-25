@@ -21,7 +21,7 @@ import { type ReachLevel, reachEncompasses } from '@app/elohim/models/protocol-c
 import { type Attestation } from '@app/imagodei/models/attestations.model';
 import { type ResearchConsentScope } from '@app/lamad/models/knowledge-map.model';
 
-import { getDisplayConfigByFramework } from '../instruments/instrument-registry';
+import { getDisplayConfigByFramework, getInstrument } from '../instruments/instrument-registry';
 import { type AggregationContext } from '../models/community-insights.model';
 import {
   type DiscoveryAssessment,
@@ -226,6 +226,49 @@ export class DiscoveryAttestationService {
     this.saveToStorage();
 
     return result;
+  }
+
+  /**
+   * Record a discovery result from raw completion data.
+   *
+   * Bridge method for completion flows (SophiaRenderer, DiscoveryQuiz) that
+   * don't have a full DiscoveryAssessment object. Looks up the instrument
+   * registry to derive framework and category, then delegates to
+   * recordDiscoveryResult().
+   */
+  recordFromCompletion(params: {
+    contentNodeId: string;
+    assessmentTitle: string;
+    instrumentId: string;
+    subscaleScores: Record<string, number>;
+    primaryType: DiscoveryResultSummary;
+    secondaryTypes?: DiscoveryResultSummary[];
+  }): DiscoveryResult {
+    const instrument = getInstrument(params.instrumentId);
+    const framework: DiscoveryFramework =
+      instrument?.displayConfig?.framework ?? instrument?.config.id ?? 'custom';
+    const category: DiscoveryCategory = instrument?.config.category ?? 'personality';
+
+    const assessment: DiscoveryAssessment = {
+      id: params.instrumentId,
+      title: params.assessmentTitle,
+      description: '',
+      category,
+      framework,
+      contentNodeId: params.contentNodeId,
+      estimatedMinutes: 0,
+      questions: [],
+      scoring: { subscales: Object.keys(params.subscaleScores), method: 'highest-subscale' },
+      resultTypes: [],
+      allowRetake: true,
+    };
+
+    return this.recordDiscoveryResult(
+      assessment,
+      params.subscaleScores,
+      params.primaryType,
+      params.secondaryTypes
+    );
   }
 
   /**

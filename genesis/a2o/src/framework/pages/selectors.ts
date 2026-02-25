@@ -412,3 +412,20 @@ export const DISCOVERY = {
   PRIMARY_TYPE: 'discovery-primary-type',
   ATTESTATION_BADGE: 'discovery-attestation-badge',
 } as const;
+
+// Assessment completion summary (elohim-app: assessment-completion-summary.component.ts)
+export const COMPLETION = {
+  SUMMARY: 'completion-summary',
+  RESULT_CARD: 'completion-result-card',
+  ICON: 'completion-icon',
+  HEADLINE: 'completion-headline',
+  DESCRIPTION: 'completion-description',
+  HEX_BADGE: 'completion-hex-badge',
+  BADGE_REVEAL: 'completion-badge-reveal',
+  SUBSCALES: 'completion-subscales',
+  SCORE: 'completion-score',
+  MASTERY_PREVIEW: 'completion-mastery-preview',
+  PROFILE_LINK: 'completion-profile-link',
+  CONTINUE: 'completion-continue',
+  NAV: 'completion-nav',
+} as const;

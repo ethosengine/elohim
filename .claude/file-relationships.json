@@ -115,6 +115,31 @@
         }
       ]
     },
+    "a2o-sync": {
+      "description": "Implementation changes should have corresponding a2o acceptance scenarios",
+      "sync_rules": [
+        {
+          "trigger_pattern": "elohim-app/src/app/lamad/**/*.ts",
+          "notify": [],
+          "message": "Lamad implementation changed. Story-first: is there an a2o scenario for this? See genesis/a2o/features/lamad/. If exploring, capture intent in .claude/data/dev-intent.jsonl before commit."
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/imagodei/**/*.ts",
+          "notify": [],
+          "message": "ImagoDei implementation changed. Story-first: is there an a2o scenario for this? See genesis/a2o/features/auth/."
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/qahal/**/*.ts",
+          "notify": [],
+          "message": "Qahal implementation changed. Story-first: check genesis/a2o/features/ for governance scenarios."
+        },
+        {
+          "trigger_pattern": "elohim-app/src/app/shefa/**/*.ts",
+          "notify": [],
+          "message": "Shefa implementation changed. Story-first: is there an a2o scenario for this? Check genesis/a2o/features/ for economy/stewardship scenarios."
+        }
+      ]
+    },
     "model-sync": {
       "description": "ContentNode models must stay in sync between service and app",
       "pairs": [

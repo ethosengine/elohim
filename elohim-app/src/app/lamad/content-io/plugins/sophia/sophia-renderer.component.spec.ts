@@ -564,4 +564,48 @@ describe('SophiaRendererComponent', () => {
       expect(destroySpy).toHaveBeenCalled();
     });
   });
+
+  describe('Completion Summary Integration', () => {
+    it('should render app-assessment-completion-summary when showResults is true', () => {
+      component.showResults = true;
+      fixture.detectChanges();
+
+      const summary = fixture.nativeElement.querySelector('app-assessment-completion-summary');
+      expect(summary).toBeTruthy();
+    });
+
+    it('should not render completion summary when showResults is false', () => {
+      component.showResults = false;
+      fixture.detectChanges();
+
+      const summary = fixture.nativeElement.querySelector('app-assessment-completion-summary');
+      expect(summary).toBeNull();
+    });
+
+    it('should resolve instrumentId from first moment metadata', () => {
+      component.moments = [
+        {
+          id: 'moment-1',
+          content: {},
+          metadata: { instrumentId: 'attachment-style-discovery' },
+        } as unknown as Moment,
+      ];
+
+      expect(component.resolvedInstrumentId).toBe('attachment-style-discovery');
+    });
+
+    it('should return null instrumentId when no moments', () => {
+      component.moments = [];
+      expect(component.resolvedInstrumentId).toBeNull();
+    });
+
+    it('should return null instrumentId when moment has no metadata', () => {
+      component.moments = [{ id: 'moment-1', content: {} } as unknown as Moment];
+      expect(component.resolvedInstrumentId).toBeNull();
+    });
+
+    it('should return null primaryType when no psyche API', () => {
+      expect(component.resolvedPrimaryType).toBeNull();
+    });
+  });
 });

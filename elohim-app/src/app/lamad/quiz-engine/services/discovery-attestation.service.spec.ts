@@ -405,6 +405,93 @@ describe('DiscoveryAttestationService', () => {
   });
 
   // ===========================================================================
+  // recordFromCompletion()
+  // ===========================================================================
+
+  describe('recordFromCompletion()', () => {
+    const completionParams = {
+      contentNodeId: 'content-attachment-001',
+      assessmentTitle: 'Attachment Style Assessment',
+      instrumentId: 'attachment-style-discovery',
+      subscaleScores: { secure: 0.8, anxious: 0.3, avoidant: 0.2 },
+      primaryType: buildResultSummary({ typeId: 'secure', name: 'Secure', score: 0.8 }),
+    };
+
+    it('should derive framework from instrument registry displayConfig', () => {
+      const result = service.recordFromCompletion(completionParams);
+      expect(result.framework).toBe('attachment-style');
+    });
+
+    it('should derive category from instrument registry config', () => {
+      const result = service.recordFromCompletion(completionParams);
+      expect(result.category).toBe('personality');
+    });
+
+    it('should set contentNodeId on the result', () => {
+      const result = service.recordFromCompletion(completionParams);
+      expect(result.contentNodeId).toBe('content-attachment-001');
+    });
+
+    it('should set assessmentTitle on the result', () => {
+      const result = service.recordFromCompletion(completionParams);
+      expect(result.assessmentTitle).toBe('Attachment Style Assessment');
+    });
+
+    it('should create an attestation with correct framework', () => {
+      service.recordFromCompletion(completionParams);
+      expect(service.attestations().length).toBe(1);
+      expect(service.attestations()[0].result.framework).toBe('attachment-style');
+    });
+
+    it('should persist to localStorage', () => {
+      service.recordFromCompletion(completionParams);
+      const stored = JSON.parse(
+        localStorage.getItem('elohim:discovery-results')!
+      ) as DiscoveryResult[];
+      expect(stored.length).toBe(1);
+      expect(stored[0].contentNodeId).toBe('content-attachment-001');
+    });
+
+    it('should fall back to "custom" framework when instrument not found', () => {
+      const result = service.recordFromCompletion({
+        ...completionParams,
+        instrumentId: 'nonexistent-instrument',
+      });
+      expect(result.framework).toBe('custom');
+    });
+
+    it('should fall back to "personality" category when instrument not found', () => {
+      const result = service.recordFromCompletion({
+        ...completionParams,
+        instrumentId: 'nonexistent-instrument',
+      });
+      expect(result.category).toBe('personality');
+    });
+
+    it('should pass secondaryTypes through to the result', () => {
+      const secondary = [buildResultSummary({ typeId: 'anxious', name: 'Anxious', score: 0.3 })];
+      const result = service.recordFromCompletion({
+        ...completionParams,
+        secondaryTypes: secondary,
+      });
+      expect(result.secondaryTypes?.length).toBe(1);
+      expect(result.secondaryTypes![0].typeId).toBe('anxious');
+    });
+
+    it('should replace existing result for the same instrumentId', () => {
+      service.recordFromCompletion(completionParams);
+      expect(service.results().length).toBe(1);
+
+      service.recordFromCompletion({
+        ...completionParams,
+        primaryType: buildResultSummary({ typeId: 'anxious', name: 'Anxious', score: 0.7 }),
+      });
+      expect(service.results().length).toBe(1);
+      expect(service.results()[0].primaryType.typeId).toBe('anxious');
+    });
+  });
+
+  // ===========================================================================
   // getResultForAssessment()
   // ===========================================================================
 
