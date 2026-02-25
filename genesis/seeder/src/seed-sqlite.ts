@@ -20,6 +20,8 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
+import { CONTENT_FORMATS } from './validation-constants.js';
+
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename));
@@ -42,13 +44,7 @@ const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
 // Value Normalizers (map legacy/variant values to valid backend enums)
 // ============================================================================
 
-/** Valid content formats accepted by elohim-storage */
-const VALID_CONTENT_FORMATS = [
-  'markdown', 'html', 'json', 'text', 'perseus', 'sophia', 'gherkin',
-  'yaml', 'toml', 'latex', 'asciidoc', 'html5-app', 'iframe', 'embed'
-];
-
-/** Map legacy/variant content formats to valid values */
+/** Map legacy/variant content formats to canonical values accepted by elohim-storage */
 function normalizeContentFormat(format: string | undefined): string {
   if (!format) return 'markdown';
 
@@ -69,7 +65,8 @@ function normalizeContentFormat(format: string | undefined): string {
   };
 
   if (mappings[normalized]) return mappings[normalized];
-  if (VALID_CONTENT_FORMATS.includes(normalized)) return normalized;
+  // Validate against the auto-generated constants from healing.rs
+  if ((CONTENT_FORMATS as readonly string[]).includes(normalized)) return normalized;
 
   // Default to markdown for unknown formats
   console.warn(`   ⚠️ Unknown contentFormat '${format}', defaulting to 'markdown'`);

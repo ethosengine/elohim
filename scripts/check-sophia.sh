@@ -26,3 +26,21 @@ for file in "${REQUIRED_FILES[@]}"; do
 done
 
 echo "sophia build artifacts verified"
+
+# Verify expected widgets are bundled in UMD
+# Uses python3 because the UMD is a single minified line (3.6MB) that exceeds grep's line handling
+UMD_FILE="$SOPHIA_DIR/packages/sophia-element/dist/sophia-element.umd.js"
+REQUIRED_WIDGETS=("likert-scale" "radio" "input-number" "numeric-input" "expression")
+
+for widget in "${REQUIRED_WIDGETS[@]}"; do
+  if ! python3 -c "
+import sys
+data = open('$UMD_FILE').read()
+sys.exit(0 if '\"$widget\"' in data else 1)
+" 2>/dev/null; then
+    echo "ERROR: Widget '$widget' not found in sophia UMD bundle"
+    echo "  Ensure it's registered in sophia/packages/sophia/src/basic-widgets.ts"
+    exit 1
+  fi
+done
+echo "sophia widget coverage verified: ${REQUIRED_WIDGETS[*]}"
