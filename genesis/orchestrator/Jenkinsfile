@@ -279,7 +279,9 @@ def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
             }
 
             config.changePatterns.each { pattern ->
-                if (file.startsWith(pattern)) {
+                // Match files inside directory (sophia/foo.ts starts with sophia/)
+                // AND bare submodule pointer changes (sophia == sophia/ minus trailing slash)
+                if (file.startsWith(pattern) || file == pattern.replaceAll('/$', '')) {
                     if (!matchedPatterns.contains(pattern)) {
                         matchedPatterns.add(pattern)
                     }
