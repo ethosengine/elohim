@@ -17,6 +17,8 @@
  * - Constitutional proofs stored as verifiable credentials
  */
 
+import type { ReachNegotiationParams, ReachNegotiationResult } from './create-context.model';
+
 // ============================================================================
 // Constitutional Layers
 // ============================================================================
@@ -122,7 +124,10 @@ export type ElohimCapability =
   | 'cultural-context-mediation' // Mediate cultural place disputes
   | 'place-relationship-mapping' // Map place relationships
   | 'ecological-limit-assessment' // Assess ecological limits
-  | 'place-stewardship'; // General place stewardship
+  | 'place-stewardship' // General place stewardship
+
+  // Reach Negotiation Operations (Content-Reach epic)
+  | 'reach-negotiation'; // Negotiate content reach before distribution
 
 // ============================================================================
 // Elohim Agent Entity
@@ -280,7 +285,8 @@ export type ElohimRequestParams =
   | AttestationRecommendationParams
   | KnowledgeMapSynthesisParams
   | SpiralDetectionParams
-  | PathAnalysisParams;
+  | PathAnalysisParams
+  | ReachNegotiationParams;
 
 export interface ContentReviewParams {
   type: 'content-review';
@@ -388,7 +394,8 @@ export type ElohimResponsePayload =
   | AttestationRecommendation
   | ElohimKnowledgeMapUpdate
   | SpiralDetectionResult
-  | PathAnalysisResult;
+  | PathAnalysisResult
+  | ReachNegotiationResult;
 
 export interface ContentReviewResult {
   type: 'content-review';
@@ -480,3 +487,6 @@ export interface ElohimSelectionCriteria {
   contextFamilyId?: string;
   contextCommunityId?: string;
 }
+
+// Re-export reach negotiation types from create-context.model
+export type { ReachNegotiationParams, ReachNegotiationResult } from './create-context.model';

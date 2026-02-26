@@ -33,6 +33,12 @@ export * from './human-consent.model';
 // Banner notification system
 export * from './banner-notice.model';
 
+// Elohim presence
+export * from './elohim-presence.model';
+
+// Create context (reach negotiation, birth context)
+export * from './create-context.model';
+
 // Infrastructure
 export * from './source-chain.model';
 export * from './json-ld.model';

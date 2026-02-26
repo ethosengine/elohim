@@ -363,6 +363,13 @@ export interface ContentNode {
 
   /** When trust profile was last computed */
   trustComputedAt?: string;
+
+  /**
+   * Immutable provenance record embedded at creation.
+   * Captures the web of meaning that existed when "post" was clicked.
+   * See create-context.model.ts for ContentBirthContext details.
+   */
+  birthContext?: import('@app/elohim/models/create-context.model').ContentBirthContext;
 }
 
 /**

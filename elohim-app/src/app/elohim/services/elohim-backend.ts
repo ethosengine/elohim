@@ -22,6 +22,8 @@ import {
   ContentReviewResult,
   AttestationRecommendationParams,
   AttestationRecommendation,
+  PathAnalysisParams,
+  PathAnalysisResult,
 } from '../models/elohim-agent.model';
 
 // ============================================================================
@@ -149,6 +151,8 @@ export class ElohimBackendCatalog {
 // ============================================================================
 
 const CAPABILITY_ATTESTATION_RECOMMENDATION = 'attestation-recommendation';
+const CAPABILITY_PATH_RECOMMENDATION = 'path-recommendation';
+const CAPABILITY_REACH_NEGOTIATION = 'reach-negotiation';
 
 /**
  * Mock backend — preserves the original simulation behavior.
@@ -191,6 +195,12 @@ export class MockBackend implements ElohimBackend {
 
       case CAPABILITY_ATTESTATION_RECOMMENDATION:
         return this.handleAttestationRecommendation(request, baseResponse);
+
+      case CAPABILITY_PATH_RECOMMENDATION:
+        return this.handlePathRecommendation(request, baseResponse);
+
+      case CAPABILITY_REACH_NEGOTIATION:
+        return this.handleReachNegotiation(request, baseResponse);
 
       default:
         return {
@@ -292,6 +302,46 @@ export class MockBackend implements ElohimBackend {
     } as ElohimResponse;
   }
 
+  private handlePathRecommendation(
+    request: ElohimRequest,
+    baseResponse: Partial<ElohimResponse>
+  ): ElohimResponse {
+    const params = request.params as PathAnalysisParams;
+
+    const payload: PathAnalysisResult = {
+      type: 'path-analysis',
+      pathId: params.pathId || 'know-thyself',
+      analysisType: 'learning-objectives',
+      findings: [
+        {
+          aspect: 'Discovery Profile Match',
+          status: 'good',
+          details: 'Your discovery results suggest this path aligns with your learning style.',
+          suggestions: ['Start with the self-discovery chapter', 'Focus on reflective exercises'],
+        },
+      ],
+      overallAssessment: 'This path aligns well with your emerging profile.',
+    };
+
+    return {
+      ...baseResponse,
+      status: 'fulfilled',
+      constitutionalReasoning: {
+        primaryPrinciple: 'Paths serve discovery, not conformity',
+        interpretation:
+          "Path recommendations should align with the learner's unique profile " +
+          'and respect their sovereignty in choosing their learning journey.',
+        valuesWeighed: [
+          { value: 'Learner sovereignty', weight: 0.4, direction: 'for' },
+          { value: 'Profile alignment', weight: 0.3, direction: 'for' },
+          { value: 'Growth trajectory', weight: 0.3, direction: 'for' },
+        ],
+        confidence: 0.72,
+      },
+      payload,
+    } as ElohimResponse;
+  }
+
   private generateDefaultReasoning(capability: ElohimCapability): ConstitutionalReasoning {
     return {
       primaryPrinciple: 'Love as committed action toward flourishing',
@@ -304,6 +354,81 @@ export class MockBackend implements ElohimBackend {
     };
   }
 
+  private handleReachNegotiation(
+    request: ElohimRequest,
+    baseResponse: Partial<ElohimResponse>
+  ): ElohimResponse {
+    const trustScore = this.randomFloat() * 0.5 + 0.5; // 0.5-1.0 for demo
+    const requestedReach = 'community'; // Default assumption for mock
+    const approved = trustScore > 0.6;
+
+    const payload = {
+      type: CAPABILITY_REACH_NEGOTIATION as 'reach-negotiation',
+      recommendedReach: approved ? requestedReach : 'local',
+      reachDelta: approved
+        ? undefined
+        : {
+            requested: requestedReach,
+            recommended: 'local',
+            reason: 'Author trust score below threshold for requested reach',
+          },
+      safetyCleared: true,
+      conditions: approved ? [] : ['Earn community endorsements to expand reach'],
+      transparencyReport: {
+        layersConsidered: ['constitutional', 'author-profile', 'graph-neighborhood', 'payload'],
+        decisionFactors: [
+          {
+            factor: 'Author trust score',
+            influence: approved ? 'positive' : 'negative',
+            weight: 0.4,
+            evidence: `Trust score: ${trustScore.toFixed(2)}`,
+          },
+          {
+            factor: 'Content safety',
+            influence: 'positive',
+            weight: 0.3,
+            evidence: 'No safety issues detected',
+          },
+          {
+            factor: 'Community health',
+            influence: 'neutral',
+            weight: 0.2,
+            evidence: 'Community activity level: normal',
+          },
+          {
+            factor: 'Graph neighborhood',
+            influence: 'positive',
+            weight: 0.1,
+            evidence: 'Content aligns with neighborhood patterns',
+          },
+        ],
+        authorStanding: `Trust score ${trustScore.toFixed(2)} — ${approved ? 'good standing' : 'building trust'}`,
+        communityHealth: 'Normal activity, low flag rate',
+        neighborhoodInfluence: 'Content graph neighborhood is healthy',
+      },
+    };
+
+    return {
+      ...baseResponse,
+      status: 'fulfilled',
+      constitutionalReasoning: {
+        primaryPrinciple: 'Free speech does not mean free reach',
+        interpretation:
+          "Reach is negotiated before distribution. The author's trust profile " +
+          'and content context determine the appropriate reach level.',
+        valuesWeighed: [
+          { value: 'Author sovereignty', weight: 0.3, direction: 'for' },
+          { value: 'Community protection', weight: 0.3, direction: approved ? 'for' : 'against' },
+          { value: 'Knowledge access', weight: 0.2, direction: 'for' },
+          { value: 'Constitutional alignment', weight: 0.2, direction: 'for' },
+        ],
+        confidence: approved ? 0.88 : 0.72,
+        precedents: ['content-reach-v1.0', 'trust-adaptive-pipeline-v1.0'],
+      },
+      payload,
+    } as ElohimResponse;
+  }
+
   private estimateProcessingTime(capability: ElohimCapability): number {
     const times: Partial<Record<ElohimCapability, number>> = {
       'content-safety-review': 1500,
@@ -312,6 +437,8 @@ export class MockBackend implements ElohimBackend {
       'knowledge-map-synthesis': 3000,
       'spiral-detection': 800,
       'path-analysis': 2500,
+      'path-recommendation': 1800,
+      [CAPABILITY_REACH_NEGOTIATION]: 2000,
     };
     return times[capability] ?? 1000;
   }
