@@ -270,9 +270,7 @@ async fn receiver_loop(
                     Ok(response) => {
                         let mut pending = pending.lock().await;
                         if let Some(tx) = pending.remove(&response.id) {
-                            let result = response
-                                .result
-                                .map_err(|e| StorageError::Conductor(e));
+                            let result = response.result.map_err(|e| StorageError::Conductor(e));
                             let _ = tx.send(result);
                         }
                     }

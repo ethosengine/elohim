@@ -1,6 +1,6 @@
 //! Content CRUD operations
 
-use rusqlite::{Connection, params, Row};
+use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -82,9 +82,15 @@ pub struct CreateContentInput {
     pub tags: Vec<String>,
 }
 
-fn default_content_type() -> String { "concept".to_string() }
-fn default_content_format() -> String { "markdown".to_string() }
-fn default_reach() -> String { "public".to_string() }
+fn default_content_type() -> String {
+    "concept".to_string()
+}
+fn default_content_format() -> String {
+    "markdown".to_string()
+}
+fn default_reach() -> String {
+    "public".to_string()
+}
 
 /// Query parameters for listing content - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -104,7 +110,9 @@ pub struct ContentQuery {
     pub offset: u32,
 }
 
-fn default_limit() -> u32 { 100 }
+fn default_limit() -> u32 {
+    100
+}
 
 /// Get content by ID
 pub fn get_content(conn: &Connection, id: &str) -> Result<Option<ContentRow>, StorageError> {
@@ -116,7 +124,10 @@ pub fn get_content(conn: &Connection, id: &str) -> Result<Option<ContentRow>, St
         .query(params![id])
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
-    if let Some(row) = rows.next().map_err(|e| StorageError::Internal(format!("Row fetch failed: {}", e)))? {
+    if let Some(row) = rows
+        .next()
+        .map_err(|e| StorageError::Internal(format!("Row fetch failed: {}", e)))?
+    {
         let mut content = ContentRow::from_row(row)
             .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
 
@@ -145,7 +156,10 @@ fn get_content_tags(conn: &Connection, content_id: &str) -> Result<Vec<String>, 
 }
 
 /// List content with optional filters
-pub fn list_content(conn: &Connection, query: &ContentQuery) -> Result<Vec<ContentRow>, StorageError> {
+pub fn list_content(
+    conn: &Connection,
+    query: &ContentQuery,
+) -> Result<Vec<ContentRow>, StorageError> {
     let mut sql = String::from("SELECT DISTINCT c.* FROM content c");
     let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![];
     let mut conditions = vec![];
@@ -200,8 +214,8 @@ pub fn list_content(conn: &Connection, query: &ContentQuery) -> Result<Vec<Conte
 
     let mut results = vec![];
     for row_result in rows {
-        let mut content = row_result
-            .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
+        let mut content =
+            row_result.map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
         content.tags = get_content_tags(conn, &content.id)?;
         results.push(content);
     }
@@ -210,8 +224,12 @@ pub fn list_content(conn: &Connection, query: &ContentQuery) -> Result<Vec<Conte
 }
 
 /// Create a single content item
-pub fn create_content(conn: &mut Connection, input: CreateContentInput) -> Result<ContentRow, StorageError> {
-    let tx = conn.transaction()
+pub fn create_content(
+    conn: &mut Connection,
+    input: CreateContentInput,
+) -> Result<ContentRow, StorageError> {
+    let tx = conn
+        .transaction()
         .map_err(|e| StorageError::Internal(format!("Transaction failed: {}", e)))?;
 
     // Insert content row
@@ -237,14 +255,16 @@ pub fn create_content(conn: &mut Connection, input: CreateContentInput) -> Resul
             input.reach,
             input.created_by,
         ],
-    ).map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+    )
+    .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
 
     // Insert tags
     for tag in &input.tags {
         tx.execute(
             "INSERT OR IGNORE INTO content_tags (content_id, tag) VALUES (?, ?)",
             params![input.id, tag],
-        ).map_err(|e| StorageError::Internal(format!("Tag insert failed: {}", e)))?;
+        )
+        .map_err(|e| StorageError::Internal(format!("Tag insert failed: {}", e)))?;
     }
 
     tx.commit()
@@ -256,8 +276,12 @@ pub fn create_content(conn: &mut Connection, input: CreateContentInput) -> Resul
 }
 
 /// Bulk create content items (for seeding)
-pub fn bulk_create_content(conn: &mut Connection, items: Vec<CreateContentInput>) -> Result<BulkResult, StorageError> {
-    let tx = conn.transaction()
+pub fn bulk_create_content(
+    conn: &mut Connection,
+    items: Vec<CreateContentInput>,
+) -> Result<BulkResult, StorageError> {
+    let tx = conn
+        .transaction()
         .map_err(|e| StorageError::Internal(format!("Transaction failed: {}", e)))?;
 
     let mut inserted = 0u64;
@@ -267,7 +291,11 @@ pub fn bulk_create_content(conn: &mut Connection, items: Vec<CreateContentInput>
     for input in items {
         // Check if already exists
         let exists: bool = tx
-            .query_row("SELECT 1 FROM content WHERE id = ?", params![input.id], |_| Ok(true))
+            .query_row(
+                "SELECT 1 FROM content WHERE id = ?",
+                params![input.id],
+                |_| Ok(true),
+            )
             .unwrap_or(false);
 
         if exists {
@@ -345,16 +373,26 @@ pub fn delete_content(conn: &mut Connection, id: &str) -> Result<bool, StorageEr
 }
 
 /// Get content by tag
-pub fn get_content_by_tag(conn: &Connection, tag: &str, limit: u32) -> Result<Vec<ContentRow>, StorageError> {
-    list_content(conn, &ContentQuery {
-        tags: vec![tag.to_string()],
-        limit,
-        ..Default::default()
-    })
+pub fn get_content_by_tag(
+    conn: &Connection,
+    tag: &str,
+    limit: u32,
+) -> Result<Vec<ContentRow>, StorageError> {
+    list_content(
+        conn,
+        &ContentQuery {
+            tags: vec![tag.to_string()],
+            limit,
+            ..Default::default()
+        },
+    )
 }
 
 /// Check if content IDs exist
-pub fn check_content_exists(conn: &Connection, ids: &[String]) -> Result<Vec<String>, StorageError> {
+pub fn check_content_exists(
+    conn: &Connection,
+    ids: &[String],
+) -> Result<Vec<String>, StorageError> {
     if ids.is_empty() {
         return Ok(vec![]);
     }
@@ -369,7 +407,8 @@ pub fn check_content_exists(conn: &Connection, ids: &[String]) -> Result<Vec<Str
         .prepare(&sql)
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
-    let param_refs: Vec<&dyn rusqlite::ToSql> = ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+    let param_refs: Vec<&dyn rusqlite::ToSql> =
+        ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
 
     let existing: Vec<String> = stmt
         .query_map(param_refs.as_slice(), |row| row.get(0))

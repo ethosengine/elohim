@@ -103,12 +103,15 @@ impl StreamTracker {
         };
 
         // Update in memory
-        self.positions.write().await.insert(key.clone(), pos.clone());
+        self.positions
+            .write()
+            .await
+            .insert(key.clone(), pos.clone());
 
         // Persist if we have a database
         if let Some(ref db) = self.db {
-            let bytes = rmp_serde::to_vec(&pos)
-                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            let bytes =
+                rmp_serde::to_vec(&pos).map_err(|e| StorageError::Serialization(e.to_string()))?;
             db.insert(key.as_bytes(), bytes)
                 .map_err(|e| StorageError::Database(e.to_string()))?;
         }
@@ -148,11 +151,7 @@ impl StreamTracker {
     }
 
     /// Remove position for a peer and document
-    pub async fn remove_position(
-        &self,
-        peer_id: &str,
-        doc_id: &str,
-    ) -> Result<bool, StorageError> {
+    pub async fn remove_position(&self, peer_id: &str, doc_id: &str) -> Result<bool, StorageError> {
         let key = Self::make_key(peer_id, doc_id);
         let existed = self.positions.write().await.remove(&key).is_some();
 

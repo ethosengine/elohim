@@ -20,11 +20,11 @@
 //! ```
 
 use crate::progress_hub::{ProgressHub, ProgressMessage};
-use futures_util::{SinkExt, StreamExt};
-use hyper::{Request, Response, StatusCode};
-use hyper::body::Incoming;
-use http_body_util::Full;
 use bytes::Bytes;
+use futures_util::{SinkExt, StreamExt};
+use http_body_util::Full;
+use hyper::body::Incoming;
+use hyper::{Request, Response, StatusCode};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -33,7 +33,8 @@ use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 use tracing::{debug, error, info, warn};
 
 /// WebSocket type after upgrade (using hyper-tungstenite)
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 /// Messages from client to server
 #[derive(Debug, Clone, Deserialize)]
@@ -45,9 +46,7 @@ pub enum ClientMessage {
         batch_ids: Vec<String>,
     },
     /// Unsubscribe from specific batches
-    Unsubscribe {
-        batch_ids: Vec<String>,
-    },
+    Unsubscribe { batch_ids: Vec<String> },
     /// Ping to keep connection alive
     Ping,
 }

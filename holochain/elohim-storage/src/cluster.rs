@@ -175,12 +175,7 @@ impl ClusterManager {
     }
 
     /// Update member online status
-    pub fn update_member_status(
-        &mut self,
-        agent_pubkey: &str,
-        online: bool,
-        last_seen: u64,
-    ) {
+    pub fn update_member_status(&mut self, agent_pubkey: &str, online: bool, last_seen: u64) {
         if let Some(member) = self.members.get_mut(agent_pubkey) {
             member.online = online;
             member.last_seen = last_seen;
@@ -208,9 +203,7 @@ impl ClusterManager {
     /// Returns members sorted by trust level (highest first),
     /// limited to the configured replica count.
     pub fn select_replication_targets(&self) -> Vec<&ClusterMember> {
-        let mut targets: Vec<_> = self.members.values()
-            .filter(|m| m.online)
-            .collect();
+        let mut targets: Vec<_> = self.members.values().filter(|m| m.online).collect();
 
         // Sort by trust level (Family first, then Extended, etc.)
         targets.sort_by_key(|m| m.trust_level);
@@ -226,12 +219,16 @@ impl ClusterManager {
     /// plus configured external replicas.
     pub fn select_recovery_targets(&self) -> Vec<&ClusterMember> {
         // All family members (regardless of replica limit)
-        let family: Vec<_> = self.members.values()
+        let family: Vec<_> = self
+            .members
+            .values()
             .filter(|m| m.online && m.trust_level == TrustLevel::Family)
             .collect();
 
         // Plus extended family up to reasonable limit
-        let mut extended: Vec<_> = self.members.values()
+        let mut extended: Vec<_> = self
+            .members
+            .values()
             .filter(|m| m.online && m.trust_level == TrustLevel::Extended)
             .collect();
         extended.truncate(3); // Max 3 extended family
@@ -249,16 +246,12 @@ impl ClusterManager {
 
     /// Get total cluster capacity
     pub fn total_capacity(&self) -> u64 {
-        self.members.values()
-            .filter_map(|m| m.capacity_bytes)
-            .sum()
+        self.members.values().filter_map(|m| m.capacity_bytes).sum()
     }
 
     /// Get total used storage
     pub fn total_used(&self) -> u64 {
-        self.members.values()
-            .filter_map(|m| m.used_bytes)
-            .sum()
+        self.members.values().filter_map(|m| m.used_bytes).sum()
     }
 
     /// Get member count by trust level
@@ -308,10 +301,18 @@ mod tests {
         let mut manager = ClusterManager::new(config, "local".to_string());
 
         // Add members at different trust levels
-        manager.add_member(make_member("community1", TrustLevel::Community, true)).unwrap();
-        manager.add_member(make_member("family1", TrustLevel::Family, true)).unwrap();
-        manager.add_member(make_member("extended1", TrustLevel::Extended, true)).unwrap();
-        manager.add_member(make_member("family2", TrustLevel::Family, true)).unwrap();
+        manager
+            .add_member(make_member("community1", TrustLevel::Community, true))
+            .unwrap();
+        manager
+            .add_member(make_member("family1", TrustLevel::Family, true))
+            .unwrap();
+        manager
+            .add_member(make_member("extended1", TrustLevel::Extended, true))
+            .unwrap();
+        manager
+            .add_member(make_member("family2", TrustLevel::Family, true))
+            .unwrap();
 
         let targets = manager.select_replication_targets();
 
@@ -327,7 +328,13 @@ mod tests {
 
         // Add 5 family members
         for i in 0..5 {
-            manager.add_member(make_member(&format!("family{}", i), TrustLevel::Family, true)).unwrap();
+            manager
+                .add_member(make_member(
+                    &format!("family{}", i),
+                    TrustLevel::Family,
+                    true,
+                ))
+                .unwrap();
         }
 
         let targets = manager.select_recovery_targets();
@@ -341,7 +348,9 @@ mod tests {
         let config = ClusterConfig::default();
         let mut manager = ClusterManager::new(config, "local".to_string());
 
-        manager.add_member(make_member("family1", TrustLevel::Family, true)).unwrap();
+        manager
+            .add_member(make_member("family1", TrustLevel::Family, true))
+            .unwrap();
 
         assert!(manager.should_serve("family1"));
         assert!(!manager.should_serve("stranger"));

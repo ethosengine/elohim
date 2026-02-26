@@ -19,20 +19,20 @@
 //! SQLite Database
 //! ```
 
-pub mod response;
-pub mod events;
 pub mod content_service;
+pub mod events;
+pub mod knowledge_service;
 pub mod path_service;
 pub mod relationship_service;
-pub mod knowledge_service;
+pub mod response;
 
 // Re-exports
-pub use response::*;
-pub use events::{EventBus, StorageEvent, EventListener};
 pub use content_service::ContentService;
+pub use events::{EventBus, EventListener, StorageEvent};
+pub use knowledge_service::KnowledgeService;
 pub use path_service::PathService;
 pub use relationship_service::RelationshipService;
-pub use knowledge_service::KnowledgeService;
+pub use response::*;
 
 use crate::db::ContentDb;
 use std::sync::Arc;

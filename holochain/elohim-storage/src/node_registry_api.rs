@@ -79,16 +79,21 @@ impl NodeRegistryApi {
         }
     }
 
-    pub async fn create_shard_assignment(&self, assignment: ShardAssignment) -> Result<Vec<u8>, StorageError> {
+    pub async fn create_shard_assignment(
+        &self,
+        assignment: ShardAssignment,
+    ) -> Result<Vec<u8>, StorageError> {
         // Serialize input to MessagePack format using standard holochain ExternIO pattern
         let payload = rmp_serde::to_vec(&assignment).map_err(|e| {
             StorageError::Internal(format!("Failed to serialize ShardAssignment: {}", e))
         })?;
 
-        self.hc_client.call_zome(
-            "node_registry_coordinator",
-            "create_shard_assignment",
-            payload,
-        ).await
+        self.hc_client
+            .call_zome(
+                "node_registry_coordinator",
+                "create_shard_assignment",
+                payload,
+            )
+            .await
     }
 }

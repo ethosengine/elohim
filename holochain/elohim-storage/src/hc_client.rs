@@ -20,13 +20,13 @@
 //! let result = client.call_zome("content_store", "process_import_chunk", payload).await?;
 //! ```
 
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 use holochain_client::{
-    AdminWebsocket, AllowedOrigins, AppWebsocket, ClientAgentSigner,
-    AuthorizeSigningCredentialsPayload, CellId, ExternIO, ZomeCallTarget,
+    AdminWebsocket, AllowedOrigins, AppWebsocket, AuthorizeSigningCredentialsPayload, CellId,
+    ClientAgentSigner, ExternIO, ZomeCallTarget,
 };
 
 use crate::error::StorageError;
@@ -137,7 +137,10 @@ impl HcClient {
             Ok(port) => info!(port, "Attached app interface"),
             Err(e) => {
                 // May already be attached from a previous call — continue
-                warn!("attach_app_interface on port {}: {} (may already exist)", app_port, e);
+                warn!(
+                    "attach_app_interface on port {}: {} (may already exist)",
+                    app_port, e
+                );
             }
         }
 
@@ -192,7 +195,9 @@ impl HcClient {
                 functions: None, // All functions
             })
             .await
-            .map_err(|e| StorageError::Connection(format!("authorize_signing_credentials failed: {}", e)))?;
+            .map_err(|e| {
+                StorageError::Connection(format!("authorize_signing_credentials failed: {}", e))
+            })?;
 
         // Add credentials to signer
         signer.add_credentials(cell_id.clone(), credentials);
@@ -210,14 +215,9 @@ impl HcClient {
 
         // Connect to app interface with signer (socket_addr, token, signer, origin)
         let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
-        let app_ws = AppWebsocket::connect(
-            &app_addr,
-            token.token,
-            signer_arc.clone(),
-            None,
-        )
-        .await
-        .map_err(|e| StorageError::Connection(format!("App connect failed: {}", e)))?;
+        let app_ws = AppWebsocket::connect(&app_addr, token.token, signer_arc.clone(), None)
+            .await
+            .map_err(|e| StorageError::Connection(format!("App connect failed: {}", e)))?;
 
         info!("Connected to app interface with signing");
 
@@ -246,7 +246,8 @@ impl HcClient {
 
         // The holochain_client handles signing automatically
         // Use ExternIO::from() for raw bytes - payload is already MessagePack encoded
-        let result = self.app_ws
+        let result = self
+            .app_ws
             .call_zome(
                 ZomeCallTarget::CellId(self.cell_id.clone()),
                 zome_name.into(),
@@ -300,9 +301,7 @@ impl HcClient {
                 // Try to extract key metrics
                 // StorageInfo has blobs.used_by_entries field
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json) {
-                    let bytes_used = parsed["blobs"]["used_by_entries"]
-                        .as_u64()
-                        .unwrap_or(0);
+                    let bytes_used = parsed["blobs"]["used_by_entries"].as_u64().unwrap_or(0);
                     let entry_count = parsed["blobs"]["used_by_entries_count"]
                         .as_u64()
                         .or_else(|| parsed["entries_count"].as_u64())
@@ -340,7 +339,8 @@ impl HcClient {
 
                     health.network = Some(NetworkHealth {
                         peer_count,
-                        details: format!("Keys: {:?}",
+                        details: format!(
+                            "Keys: {:?}",
                             parsed.as_object().map(|o| o.keys().collect::<Vec<_>>())
                         ),
                     });

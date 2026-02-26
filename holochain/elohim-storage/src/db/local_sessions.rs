@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::diesel_schema::local_sessions;
-use super::models::{LocalSession, NewLocalSession, current_timestamp};
+use super::models::{current_timestamp, LocalSession, NewLocalSession};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -95,9 +95,7 @@ pub fn get_session_by_identity(
 }
 
 /// List all sessions (including inactive)
-pub fn list_all_sessions(
-    conn: &mut SqliteConnection,
-) -> Result<Vec<LocalSession>, StorageError> {
+pub fn list_all_sessions(conn: &mut SqliteConnection) -> Result<Vec<LocalSession>, StorageError> {
     local_sessions::table
         .order(local_sessions::created_at.desc())
         .load(conn)
@@ -105,9 +103,7 @@ pub fn list_all_sessions(
 }
 
 /// Check if any session exists
-pub fn has_any_session(
-    conn: &mut SqliteConnection,
-) -> Result<bool, StorageError> {
+pub fn has_any_session(conn: &mut SqliteConnection) -> Result<bool, StorageError> {
     let count: i64 = local_sessions::table
         .count()
         .get_result(conn)
@@ -160,51 +156,40 @@ pub fn activate_session(
     deactivate_all_sessions(conn)?;
 
     // Then activate the specified one
-    diesel::update(
-        local_sessions::table.filter(local_sessions::id.eq(id))
-    )
-    .set((
-        local_sessions::is_active.eq(1),
-        local_sessions::updated_at.eq(current_timestamp()),
-    ))
-    .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    diesel::update(local_sessions::table.filter(local_sessions::id.eq(id)))
+        .set((
+            local_sessions::is_active.eq(1),
+            local_sessions::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
 
     get_session_by_id(conn, id)?
         .ok_or_else(|| StorageError::NotFound(format!("Session {} not found", id)))
 }
 
 /// Deactivate a specific session
-pub fn deactivate_session(
-    conn: &mut SqliteConnection,
-    id: &str,
-) -> Result<bool, StorageError> {
-    let updated = diesel::update(
-        local_sessions::table.filter(local_sessions::id.eq(id))
-    )
-    .set((
-        local_sessions::is_active.eq(0),
-        local_sessions::updated_at.eq(current_timestamp()),
-    ))
-    .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+pub fn deactivate_session(conn: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
+    let updated = diesel::update(local_sessions::table.filter(local_sessions::id.eq(id)))
+        .set((
+            local_sessions::is_active.eq(0),
+            local_sessions::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
 
     Ok(updated > 0)
 }
 
 /// Deactivate all sessions
-pub fn deactivate_all_sessions(
-    conn: &mut SqliteConnection,
-) -> Result<u64, StorageError> {
-    let updated = diesel::update(
-        local_sessions::table.filter(local_sessions::is_active.eq(1))
-    )
-    .set((
-        local_sessions::is_active.eq(0),
-        local_sessions::updated_at.eq(current_timestamp()),
-    ))
-    .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+pub fn deactivate_all_sessions(conn: &mut SqliteConnection) -> Result<u64, StorageError> {
+    let updated = diesel::update(local_sessions::table.filter(local_sessions::is_active.eq(1)))
+        .set((
+            local_sessions::is_active.eq(0),
+            local_sessions::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
 
     Ok(updated as u64)
 }
@@ -214,15 +199,13 @@ pub fn update_last_synced(
     conn: &mut SqliteConnection,
     id: &str,
 ) -> Result<LocalSession, StorageError> {
-    diesel::update(
-        local_sessions::table.filter(local_sessions::id.eq(id))
-    )
-    .set((
-        local_sessions::last_synced_at.eq(current_timestamp()),
-        local_sessions::updated_at.eq(current_timestamp()),
-    ))
-    .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    diesel::update(local_sessions::table.filter(local_sessions::id.eq(id)))
+        .set((
+            local_sessions::last_synced_at.eq(current_timestamp()),
+            local_sessions::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
 
     get_session_by_id(conn, id)?
         .ok_or_else(|| StorageError::NotFound(format!("Session {} not found", id)))
@@ -235,39 +218,30 @@ pub fn update_profile(
     display_name: Option<&str>,
     profile_image_hash: Option<&str>,
 ) -> Result<LocalSession, StorageError> {
-    diesel::update(
-        local_sessions::table.filter(local_sessions::id.eq(id))
-    )
-    .set((
-        local_sessions::display_name.eq(display_name),
-        local_sessions::profile_image_hash.eq(profile_image_hash),
-        local_sessions::updated_at.eq(current_timestamp()),
-    ))
-    .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
+    diesel::update(local_sessions::table.filter(local_sessions::id.eq(id)))
+        .set((
+            local_sessions::display_name.eq(display_name),
+            local_sessions::profile_image_hash.eq(profile_image_hash),
+            local_sessions::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Update failed: {}", e)))?;
 
     get_session_by_id(conn, id)?
         .ok_or_else(|| StorageError::NotFound(format!("Session {} not found", id)))
 }
 
 /// Delete a session by ID
-pub fn delete_session(
-    conn: &mut SqliteConnection,
-    id: &str,
-) -> Result<bool, StorageError> {
-    let deleted = diesel::delete(
-        local_sessions::table.filter(local_sessions::id.eq(id))
-    )
-    .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
+pub fn delete_session(conn: &mut SqliteConnection, id: &str) -> Result<bool, StorageError> {
+    let deleted = diesel::delete(local_sessions::table.filter(local_sessions::id.eq(id)))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
 
     Ok(deleted > 0)
 }
 
 /// Delete all sessions (for logout/reset)
-pub fn delete_all_sessions(
-    conn: &mut SqliteConnection,
-) -> Result<u64, StorageError> {
+pub fn delete_all_sessions(conn: &mut SqliteConnection) -> Result<u64, StorageError> {
     let deleted = diesel::delete(local_sessions::table)
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
@@ -280,9 +254,7 @@ pub fn delete_all_sessions(
 // ============================================================================
 
 /// Get session count
-pub fn session_count(
-    conn: &mut SqliteConnection,
-) -> Result<i64, StorageError> {
+pub fn session_count(conn: &mut SqliteConnection) -> Result<i64, StorageError> {
     local_sessions::table
         .count()
         .get_result(conn)
@@ -295,8 +267,8 @@ mod tests {
     use diesel::connection::SimpleConnection;
 
     fn setup_test_db() -> SqliteConnection {
-        let mut conn = SqliteConnection::establish(":memory:")
-            .expect("Failed to create in-memory database");
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
 
         // Create the table for testing
         conn.batch_execute(
@@ -318,7 +290,8 @@ mod tests {
                 UNIQUE(human_id, agent_pub_key)
             );
             "#,
-        ).expect("Failed to create test table");
+        )
+        .expect("Failed to create test table");
 
         conn
     }
@@ -426,8 +399,7 @@ mod tests {
         assert_eq!(deactivated.is_active, 0);
 
         // Reactivate
-        let reactivated = activate_session(&mut conn, &session.id)
-            .expect("Failed to activate");
+        let reactivated = activate_session(&mut conn, &session.id).expect("Failed to activate");
         assert_eq!(reactivated.is_active, 1);
     }
 }

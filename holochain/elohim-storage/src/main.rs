@@ -45,9 +45,11 @@
 //! - **Import runtime (4 workers)**: Zome call processing - can saturate without blocking server
 
 use clap::Parser;
-use elohim_storage::{BlobStore, Config, ContentDb, HttpServer, ImportHandler, ImportHandlerConfig};
-use elohim_storage::{ProgressHub, ProgressHubConfig, Services};
 use elohim_storage::import_api::{ImportApi, ImportApiConfig};
+use elohim_storage::{
+    BlobStore, Config, ContentDb, HttpServer, ImportHandler, ImportHandlerConfig,
+};
+use elohim_storage::{ProgressHub, ProgressHubConfig, Services};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -58,11 +60,11 @@ use tracing_subscriber::EnvFilter;
 use elohim_storage::db::init_pool_from_dir;
 
 #[cfg(feature = "p2p")]
-use elohim_storage::p2p::{P2PConfig, P2PNode, RelayMode};
-#[cfg(feature = "p2p")]
 use elohim_storage::db::local_sessions;
 #[cfg(feature = "p2p")]
 use elohim_storage::identity::NodeIdentity;
+#[cfg(feature = "p2p")]
+use elohim_storage::p2p::{P2PConfig, P2PNode, RelayMode};
 
 #[derive(Parser, Debug)]
 #[command(name = "elohim-storage")]
@@ -214,7 +216,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     server_rt.block_on(async_main(import_handle))
 }
 
-async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn async_main(
+    import_runtime: tokio::runtime::Handle,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let args = Args::parse();
 
     // Load config
@@ -260,7 +264,10 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
     let p2p_node = if args.enable_p2p {
         let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
             // Generate a placeholder agent key if none provided
-            format!("uhCAk_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..32].to_string())
+            format!(
+                "uhCAk_{}",
+                uuid::Uuid::new_v4().to_string().replace("-", "")[..32].to_string()
+            )
         });
 
         // Load or create P2P identity
@@ -282,7 +289,10 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
                             match local_sessions::get_active_session(&mut conn) {
                                 Ok(Some(session)) => {
                                     if let Some(bootstrap_url) = session.bootstrap_url {
-                                        info!("  Loading bootstrap from session: {}", bootstrap_url);
+                                        info!(
+                                            "  Loading bootstrap from session: {}",
+                                            bootstrap_url
+                                        );
                                         // Bootstrap URL from doorway handoff (libp2p multiaddr format)
                                         bootstrap_nodes.push(bootstrap_url);
                                     }
@@ -335,8 +345,18 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         info!("P2P networking enabled");
         info!("  Peer ID: {}", p2p_node.peer_id());
         info!("  Relay mode: {}", relay_mode);
-        info!("  mDNS discovery: {}", if enable_mdns { "enabled" } else { "disabled" });
-        info!("  Bootstrap nodes: {}", if bootstrap_nodes.is_empty() { "none".to_string() } else { bootstrap_nodes.len().to_string() });
+        info!(
+            "  mDNS discovery: {}",
+            if enable_mdns { "enabled" } else { "disabled" }
+        );
+        info!(
+            "  Bootstrap nodes: {}",
+            if bootstrap_nodes.is_empty() {
+                "none".to_string()
+            } else {
+                bootstrap_nodes.len().to_string()
+            }
+        );
         if !args.announce_addrs.is_empty() {
             info!("  Announce addresses: {}", args.announce_addrs.join(", "));
         }
@@ -371,14 +391,16 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
             }
         }
     } else {
-        info!("SQLite content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)");
+        info!(
+            "SQLite content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)"
+        );
         None
     };
 
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
-    let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
-        .with_progress_hub(Arc::clone(&progress_hub));
+    let mut http_server =
+        HttpServer::new(blob_store.clone(), http_addr).with_progress_hub(Arc::clone(&progress_hub));
 
     info!("HTTP API available at http://{}", http_addr);
     info!("Endpoints:");
@@ -397,16 +419,25 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         info!("  GET  /import/status/{{batch}} - Get import status");
         info!("  WS   /import/progress        - WebSocket progress stream");
         info!("  Conductor app URL: {}", args.app_url);
-        info!("  Chunk size: {} items (min: {})", args.import_chunk_size, args.import_min_chunk_size);
+        info!(
+            "  Chunk size: {} items (min: {})",
+            args.import_chunk_size, args.import_min_chunk_size
+        );
         info!("  Chunk delay: {}ms", args.import_chunk_delay_ms);
-        info!("  Slow threshold: {}ms (triggers chunk reduction)", args.import_slow_threshold_ms);
+        info!(
+            "  Slow threshold: {}ms (triggers chunk reduction)",
+            args.import_slow_threshold_ms
+        );
         info!("  Import processing on dedicated runtime (4 workers)");
 
         // HcClient handles cell discovery and signing internally
         // No need for manual cell_id discovery - it happens on connect
         let mut import_api = ImportApi::new(
             ImportApiConfig {
-                admin_url: args.admin_url.clone().unwrap_or_else(|| "ws://localhost:4444".to_string()),
+                admin_url: args
+                    .admin_url
+                    .clone()
+                    .unwrap_or_else(|| "ws://localhost:4444".to_string()),
                 app_url: args.app_url.clone(),
                 app_id: args.app_id.clone(),
                 role: Some("lamad".to_string()),
@@ -428,7 +459,10 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
                 info!("  ✅ Conductor connected");
             }
             Err(e) => {
-                warn!("  ⚠️ Conductor connection failed: {} (imports will queue locally)", e);
+                warn!(
+                    "  ⚠️ Conductor connection failed: {} (imports will queue locally)",
+                    e
+                );
             }
         }
 
@@ -446,7 +480,9 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
     // Initialize and attach Node Registry API
     info!("Initializing Node Registry API connection...");
     match elohim_storage::NodeRegistryApi::connect(
-        args.admin_url.clone().unwrap_or_else(|| "ws://localhost:4444".to_string()),
+        args.admin_url
+            .clone()
+            .unwrap_or_else(|| "ws://localhost:4444".to_string()),
         args.app_url.clone(),
         args.app_id.clone(),
     )
@@ -493,7 +529,10 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
             info!("  GET    /session/all   - List all sessions");
         }
         Err(e) => {
-            warn!("Failed to initialize session pool: {} (session API disabled)", e);
+            warn!(
+                "Failed to initialize session pool: {} (session API disabled)",
+                e
+            );
         }
     }
 
@@ -549,7 +588,9 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
     // Handle shutdown signal
     // Create P2P shutdown channel
     #[cfg(feature = "p2p")]
-    let p2p_shutdown_rx = p2p_node.as_ref().map(|node| node.shutdown_sender().subscribe());
+    let p2p_shutdown_rx = p2p_node
+        .as_ref()
+        .map(|node| node.shutdown_sender().subscribe());
 
     let shutdown = async {
         tokio::signal::ctrl_c().await.ok();

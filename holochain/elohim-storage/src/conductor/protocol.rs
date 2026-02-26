@@ -89,15 +89,30 @@ pub fn encode_zome_call(
     // Build the inner call_zome request
     let call_data = Value::Map(vec![
         (Value::String("cell_id".into()), cell_id),
-        (Value::String("zome_name".into()), Value::String(zome_name.into())),
-        (Value::String("fn_name".into()), Value::String(fn_name.into())),
-        (Value::String("payload".into()), Value::Binary(payload.to_vec())),
+        (
+            Value::String("zome_name".into()),
+            Value::String(zome_name.into()),
+        ),
+        (
+            Value::String("fn_name".into()),
+            Value::String(fn_name.into()),
+        ),
+        (
+            Value::String("payload".into()),
+            Value::Binary(payload.to_vec()),
+        ),
         (Value::String("cap_secret".into()), Value::Nil),
-        (Value::String("provenance".into()), Value::Binary(agent_pub_key.to_vec())),
+        (
+            Value::String("provenance".into()),
+            Value::Binary(agent_pub_key.to_vec()),
+        ),
     ]);
 
     let inner_request = Value::Map(vec![
-        (Value::String("type".into()), Value::String("call_zome".into())),
+        (
+            Value::String("type".into()),
+            Value::String("call_zome".into()),
+        ),
         (Value::String("value".into()), call_data),
     ]);
 
@@ -110,7 +125,10 @@ pub fn encode_zome_call(
     // Note: Outer envelope uses "data" for the binary payload
     let envelope = Value::Map(vec![
         (Value::String("id".into()), Value::Integer(id.into())),
-        (Value::String("type".into()), Value::String("request".into())),
+        (
+            Value::String("type".into()),
+            Value::String("request".into()),
+        ),
         (Value::String("data".into()), Value::Binary(inner_bytes)),
     ]);
 
@@ -163,7 +181,10 @@ pub fn decode_response(data: &[u8]) -> Result<DecodedResponse, StorageError> {
     let result = match resp_type {
         "response" => {
             // Success - data contains the zome call result
-            let bytes = data_value.as_slice().map(|s| s.to_vec()).unwrap_or_default();
+            let bytes = data_value
+                .as_slice()
+                .map(|s| s.to_vec())
+                .unwrap_or_default();
             Ok(bytes)
         }
         "error" => {
@@ -185,11 +206,18 @@ pub fn decode_response(data: &[u8]) -> Result<DecodedResponse, StorageError> {
 /// Encode an admin API request (for auth token).
 ///
 /// Admin API uses the same envelope format but different inner request types.
-pub fn encode_admin_request(id: u64, request_type: &str, value: Value) -> Result<Vec<u8>, StorageError> {
+pub fn encode_admin_request(
+    id: u64,
+    request_type: &str,
+    value: Value,
+) -> Result<Vec<u8>, StorageError> {
     use rmpv::encode::write_value;
 
     let inner = Value::Map(vec![
-        (Value::String("type".into()), Value::String(request_type.into())),
+        (
+            Value::String("type".into()),
+            Value::String(request_type.into()),
+        ),
         (Value::String("value".into()), value),
     ]);
 
@@ -199,7 +227,10 @@ pub fn encode_admin_request(id: u64, request_type: &str, value: Value) -> Result
 
     let envelope = Value::Map(vec![
         (Value::String("id".into()), Value::Integer(id.into())),
-        (Value::String("type".into()), Value::String("request".into())),
+        (
+            Value::String("type".into()),
+            Value::String("request".into()),
+        ),
         (Value::String("data".into()), Value::Binary(inner_bytes)),
     ]);
 
@@ -224,7 +255,10 @@ pub fn encode_authenticate(token: &[u8]) -> Result<Vec<u8>, StorageError> {
         .map_err(|e| StorageError::Internal(format!("Failed to encode auth inner: {}", e)))?;
 
     let envelope = Value::Map(vec![
-        (Value::String("type".into()), Value::String("authenticate".into())),
+        (
+            Value::String("type".into()),
+            Value::String("authenticate".into()),
+        ),
         (Value::String("data".into()), Value::Binary(inner_bytes)),
     ]);
 

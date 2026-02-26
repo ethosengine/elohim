@@ -73,8 +73,7 @@ impl request_response::Codec for ShardCodec {
         io.read_exact(&mut buf).await?;
 
         // Deserialize
-        rmp_serde::from_slice(&buf)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     async fn read_response<T>(
@@ -95,8 +94,7 @@ impl request_response::Codec for ShardCodec {
         io.read_exact(&mut buf).await?;
 
         // Deserialize
-        rmp_serde::from_slice(&buf)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     async fn write_request<T>(

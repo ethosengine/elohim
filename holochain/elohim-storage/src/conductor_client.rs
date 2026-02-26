@@ -108,16 +108,14 @@ impl ConductorClient {
                 info!(app_url = %config.app_url, "ConductorClient connected");
                 Ok(client)
             }
-            Ok(Ok(Err(e))) => {
-                Err(StorageError::Conductor(format!("Connection failed: {}", e)))
-            }
+            Ok(Ok(Err(e))) => Err(StorageError::Conductor(format!("Connection failed: {}", e))),
             Ok(Err(_)) => {
                 // Oneshot channel was dropped without sending - connection loop panicked or exited
-                Err(StorageError::Conductor("Connection loop terminated unexpectedly".into()))
+                Err(StorageError::Conductor(
+                    "Connection loop terminated unexpectedly".into(),
+                ))
             }
-            Err(_) => {
-                Err(StorageError::Conductor("Connection timeout (30s)".into()))
-            }
+            Err(_) => Err(StorageError::Conductor("Connection timeout (30s)".into())),
         }
     }
 
@@ -169,17 +167,32 @@ fn build_zome_call(
 
     // Inner call data
     let call_data = Value::Map(vec![
-        (Value::String("cell_id".into()), Value::Binary(cell_id.to_vec())),
-        (Value::String("zome_name".into()), Value::String(zome_name.into())),
-        (Value::String("fn_name".into()), Value::String(fn_name.into())),
-        (Value::String("payload".into()), Value::Binary(payload.to_vec())),
+        (
+            Value::String("cell_id".into()),
+            Value::Binary(cell_id.to_vec()),
+        ),
+        (
+            Value::String("zome_name".into()),
+            Value::String(zome_name.into()),
+        ),
+        (
+            Value::String("fn_name".into()),
+            Value::String(fn_name.into()),
+        ),
+        (
+            Value::String("payload".into()),
+            Value::Binary(payload.to_vec()),
+        ),
         (Value::String("cap_secret".into()), Value::Nil),
         (Value::String("provenance".into()), Value::Nil),
     ]);
 
     // Inner request (Holochain 0.6+ uses 'value' not 'data')
     let inner_request = Value::Map(vec![
-        (Value::String("type".into()), Value::String("call_zome".into())),
+        (
+            Value::String("type".into()),
+            Value::String("call_zome".into()),
+        ),
         (Value::String("value".into()), call_data),
     ]);
 
@@ -224,7 +237,9 @@ async fn connection_loop(
         match connect_to_conductor(&config.app_url).await {
             Ok((mut ws_sink, mut ws_stream)) => {
                 // Step 3: Authenticate
-                if let Err(e) = authenticate_connection(&mut ws_sink, &mut ws_stream, &auth_token).await {
+                if let Err(e) =
+                    authenticate_connection(&mut ws_sink, &mut ws_stream, &auth_token).await
+                {
                     let error_msg = format!("Failed to authenticate: {}", e);
                     error!(error = %e, "Failed to authenticate");
                     // Signal failure on initial connection attempt
@@ -245,8 +260,9 @@ async fn connection_loop(
                 }
 
                 // Pending responses by ID
-                let pending: Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>> =
-                    Arc::new(Mutex::new(HashMap::new()));
+                let pending: Arc<
+                    Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>,
+                > = Arc::new(Mutex::new(HashMap::new()));
                 let pending_for_recv = Arc::clone(&pending);
 
                 // Spawn receiver task
@@ -325,8 +341,14 @@ fn build_envelope(id: u64, inner_bytes: &[u8]) -> Vec<u8> {
 
     let envelope = Value::Map(vec![
         (Value::String("id".into()), Value::Integer(id.into())),
-        (Value::String("type".into()), Value::String("request".into())),
-        (Value::String("data".into()), Value::Binary(inner_bytes.to_vec())),
+        (
+            Value::String("type".into()),
+            Value::String("request".into()),
+        ),
+        (
+            Value::String("data".into()),
+            Value::Binary(inner_bytes.to_vec()),
+        ),
     ]);
 
     let mut bytes = Vec::new();
@@ -344,19 +366,25 @@ fn parse_response(data: &[u8]) -> Option<(u64, Result<Vec<u8>, StorageError>)> {
     let map = value.as_map()?;
 
     // Extract ID
-    let id = map.iter()
+    let id = map
+        .iter()
         .find(|(k, _)| k.as_str() == Some("id"))?
-        .1.as_u64()?;
+        .1
+        .as_u64()?;
 
     // Extract type
-    let resp_type = map.iter()
+    let resp_type = map
+        .iter()
         .find(|(k, _)| k.as_str() == Some("type"))?
-        .1.as_str()?;
+        .1
+        .as_str()?;
 
     // Extract data
-    let data = map.iter()
+    let data = map
+        .iter()
         .find(|(k, _)| k.as_str() == Some("data"))?
-        .1.clone();
+        .1
+        .clone();
 
     if resp_type == "response" {
         // Success - data is the zome call result
@@ -377,19 +405,22 @@ fn parse_response(data: &[u8]) -> Option<(u64, Result<Vec<u8>, StorageError>)> {
 /// Connect to conductor with proper headers
 async fn connect_to_conductor(
     url: &str,
-) -> Result<(
-    futures_util::stream::SplitSink<
-        tokio_tungstenite::WebSocketStream<
-            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+) -> Result<
+    (
+        futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<
+                tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+            >,
+            Message,
         >,
-        Message,
-    >,
-    futures_util::stream::SplitStream<
-        tokio_tungstenite::WebSocketStream<
-            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        futures_util::stream::SplitStream<
+            tokio_tungstenite::WebSocketStream<
+                tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+            >,
         >,
-    >,
-), StorageError> {
+    ),
+    StorageError,
+> {
     let request = Request::builder()
         .uri(url)
         .header("Host", url.split("//").last().unwrap_or("localhost"))
@@ -424,13 +455,22 @@ async fn get_auth_token(admin_url: &str, app_id: &str) -> Result<Vec<u8>, Storag
     // Build issue_app_authentication_token request (Holochain 0.6+ format)
     // Type name has underscores: "issue_app_authentication_token"
     let data = Value::Map(vec![
-        (Value::String("installed_app_id".into()), Value::String(app_id.into())),
-        (Value::String("expiry_seconds".into()), Value::Integer(3600.into())),
+        (
+            Value::String("installed_app_id".into()),
+            Value::String(app_id.into()),
+        ),
+        (
+            Value::String("expiry_seconds".into()),
+            Value::Integer(3600.into()),
+        ),
         (Value::String("single_use".into()), Value::Boolean(false)),
     ]);
 
     let inner = Value::Map(vec![
-        (Value::String("type".into()), Value::String("issue_app_authentication_token".into())),
+        (
+            Value::String("type".into()),
+            Value::String("issue_app_authentication_token".into()),
+        ),
         (Value::String("value".into()), data),
     ]);
 
@@ -441,7 +481,10 @@ async fn get_auth_token(admin_url: &str, app_id: &str) -> Result<Vec<u8>, Storag
     // NOTE: Outer envelope uses "data" for binary payload, but inner structure uses "value"
     let envelope = Value::Map(vec![
         (Value::String("id".into()), Value::Integer(1.into())),
-        (Value::String("type".into()), Value::String("request".into())),
+        (
+            Value::String("type".into()),
+            Value::String("request".into()),
+        ),
         (Value::String("data".into()), Value::Binary(inner_buf)),
     ]);
 
@@ -449,7 +492,8 @@ async fn get_auth_token(admin_url: &str, app_id: &str) -> Result<Vec<u8>, Storag
     write_value(&mut envelope_buf, &envelope)
         .map_err(|e| StorageError::Internal(format!("Failed to encode envelope: {}", e)))?;
 
-    sink.send(Message::Binary(envelope_buf)).await
+    sink.send(Message::Binary(envelope_buf))
+        .await
         .map_err(|e| StorageError::Conductor(format!("Failed to send auth request: {}", e)))?;
 
     // Wait for response
@@ -468,8 +512,11 @@ async fn get_auth_token(admin_url: &str, app_id: &str) -> Result<Vec<u8>, Storag
                 }
             }
         }
-        Err(StorageError::Conductor("Stream ended without response".into()))
-    }).await;
+        Err(StorageError::Conductor(
+            "Stream ended without response".into(),
+        ))
+    })
+    .await;
 
     match timeout_result {
         Ok(result) => result,
@@ -488,17 +535,20 @@ fn extract_token_from_response(data: &[u8]) -> Result<Vec<u8>, StorageError> {
 
     // Navigate: envelope.data -> inner.value -> {token, expires_at}
     // NOTE: Response envelope uses "data" field (not "value")
-    let envelope = value.as_map()
+    let envelope = value
+        .as_map()
         .ok_or_else(|| StorageError::Internal("Response is not a map".into()))?;
 
     // Get the 'data' field from envelope (response uses "data" not "value")
-    let envelope_value = envelope.iter()
+    let envelope_value = envelope
+        .iter()
         .find(|(k, _)| k.as_str() == Some("data"))
         .map(|(_, v)| v)
         .ok_or_else(|| StorageError::Internal("No data in envelope".into()))?;
 
     // Parse inner response from binary
-    let inner_bytes = envelope_value.as_slice()
+    let inner_bytes = envelope_value
+        .as_slice()
         .ok_or_else(|| StorageError::Internal("Envelope value is not binary".into()))?;
 
     let mut inner_cursor = Cursor::new(inner_bytes);
@@ -506,19 +556,23 @@ fn extract_token_from_response(data: &[u8]) -> Result<Vec<u8>, StorageError> {
         .map_err(|e| StorageError::Internal(format!("Failed to decode inner response: {}", e)))?;
 
     // Inner is {type, value} where value contains {token, expires_at}
-    let inner_map = inner_value.as_map()
+    let inner_map = inner_value
+        .as_map()
         .ok_or_else(|| StorageError::Internal("Inner response is not a map".into()))?;
 
-    let token_struct = inner_map.iter()
+    let token_struct = inner_map
+        .iter()
         .find(|(k, _)| k.as_str() == Some("value"))
         .map(|(_, v)| v)
         .ok_or_else(|| StorageError::Internal("No value in inner response".into()))?;
 
     // Get token field from value (map with token, expires_at)
-    let token_map = token_struct.as_map()
+    let token_map = token_struct
+        .as_map()
         .ok_or_else(|| StorageError::Internal("Token struct is not a map".into()))?;
 
-    let token_value = token_map.iter()
+    let token_value = token_map
+        .iter()
         .find(|(k, _)| k.as_str() == Some("token"))
         .map(|(_, v)| v)
         .ok_or_else(|| StorageError::Internal("No token field".into()))?;
@@ -534,9 +588,14 @@ fn extract_token_from_response(data: &[u8]) -> Result<Vec<u8>, StorageError> {
                     _ => Err("Not an integer"),
                 })
                 .collect::<Result<Vec<u8>, _>>()
-                .map_err(|e| StorageError::Internal(format!("Failed to convert token array: {}", e)))
+                .map_err(|e| {
+                    StorageError::Internal(format!("Failed to convert token array: {}", e))
+                })
         }
-        _ => Err(StorageError::Internal(format!("Unexpected token type: {:?}", token_value))),
+        _ => Err(StorageError::Internal(format!(
+            "Unexpected token type: {:?}",
+            token_value
+        ))),
     }
 }
 
@@ -555,16 +614,20 @@ where
     debug!("Authenticating with conductor");
 
     // Build authenticate envelope (Holochain 0.6+ uses 'authenticate' type)
-    let inner = Value::Map(vec![
-        (Value::String("token".into()), Value::Binary(token.to_vec())),
-    ]);
+    let inner = Value::Map(vec![(
+        Value::String("token".into()),
+        Value::Binary(token.to_vec()),
+    )]);
 
     let mut inner_buf = Vec::new();
     write_value(&mut inner_buf, &inner)
         .map_err(|e| StorageError::Internal(format!("Failed to encode auth inner: {}", e)))?;
 
     let envelope = Value::Map(vec![
-        (Value::String("type".into()), Value::String("authenticate".into())),
+        (
+            Value::String("type".into()),
+            Value::String("authenticate".into()),
+        ),
         (Value::String("data".into()), Value::Binary(inner_buf)),
     ]);
 
@@ -572,7 +635,8 @@ where
     write_value(&mut envelope_buf, &envelope)
         .map_err(|e| StorageError::Internal(format!("Failed to encode auth envelope: {}", e)))?;
 
-    sink.send(Message::Binary(envelope_buf)).await
+    sink.send(Message::Binary(envelope_buf))
+        .await
         .map_err(|e| StorageError::Conductor(format!("Failed to send auth: {}", e)))?;
 
     // Wait briefly - conductor doesn't send explicit auth response, just closes if invalid
@@ -593,7 +657,8 @@ where
                 }
             }
         }
-    }).await;
+    })
+    .await;
 
     match check_result {
         Ok(result) => result,

@@ -18,7 +18,10 @@ pub fn init_schema(conn: &Connection) -> Result<(), StorageError> {
         create_tables(conn)?;
         set_schema_version(conn, SCHEMA_VERSION)?;
     } else if current_version < SCHEMA_VERSION {
-        info!("Migrating schema from v{} to v{}", current_version, SCHEMA_VERSION);
+        info!(
+            "Migrating schema from v{} to v{}",
+            current_version, SCHEMA_VERSION
+        );
         migrate_schema(conn, current_version)?;
     } else {
         info!("Database schema is up to date (v{})", current_version);
@@ -33,10 +36,13 @@ fn get_schema_version(conn: &Connection) -> Result<i32, StorageError> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)",
         [],
-    ).map_err(|e| StorageError::Internal(format!("Failed to create schema_version table: {}", e)))?;
+    )
+    .map_err(|e| StorageError::Internal(format!("Failed to create schema_version table: {}", e)))?;
 
     let version: i32 = conn
-        .query_row("SELECT version FROM schema_version LIMIT 1", [], |row| row.get(0))
+        .query_row("SELECT version FROM schema_version LIMIT 1", [], |row| {
+            row.get(0)
+        })
         .unwrap_or(0);
 
     Ok(version)
@@ -74,21 +80,27 @@ fn migrate_schema(conn: &Connection, from_version: i32) -> Result<(), StorageErr
     if current == 1 {
         info!("Migrating v1 -> v2: Adding content_body column");
         conn.execute("ALTER TABLE content ADD COLUMN content_body TEXT", [])
-            .map_err(|e| StorageError::Internal(format!("Failed to add content_body column: {}", e)))?;
+            .map_err(|e| {
+                StorageError::Internal(format!("Failed to add content_body column: {}", e))
+            })?;
         current = 2;
     }
 
     // Migration: v2 -> v3: Add relationships, knowledge_maps, path_extensions tables
     if current == 2 {
         info!("Migrating v2 -> v3: Adding graph/relationship tables");
-        conn.execute_batch(RELATIONSHIPS_SCHEMA)
-            .map_err(|e| StorageError::Internal(format!("Failed to create relationships table: {}", e)))?;
-        conn.execute_batch(KNOWLEDGE_MAPS_SCHEMA)
-            .map_err(|e| StorageError::Internal(format!("Failed to create knowledge_maps table: {}", e)))?;
-        conn.execute_batch(PATH_EXTENSIONS_SCHEMA)
-            .map_err(|e| StorageError::Internal(format!("Failed to create path_extensions table: {}", e)))?;
-        conn.execute_batch(GRAPH_INDEXES_SCHEMA)
-            .map_err(|e| StorageError::Internal(format!("Failed to create graph indexes: {}", e)))?;
+        conn.execute_batch(RELATIONSHIPS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create relationships table: {}", e))
+        })?;
+        conn.execute_batch(KNOWLEDGE_MAPS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create knowledge_maps table: {}", e))
+        })?;
+        conn.execute_batch(PATH_EXTENSIONS_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create path_extensions table: {}", e))
+        })?;
+        conn.execute_batch(GRAPH_INDEXES_SCHEMA).map_err(|e| {
+            StorageError::Internal(format!("Failed to create graph indexes: {}", e))
+        })?;
         current = 3;
     }
 

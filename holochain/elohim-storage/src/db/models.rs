@@ -617,7 +617,14 @@ pub mod mastery_levels {
 
     /// All mastery levels in order
     pub const ALL: [&str; 8] = [
-        NOT_STARTED, AWARE, REMEMBER, UNDERSTAND, APPLY, ANALYZE, EVALUATE, CREATE
+        NOT_STARTED,
+        AWARE,
+        REMEMBER,
+        UNDERSTAND,
+        APPLY,
+        ANALYZE,
+        EVALUATE,
+        CREATE,
     ];
 
     /// Convert mastery level to index (0-7)
@@ -812,11 +819,21 @@ pub mod rea_actions {
 
     /// All supported hREA actions
     pub const ALL: [&str; 16] = [
-        USE, CONSUME, CITE,
-        PRODUCE, RAISE, LOWER,
-        TRANSFER, TRANSFER_CUSTODY, TRANSFER_ALL_RIGHTS, MOVE,
-        MODIFY, COMBINE, SEPARATE,
-        WORK, DELIVER_SERVICE,
+        USE,
+        CONSUME,
+        CITE,
+        PRODUCE,
+        RAISE,
+        LOWER,
+        TRANSFER,
+        TRANSFER_CUSTODY,
+        TRANSFER_ALL_RIGHTS,
+        MOVE,
+        MODIFY,
+        COMBINE,
+        SEPARATE,
+        WORK,
+        DELIVER_SERVICE,
         ACCEPT,
     ];
 
@@ -963,7 +980,12 @@ pub mod contribution_types {
     pub const INHERITED: &str = "inherited";
 
     pub const ALL: [&str; 6] = [
-        ORIGINAL_CREATOR, EDITOR, TRANSLATOR, CURATOR, MAINTAINER, INHERITED
+        ORIGINAL_CREATOR,
+        EDITOR,
+        TRANSLATOR,
+        CURATOR,
+        MAINTAINER,
+        INHERITED,
     ];
 
     pub fn is_valid(ctype: &str) -> bool {

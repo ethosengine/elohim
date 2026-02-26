@@ -27,8 +27,12 @@ impl KnowledgeService {
     // =========================================================================
 
     /// Get knowledge map by ID
-    pub fn get_knowledge_map(&self, id: &str) -> Result<Option<knowledge_maps::KnowledgeMapRow>, StorageError> {
-        self.content_db.with_conn(|conn| knowledge_maps::get_knowledge_map(conn, id))
+    pub fn get_knowledge_map(
+        &self,
+        id: &str,
+    ) -> Result<Option<knowledge_maps::KnowledgeMapRow>, StorageError> {
+        self.content_db
+            .with_conn(|conn| knowledge_maps::get_knowledge_map(conn, id))
     }
 
     /// List knowledge maps with filtering
@@ -36,7 +40,8 @@ impl KnowledgeService {
         &self,
         query: &knowledge_maps::KnowledgeMapQuery,
     ) -> Result<Vec<knowledge_maps::KnowledgeMapRow>, StorageError> {
-        self.content_db.with_conn(|conn| knowledge_maps::list_knowledge_maps(conn, query))
+        self.content_db
+            .with_conn(|conn| knowledge_maps::list_knowledge_maps(conn, query))
     }
 
     /// Get knowledge maps for an owner
@@ -59,9 +64,9 @@ impl KnowledgeService {
         self.validate_knowledge_map(&input)?;
 
         // Create knowledge map
-        let result = self.content_db.with_conn_mut(|conn| {
-            knowledge_maps::create_knowledge_map(conn, input.clone())
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| knowledge_maps::create_knowledge_map(conn, input.clone()))?;
 
         // Emit event
         self.events.emit(StorageEvent::KnowledgeMapCreated {
@@ -84,35 +89,43 @@ impl KnowledgeService {
 
         // Check if exists
         if self.get_knowledge_map(id)?.is_none() {
-            return Err(StorageError::NotFound(format!("Knowledge map '{}' not found", id)));
+            return Err(StorageError::NotFound(format!(
+                "Knowledge map '{}' not found",
+                id
+            )));
         }
 
         // Update
-        let result = self.content_db.with_conn_mut(|conn| {
-            knowledge_maps::update_knowledge_map(conn, id, input)
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| knowledge_maps::update_knowledge_map(conn, id, input))?;
 
         // Emit event
-        self.events.emit(StorageEvent::KnowledgeMapUpdated { id: id.to_string() });
+        self.events
+            .emit(StorageEvent::KnowledgeMapUpdated { id: id.to_string() });
 
         Ok(result)
     }
 
     /// Delete a knowledge map
     pub fn delete_knowledge_map(&self, id: &str) -> Result<bool, StorageError> {
-        let deleted = self.content_db.with_conn_mut(|conn| {
-            knowledge_maps::delete_knowledge_map(conn, id)
-        })?;
+        let deleted = self
+            .content_db
+            .with_conn_mut(|conn| knowledge_maps::delete_knowledge_map(conn, id))?;
 
         if deleted {
-            self.events.emit(StorageEvent::KnowledgeMapDeleted { id: id.to_string() });
+            self.events
+                .emit(StorageEvent::KnowledgeMapDeleted { id: id.to_string() });
         }
 
         Ok(deleted)
     }
 
     /// Validate knowledge map input
-    fn validate_knowledge_map(&self, input: &knowledge_maps::CreateKnowledgeMapInput) -> Result<(), StorageError> {
+    fn validate_knowledge_map(
+        &self,
+        input: &knowledge_maps::CreateKnowledgeMapInput,
+    ) -> Result<(), StorageError> {
         if input.owner_id.is_empty() {
             return Err(StorageError::InvalidInput("owner_id is required".into()));
         }
@@ -126,7 +139,9 @@ impl KnowledgeService {
         }
 
         if input.subject_name.is_empty() {
-            return Err(StorageError::InvalidInput("subject_name is required".into()));
+            return Err(StorageError::InvalidInput(
+                "subject_name is required".into(),
+            ));
         }
 
         // Validate map_type
@@ -157,7 +172,7 @@ impl KnowledgeService {
         // Validate affinity range
         if input.overall_affinity < 0.0 || input.overall_affinity > 1.0 {
             return Err(StorageError::InvalidInput(
-                "overall_affinity must be between 0.0 and 1.0".into()
+                "overall_affinity must be between 0.0 and 1.0".into(),
             ));
         }
 
@@ -169,8 +184,12 @@ impl KnowledgeService {
     // =========================================================================
 
     /// Get path extension by ID
-    pub fn get_path_extension(&self, id: &str) -> Result<Option<path_extensions::PathExtensionRow>, StorageError> {
-        self.content_db.with_conn(|conn| path_extensions::get_path_extension(conn, id))
+    pub fn get_path_extension(
+        &self,
+        id: &str,
+    ) -> Result<Option<path_extensions::PathExtensionRow>, StorageError> {
+        self.content_db
+            .with_conn(|conn| path_extensions::get_path_extension(conn, id))
     }
 
     /// List path extensions with filtering
@@ -178,7 +197,8 @@ impl KnowledgeService {
         &self,
         query: &path_extensions::PathExtensionQuery,
     ) -> Result<Vec<path_extensions::PathExtensionRow>, StorageError> {
-        self.content_db.with_conn(|conn| path_extensions::list_path_extensions(conn, query))
+        self.content_db
+            .with_conn(|conn| path_extensions::list_path_extensions(conn, query))
     }
 
     /// Get path extensions for a base path
@@ -201,9 +221,9 @@ impl KnowledgeService {
         self.validate_path_extension(&input)?;
 
         // Create path extension
-        let result = self.content_db.with_conn_mut(|conn| {
-            path_extensions::create_path_extension(conn, input.clone())
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| path_extensions::create_path_extension(conn, input.clone()))?;
 
         // Emit event
         self.events.emit(StorageEvent::PathExtensionCreated {
@@ -226,37 +246,47 @@ impl KnowledgeService {
 
         // Check if exists
         if self.get_path_extension(id)?.is_none() {
-            return Err(StorageError::NotFound(format!("Path extension '{}' not found", id)));
+            return Err(StorageError::NotFound(format!(
+                "Path extension '{}' not found",
+                id
+            )));
         }
 
         // Update
-        let result = self.content_db.with_conn_mut(|conn| {
-            path_extensions::update_path_extension(conn, id, input)
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| path_extensions::update_path_extension(conn, id, input))?;
 
         // Emit event
-        self.events.emit(StorageEvent::PathExtensionUpdated { id: id.to_string() });
+        self.events
+            .emit(StorageEvent::PathExtensionUpdated { id: id.to_string() });
 
         Ok(result)
     }
 
     /// Delete a path extension
     pub fn delete_path_extension(&self, id: &str) -> Result<bool, StorageError> {
-        let deleted = self.content_db.with_conn_mut(|conn| {
-            path_extensions::delete_path_extension(conn, id)
-        })?;
+        let deleted = self
+            .content_db
+            .with_conn_mut(|conn| path_extensions::delete_path_extension(conn, id))?;
 
         if deleted {
-            self.events.emit(StorageEvent::PathExtensionDeleted { id: id.to_string() });
+            self.events
+                .emit(StorageEvent::PathExtensionDeleted { id: id.to_string() });
         }
 
         Ok(deleted)
     }
 
     /// Validate path extension input
-    fn validate_path_extension(&self, input: &path_extensions::CreatePathExtensionInput) -> Result<(), StorageError> {
+    fn validate_path_extension(
+        &self,
+        input: &path_extensions::CreatePathExtensionInput,
+    ) -> Result<(), StorageError> {
         if input.base_path_id.is_empty() {
-            return Err(StorageError::InvalidInput("base_path_id is required".into()));
+            return Err(StorageError::InvalidInput(
+                "base_path_id is required".into(),
+            ));
         }
 
         if input.extended_by.is_empty() {

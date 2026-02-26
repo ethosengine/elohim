@@ -47,9 +47,7 @@ impl Default for ProgressHubConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProgressMessage {
     /// Initial state sent on connection/subscribe
-    InitialState {
-        batches: Vec<BatchState>,
-    },
+    InitialState { batches: Vec<BatchState> },
     /// Progress update for a batch
     Progress {
         batch_id: String,
@@ -78,9 +76,7 @@ pub enum ProgressMessage {
         errors: Vec<String>,
     },
     /// Periodic heartbeat
-    Heartbeat {
-        timestamp: String,
-    },
+    Heartbeat { timestamp: String },
 }
 
 /// State of a single batch (for initial state)
@@ -217,12 +213,7 @@ impl ProgressHub {
     }
 
     /// Register a new batch (called when import is queued)
-    pub async fn register_batch(
-        &self,
-        batch_id: &str,
-        batch_type: &str,
-        total_items: u32,
-    ) {
+    pub async fn register_batch(&self, batch_id: &str, batch_type: &str, total_items: u32) {
         let mut batches = self.batches.write().await;
         batches.insert(
             batch_id.to_string(),
@@ -339,7 +330,10 @@ impl ProgressHub {
 
                 let removed = before_count - batches.len();
                 if removed > 0 {
-                    debug!(removed = removed, "Cleaned up expired batches from ProgressHub");
+                    debug!(
+                        removed = removed,
+                        "Cleaned up expired batches from ProgressHub"
+                    );
                 }
             }
         });

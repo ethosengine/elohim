@@ -200,7 +200,8 @@ mod tests {
 
     #[test]
     fn test_cluster_mode() {
-        let mode = SovereigntyMode::home_cluster("family-123".to_string(), ClusterRole::Coordinator);
+        let mode =
+            SovereigntyMode::home_cluster("family-123".to_string(), ClusterRole::Coordinator);
 
         assert!(mode.should_replicate());
         assert_eq!(mode.cluster_id(), Some("family-123"));

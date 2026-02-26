@@ -72,12 +72,19 @@ impl AuthToken {
 
         // Build token request
         let request_value = Value::Map(vec![
-            (Value::String("installed_app_id".into()), Value::String(app_id.into())),
-            (Value::String("expiry_seconds".into()), Value::Integer(3600.into())),
+            (
+                Value::String("installed_app_id".into()),
+                Value::String(app_id.into()),
+            ),
+            (
+                Value::String("expiry_seconds".into()),
+                Value::Integer(3600.into()),
+            ),
             (Value::String("single_use".into()), Value::Boolean(false)),
         ]);
 
-        let request_bytes = encode_admin_request(1, "issue_app_authentication_token", request_value)?;
+        let request_bytes =
+            encode_admin_request(1, "issue_app_authentication_token", request_value)?;
 
         // Send request
         transport.send(request_bytes).await?;
@@ -131,11 +138,16 @@ impl AuthToken {
         match check_result {
             Ok(Ok(None)) => {
                 // Connection closed = auth rejected
-                Err(StorageError::Conductor("Authentication rejected - connection closed".into()))
+                Err(StorageError::Conductor(
+                    "Authentication rejected - connection closed".into(),
+                ))
             }
             Ok(Err(e)) => {
                 // Error = auth rejected
-                Err(StorageError::Conductor(format!("Authentication failed: {}", e)))
+                Err(StorageError::Conductor(format!(
+                    "Authentication failed: {}",
+                    e
+                )))
             }
             Ok(Ok(Some(_))) => {
                 // Unexpected message, but connection is alive
@@ -230,10 +242,7 @@ fn extract_token_from_response(data: &[u8]) -> Result<Vec<u8>, StorageError> {
             // Convert array of integers to bytes
             arr.iter()
                 .map(|v| match v {
-                    Value::Integer(i) => i
-                        .as_u64()
-                        .map(|n| n as u8)
-                        .ok_or("Invalid byte value"),
+                    Value::Integer(i) => i.as_u64().map(|n| n as u8).ok_or("Invalid byte value"),
                     _ => Err("Token array contains non-integer"),
                 })
                 .collect::<Result<Vec<u8>, _>>()

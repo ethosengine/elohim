@@ -39,15 +39,19 @@ pub struct CreateRelationshipInput {
     pub metadata_json: Option<String>,
 }
 
-fn default_confidence() -> f64 { 1.0 }
-fn default_inference_source() -> String { "explicit".to_string() }
+fn default_confidence() -> f64 {
+    1.0
+}
+fn default_inference_source() -> String {
+    "explicit".to_string()
+}
 
 /// Query parameters for listing relationships - camelCase for URL params
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RelationshipQuery {
     pub content_id: Option<String>,
-    pub direction: Option<String>,  // outgoing, incoming, both
+    pub direction: Option<String>, // outgoing, incoming, both
     pub relationship_type: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: i64,
@@ -55,7 +59,9 @@ pub struct RelationshipQuery {
     pub offset: i64,
 }
 
-fn default_limit() -> i64 { 100 }
+fn default_limit() -> i64 {
+    100
+}
 
 /// Content graph node for tree traversal
 #[derive(Debug, Clone, Serialize)]
@@ -79,7 +85,10 @@ pub struct ContentGraph {
 // =============================================================================
 
 /// Get a relationship by ID
-pub fn get_relationship(conn: &Connection, id: &str) -> Result<Option<RelationshipRow>, StorageError> {
+pub fn get_relationship(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<RelationshipRow>, StorageError> {
     let sql = "SELECT id, source_id, target_id, relationship_type, confidence,
                inference_source, metadata_json, created_at
                FROM relationships WHERE id = ?";
@@ -101,10 +110,13 @@ pub fn get_relationship(conn: &Connection, id: &str) -> Result<Option<Relationsh
 }
 
 /// List relationships with filtering
-pub fn list_relationships(conn: &Connection, query: &RelationshipQuery) -> Result<Vec<RelationshipRow>, StorageError> {
+pub fn list_relationships(
+    conn: &Connection,
+    query: &RelationshipQuery,
+) -> Result<Vec<RelationshipRow>, StorageError> {
     let mut sql = String::from(
         "SELECT id, source_id, target_id, relationship_type, confidence,
-         inference_source, metadata_json, created_at FROM relationships WHERE 1=1"
+         inference_source, metadata_json, created_at FROM relationships WHERE 1=1",
     );
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
@@ -138,32 +150,39 @@ pub fn list_relationships(conn: &Connection, query: &RelationshipQuery) -> Resul
 
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
 
-    let mut stmt = conn.prepare(&sql)
+    let mut stmt = conn
+        .prepare(&sql)
         .map_err(|e| StorageError::Internal(format!("Failed to prepare statement: {}", e)))?;
 
-    let rows = stmt.query_map(params_refs.as_slice(), |row| {
-        Ok(RelationshipRow {
-            id: row.get(0)?,
-            source_id: row.get(1)?,
-            target_id: row.get(2)?,
-            relationship_type: row.get(3)?,
-            confidence: row.get(4)?,
-            inference_source: row.get(5)?,
-            metadata_json: row.get(6)?,
-            created_at: row.get(7)?,
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(RelationshipRow {
+                id: row.get(0)?,
+                source_id: row.get(1)?,
+                target_id: row.get(2)?,
+                relationship_type: row.get(3)?,
+                confidence: row.get(4)?,
+                inference_source: row.get(5)?,
+                metadata_json: row.get(6)?,
+                created_at: row.get(7)?,
+            })
         })
-    }).map_err(|e| StorageError::Internal(format!("Failed to query relationships: {}", e)))?;
+        .map_err(|e| StorageError::Internal(format!("Failed to query relationships: {}", e)))?;
 
     let mut results = Vec::new();
     for row in rows {
-        results.push(row.map_err(|e| StorageError::Internal(format!("Failed to read row: {}", e)))?);
+        results
+            .push(row.map_err(|e| StorageError::Internal(format!("Failed to read row: {}", e)))?);
     }
 
     Ok(results)
 }
 
 /// Create a new relationship
-pub fn create_relationship(conn: &mut Connection, input: CreateRelationshipInput) -> Result<RelationshipRow, StorageError> {
+pub fn create_relationship(
+    conn: &mut Connection,
+    input: CreateRelationshipInput,
+) -> Result<RelationshipRow, StorageError> {
     let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
     let sql = "INSERT INTO relationships (id, source_id, target_id, relationship_type, confidence, inference_source, metadata_json)
@@ -173,23 +192,29 @@ pub fn create_relationship(conn: &mut Connection, input: CreateRelationshipInput
                inference_source = excluded.inference_source,
                metadata_json = excluded.metadata_json";
 
-    conn.execute(sql, params![
-        id,
-        input.source_id,
-        input.target_id,
-        input.relationship_type,
-        input.confidence,
-        input.inference_source,
-        input.metadata_json,
-    ]).map_err(|e| StorageError::Internal(format!("Failed to create relationship: {}", e)))?;
+    conn.execute(
+        sql,
+        params![
+            id,
+            input.source_id,
+            input.target_id,
+            input.relationship_type,
+            input.confidence,
+            input.inference_source,
+            input.metadata_json,
+        ],
+    )
+    .map_err(|e| StorageError::Internal(format!("Failed to create relationship: {}", e)))?;
 
-    get_relationship(conn, &id)?
-        .ok_or_else(|| StorageError::Internal("Failed to retrieve created relationship".to_string()))
+    get_relationship(conn, &id)?.ok_or_else(|| {
+        StorageError::Internal("Failed to retrieve created relationship".to_string())
+    })
 }
 
 /// Delete a relationship by ID
 pub fn delete_relationship(conn: &mut Connection, id: &str) -> Result<bool, StorageError> {
-    let rows = conn.execute("DELETE FROM relationships WHERE id = ?", params![id])
+    let rows = conn
+        .execute("DELETE FROM relationships WHERE id = ?", params![id])
         .map_err(|e| StorageError::Internal(format!("Failed to delete relationship: {}", e)))?;
 
     Ok(rows > 0)
@@ -204,14 +229,17 @@ pub fn get_content_graph(
 ) -> Result<ContentGraph, StorageError> {
     let mut sql = String::from(
         "SELECT id, source_id, target_id, relationship_type, confidence
-         FROM relationships WHERE source_id = ?"
+         FROM relationships WHERE source_id = ?",
     );
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(content_id.to_string())];
 
     if let Some(types) = relationship_types {
         if !types.is_empty() {
             let placeholders: Vec<&str> = types.iter().map(|_| "?").collect();
-            sql.push_str(&format!(" AND relationship_type IN ({})", placeholders.join(",")));
+            sql.push_str(&format!(
+                " AND relationship_type IN ({})",
+                placeholders.join(",")
+            ));
             for t in types {
                 params_vec.push(Box::new(t.clone()));
             }
@@ -222,27 +250,30 @@ pub fn get_content_graph(
 
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
 
-    let mut stmt = conn.prepare(&sql)
+    let mut stmt = conn
+        .prepare(&sql)
         .map_err(|e| StorageError::Internal(format!("Failed to prepare statement: {}", e)))?;
 
-    let rows = stmt.query_map(params_refs.as_slice(), |row| {
-        Ok((
-            row.get::<_, String>(2)?,  // target_id
-            row.get::<_, String>(3)?,  // relationship_type
-            row.get::<_, f64>(4)?,     // confidence
-        ))
-    }).map_err(|e| StorageError::Internal(format!("Failed to query graph: {}", e)))?;
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(2)?, // target_id
+                row.get::<_, String>(3)?, // relationship_type
+                row.get::<_, f64>(4)?,    // confidence
+            ))
+        })
+        .map_err(|e| StorageError::Internal(format!("Failed to query graph: {}", e)))?;
 
     let mut related = Vec::new();
     for row in rows {
-        let (target_id, rel_type, confidence) = row
-            .map_err(|e| StorageError::Internal(format!("Failed to read row: {}", e)))?;
+        let (target_id, rel_type, confidence) =
+            row.map_err(|e| StorageError::Internal(format!("Failed to read row: {}", e)))?;
 
         related.push(ContentGraphNode {
             content_id: target_id,
             relationship_type: rel_type,
             confidence,
-            children: vec![],  // Depth 1 only for now
+            children: vec![], // Depth 1 only for now
         });
     }
 
@@ -260,14 +291,18 @@ pub fn bulk_create_relationships(
     conn: &mut Connection,
     inputs: Vec<CreateRelationshipInput>,
 ) -> Result<BulkRelationshipResult, StorageError> {
-    let tx = conn.transaction()
+    let tx = conn
+        .transaction()
         .map_err(|e| StorageError::Internal(format!("Failed to start transaction: {}", e)))?;
 
     let mut created = 0;
     let mut errors = Vec::new();
 
     for input in inputs {
-        let id = input.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+        let id = input
+            .id
+            .clone()
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
 
         let result = tx.execute(
             "INSERT INTO relationships (id, source_id, target_id, relationship_type, confidence, inference_source, metadata_json)
@@ -307,11 +342,16 @@ pub struct BulkRelationshipResult {
 }
 
 /// Delete all relationships where content is source or target
-pub fn delete_relationships_for_content(conn: &mut Connection, content_id: &str) -> Result<usize, StorageError> {
-    let rows = conn.execute(
-        "DELETE FROM relationships WHERE source_id = ? OR target_id = ?",
-        params![content_id, content_id],
-    ).map_err(|e| StorageError::Internal(format!("Failed to delete relationships: {}", e)))?;
+pub fn delete_relationships_for_content(
+    conn: &mut Connection,
+    content_id: &str,
+) -> Result<usize, StorageError> {
+    let rows = conn
+        .execute(
+            "DELETE FROM relationships WHERE source_id = ? OR target_id = ?",
+            params![content_id, content_id],
+        )
+        .map_err(|e| StorageError::Internal(format!("Failed to delete relationships: {}", e)))?;
 
     Ok(rows)
 }

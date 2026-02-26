@@ -129,8 +129,8 @@ impl SledRecordStore {
     }
 
     fn deserialize_record(data: &[u8]) -> Result<Record, String> {
-        let stored: StoredRecord =
-            rmp_serde::from_slice(data).map_err(|e| format!("Failed to deserialize record: {}", e))?;
+        let stored: StoredRecord = rmp_serde::from_slice(data)
+            .map_err(|e| format!("Failed to deserialize record: {}", e))?;
         Ok(stored.into_record())
     }
 
@@ -140,9 +140,12 @@ impl SledRecordStore {
     }
 
     fn deserialize_providers(data: &[u8]) -> Result<Vec<ProviderRecord>, String> {
-        let stored: Vec<StoredProvider> =
-            rmp_serde::from_slice(data).map_err(|e| format!("Failed to deserialize providers: {}", e))?;
-        Ok(stored.into_iter().filter_map(|s| s.into_provider_record()).collect())
+        let stored: Vec<StoredProvider> = rmp_serde::from_slice(data)
+            .map_err(|e| format!("Failed to deserialize providers: {}", e))?;
+        Ok(stored
+            .into_iter()
+            .filter_map(|s| s.into_provider_record())
+            .collect())
     }
 
     /// Flush all pending writes to disk

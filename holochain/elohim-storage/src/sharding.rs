@@ -179,7 +179,8 @@ impl ShardEncoder {
                 rs.encode(&mut shard_refs).unwrap();
 
                 // Compute hashes
-                let hashes: Vec<String> = shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
+                let hashes: Vec<String> =
+                    shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
 
                 (
                     self.config.rs_data_shards,
@@ -213,11 +214,10 @@ impl ShardEncoder {
     pub fn create_shards(&self, data: &[u8], encoding: &str) -> Vec<Vec<u8>> {
         match encoding {
             "none" => vec![data.to_vec()],
-            "chunked" => {
-                data.chunks(self.config.shard_size)
-                    .map(|chunk| chunk.to_vec())
-                    .collect()
-            }
+            "chunked" => data
+                .chunks(self.config.shard_size)
+                .map(|chunk| chunk.to_vec())
+                .collect(),
             _ => {
                 // Reed-Solomon encoding
                 let rs = ReedSolomon::new(
@@ -260,11 +260,9 @@ impl ShardEncoder {
         shards: &[Option<Vec<u8>>],
     ) -> Result<Vec<u8>, io::Error> {
         match manifest.encoding.as_str() {
-            "none" => {
-                shards[0]
-                    .clone()
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Missing shard"))
-            }
+            "none" => shards[0]
+                .clone()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Missing shard")),
             "chunked" => {
                 // All shards must be present for chunked encoding
                 let mut data = Vec::with_capacity(manifest.total_size as usize);
@@ -389,8 +387,8 @@ mod tests {
             shard_size: 10,
             rs_data_shards: 4,
             rs_parity_shards: 3,
-            rs_threshold: 50,      // RS for data > 50 bytes
-            single_shard_max: 10,  // Force RS encoding for test data
+            rs_threshold: 50,     // RS for data > 50 bytes
+            single_shard_max: 10, // Force RS encoding for test data
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
@@ -415,8 +413,8 @@ mod tests {
             shard_size: 25,
             rs_data_shards: 4,
             rs_parity_shards: 3,
-            rs_threshold: 50,      // RS for data > 50 bytes
-            single_shard_max: 10,  // Force RS encoding for test data
+            rs_threshold: 50,     // RS for data > 50 bytes
+            single_shard_max: 10, // Force RS encoding for test data
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
@@ -424,7 +422,10 @@ mod tests {
 
         // Verify RS encoding was used
         assert_eq!(manifest.encoding, "rs-4-7");
-        assert!(manifest.total_shards >= 7, "Expected at least 7 shards for rs-4-7");
+        assert!(
+            manifest.total_shards >= 7,
+            "Expected at least 7 shards for rs-4-7"
+        );
 
         let shards = encoder.create_shards(&data, &manifest.encoding);
 
