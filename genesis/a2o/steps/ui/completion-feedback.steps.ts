@@ -76,7 +76,10 @@ Then(
     const headline = device.page.locator(`[data-testid="${COMPLETION.HEADLINE}"]`);
     await headline.waitFor({ state: 'visible', timeout: 10_000 });
     const text = await headline.textContent();
-    assert.ok(text?.includes(expected), `Expected headline to contain "${expected}", got: "${text}"`);
+    assert.ok(
+      text?.includes(expected),
+      `Expected headline to contain "${expected}", got: "${text}"`
+    );
   }
 );
 
@@ -136,9 +139,7 @@ Then('each subscale bar should have a non-zero width', async function (this: E2E
   const allNonZero = await device.page.evaluate((sel: string) => {
     const fills = document.querySelectorAll(sel);
     if (fills.length === 0) return false;
-    return Array.from(fills).every(
-      (el) => (el as HTMLElement).offsetWidth > 0
-    );
+    return Array.from(fills).every(el => (el as HTMLElement).offsetWidth > 0);
   }, selector);
 
   assert.ok(allNonZero, 'Expected all subscale bars to have non-zero width');
@@ -156,7 +157,8 @@ Then('the score display should show a percentage', async function (this: E2EWorl
   await score.waitFor({ state: 'visible', timeout: 10_000 });
   const text = await score.textContent();
   assert.ok(text, 'Score display should have text');
-  assert.match(text, /\d+%/, `Expected percentage in score display, got: "${text}"`);
+  // eslint-disable-next-line sonarjs/slow-regex -- simple \d+% has no backtracking risk
+  assert.match(text, /\d+%/u, `Expected percentage in score display, got: "${text}"`);
 });
 
 Then('no score display should be shown', async function (this: E2EWorld) {

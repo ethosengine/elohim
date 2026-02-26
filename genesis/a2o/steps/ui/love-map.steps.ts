@@ -29,33 +29,27 @@ function requirePlaywright(world: E2EWorld): PlaywrightDevice | null {
 // Navigation
 // ---------------------------------------------------------------------------
 
-When(
-  '{word} navigates to the path',
-  async function (this: E2EWorld, _humanName: string) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+When('{word} navigates to the path', async function (this: E2EWorld, _humanName: string) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    const pathId = this.contentIds.get('loveMapPathId');
-    assert.ok(pathId, 'No love map path ID stored — was "the love map path exists" step run?');
+  const pathId = this.contentIds.get('loveMapPathId');
+  assert.ok(pathId, 'No love map path ID stored — was "the love map path exists" step run?');
 
-    await device.navigate(`/lamad/path:${pathId}`);
-    await device.page.waitForLoadState('networkidle');
-  }
-);
+  await device.navigate(`/lamad/path:${pathId}`);
+  await device.page.waitForLoadState('networkidle');
+});
 
-When(
-  '{word} views the path chapters',
-  async function (this: E2EWorld, _humanName: string) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+When('{word} views the path chapters', async function (this: E2EWorld, _humanName: string) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    const pathId = this.contentIds.get('loveMapPathId');
-    assert.ok(pathId, 'No love map path ID stored');
+  const pathId = this.contentIds.get('loveMapPathId');
+  assert.ok(pathId, 'No love map path ID stored');
 
-    await device.navigate(`/lamad/path:${pathId}`);
-    await device.page.waitForLoadState('networkidle');
-  }
-);
+  await device.navigate(`/lamad/path:${pathId}`);
+  await device.page.waitForLoadState('networkidle');
+});
 
 When(
   '{word} browses all available learning paths',
@@ -83,18 +77,13 @@ Then(
   }
 );
 
-Then(
-  'the path should indicate it requires mutual attestation',
-  async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Then('the path should indicate it requires mutual attestation', async function (this: E2EWorld) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    const attestation = device.page
-      .getByText('mutual attestation', { exact: false })
-      .first();
-    await attestation.waitFor({ state: 'visible', timeout: 10_000 });
-  }
-);
+  const attestation = device.page.getByText('mutual attestation', { exact: false }).first();
+  await attestation.waitFor({ state: 'visible', timeout: 10_000 });
+});
 
 Then(
   'the estimated duration should be {string}',
@@ -118,42 +107,34 @@ Then(
   }
 );
 
-Then(
-  'the chapters should show complementary teaching directions',
-  async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Then('the chapters should show complementary teaching directions', async function (this: E2EWorld) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    // Look for evidence of mutual teaching structure in chapter descriptions
-    const teachingIndicator = device.page
-      .getByText('Tending and Naming', { exact: false })
-      .first();
-    await teachingIndicator.waitFor({ state: 'visible', timeout: 10_000 });
-  }
-);
+  // Look for evidence of mutual teaching structure in chapter descriptions
+  const teachingIndicator = device.page.getByText('Tending and Naming', { exact: false }).first();
+  await teachingIndicator.waitFor({ state: 'visible', timeout: 10_000 });
+});
 
 // ---------------------------------------------------------------------------
 // Privacy assertions
 // ---------------------------------------------------------------------------
 
-Then(
-  'the {string} path should not appear',
-  async function (this: E2EWorld, pathTitle: string) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Then('the {string} path should not appear', async function (this: E2EWorld, pathTitle: string) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    // Wait for the path list to load
-    await device.page.waitForLoadState('networkidle');
+  // Wait for the path list to load
+  await device.page.waitForLoadState('networkidle');
 
-    const pathElement = device.page.getByText(pathTitle, { exact: false });
-    const count = await pathElement.count();
-    assert.strictEqual(
-      count,
-      0,
-      `Path "${pathTitle}" should not be visible to non-participants but was found`
-    );
-  }
-);
+  const pathElement = device.page.getByText(pathTitle, { exact: false });
+  const count = await pathElement.count();
+  assert.strictEqual(
+    count,
+    0,
+    `Path "${pathTitle}" should not be visible to non-participants but was found`
+  );
+});
 
 Then(
   'searching for {string} should return no results for {word}',

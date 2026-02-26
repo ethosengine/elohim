@@ -11,13 +11,9 @@ import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
-import { BrowserDevice } from '../src/framework/devices/browser-device.js';
-import type { AllocationView } from '../src/framework/api/doorway-client.js';
-import {
-  allFixtures,
-  type HumanFixture,
-} from '../src/framework/fixtures/humans.js';
 import { E2EWorld } from '../src/framework/world.js';
+
+import type { AllocationView } from '../src/framework/api/doorway-client.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,18 +69,12 @@ Given(
 );
 
 // Alternate wording used in the philosophy scenario
-Given(
-  'content has been seeded with affinity-based allocations',
-  async function (this: E2EWorld) {
-    const client = getClient(this);
-    const allocations = await client.listAllocations();
-    assert.ok(
-      allocations.length > 0,
-      'No stewardship allocations found — has the seeder been run?'
-    );
-    this.contentIds.set('totalAllocationCount', String(allocations.length));
-  }
-);
+Given('content has been seeded with affinity-based allocations', async function (this: E2EWorld) {
+  const client = getClient(this);
+  const allocations = await client.listAllocations();
+  assert.ok(allocations.length > 0, 'No stewardship allocations found — has the seeder been run?');
+  this.contentIds.set('totalAllocationCount', String(allocations.length));
+});
 
 // ---------------------------------------------------------------------------
 // Query steps
@@ -98,10 +88,7 @@ When(
     // Find content with this category tag, then get allocations for each
     const allContent = await client.searchContent([category]);
 
-    assert.ok(
-      allContent.length > 0,
-      `No content found with tag "${category}"`
-    );
+    assert.ok(allContent.length > 0, `No content found with tag "${category}"`);
 
     // Get allocations for the first matching content item
     const contentId = allContent[0].id as string;
@@ -113,16 +100,13 @@ When(
   }
 );
 
-When(
-  'I query stewardship allocations for any content category',
-  async function (this: E2EWorld) {
-    const client = getClient(this);
-    const allAllocations = await client.listAllocations();
-    assert.ok(allAllocations.length > 0, 'No allocations found');
+When('I query stewardship allocations for any content category', async function (this: E2EWorld) {
+  const client = getClient(this);
+  const allAllocations = await client.listAllocations();
+  assert.ok(allAllocations.length > 0, 'No allocations found');
 
-    this.contentIds.set('allAllocations', JSON.stringify(allAllocations));
-  }
-);
+  this.contentIds.set('allAllocations', JSON.stringify(allAllocations));
+});
 
 When(
   'I query stewardship allocations for content with no matching category',
@@ -152,7 +136,7 @@ When(
         if (
           allocations.length === 1 &&
           allocations[0].stewardPresenceId === 'matthew-dowell' &&
-          allocations[0].allocationRatio === 1.0
+          allocations[0].allocationRatio === 1
         ) {
           this.contentIds.set('lastAllocations', JSON.stringify(allocations));
           this.contentIds.set('lastQueryContentId', contentId);
@@ -165,16 +149,13 @@ When(
   }
 );
 
-When(
-  'I query all stewardship allocations',
-  async function (this: E2EWorld) {
-    const client = getClient(this);
-    const allAllocations = await client.listAllocations();
-    assert.ok(allAllocations.length > 0, 'No allocations found');
+When('I query all stewardship allocations', async function (this: E2EWorld) {
+  const client = getClient(this);
+  const allAllocations = await client.listAllocations();
+  assert.ok(allAllocations.length > 0, 'No allocations found');
 
-    this.contentIds.set('allAllocations', JSON.stringify(allAllocations));
-  }
-);
+  this.contentIds.set('allAllocations', JSON.stringify(allAllocations));
+});
 
 // ---------------------------------------------------------------------------
 // Assertion steps — steward presence
@@ -205,22 +186,19 @@ Then(
   }
 );
 
-Then(
-  /^(.+) should be listed as a steward$/,
-  function (this: E2EWorld, displayName: string) {
-    const allocations = getStoredAllocations(this);
-    const presenceId = presenceIdFor(displayName);
+Then(/^(.+) should be listed as a steward$/, function (this: E2EWorld, displayName: string) {
+  const allocations = getStoredAllocations(this);
+  const presenceId = presenceIdFor(displayName);
 
-    const steward = allocations.find(a => a.stewardPresenceId === presenceId);
-    assert.ok(
-      steward,
-      `${displayName} (${presenceId}) not found in allocations: ${allocations.map(a => a.stewardPresenceId).join(', ')}`
-    );
+  const steward = allocations.find(a => a.stewardPresenceId === presenceId);
+  assert.ok(
+    steward,
+    `${displayName} (${presenceId}) not found in allocations: ${allocations.map(a => a.stewardPresenceId).join(', ')}`
+  );
 
-    this.contentIds.set('lastMentionedSteward', presenceId);
-    this.contentIds.set('lastMentionedStewardGender', displayName);
-  }
-);
+  this.contentIds.set('lastMentionedSteward', presenceId);
+  this.contentIds.set('lastMentionedStewardGender', displayName);
+});
 
 Then(
   /^(.+) should have the highest allocation ratio$/,
@@ -247,18 +225,15 @@ Then(
 // Assertion steps — allocation properties
 // ---------------------------------------------------------------------------
 
-Then(
-  'no single steward should have 100% allocation ratio',
-  function (this: E2EWorld) {
-    const allocations = getStoredAllocations(this);
-    for (const a of allocations) {
-      assert.ok(
-        a.allocationRatio < 1.0,
-        `Steward ${a.stewardPresenceId} has 100% allocation (ratio=${a.allocationRatio})`
-      );
-    }
+Then('no single steward should have 100% allocation ratio', function (this: E2EWorld) {
+  const allocations = getStoredAllocations(this);
+  for (const a of allocations) {
+    assert.ok(
+      a.allocationRatio < 1,
+      `Steward ${a.stewardPresenceId} has 100% allocation (ratio=${a.allocationRatio})`
+    );
   }
-);
+});
 
 Then(
   'her/his allocation method should be {string}',
@@ -294,33 +269,27 @@ Then(
   }
 );
 
-Then(
-  'the allocation method should be {string}',
-  function (this: E2EWorld, expectedMethod: string) {
-    const allocations = getStoredAllocations(this);
-    for (const a of allocations) {
-      assert.strictEqual(
-        a.allocationMethod,
-        expectedMethod,
-        `Expected method "${expectedMethod}", got "${a.allocationMethod}" for ${a.stewardPresenceId}`
-      );
-    }
+Then('the allocation method should be {string}', function (this: E2EWorld, expectedMethod: string) {
+  const allocations = getStoredAllocations(this);
+  for (const a of allocations) {
+    assert.strictEqual(
+      a.allocationMethod,
+      expectedMethod,
+      `Expected method "${expectedMethod}", got "${a.allocationMethod}" for ${a.stewardPresenceId}`
+    );
   }
-);
+});
 
-Then(
-  'the contribution type should be {string}',
-  function (this: E2EWorld, expectedType: string) {
-    const allocations = getStoredAllocations(this);
-    for (const a of allocations) {
-      assert.strictEqual(
-        a.contributionType,
-        expectedType,
-        `Expected type "${expectedType}", got "${a.contributionType}" for ${a.stewardPresenceId}`
-      );
-    }
+Then('the contribution type should be {string}', function (this: E2EWorld, expectedType: string) {
+  const allocations = getStoredAllocations(this);
+  for (const a of allocations) {
+    assert.strictEqual(
+      a.contributionType,
+      expectedType,
+      `Expected type "${expectedType}", got "${a.contributionType}" for ${a.stewardPresenceId}`
+    );
   }
-);
+});
 
 // ---------------------------------------------------------------------------
 // Assertion steps — ratios
@@ -359,22 +328,19 @@ Then(
     const tolerance = 0.05;
     for (const [contentId, total] of byContent) {
       assert.ok(
-        Math.abs(total - 1.0) <= tolerance,
+        Math.abs(total - 1) <= tolerance,
         `Allocation ratios for ${contentId} sum to ${total.toFixed(3)}, expected ~1.0`
       );
     }
   }
 );
 
-Then(
-  'Matthew should be the sole steward with ratio 1.0',
-  function (this: E2EWorld) {
-    const allocations = getStoredAllocations(this);
-    assert.strictEqual(allocations.length, 1, `Expected 1 allocation, got ${allocations.length}`);
-    assert.strictEqual(allocations[0].stewardPresenceId, 'matthew-dowell');
-    assert.strictEqual(allocations[0].allocationRatio, 1.0);
-  }
-);
+Then('Matthew should be the sole steward with ratio 1.0', function (this: E2EWorld) {
+  const allocations = getStoredAllocations(this);
+  assert.strictEqual(allocations.length, 1, `Expected 1 allocation, got ${allocations.length}`);
+  assert.strictEqual(allocations[0].stewardPresenceId, 'matthew-dowell');
+  assert.strictEqual(allocations[0].allocationRatio, 1);
+});
 
 Then(
   'the average number of stewards per content item should be greater than 1',
@@ -387,23 +353,17 @@ Then(
     const contentIds = new Set(allAllocations.map(a => a.contentId));
     const avg = allAllocations.length / contentIds.size;
 
-    assert.ok(
-      avg > 1,
-      `Average stewards per content item is ${avg.toFixed(2)}, expected > 1`
-    );
+    assert.ok(avg > 1, `Average stewards per content item is ${avg.toFixed(2)}, expected > 1`);
   }
 );
 
-Then(
-  'the manifesto principle holds: content is stewarded, not owned',
-  function (this: E2EWorld) {
-    // This is a philosophical assertion backed by the data checked in the prior step.
-    // If avg stewards > 1, the principle holds. No additional verification needed.
-    const raw = this.contentIds.get('allAllocations');
-    assert.ok(raw, 'No allocations stored');
-    const allAllocations = JSON.parse(raw) as AllocationView[];
-    const contentIds = new Set(allAllocations.map(a => a.contentId));
-    const avg = allAllocations.length / contentIds.size;
-    assert.ok(avg > 1, 'Content should be stewarded by multiple humans, not owned by one');
-  }
-);
+Then('the manifesto principle holds: content is stewarded, not owned', function (this: E2EWorld) {
+  // This is a philosophical assertion backed by the data checked in the prior step.
+  // If avg stewards > 1, the principle holds. No additional verification needed.
+  const raw = this.contentIds.get('allAllocations');
+  assert.ok(raw, 'No allocations stored');
+  const allAllocations = JSON.parse(raw) as AllocationView[];
+  const contentIds = new Set(allAllocations.map(a => a.contentId));
+  const avg = allAllocations.length / contentIds.size;
+  assert.ok(avg > 1, 'Content should be stewarded by multiple humans, not owned by one');
+});
