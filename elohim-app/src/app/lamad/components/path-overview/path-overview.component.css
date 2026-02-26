@@ -1639,3 +1639,27 @@
     font-size: 0.7rem;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Path Adaptation — mastery-unlocked and skip-ahead visual differentiation  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.step-item.mastery-unlocked {
+  border-left: 3px solid var(--lamad-accent-purple, #8b5cf6);
+}
+
+.step-item.skip-ahead {
+  border-left: 3px solid var(--lamad-accent-blue, #3b82f6);
+}
+
+.mastery-unlock-icon,
+.skip-ahead-icon {
+  font-size: 1rem;
+}
+
+.step-adaptation-hint {
+  font-size: 0.8rem;
+  color: var(--lamad-text-muted, #6b7280);
+  font-style: italic;
+  margin: 0.25rem 0 0;
+}

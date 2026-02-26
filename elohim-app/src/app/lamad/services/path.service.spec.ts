@@ -4,6 +4,7 @@ import { PathService, AccessCheckResult } from './path.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentMasteryService } from './content-mastery.service';
+import { LearnerContextService } from './learner-context.service';
 import { LearningPath, PathStep, PathStepView, PathIndex, ContentNode } from '../models';
 import { AgentProgress } from '@app/elohim/models/agent.model';
 
@@ -12,6 +13,7 @@ describe('PathService', () => {
   let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
   let agentServiceSpy: jasmine.SpyObj<AgentService>;
   let contentMasterySpy: jasmine.SpyObj<ContentMasteryService>;
+  let learnerContextSpy: jasmine.SpyObj<LearnerContextService>;
 
   const mockPath: LearningPath = {
     id: 'test-path',
@@ -131,6 +133,11 @@ describe('PathService', () => {
     const contentMasterySpyObj = jasmine.createSpyObj('ContentMasteryService', [
       'getMasteryLevelSync',
     ]);
+    const learnerContextSpyObj = jasmine.createSpyObj('LearnerContextService', [
+      'isMasteryUnlocked',
+      'isInSkippedSection',
+      'getDiscoveryProfile',
+    ]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -138,6 +145,7 @@ describe('PathService', () => {
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
         { provide: AgentService, useValue: agentServiceSpyObj },
         { provide: ContentMasteryService, useValue: contentMasterySpyObj },
+        { provide: LearnerContextService, useValue: learnerContextSpyObj },
       ],
     });
 
@@ -147,6 +155,9 @@ describe('PathService', () => {
     contentMasterySpy = TestBed.inject(
       ContentMasteryService
     ) as jasmine.SpyObj<ContentMasteryService>;
+    learnerContextSpy = TestBed.inject(
+      LearnerContextService
+    ) as jasmine.SpyObj<LearnerContextService>;
 
     // Default spy return values
     dataLoaderSpy.getPath.and.returnValue(of(mockPath));
@@ -155,6 +166,8 @@ describe('PathService', () => {
     agentServiceSpy.getProgressForPath.and.returnValue(of(mockProgress));
     agentServiceSpy.getAttestations.and.returnValue([]);
     contentMasterySpy.getMasteryLevelSync.and.returnValue('not_started');
+    learnerContextSpy.isMasteryUnlocked.and.returnValue(false);
+    learnerContextSpy.isInSkippedSection.and.returnValue(false);
   });
 
   it('should be created', () => {
@@ -330,6 +343,48 @@ describe('PathService', () => {
       };
       const result = service.isStepAccessible(mockPath, 4, progressAtStep4, ['test-attestation']);
       expect(result.accessible).toBe(true);
+    });
+
+    // =========================================================================
+    // Path Adaptation: Mastery-Aware Fog-of-War
+    // =========================================================================
+
+    it('should unlock step via prior mastery when content is mastered', () => {
+      learnerContextSpy.isMasteryUnlocked.and.returnValue(true);
+      // Step 3 is normally locked (only 0,1,2 accessible with progress at step 0)
+      const result = service.isStepAccessible(mockPath, 3, mockProgress, []);
+      expect(result.accessible).toBe(true);
+      expect(result.accessType).toBe('mastery-unlocked');
+      expect(result.reason).toBe('Prior mastery');
+    });
+
+    it('should NOT bypass attestation gate even with mastery unlock', () => {
+      learnerContextSpy.isMasteryUnlocked.and.returnValue(true);
+      const progressAtStep4 = {
+        ...mockProgress,
+        currentStepIndex: 4,
+        completedStepIndices: [0, 1, 2, 3],
+      };
+      // Step 4 requires 'test-attestation' — mastery should not bypass it
+      const result = service.isStepAccessible(mockPath, 4, progressAtStep4, []);
+      expect(result.accessible).toBe(false);
+      expect(result.reason).toContain('Requires attestation');
+    });
+
+    it('should return mastery-unlocked for scattered mastery with no progress', () => {
+      learnerContextSpy.isMasteryUnlocked.and.callFake((resourceId: string | undefined) =>
+        resourceId === 'content-4' ? true : false
+      );
+      // No progress, but step 3 content is mastered
+      const result = service.isStepAccessible(mockPath, 3, null, []);
+      expect(result.accessible).toBe(true);
+      expect(result.accessType).toBe('mastery-unlocked');
+    });
+
+    it('should return sequential accessType for normal progression', () => {
+      const result = service.isStepAccessible(mockPath, 0, null, []);
+      expect(result.accessible).toBe(true);
+      expect(result.accessType).toBe('sequential');
     });
   });
 

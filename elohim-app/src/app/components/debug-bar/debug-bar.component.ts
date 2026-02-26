@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 // @coverage: 90.9% (2026-02-24)
 
@@ -7,7 +8,7 @@ import { ConfigService, AppConfig } from '../../services/config.service';
 
 @Component({
   selector: 'app-debug-bar',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   templateUrl: './debug-bar.component.html',
   styleUrl: './debug-bar.component.css',
 })

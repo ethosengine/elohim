@@ -3,8 +3,9 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 
+import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
 import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import { SophiaRendererComponent } from './sophia-renderer.component';
 import { SophiaWrapperComponent } from './sophia-wrapper.component';
@@ -87,7 +88,38 @@ describe('SophiaRendererComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [SophiaRendererComponent, RouterModule.forRoot([]), NoopAnimationsModule],
-      providers: [{ provide: MasteryStatsService, useValue: mockMasteryStats }],
+      providers: [
+        { provide: MasteryStatsService, useValue: mockMasteryStats },
+        {
+          provide: ElohimPresenceService,
+          useValue: (() => {
+            const spy = jasmine.createSpyObj('ElohimPresenceService', [
+              'onDiscoveryCompleted',
+              'onContentCompleted',
+            ], {
+              presence$: of([]),
+              cost$: of({ tokensProcessed: 0, timeMs: 0, constitutionalChecks: 0, precedentLookups: 0 }),
+              notices$: of([]),
+              providerId: 'elohim-presence',
+            });
+            const mockResponse = of({
+              requestId: 'req-1',
+              elohimId: 'elohim-1',
+              status: 'fulfilled' as const,
+              constitutionalReasoning: {
+                primaryPrinciple: 'Test',
+                interpretation: 'Test',
+                valuesWeighed: [],
+                confidence: 0.5,
+              },
+              respondedAt: new Date().toISOString(),
+            });
+            spy.onDiscoveryCompleted.and.returnValue(mockResponse);
+            spy.onContentCompleted.and.returnValue(mockResponse);
+            return spy;
+          })(),
+        },
+      ],
     })
       .overrideComponent(SophiaRendererComponent, {
         remove: { imports: [SophiaWrapperComponent] },

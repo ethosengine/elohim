@@ -405,6 +405,30 @@ export interface CliftonTheme {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Discovery Profile (aggregated for path recommendations)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Aggregated discovery profile for path adaptation.
+ *
+ * Summarizes all completed discovery assessments into a shape
+ * that path recommendation and adaptation services can consume.
+ */
+export interface DiscoveryProfile {
+  /** Results grouped by category */
+  byCategory: Record<DiscoveryCategory, DiscoveryResult[]>;
+
+  /** Featured results for display */
+  featured: DiscoveryResult[];
+
+  /** Total assessments completed */
+  totalAssessments: number;
+
+  /** Top traits/results for quick path recommendation context */
+  topTraits: { framework: string; label: string }[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Template Interpolation
 // ─────────────────────────────────────────────────────────────────────────────
 

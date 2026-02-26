@@ -142,7 +142,7 @@ describe('MockBackend', () => {
   }));
 
   it('should generate default reasoning for unknown capabilities', fakeAsync(() => {
-    const request = buildRequest({ capability: 'path-recommendation' });
+    const request = buildRequest({ capability: 'spiral-detection' });
     let response: ElohimResponse | undefined;
 
     backend.invoke(request, mockElohim).subscribe(r => {
@@ -151,7 +151,31 @@ describe('MockBackend', () => {
     tick(3000);
 
     expect(response!.status).toBe('fulfilled');
-    expect(response!.constitutionalReasoning.interpretation).toContain('path-recommendation');
+    expect(response!.constitutionalReasoning.interpretation).toContain('spiral-detection');
+  }));
+
+  it('should handle path-recommendation capability', fakeAsync(() => {
+    const request = buildRequest({
+      capability: 'path-recommendation',
+      params: {
+        type: 'path-analysis',
+        pathId: 'know-thyself',
+        analysisType: 'learning-objectives',
+      },
+    });
+    let response: ElohimResponse | undefined;
+
+    backend.invoke(request, mockElohim).subscribe(r => {
+      response = r;
+    });
+    tick(2000);
+
+    expect(response!.status).toBe('fulfilled');
+    expect(response!.payload).toBeDefined();
+    const payload = response!.payload as { type: string; pathId: string; overallAssessment: string };
+    expect(payload.type).toBe('path-analysis');
+    expect(payload.pathId).toBe('know-thyself');
+    expect(payload.overallAssessment).toBeTruthy();
   }));
 
   it('should use longer processing time for knowledge-map-synthesis', fakeAsync(() => {

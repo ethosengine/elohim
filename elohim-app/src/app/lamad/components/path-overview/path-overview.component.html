@@ -321,6 +321,10 @@
                   <span class="checkmark global" title="Mastered in another journey">✓</span>
                 } @else if (s.isLocked) {
                   <span class="lock">🔒</span>
+                } @else if (s.accessType === 'mastery-unlocked') {
+                  <span class="mastery-unlock-icon" title="Accessible via prior mastery">🧠</span>
+                } @else if (s.accessType === 'skip-ahead') {
+                  <span class="skip-ahead-icon" title="Skipped via pre-assessment">⏭</span>
                 } @else {
                   <span class="number">{{ s.step.order + 1 }}</span>
                 }
@@ -346,6 +350,10 @@
                 }
                 @if (s.isLocked) {
                   <p class="step-locked-message">Complete previous steps to unlock</p>
+                } @else if (s.accessType === 'mastery-unlocked') {
+                  <p class="step-adaptation-hint">Available via prior mastery</p>
+                } @else if (s.accessType === 'skip-ahead') {
+                  <p class="step-adaptation-hint">Skipped via pre-assessment</p>
                 }
               </div>
 

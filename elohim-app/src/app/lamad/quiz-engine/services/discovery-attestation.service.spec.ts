@@ -1696,4 +1696,48 @@ describe('DiscoveryAttestationService', () => {
       expect(svc.attestations()[0].reach).toBe('bioregional' as ReachLevel);
     });
   });
+
+  // ===========================================================================
+  // getDiscoveryProfile
+  // ===========================================================================
+
+  describe('getDiscoveryProfile', () => {
+    it('should return null when no results recorded', () => {
+      expect(service.getDiscoveryProfile()).toBeNull();
+    });
+
+    it('should return profile with category breakdown after recording a result', () => {
+      recordDefault();
+
+      const profile = service.getDiscoveryProfile();
+      expect(profile).toBeTruthy();
+      expect(profile!.totalAssessments).toBe(1);
+      expect(profile!.byCategory).toBeDefined();
+    });
+
+    it('should include top traits from featured results', () => {
+      recordDefault({}, {}, { type4: 0.85, type5: 0.6 });
+      service.toggleFeatured(service.results()[0].id);
+
+      const profile = service.getDiscoveryProfile();
+      expect(profile).toBeTruthy();
+      expect(profile!.topTraits.length).toBeGreaterThan(0);
+      expect(profile!.topTraits[0].framework).toBeTruthy();
+      expect(profile!.topTraits[0].label).toBeTruthy();
+    });
+
+    it('should aggregate multiple assessments', () => {
+      recordDefault({ id: 'a1', title: 'First' });
+      recordDefault({
+        id: 'a2',
+        title: 'Second',
+        framework: 'attachment-style' as DiscoveryFramework,
+        category: 'relationships' as DiscoveryCategory,
+      });
+
+      const profile = service.getDiscoveryProfile();
+      expect(profile).toBeTruthy();
+      expect(profile!.totalAssessments).toBe(2);
+    });
+  });
 });

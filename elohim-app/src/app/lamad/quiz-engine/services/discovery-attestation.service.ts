@@ -29,6 +29,7 @@ import {
   type DiscoveryAttestation,
   type DiscoveryFramework,
   type DiscoveryCategory,
+  type DiscoveryProfile,
   type DiscoveryResultSummary,
   formatDiscoveryResult,
   formatDiscoveryShort,
@@ -152,6 +153,23 @@ export class DiscoveryAttestationService {
     this.getResultsForContext({ requiredReach: 'bioregional', minimumConsent: 'aggregate-only' })
   );
 
+  /** Aggregated discovery profile for path adaptation and recommendations. */
+  readonly discoveryProfile = computed(() => {
+    const results = this.resultsSignal();
+    if (results.length === 0) return null;
+
+    const byCategory = this.resultsByCategory();
+    const featured = this.featuredResults();
+
+    // Extract top traits from featured results for path recommendation context
+    const topTraits = featured.slice(0, 3).map(r => ({
+      framework: r.framework,
+      label: r.shortDisplay,
+    }));
+
+    return { byCategory, featured, totalAssessments: results.length, topTraits };
+  });
+
   // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
@@ -269,6 +287,14 @@ export class DiscoveryAttestationService {
       params.primaryType,
       params.secondaryTypes
     );
+  }
+
+  /**
+   * Get the current discovery profile for path recommendations.
+   * Returns null if no discovery assessments have been completed.
+   */
+  getDiscoveryProfile(): DiscoveryProfile | null {
+    return this.discoveryProfile();
   }
 
   /**

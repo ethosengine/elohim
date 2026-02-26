@@ -18,9 +18,11 @@ import {
   output,
   computed,
   inject,
+  signal,
   OnInit,
 } from '@angular/core';
 
+import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
 import { MasteryStatsService } from '@app/lamad/services/mastery-stats.service';
 
 import { getInstrument, type InstrumentRegistryEntry } from '../../instruments/instrument-registry';
@@ -30,6 +32,8 @@ import {
   getCategoryIcon,
 } from '../../models/discovery-assessment.model';
 import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
+
+import type { ElohimPresenceMoment } from '@app/elohim/models/elohim-presence.model';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -149,6 +153,35 @@ export interface SubscaleBar {
             </div>
           </div>
         }
+      }
+
+      <!-- Elohim Presence Insight -->
+      @if (elohimLoading()) {
+        <div class="elohim-insight loading" data-testid="elohim-insight-loading">
+          <span class="insight-icon">...</span>
+          <span class="insight-text">Elohim is reflecting...</span>
+        </div>
+      }
+      @if (elohimMoment(); as moment) {
+        <div class="elohim-insight" data-testid="elohim-insight">
+          <div class="insight-header">
+            <span class="insight-icon">&#x2727;</span>
+            <span class="insight-label">Elohim Insight</span>
+          </div>
+          <p class="insight-message" data-testid="elohim-insight-message">
+            {{ moment.message }}
+          </p>
+          <details class="insight-reasoning" data-testid="elohim-insight-reasoning">
+            <summary>Constitutional Reasoning</summary>
+            <p class="reasoning-principle">{{ moment.reasoning.primaryPrinciple }}</p>
+            <p class="reasoning-interpretation">{{ moment.reasoning.interpretation }}</p>
+            @if (moment.cost) {
+              <span class="reasoning-cost">
+                {{ moment.cost.tokensProcessed }} tokens | {{ moment.cost.timeMs }}ms
+              </span>
+            }
+          </details>
+        </div>
       }
 
       <!-- Navigation -->
@@ -412,6 +445,91 @@ export interface SubscaleBar {
         text-decoration: underline;
       }
 
+      /* Elohim Insight */
+      .elohim-insight {
+        text-align: left;
+        background: rgba(100, 181, 246, 0.08);
+        border: 1px solid rgba(100, 181, 246, 0.2);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .elohim-insight.loading {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #888;
+        font-style: italic;
+      }
+
+      .insight-header {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .insight-icon {
+        font-size: 1rem;
+        color: #64b5f6;
+      }
+
+      .insight-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64b5f6;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .insight-message {
+        font-size: 0.9rem;
+        color: #ddd;
+        margin: 0 0 0.75rem;
+        line-height: 1.5;
+      }
+
+      .insight-reasoning {
+        font-size: 0.8rem;
+        color: #999;
+      }
+
+      .insight-reasoning summary {
+        cursor: pointer;
+        font-weight: 500;
+        color: #aaa;
+      }
+
+      .reasoning-principle {
+        font-weight: 500;
+        margin: 0.375rem 0 0.25rem;
+        color: #bbb;
+      }
+
+      .reasoning-interpretation {
+        margin: 0 0 0.25rem;
+      }
+
+      .reasoning-cost {
+        font-size: 0.7rem;
+        color: #777;
+        font-family: monospace;
+      }
+
+      :host-context(body[data-theme='light']) .elohim-insight {
+        background: rgba(25, 118, 210, 0.06);
+        border-color: rgba(25, 118, 210, 0.15);
+      }
+
+      :host-context(body[data-theme='light']) .insight-message {
+        color: #333;
+      }
+
+      :host-context(body[data-theme='light']) .reasoning-principle {
+        color: #444;
+      }
+
       .btn {
         display: inline-flex;
         align-items: center;
@@ -506,6 +624,11 @@ export interface SubscaleBar {
 export class AssessmentCompletionSummaryComponent implements OnInit {
   private readonly discoveryService = inject(DiscoveryAttestationService);
   private readonly masteryStats = inject(MasteryStatsService);
+  private readonly presenceService = inject(ElohimPresenceService);
+
+  /** Elohim presence moment after discovery completion */
+  readonly elohimMoment = signal<ElohimPresenceMoment | null>(null);
+  readonly elohimLoading = signal(false);
 
   // ─── Inputs ──────────────────────────────────────────────────────────────────
 
@@ -651,6 +774,7 @@ export class AssessmentCompletionSummaryComponent implements OnInit {
   ngOnInit(): void {
     if (this.mode() === 'discovery') {
       this.recordAttestation();
+      this.requestElohimInsight();
     }
   }
 
@@ -668,6 +792,33 @@ export class AssessmentCompletionSummaryComponent implements OnInit {
       instrumentId: instId,
       subscaleScores: scores,
       primaryType: pt,
+    });
+  }
+
+  private requestElohimInsight(): void {
+    const nodeId = this.contentNodeId();
+    if (!nodeId) return;
+
+    this.elohimLoading.set(true);
+    this.presenceService.onDiscoveryCompleted(nodeId, this.title(), 'current-user').subscribe({
+      next: response => {
+        this.elohimLoading.set(false);
+        if (response.status === 'fulfilled') {
+          this.elohimMoment.set({
+            id: response.requestId,
+            type: 'insight',
+            capability: 'path-recommendation',
+            message:
+              `Based on your ${this.title()} results, I have a learning path recommendation. ` +
+              `(Guided by: ${response.constitutionalReasoning.primaryPrinciple})`,
+            reasoning: response.constitutionalReasoning,
+            cost: response.cost,
+            dismissible: true,
+            createdAt: response.respondedAt,
+          });
+        }
+      },
+      error: () => this.elohimLoading.set(false),
     });
   }
 }

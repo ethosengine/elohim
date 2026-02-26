@@ -46,6 +46,9 @@ export { PathNegotiationService } from './path-negotiation.service';
 export { ContentMasteryService } from './content-mastery.service';
 export type { MigrationResult } from './content-mastery.service';
 
+// Learner context (mastery-aware adaptation layer)
+export { LearnerContextService } from './learner-context.service';
+
 // Mastery service (elohim-storage backend)
 export { MasteryService, MasteryLevels, MASTERY_LEVEL_ORDER } from './mastery.service';
 export type { MasteryLevelType } from './mastery.service';

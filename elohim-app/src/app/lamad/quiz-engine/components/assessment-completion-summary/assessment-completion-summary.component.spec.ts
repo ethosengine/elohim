@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
 
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 
+import { ElohimPresenceService } from '@app/elohim/services/elohim-presence.service';
 import type { LearnerMasteryProfile } from '@app/lamad/models/learner-mastery-profile.model';
 import { MasteryStatsService } from '@app/lamad/services/mastery-stats.service';
 
@@ -21,6 +22,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
   let host: TestHostComponent;
   let mockDiscoveryService: jasmine.SpyObj<DiscoveryAttestationService>;
   let mockMasteryStats: jasmine.SpyObj<MasteryStatsService>;
+  let mockPresenceService: jasmine.SpyObj<ElohimPresenceService>;
   let profileSubject: BehaviorSubject<LearnerMasteryProfile | null>;
 
   // ─── Fixtures ──────────────────────────────────────────────────────────────
@@ -87,8 +89,45 @@ describe('AssessmentCompletionSummaryComponent', () => {
 
   // ─── Setup ─────────────────────────────────────────────────────────────────
 
+  const mockFulfilledResponse = {
+    requestId: 'req-test-1',
+    elohimId: 'elohim-1',
+    status: 'fulfilled' as const,
+    constitutionalReasoning: {
+      primaryPrinciple: 'Love as committed action toward flourishing',
+      interpretation: 'Path recommendation after discovery',
+      valuesWeighed: [{ value: 'Human dignity', weight: 0.5, direction: 'for' as const }],
+      confidence: 0.75,
+    },
+    respondedAt: new Date().toISOString(),
+    cost: {
+      tokensProcessed: 800,
+      timeMs: 1200,
+      constitutionalChecks: 3,
+      precedentLookups: 1,
+    },
+  };
+
   beforeEach(async () => {
     profileSubject = new BehaviorSubject<LearnerMasteryProfile | null>(null);
+
+    mockPresenceService = jasmine.createSpyObj(
+      'ElohimPresenceService',
+      ['onDiscoveryCompleted', 'onContentCompleted', 'dismissNotice', 'handleAction'],
+      {
+        presence$: of([]),
+        cost$: of({
+          tokensProcessed: 0,
+          timeMs: 0,
+          constitutionalChecks: 0,
+          precedentLookups: 0,
+        }),
+        notices$: of([]),
+        providerId: 'elohim-presence',
+      },
+    );
+    mockPresenceService.onDiscoveryCompleted.and.returnValue(of(mockFulfilledResponse));
+    mockPresenceService.onContentCompleted.and.returnValue(of(mockFulfilledResponse));
 
     mockDiscoveryService = jasmine.createSpyObj(
       'DiscoveryAttestationService',
@@ -127,6 +166,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
       providers: [
         { provide: DiscoveryAttestationService, useValue: mockDiscoveryService },
         { provide: MasteryStatsService, useValue: mockMasteryStats },
+        { provide: ElohimPresenceService, useValue: mockPresenceService },
       ],
     }).compileComponents();
 
@@ -226,6 +266,43 @@ describe('AssessmentCompletionSummaryComponent', () => {
       // ngOnInit already ran; changing input won't re-trigger
       // but we verify the guard in recordAttestation
       expect(mockDiscoveryService.recordFromCompletion).not.toHaveBeenCalled();
+    });
+
+    it('should request elohim insight on discovery init', () => {
+      expect(mockPresenceService.onDiscoveryCompleted).toHaveBeenCalledWith(
+        'content-attachment-001',
+        'Attachment Style Assessment',
+        'current-user',
+      );
+    });
+
+    it('should show elohim insight section when fulfilled', () => {
+      const insight = fixture.nativeElement.querySelector('[data-testid="elohim-insight"]');
+      expect(insight).toBeTruthy();
+    });
+
+    it('should display insight message', () => {
+      const message = fixture.nativeElement.querySelector(
+        '[data-testid="elohim-insight-message"]',
+      );
+      expect(message).toBeTruthy();
+      expect(message.textContent).toContain('Attachment Style Assessment');
+    });
+
+    it('should include constitutional reasoning section', () => {
+      const reasoning = fixture.nativeElement.querySelector(
+        '[data-testid="elohim-insight-reasoning"]',
+      );
+      expect(reasoning).toBeTruthy();
+      expect(reasoning.textContent).toContain('Love as committed action toward flourishing');
+    });
+
+    it('should display computation cost in reasoning', () => {
+      const reasoning = fixture.nativeElement.querySelector(
+        '[data-testid="elohim-insight-reasoning"]',
+      );
+      expect(reasoning.textContent).toContain('800');
+      expect(reasoning.textContent).toContain('1200');
     });
   });
 

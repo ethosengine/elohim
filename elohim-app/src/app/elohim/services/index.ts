@@ -20,6 +20,13 @@ export { TrustBadgeService } from './trust-badge.service';
 // Banner notification system
 export { BannerService } from './banner.service';
 
+// Elohim backend abstraction
+export { ElohimBackendCatalog, MockBackend } from './elohim-backend';
+export type { ElohimBackend, ElohimBackendType } from './elohim-backend';
+
+// Elohim presence orchestrator
+export { ElohimPresenceService } from './elohim-presence.service';
+
 // Cross-pillar services (formerly in shared/)
 export { ProfileService } from './profile.service';
 export { HumanConsentService } from './human-consent.service';

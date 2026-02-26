@@ -14,7 +14,7 @@ import { AgentService } from '@app/elohim/services/agent.service';
 import { SeoService } from '../../../services/seo.service';
 import { LearningPath, PathStep, PathChapter, PathModule, PathSection } from '../../models';
 import { ContentMasteryService } from '../../services/content-mastery.service';
-import { PathService } from '../../services/path.service';
+import { PathService, type AccessType } from '../../services/path.service';
 import {
   getStepTypeIcon,
   getIconForContent,
@@ -34,6 +34,8 @@ interface StepDisplay {
   isLocked: boolean;
   masteryLevel: MasteryLevel;
   masteryTier: MasteryTier;
+  /** How this step was unlocked (for visual differentiation) */
+  accessType?: AccessType;
 }
 
 /**
@@ -193,6 +195,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       path: this.pathService.getPath(this.pathId),
       progress: this.agentService.getProgressForPath(this.pathId),
       accessible: this.pathService.getAccessibleSteps(this.pathId),
+      accessChecks: this.pathService.getAccessCheckResults(this.pathId),
       completion: this.pathService.getPathCompletionByContent(this.pathId),
       chapterSummaries: this.pathService.getChapterSummariesWithContent(this.pathId),
       stepsMetadata: this.pathService.getAllStepsMetadata(this.pathId), // Lightweight!
@@ -204,6 +207,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
           path,
           progress,
           accessible,
+          accessChecks,
           completion,
           chapterSummaries,
           stepsMetadata,
@@ -235,6 +239,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
             isLocked: !accessible.includes(s.stepIndex),
             masteryLevel: s.masteryLevel,
             masteryTier: s.masteryTier,
+            accessType: accessChecks.get(s.stepIndex)?.accessType,
           }));
 
           if (chapterSummaries.length > 0) {
@@ -424,6 +429,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       'global-complete': s.isGlobalCompletion,
       locked: s.isLocked,
       accessible: !s.isLocked,
+      'mastery-unlocked': s.accessType === 'mastery-unlocked',
+      'skip-ahead': s.accessType === 'skip-ahead',
       [this.getMasteryTierClass(s.masteryTier)]: true,
     };
   }
