@@ -62,8 +62,10 @@ interface HumansJson {
 // Credential derivation
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line sonarjs/no-hardcoded-passwords -- test fixture credentials, not production
 const DEFAULT_PASSWORD = 'Test2026!';
 const ADMIN_EMAIL = 'matthew.dowell@alpha.elohim.host';
+// eslint-disable-next-line sonarjs/no-hardcoded-passwords -- test fixture credentials, not production
 const ADMIN_PASSWORD = 'TestAdmin2026!';
 const ADMIN_HUMAN_ID = 'human-matthew-manager';
 
@@ -111,8 +113,10 @@ export interface HumanFixture {
 // Loader — reads humans.json once and caches
 // ---------------------------------------------------------------------------
 
-let _cache: { fixtures: Map<string, HumanFixture>; relationships: HumansJsonRelationship[] } | null =
-  null;
+let _cache: {
+  fixtures: Map<string, HumanFixture>;
+  relationships: HumansJsonRelationship[];
+} | null = null;
 
 function loadHumansJson(): HumansJson {
   const __dirname = dirname(fileURLToPath(import.meta.url));

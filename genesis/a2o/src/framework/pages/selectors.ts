@@ -13,6 +13,8 @@
 // Doorway App
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* eslint-disable sonarjs/no-hardcoded-passwords -- data-testid selectors, not credentials */
+
 // Doorway threshold login (doorway-app: threshold-login.component.ts)
 export const THRESHOLD = {
   IDENTIFIER: 'threshold-identifier',
