@@ -149,6 +149,7 @@ describe('PathOverviewComponent', () => {
     const pathServiceSpy = jasmine.createSpyObj('PathService', [
       'getPath',
       'getAccessibleSteps',
+      'getAccessCheckResults',
       'getPathCompletionByContent',
       'getChapterSummariesWithContent',
       'getAllStepsMetadata',
@@ -191,6 +192,12 @@ describe('PathOverviewComponent', () => {
     pathService.getPath.and.returnValue(of(mockPath));
     agentService.getProgressForPath.and.returnValue(of(mockProgress));
     pathService.getAccessibleSteps.and.returnValue(of(mockAccessibleSteps));
+    pathService.getAccessCheckResults.and.returnValue(of(new Map<number, any>([
+      [0, { accessible: true, accessType: 'sequential' }],
+      [1, { accessible: true, accessType: 'sequential' }],
+      [2, { accessible: true, accessType: 'sequential' }],
+      [3, { accessible: false }],
+    ])));
     pathService.getPathCompletionByContent.and.returnValue(of(mockCompletion));
     pathService.getChapterSummariesWithContent.and.returnValue(of([]));
     pathService.getAllStepsMetadata.and.returnValue(of(mockStepsMetadata));
