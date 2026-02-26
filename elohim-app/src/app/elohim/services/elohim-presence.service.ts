@@ -13,9 +13,15 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { map } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 
-import { BehaviorSubject, Observable, Subscription } from 'rxjs';
+import { BehaviorSubject, Observable, Subscription, of } from 'rxjs';
+
+import { LearnerContextService } from '@app/lamad/services/learner-context.service';
+import {
+  PathRecommendationService,
+  type PathRecommendation,
+} from '@app/lamad/services/path-recommendation.service';
 
 import { BannerService } from './banner.service';
 import { ElohimAgentService } from './elohim-agent.service';
@@ -64,7 +70,9 @@ export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
 
   constructor(
     private readonly agentService: ElohimAgentService,
-    private readonly bannerService: BannerService
+    private readonly bannerService: BannerService,
+    private readonly pathRecommendation: PathRecommendationService,
+    private readonly learnerContext: LearnerContextService
   ) {
     this.bannerService.registerProvider(this);
   }
@@ -106,21 +114,26 @@ export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
     });
 
     this.subscriptions.add(
-      response$.subscribe(response => {
-        if (response.status === 'fulfilled') {
-          this.addMoment({
-            type: 'insight',
-            capability: 'path-recommendation',
-            response,
-            message: this.formatInsightMessage(response, assessmentTitle),
-            actions: [
-              { id: 'view-path', label: 'View Recommended Path', primary: true },
-              { id: 'dismiss', label: 'Maybe Later' },
-            ],
-            metadata: { recommendedPathId: contentNodeId },
-          });
-        }
-      })
+      response$
+        .pipe(
+          switchMap(response => {
+            if (response.status !== 'fulfilled') return of(null);
+
+            const profile = this.learnerContext.getDiscoveryProfile();
+            if (!profile) {
+              this.addDiscoveryMoment(response, assessmentTitle, null, contentNodeId);
+              return of(null);
+            }
+
+            return this.pathRecommendation.getTopRecommendation(profile).pipe(
+              map(rec => {
+                this.addDiscoveryMoment(response, assessmentTitle, rec, contentNodeId);
+                return null;
+              })
+            );
+          })
+        )
+        .subscribe()
     );
 
     return response$;
@@ -263,6 +276,29 @@ export class ElohimPresenceService implements BannerNoticeProvider, OnDestroy {
   // =========================================================================
   // Internals
   // =========================================================================
+
+  private addDiscoveryMoment(
+    response: ElohimResponse,
+    assessmentTitle: string,
+    recommendation: PathRecommendation | null,
+    fallbackContentNodeId: string
+  ): void {
+    const message = recommendation
+      ? `Based on your ${assessmentTitle} results, "${recommendation.pathTitle}" looks like a great next step.`
+      : this.formatInsightMessage(response, assessmentTitle);
+
+    this.addMoment({
+      type: 'insight',
+      capability: 'path-recommendation',
+      response,
+      message,
+      actions: [
+        { id: 'view-path', label: 'View Recommended Path', primary: true },
+        { id: 'dismiss', label: 'Maybe Later' },
+      ],
+      metadata: { recommendedPathId: recommendation?.pathId ?? fallbackContentNodeId },
+    });
+  }
 
   private addMoment(opts: {
     type: ElohimPresenceType;

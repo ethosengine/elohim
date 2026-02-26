@@ -170,8 +170,7 @@ impl ImportHandler {
 
                     info!(
                         delay_secs = self.config.reconnect_delay_secs,
-                        "Reconnecting in {} seconds...",
-                        self.config.reconnect_delay_secs
+                        "Reconnecting in {} seconds...", self.config.reconnect_delay_secs
                     );
                     tokio::time::sleep(Duration::from_secs(self.config.reconnect_delay_secs)).await;
                 }
@@ -262,7 +261,12 @@ impl ImportHandler {
     /// Setup: get token, app port, and cell info from admin interface
     async fn setup_from_admin(&self) -> Result<(Vec<u8>, u16, (Vec<u8>, Vec<u8>)), StorageError> {
         // Connect to admin interface
-        let host = self.config.admin_url.split("//").last().unwrap_or("localhost");
+        let host = self
+            .config
+            .admin_url
+            .split("//")
+            .last()
+            .unwrap_or("localhost");
         let admin_request = Request::builder()
             .uri(&self.config.admin_url)
             .header("Host", host)
@@ -294,7 +298,9 @@ impl ImportHandler {
         debug!("Got app auth token");
 
         // Get or create app interface
-        let app_port = self.get_or_create_app_interface(&mut write, &mut read).await?;
+        let app_port = self
+            .get_or_create_app_interface(&mut write, &mut read)
+            .await?;
         info!(port = app_port, "Using app interface");
 
         // Close admin connection
@@ -308,7 +314,11 @@ impl ImportHandler {
     // ========================================================================
 
     /// Get cell info (dna_hash, agent_pub_key) for the app
-    async fn get_cell_info<S, R>(&self, write: &mut S, read: &mut R) -> Result<(Vec<u8>, Vec<u8>), StorageError>
+    async fn get_cell_info<S, R>(
+        &self,
+        write: &mut S,
+        read: &mut R,
+    ) -> Result<(Vec<u8>, Vec<u8>), StorageError>
     where
         S: SinkExt<Message> + Unpin,
         S::Error: std::fmt::Display,
@@ -317,7 +327,10 @@ impl ImportHandler {
         // Build inner request: { type: "list_apps", value: {} }
         // Note: Holochain 0.6+ uses "value" not "data" for request parameters
         let inner = Value::Map(vec![
-            (Value::String("type".into()), Value::String("list_apps".into())),
+            (
+                Value::String("type".into()),
+                Value::String("list_apps".into()),
+            ),
             (Value::String("value".into()), Value::Map(vec![])),
         ]);
 
@@ -328,7 +341,11 @@ impl ImportHandler {
     }
 
     /// Get app auth token
-    async fn get_app_token<S, R>(&self, write: &mut S, read: &mut R) -> Result<Vec<u8>, StorageError>
+    async fn get_app_token<S, R>(
+        &self,
+        write: &mut S,
+        read: &mut R,
+    ) -> Result<Vec<u8>, StorageError>
     where
         S: SinkExt<Message> + Unpin,
         S::Error: std::fmt::Display,
@@ -340,7 +357,10 @@ impl ImportHandler {
                 Value::String("installed_app_id".into()),
                 Value::String(self.config.installed_app_id.clone().into()),
             ),
-            (Value::String("expiry_seconds".into()), Value::Integer(3600.into())),
+            (
+                Value::String("expiry_seconds".into()),
+                Value::Integer(3600.into()),
+            ),
             (Value::String("single_use".into()), Value::Boolean(false)),
         ]);
 
@@ -358,8 +378,15 @@ impl ImportHandler {
         // Response inner: { type: "app_authentication_token_issued", value: { token: <bytes> } }
         if let Value::Map(map) = &response {
             // Debug: log response structure
-            let keys: Vec<_> = map.iter()
-                .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+            let keys: Vec<_> = map
+                .iter()
+                .filter_map(|(k, _)| {
+                    if let Value::String(s) = k {
+                        s.as_str().map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                })
                 .collect();
             error!(keys = ?keys, "Token response map keys");
 
@@ -381,9 +408,12 @@ impl ImportHandler {
                                     return Ok(token.clone());
                                 }
                                 // Try to convert array of integers to bytes
-                                let bytes: Result<Vec<u8>, _> = arr.iter()
+                                let bytes: Result<Vec<u8>, _> = arr
+                                    .iter()
                                     .map(|v| match v {
-                                        Value::Integer(i) => i.as_u64().map(|n| n as u8).ok_or("invalid byte"),
+                                        Value::Integer(i) => {
+                                            i.as_u64().map(|n| n as u8).ok_or("invalid byte")
+                                        }
                                         _ => Err("not integer"),
                                     })
                                     .collect();
@@ -401,8 +431,15 @@ impl ImportHandler {
                         }
                     }
                     // Also check directly in the value map (newer format might just be { token: <bytes> })
-                    let token_keys: Vec<_> = data_map.iter()
-                        .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                    let token_keys: Vec<_> = data_map
+                        .iter()
+                        .filter_map(|(k, _)| {
+                            if let Value::String(s) = k {
+                                s.as_str().map(|s| s.to_string())
+                            } else {
+                                None
+                            }
+                        })
                         .collect();
                     error!(keys = ?token_keys, "Token data map keys (token field not binary)");
                 }
@@ -420,11 +457,17 @@ impl ImportHandler {
             }
         }
 
-        Err(StorageError::Parse("Failed to get token from response".to_string()))
+        Err(StorageError::Parse(
+            "Failed to get token from response".to_string(),
+        ))
     }
 
     /// Get or create app interface
-    async fn get_or_create_app_interface<S, R>(&self, write: &mut S, read: &mut R) -> Result<u16, StorageError>
+    async fn get_or_create_app_interface<S, R>(
+        &self,
+        write: &mut S,
+        read: &mut R,
+    ) -> Result<u16, StorageError>
     where
         S: SinkExt<Message> + Unpin,
         S::Error: std::fmt::Display,
@@ -503,8 +546,14 @@ impl ImportHandler {
 
         // Build envelope: { id, type: "request", data: <inner bytes> }
         let envelope = Value::Map(vec![
-            (Value::String("id".into()), Value::Integer(request_id.into())),
-            (Value::String("type".into()), Value::String("request".into())),
+            (
+                Value::String("id".into()),
+                Value::Integer(request_id.into()),
+            ),
+            (
+                Value::String("type".into()),
+                Value::String("request".into()),
+            ),
             (Value::String("data".into()), Value::Binary(inner_buf)),
         ]);
 
@@ -514,7 +563,7 @@ impl ImportHandler {
 
         // Send request
         write
-            .send(Message::Binary(envelope_buf.into()))
+            .send(Message::Binary(envelope_buf))
             .await
             .map_err(|e| StorageError::Connection(format!("Failed to send: {}", e)))?;
 
@@ -525,8 +574,9 @@ impl ImportHandler {
                 match msg {
                     Ok(Message::Binary(data)) => {
                         let mut cursor = Cursor::new(&data[..]);
-                        let value = rmpv::decode::read_value(&mut cursor)
-                            .map_err(|e| StorageError::Parse(format!("Failed to parse response: {}", e)))?;
+                        let value = rmpv::decode::read_value(&mut cursor).map_err(|e| {
+                            StorageError::Parse(format!("Failed to parse response: {}", e))
+                        })?;
 
                         // Check if this is our response
                         if let Value::Map(ref map) = value {
@@ -542,7 +592,8 @@ impl ImportHandler {
                             if let Some(Value::Integer(resp_id)) = get_field(map, "id") {
                                 if resp_id.as_u64() == Some(request_id) {
                                     // Parse inner response from data field
-                                    if let Some(Value::Binary(inner_bytes)) = get_field(map, "data") {
+                                    if let Some(Value::Binary(inner_bytes)) = get_field(map, "data")
+                                    {
                                         let mut inner_cursor = Cursor::new(&inner_bytes[..]);
                                         let inner = rmpv::decode::read_value(&mut inner_cursor)
                                             .map_err(|e| {
@@ -579,7 +630,11 @@ impl ImportHandler {
     // ========================================================================
 
     /// Send AppAuthenticationRequest to the app interface
-    async fn send_app_auth_request<S>(&self, write: &mut S, token: &[u8]) -> Result<(), StorageError>
+    async fn send_app_auth_request<S>(
+        &self,
+        write: &mut S,
+        token: &[u8],
+    ) -> Result<(), StorageError>
     where
         S: SinkExt<Message> + Unpin,
         S::Error: std::fmt::Display,
@@ -598,7 +653,10 @@ impl ImportHandler {
         // Wrap in "authenticate" envelope (NOT "request" - special format for auth)
         // The SDK uses: { type: "authenticate", data: encode(request) }
         let envelope = Value::Map(vec![
-            (Value::String("type".into()), Value::String("authenticate".into())),
+            (
+                Value::String("type".into()),
+                Value::String("authenticate".into()),
+            ),
             (Value::String("data".into()), Value::Binary(inner_buf)),
         ]);
 
@@ -607,7 +665,7 @@ impl ImportHandler {
             .map_err(|e| StorageError::Parse(format!("Failed to encode envelope: {}", e)))?;
 
         write
-            .send(Message::Binary(buf.into()))
+            .send(Message::Binary(buf))
             .await
             .map_err(|e| StorageError::Connection(format!("Failed to send auth request: {}", e)))?;
 
@@ -640,12 +698,10 @@ impl ImportHandler {
                         Some(Ok(Message::Binary(data))) => {
                             // Check if this is an error message
                             let mut cursor = Cursor::new(&data[..]);
-                            if let Ok(value) = rmpv::decode::read_value(&mut cursor) {
-                                if let Value::Map(ref map) = value {
-                                    if let Some(resp_type) = get_string_field(map, "type") {
-                                        if resp_type == "error" {
-                                            return Err(StorageError::Auth("Authentication rejected".to_string()));
-                                        }
+                            if let Ok(Value::Map(ref map)) = rmpv::decode::read_value(&mut cursor) {
+                                if let Some(resp_type) = get_string_field(map, "type") {
+                                    if resp_type == "error" {
+                                        return Err(StorageError::Auth("Authentication rejected".to_string()));
                                     }
                                 }
                             }
@@ -689,7 +745,10 @@ impl ImportHandler {
             .map_err(|e| StorageError::Parse(format!("Failed to parse message: {}", e)))?;
 
         // Try multiple signal formats (like subscriber.rs)
-        if self.try_handle_signal(&value, ws, dna_hash, agent_pub_key).await? {
+        if self
+            .try_handle_signal(&value, ws, dna_hash, agent_pub_key)
+            .await?
+        {
             return Ok(());
         }
 
@@ -790,7 +849,7 @@ impl ImportHandler {
 
         let total_items = items.len();
         let chunk_size = self.config.chunk_size;
-        let total_chunks = (total_items + chunk_size - 1) / chunk_size;
+        let total_chunks = total_items.div_ceil(chunk_size);
 
         info!(
             batch_id = %payload.batch_id,
@@ -930,6 +989,7 @@ impl ImportHandler {
     // ========================================================================
 
     /// Call process_import_chunk on zome and wait for response
+    #[allow(clippy::too_many_arguments)]
     async fn call_process_chunk<S>(
         &self,
         ws: &mut S,
@@ -973,13 +1033,22 @@ impl ImportHandler {
                 Value::String("fn_name".into()),
                 Value::String("process_import_chunk".into()),
             ),
-            (Value::String("payload".into()), Value::Binary(payload_bytes)),
+            (
+                Value::String("payload".into()),
+                Value::Binary(payload_bytes),
+            ),
             (Value::String("cap_secret".into()), Value::Nil),
-            (Value::String("provenance".into()), Value::Binary(agent_pub_key.to_vec())),
+            (
+                Value::String("provenance".into()),
+                Value::Binary(agent_pub_key.to_vec()),
+            ),
         ]);
 
         let inner = Value::Map(vec![
-            (Value::String("type".into()), Value::String("call_zome".into())),
+            (
+                Value::String("type".into()),
+                Value::String("call_zome".into()),
+            ),
             (Value::String("value".into()), call_data),
         ]);
 
@@ -990,8 +1059,14 @@ impl ImportHandler {
 
         // Build envelope
         let envelope = Value::Map(vec![
-            (Value::String("id".into()), Value::Integer(request_id.into())),
-            (Value::String("type".into()), Value::String("request".into())),
+            (
+                Value::String("id".into()),
+                Value::Integer(request_id.into()),
+            ),
+            (
+                Value::String("type".into()),
+                Value::String("request".into()),
+            ),
             (Value::String("data".into()), Value::Binary(inner_buf)),
         ]);
 
@@ -1000,7 +1075,7 @@ impl ImportHandler {
             .map_err(|e| StorageError::Parse(format!("Failed to encode envelope: {}", e)))?;
 
         // Send request
-        ws.send(Message::Binary(envelope_buf.into()))
+        ws.send(Message::Binary(envelope_buf))
             .await
             .map_err(|e| StorageError::Connection(format!("Failed to send: {}", e)))?;
 
@@ -1031,7 +1106,10 @@ impl ImportHandler {
     // ========================================================================
 
     /// Parse cell info from list_apps response
-    fn parse_cell_info_from_apps(&self, response: &Value) -> Result<(Vec<u8>, Vec<u8>), StorageError> {
+    fn parse_cell_info_from_apps(
+        &self,
+        response: &Value,
+    ) -> Result<(Vec<u8>, Vec<u8>), StorageError> {
         // Response structure varies by Holochain version:
         // v0.3+: { type: "...", data: [{ installed_app_id, cell_info: { role_name: [{ type: "provisioned", value: { cell_id: { dna_hash: ..., agent_pub_key: ... } } }] } }] }
         // Earlier: { type: "...", data: [{ installed_app_id, cell_info: { role_name: [{ cell_id: [dna, agent] }] } }] }
@@ -1045,28 +1123,49 @@ impl ImportHandler {
 
         // Helper to extract apps array from a value (handles nested wrapping)
         fn extract_apps(value: &Value, depth: u8) -> Option<Vec<Value>> {
-            if depth > 5 { return None; } // Prevent infinite recursion
+            if depth > 5 {
+                return None;
+            } // Prevent infinite recursion
 
             // Debug logging for tracing
-            tracing::debug!("extract_apps depth={} type={}", depth, response_type_str(value));
+            tracing::debug!(
+                "extract_apps depth={} type={}",
+                depth,
+                response_type_str(value)
+            );
 
             match value {
                 Value::Array(arr) => {
                     tracing::debug!("extract_apps depth={} found array len={}", depth, arr.len());
                     Some(arr.clone())
-                },
+                }
                 Value::Map(map) => {
-                    let keys: Vec<_> = map.iter()
-                        .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                    let keys: Vec<_> = map
+                        .iter()
+                        .filter_map(|(k, _)| {
+                            if let Value::String(s) = k {
+                                s.as_str().map(|s| s.to_string())
+                            } else {
+                                None
+                            }
+                        })
                         .collect();
                     tracing::debug!("extract_apps depth={} map keys={:?}", depth, keys);
 
                     // Try value field first (newer Holochain), then data
                     // May be nested: response.value.value = [apps]
                     if let Some(inner) = get_field(map, "value") {
-                        tracing::debug!("extract_apps depth={} found 'value' field type={}", depth, response_type_str(inner));
+                        tracing::debug!(
+                            "extract_apps depth={} found 'value' field type={}",
+                            depth,
+                            response_type_str(inner)
+                        );
                         if let Value::Array(arr) = inner {
-                            tracing::debug!("extract_apps depth={} value is array len={}", depth, arr.len());
+                            tracing::debug!(
+                                "extract_apps depth={} value is array len={}",
+                                depth,
+                                arr.len()
+                            );
                             return Some(arr.clone());
                         }
                         // Recurse into nested wrapper
@@ -1075,7 +1174,11 @@ impl ImportHandler {
                         }
                     }
                     if let Some(inner) = get_field(map, "data") {
-                        tracing::debug!("extract_apps depth={} found 'data' field type={}", depth, response_type_str(inner));
+                        tracing::debug!(
+                            "extract_apps depth={} found 'data' field type={}",
+                            depth,
+                            response_type_str(inner)
+                        );
                         if let Value::Array(arr) = inner {
                             return Some(arr.clone());
                         }
@@ -1087,7 +1190,11 @@ impl ImportHandler {
                     None
                 }
                 Value::Binary(bytes) => {
-                    tracing::debug!("extract_apps depth={} decoding binary len={}", depth, bytes.len());
+                    tracing::debug!(
+                        "extract_apps depth={} decoding binary len={}",
+                        depth,
+                        bytes.len()
+                    );
                     // Decode nested msgpack
                     let mut cursor = Cursor::new(&bytes[..]);
                     if let Ok(inner) = rmpv::decode::read_value(&mut cursor) {
@@ -1105,15 +1212,29 @@ impl ImportHandler {
         } else {
             // Log what we got for debugging - trace all the way down
             if let Value::Map(map) = response {
-                let keys: Vec<_> = map.iter()
-                    .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                let keys: Vec<_> = map
+                    .iter()
+                    .filter_map(|(k, _)| {
+                        if let Value::String(s) = k {
+                            s.as_str().map(|s| s.to_string())
+                        } else {
+                            None
+                        }
+                    })
                     .collect();
                 error!("Response map keys: {:?}", keys);
                 if let Some(v) = get_field(map, "value") {
                     error!("value field type: {}", response_type_str(v));
                     if let Value::Map(inner) = v {
-                        let inner_keys: Vec<_> = inner.iter()
-                            .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                        let inner_keys: Vec<_> = inner
+                            .iter()
+                            .filter_map(|(k, _)| {
+                                if let Value::String(s) = k {
+                                    s.as_str().map(|s| s.to_string())
+                                } else {
+                                    None
+                                }
+                            })
                             .collect();
                         error!("Inner map keys: {:?}", inner_keys);
                         // Go one level deeper
@@ -1122,8 +1243,15 @@ impl ImportHandler {
                             if let Value::Array(arr) = v2 {
                                 error!("Inner.value is array with {} elements!", arr.len());
                             } else if let Value::Map(inner2) = v2 {
-                                let inner2_keys: Vec<_> = inner2.iter()
-                                    .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+                                let inner2_keys: Vec<_> = inner2
+                                    .iter()
+                                    .filter_map(|(k, _)| {
+                                        if let Value::String(s) = k {
+                                            s.as_str().map(|s| s.to_string())
+                                        } else {
+                                            None
+                                        }
+                                    })
                                     .collect();
                                 error!("Inner2 map keys: {:?}", inner2_keys);
                             }
@@ -1159,13 +1287,17 @@ impl ImportHandler {
                                 for cell in cell_arr {
                                     if let Value::Map(cell_map) = cell {
                                         // Try new format: { type: "provisioned", value: { cell_id: { dna_hash, agent_pub_key } } }
-                                        if let Some(cell_id) = self.extract_cell_id_from_provisioned(cell_map) {
+                                        if let Some(cell_id) =
+                                            self.extract_cell_id_from_provisioned(cell_map)
+                                        {
                                             debug!(role = %role_name, "Extracted cell_id from provisioned format");
                                             return Ok(cell_id);
                                         }
 
                                         // Try legacy format: { cell_id: [dna, agent] }
-                                        if let Some(Value::Array(cell_id)) = get_field(cell_map, "cell_id") {
+                                        if let Some(Value::Array(cell_id)) =
+                                            get_field(cell_map, "cell_id")
+                                        {
                                             if cell_id.len() >= 2 {
                                                 let dna = extract_bytes(&cell_id[0])?;
                                                 let agent = extract_bytes(&cell_id[1])?;
@@ -1196,7 +1328,10 @@ impl ImportHandler {
 
     /// Extract cell_id from provisioned cell format (Holochain 0.3+)
     /// Format: { type: "provisioned", value: { cell_id: { dna_hash: <bytes>, agent_pub_key: <bytes> } } }
-    fn extract_cell_id_from_provisioned(&self, cell_map: &[(Value, Value)]) -> Option<(Vec<u8>, Vec<u8>)> {
+    fn extract_cell_id_from_provisioned(
+        &self,
+        cell_map: &[(Value, Value)],
+    ) -> Option<(Vec<u8>, Vec<u8>)> {
         // Check if this is a provisioned cell
         let cell_type = get_string_field(cell_map, "type");
         if cell_type.as_deref() != Some("provisioned") {
@@ -1216,10 +1351,9 @@ impl ImportHandler {
         match cell_id {
             // New format: { dna_hash: <bytes>, agent_pub_key: <bytes> }
             Value::Map(id_map) => {
-                let dna = get_field(id_map, "dna_hash")
-                    .and_then(|v| extract_bytes(v).ok())?;
-                let agent = get_field(id_map, "agent_pub_key")
-                    .and_then(|v| extract_bytes(v).ok())?;
+                let dna = get_field(id_map, "dna_hash").and_then(|v| extract_bytes(v).ok())?;
+                let agent =
+                    get_field(id_map, "agent_pub_key").and_then(|v| extract_bytes(v).ok())?;
                 Some((dna, agent))
             }
             // Legacy format: [dna, agent]
@@ -1275,8 +1409,15 @@ fn response_type_str(value: &Value) -> String {
         Value::Binary(b) => format!("binary({}b)", b.len()),
         Value::Array(a) => format!("array({})", a.len()),
         Value::Map(m) => {
-            let keys: Vec<_> = m.iter()
-                .filter_map(|(k, _)| if let Value::String(s) = k { s.as_str().map(|s| s.to_string()) } else { None })
+            let keys: Vec<_> = m
+                .iter()
+                .filter_map(|(k, _)| {
+                    if let Value::String(s) = k {
+                        s.as_str().map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                })
                 .collect();
             format!("map({})[{}]", m.len(), keys.join(","))
         }
@@ -1399,10 +1540,7 @@ mod tests {
             Arc::new(BlobStore::new_memory()),
         );
 
-        assert_eq!(
-            handler.derive_app_url(4445),
-            "ws://conductor.local:4445"
-        );
+        assert_eq!(handler.derive_app_url(4445), "ws://conductor.local:4445");
     }
 
     #[test]

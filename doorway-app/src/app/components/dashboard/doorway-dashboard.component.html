@@ -10,8 +10,8 @@
         <span class="status-dot"></span>
         {{ connectionState() | titlecase }}
       </span>
-      <button class="refresh-btn" (click)="refresh()" [disabled]="loading()" data-testid="dashboard-refresh">
-        <span class="icon">&#8635;</span>
+      <button class="refresh-btn" (click)="refresh()" [disabled]="loading()" data-testid="dashboard-refresh" aria-label="Refresh dashboard data">
+        <span class="icon" aria-hidden="true">&#8635;</span>
         Refresh
       </button>
     </div>
@@ -79,9 +79,11 @@
     }
 
     <!-- Tabs -->
-    <nav class="tabs">
+    <nav class="tabs" role="tablist" aria-label="Dashboard sections">
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'overview'"
         [class.active]="activeTab() === 'overview'"
         (click)="setTab('overview')"
         data-testid="dashboard-tab-overview">
@@ -89,6 +91,8 @@
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'nodes'"
         [class.active]="activeTab() === 'nodes'"
         (click)="setTab('nodes')"
         data-testid="dashboard-tab-nodes">
@@ -96,6 +100,8 @@
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'resources'"
         [class.active]="activeTab() === 'resources'"
         (click)="setTab('resources')"
         data-testid="dashboard-tab-resources">
@@ -103,6 +109,8 @@
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'users'"
         [class.active]="activeTab() === 'users'"
         (click)="setTab('users')"
         data-testid="dashboard-tab-users">
@@ -110,6 +118,8 @@
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'pipeline'"
         [class.active]="activeTab() === 'pipeline'"
         (click)="setTab('pipeline')"
         data-testid="dashboard-tab-pipeline">
@@ -117,6 +127,8 @@
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'federation'"
         [class.active]="activeTab() === 'federation'"
         (click)="setTab('federation')"
         data-testid="dashboard-tab-federation">
@@ -124,6 +136,8 @@
       </button>
       <button
         class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'graduation'"
         [class.active]="activeTab() === 'graduation'"
         (click)="setTab('graduation')"
         data-testid="dashboard-tab-graduation">

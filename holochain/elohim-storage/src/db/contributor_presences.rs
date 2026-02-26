@@ -9,7 +9,9 @@ use uuid::Uuid;
 
 use super::context::AppContext;
 use super::diesel_schema::contributor_presences;
-use super::models::{ContributorPresence, NewContributorPresence, presence_states, current_timestamp};
+use super::models::{
+    current_timestamp, presence_states, ContributorPresence, NewContributorPresence,
+};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -55,7 +57,9 @@ pub struct ContributorPresenceQuery {
     pub offset: i64,
 }
 
-fn default_limit() -> i64 { 100 }
+fn default_limit() -> i64 {
+    100
+}
 
 /// Result of bulk operation
 #[derive(Debug, Clone, Serialize)]
@@ -274,13 +278,19 @@ pub fn accumulate_recognition(
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or_default();
 
-        let current = by_content.get(content_id)
+        let current = by_content
+            .get(content_id)
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
-        by_content.insert(content_id.clone(), serde_json::json!(current + update.affinity_delta as f64));
+        by_content.insert(
+            content_id.clone(),
+            serde_json::json!(current + update.affinity_delta as f64),
+        );
 
-        Some(serde_json::to_string(&by_content)
-            .map_err(|e| StorageError::Internal(format!("JSON serialization failed: {}", e)))?)
+        Some(
+            serde_json::to_string(&by_content)
+                .map_err(|e| StorageError::Internal(format!("JSON serialization failed: {}", e)))?,
+        )
     } else {
         presence.recognition_by_content_json.clone()
     };
@@ -294,7 +304,7 @@ pub fn accumulate_recognition(
     diesel::update(
         contributor_presences::table
             .filter(contributor_presences::app_id.eq(&ctx.app_id))
-            .filter(contributor_presences::id.eq(id))
+            .filter(contributor_presences::id.eq(id)),
     )
     .set((
         contributor_presences::affinity_total.eq(new_affinity),
@@ -333,13 +343,14 @@ pub fn initiate_stewardship(
     diesel::update(
         contributor_presences::table
             .filter(contributor_presences::app_id.eq(&ctx.app_id))
-            .filter(contributor_presences::id.eq(id))
+            .filter(contributor_presences::id.eq(id)),
     )
     .set((
         contributor_presences::presence_state.eq(presence_states::STEWARDED),
         contributor_presences::steward_id.eq(&input.steward_id),
         contributor_presences::stewardship_started_at.eq(current_timestamp()),
-        contributor_presences::stewardship_commitment_id.eq(input.stewardship_commitment_id.as_deref()),
+        contributor_presences::stewardship_commitment_id
+            .eq(input.stewardship_commitment_id.as_deref()),
         contributor_presences::updated_at.eq(current_timestamp()),
     ))
     .execute(conn)
@@ -362,14 +373,14 @@ pub fn initiate_claim(
 
     if presence.presence_state == presence_states::CLAIMED {
         return Err(StorageError::InvalidInput(
-            "Presence is already claimed".into()
+            "Presence is already claimed".into(),
         ));
     }
 
     diesel::update(
         contributor_presences::table
             .filter(contributor_presences::app_id.eq(&ctx.app_id))
-            .filter(contributor_presences::id.eq(id))
+            .filter(contributor_presences::id.eq(id)),
     )
     .set((
         contributor_presences::presence_state.eq(presence_states::CLAIMING),
@@ -410,7 +421,7 @@ pub fn verify_claim(
     diesel::update(
         contributor_presences::table
             .filter(contributor_presences::app_id.eq(&ctx.app_id))
-            .filter(contributor_presences::id.eq(id))
+            .filter(contributor_presences::id.eq(id)),
     )
     .set((
         contributor_presences::presence_state.eq(presence_states::CLAIMED),
@@ -435,7 +446,7 @@ pub fn update_stewardship_quality(
     diesel::update(
         contributor_presences::table
             .filter(contributor_presences::app_id.eq(&ctx.app_id))
-            .filter(contributor_presences::id.eq(id))
+            .filter(contributor_presences::id.eq(id)),
     )
     .set((
         contributor_presences::stewardship_quality_score.eq(quality_score),
@@ -457,7 +468,7 @@ pub fn delete_contributor_presence(
     let deleted = diesel::delete(
         contributor_presences::table
             .filter(contributor_presences::app_id.eq(&ctx.app_id))
-            .filter(contributor_presences::id.eq(id))
+            .filter(contributor_presences::id.eq(id)),
     )
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
@@ -489,7 +500,10 @@ pub fn stats_by_state(
     contributor_presences::table
         .filter(contributor_presences::app_id.eq(&ctx.app_id))
         .group_by(contributor_presences::presence_state)
-        .select((contributor_presences::presence_state, diesel::dsl::count_star()))
+        .select((
+            contributor_presences::presence_state,
+            diesel::dsl::count_star(),
+        ))
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Stats query failed: {}", e)))
 }

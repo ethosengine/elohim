@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::context::AppContext;
 use super::diesel_schema::human_relationships;
-use super::models::{HumanRelationship, NewHumanRelationship, intimacy_levels, current_timestamp};
+use super::models::{current_timestamp, intimacy_levels, HumanRelationship, NewHumanRelationship};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -43,8 +43,12 @@ pub struct CreateHumanRelationshipInput {
     pub expires_at: Option<String>,
 }
 
-fn default_intimacy() -> String { intimacy_levels::RECOGNITION.to_string() }
-fn default_private_reach() -> String { "private".to_string() }
+fn default_intimacy() -> String {
+    intimacy_levels::RECOGNITION.to_string()
+}
+fn default_private_reach() -> String {
+    "private".to_string()
+}
 
 /// Query parameters for listing human relationships - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -68,7 +72,9 @@ pub struct HumanRelationshipQuery {
     pub offset: i64,
 }
 
-fn default_limit() -> i64 { 100 }
+fn default_limit() -> i64 {
+    100
+}
 
 /// Result of bulk operation
 #[derive(Debug, Clone, Serialize)]
@@ -124,8 +130,9 @@ pub fn list_human_relationships(
     // Filter by party involvement
     if let Some(ref party_id) = query.party_id {
         base_query = base_query.filter(
-            human_relationships::party_a_id.eq(party_id)
-                .or(human_relationships::party_b_id.eq(party_id))
+            human_relationships::party_a_id
+                .eq(party_id)
+                .or(human_relationships::party_b_id.eq(party_id)),
         );
     }
 
@@ -148,7 +155,8 @@ pub fn list_human_relationships(
                 .filter(|(i, _)| *i >= min_index)
                 .map(|(_, level)| *level)
                 .collect();
-            base_query = base_query.filter(human_relationships::intimacy_level.eq_any(valid_levels));
+            base_query =
+                base_query.filter(human_relationships::intimacy_level.eq_any(valid_levels));
         }
     }
 
@@ -162,8 +170,9 @@ pub fn list_human_relationships(
     // Filter for custody enabled
     if query.custody_enabled_only == Some(true) {
         base_query = base_query.filter(
-            human_relationships::custody_enabled_by_a.eq(1)
-                .or(human_relationships::custody_enabled_by_b.eq(1))
+            human_relationships::custody_enabled_by_a
+                .eq(1)
+                .or(human_relationships::custody_enabled_by_b.eq(1)),
         );
     }
 
@@ -181,10 +190,14 @@ pub fn get_relationships_for_human(
     ctx: &AppContext,
     human_id: &str,
 ) -> Result<Vec<HumanRelationship>, StorageError> {
-    list_human_relationships(conn, ctx, &HumanRelationshipQuery {
-        party_id: Some(human_id.to_string()),
-        ..Default::default()
-    })
+    list_human_relationships(
+        conn,
+        ctx,
+        &HumanRelationshipQuery {
+            party_id: Some(human_id.to_string()),
+            ..Default::default()
+        },
+    )
 }
 
 /// Get relationship between two specific humans
@@ -198,10 +211,12 @@ pub fn get_relationship_between(
     let mut base_query = human_relationships::table
         .filter(human_relationships::app_id.eq(&ctx.app_id))
         .filter(
-            (human_relationships::party_a_id.eq(party_a_id)
+            (human_relationships::party_a_id
+                .eq(party_a_id)
                 .and(human_relationships::party_b_id.eq(party_b_id)))
-            .or(human_relationships::party_a_id.eq(party_b_id)
-                .and(human_relationships::party_b_id.eq(party_a_id)))
+            .or(human_relationships::party_a_id
+                .eq(party_b_id)
+                .and(human_relationships::party_b_id.eq(party_a_id))),
         )
         .into_boxed();
 
@@ -223,12 +238,14 @@ pub fn get_trusted_contacts(
     human_relationships::table
         .filter(human_relationships::app_id.eq(&ctx.app_id))
         .filter(
-            human_relationships::party_a_id.eq(human_id)
-                .or(human_relationships::party_b_id.eq(human_id))
+            human_relationships::party_a_id
+                .eq(human_id)
+                .or(human_relationships::party_b_id.eq(human_id)),
         )
         .filter(
-            human_relationships::custody_enabled_by_a.eq(1)
-                .or(human_relationships::custody_enabled_by_b.eq(1))
+            human_relationships::custody_enabled_by_a
+                .eq(1)
+                .or(human_relationships::custody_enabled_by_b.eq(1)),
         )
         .filter(human_relationships::consent_given_by_a.eq(1))
         .filter(human_relationships::consent_given_by_b.eq(1))
@@ -306,7 +323,7 @@ pub fn update_consent(
         diesel::update(
             human_relationships::table
                 .filter(human_relationships::app_id.eq(&ctx.app_id))
-                .filter(human_relationships::id.eq(id))
+                .filter(human_relationships::id.eq(id)),
         )
         .set((
             human_relationships::consent_given_by_a.eq(consent_value),
@@ -318,7 +335,7 @@ pub fn update_consent(
         diesel::update(
             human_relationships::table
                 .filter(human_relationships::app_id.eq(&ctx.app_id))
-                .filter(human_relationships::id.eq(id))
+                .filter(human_relationships::id.eq(id)),
         )
         .set((
             human_relationships::consent_given_by_b.eq(consent_value),
@@ -352,28 +369,28 @@ pub fn update_custody(
     let custody_value = if custody.custody_enabled { 1 } else { 0 };
 
     // Check that mutual consent exists before enabling custody
-    if custody.custody_enabled {
-        if rel.consent_given_by_a != 1 || rel.consent_given_by_b != 1 {
-            return Err(StorageError::InvalidInput(
-                "Cannot enable custody without mutual consent".into()
-            ));
-        }
+    if custody.custody_enabled && (rel.consent_given_by_a != 1 || rel.consent_given_by_b != 1) {
+        return Err(StorageError::InvalidInput(
+            "Cannot enable custody without mutual consent".into(),
+        ));
     }
 
     if rel.party_a_id == party_id {
         diesel::update(
             human_relationships::table
                 .filter(human_relationships::app_id.eq(&ctx.app_id))
-                .filter(human_relationships::id.eq(id))
+                .filter(human_relationships::id.eq(id)),
         )
         .set((
             human_relationships::custody_enabled_by_a.eq(custody_value),
-            human_relationships::auto_custody_enabled.eq(
-                custody.auto_custody_enabled.map(|v| if v { 1 } else { 0 }).unwrap_or(rel.auto_custody_enabled)
-            ),
-            human_relationships::emergency_access_enabled.eq(
-                custody.emergency_access_enabled.map(|v| if v { 1 } else { 0 }).unwrap_or(rel.emergency_access_enabled)
-            ),
+            human_relationships::auto_custody_enabled.eq(custody
+                .auto_custody_enabled
+                .map(|v| if v { 1 } else { 0 })
+                .unwrap_or(rel.auto_custody_enabled)),
+            human_relationships::emergency_access_enabled.eq(custody
+                .emergency_access_enabled
+                .map(|v| if v { 1 } else { 0 })
+                .unwrap_or(rel.emergency_access_enabled)),
             human_relationships::updated_at.eq(current_timestamp()),
         ))
         .execute(conn)
@@ -382,16 +399,18 @@ pub fn update_custody(
         diesel::update(
             human_relationships::table
                 .filter(human_relationships::app_id.eq(&ctx.app_id))
-                .filter(human_relationships::id.eq(id))
+                .filter(human_relationships::id.eq(id)),
         )
         .set((
             human_relationships::custody_enabled_by_b.eq(custody_value),
-            human_relationships::auto_custody_enabled.eq(
-                custody.auto_custody_enabled.map(|v| if v { 1 } else { 0 }).unwrap_or(rel.auto_custody_enabled)
-            ),
-            human_relationships::emergency_access_enabled.eq(
-                custody.emergency_access_enabled.map(|v| if v { 1 } else { 0 }).unwrap_or(rel.emergency_access_enabled)
-            ),
+            human_relationships::auto_custody_enabled.eq(custody
+                .auto_custody_enabled
+                .map(|v| if v { 1 } else { 0 })
+                .unwrap_or(rel.auto_custody_enabled)),
+            human_relationships::emergency_access_enabled.eq(custody
+                .emergency_access_enabled
+                .map(|v| if v { 1 } else { 0 })
+                .unwrap_or(rel.emergency_access_enabled)),
             human_relationships::updated_at.eq(current_timestamp()),
         ))
         .execute(conn)
@@ -408,17 +427,18 @@ pub fn update_custody(
         .ok_or_else(|| StorageError::Internal("Failed to retrieve updated relationship".into()))?;
 
     // Auto-enable custody at intimate level if both parties have enabled custody
-    if intimacy_levels::triggers_auto_custody(&updated.intimacy_level) {
-        if updated.custody_enabled_by_a == 1 && updated.custody_enabled_by_b == 1 {
-            diesel::update(
-                human_relationships::table
-                    .filter(human_relationships::app_id.eq(&ctx.app_id))
-                    .filter(human_relationships::id.eq(id))
-            )
-            .set(human_relationships::auto_custody_enabled.eq(1))
-            .execute(conn)
-            .map_err(|e| StorageError::Internal(format!("Auto-custody update failed: {}", e)))?;
-        }
+    if intimacy_levels::triggers_auto_custody(&updated.intimacy_level)
+        && updated.custody_enabled_by_a == 1
+        && updated.custody_enabled_by_b == 1
+    {
+        diesel::update(
+            human_relationships::table
+                .filter(human_relationships::app_id.eq(&ctx.app_id))
+                .filter(human_relationships::id.eq(id)),
+        )
+        .set(human_relationships::auto_custody_enabled.eq(1))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Auto-custody update failed: {}", e)))?;
     }
 
     get_human_relationship(conn, ctx, id)?
@@ -443,7 +463,7 @@ pub fn update_intimacy_level(
     diesel::update(
         human_relationships::table
             .filter(human_relationships::app_id.eq(&ctx.app_id))
-            .filter(human_relationships::id.eq(id))
+            .filter(human_relationships::id.eq(id)),
     )
     .set((
         human_relationships::intimacy_level.eq(new_level),
@@ -465,7 +485,7 @@ pub fn verify_relationship(
     diesel::update(
         human_relationships::table
             .filter(human_relationships::app_id.eq(&ctx.app_id))
-            .filter(human_relationships::id.eq(id))
+            .filter(human_relationships::id.eq(id)),
     )
     .set((
         human_relationships::verified_at.eq(current_timestamp()),
@@ -487,7 +507,7 @@ pub fn delete_human_relationship(
     let deleted = diesel::delete(
         human_relationships::table
             .filter(human_relationships::app_id.eq(&ctx.app_id))
-            .filter(human_relationships::id.eq(id))
+            .filter(human_relationships::id.eq(id)),
     )
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
@@ -519,7 +539,10 @@ pub fn stats_by_intimacy(
     human_relationships::table
         .filter(human_relationships::app_id.eq(&ctx.app_id))
         .group_by(human_relationships::intimacy_level)
-        .select((human_relationships::intimacy_level, diesel::dsl::count_star()))
+        .select((
+            human_relationships::intimacy_level,
+            diesel::dsl::count_star(),
+        ))
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Stats query failed: {}", e)))
 }

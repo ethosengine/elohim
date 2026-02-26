@@ -20,11 +20,11 @@
 //! ```
 
 use crate::progress_hub::{ProgressHub, ProgressMessage};
-use futures_util::{SinkExt, StreamExt};
-use hyper::{Request, Response, StatusCode};
-use hyper::body::Incoming;
-use http_body_util::Full;
 use bytes::Bytes;
+use futures_util::{SinkExt, StreamExt};
+use http_body_util::Full;
+use hyper::body::Incoming;
+use hyper::{Request, Response, StatusCode};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -33,7 +33,8 @@ use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 use tracing::{debug, error, info, warn};
 
 /// WebSocket type after upgrade (using hyper-tungstenite)
-type HyperWebSocket = hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
+type HyperWebSocket =
+    hyper_tungstenite::WebSocketStream<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>>;
 
 /// Messages from client to server
 #[derive(Debug, Clone, Deserialize)]
@@ -45,9 +46,7 @@ pub enum ClientMessage {
         batch_ids: Vec<String>,
     },
     /// Unsubscribe from specific batches
-    Unsubscribe {
-        batch_ids: Vec<String>,
-    },
+    Unsubscribe { batch_ids: Vec<String> },
     /// Ping to keep connection alive
     Ping,
 }
@@ -170,7 +169,7 @@ async fn handle_connection(
 
                                 let initial = ProgressMessage::InitialState { batches: states };
                                 let json = serde_json::to_string(&initial)?;
-                                ws_sink.send(WsMessage::Text(json.into())).await?;
+                                ws_sink.send(WsMessage::Text(json)).await?;
                             }
                             Ok(ClientMessage::Unsubscribe { batch_ids }) => {
                                 for id in batch_ids {
@@ -189,7 +188,7 @@ async fn handle_connection(
                                     timestamp: chrono::Utc::now().to_rfc3339(),
                                 };
                                 let json = serde_json::to_string(&heartbeat)?;
-                                ws_sink.send(WsMessage::Text(json.into())).await?;
+                                ws_sink.send(WsMessage::Text(json)).await?;
                             }
                             Err(e) => {
                                 warn!(error = %e, text = %text, "Failed to parse client message");
@@ -237,7 +236,7 @@ async fn handle_connection(
 
                         if should_send {
                             let json = serde_json::to_string(&message)?;
-                            if let Err(e) = ws_sink.send(WsMessage::Text(json.into())).await {
+                            if let Err(e) = ws_sink.send(WsMessage::Text(json)).await {
                                 warn!(error = %e, "Failed to send progress to client");
                                 break;
                             }
@@ -259,7 +258,7 @@ async fn handle_connection(
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 };
                 let json = serde_json::to_string(&heartbeat)?;
-                if let Err(e) = ws_sink.send(WsMessage::Text(json.into())).await {
+                if let Err(e) = ws_sink.send(WsMessage::Text(json)).await {
                     warn!(error = %e, "Failed to send heartbeat");
                     break;
                 }

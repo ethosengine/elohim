@@ -35,7 +35,9 @@ fn parse_json(json_str: &str) -> Value {
 
 /// Default schema version for InputView types.
 /// Clients that omit schemaVersion are implicitly version 1.
-fn default_schema_version() -> u32 { 1 }
+fn default_schema_version() -> u32 {
+    1
+}
 
 /// Supported schema versions. Reject anything not in this set.
 /// Extend this array when introducing a new schema version.
@@ -43,7 +45,10 @@ pub const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1];
 
 /// Validate that all schema versions in a batch are supported.
 pub fn validate_schema_versions(versions: &[u32]) -> Result<(), String> {
-    if let Some(&bad) = versions.iter().find(|v| !SUPPORTED_SCHEMA_VERSIONS.contains(v)) {
+    if let Some(&bad) = versions
+        .iter()
+        .find(|v| !SUPPORTED_SCHEMA_VERSIONS.contains(v))
+    {
         return Err(format!(
             "Unsupported schema version: {}. Supported: {:?}",
             bad, SUPPORTED_SCHEMA_VERSIONS
@@ -60,9 +65,9 @@ use crate::db::models::{
 };
 
 // Legacy rusqlite types (used by services until migration complete)
-use crate::db::paths::{PathRow, StepRow, ChapterRow, PathWithSteps as LegacyPathWithSteps};
-use crate::db::relationships::RelationshipRow;
 use crate::db::content::ContentRow;
+use crate::db::paths::{ChapterRow, PathRow, PathWithSteps as LegacyPathWithSteps, StepRow};
+use crate::db::relationships::RelationshipRow;
 
 // ============================================================================
 // App View
@@ -437,8 +442,10 @@ impl From<LegacyPathWithSteps> for PathWithDetailsView {
         Self {
             path: p.path.into(),
             tags: vec![], // Legacy doesn't have tags at this level
-            chapters: p.chapters.into_iter().map(|c| {
-                ChapterWithStepsView {
+            chapters: p
+                .chapters
+                .into_iter()
+                .map(|c| ChapterWithStepsView {
                     chapter: ChapterView {
                         id: c.id,
                         app_id: String::new(),
@@ -449,8 +456,8 @@ impl From<LegacyPathWithSteps> for PathWithDetailsView {
                         estimated_duration: c.estimated_duration,
                     },
                     steps: c.steps.into_iter().map(|s| s.into()).collect(),
-                }
-            }).collect(),
+                })
+                .collect(),
             ungrouped_steps: p.ungrouped_steps.into_iter().map(|s| s.into()).collect(),
             attestations: vec![], // Legacy doesn't have attestations
         }
@@ -1058,7 +1065,7 @@ impl From<CreateContentInputView> for CreateContentInput {
 // Path Input Views
 // ============================================================================
 
-use crate::db::paths::{CreatePathInput, CreateChapterInput, CreateStepInput};
+use crate::db::paths::{CreateChapterInput, CreatePathInput, CreateStepInput};
 
 /// Input for creating a step - camelCase API boundary type
 #[derive(Debug, Clone, Deserialize, TS)]
@@ -1279,7 +1286,9 @@ impl From<CreateHumanRelationshipInputView> for CreateHumanRelationshipInput {
             party_a_id: v.party_a_id,
             party_b_id: v.party_b_id,
             relationship_type: v.relationship_type,
-            intimacy_level: v.intimacy_level.unwrap_or_else(|| "recognition".to_string()),
+            intimacy_level: v
+                .intimacy_level
+                .unwrap_or_else(|| "recognition".to_string()),
             is_bidirectional: v.is_bidirectional,
             consent_given_by_a: v.consent_given_by_a,
             consent_given_by_b: v.consent_given_by_b,
@@ -1486,7 +1495,9 @@ impl From<CreateAllocationInputView> for CreateAllocationInput {
             steward_presence_id: v.steward_presence_id,
             allocation_ratio: v.allocation_ratio.unwrap_or(1.0),
             allocation_method: v.allocation_method.unwrap_or_else(|| "manual".to_string()),
-            contribution_type: v.contribution_type.unwrap_or_else(|| "inherited".to_string()),
+            contribution_type: v
+                .contribution_type
+                .unwrap_or_else(|| "inherited".to_string()),
             contribution_evidence_json: serialize_json_opt(&v.contribution_evidence),
             note: v.note,
             metadata_json: serialize_json_opt(&v.metadata),
@@ -1611,19 +1622,20 @@ mod schema_version_tests {
     #[test]
     fn all_input_views_accept_schema_version() {
         // Verify schema_version works across representative InputView types
-        let content: CreateContentInputView = serde_json::from_str(
-            r#"{"id":"c","title":"T","schemaVersion":3}"#
-        ).unwrap();
+        let content: CreateContentInputView =
+            serde_json::from_str(r#"{"id":"c","title":"T","schemaVersion":3}"#).unwrap();
         assert_eq!(content.schema_version, 3);
 
         let rel: CreateRelationshipInputView = serde_json::from_str(
-            r#"{"sourceId":"a","targetId":"b","relationshipType":"relates","schemaVersion":2}"#
-        ).unwrap();
+            r#"{"sourceId":"a","targetId":"b","relationshipType":"relates","schemaVersion":2}"#,
+        )
+        .unwrap();
         assert_eq!(rel.schema_version, 2);
 
         let event: CreateEconomicEventInputView = serde_json::from_str(
-            r#"{"action":"use","provider":"p","receiver":"r","schemaVersion":5}"#
-        ).unwrap();
+            r#"{"action":"use","provider":"p","receiver":"r","schemaVersion":5}"#,
+        )
+        .unwrap();
         assert_eq!(event.schema_version, 5);
     }
 
@@ -1635,42 +1647,40 @@ mod schema_version_tests {
     #[test]
     fn all_input_views_have_schema_version_field() {
         // Every InputView type must appear here. If you add a new one, add it below.
-        let content: CreateContentInputView = serde_json::from_value(
-            serde_json::json!({"id":"x","title":"x"})
-        ).unwrap();
-        let step: CreateStepInputView = serde_json::from_value(
-            serde_json::json!({"id":"x","pathId":"p","title":"x"})
-        ).unwrap();
-        let chapter: CreateChapterInputView = serde_json::from_value(
-            serde_json::json!({"id":"x","title":"x"})
-        ).unwrap();
-        let path: CreatePathInputView = serde_json::from_value(
-            serde_json::json!({"id":"x","title":"x"})
-        ).unwrap();
+        let content: CreateContentInputView =
+            serde_json::from_value(serde_json::json!({"id":"x","title":"x"})).unwrap();
+        let step: CreateStepInputView =
+            serde_json::from_value(serde_json::json!({"id":"x","pathId":"p","title":"x"})).unwrap();
+        let chapter: CreateChapterInputView =
+            serde_json::from_value(serde_json::json!({"id":"x","title":"x"})).unwrap();
+        let path: CreatePathInputView =
+            serde_json::from_value(serde_json::json!({"id":"x","title":"x"})).unwrap();
         let rel: CreateRelationshipInputView = serde_json::from_value(
-            serde_json::json!({"sourceId":"a","targetId":"b","relationshipType":"r"})
-        ).unwrap();
+            serde_json::json!({"sourceId":"a","targetId":"b","relationshipType":"r"}),
+        )
+        .unwrap();
         let human_rel: CreateHumanRelationshipInputView = serde_json::from_value(
             serde_json::json!({"partyAId":"a","partyBId":"b","relationshipType":"r","initiatedBy":"a"})
         ).unwrap();
         let presence: CreateContributorPresenceInputView = serde_json::from_value(
-            serde_json::json!({"displayName":"x","establishingContentIds":[]})
-        ).unwrap();
+            serde_json::json!({"displayName":"x","establishingContentIds":[]}),
+        )
+        .unwrap();
         let claim: InitiateClaimInputView = serde_json::from_value(
-            serde_json::json!({"claimingAgentId":"a","verificationMethod":"m"})
-        ).unwrap();
+            serde_json::json!({"claimingAgentId":"a","verificationMethod":"m"}),
+        )
+        .unwrap();
         let event: CreateEconomicEventInputView = serde_json::from_value(
-            serde_json::json!({"action":"use","provider":"p","receiver":"r"})
-        ).unwrap();
-        let alloc: CreateAllocationInputView = serde_json::from_value(
-            serde_json::json!({"contentId":"c","stewardPresenceId":"s"})
-        ).unwrap();
-        let update_alloc: UpdateAllocationInputView = serde_json::from_value(
-            serde_json::json!({})
-        ).unwrap();
-        let mastery: CreateMasteryInputView = serde_json::from_value(
-            serde_json::json!({"humanId":"h","contentId":"c"})
-        ).unwrap();
+            serde_json::json!({"action":"use","provider":"p","receiver":"r"}),
+        )
+        .unwrap();
+        let alloc: CreateAllocationInputView =
+            serde_json::from_value(serde_json::json!({"contentId":"c","stewardPresenceId":"s"}))
+                .unwrap();
+        let update_alloc: UpdateAllocationInputView =
+            serde_json::from_value(serde_json::json!({})).unwrap();
+        let mastery: CreateMasteryInputView =
+            serde_json::from_value(serde_json::json!({"humanId":"h","contentId":"c"})).unwrap();
 
         // The lint: accessing .schema_version on each. Fails to compile if missing.
         assert_eq!(content.schema_version, 1);

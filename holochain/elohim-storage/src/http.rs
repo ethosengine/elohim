@@ -33,23 +33,14 @@
 //! ```
 
 use crate::blob_store::BlobStore;
-use crate::db::{self, ContentDb, ContentQuery, DbPool, AppContext};
-use crate::db::{human_relationships, contributor_presences, economic_events, content_mastery, stewardship_allocations};
-use crate::views::{
-    PathView, PathWithDetailsView, ChapterView, StepView,
-    ContentView, ContentWithTagsView,
-    RelationshipView, RelationshipWithContentView,
-    HumanRelationshipView, ContributorPresenceView, EconomicEventView,
-    ContentMasteryView, StewardshipAllocationView, StewardshipAllocationWithPresenceView,
-    ContentStewardshipView, LocalSessionView,
-    // InputView types for API boundary (camelCase with parsed JSON)
-    CreateContentInputView, CreatePathInputView, CreateRelationshipInputView,
-    CreateHumanRelationshipInputView, CreateContributorPresenceInputView,
-    CreateEconomicEventInputView, CreateAllocationInputView, UpdateAllocationInputView,
-    CreateMasteryInputView, InitiateClaimInputView, CreateChapterInputView, CreateStepInputView,
-    validate_schema_versions, SUPPORTED_SCHEMA_VERSIONS,
+use crate::db::policy_cache::{
+    ContentMetadata, PolicyDecision, PolicyEnforcement, PolicyEvent, PolicyEventType,
 };
-use crate::db::policy_cache::{PolicyEnforcement, ContentMetadata, PolicyDecision, PolicyEvent, PolicyEventType};
+use crate::db::{self, AppContext, ContentDb, ContentQuery, DbPool};
+use crate::db::{
+    content_mastery, contributor_presences, economic_events, human_relationships,
+    stewardship_allocations,
+};
 use crate::error::StorageError;
 use crate::import_api::ImportApi;
 use crate::progress_hub::ProgressHub;
@@ -57,6 +48,31 @@ use crate::progress_ws;
 use crate::services::{response, Services};
 use crate::sharding::{ShardEncoder, ShardManifest};
 use crate::sync::SyncManager;
+use crate::views::{
+    validate_schema_versions,
+    ContentMasteryView,
+    ContentStewardshipView,
+    ContentView,
+    ContributorPresenceView,
+    CreateAllocationInputView,
+    // InputView types for API boundary (camelCase with parsed JSON)
+    CreateContentInputView,
+    CreateContributorPresenceInputView,
+    CreateEconomicEventInputView,
+    CreateHumanRelationshipInputView,
+    CreateMasteryInputView,
+    CreatePathInputView,
+    CreateRelationshipInputView,
+    EconomicEventView,
+    InitiateClaimInputView,
+    LocalSessionView,
+    PathView,
+    PathWithDetailsView,
+    RelationshipView,
+    StewardshipAllocationView,
+    UpdateAllocationInputView,
+    SUPPORTED_SCHEMA_VERSIONS,
+};
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
@@ -64,7 +80,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{header, Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -90,6 +106,8 @@ pub struct HttpServer {
     services: Option<Arc<Services>>,
     /// Policy enforcement for stewardship content filtering
     policy_enforcement: Option<Arc<PolicyEnforcement>>,
+    /// Node Registry API for tracking shards
+    node_registry_api: Option<Arc<crate::node_registry_api::NodeRegistryApi>>,
     /// P2P handle for status endpoint (Send+Sync safe)
     #[cfg(feature = "p2p")]
     p2p_handle: Option<crate::p2p::P2PHandle>,
@@ -100,7 +118,8 @@ pub struct HttpServer {
 fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>, String> {
     match req.headers().get("X-Schema-Version") {
         Some(val) => {
-            let version = val.to_str()
+            let version = val
+                .to_str()
                 .map_err(|_| "Invalid X-Schema-Version header encoding".to_string())?
                 .parse::<u32>()
                 .map_err(|_| "X-Schema-Version must be a positive integer".to_string())?;
@@ -133,6 +152,7 @@ impl HttpServer {
             db_pool: None,
             services: None,
             policy_enforcement: None,
+            node_registry_api: None,
             #[cfg(feature = "p2p")]
             p2p_handle: None,
         }
@@ -147,6 +167,15 @@ impl HttpServer {
     /// Set the Progress Hub for WebSocket streaming
     pub fn with_progress_hub(mut self, hub: Arc<ProgressHub>) -> Self {
         self.progress_hub = Some(hub);
+        self
+    }
+
+    /// Set the Node Registry API
+    pub fn with_node_registry_api(
+        mut self,
+        api: Arc<crate::node_registry_api::NodeRegistryApi>,
+    ) -> Self {
+        self.node_registry_api = Some(api);
         self
     }
 
@@ -282,7 +311,7 @@ impl HttpServer {
                         .status(StatusCode::SERVICE_UNAVAILABLE)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(
-                            r#"{"error": "Progress hub not enabled"}"#
+                            r#"{"error": "Progress hub not enabled"}"#,
                         )))
                         .unwrap())
                 }
@@ -298,11 +327,14 @@ impl HttpServer {
                         if api.needs_reconnect() {
                             drop(api); // Release read lock before acquiring write lock
                             let mut api_write = import_api.write().await;
-                            if api_write.needs_reconnect() { // Double-check after acquiring write lock
+                            if api_write.needs_reconnect() {
+                                // Double-check after acquiring write lock
                                 info!("Import API: Attempting lazy reconnection to conductor...");
                                 match api_write.connect_conductor().await {
                                     Ok(_) => info!("Import API: Lazy reconnection successful"),
-                                    Err(e) => warn!(error = %e, "Import API: Lazy reconnection failed"),
+                                    Err(e) => {
+                                        warn!(error = %e, "Import API: Lazy reconnection failed")
+                                    }
                                 }
                             }
                         }
@@ -315,7 +347,7 @@ impl HttpServer {
                         .status(StatusCode::SERVICE_UNAVAILABLE)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(
-                            r#"{"error": "Import API not enabled. Set ENABLE_IMPORT_API=true"}"#
+                            r#"{"error": "Import API not enabled. Set ENABLE_IMPORT_API=true"}"#,
                         )))
                         .unwrap())
                 }
@@ -323,20 +355,19 @@ impl HttpServer {
 
             // P2P Status endpoint
             #[cfg(feature = "p2p")]
-            (Method::GET, "/p2p/status") => {
-                self.handle_p2p_status().await
-            }
+            (Method::GET, "/p2p/status") => self.handle_p2p_status().await,
 
             // Sync API: /sync/v1/{app_id}/docs[/{doc_id}[/heads|/changes]]
             (method, p) if p.starts_with("/sync/v1/") => {
                 if let Some(ref sync_manager) = self.sync_manager {
-                    self.handle_sync_request(req, method, &path, sync_manager.clone()).await
+                    self.handle_sync_request(req, method, &path, sync_manager.clone())
+                        .await
                 } else {
                     Ok(Response::builder()
                         .status(StatusCode::SERVICE_UNAVAILABLE)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(
-                            r#"{"error": "Sync API not enabled"}"#
+                            r#"{"error": "Sync API not enabled"}"#,
                         )))
                         .unwrap())
                 }
@@ -345,13 +376,14 @@ impl HttpServer {
             // Database API: Content, Paths, Stats
             (method, p) if p.starts_with("/db/") => {
                 if let Some(ref content_db) = self.content_db {
-                    self.handle_db_request(req, method, &path, content_db.clone()).await
+                    self.handle_db_request(req, method, &path, content_db.clone())
+                        .await
                 } else {
                     Ok(Response::builder()
                         .status(StatusCode::SERVICE_UNAVAILABLE)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(
-                            r#"{"error": "Content database not enabled"}"#
+                            r#"{"error": "Content database not enabled"}"#,
                         )))
                         .unwrap())
                 }
@@ -366,7 +398,7 @@ impl HttpServer {
                         .status(StatusCode::SERVICE_UNAVAILABLE)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Full::new(Bytes::from(
-                            r#"{"error": "Content database not enabled"}"#
+                            r#"{"error": "Content database not enabled"}"#,
                         )))
                         .unwrap())
                 }
@@ -413,12 +445,22 @@ impl HttpServer {
             Ok(mut response) => {
                 // Add CORS headers to ALL responses (not just preflight)
                 let headers = response.headers_mut();
-                headers.insert("Access-Control-Allow-Origin",
-                    hyper::header::HeaderValue::from_static("*"));
-                headers.insert("Access-Control-Allow-Methods",
-                    hyper::header::HeaderValue::from_static("GET, PUT, POST, DELETE, HEAD, OPTIONS"));
-                headers.insert("Access-Control-Allow-Headers",
-                    hyper::header::HeaderValue::from_static("Content-Type, Authorization, X-Agent-Id, X-Schema-Version"));
+                headers.insert(
+                    "Access-Control-Allow-Origin",
+                    hyper::header::HeaderValue::from_static("*"),
+                );
+                headers.insert(
+                    "Access-Control-Allow-Methods",
+                    hyper::header::HeaderValue::from_static(
+                        "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+                    ),
+                );
+                headers.insert(
+                    "Access-Control-Allow-Headers",
+                    hyper::header::HeaderValue::from_static(
+                        "Content-Type, Authorization, X-Agent-Id, X-Schema-Version",
+                    ),
+                );
                 Ok(response)
             }
             Err(e) => {
@@ -456,16 +498,21 @@ impl HttpServer {
         expected_hash: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         // Read body
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let data = body.to_bytes();
 
         // Verify hash - normalize both to hex for comparison
         // URL may contain raw hex, sha256-prefixed, or CID format
         let computed_hash = BlobStore::compute_hash(&data);
-        let computed_hex = computed_hash.strip_prefix("sha256-").unwrap_or(&computed_hash);
-        let expected_hex = expected_hash.strip_prefix("sha256-").unwrap_or(expected_hash);
+        let computed_hex = computed_hash
+            .strip_prefix("sha256-")
+            .unwrap_or(&computed_hash);
+        let expected_hex = expected_hash
+            .strip_prefix("sha256-")
+            .unwrap_or(expected_hash);
 
         if !expected_hash.is_empty() && computed_hex != expected_hex {
             return Ok(Response::builder()
@@ -505,10 +552,7 @@ impl HttpServer {
     }
 
     /// GET /shard/{hash} - Retrieve a shard
-    async fn handle_get_shard(
-        &self,
-        hash: &str,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_get_shard(&self, hash: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         if hash.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
@@ -525,10 +569,7 @@ impl HttpServer {
                     .header(header::CONTENT_TYPE, "application/octet-stream")
                     .header(header::CONTENT_LENGTH, data.len())
                     .header(header::ETAG, format!("\"{}\"", hash))
-                    .header(
-                        header::CACHE_CONTROL,
-                        "public, max-age=31536000, immutable",
-                    )
+                    .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
                     .body(Full::new(Bytes::from(data)))
                     .unwrap())
             }
@@ -541,10 +582,7 @@ impl HttpServer {
     }
 
     /// HEAD /shard/{hash} - Check if shard exists
-    async fn handle_head_shard(
-        &self,
-        hash: &str,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_head_shard(&self, hash: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         if hash.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
@@ -581,17 +619,25 @@ impl HttpServer {
             .unwrap_or("application/octet-stream")
             .to_string();
 
+        let agent_id =
+            Self::extract_agent_id(&req).unwrap_or_else(|| "did:elohim:storage".to_string());
+
         // Read body
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let data = body.to_bytes().to_vec();
 
         // Verify hash if provided - normalize both to hex for comparison
         // URL may contain raw hex, sha256-prefixed, or CID format
         let computed_hash = BlobStore::compute_hash(&data);
-        let computed_hex = computed_hash.strip_prefix("sha256-").unwrap_or(&computed_hash);
-        let expected_hex = expected_hash.strip_prefix("sha256-").unwrap_or(expected_hash);
+        let computed_hex = computed_hash
+            .strip_prefix("sha256-")
+            .unwrap_or(&computed_hash);
+        let expected_hex = expected_hash
+            .strip_prefix("sha256-")
+            .unwrap_or(expected_hash);
 
         if !expected_hash.is_empty() && computed_hex != expected_hex {
             return Ok(Response::builder()
@@ -631,6 +677,36 @@ impl HttpServer {
             }
 
             self.blob_store.store(&shard_data).await?;
+
+            // Register with Node Registry if available
+            if let Some(ref nr_api) = self.node_registry_api {
+                let assignment = crate::node_registry_api::ShardAssignment {
+                    assignment_hash: None,
+                    content_hash: expected_hex.to_string(), // The full content hash
+                    // Ideally, use the actual agent ID (e.g. from X-Agent-Id header) if provided;
+                    // fallback to a generic placeholder or the configured connection's role for now.
+                    custodian_did: agent_id.clone(),
+                    shard_index: i as u32,
+                    strategy: crate::node_registry_api::ShardingStrategy::Geographic,
+                    status: crate::node_registry_api::ShardStatus::Active,
+                    verified_at: None,
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    updated_at: chrono::Utc::now().to_rfc3339(),
+                };
+                if let Err(e) = nr_api.create_shard_assignment(assignment).await {
+                    warn!(
+                        error = %e,
+                        shard_index = i,
+                        "Failed to register shard assignment with Node Registry"
+                    );
+                } else {
+                    info!(
+                        shard_index = i,
+                        content_hash = %expected_hex,
+                        "Registered shard assignment with Node Registry"
+                    );
+                }
+            }
         }
 
         // Store manifest
@@ -647,8 +723,8 @@ impl HttpServer {
             "Stored blob with manifest"
         );
 
-        let body = serde_json::to_string(&manifest)
-            .map_err(|e| StorageError::Internal(e.to_string()))?;
+        let body =
+            serde_json::to_string(&manifest).map_err(|e| StorageError::Internal(e.to_string()))?;
 
         Ok(Response::builder()
             .status(StatusCode::CREATED)
@@ -670,15 +746,23 @@ impl HttpServer {
         Response::builder()
             .status(StatusCode::OK)
             .header("Access-Control-Allow-Origin", "*")
-            .header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, HEAD, OPTIONS")
-            .header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Agent-Id, X-Schema-Version")
+            .header(
+                "Access-Control-Allow-Methods",
+                "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+            )
+            .header(
+                "Access-Control-Allow-Headers",
+                "Content-Type, Authorization, X-Agent-Id, X-Schema-Version",
+            )
             .header("Access-Control-Max-Age", "86400")
             .body(Full::new(Bytes::new()))
             .unwrap()
     }
 
     /// Add CORS headers to a response
-    fn with_cors_headers(builder: hyper::http::response::Builder) -> hyper::http::response::Builder {
+    fn with_cors_headers(
+        builder: hyper::http::response::Builder,
+    ) -> hyper::http::response::Builder {
         builder
             .header("Access-Control-Allow-Origin", "*")
             .header("Cross-Origin-Resource-Policy", "cross-origin")
@@ -719,7 +803,7 @@ impl HttpServer {
             // For now, we only have the hash - in future, we could look up metadata
             let content = ContentMetadata {
                 hash: hash.to_string(),
-                categories: Vec::new(),  // TODO: Could be looked up from content_db
+                categories: Vec::new(), // TODO: Could be looked up from content_db
                 age_rating: None,
                 reach_level: None,
             };
@@ -815,10 +899,7 @@ impl HttpServer {
     }
 
     /// GET /manifest/{hash} - Get shard manifest
-    async fn handle_get_manifest(
-        &self,
-        hash: &str,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    async fn handle_get_manifest(&self, hash: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         if hash.is_empty() {
             return Ok(Response::builder()
                 .status(StatusCode::BAD_REQUEST)
@@ -830,8 +911,8 @@ impl HttpServer {
 
         match manifest {
             Some(m) => {
-                let body = serde_json::to_string(&m)
-                    .map_err(|e| StorageError::Internal(e.to_string()))?;
+                let body =
+                    serde_json::to_string(&m).map_err(|e| StorageError::Internal(e.to_string()))?;
 
                 Ok(Response::builder()
                     .status(StatusCode::OK)
@@ -851,8 +932,9 @@ impl HttpServer {
     async fn handle_p2p_status(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         if let Some(ref handle) = self.p2p_handle {
             let status = handle.status();
-            let json = serde_json::to_string(&status)
-                .map_err(|e| StorageError::Internal(format!("Failed to serialize P2P status: {}", e)))?;
+            let json = serde_json::to_string(&status).map_err(|e| {
+                StorageError::Internal(format!("Failed to serialize P2P status: {}", e))
+            })?;
             Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -863,7 +945,7 @@ impl HttpServer {
                 .status(StatusCode::SERVICE_UNAVAILABLE)
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Full::new(Bytes::from(
-                    r#"{"error": "P2P networking not enabled"}"#
+                    r#"{"error": "P2P networking not enabled"}"#,
                 )))
                 .unwrap())
         }
@@ -898,13 +980,17 @@ impl HttpServer {
 
         // /sync/v1/{app_id}/docs
         if parts.len() == 2 && parts[1] == "docs" {
-            return self.handle_sync_list_docs(method, app_id, &req, sync_manager).await;
+            return self
+                .handle_sync_list_docs(method, app_id, &req, sync_manager)
+                .await;
         }
 
         // /sync/v1/{app_id}/docs/{doc_id}
         if parts.len() == 3 && parts[1] == "docs" {
             let doc_id = parts[2];
-            return self.handle_sync_doc(method, app_id, doc_id, req, sync_manager).await;
+            return self
+                .handle_sync_doc(method, app_id, doc_id, req, sync_manager)
+                .await;
         }
 
         // /sync/v1/{app_id}/docs/{doc_id}/{action}
@@ -913,8 +999,14 @@ impl HttpServer {
             let action = parts[3];
 
             return match action {
-                "heads" => self.handle_sync_heads(method, app_id, doc_id, sync_manager).await,
-                "changes" => self.handle_sync_changes(method, app_id, doc_id, req, sync_manager).await,
+                "heads" => {
+                    self.handle_sync_heads(method, app_id, doc_id, sync_manager)
+                        .await
+                }
+                "changes" => {
+                    self.handle_sync_changes(method, app_id, doc_id, req, sync_manager)
+                        .await
+                }
                 _ => Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -951,15 +1043,25 @@ impl HttpServer {
 
         // Parse query params: ?prefix=&offset=&limit=
         let query = req.uri().query().unwrap_or("");
-        let params: std::collections::HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
-            .into_owned()
-            .collect();
+        let params: std::collections::HashMap<String, String> =
+            url::form_urlencoded::parse(query.as_bytes())
+                .into_owned()
+                .collect();
 
         let prefix = params.get("prefix").map(|s| s.as_str());
-        let offset: u32 = params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0);
-        let limit: u32 = params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100);
+        let offset: u32 = params
+            .get("offset")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let limit: u32 = params
+            .get("limit")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(100);
 
-        match sync_manager.list_documents(app_id, prefix, offset, limit).await {
+        match sync_manager
+            .list_documents(app_id, prefix, offset, limit)
+            .await
+        {
             Ok((docs, total)) => {
                 let documents: Vec<serde_json::Value> = docs
                     .into_iter()
@@ -993,10 +1095,7 @@ impl HttpServer {
                 Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
-                    .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "{}"}}"#,
-                        e
-                    ))))
+                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
                     .unwrap())
             }
         }
@@ -1044,10 +1143,7 @@ impl HttpServer {
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "{}"}}"#,
-                                e
-                            ))))
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
                             .unwrap())
                     }
                 }
@@ -1095,10 +1191,7 @@ impl HttpServer {
                 Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
-                    .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "{}"}}"#,
-                        e
-                    ))))
+                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
                     .unwrap())
             }
         }
@@ -1128,12 +1221,20 @@ impl HttpServer {
                     .map(|s| s.split(',').map(|h| h.to_string()).collect())
                     .unwrap_or_default();
 
-                match sync_manager.get_changes_since(app_id, doc_id, &have_heads).await {
+                match sync_manager
+                    .get_changes_since(app_id, doc_id, &have_heads)
+                    .await
+                {
                     Ok((changes, new_heads)) => {
                         // Encode changes as base64 for JSON transport
                         let changes_b64: Vec<String> = changes
                             .iter()
-                            .map(|c| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, c))
+                            .map(|c| {
+                                base64::Engine::encode(
+                                    &base64::engine::general_purpose::STANDARD,
+                                    c,
+                                )
+                            })
                             .collect();
 
                         let body = serde_json::json!({
@@ -1154,19 +1255,17 @@ impl HttpServer {
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "{}"}}"#,
-                                e
-                            ))))
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
                             .unwrap())
                     }
                 }
             }
             Method::POST => {
                 // Apply changes from client
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let body_bytes = body.to_bytes();
 
                 // Parse JSON body: { "changes": ["base64..."] }
@@ -1181,7 +1280,9 @@ impl HttpServer {
                 let changes: Vec<Vec<u8>> = changes_b64
                     .iter()
                     .filter_map(|v| v.as_str())
-                    .filter_map(|s| base64::Engine::decode(&base64::engine::general_purpose::STANDARD, s).ok())
+                    .filter_map(|s| {
+                        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, s).ok()
+                    })
                     .collect();
 
                 if changes.is_empty() {
@@ -1213,10 +1314,7 @@ impl HttpServer {
                         Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "{}"}}"#,
-                                e
-                            ))))
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
                             .unwrap())
                     }
                 }
@@ -1332,7 +1430,9 @@ impl HttpServer {
         }
 
         if let Some(content_id) = resource_path.strip_prefix("content/") {
-            return self.handle_db_content_by_id(req, method, content_id, &content_db).await;
+            return self
+                .handle_db_content_by_id(req, method, content_id, &content_db)
+                .await;
         }
 
         if resource_path == "paths" {
@@ -1344,42 +1444,60 @@ impl HttpServer {
         }
 
         if let Some(path_id) = resource_path.strip_prefix("paths/") {
-            return self.handle_db_path_by_id(req, method, path_id, &content_db).await;
+            return self
+                .handle_db_path_by_id(req, method, path_id, &content_db)
+                .await;
         }
 
         // Relationships routes
         if resource_path == "relationships" {
-            return self.handle_db_relationships_list(req, method, &content_db).await;
+            return self
+                .handle_db_relationships_list(req, method, &content_db)
+                .await;
         }
 
         if resource_path == "relationships/bulk" {
-            return self.handle_db_relationships_bulk(req, method, &content_db).await;
+            return self
+                .handle_db_relationships_bulk(req, method, &content_db)
+                .await;
         }
 
         if let Some(rel_id) = resource_path.strip_prefix("relationships/graph/") {
-            return self.handle_db_content_graph(req, method, rel_id, &content_db).await;
+            return self
+                .handle_db_content_graph(req, method, rel_id, &content_db)
+                .await;
         }
 
         if let Some(rel_id) = resource_path.strip_prefix("relationships/") {
-            return self.handle_db_relationship_by_id(req, method, rel_id, &content_db).await;
+            return self
+                .handle_db_relationship_by_id(req, method, rel_id, &content_db)
+                .await;
         }
 
         // Knowledge maps routes
         if resource_path == "knowledge-maps" {
-            return self.handle_db_knowledge_maps_list(req, method, &content_db).await;
+            return self
+                .handle_db_knowledge_maps_list(req, method, &content_db)
+                .await;
         }
 
         if let Some(map_id) = resource_path.strip_prefix("knowledge-maps/") {
-            return self.handle_db_knowledge_map_by_id(req, method, map_id, &content_db).await;
+            return self
+                .handle_db_knowledge_map_by_id(req, method, map_id, &content_db)
+                .await;
         }
 
         // Path extensions routes
         if resource_path == "path-extensions" {
-            return self.handle_db_path_extensions_list(req, method, &content_db).await;
+            return self
+                .handle_db_path_extensions_list(req, method, &content_db)
+                .await;
         }
 
         if let Some(ext_id) = resource_path.strip_prefix("path-extensions/") {
-            return self.handle_db_path_extension_by_id(req, method, ext_id, &content_db).await;
+            return self
+                .handle_db_path_extension_by_id(req, method, ext_id, &content_db)
+                .await;
         }
 
         // ============================================================================
@@ -1388,19 +1506,27 @@ impl HttpServer {
 
         // Human relationships routes (Diesel)
         if resource_path == "human-relationships" {
-            return self.handle_human_relationships_list(req, method, &app_ctx).await;
+            return self
+                .handle_human_relationships_list(req, method, &app_ctx)
+                .await;
         }
 
         if let Some(rel_path) = resource_path.strip_prefix("human-relationships/") {
             // Check for action sub-paths first
             if let Some(rest) = rel_path.strip_suffix("/consent") {
-                return self.handle_human_relationship_consent(req, method, rest, &app_ctx).await;
+                return self
+                    .handle_human_relationship_consent(req, method, rest, &app_ctx)
+                    .await;
             }
             if let Some(rest) = rel_path.strip_suffix("/custody") {
-                return self.handle_human_relationship_custody(req, method, rest, &app_ctx).await;
+                return self
+                    .handle_human_relationship_custody(req, method, rest, &app_ctx)
+                    .await;
             }
             // Fall back to generic ID handler
-            return self.handle_human_relationship_by_id(req, method, rel_path, &app_ctx).await;
+            return self
+                .handle_human_relationship_by_id(req, method, rel_path, &app_ctx)
+                .await;
         }
 
         // Contributor presences routes (Diesel)
@@ -1415,16 +1541,24 @@ impl HttpServer {
         if let Some(presence_path) = resource_path.strip_prefix("presences/") {
             // Check for action sub-paths first
             if let Some(rest) = presence_path.strip_suffix("/stewardship") {
-                return self.handle_presence_stewardship(req, method, rest, &app_ctx).await;
+                return self
+                    .handle_presence_stewardship(req, method, rest, &app_ctx)
+                    .await;
             }
             if let Some(rest) = presence_path.strip_suffix("/claim") {
-                return self.handle_presence_claim(req, method, rest, &app_ctx).await;
+                return self
+                    .handle_presence_claim(req, method, rest, &app_ctx)
+                    .await;
             }
             if let Some(rest) = presence_path.strip_suffix("/verify-claim") {
-                return self.handle_presence_verify_claim(req, method, rest, &app_ctx).await;
+                return self
+                    .handle_presence_verify_claim(req, method, rest, &app_ctx)
+                    .await;
             }
             // Fall back to generic ID handler
-            return self.handle_presence_by_id(req, method, presence_path, &app_ctx).await;
+            return self
+                .handle_presence_by_id(req, method, presence_path, &app_ctx)
+                .await;
         }
 
         // Economic events routes (Diesel)
@@ -1437,7 +1571,9 @@ impl HttpServer {
         }
 
         if let Some(event_id) = resource_path.strip_prefix("events/") {
-            return self.handle_event_by_id(req, method, event_id, &app_ctx).await;
+            return self
+                .handle_event_by_id(req, method, event_id, &app_ctx)
+                .await;
         }
 
         // Content mastery routes (Diesel)
@@ -1452,9 +1588,13 @@ impl HttpServer {
         if let Some(mastery_path) = resource_path.strip_prefix("mastery/") {
             // Support /mastery/human/{human_id} and /mastery/{id}
             if let Some(human_id) = mastery_path.strip_prefix("human/") {
-                return self.handle_mastery_for_human(req, method, human_id, &app_ctx).await;
+                return self
+                    .handle_mastery_for_human(req, method, human_id, &app_ctx)
+                    .await;
             }
-            return self.handle_mastery_by_id(req, method, mastery_path, &app_ctx).await;
+            return self
+                .handle_mastery_by_id(req, method, mastery_path, &app_ctx)
+                .await;
         }
 
         // Stewardship allocations routes (Diesel)
@@ -1469,25 +1609,37 @@ impl HttpServer {
         if let Some(alloc_path) = resource_path.strip_prefix("allocations/") {
             // Support /allocations/content/{content_id} and /allocations/steward/{steward_id}
             if let Some(content_id) = alloc_path.strip_prefix("content/") {
-                return self.handle_allocations_for_content(req, method, content_id, &app_ctx).await;
+                return self
+                    .handle_allocations_for_content(req, method, content_id, &app_ctx)
+                    .await;
             }
             if let Some(steward_id) = alloc_path.strip_prefix("steward/") {
-                return self.handle_allocations_for_steward(req, method, steward_id, &app_ctx).await;
+                return self
+                    .handle_allocations_for_steward(req, method, steward_id, &app_ctx)
+                    .await;
             }
             // Check for action sub-paths
             if let Some(rest) = alloc_path.strip_suffix("/dispute") {
-                return self.handle_allocation_dispute(req, method, rest, &app_ctx).await;
+                return self
+                    .handle_allocation_dispute(req, method, rest, &app_ctx)
+                    .await;
             }
             if let Some(rest) = alloc_path.strip_suffix("/resolve") {
-                return self.handle_allocation_resolve(req, method, rest, &app_ctx).await;
+                return self
+                    .handle_allocation_resolve(req, method, rest, &app_ctx)
+                    .await;
             }
-            return self.handle_allocation_by_id(req, method, alloc_path, &app_ctx).await;
+            return self
+                .handle_allocation_by_id(req, method, alloc_path, &app_ctx)
+                .await;
         }
 
         Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .header(header::CONTENT_TYPE, "application/json")
-            .body(Full::new(Bytes::from(r#"{"error": "Unknown database endpoint"}"#)))
+            .body(Full::new(Bytes::from(
+                r#"{"error": "Unknown database endpoint"}"#,
+            )))
             .unwrap())
     }
 
@@ -1559,8 +1711,14 @@ impl HttpServer {
                 .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
                 .unwrap_or_default(),
             search: params.get("search").cloned(),
-            limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-            offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+            limit: params
+                .get("limit")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(100),
+            offset: params
+                .get("offset")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
         };
 
         // Use service layer if available
@@ -1570,7 +1728,8 @@ impl HttpServer {
                     match services.content.list(&query) {
                         Ok(items) => {
                             // Convert to View types for camelCase API boundary
-                            let views: Vec<ContentView> = items.into_iter().map(Into::into).collect();
+                            let views: Vec<ContentView> =
+                                items.into_iter().map(Into::into).collect();
                             let body = serde_json::json!({
                                 "items": views,
                                 "count": views.len(),
@@ -1605,7 +1764,8 @@ impl HttpServer {
                         match db::content::list_content(conn, &query) {
                             Ok(items) => {
                                 // Convert to View types for camelCase API boundary
-                                let views: Vec<ContentView> = items.into_iter().map(Into::into).collect();
+                                let views: Vec<ContentView> =
+                                    items.into_iter().map(Into::into).collect();
                                 let body = serde_json::json!({
                                     "items": views,
                                     "count": views.len(),
@@ -1624,7 +1784,10 @@ impl HttpServer {
                                 Ok(Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                                     .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error": "{}"}}"#,
+                                        e
+                                    ))))
                                     .unwrap())
                             }
                         }
@@ -1658,7 +1821,10 @@ impl HttpServer {
                                 Ok(Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                                     .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error": "{}"}}"#,
+                                        e
+                                    ))))
                                     .unwrap())
                             }
                         }
@@ -1688,9 +1854,10 @@ impl HttpServer {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
         }
 
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let body_bytes = body.to_bytes();
 
         // Deserialize camelCase InputViews, convert to internal DB types
@@ -1700,7 +1867,8 @@ impl HttpServer {
         if let Err(msg) = validate_schema_versions(&versions) {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
         }
-        let items: Vec<db::content::CreateContentInput> = input_views.into_iter().map(|v| v.into()).collect();
+        let items: Vec<db::content::CreateContentInput> =
+            input_views.into_iter().map(|v| v.into()).collect();
 
         let count = items.len();
         info!(count = count, "Bulk creating content");
@@ -1713,16 +1881,18 @@ impl HttpServer {
             }
         } else {
             // Fallback to direct repository calls (legacy)
-            content_db.with_conn_mut(|conn| {
-                match db::content::bulk_create_content(conn, items) {
-                    Ok(result) => {
-                        info!(inserted = result.inserted, skipped = result.skipped, "Bulk content creation complete");
-                        Ok(response::ok_with_schema_info(&result))
-                    }
-                    Err(e) => {
-                        error!(error = %e, "Failed to bulk create content");
-                        Ok(response::error_response(e))
-                    }
+            content_db.with_conn_mut(|conn| match db::content::bulk_create_content(conn, items) {
+                Ok(result) => {
+                    info!(
+                        inserted = result.inserted,
+                        skipped = result.skipped,
+                        "Bulk content creation complete"
+                    );
+                    Ok(response::ok_with_schema_info(&result))
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to bulk create content");
+                    Ok(response::error_response(e))
                 }
             })
         }
@@ -1741,14 +1911,22 @@ impl HttpServer {
             match method {
                 Method::GET => {
                     // Convert to View type for camelCase API boundary
-                    let result = services.content.get(content_id)
+                    let result = services
+                        .content
+                        .get(content_id)
                         .map(|opt| opt.map(ContentView::from));
-                    Ok(response::from_option(result, &format!("Content not found: {}", content_id)))
+                    Ok(response::from_option(
+                        result,
+                        &format!("Content not found: {}", content_id),
+                    ))
                 }
                 Method::DELETE => {
                     // Use cascade delete to also remove relationships
                     let result = services.content.delete_cascade(content_id);
-                    Ok(response::from_delete_bool_result(result, &format!("Content not found: {}", content_id)))
+                    Ok(response::from_delete_bool_result(
+                        result,
+                        &format!("Content not found: {}", content_id),
+                    ))
                 }
                 _ => Ok(response::method_not_allowed()),
             }
@@ -1837,27 +2015,31 @@ impl HttpServer {
                 .into_owned()
                 .collect();
 
-        let limit: u32 = params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100);
-        let offset: u32 = params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0);
+        let limit: u32 = params
+            .get("limit")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(100);
+        let offset: u32 = params
+            .get("offset")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
 
         // Use service layer if available
         if let Some(ref services) = self.services {
             match method {
-                Method::GET => {
-                    match services.path.list(limit, offset) {
-                        Ok(paths) => {
-                            let views: Vec<PathView> = paths.into_iter().map(|p| p.into()).collect();
-                            let body = serde_json::json!({
-                                "items": views,
-                                "count": views.len(),
-                                "limit": limit,
-                                "offset": offset,
-                            });
-                            Ok(response::ok(&body))
-                        }
-                        Err(e) => Ok(response::error_response(e)),
+                Method::GET => match services.path.list(limit, offset) {
+                    Ok(paths) => {
+                        let views: Vec<PathView> = paths.into_iter().map(|p| p.into()).collect();
+                        let body = serde_json::json!({
+                            "items": views,
+                            "count": views.len(),
+                            "limit": limit,
+                            "offset": offset,
+                        });
+                        Ok(response::ok(&body))
                     }
-                }
+                    Err(e) => Ok(response::error_response(e)),
+                },
                 Method::POST => {
                     let body = req.collect().await.map_err(|e| {
                         StorageError::Internal(format!("Failed to read body: {}", e))
@@ -1881,7 +2063,8 @@ impl HttpServer {
                         match db::paths::list_paths(conn, limit, offset) {
                             Ok(paths) => {
                                 // Convert to View types for camelCase API boundary
-                                let views: Vec<PathView> = paths.into_iter().map(|p| p.into()).collect();
+                                let views: Vec<PathView> =
+                                    paths.into_iter().map(|p| p.into()).collect();
                                 let body = serde_json::json!({
                                     "items": views,
                                     "count": views.len(),
@@ -1900,7 +2083,10 @@ impl HttpServer {
                                 Ok(Response::builder()
                                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                                     .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error": "{}"}}"#,
+                                        e
+                                    ))))
                                     .unwrap())
                             }
                         }
@@ -1917,26 +2103,24 @@ impl HttpServer {
                         .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
                     let input: db::paths::CreatePathInput = input_view.into();
 
-                    content_db.with_conn_mut(|conn| {
-                        match db::paths::create_path(conn, input) {
-                            Ok(path) => {
-                                let body = serde_json::to_string(&path)
-                                    .map_err(|e| StorageError::Internal(e.to_string()))?;
+                    content_db.with_conn_mut(|conn| match db::paths::create_path(conn, input) {
+                        Ok(path) => {
+                            let body = serde_json::to_string(&path)
+                                .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-                                Ok(Response::builder()
-                                    .status(StatusCode::CREATED)
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Full::new(Bytes::from(body)))
-                                    .unwrap())
-                            }
-                            Err(e) => {
-                                error!(error = %e, "Failed to create path");
-                                Ok(Response::builder()
-                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                    .header(header::CONTENT_TYPE, "application/json")
-                                    .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                    .unwrap())
-                            }
+                            Ok(Response::builder()
+                                .status(StatusCode::CREATED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap())
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to create path");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                                .unwrap())
                         }
                     })
                 }
@@ -1966,9 +2150,10 @@ impl HttpServer {
                 return Ok(response::method_not_allowed());
             }
 
-            let body = req.collect().await.map_err(|e| {
-                StorageError::Internal(format!("Failed to read body: {}", e))
-            })?;
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
             let body_bytes = body.to_bytes();
 
             // Deserialize camelCase InputViews, convert to internal DB types
@@ -1978,7 +2163,8 @@ impl HttpServer {
             if let Err(msg) = validate_schema_versions(&versions) {
                 return Ok(response::error_response(StorageError::InvalidInput(msg)));
             }
-            let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
+            let paths: Vec<db::paths::CreatePathInput> =
+                input_views.into_iter().map(|v| v.into()).collect();
 
             let count = paths.len();
             info!(count = count, "Bulk creating paths via service");
@@ -1994,9 +2180,10 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let body_bytes = body.to_bytes();
 
         // Deserialize camelCase InputViews, convert to internal DB types
@@ -2006,21 +2193,24 @@ impl HttpServer {
         if let Err(msg) = validate_schema_versions(&versions) {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
         }
-        let paths: Vec<db::paths::CreatePathInput> = input_views.into_iter().map(|v| v.into()).collect();
+        let paths: Vec<db::paths::CreatePathInput> =
+            input_views.into_iter().map(|v| v.into()).collect();
 
         let count = paths.len();
         info!(count = count, "Bulk creating paths");
 
-        content_db.with_conn_mut(|conn| {
-            match db::paths::bulk_create_paths(conn, paths) {
-                Ok(result) => {
-                    info!(inserted = result.inserted, skipped = result.skipped, "Bulk path creation complete");
-                    Ok(response::ok_with_schema_info(&result))
-                }
-                Err(e) => {
-                    error!(error = %e, "Failed to bulk create paths");
-                    Ok(response::error_response(e))
-                }
+        content_db.with_conn_mut(|conn| match db::paths::bulk_create_paths(conn, paths) {
+            Ok(result) => {
+                info!(
+                    inserted = result.inserted,
+                    skipped = result.skipped,
+                    "Bulk path creation complete"
+                );
+                Ok(response::ok_with_schema_info(&result))
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to bulk create paths");
+                Ok(response::error_response(e))
             }
         })
     }
@@ -2036,19 +2226,22 @@ impl HttpServer {
         // Service-based handling
         if let Some(ref services) = self.services {
             match method {
-                Method::GET => {
-                    match services.path.get_with_steps(path_id) {
-                        Ok(Some(path)) => {
-                            let view: PathWithDetailsView = path.into();
-                            return Ok(response::ok(&view));
-                        }
-                        Ok(None) => return Ok(response::not_found(&format!("Path not found: {}", path_id))),
-                        Err(e) => return Ok(response::error_response(e)),
+                Method::GET => match services.path.get_with_steps(path_id) {
+                    Ok(Some(path)) => {
+                        let view: PathWithDetailsView = path.into();
+                        return Ok(response::ok(&view));
                     }
-                }
+                    Ok(None) => {
+                        return Ok(response::not_found(&format!("Path not found: {}", path_id)))
+                    }
+                    Err(e) => return Ok(response::error_response(e)),
+                },
                 Method::DELETE => {
                     let result = services.path.delete(path_id);
-                    return Ok(response::from_delete_bool_result(result, &format!("Path not found: {}", path_id)));
+                    return Ok(response::from_delete_bool_result(
+                        result,
+                        &format!("Path not found: {}", path_id),
+                    ));
                 }
                 _ => return Ok(response::method_not_allowed()),
             }
@@ -2092,28 +2285,26 @@ impl HttpServer {
                 })
             }
             Method::DELETE => {
-                content_db.with_conn_mut(|conn| {
-                    match db::paths::delete_path(conn, path_id) {
-                        Ok(true) => Ok(Response::builder()
-                            .status(StatusCode::NO_CONTENT)
-                            .body(Full::new(Bytes::new()))
-                            .unwrap()),
-                        Ok(false) => Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
+                content_db.with_conn_mut(|conn| match db::paths::delete_path(conn, path_id) {
+                    Ok(true) => Ok(Response::builder()
+                        .status(StatusCode::NO_CONTENT)
+                        .body(Full::new(Bytes::new()))
+                        .unwrap()),
+                    Ok(false) => Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "Path not found: {}"}}"#,
+                            path_id
+                        ))))
+                        .unwrap()),
+                    Err(e) => {
+                        error!(error = %e, path_id = %path_id, "Failed to delete path");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "Path not found: {}"}}"#,
-                                path_id
-                            ))))
-                            .unwrap()),
-                        Err(e) => {
-                            error!(error = %e, path_id = %path_id, "Failed to delete path");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                            .unwrap())
                     }
                 })
             }
@@ -2148,36 +2339,44 @@ impl HttpServer {
                 content_id: params.get("content_id").cloned(),
                 direction: params.get("direction").cloned(),
                 relationship_type: params.get("relationship_type").cloned(),
-                limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-                offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                limit: params
+                    .get("limit")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(100),
+                offset: params
+                    .get("offset")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
             };
 
             match method {
-                Method::GET => {
-                    match services.relationship.list(&query) {
-                        Ok(items) => {
-                            let views: Vec<RelationshipView> = items.into_iter().map(|r| r.into()).collect();
-                            let body = serde_json::json!({
-                                "items": views,
-                                "count": views.len(),
-                                "limit": query.limit,
-                                "offset": query.offset,
-                            });
-                            return Ok(response::ok(&body));
-                        }
-                        Err(e) => return Ok(response::error_response(e)),
+                Method::GET => match services.relationship.list(&query) {
+                    Ok(items) => {
+                        let views: Vec<RelationshipView> =
+                            items.into_iter().map(|r| r.into()).collect();
+                        let body = serde_json::json!({
+                            "items": views,
+                            "count": views.len(),
+                            "limit": query.limit,
+                            "offset": query.offset,
+                        });
+                        return Ok(response::ok(&body));
                     }
-                }
+                    Err(e) => return Ok(response::error_response(e)),
+                },
                 Method::POST => {
                     let body = req.collect().await.map_err(|e| {
                         StorageError::Internal(format!("Failed to read body: {}", e))
                     })?;
                     let body_bytes = body.to_bytes();
                     // Deserialize camelCase InputView, convert to internal DB type
-                    let input_view: CreateRelationshipInputView = serde_json::from_slice(&body_bytes)
-                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    let input_view: CreateRelationshipInputView =
+                        serde_json::from_slice(&body_bytes)
+                            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
                     let input: db::relationships::CreateRelationshipInput = input_view.into();
-                    return Ok(response::from_create_result(services.relationship.create(input)));
+                    return Ok(response::from_create_result(
+                        services.relationship.create(input),
+                    ));
                 }
                 _ => return Ok(response::method_not_allowed()),
             }
@@ -2196,8 +2395,14 @@ impl HttpServer {
                     content_id: params.get("content_id").cloned(),
                     direction: params.get("direction").cloned(),
                     relationship_type: params.get("relationship_type").cloned(),
-                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                    limit: params
+                        .get("limit")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(100),
+                    offset: params
+                        .get("offset")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0),
                 };
 
                 content_db.with_conn(|conn| {
@@ -2228,14 +2433,16 @@ impl HttpServer {
                 })
             }
             Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let body_bytes = body.to_bytes();
 
                 // Deserialize camelCase InputView, convert to internal DB type
-                let input_view: CreateRelationshipInputView = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                let input_view: CreateRelationshipInputView =
+                    serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
                 let input: db::relationships::CreateRelationshipInput = input_view.into();
 
                 content_db.with_conn_mut(|conn| {
@@ -2286,9 +2493,10 @@ impl HttpServer {
                 return Ok(response::method_not_allowed());
             }
 
-            let body = req.collect().await.map_err(|e| {
-                StorageError::Internal(format!("Failed to read body: {}", e))
-            })?;
+            let body = req
+                .collect()
+                .await
+                .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
             let body_bytes = body.to_bytes();
 
             // Deserialize camelCase InputViews, convert to internal DB types
@@ -2298,7 +2506,8 @@ impl HttpServer {
             if let Err(msg) = validate_schema_versions(&versions) {
                 return Ok(response::error_response(StorageError::InvalidInput(msg)));
             }
-            let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
+            let inputs: Vec<db::relationships::CreateRelationshipInput> =
+                input_views.into_iter().map(|v| v.into()).collect();
 
             return match services.relationship.bulk_create(inputs) {
                 Ok(result) => Ok(response::ok_with_schema_info(&result)),
@@ -2311,9 +2520,10 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let body_bytes = body.to_bytes();
 
         // Deserialize camelCase InputViews, convert to internal DB types
@@ -2323,7 +2533,8 @@ impl HttpServer {
         if let Err(msg) = validate_schema_versions(&versions) {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
         }
-        let inputs: Vec<db::relationships::CreateRelationshipInput> = input_views.into_iter().map(|v| v.into()).collect();
+        let inputs: Vec<db::relationships::CreateRelationshipInput> =
+            input_views.into_iter().map(|v| v.into()).collect();
 
         content_db.with_conn_mut(|conn| {
             match db::relationships::bulk_create_relationships(conn, inputs) {
@@ -2356,10 +2567,15 @@ impl HttpServer {
                     .into_owned()
                     .collect();
 
-            let relationship_types: Option<Vec<String>> = params.get("types")
+            let relationship_types: Option<Vec<String>> = params
+                .get("types")
                 .map(|s| s.split(',').map(|t| t.trim().to_string()).collect());
 
-            return Ok(response::from_result(services.relationship.get_graph(content_id, relationship_types.as_deref())));
+            return Ok(response::from_result(
+                services
+                    .relationship
+                    .get_graph(content_id, relationship_types.as_deref()),
+            ));
         }
 
         // Legacy fallback
@@ -2377,11 +2593,16 @@ impl HttpServer {
                 .into_owned()
                 .collect();
 
-        let relationship_types: Option<Vec<String>> = params.get("types")
+        let relationship_types: Option<Vec<String>> = params
+            .get("types")
             .map(|s| s.split(',').map(|t| t.trim().to_string()).collect());
 
         content_db.with_conn(|conn| {
-            match db::relationships::get_content_graph(conn, content_id, relationship_types.as_deref()) {
+            match db::relationships::get_content_graph(
+                conn,
+                content_id,
+                relationship_types.as_deref(),
+            ) {
                 Ok(graph) => {
                     let body = serde_json::to_string(&graph)
                         .map_err(|e| StorageError::Internal(e.to_string()))?;
@@ -2417,11 +2638,17 @@ impl HttpServer {
             match method {
                 Method::GET => {
                     let result = services.relationship.get(rel_id);
-                    return Ok(response::from_option(result, &format!("Relationship not found: {}", rel_id)));
+                    return Ok(response::from_option(
+                        result,
+                        &format!("Relationship not found: {}", rel_id),
+                    ));
                 }
                 Method::DELETE => {
                     let result = services.relationship.delete(rel_id);
-                    return Ok(response::from_delete_bool_result(result, &format!("Relationship not found: {}", rel_id)));
+                    return Ok(response::from_delete_bool_result(
+                        result,
+                        &format!("Relationship not found: {}", rel_id),
+                    ));
                 }
                 _ => return Ok(response::method_not_allowed()),
             }
@@ -2429,64 +2656,60 @@ impl HttpServer {
 
         // Legacy fallback
         match method {
-            Method::GET => {
-                content_db.with_conn(|conn| {
-                    match db::relationships::get_relationship(conn, rel_id) {
-                        Ok(Some(rel)) => {
-                            let body = serde_json::to_string(&rel)
-                                .map_err(|e| StorageError::Internal(e.to_string()))?;
+            Method::GET => content_db.with_conn(|conn| {
+                match db::relationships::get_relationship(conn, rel_id) {
+                    Ok(Some(rel)) => {
+                        let body = serde_json::to_string(&rel)
+                            .map_err(|e| StorageError::Internal(e.to_string()))?;
 
-                            Ok(Response::builder()
-                                .status(StatusCode::OK)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(body)))
-                                .unwrap())
-                        }
-                        Ok(None) => Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "Relationship not found: {}"}}"#,
-                                rel_id
-                            ))))
-                            .unwrap()),
-                        Err(e) => {
-                            error!(error = %e, rel_id = %rel_id, "Failed to get relationship");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
+                            .body(Full::new(Bytes::from(body)))
+                            .unwrap())
                     }
-                })
-            }
-            Method::DELETE => {
-                content_db.with_conn_mut(|conn| {
-                    match db::relationships::delete_relationship(conn, rel_id) {
-                        Ok(true) => Ok(Response::builder()
-                            .status(StatusCode::NO_CONTENT)
-                            .body(Full::new(Bytes::new()))
-                            .unwrap()),
-                        Ok(false) => Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
+                    Ok(None) => Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "Relationship not found: {}"}}"#,
+                            rel_id
+                        ))))
+                        .unwrap()),
+                    Err(e) => {
+                        error!(error = %e, rel_id = %rel_id, "Failed to get relationship");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "Relationship not found: {}"}}"#,
-                                rel_id
-                            ))))
-                            .unwrap()),
-                        Err(e) => {
-                            error!(error = %e, rel_id = %rel_id, "Failed to delete relationship");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                            .unwrap())
                     }
-                })
-            }
+                }
+            }),
+            Method::DELETE => content_db.with_conn_mut(|conn| {
+                match db::relationships::delete_relationship(conn, rel_id) {
+                    Ok(true) => Ok(Response::builder()
+                        .status(StatusCode::NO_CONTENT)
+                        .body(Full::new(Bytes::new()))
+                        .unwrap()),
+                    Ok(false) => Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "Relationship not found: {}"}}"#,
+                            rel_id
+                        ))))
+                        .unwrap()),
+                    Err(e) => {
+                        error!(error = %e, rel_id = %rel_id, "Failed to delete relationship");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                            .unwrap())
+                    }
+                }
+            }),
             _ => Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -2519,33 +2742,40 @@ impl HttpServer {
                 map_type: params.get("map_type").cloned(),
                 subject_id: params.get("subject_id").cloned(),
                 visibility: params.get("visibility").cloned(),
-                limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-                offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                limit: params
+                    .get("limit")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(100),
+                offset: params
+                    .get("offset")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
             };
 
             match method {
-                Method::GET => {
-                    match services.knowledge.list_knowledge_maps(&query) {
-                        Ok(items) => {
-                            let body = serde_json::json!({
-                                "items": items,
-                                "count": items.len(),
-                                "limit": query.limit,
-                                "offset": query.offset,
-                            });
-                            return Ok(response::ok(&body));
-                        }
-                        Err(e) => return Ok(response::error_response(e)),
+                Method::GET => match services.knowledge.list_knowledge_maps(&query) {
+                    Ok(items) => {
+                        let body = serde_json::json!({
+                            "items": items,
+                            "count": items.len(),
+                            "limit": query.limit,
+                            "offset": query.offset,
+                        });
+                        return Ok(response::ok(&body));
                     }
-                }
+                    Err(e) => return Ok(response::error_response(e)),
+                },
                 Method::POST => {
                     let body = req.collect().await.map_err(|e| {
                         StorageError::Internal(format!("Failed to read body: {}", e))
                     })?;
                     let body_bytes = body.to_bytes();
-                    let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
-                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                    return Ok(response::from_create_result(services.knowledge.create_knowledge_map(input)));
+                    let input: db::knowledge_maps::CreateKnowledgeMapInput =
+                        serde_json::from_slice(&body_bytes)
+                            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_create_result(
+                        services.knowledge.create_knowledge_map(input),
+                    ));
                 }
                 _ => return Ok(response::method_not_allowed()),
             }
@@ -2565,8 +2795,14 @@ impl HttpServer {
                     map_type: params.get("map_type").cloned(),
                     subject_id: params.get("subject_id").cloned(),
                     visibility: params.get("visibility").cloned(),
-                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                    limit: params
+                        .get("limit")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(100),
+                    offset: params
+                        .get("offset")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0),
                 };
 
                 content_db.with_conn(|conn| {
@@ -2597,13 +2833,15 @@ impl HttpServer {
                 })
             }
             Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let body_bytes = body.to_bytes();
 
-                let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                let input: db::knowledge_maps::CreateKnowledgeMapInput =
+                    serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
 
                 content_db.with_conn_mut(|conn| {
                     match db::knowledge_maps::create_knowledge_map(conn, input) {
@@ -2649,20 +2887,29 @@ impl HttpServer {
             match method {
                 Method::GET => {
                     let result = services.knowledge.get_knowledge_map(map_id);
-                    return Ok(response::from_option(result, &format!("Knowledge map not found: {}", map_id)));
+                    return Ok(response::from_option(
+                        result,
+                        &format!("Knowledge map not found: {}", map_id),
+                    ));
                 }
                 Method::PUT => {
                     let body = req.collect().await.map_err(|e| {
                         StorageError::Internal(format!("Failed to read body: {}", e))
                     })?;
                     let body_bytes = body.to_bytes();
-                    let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
-                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                    return Ok(response::from_result(services.knowledge.update_knowledge_map(map_id, input)));
+                    let input: db::knowledge_maps::CreateKnowledgeMapInput =
+                        serde_json::from_slice(&body_bytes)
+                            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_result(
+                        services.knowledge.update_knowledge_map(map_id, input),
+                    ));
                 }
                 Method::DELETE => {
                     let result = services.knowledge.delete_knowledge_map(map_id);
-                    return Ok(response::from_delete_bool_result(result, &format!("Knowledge map not found: {}", map_id)));
+                    return Ok(response::from_delete_bool_result(
+                        result,
+                        &format!("Knowledge map not found: {}", map_id),
+                    ));
                 }
                 _ => return Ok(response::method_not_allowed()),
             }
@@ -2703,13 +2950,15 @@ impl HttpServer {
                 })
             }
             Method::PUT => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let body_bytes = body.to_bytes();
 
-                let input: db::knowledge_maps::CreateKnowledgeMapInput = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                let input: db::knowledge_maps::CreateKnowledgeMapInput =
+                    serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
 
                 content_db.with_conn_mut(|conn| {
                     match db::knowledge_maps::update_knowledge_map(conn, map_id, input) {
@@ -2742,32 +2991,30 @@ impl HttpServer {
                     }
                 })
             }
-            Method::DELETE => {
-                content_db.with_conn_mut(|conn| {
-                    match db::knowledge_maps::delete_knowledge_map(conn, map_id) {
-                        Ok(true) => Ok(Response::builder()
-                            .status(StatusCode::NO_CONTENT)
-                            .body(Full::new(Bytes::new()))
-                            .unwrap()),
-                        Ok(false) => Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
+            Method::DELETE => content_db.with_conn_mut(|conn| {
+                match db::knowledge_maps::delete_knowledge_map(conn, map_id) {
+                    Ok(true) => Ok(Response::builder()
+                        .status(StatusCode::NO_CONTENT)
+                        .body(Full::new(Bytes::new()))
+                        .unwrap()),
+                    Ok(false) => Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "Knowledge map not found: {}"}}"#,
+                            map_id
+                        ))))
+                        .unwrap()),
+                    Err(e) => {
+                        error!(error = %e, map_id = %map_id, "Failed to delete knowledge map");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "Knowledge map not found: {}"}}"#,
-                                map_id
-                            ))))
-                            .unwrap()),
-                        Err(e) => {
-                            error!(error = %e, map_id = %map_id, "Failed to delete knowledge map");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                            .unwrap())
                     }
-                })
-            }
+                }
+            }),
             _ => Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -2800,33 +3047,40 @@ impl HttpServer {
                 extended_by: params.get("extended_by").cloned(),
                 visibility: params.get("visibility").cloned(),
                 forked_from: params.get("forked_from").cloned(),
-                limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-                offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                limit: params
+                    .get("limit")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(100),
+                offset: params
+                    .get("offset")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
             };
 
             match method {
-                Method::GET => {
-                    match services.knowledge.list_path_extensions(&query) {
-                        Ok(items) => {
-                            let body = serde_json::json!({
-                                "items": items,
-                                "count": items.len(),
-                                "limit": query.limit,
-                                "offset": query.offset,
-                            });
-                            return Ok(response::ok(&body));
-                        }
-                        Err(e) => return Ok(response::error_response(e)),
+                Method::GET => match services.knowledge.list_path_extensions(&query) {
+                    Ok(items) => {
+                        let body = serde_json::json!({
+                            "items": items,
+                            "count": items.len(),
+                            "limit": query.limit,
+                            "offset": query.offset,
+                        });
+                        return Ok(response::ok(&body));
                     }
-                }
+                    Err(e) => return Ok(response::error_response(e)),
+                },
                 Method::POST => {
                     let body = req.collect().await.map_err(|e| {
                         StorageError::Internal(format!("Failed to read body: {}", e))
                     })?;
                     let body_bytes = body.to_bytes();
-                    let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
-                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                    return Ok(response::from_create_result(services.knowledge.create_path_extension(input)));
+                    let input: db::path_extensions::CreatePathExtensionInput =
+                        serde_json::from_slice(&body_bytes)
+                            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_create_result(
+                        services.knowledge.create_path_extension(input),
+                    ));
                 }
                 _ => return Ok(response::method_not_allowed()),
             }
@@ -2846,8 +3100,14 @@ impl HttpServer {
                     extended_by: params.get("extended_by").cloned(),
                     visibility: params.get("visibility").cloned(),
                     forked_from: params.get("forked_from").cloned(),
-                    limit: params.get("limit").and_then(|s| s.parse().ok()).unwrap_or(100),
-                    offset: params.get("offset").and_then(|s| s.parse().ok()).unwrap_or(0),
+                    limit: params
+                        .get("limit")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(100),
+                    offset: params
+                        .get("offset")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0),
                 };
 
                 content_db.with_conn(|conn| {
@@ -2878,13 +3138,15 @@ impl HttpServer {
                 })
             }
             Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let body_bytes = body.to_bytes();
 
-                let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                let input: db::path_extensions::CreatePathExtensionInput =
+                    serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
 
                 content_db.with_conn_mut(|conn| {
                     match db::path_extensions::create_path_extension(conn, input) {
@@ -2930,20 +3192,29 @@ impl HttpServer {
             match method {
                 Method::GET => {
                     let result = services.knowledge.get_path_extension(ext_id);
-                    return Ok(response::from_option(result, &format!("Path extension not found: {}", ext_id)));
+                    return Ok(response::from_option(
+                        result,
+                        &format!("Path extension not found: {}", ext_id),
+                    ));
                 }
                 Method::PUT => {
                     let body = req.collect().await.map_err(|e| {
                         StorageError::Internal(format!("Failed to read body: {}", e))
                     })?;
                     let body_bytes = body.to_bytes();
-                    let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
-                        .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                    return Ok(response::from_result(services.knowledge.update_path_extension(ext_id, input)));
+                    let input: db::path_extensions::CreatePathExtensionInput =
+                        serde_json::from_slice(&body_bytes)
+                            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+                    return Ok(response::from_result(
+                        services.knowledge.update_path_extension(ext_id, input),
+                    ));
                 }
                 Method::DELETE => {
                     let result = services.knowledge.delete_path_extension(ext_id);
-                    return Ok(response::from_delete_bool_result(result, &format!("Path extension not found: {}", ext_id)));
+                    return Ok(response::from_delete_bool_result(
+                        result,
+                        &format!("Path extension not found: {}", ext_id),
+                    ));
                 }
                 _ => return Ok(response::method_not_allowed()),
             }
@@ -2984,13 +3255,15 @@ impl HttpServer {
                 })
             }
             Method::PUT => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let body_bytes = body.to_bytes();
 
-                let input: db::path_extensions::CreatePathExtensionInput = serde_json::from_slice(&body_bytes)
-                    .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
+                let input: db::path_extensions::CreatePathExtensionInput =
+                    serde_json::from_slice(&body_bytes)
+                        .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
 
                 content_db.with_conn_mut(|conn| {
                     match db::path_extensions::update_path_extension(conn, ext_id, input) {
@@ -3023,32 +3296,30 @@ impl HttpServer {
                     }
                 })
             }
-            Method::DELETE => {
-                content_db.with_conn_mut(|conn| {
-                    match db::path_extensions::delete_path_extension(conn, ext_id) {
-                        Ok(true) => Ok(Response::builder()
-                            .status(StatusCode::NO_CONTENT)
-                            .body(Full::new(Bytes::new()))
-                            .unwrap()),
-                        Ok(false) => Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
+            Method::DELETE => content_db.with_conn_mut(|conn| {
+                match db::path_extensions::delete_path_extension(conn, ext_id) {
+                    Ok(true) => Ok(Response::builder()
+                        .status(StatusCode::NO_CONTENT)
+                        .body(Full::new(Bytes::new()))
+                        .unwrap()),
+                    Ok(false) => Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(format!(
+                            r#"{{"error": "Path extension not found: {}"}}"#,
+                            ext_id
+                        ))))
+                        .unwrap()),
+                    Err(e) => {
+                        error!(error = %e, ext_id = %ext_id, "Failed to delete path extension");
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Full::new(Bytes::from(format!(
-                                r#"{{"error": "Path extension not found: {}"}}"#,
-                                ext_id
-                            ))))
-                            .unwrap()),
-                        Err(e) => {
-                            error!(error = %e, ext_id = %ext_id, "Failed to delete path extension");
-                            Ok(Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
-                                .unwrap())
-                        }
+                            .body(Full::new(Bytes::from(format!(r#"{{"error": "{}"}}"#, e))))
+                            .unwrap())
                     }
-                })
-            }
+                }
+            }),
             _ => Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -3118,8 +3389,12 @@ impl HttpServer {
                     for item in items {
                         // Parse content_body field as JSON and check appId
                         if let Some(ref content_body) = item.content_body {
-                            if let Ok(content_obj) = serde_json::from_str::<serde_json::Value>(content_body) {
-                                if let Some(content_app_id) = content_obj.get("appId").and_then(|v| v.as_str()) {
+                            if let Ok(content_obj) =
+                                serde_json::from_str::<serde_json::Value>(content_body)
+                            {
+                                if let Some(content_app_id) =
+                                    content_obj.get("appId").and_then(|v| v.as_str())
+                                {
                                     if content_app_id == app_id {
                                         return Ok(Some(item));
                                     }
@@ -3152,11 +3427,14 @@ impl HttpServer {
             Some(hash) if !hash.is_empty() => hash.clone(),
             _ => {
                 // Try metadata.blobHash or metadata.blob_hash
-                let metadata: serde_json::Value = content.metadata_json.as_ref()
+                let metadata: serde_json::Value = content
+                    .metadata_json
+                    .as_ref()
                     .and_then(|s| serde_json::from_str(s).ok())
                     .unwrap_or(serde_json::json!({}));
 
-                metadata.get("blobHash")
+                metadata
+                    .get("blobHash")
                     .or_else(|| metadata.get("blob_hash"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string())
@@ -3166,7 +3444,9 @@ impl HttpServer {
 
         if blob_hash.is_empty() {
             // Get fallback URL if available
-            let content_obj: serde_json::Value = content.content_body.as_ref()
+            let content_obj: serde_json::Value = content
+                .content_body
+                .as_ref()
                 .and_then(|s| serde_json::from_str(s).ok())
                 .unwrap_or(serde_json::json!({}));
             let fallback = content_obj.get("fallbackUrl").and_then(|v| v.as_str());
@@ -3174,13 +3454,14 @@ impl HttpServer {
             return Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Full::new(Bytes::from(
-                    if let Some(url) = fallback {
-                        format!(r#"{{"error": "App ZIP not available", "fallback": "{}"}}"#, url)
-                    } else {
-                        r#"{"error": "App ZIP not available (no blob_hash)"}"#.to_string()
-                    }
-                )))
+                .body(Full::new(Bytes::from(if let Some(url) = fallback {
+                    format!(
+                        r#"{{"error": "App ZIP not available", "fallback": "{}"}}"#,
+                        url
+                    )
+                } else {
+                    r#"{"error": "App ZIP not available (no blob_hash)"}"#.to_string()
+                })))
                 .unwrap());
         }
 
@@ -3237,8 +3518,10 @@ impl HttpServer {
                         exact_idx = Some(i);
                         break;
                     }
-                    if suffix_idx.is_none() &&
-                       (name.ends_with(normalized_path) || name.ends_with(&format!("/{}", normalized_path))) {
+                    if suffix_idx.is_none()
+                        && (name.ends_with(normalized_path)
+                            || name.ends_with(&format!("/{}", normalized_path)))
+                    {
                         suffix_idx = Some(i);
                     }
                 }
@@ -3349,9 +3632,10 @@ impl HttpServer {
                 }
             }
             Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 // Deserialize camelCase InputView, convert to internal DB type
                 let input_view: CreateHumanRelationshipInputView =
                     serde_json::from_slice(&body.to_bytes())
@@ -3378,17 +3662,21 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
 
         match method {
-            Method::GET => {
-                match human_relationships::get_human_relationship(&mut conn, ctx, id) {
-                    Ok(Some(rel)) => Ok(response::ok(&rel)),
-                    Ok(None) => Ok(response::not_found(&format!("Human relationship {} not found", id))),
-                    Err(e) => Ok(response::error_response(e)),
-                }
-            }
+            Method::GET => match human_relationships::get_human_relationship(&mut conn, ctx, id) {
+                Ok(Some(rel)) => Ok(response::ok(&rel)),
+                Ok(None) => Ok(response::not_found(&format!(
+                    "Human relationship {} not found",
+                    id
+                ))),
+                Err(e) => Ok(response::error_response(e)),
+            },
             Method::DELETE => {
                 match human_relationships::delete_human_relationship(&mut conn, ctx, id) {
                     Ok(true) => Ok(response::ok(&serde_json::json!({"deleted": id}))),
-                    Ok(false) => Ok(response::not_found(&format!("Human relationship {} not found", id))),
+                    Ok(false) => Ok(response::not_found(&format!(
+                        "Human relationship {} not found",
+                        id
+                    ))),
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
@@ -3409,9 +3697,10 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
 
         #[derive(Deserialize)]
         struct ConsentInput {
@@ -3426,7 +3715,13 @@ impl HttpServer {
             consent_given: input.consent,
         };
 
-        match human_relationships::update_consent(&mut conn, ctx, id, &input.party_id, &consent_update) {
+        match human_relationships::update_consent(
+            &mut conn,
+            ctx,
+            id,
+            &input.party_id,
+            &consent_update,
+        ) {
             Ok(rel) => Ok(response::ok(&rel)),
             Err(e) => Ok(response::error_response(e)),
         }
@@ -3445,9 +3740,10 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
 
         #[derive(Deserialize)]
         struct CustodyInput {
@@ -3468,7 +3764,13 @@ impl HttpServer {
             emergency_access_enabled: input.emergency_access,
         };
 
-        match human_relationships::update_custody(&mut conn, ctx, id, &input.party_id, &custody_update) {
+        match human_relationships::update_custody(
+            &mut conn,
+            ctx,
+            id,
+            &input.party_id,
+            &custody_update,
+        ) {
             Ok(rel) => Ok(response::ok(&rel)),
             Err(e) => Ok(response::error_response(e)),
         }
@@ -3491,7 +3793,8 @@ impl HttpServer {
 
                 match contributor_presences::list_contributor_presences(&mut conn, ctx, &query) {
                     Ok(items) => {
-                        let views: Vec<ContributorPresenceView> = items.into_iter().map(|p| p.into()).collect();
+                        let views: Vec<ContributorPresenceView> =
+                            items.into_iter().map(|p| p.into()).collect();
                         let body = serde_json::json!({
                             "items": views,
                             "count": views.len(),
@@ -3502,14 +3805,16 @@ impl HttpServer {
                 }
             }
             Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 // Deserialize camelCase InputView, convert to internal DB type
                 let input_view: CreateContributorPresenceInputView =
                     serde_json::from_slice(&body.to_bytes())
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
-                let input: contributor_presences::CreateContributorPresenceInput = input_view.into();
+                let input: contributor_presences::CreateContributorPresenceInput =
+                    input_view.into();
 
                 match contributor_presences::create_contributor_presence(&mut conn, ctx, input) {
                     Ok(presence) => {
@@ -3568,9 +3873,10 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
 
         let input: contributor_presences::InitiateStewardshipInput =
             serde_json::from_slice(&body.to_bytes())
@@ -3598,14 +3904,14 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
 
         // Deserialize camelCase InputView, convert to internal DB type
-        let input_view: InitiateClaimInputView =
-            serde_json::from_slice(&body.to_bytes())
-                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let input_view: InitiateClaimInputView = serde_json::from_slice(&body.to_bytes())
+            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
         let input: contributor_presences::InitiateClaimInput = input_view.into();
 
         match contributor_presences::initiate_claim(&mut conn, ctx, id, &input) {
@@ -3657,7 +3963,8 @@ impl HttpServer {
 
                 match economic_events::list_economic_events(&mut conn, ctx, &query) {
                     Ok(items) => {
-                        let views: Vec<EconomicEventView> = items.into_iter().map(|e| e.into()).collect();
+                        let views: Vec<EconomicEventView> =
+                            items.into_iter().map(|e| e.into()).collect();
                         let body = serde_json::json!({
                             "items": views,
                             "count": views.len(),
@@ -3668,9 +3975,10 @@ impl HttpServer {
                 }
             }
             Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 // Deserialize camelCase InputView, convert to internal DB type
                 let input_view: CreateEconomicEventInputView =
                     serde_json::from_slice(&body.to_bytes())
@@ -3700,16 +4008,14 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
 
         match method {
-            Method::GET => {
-                match economic_events::get_economic_event(&mut conn, ctx, id) {
-                    Ok(Some(event)) => {
-                        let view: EconomicEventView = event.into();
-                        Ok(response::ok(&view))
-                    }
-                    Ok(None) => Ok(response::not_found(&format!("Event {} not found", id))),
-                    Err(e) => Ok(response::error_response(e)),
+            Method::GET => match economic_events::get_economic_event(&mut conn, ctx, id) {
+                Ok(Some(event)) => {
+                    let view: EconomicEventView = event.into();
+                    Ok(response::ok(&view))
                 }
-            }
+                Ok(None) => Ok(response::not_found(&format!("Event {} not found", id))),
+                Err(e) => Ok(response::error_response(e)),
+            },
             _ => Ok(response::method_not_allowed()),
         }
     }
@@ -3731,7 +4037,8 @@ impl HttpServer {
 
                 match content_mastery::list_mastery(&mut conn, ctx, &query) {
                     Ok(items) => {
-                        let views: Vec<ContentMasteryView> = items.into_iter().map(|m| m.into()).collect();
+                        let views: Vec<ContentMasteryView> =
+                            items.into_iter().map(|m| m.into()).collect();
                         let body = serde_json::json!({
                             "items": views,
                             "count": views.len(),
@@ -3742,9 +4049,10 @@ impl HttpServer {
                 }
             }
             Method::POST => {
-                let body = req.collect().await.map_err(|e| {
-                    StorageError::Internal(format!("Failed to read body: {}", e))
-                })?;
+                let body = req
+                    .collect()
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
                 let input: content_mastery::CreateMasteryInput =
                     serde_json::from_slice(&body.to_bytes())
                         .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
@@ -3772,16 +4080,17 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
 
         match method {
-            Method::GET => {
-                match content_mastery::get_mastery(&mut conn, ctx, id) {
-                    Ok(Some(mastery)) => {
-                        let view: ContentMasteryView = mastery.into();
-                        Ok(response::ok(&view))
-                    }
-                    Ok(None) => Ok(response::not_found(&format!("Mastery record {} not found", id))),
-                    Err(e) => Ok(response::error_response(e)),
+            Method::GET => match content_mastery::get_mastery(&mut conn, ctx, id) {
+                Ok(Some(mastery)) => {
+                    let view: ContentMasteryView = mastery.into();
+                    Ok(response::ok(&view))
                 }
-            }
+                Ok(None) => Ok(response::not_found(&format!(
+                    "Mastery record {} not found",
+                    id
+                ))),
+                Err(e) => Ok(response::error_response(e)),
+            },
             _ => Ok(response::method_not_allowed()),
         }
     }
@@ -3797,21 +4106,20 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
 
         match method {
-            Method::GET => {
-                match content_mastery::get_mastery_for_human(&mut conn, ctx, human_id) {
-                    Ok(items) => {
-                        let views: Vec<ContentMasteryView> = items.into_iter().map(|m| m.into()).collect();
-                        let count = views.len();
-                        let body = serde_json::json!({
-                            "items": views,
-                            "count": count,
-                            "humanId": human_id,
-                        });
-                        Ok(response::ok(&body))
-                    }
-                    Err(e) => Ok(response::error_response(e)),
+            Method::GET => match content_mastery::get_mastery_for_human(&mut conn, ctx, human_id) {
+                Ok(items) => {
+                    let views: Vec<ContentMasteryView> =
+                        items.into_iter().map(|m| m.into()).collect();
+                    let count = views.len();
+                    let body = serde_json::json!({
+                        "items": views,
+                        "count": count,
+                        "humanId": human_id,
+                    });
+                    Ok(response::ok(&body))
                 }
-            }
+                Err(e) => Ok(response::error_response(e)),
+            },
             _ => Ok(response::method_not_allowed()),
         }
     }
@@ -3836,9 +4144,10 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
 
         // Deserialize camelCase InputView array, convert to internal DB types
         let input_views: Vec<CreateContributorPresenceInputView> =
@@ -3873,9 +4182,10 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
 
         // Deserialize camelCase InputView array, convert to internal DB types
         let input_views: Vec<CreateEconomicEventInputView> =
@@ -3910,14 +4220,14 @@ impl HttpServer {
         }
 
         let mut conn = self.get_diesel_conn()?;
-        let body = req.collect().await.map_err(|e| {
-            StorageError::Internal(format!("Failed to read body: {}", e))
-        })?;
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
 
         // Deserialize camelCase InputView array, convert to internal DB types
-        let input_views: Vec<CreateMasteryInputView> =
-            serde_json::from_slice(&body.to_bytes())
-                .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
+        let input_views: Vec<CreateMasteryInputView> = serde_json::from_slice(&body.to_bytes())
+            .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
         let versions: Vec<u32> = input_views.iter().map(|v| v.schema_version).collect();
         if let Err(msg) = validate_schema_versions(&versions) {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
@@ -3942,9 +4252,12 @@ impl HttpServer {
         method: Method,
         app_ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let pool = self.db_pool.as_ref()
+        let pool = self
+            .db_pool
+            .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         match method {
@@ -3967,14 +4280,17 @@ impl HttpServer {
 
                 match stewardship_allocations::list_allocations(&mut conn, app_ctx, &query) {
                     Ok(allocations) => {
-                        let views: Vec<StewardshipAllocationView> = allocations.into_iter().map(|a| a.into()).collect();
+                        let views: Vec<StewardshipAllocationView> =
+                            allocations.into_iter().map(|a| a.into()).collect();
                         Ok(response::ok(&views))
                     }
                     Err(e) => Ok(response::error_response(e)),
                 }
             }
             Method::POST => {
-                let body = req.collect().await
+                let body = req
+                    .collect()
+                    .await
                     .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
                     .to_bytes();
                 // Deserialize camelCase InputView, convert to internal DB type
@@ -4002,9 +4318,12 @@ impl HttpServer {
         id: &str,
         app_ctx: &AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let pool = self.db_pool.as_ref()
+        let pool = self
+            .db_pool
+            .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         match method {
@@ -4018,7 +4337,9 @@ impl HttpServer {
                 }
             }
             Method::PUT => {
-                let body = req.collect().await
+                let body = req
+                    .collect()
+                    .await
                     .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
                     .to_bytes();
                 // Deserialize camelCase InputView, convert to internal DB type
@@ -4056,9 +4377,12 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
-        let pool = self.db_pool.as_ref()
+        let pool = self
+            .db_pool
+            .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         match stewardship_allocations::get_content_stewardship(&mut conn, app_ctx, content_id) {
@@ -4082,14 +4406,18 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
-        let pool = self.db_pool.as_ref()
+        let pool = self
+            .db_pool
+            .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         match stewardship_allocations::get_allocations_for_steward(&mut conn, app_ctx, steward_id) {
             Ok(allocations) => {
-                let views: Vec<StewardshipAllocationView> = allocations.into_iter().map(|a| a.into()).collect();
+                let views: Vec<StewardshipAllocationView> =
+                    allocations.into_iter().map(|a| a.into()).collect();
                 Ok(response::ok(&views))
             }
             Err(e) => Ok(response::error_response(e)),
@@ -4108,9 +4436,12 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
-        let pool = self.db_pool.as_ref()
+        let pool = self
+            .db_pool
+            .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         #[derive(serde::Deserialize)]
@@ -4120,13 +4451,22 @@ impl HttpServer {
             reason: String,
         }
 
-        let body = req.collect().await
+        let body = req
+            .collect()
+            .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
             .to_bytes();
         let input: DisputeInput = serde_json::from_slice(&body)
             .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
 
-        match stewardship_allocations::file_dispute(&mut conn, app_ctx, allocation_id, &input.dispute_id, &input.disputed_by, &input.reason) {
+        match stewardship_allocations::file_dispute(
+            &mut conn,
+            app_ctx,
+            allocation_id,
+            &input.dispute_id,
+            &input.disputed_by,
+            &input.reason,
+        ) {
             Ok(allocation) => {
                 let view: StewardshipAllocationView = allocation.into();
                 Ok(response::ok(&view))
@@ -4147,9 +4487,12 @@ impl HttpServer {
             return Ok(response::method_not_allowed());
         }
 
-        let pool = self.db_pool.as_ref()
+        let pool = self
+            .db_pool
+            .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
         #[derive(serde::Deserialize)]
@@ -4158,13 +4501,21 @@ impl HttpServer {
             new_state: String,
         }
 
-        let body = req.collect().await
+        let body = req
+            .collect()
+            .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
             .to_bytes();
         let input: ResolveInput = serde_json::from_slice(&body)
             .map_err(|e| StorageError::InvalidInput(format!("Invalid JSON: {}", e)))?;
 
-        match stewardship_allocations::resolve_dispute(&mut conn, app_ctx, allocation_id, &input.ratifier_id, &input.new_state) {
+        match stewardship_allocations::resolve_dispute(
+            &mut conn,
+            app_ctx,
+            allocation_id,
+            &input.ratifier_id,
+            &input.new_state,
+        ) {
             Ok(allocation) => {
                 let view: StewardshipAllocationView = allocation.into();
                 Ok(response::ok(&view))
@@ -4188,12 +4539,17 @@ impl HttpServer {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
         }
 
-        let pool = self.db_pool.as_ref()
+        let pool = self
+            .db_pool
+            .as_ref()
             .ok_or_else(|| StorageError::Internal("Database pool not initialized".into()))?;
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
 
-        let body = req.collect().await
+        let body = req
+            .collect()
+            .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?
             .to_bytes();
         // Deserialize camelCase InputView array, convert to internal DB types
@@ -4227,7 +4583,11 @@ impl HttpServer {
             errors: Vec<String>,
         }
 
-        Ok(response::ok_with_schema_info(&BulkResult { created, failed, errors }))
+        Ok(response::ok_with_schema_info(&BulkResult {
+            created,
+            failed,
+            errors,
+        }))
     }
 
     // =========================================================================
@@ -4242,7 +4602,8 @@ impl HttpServer {
         &self,
         pool: DbPool,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         match db::local_sessions::get_active_session(&mut conn)? {
@@ -4264,14 +4625,17 @@ impl HttpServer {
         req: Request<Incoming>,
         pool: DbPool,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let body = req.collect().await
+        let body = req
+            .collect()
+            .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let bytes = body.to_bytes();
 
         let input: db::local_sessions::CreateLocalSessionInput = serde_json::from_slice(&bytes)
             .map_err(|e| StorageError::Internal(format!("Invalid JSON: {}", e)))?;
 
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         let session = db::local_sessions::create_session(&mut conn, input)?;
@@ -4292,7 +4656,8 @@ impl HttpServer {
         &self,
         pool: DbPool,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         // Get active session first to know what we're deleting
@@ -4320,11 +4685,13 @@ impl HttpServer {
         &self,
         pool: DbPool,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        let mut conn = pool.get()
+        let mut conn = pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
         let sessions = db::local_sessions::list_all_sessions(&mut conn)?;
-        let views: Vec<LocalSessionView> = sessions.into_iter().map(LocalSessionView::from).collect();
+        let views: Vec<LocalSessionView> =
+            sessions.into_iter().map(LocalSessionView::from).collect();
         Ok(response::ok(&views))
     }
 

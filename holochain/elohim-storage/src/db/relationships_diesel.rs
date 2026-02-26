@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::context::AppContext;
 use super::diesel_schema::relationships;
-use super::models::{Relationship, NewRelationship, current_timestamp};
+use super::models::{current_timestamp, NewRelationship, Relationship};
 use crate::error::StorageError;
 
 // ============================================================================
@@ -40,9 +40,15 @@ pub struct CreateRelationshipInput {
     pub metadata_json: Option<String>,
 }
 
-fn default_confidence() -> f32 { 1.0 }
-fn default_inference_source() -> String { "explicit".to_string() }
-fn default_reach() -> String { "commons".to_string() }
+fn default_confidence() -> f32 {
+    1.0
+}
+fn default_inference_source() -> String {
+    "explicit".to_string()
+}
+fn default_reach() -> String {
+    "commons".to_string()
+}
 
 /// Query parameters for listing relationships - camelCase for URL params
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -61,7 +67,9 @@ pub struct RelationshipQuery {
     pub offset: i64,
 }
 
-fn default_limit() -> i64 { 100 }
+fn default_limit() -> i64 {
+    100
+}
 
 /// Result of bulk operation
 #[derive(Debug, Clone, Serialize)]
@@ -118,8 +126,9 @@ pub fn list_relationships(
             _ => {
                 // Both directions (default)
                 base_query = base_query.filter(
-                    relationships::source_id.eq(content_id)
-                        .or(relationships::target_id.eq(content_id))
+                    relationships::source_id
+                        .eq(content_id)
+                        .or(relationships::target_id.eq(content_id)),
                 );
             }
         }
@@ -156,10 +165,14 @@ pub fn get_relationships_for_content(
     ctx: &AppContext,
     content_id: &str,
 ) -> Result<Vec<Relationship>, StorageError> {
-    list_relationships(conn, ctx, &RelationshipQuery {
-        content_id: Some(content_id.to_string()),
-        ..Default::default()
-    })
+    list_relationships(
+        conn,
+        ctx,
+        &RelationshipQuery {
+            content_id: Some(content_id.to_string()),
+            ..Default::default()
+        },
+    )
 }
 
 /// Get outgoing relationships from a content node
@@ -241,7 +254,12 @@ pub fn create_relationship(
     // Use INSERT OR REPLACE for idempotent creation
     diesel::insert_into(relationships::table)
         .values(&new_rel)
-        .on_conflict((relationships::app_id, relationships::source_id, relationships::target_id, relationships::relationship_type))
+        .on_conflict((
+            relationships::app_id,
+            relationships::source_id,
+            relationships::target_id,
+            relationships::relationship_type,
+        ))
         .do_update()
         .set((
             relationships::confidence.eq(input.confidence),
@@ -269,7 +287,10 @@ pub fn create_bidirectional(
     use super::models::relationship_types;
 
     conn.transaction(|conn| {
-        let forward_id = input.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+        let forward_id = input
+            .id
+            .clone()
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
         let inverse_id = Uuid::new_v4().to_string();
 
         // Get inverse relationship type
@@ -302,8 +323,8 @@ pub fn create_bidirectional(
         let inverse_rel = NewRelationship {
             id: &inverse_id,
             app_id: &ctx.app_id,
-            source_id: &input.target_id,  // Swapped
-            target_id: &input.source_id,  // Swapped
+            source_id: &input.target_id, // Swapped
+            target_id: &input.source_id, // Swapped
             relationship_type: inverse_type,
             confidence: input.confidence,
             inference_source: &input.inference_source,
@@ -341,7 +362,10 @@ pub fn bulk_create_relationships(
 
     conn.transaction(|conn| {
         for input in inputs {
-            let id = input.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+            let id = input
+                .id
+                .clone()
+                .unwrap_or_else(|| Uuid::new_v4().to_string());
 
             // Check if exists
             let exists: bool = relationships::table
@@ -372,7 +396,12 @@ pub fn bulk_create_relationships(
 
             match diesel::insert_into(relationships::table)
                 .values(&new_rel)
-                .on_conflict((relationships::app_id, relationships::source_id, relationships::target_id, relationships::relationship_type))
+                .on_conflict((
+                    relationships::app_id,
+                    relationships::source_id,
+                    relationships::target_id,
+                    relationships::relationship_type,
+                ))
                 .do_update()
                 .set((
                     relationships::confidence.eq(input.confidence),
@@ -395,7 +424,11 @@ pub fn bulk_create_relationships(
             }
         }
 
-        Ok(BulkRelationshipResult { created, updated, errors })
+        Ok(BulkRelationshipResult {
+            created,
+            updated,
+            errors,
+        })
     })
 }
 
@@ -411,7 +444,7 @@ pub fn delete_relationship(
     let deleted = diesel::delete(
         relationships::table
             .filter(relationships::app_id.eq(&ctx.app_id))
-            .filter(relationships::id.eq(id))
+            .filter(relationships::id.eq(id)),
     )
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
@@ -422,7 +455,7 @@ pub fn delete_relationship(
             let _ = diesel::delete(
                 relationships::table
                     .filter(relationships::app_id.eq(&ctx.app_id))
-                    .filter(relationships::id.eq(&inverse_id))
+                    .filter(relationships::id.eq(&inverse_id)),
             )
             .execute(conn);
         }
@@ -441,9 +474,10 @@ pub fn delete_relationships_for_content(
         relationships::table
             .filter(relationships::app_id.eq(&ctx.app_id))
             .filter(
-                relationships::source_id.eq(content_id)
-                    .or(relationships::target_id.eq(content_id))
-            )
+                relationships::source_id
+                    .eq(content_id)
+                    .or(relationships::target_id.eq(content_id)),
+            ),
     )
     .execute(conn)
     .map_err(|e| StorageError::Internal(format!("Delete failed: {}", e)))?;
@@ -500,8 +534,8 @@ mod tests {
     use diesel::Connection;
 
     fn setup_test_db() -> SqliteConnection {
-        let mut conn = SqliteConnection::establish(":memory:")
-            .expect("Failed to create in-memory database");
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
 
         diesel::sql_query(
             r#"

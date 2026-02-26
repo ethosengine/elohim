@@ -29,14 +29,14 @@ pub use stream::{StreamPosition, StreamTracker};
 use crate::error::StorageError;
 use automerge::Automerge;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::debug;
 
 /// Sync manager coordinates document synchronization
 pub struct SyncManager {
     /// Document store
     doc_store: Arc<DocStore>,
     /// Stream position tracker
+    #[allow(dead_code)]
     stream_tracker: Arc<StreamTracker>,
 }
 
@@ -50,7 +50,11 @@ impl SyncManager {
     }
 
     /// Get or create a document
-    pub async fn get_or_create_doc(&self, app_id: &str, doc_id: &str) -> Result<Automerge, StorageError> {
+    pub async fn get_or_create_doc(
+        &self,
+        app_id: &str,
+        doc_id: &str,
+    ) -> Result<Automerge, StorageError> {
         match self.doc_store.get(app_id, doc_id).await? {
             Some(stored) => {
                 let doc = Automerge::load(&stored.data)
@@ -84,11 +88,7 @@ impl SyncManager {
         self.doc_store.save(app_id, doc_id, &doc).await?;
 
         // Return new heads
-        let heads: Vec<String> = doc
-            .get_heads()
-            .iter()
-            .map(|h| hex::encode(h.0))
-            .collect();
+        let heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
 
         debug!(app_id = %app_id, doc_id = %doc_id, heads = ?heads, "Applied changes, new heads");
         Ok(heads)
@@ -134,11 +134,7 @@ impl SyncManager {
         };
 
         // Current heads
-        let new_heads: Vec<String> = doc
-            .get_heads()
-            .iter()
-            .map(|h| hex::encode(h.0))
-            .collect();
+        let new_heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
 
         Ok((changes, new_heads))
     }
@@ -149,11 +145,7 @@ impl SyncManager {
             Some(stored) => {
                 let doc = Automerge::load(&stored.data)
                     .map_err(|e| StorageError::Sync(format!("Failed to load doc: {}", e)))?;
-                let heads: Vec<String> = doc
-                    .get_heads()
-                    .iter()
-                    .map(|h| hex::encode(h.0))
-                    .collect();
+                let heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
                 Ok(heads)
             }
             None => Ok(vec![]),

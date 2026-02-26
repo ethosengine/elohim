@@ -13,7 +13,6 @@ use crate::blob_store::BlobStore;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 use serde::{Deserialize, Serialize};
 use std::io;
-use tracing::{debug, info};
 
 /// Default shard size (1MB)
 pub const DEFAULT_SHARD_SIZE: usize = 1024 * 1024;
@@ -136,7 +135,7 @@ impl ShardEncoder {
             "chunked" => {
                 // Split into sequential chunks
                 let shard_size = self.config.shard_size as u64;
-                let num_shards = (data.len() + self.config.shard_size - 1) / self.config.shard_size;
+                let num_shards = data.len().div_ceil(self.config.shard_size);
                 let mut hashes = Vec::with_capacity(num_shards);
 
                 for i in 0..num_shards {
@@ -156,8 +155,7 @@ impl ShardEncoder {
                 )
                 .unwrap();
 
-                let shard_size = (data.len() + self.config.rs_data_shards as usize - 1)
-                    / self.config.rs_data_shards as usize;
+                let shard_size = data.len().div_ceil(self.config.rs_data_shards as usize);
 
                 // Pad data to align with shard size
                 let mut padded_data = data.to_vec();
@@ -179,7 +177,8 @@ impl ShardEncoder {
                 rs.encode(&mut shard_refs).unwrap();
 
                 // Compute hashes
-                let hashes: Vec<String> = shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
+                let hashes: Vec<String> =
+                    shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
 
                 (
                     self.config.rs_data_shards,
@@ -213,11 +212,10 @@ impl ShardEncoder {
     pub fn create_shards(&self, data: &[u8], encoding: &str) -> Vec<Vec<u8>> {
         match encoding {
             "none" => vec![data.to_vec()],
-            "chunked" => {
-                data.chunks(self.config.shard_size)
-                    .map(|chunk| chunk.to_vec())
-                    .collect()
-            }
+            "chunked" => data
+                .chunks(self.config.shard_size)
+                .map(|chunk| chunk.to_vec())
+                .collect(),
             _ => {
                 // Reed-Solomon encoding
                 let rs = ReedSolomon::new(
@@ -226,8 +224,7 @@ impl ShardEncoder {
                 )
                 .unwrap();
 
-                let shard_size = (data.len() + self.config.rs_data_shards as usize - 1)
-                    / self.config.rs_data_shards as usize;
+                let shard_size = data.len().div_ceil(self.config.rs_data_shards as usize);
 
                 // Pad data
                 let mut padded_data = data.to_vec();
@@ -260,11 +257,9 @@ impl ShardEncoder {
         shards: &[Option<Vec<u8>>],
     ) -> Result<Vec<u8>, io::Error> {
         match manifest.encoding.as_str() {
-            "none" => {
-                shards[0]
-                    .clone()
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Missing shard"))
-            }
+            "none" => shards[0]
+                .clone()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Missing shard")),
             "chunked" => {
                 // All shards must be present for chunked encoding
                 let mut data = Vec::with_capacity(manifest.total_size as usize);
@@ -331,8 +326,8 @@ impl ShardEncoder {
 
                 // Concatenate data shards (shard_vecs updated in place by reconstruct)
                 let mut data = Vec::with_capacity(manifest.total_size as usize);
-                for i in 0..manifest.data_shards as usize {
-                    data.extend_from_slice(&shard_vecs[i]);
+                for shard in shard_vecs.iter().take(manifest.data_shards as usize) {
+                    data.extend_from_slice(shard);
                 }
                 data.truncate(manifest.total_size as usize);
 
@@ -389,8 +384,8 @@ mod tests {
             shard_size: 10,
             rs_data_shards: 4,
             rs_parity_shards: 3,
-            rs_threshold: 50,      // RS for data > 50 bytes
-            single_shard_max: 10,  // Force RS encoding for test data
+            rs_threshold: 50,     // RS for data > 50 bytes
+            single_shard_max: 10, // Force RS encoding for test data
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
@@ -415,8 +410,8 @@ mod tests {
             shard_size: 25,
             rs_data_shards: 4,
             rs_parity_shards: 3,
-            rs_threshold: 50,      // RS for data > 50 bytes
-            single_shard_max: 10,  // Force RS encoding for test data
+            rs_threshold: 50,     // RS for data > 50 bytes
+            single_shard_max: 10, // Force RS encoding for test data
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
@@ -424,7 +419,10 @@ mod tests {
 
         // Verify RS encoding was used
         assert_eq!(manifest.encoding, "rs-4-7");
-        assert!(manifest.total_shards >= 7, "Expected at least 7 shards for rs-4-7");
+        assert!(
+            manifest.total_shards >= 7,
+            "Expected at least 7 shards for rs-4-7"
+        );
 
         let shards = encoder.create_shards(&data, &manifest.encoding);
 

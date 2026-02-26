@@ -310,6 +310,21 @@ export const PROFILE = {
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Elohim App — Love Map (Intimate Paths)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Love map negotiation & path UI (elohim-app: future love-map components)
+export const LOVE_MAP = {
+  NEGOTIATION_PROPOSE: 'love-map-propose',
+  NEGOTIATION_ACCEPT: 'love-map-accept',
+  STRATEGY_SELECT: 'love-map-strategy',
+  ATTESTATION_BADGE: 'love-map-attestation-badge',
+  CHAPTER_TITLE: 'love-map-chapter-title',
+  CONSENT_GATE: 'love-map-consent-gate',
+  PRIVACY_INDICATOR: 'love-map-privacy-indicator',
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Elohim App — Quiz Engine & Renderers
 // ─────────────────────────────────────────────────────────────────────────────
 

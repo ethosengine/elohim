@@ -250,7 +250,7 @@ describe('CommunityInsightsService', () => {
 
     it('should use custom context when provided', () => {
       const contextResults = [
-        buildPublicResult({ completedAt: '2025-03-01T00:00:00Z' }),
+        buildPublicResult({ completedAt: '2025-03-15T12:00:00Z' }),
       ];
       attestationSpy.getResultsForContext.and.returnValue(contextResults);
 

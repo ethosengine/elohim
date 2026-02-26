@@ -22,30 +22,30 @@
 //! - `path_attestations` - Attestations granted upon path completion
 
 // Legacy rusqlite modules (will be deprecated)
-pub mod schema;
 pub mod content;
 pub mod paths;
+pub mod schema;
 
 // Graph/relationship modules (rusqlite, new in v3)
-pub mod relationships;
 pub mod knowledge_maps;
 pub mod path_extensions;
+pub mod relationships;
 
 // New Diesel modules with app scoping
+pub mod content_diesel;
 pub mod context;
 pub mod diesel_schema;
 pub mod models;
-pub mod content_diesel;
 pub mod paths_diesel;
 
 // Diesel modules for graph relationships and domain models
-pub mod relationships_diesel;
-pub mod human_relationships;
+pub mod content_mastery;
 pub mod contributor_presences;
 pub mod economic_events;
-pub mod content_mastery;
-pub mod stewardship_allocations;
+pub mod human_relationships;
 pub mod local_sessions;
+pub mod relationships_diesel;
+pub mod stewardship_allocations;
 
 // Policy cache for stewardship enforcement
 pub mod policy_cache;
@@ -57,7 +57,7 @@ use std::time::Duration;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager, Pool};
 use rusqlite::Connection;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 use crate::error::StorageError;
 pub use context::AppContext;
@@ -94,8 +94,9 @@ impl ContentDb {
     pub fn open_in_memory() -> Result<Self, StorageError> {
         debug!("Opening in-memory SQLite database");
 
-        let conn = Connection::open_in_memory()
-            .map_err(|e| StorageError::Internal(format!("Failed to open in-memory SQLite: {}", e)))?;
+        let conn = Connection::open_in_memory().map_err(|e| {
+            StorageError::Internal(format!("Failed to open in-memory SQLite: {}", e))
+        })?;
 
         let db = Self {
             conn: Mutex::new(conn),
@@ -108,7 +109,9 @@ impl ContentDb {
 
     /// Initialize database schema
     fn init_schema(&self) -> Result<(), StorageError> {
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| StorageError::Internal(format!("Lock poisoned: {}", e)))?;
 
         schema::init_schema(&conn)?;
@@ -121,7 +124,9 @@ impl ContentDb {
     where
         F: FnOnce(&Connection) -> Result<T, StorageError>,
     {
-        let conn = self.conn.lock()
+        let conn = self
+            .conn
+            .lock()
             .map_err(|e| StorageError::Internal(format!("Lock poisoned: {}", e)))?;
         f(&conn)
     }
@@ -131,7 +136,9 @@ impl ContentDb {
     where
         F: FnOnce(&mut Connection) -> Result<T, StorageError>,
     {
-        let mut conn = self.conn.lock()
+        let mut conn = self
+            .conn
+            .lock()
             .map_err(|e| StorageError::Internal(format!("Lock poisoned: {}", e)))?;
         f(&mut conn)
     }
@@ -152,7 +159,9 @@ impl ContentDb {
                 .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
             let tag_count: i64 = conn
-                .query_row("SELECT COUNT(DISTINCT tag) FROM content_tags", [], |row| row.get(0))
+                .query_row("SELECT COUNT(DISTINCT tag) FROM content_tags", [], |row| {
+                    row.get(0)
+                })
                 .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
             Ok(DbStats {
@@ -176,8 +185,8 @@ pub struct DbStats {
 
 // Legacy re-exports (for backwards compatibility with http.rs)
 // These will be deprecated once http.rs is updated to use Diesel
-pub use content::{ContentRow, CreateContentInput as LegacyCreateContentInput, ContentQuery};
-pub use paths::{PathRow, StepRow, CreatePathInput as LegacyCreatePathInput, CreateStepInput};
+pub use content::{ContentQuery, ContentRow, CreateContentInput as LegacyCreateContentInput};
+pub use paths::{CreatePathInput as LegacyCreatePathInput, CreateStepInput, PathRow, StepRow};
 
 // ============================================================================
 // Diesel Connection Pool
@@ -226,7 +235,8 @@ impl AppScopedDb {
 
     /// Get a connection from the pool
     pub fn conn(&self) -> Result<PooledConn, StorageError> {
-        self.pool.get()
+        self.pool
+            .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))
     }
 
@@ -255,6 +265,9 @@ impl AppScopedDb {
 
 // Re-export Diesel types (namespaced to avoid conflicts with legacy types)
 pub mod diesel_types {
-    pub use super::content_diesel::{CreateContentInput, ContentQuery, BulkResult};
-    pub use super::paths_diesel::{CreatePathInput, CreateChapterInput, CreateStepInput, CreateAttestationInput, BulkPathResult};
+    pub use super::content_diesel::{BulkResult, ContentQuery, CreateContentInput};
+    pub use super::paths_diesel::{
+        BulkPathResult, CreateAttestationInput, CreateChapterInput, CreatePathInput,
+        CreateStepInput,
+    };
 }

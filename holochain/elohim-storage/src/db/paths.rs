@@ -1,10 +1,8 @@
 //! Path and Step CRUD operations
 
-use rusqlite::{Connection, params, Row};
-use serde::{Deserialize, Serialize};
-use tracing::debug;
-
 use crate::error::StorageError;
+use rusqlite::{params, Connection, Row};
+use serde::{Deserialize, Serialize};
 
 /// Path row from database
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,8 +138,12 @@ pub struct CreatePathInput {
     pub chapters: Vec<CreateChapterInput>,
 }
 
-fn default_path_type() -> String { "guided".to_string() }
-fn default_visibility() -> String { "public".to_string() }
+fn default_path_type() -> String {
+    "guided".to_string()
+}
+fn default_visibility() -> String {
+    "public".to_string()
+}
 
 /// Input for creating a chapter
 #[derive(Debug, Clone, Deserialize)]
@@ -182,7 +184,9 @@ pub struct CreateStepInput {
     pub metadata_json: Option<String>,
 }
 
-fn default_step_type() -> String { "learn".to_string() }
+fn default_step_type() -> String {
+    "learn".to_string()
+}
 
 /// Get path by ID
 pub fn get_path(conn: &Connection, id: &str) -> Result<Option<PathRow>, StorageError> {
@@ -194,7 +198,10 @@ pub fn get_path(conn: &Connection, id: &str) -> Result<Option<PathRow>, StorageE
         .query(params![id])
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
-    if let Some(row) = rows.next().map_err(|e| StorageError::Internal(format!("Row fetch failed: {}", e)))? {
+    if let Some(row) = rows
+        .next()
+        .map_err(|e| StorageError::Internal(format!("Row fetch failed: {}", e)))?
+    {
         let mut path = PathRow::from_row(row)
             .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
 
@@ -211,7 +218,10 @@ pub fn get_path(conn: &Connection, id: &str) -> Result<Option<PathRow>, StorageE
 }
 
 /// Get path with all chapters and steps
-pub fn get_path_with_steps(conn: &Connection, id: &str) -> Result<Option<PathWithSteps>, StorageError> {
+pub fn get_path_with_steps(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<PathWithSteps>, StorageError> {
     let path = match get_path(conn, id)? {
         Some(p) => p,
         None => return Ok(None),
@@ -236,19 +246,22 @@ pub struct PathWithSteps {
 }
 
 /// Get chapters for a path
-fn get_chapters_for_path(conn: &Connection, path_id: &str) -> Result<Vec<ChapterRow>, StorageError> {
+fn get_chapters_for_path(
+    conn: &Connection,
+    path_id: &str,
+) -> Result<Vec<ChapterRow>, StorageError> {
     let mut stmt = conn
         .prepare("SELECT * FROM chapters WHERE path_id = ? ORDER BY order_index")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let chapter_rows = stmt
-        .query_map(params![path_id], |row| ChapterRow::from_row(row))
+        .query_map(params![path_id], ChapterRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
     let mut chapters = vec![];
     for row_result in chapter_rows {
-        let mut chapter = row_result
-            .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
+        let mut chapter =
+            row_result.map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
 
         // Load steps for this chapter
         chapter.steps = get_steps_for_chapter(conn, &chapter.id)?;
@@ -259,13 +272,16 @@ fn get_chapters_for_path(conn: &Connection, path_id: &str) -> Result<Vec<Chapter
 }
 
 /// Get steps for a chapter
-fn get_steps_for_chapter(conn: &Connection, chapter_id: &str) -> Result<Vec<StepRow>, StorageError> {
+fn get_steps_for_chapter(
+    conn: &Connection,
+    chapter_id: &str,
+) -> Result<Vec<StepRow>, StorageError> {
     let mut stmt = conn
         .prepare("SELECT * FROM steps WHERE chapter_id = ? ORDER BY order_index")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![chapter_id], |row| StepRow::from_row(row))
+        .query_map(params![chapter_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -276,11 +292,13 @@ fn get_steps_for_chapter(conn: &Connection, chapter_id: &str) -> Result<Vec<Step
 /// Get steps not in any chapter
 fn get_ungrouped_steps(conn: &Connection, path_id: &str) -> Result<Vec<StepRow>, StorageError> {
     let mut stmt = conn
-        .prepare("SELECT * FROM steps WHERE path_id = ? AND chapter_id IS NULL ORDER BY order_index")
+        .prepare(
+            "SELECT * FROM steps WHERE path_id = ? AND chapter_id IS NULL ORDER BY order_index",
+        )
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![path_id], |row| StepRow::from_row(row))
+        .query_map(params![path_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -306,26 +324,36 @@ fn get_path_tags(conn: &Connection, path_id: &str) -> Result<Vec<String>, Storag
 /// Get step count for a path
 fn get_step_count(conn: &Connection, path_id: &str) -> Result<u32, StorageError> {
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM steps WHERE path_id = ?", params![path_id], |row| row.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM steps WHERE path_id = ?",
+            params![path_id],
+            |row| row.get(0),
+        )
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
     Ok(count as u32)
 }
 
 /// List all paths
-pub fn list_paths(conn: &Connection, limit: u32, offset: u32) -> Result<Vec<PathRow>, StorageError> {
+pub fn list_paths(
+    conn: &Connection,
+    limit: u32,
+    offset: u32,
+) -> Result<Vec<PathRow>, StorageError> {
     let mut stmt = conn
         .prepare("SELECT * FROM paths ORDER BY created_at DESC LIMIT ? OFFSET ?")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let path_rows = stmt
-        .query_map(params![limit as i64, offset as i64], |row| PathRow::from_row(row))
+        .query_map(params![limit as i64, offset as i64], |row| {
+            PathRow::from_row(row)
+        })
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
     let mut paths = vec![];
     for row_result in path_rows {
-        let mut path = row_result
-            .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
+        let mut path =
+            row_result.map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
 
         path.tags = get_path_tags(conn, &path.id)?;
         path.step_count = get_step_count(conn, &path.id)?;
@@ -337,7 +365,8 @@ pub fn list_paths(conn: &Connection, limit: u32, offset: u32) -> Result<Vec<Path
 
 /// Create a path with chapters and steps
 pub fn create_path(conn: &mut Connection, input: CreatePathInput) -> Result<PathRow, StorageError> {
-    let tx = conn.transaction()
+    let tx = conn
+        .transaction()
         .map_err(|e| StorageError::Internal(format!("Transaction failed: {}", e)))?;
 
     // Insert path
@@ -361,14 +390,16 @@ pub fn create_path(conn: &mut Connection, input: CreatePathInput) -> Result<Path
             input.visibility,
             input.created_by,
         ],
-    ).map_err(|e| StorageError::Internal(format!("Path insert failed: {}", e)))?;
+    )
+    .map_err(|e| StorageError::Internal(format!("Path insert failed: {}", e)))?;
 
     // Insert tags
     for tag in &input.tags {
         tx.execute(
             "INSERT OR IGNORE INTO path_tags (path_id, tag) VALUES (?, ?)",
             params![input.id, tag],
-        ).map_err(|e| StorageError::Internal(format!("Tag insert failed: {}", e)))?;
+        )
+        .map_err(|e| StorageError::Internal(format!("Tag insert failed: {}", e)))?;
     }
 
     // Insert chapters and their steps
@@ -386,7 +417,8 @@ pub fn create_path(conn: &mut Connection, input: CreatePathInput) -> Result<Path
                 chapter.order_index,
                 chapter.estimated_duration,
             ],
-        ).map_err(|e| StorageError::Internal(format!("Chapter insert failed: {}", e)))?;
+        )
+        .map_err(|e| StorageError::Internal(format!("Chapter insert failed: {}", e)))?;
 
         // Insert steps for this chapter
         for step in &chapter.steps {
@@ -410,7 +442,8 @@ pub fn create_path(conn: &mut Connection, input: CreatePathInput) -> Result<Path
                     step.estimated_duration,
                     step.metadata_json,
                 ],
-            ).map_err(|e| StorageError::Internal(format!("Step insert failed: {}", e)))?;
+            )
+            .map_err(|e| StorageError::Internal(format!("Step insert failed: {}", e)))?;
         }
     }
 
@@ -422,7 +455,10 @@ pub fn create_path(conn: &mut Connection, input: CreatePathInput) -> Result<Path
 }
 
 /// Bulk create paths (for seeding)
-pub fn bulk_create_paths(conn: &mut Connection, paths: Vec<CreatePathInput>) -> Result<BulkPathResult, StorageError> {
+pub fn bulk_create_paths(
+    conn: &mut Connection,
+    paths: Vec<CreatePathInput>,
+) -> Result<BulkPathResult, StorageError> {
     let mut inserted = 0u64;
     let mut skipped = 0u64;
     let mut errors = vec![];
@@ -430,7 +466,11 @@ pub fn bulk_create_paths(conn: &mut Connection, paths: Vec<CreatePathInput>) -> 
     for path_input in paths {
         // Check if already exists
         let exists: bool = conn
-            .query_row("SELECT 1 FROM paths WHERE id = ?", params![path_input.id], |_| Ok(true))
+            .query_row(
+                "SELECT 1 FROM paths WHERE id = ?",
+                params![path_input.id],
+                |_| Ok(true),
+            )
             .unwrap_or(false);
 
         if exists {
@@ -475,7 +515,7 @@ pub fn get_steps_for_path(conn: &Connection, path_id: &str) -> Result<Vec<StepRo
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![path_id], |row| StepRow::from_row(row))
+        .query_map(params![path_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -490,13 +530,13 @@ pub fn get_chapters(conn: &Connection, path_id: &str) -> Result<Vec<ChapterRow>,
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let chapter_rows = stmt
-        .query_map(params![path_id], |row| ChapterRow::from_row(row))
+        .query_map(params![path_id], ChapterRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
     let mut chapters = vec![];
     for row_result in chapter_rows {
-        let mut chapter = row_result
-            .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
+        let mut chapter =
+            row_result.map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
 
         // Load steps for this chapter
         chapter.steps = get_steps_for_chapter_internal(conn, &chapter.id)?;
@@ -507,13 +547,16 @@ pub fn get_chapters(conn: &Connection, path_id: &str) -> Result<Vec<ChapterRow>,
 }
 
 /// Get steps for a specific chapter (internal helper)
-fn get_steps_for_chapter_internal(conn: &Connection, chapter_id: &str) -> Result<Vec<StepRow>, StorageError> {
+fn get_steps_for_chapter_internal(
+    conn: &Connection,
+    chapter_id: &str,
+) -> Result<Vec<StepRow>, StorageError> {
     let mut stmt = conn
         .prepare("SELECT * FROM steps WHERE chapter_id = ? ORDER BY order_index")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![chapter_id], |row| StepRow::from_row(row))
+        .query_map(params![chapter_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -543,14 +586,15 @@ pub fn create_step(conn: &mut Connection, input: CreateStepInput) -> Result<Step
             input.estimated_duration,
             input.metadata_json,
         ],
-    ).map_err(|e| StorageError::Internal(format!("Insert step failed: {}", e)))?;
+    )
+    .map_err(|e| StorageError::Internal(format!("Insert step failed: {}", e)))?;
 
     // Return the created step
     let mut stmt = conn
         .prepare("SELECT * FROM steps WHERE id = ?")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
-    stmt.query_row(params![input.id], |row| StepRow::from_row(row))
+    stmt.query_row(params![input.id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Step not found after insert: {}", e)))
 }
 
@@ -564,7 +608,11 @@ pub fn delete_step(conn: &mut Connection, id: &str) -> Result<bool, StorageError
 }
 
 /// Create a chapter
-pub fn create_chapter(conn: &mut Connection, path_id: &str, input: CreateChapterInput) -> Result<ChapterRow, StorageError> {
+pub fn create_chapter(
+    conn: &mut Connection,
+    path_id: &str,
+    input: CreateChapterInput,
+) -> Result<ChapterRow, StorageError> {
     conn.execute(
         r#"
         INSERT INTO chapters (id, path_id, title, description, order_index, estimated_duration)
@@ -578,14 +626,15 @@ pub fn create_chapter(conn: &mut Connection, path_id: &str, input: CreateChapter
             input.order_index,
             input.estimated_duration,
         ],
-    ).map_err(|e| StorageError::Internal(format!("Insert chapter failed: {}", e)))?;
+    )
+    .map_err(|e| StorageError::Internal(format!("Insert chapter failed: {}", e)))?;
 
     // Return the created chapter
     let mut stmt = conn
         .prepare("SELECT * FROM chapters WHERE id = ?")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
-    stmt.query_row(params![input.id], |row| ChapterRow::from_row(row))
+    stmt.query_row(params![input.id], ChapterRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Chapter not found after insert: {}", e)))
 }
 

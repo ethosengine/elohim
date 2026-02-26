@@ -6,7 +6,7 @@
 
 | Phase | Weeks | Goal | Status |
 |-------|-------|------|--------|
-| 1. Shard Tracking | 1-2 | Know where shards are | Not Started |
+| 1. Shard Tracking | 1-2 | Know where shards are | Done |
 | 2. Recovery Request Flow | 3-4 | Initiate recovery, collect authorizations | Not Started |
 | 3. Reconstruction Coordinator | 5-6 | Doorway orchestrates reconstruction | Not Started |
 | 4. Work-While-Recovering | 7-8 | Use content before full recovery | Not Started |
@@ -24,37 +24,37 @@ Everything else depends on knowing where shards are. Currently Reed-Solomon shar
 ### Tasks
 
 #### 1.1 Add ShardAssignment to node-registry DNA
-- [ ] Add `ShardAssignment` entry type to `node_registry_integrity/src/lib.rs`
-- [ ] Add validation rules (shard_index 0-6, valid content_hash, valid custodian_did)
-- [ ] Add `ShardStatus` enum: Active, Stale, Failed, Migrating, Reconstructing
-- [ ] Add `ShardingStrategy` enum: Geographic, TrustTier, FamilyCluster, Manual
+- [x] Add `ShardAssignment` entry type to `node_registry_integrity/src/lib.rs`
+- [x] Add validation rules (shard_index 0-6, valid content_hash, valid custodian_did)
+- [x] Add `ShardStatus` enum: Active, Stale, Failed, Migrating, Reconstructing
+- [x] Add `ShardingStrategy` enum: Geographic, TrustTier, FamilyCluster, Manual
 
 #### 1.2 Add link types for shard discovery
-- [ ] `ContentToShardAssignment`: Anchor(content_hash) → ShardAssignment
-- [ ] `CustodianToShardAssignment`: Anchor(custodian_did) → ShardAssignment
-- [ ] `ShardIndexToAssignment`: Anchor(content_hash:shard_index) → ShardAssignment
+- [x] `ContentToShardAssignment`: Anchor(content_hash) → ShardAssignment
+- [x] `CustodianToShardAssignment`: Anchor(custodian_did) → ShardAssignment
+- [x] `ShardIndexToAssignment`: Anchor(content_hash:shard_index) → ShardAssignment
 
 #### 1.3 Add coordinator functions
-- [ ] `create_shard_assignment(input)` - Register a shard assignment
-- [ ] `get_shard_assignments_for_content(content_hash)` - Find all shards for content
-- [ ] `get_shard_assignments_for_custodian(custodian_did)` - Find all shards a custodian holds
-- [ ] `update_shard_status(assignment_hash, new_status)` - Mark shard status
-- [ ] `update_shard_verified_at(assignment_hash)` - Touch verification timestamp
+- [x] `create_shard_assignment(input)` - Register a shard assignment
+- [x] `get_shard_assignments_for_content(content_hash)` - Find all shards for content
+- [x] `get_shard_assignments_for_custodian(custodian_did)` - Find all shards a custodian holds
+- [x] `update_shard_status(assignment_hash, new_status)` - Mark shard status
+- [x] `update_shard_verified_at(assignment_hash)` - Touch verification timestamp
 
 #### 1.4 Wire up elohim-storage
-- [ ] After Reed-Solomon encoding, call node-registry to create ShardAssignments
-- [ ] Include custodian_did (our DID) and shard_index for each shard
-- [ ] Emit signal for projection
+- [x] After Reed-Solomon encoding, call node-registry to create ShardAssignments
+- [x] Include custodian_did (our DID) and shard_index for each shard
+- [x] Emit signal for projection
 
 #### 1.5 Add post-commit signals
-- [ ] `ShardAssignmentCommitted` signal for projection to MongoDB
-- [ ] Include content_hash, shard_index, custodian_did, status
+- [x] `ShardAssignmentCommitted` signal for projection to MongoDB
+- [x] Include content_hash, shard_index, custodian_did, status
 
 ### Definition of Done
-- [ ] Can query "which doorways hold shards for content X"
-- [ ] Can query "which content shards does doorway Y hold"
-- [ ] elohim-storage automatically registers shard assignments
-- [ ] Shefa dashboard can show shard distribution (via projection)
+- [x] Can query "which doorways hold shards for content X"
+- [x] Can query "which content shards does doorway Y hold"
+- [x] elohim-storage automatically registers shard assignments
+- [x] Shefa dashboard can show shard distribution (via projection)
 
 ---
 

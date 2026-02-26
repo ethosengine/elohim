@@ -11,10 +11,9 @@ use uuid::Uuid;
 use super::context::AppContext;
 use super::diesel_schema::stewardship_allocations;
 use super::models::{
-    StewardshipAllocation, NewStewardshipAllocation,
-    StewardshipAllocationWithPresence, ContentStewardship,
-    ContributorPresence, current_timestamp,
-    allocation_methods, contribution_types, governance_states,
+    allocation_methods, contribution_types, current_timestamp, governance_states,
+    ContentStewardship, ContributorPresence, NewStewardshipAllocation, StewardshipAllocation,
+    StewardshipAllocationWithPresence,
 };
 use crate::error::StorageError;
 
@@ -132,7 +131,10 @@ pub fn create_allocation(
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to create allocation: {}", e)))?;
 
-    debug!("Created stewardship allocation {} for content {}", id, input.content_id);
+    debug!(
+        "Created stewardship allocation {} for content {}",
+        id, input.content_id
+    );
 
     get_allocation_by_id(conn, ctx, &id)
 }
@@ -201,11 +203,15 @@ pub fn get_allocations_for_content(
     ctx: &AppContext,
     content_id: &str,
 ) -> Result<Vec<StewardshipAllocation>, StorageError> {
-    list_allocations(conn, ctx, &AllocationQuery {
-        content_id: Some(content_id.to_string()),
-        active_only: Some(true),
-        ..Default::default()
-    })
+    list_allocations(
+        conn,
+        ctx,
+        &AllocationQuery {
+            content_id: Some(content_id.to_string()),
+            active_only: Some(true),
+            ..Default::default()
+        },
+    )
 }
 
 /// Get all allocations for a steward
@@ -214,11 +220,15 @@ pub fn get_allocations_for_steward(
     ctx: &AppContext,
     steward_presence_id: &str,
 ) -> Result<Vec<StewardshipAllocation>, StorageError> {
-    list_allocations(conn, ctx, &AllocationQuery {
-        steward_presence_id: Some(steward_presence_id.to_string()),
-        active_only: Some(true),
-        ..Default::default()
-    })
+    list_allocations(
+        conn,
+        ctx,
+        &AllocationQuery {
+            steward_presence_id: Some(steward_presence_id.to_string()),
+            active_only: Some(true),
+            ..Default::default()
+        },
+    )
 }
 
 /// Get content stewardship aggregate (all allocations with steward presences)
@@ -232,7 +242,8 @@ pub fn get_content_stewardship(
     let allocations = get_allocations_for_content(conn, ctx, content_id)?;
 
     // Get steward presences for all allocations
-    let steward_ids: Vec<&str> = allocations.iter()
+    let steward_ids: Vec<&str> = allocations
+        .iter()
         .map(|a| a.steward_presence_id.as_str())
         .collect();
 
@@ -243,15 +254,17 @@ pub fn get_content_stewardship(
         .map_err(|e| StorageError::Internal(format!("Failed to load presences: {}", e)))?;
 
     // Build lookup map
-    let presence_map: std::collections::HashMap<&str, &ContributorPresence> = presences.iter()
-        .map(|p| (p.id.as_str(), p))
-        .collect();
+    let presence_map: std::collections::HashMap<&str, &ContributorPresence> =
+        presences.iter().map(|p| (p.id.as_str(), p)).collect();
 
     // Build allocations with presences
-    let allocations_with_presences: Vec<StewardshipAllocationWithPresence> = allocations.iter()
+    let allocations_with_presences: Vec<StewardshipAllocationWithPresence> = allocations
+        .iter()
         .map(|a| StewardshipAllocationWithPresence {
             allocation: a.clone(),
-            steward: presence_map.get(a.steward_presence_id.as_str()).map(|p| (*p).clone()),
+            steward: presence_map
+                .get(a.steward_presence_id.as_str())
+                .map(|p| (*p).clone()),
         })
         .collect();
 
@@ -260,7 +273,9 @@ pub fn get_content_stewardship(
 
     // Calculate totals
     let total_allocation: f32 = allocations.iter().map(|a| a.allocation_ratio).sum();
-    let has_disputes = allocations.iter().any(|a| a.governance_state == governance_states::DISPUTED);
+    let has_disputes = allocations
+        .iter()
+        .any(|a| a.governance_state == governance_states::DISPUTED);
 
     Ok(ContentStewardship {
         content_id: content_id.to_string(),
@@ -289,15 +304,41 @@ pub fn update_allocation(
         .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
         .set((
             stewardship_allocations::updated_at.eq(&now),
-            input.allocation_ratio.map(|r| stewardship_allocations::allocation_ratio.eq(r)),
-            input.allocation_method.as_ref().map(|m| stewardship_allocations::allocation_method.eq(m)),
-            input.contribution_type.as_ref().map(|t| stewardship_allocations::contribution_type.eq(t)),
-            input.governance_state.as_ref().map(|s| stewardship_allocations::governance_state.eq(s)),
-            input.dispute_id.as_ref().map(|d| stewardship_allocations::dispute_id.eq(d)),
-            input.dispute_reason.as_ref().map(|r| stewardship_allocations::dispute_reason.eq(r)),
-            input.elohim_ratified_at.as_ref().map(|t| stewardship_allocations::elohim_ratified_at.eq(t)),
-            input.elohim_ratifier_id.as_ref().map(|r| stewardship_allocations::elohim_ratifier_id.eq(r)),
-            input.note.as_ref().map(|n| stewardship_allocations::note.eq(n)),
+            input
+                .allocation_ratio
+                .map(|r| stewardship_allocations::allocation_ratio.eq(r)),
+            input
+                .allocation_method
+                .as_ref()
+                .map(|m| stewardship_allocations::allocation_method.eq(m)),
+            input
+                .contribution_type
+                .as_ref()
+                .map(|t| stewardship_allocations::contribution_type.eq(t)),
+            input
+                .governance_state
+                .as_ref()
+                .map(|s| stewardship_allocations::governance_state.eq(s)),
+            input
+                .dispute_id
+                .as_ref()
+                .map(|d| stewardship_allocations::dispute_id.eq(d)),
+            input
+                .dispute_reason
+                .as_ref()
+                .map(|r| stewardship_allocations::dispute_reason.eq(r)),
+            input
+                .elohim_ratified_at
+                .as_ref()
+                .map(|t| stewardship_allocations::elohim_ratified_at.eq(t)),
+            input
+                .elohim_ratifier_id
+                .as_ref()
+                .map(|r| stewardship_allocations::elohim_ratifier_id.eq(r)),
+            input
+                .note
+                .as_ref()
+                .map(|n| stewardship_allocations::note.eq(n)),
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to update allocation: {}", e)))?;
@@ -342,9 +383,8 @@ pub fn accumulate_recognition(
         .filter(stewardship_allocations::id.eq(id))
         .filter(stewardship_allocations::app_id.eq(ctx.app_id()))
         .set((
-            stewardship_allocations::recognition_accumulated.eq(
-                stewardship_allocations::recognition_accumulated + recognition_amount
-            ),
+            stewardship_allocations::recognition_accumulated
+                .eq(stewardship_allocations::recognition_accumulated + recognition_amount),
             stewardship_allocations::last_recognition_at.eq(&now),
             stewardship_allocations::updated_at.eq(&now),
         ))

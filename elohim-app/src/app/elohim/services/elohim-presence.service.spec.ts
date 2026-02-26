@@ -4,6 +4,12 @@ import { Router } from '@angular/router';
 import { of, timer } from 'rxjs';
 import { map } from 'rxjs/operators';
 
+import { LearnerContextService } from '@app/lamad/services/learner-context.service';
+import {
+  PathRecommendationService,
+  type PathRecommendation,
+} from '@app/lamad/services/path-recommendation.service';
+
 import { BannerService } from './banner.service';
 import { ElohimAgentService } from './elohim-agent.service';
 import { ElohimPresenceService } from './elohim-presence.service';
@@ -15,6 +21,8 @@ describe('ElohimPresenceService', () => {
   let mockAgentService: jasmine.SpyObj<ElohimAgentService>;
   let mockBannerService: jasmine.SpyObj<BannerService>;
   let mockRouter: jasmine.SpyObj<Router>;
+  let mockPathRecommendation: jasmine.SpyObj<PathRecommendationService>;
+  let mockLearnerContext: jasmine.SpyObj<LearnerContextService>;
 
   const buildFulfilledResponse = (
     overrides: Partial<ElohimResponse> = {},
@@ -70,12 +78,27 @@ describe('ElohimPresenceService', () => {
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
     mockRouter.navigate.and.returnValue(Promise.resolve(true));
 
+    mockPathRecommendation = jasmine.createSpyObj('PathRecommendationService', [
+      'getTopRecommendation',
+      'getRecommendations',
+    ]);
+    mockPathRecommendation.getTopRecommendation.and.returnValue(of(null));
+
+    mockLearnerContext = jasmine.createSpyObj('LearnerContextService', [
+      'getDiscoveryProfile',
+      'isMasteryUnlocked',
+      'getAdaptationState',
+    ]);
+    mockLearnerContext.getDiscoveryProfile.and.returnValue(null);
+
     TestBed.configureTestingModule({
       providers: [
         ElohimPresenceService,
         { provide: ElohimAgentService, useValue: mockAgentService },
         { provide: BannerService, useValue: mockBannerService },
         { provide: Router, useValue: mockRouter },
+        { provide: PathRecommendationService, useValue: mockPathRecommendation },
+        { provide: LearnerContextService, useValue: mockLearnerContext },
       ],
     });
 
@@ -166,6 +189,59 @@ describe('ElohimPresenceService', () => {
       tick();
 
       expect(moments.length).toBe(0);
+    }));
+
+    it('should use recommended path when discovery profile exists', fakeAsync(() => {
+      const mockProfile = {
+        byCategory: { values: [{ framework: 'values-hierarchy' }] },
+        featured: [],
+        totalAssessments: 1,
+        topTraits: [],
+      };
+      const mockRec: PathRecommendation = {
+        pathId: 'know-thyself-path',
+        pathTitle: 'Know Thyself: Self-Discovery Journey',
+        relevanceScore: 0.8,
+        matchedCategories: ['values'],
+        reason: 'Matches your values discovery results',
+      };
+
+      mockLearnerContext.getDiscoveryProfile.and.returnValue(mockProfile as never);
+      mockPathRecommendation.getTopRecommendation.and.returnValue(of(mockRec));
+
+      let moments: { metadata?: Record<string, unknown>; message: string }[] = [];
+      service.presence$.subscribe(
+        m => (moments = m as { metadata?: Record<string, unknown>; message: string }[]),
+      );
+
+      service.onDiscoveryCompleted('node-1', 'Values Hierarchy', 'user-1').subscribe();
+      tick();
+
+      expect(moments.length).toBe(1);
+      expect(moments[0].metadata!['recommendedPathId']).toBe('know-thyself-path');
+      expect(moments[0].message).toContain('Know Thyself');
+    }));
+
+    it('should fall back to contentNodeId when no recommendation found', fakeAsync(() => {
+      const mockProfile = {
+        byCategory: { values: [{ framework: 'values-hierarchy' }] },
+        featured: [],
+        totalAssessments: 1,
+        topTraits: [],
+      };
+
+      mockLearnerContext.getDiscoveryProfile.and.returnValue(mockProfile as never);
+      mockPathRecommendation.getTopRecommendation.and.returnValue(of(null));
+
+      let moments: { metadata?: Record<string, unknown> }[] = [];
+      service.presence$.subscribe(
+        m => (moments = m as { metadata?: Record<string, unknown> }[]),
+      );
+
+      service.onDiscoveryCompleted('node-1', 'Test', 'user-1').subscribe();
+      tick();
+
+      expect(moments[0].metadata!['recommendedPathId']).toBe('node-1');
     }));
   });
 
@@ -453,6 +529,37 @@ describe('ElohimPresenceService', () => {
 
       expect(moments[0].metadata).toBeDefined();
       expect(moments[0].metadata!['recommendedPathId']).toBe('node-42');
+    }));
+
+    it('should navigate to recommended path when recommendation exists', fakeAsync(() => {
+      const mockProfile = {
+        byCategory: { values: [{ framework: 'values-hierarchy' }] },
+        featured: [],
+        totalAssessments: 1,
+        topTraits: [],
+      };
+      const mockRec: PathRecommendation = {
+        pathId: 'know-thyself-path',
+        pathTitle: 'Know Thyself',
+        relevanceScore: 0.8,
+        matchedCategories: ['values'],
+        reason: 'Matches your values results',
+      };
+
+      mockLearnerContext.getDiscoveryProfile.and.returnValue(mockProfile as never);
+      mockPathRecommendation.getTopRecommendation.and.returnValue(of(mockRec));
+
+      service.onDiscoveryCompleted('node-1', 'Values Hierarchy', 'user-1').subscribe();
+      tick();
+
+      let notices: { id: string }[] = [];
+      service.notices$.subscribe(n => (notices = n as { id: string }[]));
+      tick();
+
+      const noticeId = notices[0].id;
+      service.handleAction(noticeId, 'view-path');
+
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/lamad/path', 'know-thyself-path']);
     }));
   });
 

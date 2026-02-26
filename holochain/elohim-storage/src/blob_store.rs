@@ -21,16 +21,15 @@
 //! When the `p2p` feature is enabled, blobs can be announced to the Holochain
 //! infrastructure DNA for discovery by other nodes using `store_and_announce()`.
 
-use crate::error::StorageError;
 use crate::content_server::{ContentServerBridge, StorageEndpointInput};
+use crate::error::StorageError;
 use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tokio::fs;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Raw codec for CID (raw bytes, no structure)
 const RAW_CODEC: u64 = 0x55;
@@ -284,13 +283,18 @@ impl BlobStore {
     }
 
     /// Store a large blob as chunks
-    async fn store_chunked(&self, hash: &str, cid: &str, data: &[u8]) -> Result<StoreResult, StorageError> {
+    async fn store_chunked(
+        &self,
+        hash: &str,
+        cid: &str,
+        data: &[u8],
+    ) -> Result<StoreResult, StorageError> {
         let blob_path = self.blob_path(hash);
         let chunk_dir = blob_path.with_extension("d");
 
         fs::create_dir_all(&chunk_dir).await?;
 
-        let chunk_count = (data.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        let chunk_count = data.len().div_ceil(CHUNK_SIZE);
         let mut chunk_hashes = Vec::with_capacity(chunk_count);
 
         for (i, chunk) in data.chunks(CHUNK_SIZE).enumerate() {
@@ -369,7 +373,12 @@ impl BlobStore {
     /// Get a range of bytes by CID or hash
     ///
     /// Accepts CID, sha256-prefixed hash, or raw hex hash.
-    pub async fn get_range_by_address(&self, addr: &str, start: u64, end: u64) -> Result<Vec<u8>, StorageError> {
+    pub async fn get_range_by_address(
+        &self,
+        addr: &str,
+        start: u64,
+        end: u64,
+    ) -> Result<Vec<u8>, StorageError> {
         let hex = Self::parse_content_address(addr)?;
         let hash = format!("sha256-{}", hex);
         self.get_range(&hash, start, end).await
@@ -400,7 +409,7 @@ impl BlobStore {
         let blob_path = self.blob_path(hash);
 
         // Check if file exists
-        if !fs::metadata(&blob_path).await.is_ok() {
+        if fs::metadata(&blob_path).await.is_err() {
             return Err(StorageError::NotFound(hash.to_string()));
         }
 
@@ -444,7 +453,12 @@ impl BlobStore {
     }
 
     /// Get a range of bytes from a blob (for HTTP Range requests)
-    pub async fn get_range(&self, hash: &str, start: u64, end: u64) -> Result<Vec<u8>, StorageError> {
+    pub async fn get_range(
+        &self,
+        hash: &str,
+        start: u64,
+        end: u64,
+    ) -> Result<Vec<u8>, StorageError> {
         let blob_path = self.blob_path(hash);
 
         // Check if chunked - for now, load full blob and slice
@@ -495,7 +509,9 @@ impl BlobStore {
                     if let Ok(mut subentries) = fs::read_dir(entry.path()).await {
                         while let Ok(Some(subentry)) = subentries.next_entry().await {
                             let path = subentry.path();
-                            if !path.to_string_lossy().contains(".chunks") && !path.to_string_lossy().ends_with(".d") {
+                            if !path.to_string_lossy().contains(".chunks")
+                                && !path.to_string_lossy().ends_with(".d")
+                            {
                                 total_blobs += 1;
                                 if let Ok(metadata) = fs::metadata(&path).await {
                                     if metadata.len() == 7 {
@@ -504,7 +520,10 @@ impl BlobStore {
                                             if content == b"CHUNKED" {
                                                 chunked_blobs += 1;
                                                 // Get actual size from chunk index
-                                                if let Some(hash) = path.file_name().map(|f| f.to_string_lossy().to_string()) {
+                                                if let Some(hash) = path
+                                                    .file_name()
+                                                    .map(|f| f.to_string_lossy().to_string())
+                                                {
                                                     if let Ok(size) = self.size(&hash).await {
                                                         total_bytes += size;
                                                         continue;
@@ -644,6 +663,9 @@ mod tests {
         assert!(store.exists_by_address(&result.hash).await.unwrap());
 
         // Check non-existent
-        assert!(!store.exists_by_address("bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").await.unwrap_or(false));
+        assert!(!store
+            .exists_by_address("bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            .await
+            .unwrap_or(false));
     }
 }

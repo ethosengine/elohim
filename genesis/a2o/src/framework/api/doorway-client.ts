@@ -88,6 +88,67 @@ export interface HealthResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Stewardship Allocation types (mirrors StewardshipAllocationView)
+// ---------------------------------------------------------------------------
+
+export interface AllocationView {
+  id: string;
+  contentId: string;
+  stewardPresenceId: string;
+  allocationRatio: number;
+  allocationMethod: string;
+  contributionType: string;
+  governanceState: string;
+  note?: string;
+}
+
+export interface ContentStewardshipView {
+  contentId: string;
+  allocations: AllocationView[];
+  totalAllocation: number;
+  hasDisputes: boolean;
+  primarySteward: AllocationView | null;
+}
+
+// ---------------------------------------------------------------------------
+// Contributor Presence types (mirrors ContributorPresenceView)
+// ---------------------------------------------------------------------------
+
+export interface PresenceView {
+  id: string;
+  displayName: string;
+  presenceState: string;
+  metadata?: Record<string, unknown> | null;
+}
+
+// ---------------------------------------------------------------------------
+// Path types (mirrors PathView / PathWithDetailsView)
+// ---------------------------------------------------------------------------
+
+export interface PathIndexEntry {
+  id: string;
+  title: string;
+  visibility?: string;
+  participantIds?: string[];
+  estimatedDuration?: string;
+  tags?: string[];
+}
+
+export interface ChapterView {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+}
+
+export interface PathWithDetailsView extends PathIndexEntry {
+  description?: string;
+  chapters?: ChapterView[];
+  pathType?: string;
+  difficulty?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
@@ -140,6 +201,40 @@ export class DoorwayClient {
 
   async me(): Promise<MeResponse> {
     return this.get<MeResponse>('/auth/me');
+  }
+
+  // -- Stewardship Allocations -----------------------------------------------
+
+  async listAllocations(): Promise<AllocationView[]> {
+    return this.get<AllocationView[]>('/db/allocations?active_only=true&limit=10000');
+  }
+
+  async getAllocationsForContent(contentId: string): Promise<AllocationView[]> {
+    return this.get<AllocationView[]>(`/db/allocations/content/${encodeURIComponent(contentId)}`);
+  }
+
+  async getAllocationsForSteward(stewardId: string): Promise<AllocationView[]> {
+    return this.get<AllocationView[]>(`/db/allocations/steward/${encodeURIComponent(stewardId)}`);
+  }
+
+  // -- Paths ----------------------------------------------------------------
+
+  async listPaths(): Promise<PathIndexEntry[]> {
+    return this.get<PathIndexEntry[]>('/db/paths');
+  }
+
+  async getPath(id: string): Promise<PathWithDetailsView> {
+    return this.get<PathWithDetailsView>(`/db/paths/${encodeURIComponent(id)}`);
+  }
+
+  // -- Presences ------------------------------------------------------------
+
+  async listPresences(): Promise<PresenceView[]> {
+    return this.get<PresenceView[]>('/db/presences');
+  }
+
+  async getPresence(id: string): Promise<PresenceView> {
+    return this.get<PresenceView>(`/db/presences/${encodeURIComponent(id)}`);
   }
 
   // -- Content CRUD ---------------------------------------------------------

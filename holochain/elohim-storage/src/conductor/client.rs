@@ -217,7 +217,9 @@ impl ConductorClient {
             .as_mut()
             .ok_or_else(|| StorageError::Conductor("No session available".into()))?;
 
-        session.call_zome(dna_hash, agent_pub_key, zome_name, fn_name, payload).await
+        session
+            .call_zome(dna_hash, agent_pub_key, zome_name, fn_name, payload)
+            .await
     }
 
     /// Check if the client currently has a live session.

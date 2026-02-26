@@ -33,16 +33,22 @@ impl PathService {
 
     /// Get path with all chapters and steps
     pub fn get_with_steps(&self, id: &str) -> Result<Option<paths::PathWithSteps>, StorageError> {
-        self.content_db.with_conn(|conn| paths::get_path_with_steps(conn, id))
+        self.content_db
+            .with_conn(|conn| paths::get_path_with_steps(conn, id))
     }
 
     /// List paths with pagination
     pub fn list(&self, limit: u32, offset: u32) -> Result<Vec<paths::PathRow>, StorageError> {
-        self.content_db.with_conn(|conn| paths::list_paths(conn, limit, offset))
+        self.content_db
+            .with_conn(|conn| paths::list_paths(conn, limit, offset))
     }
 
     /// Search paths by tag
-    pub fn search_by_tag(&self, tag: &str, limit: u32) -> Result<Vec<paths::PathRow>, StorageError> {
+    pub fn search_by_tag(
+        &self,
+        tag: &str,
+        limit: u32,
+    ) -> Result<Vec<paths::PathRow>, StorageError> {
         // Use list and filter by tag (could be optimized with a dedicated query)
         let all_paths = self.list(1000, 0)?;
         let filtered: Vec<_> = all_paths
@@ -63,9 +69,9 @@ impl PathService {
         self.validate_path(&input)?;
 
         // Create path
-        let result = self.content_db.with_conn_mut(|conn| {
-            paths::create_path(conn, input.clone())
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| paths::create_path(conn, input.clone()))?;
 
         // Emit event
         self.events.emit(StorageEvent::PathCreated {
@@ -91,9 +97,9 @@ impl PathService {
         let ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
 
         // Perform bulk create
-        let result = self.content_db.with_conn_mut(|conn| {
-            paths::bulk_create_paths(conn, items)
-        })?;
+        let result = self
+            .content_db
+            .with_conn_mut(|conn| paths::bulk_create_paths(conn, items))?;
 
         // Emit event if any items were inserted
         if result.inserted > 0 {
@@ -114,12 +120,13 @@ impl PathService {
             return Ok(false);
         }
 
-        let deleted = self.content_db.with_conn_mut(|conn| {
-            paths::delete_path(conn, id)
-        })?;
+        let deleted = self
+            .content_db
+            .with_conn_mut(|conn| paths::delete_path(conn, id))?;
 
         if deleted {
-            self.events.emit(StorageEvent::PathDeleted { id: id.to_string() });
+            self.events
+                .emit(StorageEvent::PathDeleted { id: id.to_string() });
         }
 
         Ok(deleted)
@@ -131,23 +138,25 @@ impl PathService {
 
     /// Get steps for a path
     pub fn get_steps(&self, path_id: &str) -> Result<Vec<paths::StepRow>, StorageError> {
-        self.content_db.with_conn(|conn| paths::get_steps_for_path(conn, path_id))
+        self.content_db
+            .with_conn(|conn| paths::get_steps_for_path(conn, path_id))
     }
 
     /// Create a step
-    pub fn create_step(&self, input: paths::CreateStepInput) -> Result<paths::StepRow, StorageError> {
+    pub fn create_step(
+        &self,
+        input: paths::CreateStepInput,
+    ) -> Result<paths::StepRow, StorageError> {
         self.validate_step(&input)?;
 
-        self.content_db.with_conn_mut(|conn| {
-            paths::create_step(conn, input)
-        })
+        self.content_db
+            .with_conn_mut(|conn| paths::create_step(conn, input))
     }
 
     /// Delete a step
     pub fn delete_step(&self, step_id: &str) -> Result<bool, StorageError> {
-        self.content_db.with_conn_mut(|conn| {
-            paths::delete_step(conn, step_id)
-        })
+        self.content_db
+            .with_conn_mut(|conn| paths::delete_step(conn, step_id))
     }
 
     // =========================================================================
@@ -156,23 +165,26 @@ impl PathService {
 
     /// Get chapters for a path
     pub fn get_chapters(&self, path_id: &str) -> Result<Vec<paths::ChapterRow>, StorageError> {
-        self.content_db.with_conn(|conn| paths::get_chapters(conn, path_id))
+        self.content_db
+            .with_conn(|conn| paths::get_chapters(conn, path_id))
     }
 
     /// Create a chapter
-    pub fn create_chapter(&self, input: paths::CreateChapterInput, path_id: &str) -> Result<paths::ChapterRow, StorageError> {
+    pub fn create_chapter(
+        &self,
+        input: paths::CreateChapterInput,
+        path_id: &str,
+    ) -> Result<paths::ChapterRow, StorageError> {
         self.validate_chapter(&input)?;
 
-        self.content_db.with_conn_mut(|conn| {
-            paths::create_chapter(conn, path_id, input)
-        })
+        self.content_db
+            .with_conn_mut(|conn| paths::create_chapter(conn, path_id, input))
     }
 
     /// Delete a chapter (cascades to steps)
     pub fn delete_chapter(&self, chapter_id: &str) -> Result<bool, StorageError> {
-        self.content_db.with_conn_mut(|conn| {
-            paths::delete_chapter(conn, chapter_id)
-        })
+        self.content_db
+            .with_conn_mut(|conn| paths::delete_chapter(conn, chapter_id))
     }
 
     // =========================================================================
@@ -186,7 +198,9 @@ impl PathService {
         }
 
         if input.id.len() > 255 {
-            return Err(StorageError::InvalidInput("id must be <= 255 characters".into()));
+            return Err(StorageError::InvalidInput(
+                "id must be <= 255 characters".into(),
+            ));
         }
 
         if input.title.is_empty() {
@@ -194,11 +208,20 @@ impl PathService {
         }
 
         if input.title.len() > 500 {
-            return Err(StorageError::InvalidInput("title must be <= 500 characters".into()));
+            return Err(StorageError::InvalidInput(
+                "title must be <= 500 characters".into(),
+            ));
         }
 
         // Validate path_type
-        let valid_types = ["guided", "self-paced", "challenge", "assessment", "exploration", "certification"];
+        let valid_types = [
+            "guided",
+            "self-paced",
+            "challenge",
+            "assessment",
+            "exploration",
+            "certification",
+        ];
         if !valid_types.contains(&input.path_type.as_str()) {
             return Err(StorageError::InvalidInput(format!(
                 "path_type '{}' is not valid. Valid types: {:?}",
@@ -239,7 +262,8 @@ impl PathService {
         for (i, chapter) in input.chapters.iter().enumerate() {
             if let Err(e) = self.validate_chapter(chapter) {
                 return Err(StorageError::InvalidInput(format!(
-                    "chapters[{}]: {}", i, e
+                    "chapters[{}]: {}",
+                    i, e
                 )));
             }
         }
@@ -254,15 +278,15 @@ impl PathService {
         }
 
         if input.title.is_empty() {
-            return Err(StorageError::InvalidInput("chapter title is required".into()));
+            return Err(StorageError::InvalidInput(
+                "chapter title is required".into(),
+            ));
         }
 
         // Validate steps
         for (i, step) in input.steps.iter().enumerate() {
             if let Err(e) = self.validate_step(step) {
-                return Err(StorageError::InvalidInput(format!(
-                    "steps[{}]: {}", i, e
-                )));
+                return Err(StorageError::InvalidInput(format!("steps[{}]: {}", i, e)));
             }
         }
 
@@ -276,7 +300,9 @@ impl PathService {
         }
 
         if input.path_id.is_empty() {
-            return Err(StorageError::InvalidInput("step path_id is required".into()));
+            return Err(StorageError::InvalidInput(
+                "step path_id is required".into(),
+            ));
         }
 
         if input.title.is_empty() {
@@ -285,8 +311,16 @@ impl PathService {
 
         // Validate step_type
         let valid_types = [
-            "learn", "practice", "quiz", "assessment", "discussion",
-            "project", "resource", "video", "reading", "checkpoint",
+            "learn",
+            "practice",
+            "quiz",
+            "assessment",
+            "discussion",
+            "project",
+            "resource",
+            "video",
+            "reading",
+            "checkpoint",
         ];
         if !valid_types.contains(&input.step_type.as_str()) {
             return Err(StorageError::InvalidInput(format!(

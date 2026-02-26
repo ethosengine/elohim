@@ -39,31 +39,32 @@ mod getrandom_custom;
 
 // Core modules (always available)
 pub mod blob_store;
-pub mod db;  // SQLite content/path storage
-pub mod metadata;
+pub mod conductor; // Custom conductor connection (unsigned - deprecated)
+pub mod conductor_client; // Legacy: kept for backward compatibility during migration
 pub mod config;
-pub mod signals;
+pub mod db; // SQLite content/path storage
 pub mod error;
-pub mod sharding;
+pub mod hc_client;
 pub mod http;
 pub mod import_handler;
-pub mod conductor;              // Custom conductor connection (unsigned - deprecated)
-pub mod conductor_client;       // Legacy: kept for backward compatibility during migration
-pub mod hc_client;              // Official holochain_client wrapper with signing support
-pub use hc_client::{HcClient, HcClientConfig, ConductorHealth, StorageHealth, NetworkHealth};
-pub mod import_api;
-pub mod progress_hub;
-pub mod progress_ws;
+pub mod metadata;
+pub mod sharding;
+pub mod signals; // Official holochain_client wrapper with signing support
+pub use hc_client::{ConductorHealth, HcClient, HcClientConfig, NetworkHealth, StorageHealth};
 pub mod cell_discovery;
 pub mod debug_stream;
+pub mod import_api;
+pub mod node_registry_api;
+pub mod progress_hub;
+pub mod progress_ws;
 pub mod services;
 
 // View types for HTTP API responses (camelCase serialization for TypeScript)
 pub mod views;
 
 // P2P identity and discovery (always available, but some types require p2p feature)
-pub mod identity;
 pub mod content_server;
+pub mod identity;
 
 // P2P network modules (require p2p feature)
 #[cfg(feature = "p2p")]
@@ -73,24 +74,25 @@ pub mod p2p;
 pub mod sync;
 
 // Sovereignty and cluster modules
-pub mod sovereignty;
 #[cfg(feature = "p2p")]
 pub mod cluster;
+pub mod sovereignty;
 
 // Re-exports
 pub use blob_store::BlobStore;
-pub use metadata::MetadataDb;
 pub use config::Config;
+pub use debug_stream::{DebugBroadcaster, DebugEvent};
 pub use error::StorageError;
-pub use sharding::{ShardEncoder, ShardManifest, ShardConfig};
 pub use http::HttpServer;
 pub use import_handler::{ImportHandler, ImportHandlerConfig, ImportProgress};
+pub use metadata::MetadataDb;
+pub use node_registry_api::{NodeRegistryApi, ShardAssignment, ShardStatus, ShardingStrategy};
 pub use progress_hub::{ProgressHub, ProgressHubConfig, ProgressMessage};
-pub use debug_stream::{DebugBroadcaster, DebugEvent};
+pub use sharding::{ShardConfig, ShardEncoder, ShardManifest};
 
 // P2P re-exports
-pub use identity::{NodeCapabilities, NodeIdentityInfo};
 pub use content_server::{ContentServerBridge, ContentServerConfig, PublisherInfo};
+pub use identity::{NodeCapabilities, NodeIdentityInfo};
 
 #[cfg(feature = "p2p")]
 pub use identity::NodeIdentity;
@@ -98,19 +100,21 @@ pub use identity::NodeIdentity;
 pub use p2p::{P2PConfig, P2PHandle, P2PNode, P2PStatusInfo, RelayMode};
 
 // Sync re-exports
-pub use sync::{DocStore, DocStoreConfig, StoredDocument, StreamPosition, StreamTracker, SyncManager};
+pub use sync::{
+    DocStore, DocStoreConfig, StoredDocument, StreamPosition, StreamTracker, SyncManager,
+};
 
 // SQLite re-exports
-pub use db::{ContentDb, DbStats, ContentRow, PathRow, StepRow};
+pub use db::{ContentDb, ContentRow, DbStats, PathRow, StepRow};
 
 // Policy cache re-exports
 pub use db::policy_cache::{
-    PolicyCache, PolicyEnforcement, CachedPolicy, PolicyDecision, TimeAccessDecision,
-    ContentMetadata, PolicyEvent, PolicyEventType, TimeWindow,
+    CachedPolicy, ContentMetadata, PolicyCache, PolicyDecision, PolicyEnforcement, PolicyEvent,
+    PolicyEventType, TimeAccessDecision, TimeWindow,
 };
 
 // Service re-exports
 pub use services::{
-    Services, ContentService, PathService, RelationshipService, KnowledgeService,
-    EventBus, StorageEvent,
+    ContentService, EventBus, KnowledgeService, PathService, RelationshipService, Services,
+    StorageEvent,
 };
