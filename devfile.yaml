@@ -160,6 +160,9 @@ commands:
         ln -sf "$CLAUDE_CONFIG_DIR" /home/user/.claude
         mkdir -p /home/user/.claude/ide
 
+        # Install/update Claude Code via native installer (always gets latest version)
+        curl -fsSL https://claude.ai/install.sh | bash
+
   - id: setup-claude-mcp
     exec:
       component: tools
@@ -216,8 +219,8 @@ commands:
       commandLine: |
         npm install && npm run seed
 
-#events:
-#  postStart:
-#    - setup-vscode-cli
+events:
+  postStart:
+    - setup-vscode-cli
 #    - setup-npm-env
 #    - setup-claude-mcp
