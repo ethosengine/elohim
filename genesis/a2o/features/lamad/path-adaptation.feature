@@ -73,14 +73,14 @@ Feature: Adaptive Path Progression
   # Layer 3: Discovery-Informed Recommendations
   # ═══════════════════════════════════════════════════════════════════════════
 
-  @discovery @recommendation @wip
+  @discovery @recommendation
   Scenario: Elohim recommends a path after discovery completion
     Given Matthew has completed the "Values Hierarchy" discovery assessment
     When the elohim presence processes the discovery completion
     Then a banner insight should appear with a path recommendation
     And the "View Recommended Path" action should be available
 
-  @discovery @navigation @wip
+  @discovery @navigation
   Scenario: Clicking "View Recommended Path" navigates to the path
     Given Matthew sees an elohim insight with a "View Recommended Path" action
     And the recommended path is "know-thyself"

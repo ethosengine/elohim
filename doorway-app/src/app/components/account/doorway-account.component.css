@@ -1,0 +1,350 @@
+.account-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--dw-text-primary);
+}
+
+.page-header .back-link {
+  color: var(--dw-accent-primary);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.page-header .back-link:hover {
+  text-decoration: underline;
+}
+
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4rem 2rem;
+  color: var(--dw-text-secondary);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--dw-spinner-track);
+  border-top-color: var(--dw-spinner-active);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
+  border-radius: 0.375rem;
+  color: var(--dw-text-primary);
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.card {
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.card h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+  color: var(--dw-text-primary);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: var(--dw-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-value {
+  font-size: 0.875rem;
+  color: var(--dw-text-primary);
+  font-weight: 500;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  width: fit-content;
+  background: var(--dw-error-bg);
+  color: var(--dw-error);
+}
+
+.status-badge.active {
+  background: var(--dw-success-bg);
+  color: var(--dw-success);
+}
+
+.region-tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  background: var(--dw-info-bg);
+  color: var(--dw-info-text);
+  font-size: 0.75rem;
+}
+
+.context-banner {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--dw-info-bg);
+  border: 1px solid var(--dw-info);
+  border-radius: 0.75rem;
+}
+
+.context-banner .banner-icon {
+  font-size: 1.25rem;
+  color: var(--dw-info);
+  flex-shrink: 0;
+}
+
+.context-banner .banner-text strong {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--dw-info-text);
+  margin-bottom: 0.25rem;
+}
+
+.context-banner .banner-text p {
+  font-size: 0.8125rem;
+  color: var(--dw-info-text);
+  margin: 0;
+  opacity: 0.8;
+}
+
+.gauge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.gauge-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.gauge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.gauge-label {
+  font-size: 0.875rem;
+  color: var(--dw-text-secondary);
+}
+
+.gauge-value {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.gauge-bar {
+  height: 8px;
+  background: var(--dw-gauge-track);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gauge-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.gauge-detail {
+  font-size: 0.75rem;
+  color: var(--dw-text-secondary);
+}
+
+.pipeline-section .pipeline-subtitle {
+  font-size: 0.875rem;
+  color: var(--dw-text-secondary);
+  margin: -0.5rem 0 1.5rem;
+}
+
+.pipeline-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  position: relative;
+  padding-bottom: 1.5rem;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+.step-marker {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  background: var(--dw-gauge-track);
+  color: var(--dw-text-secondary);
+  position: relative;
+  z-index: 1;
+}
+
+.completed .step-marker {
+  background: var(--dw-success);
+  color: white;
+}
+
+.current .step-marker {
+  background: var(--dw-accent-primary);
+  color: white;
+}
+
+.check {
+  font-size: 0.875rem;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.25rem;
+}
+
+.step-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--dw-text-primary);
+}
+
+.step-desc {
+  font-size: 0.75rem;
+  color: var(--dw-text-secondary);
+}
+
+.step-connector {
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  width: 2px;
+  height: calc(100% - 32px);
+  background: var(--dw-gauge-track);
+}
+
+.step-connector.completed {
+  background: var(--dw-success);
+}
+
+.graduation-cta {
+  background: var(--dw-bg-tertiary);
+}
+
+.graduation-cta p {
+  font-size: 0.875rem;
+  color: var(--dw-text-secondary);
+  margin: 0 0 1rem;
+}
+
+.graduation-cta h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--dw-text-primary);
+}
+
+.graduation-cta ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.graduation-cta li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0;
+  font-size: 0.875rem;
+  color: var(--dw-text-secondary);
+}
+
+.graduation-cta li.met {
+  color: var(--dw-text-primary);
+}
+
+.graduation-cta .req-check {
+  font-size: 0.875rem;
+  width: 1.25rem;
+  text-align: center;
+}
+
+.met .req-check {
+  color: var(--dw-success);
+}
+
+.profile-link-section {
+  text-align: center;
+  padding: 1rem 0 2rem;
+}
+
+.profile-link {
+  color: var(--dw-accent-primary);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.profile-link:hover {
+  text-decoration: underline;
+}

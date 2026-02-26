@@ -1,1 +1,371 @@
-/* You can add global styles to this file, and also import other style files */
+/* Doorway-App Global Styles & Design Tokens */
+
+/* ============================================================================
+   Reset
+   ============================================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================================
+   Design Tokens — Dark Mode Default
+   ============================================================================
+   The --dw-* namespace keeps doorway tokens separate from elohim-app's
+   --lamad-* tokens. Dark mode is the default to match the existing doorway
+   visual and avoid regression.
+   ============================================================================ */
+
+:root {
+  /* Backgrounds */
+  --dw-bg-primary: #0f172a;
+  --dw-bg-secondary: #1e293b;
+  --dw-bg-tertiary: #334155;
+  --dw-bg-surface: #1f2937;
+  --dw-bg-input: #0f172a;
+  --dw-bg-hover: #374151;
+
+  /* Text */
+  --dw-text-primary: #f9fafb;
+  --dw-text-secondary: #9ca3af;
+  --dw-text-tertiary: rgba(255, 255, 255, 0.5);
+  --dw-text-muted: rgba(255, 255, 255, 0.35);
+  --dw-text-inverse: #111827;
+
+  /* Borders */
+  --dw-border: #374151;
+  --dw-border-subtle: rgba(255, 255, 255, 0.1);
+  --dw-border-input: rgba(255, 255, 255, 0.15);
+
+  /* Accent / Interactive */
+  --dw-accent-primary: #6366f1;
+  --dw-accent-hover: #4f46e5;
+  --dw-accent-subtle: rgba(99, 102, 241, 0.1);
+  --dw-accent-border: rgba(99, 102, 241, 0.3);
+  --dw-accent-text: #818cf8;
+
+  /* Semantic */
+  --dw-success: #10b981;
+  --dw-success-bg: rgba(16, 185, 129, 0.1);
+  --dw-success-text: #6ee7b7;
+  --dw-warning: #f59e0b;
+  --dw-warning-bg: rgba(245, 158, 11, 0.1);
+  --dw-warning-text: #fcd34d;
+  --dw-error: #ef4444;
+  --dw-error-bg: rgba(239, 68, 68, 0.1);
+  --dw-error-text: #fca5a5;
+  --dw-info: #3b82f6;
+  --dw-info-bg: rgba(59, 130, 246, 0.1);
+  --dw-info-text: #93c5fd;
+
+  /* Full-page gradients (auth screens, landing) */
+  --dw-gradient-start: #0f172a;
+  --dw-gradient-end: #1e293b;
+
+  /* Shadows */
+  --dw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --dw-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --dw-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+
+  /* Spinner / Gauge */
+  --dw-spinner-track: rgba(255, 255, 255, 0.1);
+  --dw-spinner-active: #6366f1;
+  --dw-gauge-track: #374151;
+}
+
+/* ============================================================================
+   Light Theme — System Preference Override
+   ============================================================================ */
+
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Backgrounds */
+    --dw-bg-primary: #ffffff;
+    --dw-bg-secondary: #f8fafc;
+    --dw-bg-tertiary: #f1f5f9;
+    --dw-bg-surface: #ffffff;
+    --dw-bg-input: #ffffff;
+    --dw-bg-hover: #f3f4f6;
+
+    /* Text */
+    --dw-text-primary: #111827;
+    --dw-text-secondary: #6b7280;
+    --dw-text-tertiary: #9ca3af;
+    --dw-text-muted: #d1d5db;
+    --dw-text-inverse: #f9fafb;
+
+    /* Borders */
+    --dw-border: #e5e7eb;
+    --dw-border-subtle: rgba(0, 0, 0, 0.1);
+    --dw-border-input: #d1d5db;
+
+    /* Accent / Interactive */
+    --dw-accent-primary: #4f46e5;
+    --dw-accent-hover: #4338ca;
+    --dw-accent-subtle: rgba(79, 70, 229, 0.08);
+    --dw-accent-border: rgba(79, 70, 229, 0.25);
+    --dw-accent-text: #4f46e5;
+
+    /* Semantic */
+    --dw-success: #059669;
+    --dw-success-bg: #ecfdf5;
+    --dw-success-text: #065f46;
+    --dw-warning: #d97706;
+    --dw-warning-bg: #fffbeb;
+    --dw-warning-text: #92400e;
+    --dw-error: #dc2626;
+    --dw-error-bg: #fef2f2;
+    --dw-error-text: #991b1b;
+    --dw-info: #2563eb;
+    --dw-info-bg: #eff6ff;
+    --dw-info-text: #1e40af;
+
+    /* Full-page gradients */
+    --dw-gradient-start: #f8fafc;
+    --dw-gradient-end: #ffffff;
+
+    /* Shadows */
+    --dw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --dw-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+    --dw-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
+
+    /* Spinner / Gauge */
+    --dw-spinner-track: #e5e7eb;
+    --dw-spinner-active: #4f46e5;
+    --dw-gauge-track: #e5e7eb;
+  }
+}
+
+/* ============================================================================
+   Manual Theme Overrides — Take Precedence Over Media Queries
+   ============================================================================ */
+
+body[data-theme='light'] {
+  --dw-bg-primary: #ffffff;
+  --dw-bg-secondary: #f8fafc;
+  --dw-bg-tertiary: #f1f5f9;
+  --dw-bg-surface: #ffffff;
+  --dw-bg-input: #ffffff;
+  --dw-bg-hover: #f3f4f6;
+  --dw-text-primary: #111827;
+  --dw-text-secondary: #6b7280;
+  --dw-text-tertiary: #9ca3af;
+  --dw-text-muted: #d1d5db;
+  --dw-text-inverse: #f9fafb;
+  --dw-border: #e5e7eb;
+  --dw-border-subtle: rgba(0, 0, 0, 0.1);
+  --dw-border-input: #d1d5db;
+  --dw-accent-primary: #4f46e5;
+  --dw-accent-hover: #4338ca;
+  --dw-accent-subtle: rgba(79, 70, 229, 0.08);
+  --dw-accent-border: rgba(79, 70, 229, 0.25);
+  --dw-accent-text: #4f46e5;
+  --dw-success: #059669;
+  --dw-success-bg: #ecfdf5;
+  --dw-success-text: #065f46;
+  --dw-warning: #d97706;
+  --dw-warning-bg: #fffbeb;
+  --dw-warning-text: #92400e;
+  --dw-error: #dc2626;
+  --dw-error-bg: #fef2f2;
+  --dw-error-text: #991b1b;
+  --dw-info: #2563eb;
+  --dw-info-bg: #eff6ff;
+  --dw-info-text: #1e40af;
+  --dw-gradient-start: #f8fafc;
+  --dw-gradient-end: #ffffff;
+  --dw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --dw-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --dw-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
+  --dw-spinner-track: #e5e7eb;
+  --dw-spinner-active: #4f46e5;
+  --dw-gauge-track: #e5e7eb;
+}
+
+body[data-theme='dark'] {
+  --dw-bg-primary: #0f172a;
+  --dw-bg-secondary: #1e293b;
+  --dw-bg-tertiary: #334155;
+  --dw-bg-surface: #1f2937;
+  --dw-bg-input: #0f172a;
+  --dw-bg-hover: #374151;
+  --dw-text-primary: #f9fafb;
+  --dw-text-secondary: #9ca3af;
+  --dw-text-tertiary: rgba(255, 255, 255, 0.5);
+  --dw-text-muted: rgba(255, 255, 255, 0.35);
+  --dw-text-inverse: #111827;
+  --dw-border: #374151;
+  --dw-border-subtle: rgba(255, 255, 255, 0.1);
+  --dw-border-input: rgba(255, 255, 255, 0.15);
+  --dw-accent-primary: #6366f1;
+  --dw-accent-hover: #4f46e5;
+  --dw-accent-subtle: rgba(99, 102, 241, 0.1);
+  --dw-accent-border: rgba(99, 102, 241, 0.3);
+  --dw-accent-text: #818cf8;
+  --dw-success: #10b981;
+  --dw-success-bg: rgba(16, 185, 129, 0.1);
+  --dw-success-text: #6ee7b7;
+  --dw-warning: #f59e0b;
+  --dw-warning-bg: rgba(245, 158, 11, 0.1);
+  --dw-warning-text: #fcd34d;
+  --dw-error: #ef4444;
+  --dw-error-bg: rgba(239, 68, 68, 0.1);
+  --dw-error-text: #fca5a5;
+  --dw-info: #3b82f6;
+  --dw-info-bg: rgba(59, 130, 246, 0.1);
+  --dw-info-text: #93c5fd;
+  --dw-gradient-start: #0f172a;
+  --dw-gradient-end: #1e293b;
+  --dw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --dw-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --dw-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --dw-spinner-track: rgba(255, 255, 255, 0.1);
+  --dw-spinner-active: #6366f1;
+  --dw-gauge-track: #374151;
+}
+
+/* ============================================================================
+   Body Base Styles
+   ============================================================================ */
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--dw-bg-primary);
+  color: var(--dw-text-primary);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ============================================================================
+   Accessibility: Focus Visibility
+   ============================================================================
+   Visible focus indicators for keyboard navigation, hidden for mouse users.
+   WCAG 2.1 compliance.
+   ============================================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--dw-accent-primary);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ============================================================================
+   Accessibility: Skip Navigation Link
+   ============================================================================ */
+
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 10000;
+}
+
+.skip-link:focus {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  width: auto;
+  height: auto;
+  padding: 0.75rem 1.5rem;
+  background: var(--dw-accent-primary);
+  color: white;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================================================
+   Accessibility: Screen Reader Only
+   ============================================================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================================================
+   Accessibility: Touch Targets
+   ============================================================================
+   WCAG 2.2 recommends minimum 44x44px tap targets.
+   ============================================================================ */
+
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.touch-target-lg {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+.touch-target-inline {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (pointer: coarse) {
+  button:not([class*='touch']),
+  [role='button']:not([class*='touch']) {
+    min-height: 44px;
+  }
+}
+
+/* ============================================================================
+   Accessibility: Reduced Motion
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   Custom Scrollbar
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dw-border-subtle);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dw-accent-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dw-accent-hover);
+}

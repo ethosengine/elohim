@@ -1,0 +1,110 @@
+.graduation-tab {
+  padding: 1rem 0;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem;
+  color: var(--dw-text-secondary);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--dw-spinner-track);
+  border-top-color: var(--dw-info);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.graduation-section {
+  margin-bottom: 2rem;
+}
+
+.graduation-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--dw-text-primary);
+  margin: 0 0 1rem;
+}
+
+.graduation-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.graduation-table th,
+.graduation-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--dw-border);
+}
+
+.graduation-table th {
+  background: var(--dw-bg-tertiary);
+  font-weight: 500;
+  color: var(--dw-text-secondary);
+}
+
+.graduation-table tbody tr:hover {
+  background: var(--dw-bg-hover);
+}
+
+.graduation-table .identifier {
+  font-weight: 500;
+}
+
+.graduation-table .date {
+  color: var(--dw-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.bool-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--dw-error-bg);
+  color: var(--dw-error);
+}
+
+.bool-badge.yes {
+  background: var(--dw-success-bg);
+  color: var(--dw-success);
+}
+
+.btn-graduate {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--dw-accent-primary);
+  border-radius: 0.375rem;
+  background: var(--dw-bg-surface);
+  color: var(--dw-accent-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-graduate:hover:not(:disabled) {
+  background: var(--dw-accent-subtle);
+}
+
+.btn-graduate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--dw-text-secondary);
+}
