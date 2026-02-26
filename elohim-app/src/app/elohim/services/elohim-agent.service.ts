@@ -4,7 +4,7 @@ import { Injectable } from '@angular/core';
 
 import { map, switchMap } from 'rxjs/operators';
 
-import { Observable, of, timer } from 'rxjs';
+import { Observable, from, of } from 'rxjs';
 
 import {
   ElohimAgent,
@@ -14,42 +14,38 @@ import {
   ElohimResponse,
   ElohimIndexEntry,
   ElohimSelectionCriteria,
-  ConstitutionalReasoning,
-  ContentReviewParams,
-  ContentReviewResult,
-  AttestationRecommendationParams,
-  AttestationRecommendation,
 } from '../models/elohim-agent.model';
 
 import { DataLoaderService } from './data-loader.service';
+import { ElohimBackendCatalog, MockBackend } from './elohim-backend';
 
 /**
  * ElohimAgentService - Interface to autonomous constitutional guardians.
  *
  * This service provides the protocol for invoking Elohim agents.
- * In production, these calls go to actual AI agents running on edge nodes.
- * For prototype, we simulate the invocation patterns and response structures.
+ * Invocations are dispatched to a pluggable backend (mock, Anthropic, native).
+ * The ElohimBackendCatalog selects the best available backend with fallback.
  *
  * Key principles:
  * - Elohim are invoked, not commanded
  * - Every response includes constitutional reasoning
  * - Elohim can decline requests that violate their principles
  * - Layer-appropriate Elohim are selected automatically when requested
- *
- * Usage patterns:
- * 1. Content attestation: Request content review → Get recommendation
- * 2. Knowledge maps: Request map synthesis → Get updated map
- * 3. Spiral detection: Request monitoring → Get intervention suggestions
- * 4. Path analysis: Request analysis → Get improvement suggestions
  */
-const CAPABILITY_ATTESTATION_RECOMMENDATION = 'attestation-recommendation';
-
 @Injectable({ providedIn: 'root' })
 export class ElohimAgentService {
   private readonly elohimCache = new Map<string, ElohimAgent>();
   private requestLog: ElohimRequest[] = [];
 
-  constructor(private readonly dataLoader: DataLoaderService) {}
+  constructor(
+    private readonly dataLoader: DataLoaderService,
+    private readonly catalog: ElohimBackendCatalog
+  ) {
+    // Register MockBackend as default fallback.
+    // NativeBackend is registered lazily by ElohimConfigComponent
+    // when native backend is selected, to avoid network calls at init time.
+    this.catalog.register(new MockBackend());
+  }
 
   // =========================================================================
   // Elohim Discovery
@@ -144,8 +140,7 @@ export class ElohimAgentService {
    * Invoke an Elohim with a request.
    *
    * This is the core method for interacting with Elohim agents.
-   * The Elohim will process the request according to its constitutional binding
-   * and return a response with full reasoning.
+   * The request is dispatched to the best available backend via the catalog.
    */
   invoke(request: ElohimRequest): Observable<ElohimResponse> {
     // Log the request
@@ -180,10 +175,10 @@ export class ElohimAgentService {
           );
         }
 
-        // Simulate processing time based on capability
-        const processingTime = this.estimateProcessingTime(request.capability);
-
-        return timer(processingTime).pipe(map(() => this.processRequest(request, elohim)));
+        // Dispatch to backend
+        return from(this.catalog.selectBackend()).pipe(
+          switchMap(backend => backend.invoke(request, elohim))
+        );
       })
     );
   }
@@ -205,7 +200,7 @@ export class ElohimAgentService {
         type: 'content-review',
         contentId,
         reviewType,
-      } as ContentReviewParams,
+      },
       requesterId,
       priority: 'normal',
       requestedAt: new Date().toISOString(),
@@ -227,158 +222,19 @@ export class ElohimAgentService {
     const request: ElohimRequest = {
       requestId: this.generateRequestId(),
       targetElohimId: 'auto',
-      capability: CAPABILITY_ATTESTATION_RECOMMENDATION,
+      capability: 'attestation-recommendation',
       params: {
-        type: CAPABILITY_ATTESTATION_RECOMMENDATION,
+        type: 'attestation-recommendation',
         contentId,
         requestedAttestationType: attestationType,
         evidence,
-      } as AttestationRecommendationParams,
+      },
       requesterId,
       priority: 'normal',
       requestedAt: new Date().toISOString(),
     };
 
     return this.invoke(request);
-  }
-
-  // =========================================================================
-  // Request Processing (Prototype Simulation)
-  // =========================================================================
-
-  /**
-   * Process a request and generate a response.
-   * In production, this calls the actual Elohim AI agent.
-   * For prototype, we simulate responses that demonstrate the patterns.
-   */
-  private processRequest(request: ElohimRequest, elohim: ElohimAgent): ElohimResponse {
-    const baseResponse = {
-      requestId: request.requestId,
-      elohimId: elohim.id,
-      respondedAt: new Date().toISOString(),
-      cost: {
-        tokensProcessed:
-          Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 1000) + 500, // Demo data generation
-        timeMs: this.estimateProcessingTime(request.capability),
-        constitutionalChecks:
-          Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 5) + 1, // Demo data generation
-        precedentLookups: Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 3), // Demo data generation
-      },
-    };
-
-    // Route to capability-specific handlers
-    switch (request.capability) {
-      case 'content-safety-review':
-        return this.handleContentReview(request, elohim, baseResponse);
-
-      case CAPABILITY_ATTESTATION_RECOMMENDATION:
-        return this.handleAttestationRecommendation(request, elohim, baseResponse);
-
-      default:
-        return {
-          ...baseResponse,
-          status: 'fulfilled',
-          constitutionalReasoning: this.generateDefaultReasoning(request.capability),
-          payload: undefined,
-        };
-    }
-  }
-
-  private handleContentReview(
-    request: ElohimRequest,
-    elohim: ElohimAgent,
-    baseResponse: Partial<ElohimResponse>
-  ): ElohimResponse {
-    const params = request.params as ContentReviewParams;
-
-    // Simulate content review (in production: actual AI analysis)
-    const approved = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 > 0.1; // Demo data generation (90% approval for demo)
-    const issues = approved
-      ? []
-      : [
-          {
-            severity: 'warning' as const,
-            category: 'clarity',
-            description: 'Content could benefit from additional examples',
-            suggestion: 'Consider adding concrete use cases',
-          },
-        ];
-
-    const payload: ContentReviewResult = {
-      type: 'content-review',
-      contentId: params.contentId,
-      approved,
-      issues,
-      trustScoreImpact: approved ? 0.1 : -0.05,
-    };
-
-    return {
-      ...baseResponse,
-      status: 'fulfilled',
-      constitutionalReasoning: {
-        primaryPrinciple: 'Love as committed action toward flourishing',
-        interpretation:
-          'Content review ensures learners receive accurate, safe information that supports their growth',
-        valuesWeighed: [
-          { value: 'Learner safety', weight: 0.4, direction: 'for' },
-          { value: 'Knowledge access', weight: 0.3, direction: 'for' },
-          { value: 'Author dignity', weight: 0.2, direction: 'for' },
-          { value: 'Community trust', weight: 0.1, direction: 'for' },
-        ],
-        confidence: 0.85,
-        precedents: ['content-review-2025-001', 'safety-standard-v1.2'],
-      },
-      payload,
-    } as ElohimResponse;
-  }
-
-  private handleAttestationRecommendation(
-    request: ElohimRequest,
-    elohim: ElohimAgent,
-    baseResponse: Partial<ElohimResponse>
-  ): ElohimResponse {
-    const params = request.params as AttestationRecommendationParams;
-
-    // Simulate attestation decision (in production: actual AI analysis)
-    const recommend =
-      crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 > 0.2 ? 'grant' : 'defer'; // Demo data generation
-
-    const payload: AttestationRecommendation = {
-      type: CAPABILITY_ATTESTATION_RECOMMENDATION,
-      contentId: params.contentId,
-      recommend: recommend as 'grant' | 'deny' | 'defer',
-      attestationType: params.requestedAttestationType,
-      suggestedReach: recommend === 'grant' ? 'community' : undefined,
-      conditions:
-        recommend === 'defer' ? ['Requires peer review', 'Additional evidence needed'] : undefined,
-      reasoning:
-        recommend === 'grant'
-          ? 'Content meets quality standards and aligns with constitutional principles'
-          : 'Additional review recommended before granting attestation',
-    };
-
-    return {
-      ...baseResponse,
-      status: 'fulfilled',
-      constitutionalReasoning: {
-        primaryPrinciple: 'Boundaries around freedom of reach',
-        interpretation:
-          'Attestations expand content reach; must ensure content serves flourishing before broader distribution',
-        valuesWeighed: [
-          {
-            value: 'Content quality',
-            weight: 0.35,
-            direction: recommend === 'grant' ? 'for' : 'against',
-          },
-          { value: 'Community protection', weight: 0.3, direction: 'for' },
-          { value: 'Author recognition', weight: 0.2, direction: 'for' },
-          { value: 'Knowledge sharing', weight: 0.15, direction: 'for' },
-        ],
-        confidence: recommend === 'grant' ? 0.8 : 0.6,
-        precedents: ['attestation-standard-v1.0'],
-      },
-      payload,
-    } as ElohimResponse;
   }
 
   // =========================================================================
@@ -392,19 +248,6 @@ export class ElohimAgentService {
       .join('')
       .substring(0, 9);
     return `req-${Date.now()}-${randomStr}`;
-  }
-
-  private estimateProcessingTime(capability: ElohimCapability): number {
-    // Simulate realistic processing times (ms)
-    const times: Partial<Record<ElohimCapability, number>> = {
-      'content-safety-review': 1500,
-      'accuracy-verification': 2000,
-      [CAPABILITY_ATTESTATION_RECOMMENDATION]: 1200,
-      'knowledge-map-synthesis': 3000,
-      'spiral-detection': 800,
-      'path-analysis': 2500,
-    };
-    return times[capability] ?? 1000;
   }
 
   private createDeclinedResponse(
@@ -424,18 +267,6 @@ export class ElohimAgentService {
       },
       declineReason: reason,
       respondedAt: new Date().toISOString(),
-    };
-  }
-
-  private generateDefaultReasoning(capability: ElohimCapability): ConstitutionalReasoning {
-    return {
-      primaryPrinciple: 'Love as committed action toward flourishing',
-      interpretation: `Capability '${capability}' exercised in service of human flourishing`,
-      valuesWeighed: [
-        { value: 'Human dignity', weight: 0.5, direction: 'for' },
-        { value: 'Collective wellbeing', weight: 0.5, direction: 'for' },
-      ],
-      confidence: 0.75,
     };
   }
 

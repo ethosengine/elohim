@@ -4,13 +4,18 @@
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::audit::{AuditEntry, AuditLog};
 use crate::backend::traits::LlmBackend;
+use crate::backend::AnthropicBackend;
 use crate::capability::{CapabilityRegistry, ElohimCapability};
-use crate::request::ElohimRequest;
-use crate::response::{ConstitutionalReasoning, ElohimResponse, ResponsePayload, ResponseStatus};
+use crate::request::{ElohimRequest, RequestCredentials};
+use crate::response::{ConstitutionalReasoning, ElohimResponse, ResponsePayload};
+
+// ResponseStatus used in tests
+#[cfg(test)]
+use crate::response::ResponseStatus;
 use crate::stream::TokenStream;
 use crate::types::ComputationCost;
 use constitution::{ConstitutionalStack, PromptAssembler, StackContext};
@@ -179,8 +184,8 @@ impl ElohimAgentService {
         let stack = self.stack.read().await;
         let stack = stack.as_ref().ok_or(ServiceError::NotInitialized)?;
 
-        // Select backend
-        let backend = self.select_backend().await?;
+        // Select backend (BYOK-aware)
+        let backend = self.select_backend_for_request(&request).await?;
 
         // Process the request
         let response = self
@@ -230,7 +235,22 @@ impl ElohimAgentService {
         self.capabilities.available().await
     }
 
-    /// Select the best available backend.
+    /// Select the best available backend, considering BYOK credentials.
+    async fn select_backend_for_request(
+        &self,
+        request: &ElohimRequest,
+    ) -> Result<Arc<dyn LlmBackend>, ServiceError> {
+        // Check for BYOK credentials first
+        if let Some(ctx) = &request.context {
+            if let Some(creds) = &ctx.credentials {
+                return self.create_byok_backend(creds);
+            }
+        }
+        // Fall through to default backend selection
+        self.select_backend().await
+    }
+
+    /// Select the best available registered backend.
     async fn select_backend(&self) -> Result<Arc<dyn LlmBackend>, ServiceError> {
         for backend in &self.backends {
             if backend.is_available().await {
@@ -238,6 +258,30 @@ impl ElohimAgentService {
             }
         }
         Err(ServiceError::NoBackendAvailable)
+    }
+
+    /// Create an ephemeral backend from BYOK credentials.
+    fn create_byok_backend(
+        &self,
+        creds: &RequestCredentials,
+    ) -> Result<Arc<dyn LlmBackend>, ServiceError> {
+        match creds.backend_id.as_str() {
+            "anthropic" => {
+                let backend = AnthropicBackend::claude_sonnet(&creds.api_key);
+                info!("Created ephemeral Anthropic backend for BYOK request");
+                Ok(Arc::new(backend))
+            }
+            "openai" => {
+                let backend =
+                    crate::backend::OpenAiBackend::openai("gpt-4o", &creds.api_key);
+                info!("Created ephemeral OpenAI backend for BYOK request");
+                Ok(Arc::new(backend))
+            }
+            other => Err(ServiceError::InvalidRequest(format!(
+                "Unknown BYOK backend: {}",
+                other
+            ))),
+        }
     }
 
     /// Process a request with constitutional reasoning.
