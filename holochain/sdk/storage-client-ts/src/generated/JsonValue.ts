@@ -9,6 +9,6 @@
  * calculates a cross-directory relative path that breaks at build time.
  *
  * By owning the type locally, we set `export_to` to the same directory
- * as all View types, so excellall imports resolve as `"./JsonValue"`.
+ * as all View types, so all imports resolve as `"./JsonValue"`.
  */
 export type JsonValue = number | string | boolean | Array<JsonValue> | { [key in string]?: JsonValue } | null;
