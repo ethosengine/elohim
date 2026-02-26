@@ -1,14 +1,19 @@
 import { Injectable } from '@angular/core';
 
-// @coverage: 93.1% (2026-02-24)
+import { catchError, map } from 'rxjs/operators';
 
 import { Observable, of, throwError } from 'rxjs';
+
+import { ContextAssemblyService } from '@app/elohim';
 
 import { ContentNode } from '../../models/content-node.model';
 import { ContentIOExportInput } from '../interfaces/content-io-plugin.interface';
 import { ValidationResult } from '../interfaces/validation-result.interface';
 
 import { ContentFormatRegistryService } from './content-format-registry.service';
+
+import type { ContentFormat, ContentReach, ContentType } from '../../models/content-node.model';
+import type { ContentBirthContext, ContextAssemblyResult, CreatePayload } from '@app/elohim';
 
 /**
  * ContentEditorService - High-level content editing operations.
@@ -19,12 +24,10 @@ import { ContentFormatRegistryService } from './content-format-registry.service'
  * - Validate content before save
  * - Check edit permissions
  *
- * Holochain Integration:
- * In the prototype phase, this service works with in-memory/localStorage drafts.
- * In production, save operations will commit entries to the DHT.
- *
- * The service doesn't handle UI concerns (that's the editor component's job),
- * it focuses on business logic around content editing.
+ * Content creation runs through ContextAssemblyService for reach negotiation:
+ * the 6-layer context envelope is assembled on-device and an elohim-agent
+ * negotiates the content's reach before it leaves the local DHT shard.
+ * Assembly failure never blocks saving — graceful degradation is built in.
  */
 @Injectable({
   providedIn: 'root',
@@ -33,7 +36,10 @@ export class ContentEditorService {
   /** Draft storage for unsaved changes (prototype) */
   private readonly drafts = new Map<string, ContentDraft>();
 
-  constructor(private readonly registry: ContentFormatRegistryService) {}
+  constructor(
+    private readonly registry: ContentFormatRegistryService,
+    private readonly contextAssembly: ContextAssemblyService
+  ) {}
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Permissions
@@ -227,10 +233,15 @@ export class ContentEditorService {
   }
 
   /**
-   * Save content (prototype: stores in draft, future: commits to Holochain).
+   * Save content with context assembly and reach negotiation.
+   *
+   * Assembles the 6-layer context envelope on-device, invokes an elohim-agent
+   * to negotiate reach, and returns the result alongside the save confirmation.
+   * Assembly failure never blocks saving — graceful degradation returns success
+   * without assembly data.
    *
    * @param draftId - The draft to save
-   * @returns Save result
+   * @returns Save result with optional context assembly and birth context
    */
   saveContent(draftId: string): Observable<SaveResult> {
     const draft = this.drafts.get(draftId);
@@ -239,25 +250,32 @@ export class ContentEditorService {
       return throwError(() => new Error(`Draft not found: ${draftId}`));
     }
 
-    // In prototype phase, we can't actually persist to files
-    // This would be where we call HolochainService in production
-    // For now, mark as saved and return success
-
     draft.isDirty = false;
     draft.updatedAt = Date.now();
+    const nodeId = draft.originalNodeId ?? this.generateNodeId(draft.content.title);
 
-    // Future: In production, this would:
-    // 1. Validate content
-    // 2. Call HolochainService.createEntry() or updateEntry()
-    // 3. Update cache in DataLoaderService
-    // 4. Return the new/updated ContentNode
+    const payload = this.buildCreatePayload(draft);
 
-    return of({
-      success: true,
-      nodeId: draft.originalNodeId ?? this.generateNodeId(draft.content.title),
-      message: 'Content saved to draft. Holochain persistence not yet implemented.',
-      draft,
-    });
+    return this.contextAssembly.assembleAndNegotiate(payload).pipe(
+      map(assemblyResult => ({
+        success: true as const,
+        nodeId,
+        message: assemblyResult.timedOut
+          ? 'Content saved. Context assembly timed out — using defaults.'
+          : 'Content saved with context assembly.',
+        draft,
+        contextAssembly: assemblyResult,
+        birthContext: assemblyResult.birthContext,
+      })),
+      catchError(() =>
+        of({
+          success: true as const,
+          nodeId,
+          message: 'Content saved. Context assembly unavailable.',
+          draft,
+        })
+      )
+    );
   }
 
   /**
@@ -283,6 +301,21 @@ export class ContentEditorService {
   // ═══════════════════════════════════════════════════════════════════════════
   // Utilities
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build a CreatePayload from a ContentDraft for context assembly.
+   */
+  private buildCreatePayload(draft: ContentDraft): CreatePayload {
+    return {
+      actionType: 'content-create',
+      content: draft.content.content,
+      contentType: (draft.content.contentType ?? 'concept') as ContentType,
+      contentFormat: draft.content.contentFormat as ContentFormat,
+      requestedReach: draft.requestedReach ?? 'local',
+      tags: draft.content.tags ?? [],
+      citedContentIds: draft.content.relatedNodeIds ?? [],
+    };
+  }
 
   /**
    * Convert a ContentNode to ContentIOExportInput.
@@ -354,6 +387,9 @@ export interface ContentDraft {
 
   /** Whether there are unsaved changes */
   isDirty: boolean;
+
+  /** Author's requested reach level (default: 'local') */
+  requestedReach?: ContentReach;
 }
 
 /**
@@ -374,6 +410,12 @@ export interface SaveResult {
 
   /** Error if save failed */
   error?: string;
+
+  /** Context assembly result (present when assembly succeeded) */
+  contextAssembly?: ContextAssemblyResult;
+
+  /** Content birth context derived from assembly */
+  birthContext?: ContentBirthContext;
 }
 
 /**

@@ -324,12 +324,32 @@ export class DataLoaderService {
       }),
       catchError((err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err);
+
+        // "Not found" is a data issue, not connectivity — don't try cache
         if (errMsg.includes('Path not found') || errMsg.includes('not found')) {
           this.logger.warn('Path not found (may be stale reference)', { pathId });
-        } else {
-          this.logger.error('Error loading path', err, { pathId });
+          throw err;
         }
-        throw err; // Re-throw - paths are critical, can't use placeholder
+
+        this.logger.warn('Error loading path, trying IDB cache', { pathId, error: errMsg });
+
+        if (!this.idbInitialized) {
+          throw err;
+        }
+
+        return from(this.idbCache.getPath(pathId)).pipe(
+          map(cached => {
+            if (cached) {
+              this.logger.info('Served path from IDB cache (offline fallback)', { pathId });
+              return cached;
+            }
+            this.logger.debug('IDB cache miss for path', { pathId });
+            throw err;
+          }),
+          catchError(() => {
+            throw err;
+          })
+        );
       })
     );
   }
@@ -455,8 +475,23 @@ export class DataLoaderService {
       }),
       catchError((err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn('Error loading content', { resourceId, error: errMsg });
-        return of(this.createPlaceholderContent(resourceId, errMsg));
+        this.logger.warn('Error loading content, trying IDB cache', { resourceId, error: errMsg });
+
+        if (!this.idbInitialized) {
+          return of(this.createPlaceholderContent(resourceId, errMsg));
+        }
+
+        return from(this.idbCache.getContent(resourceId)).pipe(
+          map(cached => {
+            if (cached) {
+              this.logger.info('Served content from IDB cache (offline fallback)', { resourceId });
+              return cached;
+            }
+            this.logger.debug('IDB cache miss for content', { resourceId });
+            return this.createPlaceholderContent(resourceId, errMsg);
+          }),
+          catchError(() => of(this.createPlaceholderContent(resourceId, errMsg)))
+        );
       })
     );
   }
@@ -499,16 +534,42 @@ export class DataLoaderService {
       }),
       catchError((err: unknown) => {
         const errMsg = err instanceof Error ? err.message : String(err);
-        this.logger.warn('Batch load error', {
+        this.logger.warn('Batch load error, trying IDB cache', {
           count: resourceIds.length,
           error: errMsg,
         });
-        // Return placeholders for all
-        const contentMap = new Map<string, ContentNode>();
-        for (const id of resourceIds) {
-          contentMap.set(id, this.createPlaceholderContent(id, errMsg));
+
+        if (!this.idbInitialized) {
+          const contentMap = new Map<string, ContentNode>();
+          for (const id of resourceIds) {
+            contentMap.set(id, this.createPlaceholderContent(id, errMsg));
+          }
+          return of(contentMap);
         }
-        return of(contentMap);
+
+        return from(this.idbCache.getContentBatch(resourceIds)).pipe(
+          map(cachedMap => {
+            const resultMap = new Map<string, ContentNode>(cachedMap);
+            const cacheHits = cachedMap.size;
+            const cacheMisses = resourceIds.length - cacheHits;
+
+            this.logger.info('Batch IDB cache fallback', { cacheHits, cacheMisses });
+
+            for (const id of resourceIds) {
+              if (!resultMap.has(id)) {
+                resultMap.set(id, this.createPlaceholderContent(id, errMsg));
+              }
+            }
+            return resultMap;
+          }),
+          catchError(() => {
+            const contentMap = new Map<string, ContentNode>();
+            for (const id of resourceIds) {
+              contentMap.set(id, this.createPlaceholderContent(id, errMsg));
+            }
+            return of(contentMap);
+          })
+        );
       })
     );
   }
@@ -789,33 +850,66 @@ export class DataLoaderService {
 
   /**
    * Load agent progress for a specific path.
-   * Uses localStorage for prototype. In Holochain, this will read from private source chain.
+   * Reads from IndexedDB first, falls back to localStorage, migrates on read.
    */
   getAgentProgress(agentId: string, pathId: string): Observable<AgentProgress | null> {
-    // Use localStorage directly instead of fetching from JSON files
-    // This avoids 404 errors and keeps all progress client-side
-    const progress = this.getLocalProgress(agentId, pathId);
-    return of(progress);
+    if (!this.idbInitialized) {
+      return of(this.getLocalProgress(agentId, pathId));
+    }
+
+    const idbKey = `progress-${agentId}-${pathId}`;
+    return from(this.idbCache.getMetadata<AgentProgress>(idbKey)).pipe(
+      map(idbProgress => {
+        if (idbProgress) return idbProgress;
+
+        // Fall back to localStorage and migrate if found
+        const localProgress = this.getLocalProgress(agentId, pathId);
+        if (localProgress) {
+          // Migrate: write to IDB and remove from localStorage
+          const lsKey = `lamad-progress-${agentId}-${pathId}`;
+          this.idbCache
+            .setMetadata(idbKey, localProgress)
+            .then(() => {
+              try {
+                localStorage.removeItem(lsKey);
+              } catch {
+                /* ignore */
+              }
+              this.logger.debug('Migrated progress to IDB', { agentId, pathId });
+            })
+            .catch(() => undefined);
+        }
+        return localProgress;
+      }),
+      catchError(() => of(this.getLocalProgress(agentId, pathId)))
+    );
   }
 
   /**
    * Save agent progress.
-   * In prototype: Updates localStorage (JSON files are read-only).
-   * In Holochain: Writes to private source chain.
+   * Dual-writes to IndexedDB (primary) and localStorage (fallback).
    */
   saveAgentProgress(progress: AgentProgress): Observable<void> {
-    const key = `lamad-progress-${progress.agentId}-${progress.pathId}`;
+    const lsKey = `lamad-progress-${progress.agentId}-${progress.pathId}`;
+
+    // Always write to localStorage as fallback
     try {
-      localStorage.setItem(key, JSON.stringify(progress));
+      localStorage.setItem(lsKey, JSON.stringify(progress));
     } catch {
-      // Silently ignore localStorage quota errors - progress will be lost on refresh
-      // but the app continues to function
+      // Silently ignore localStorage quota errors
     }
+
+    // Write to IDB if available (non-blocking)
+    if (this.idbInitialized) {
+      const idbKey = `progress-${progress.agentId}-${progress.pathId}`;
+      this.idbCache.setMetadata(idbKey, progress).catch(() => undefined);
+    }
+
     return of(undefined);
   }
 
   /**
-   * Load progress from localStorage (prototype fallback).
+   * Load progress from localStorage (fallback).
    */
   getLocalProgress(agentId: string, pathId: string): AgentProgress | null {
     const key = `lamad-progress-${agentId}-${pathId}`;

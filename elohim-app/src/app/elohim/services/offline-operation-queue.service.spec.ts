@@ -1424,4 +1424,297 @@ describe('OfflineOperationQueueService', () => {
       expect(results[2].succeeded).toBe(0);
     });
   });
+
+  // ==========================================================================
+  // Connection Watcher (auto-sync on reconnect)
+  // ==========================================================================
+
+  describe('connection watcher', () => {
+    it('should auto-sync when transitioning from disconnected to connected', fakeAsync(() => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      // Enqueue while "disconnected"
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        payload: { title: 'Test' },
+      });
+      expect(service.queueSize()).toBe(1);
+
+      // Simulate reconnection transition (was disconnected, now connected)
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+
+      // Before debounce: no sync yet
+      tick(500);
+      expect(service.queueSize()).toBe(1);
+
+      // After debounce (1500ms): sync should fire
+      tick(1100);
+      // Give async syncAll time to process
+      tick(0);
+
+      expect(mockHolochainClient.callZome).toHaveBeenCalled();
+    }));
+
+    it('should not auto-sync when already connected (no transition)', fakeAsync(() => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+      });
+
+      // Already connected → connected: not a transition
+      (service as any).wasConnected = true;
+      service.handleConnectionChange(true);
+
+      tick(2000);
+
+      expect(mockHolochainClient.callZome).not.toHaveBeenCalled();
+    }));
+
+    it('should not auto-sync when queue is empty', fakeAsync(() => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      // Empty queue
+      expect(service.queueSize()).toBe(0);
+
+      // Simulate reconnection
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+
+      tick(2000);
+
+      expect(mockHolochainClient.callZome).not.toHaveBeenCalled();
+    }));
+
+    it('should not auto-sync if already syncing', fakeAsync(() => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+
+      // Make callZome take time so sync is "in progress"
+      mockHolochainClient.callZome.and.callFake(
+        () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 3000))
+      );
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+      });
+
+      // Start a manual sync first
+      void service.syncAll();
+      tick(0);
+
+      // Now simulate reconnection while sync is in progress
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+
+      // After debounce, should NOT start another sync (isSyncing check)
+      tick(1600);
+
+      // Only 1 callZome from the manual sync, not a second from auto-sync
+      expect(mockHolochainClient.callZome).toHaveBeenCalledTimes(1);
+
+      // Let the manual sync finish
+      tick(3000);
+    }));
+
+    it('should debounce auto-sync with 1500ms delay', fakeAsync(() => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+      });
+
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+
+      // At 1000ms: no sync yet
+      tick(1000);
+      expect(mockHolochainClient.callZome).not.toHaveBeenCalled();
+
+      // At 1499ms: still no sync
+      tick(499);
+      expect(mockHolochainClient.callZome).not.toHaveBeenCalled();
+
+      // At 1500ms: sync fires
+      tick(1);
+      tick(0); // process async
+      expect(mockHolochainClient.callZome).toHaveBeenCalled();
+    }));
+
+    it('should re-check connection state after debounce delay', fakeAsync(() => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+      });
+
+      // Trigger reconnection
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+
+      // Lose connection again before debounce fires
+      mockHolochainClient.isConnected.and.returnValue(false);
+
+      // After debounce: should re-check and NOT sync (disconnected again)
+      tick(1600);
+
+      expect(mockHolochainClient.callZome).not.toHaveBeenCalled();
+    }));
+
+    it('should track previous connection state correctly', () => {
+      // Start disconnected
+      expect((service as any).wasConnected).toBe(false);
+
+      // Transition to connected
+      service.handleConnectionChange(true);
+      expect((service as any).wasConnected).toBe(true);
+
+      // Stay connected
+      service.handleConnectionChange(true);
+      expect((service as any).wasConnected).toBe(true);
+
+      // Transition to disconnected
+      service.handleConnectionChange(false);
+      expect((service as any).wasConnected).toBe(false);
+    });
+
+    it('should cancel previous debounce on rapid reconnections', fakeAsync(() => {
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+      });
+
+      // First reconnection
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+
+      tick(500);
+
+      // Disconnect and reconnect again (flaky connection)
+      service.handleConnectionChange(false);
+      service.handleConnectionChange(true);
+
+      // Wait 1500ms from second reconnection
+      tick(1500);
+      tick(0);
+
+      // Should only have synced once (first debounce was cancelled)
+      expect(mockHolochainClient.callZome).toHaveBeenCalledTimes(1);
+    }));
+  });
+
+  // ==========================================================================
+  // Integration: Full Offline Cycle
+  // ==========================================================================
+
+  describe('full offline cycle', () => {
+    it('should enqueue offline, auto-sync on reconnect, and drain queue', fakeAsync(() => {
+      // Start disconnected
+      mockHolochainClient.isConnected.and.returnValue(false);
+
+      // Enqueue 3 operations while offline
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        payload: { title: 'Content A' },
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        payload: { title: 'Content B' },
+      });
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_link',
+        payload: { from: 'a', to: 'b' },
+      });
+
+      expect(service.queueSize()).toBe(3);
+      expect(service.isPending()).toBeTrue();
+
+      // Attempt manual sync while offline — should be a no-op
+      tick(0);
+      const offlineResult = service.syncAll();
+      tick(0);
+
+      // syncAll returns early when disconnected
+      offlineResult.then(r => {
+        expect(r.succeeded).toBe(0);
+        expect(r.failed).toBe(0);
+      });
+      tick(0);
+
+      // Connection restored
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      // Simulate reconnection transition
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+
+      // After debounce (1500ms) + processing
+      tick(1600);
+      tick(0);
+
+      // All 3 operations should have been synced
+      expect(mockHolochainClient.callZome).toHaveBeenCalledTimes(3);
+      expect(service.queueSize()).toBe(0);
+      expect(service.isPending()).toBeFalse();
+    }));
+
+    it('should persist queue to IDB and notify listeners during cycle', fakeAsync(() => {
+      const queueChangeSpy = jasmine.createSpy('queueChange');
+      const syncCompleteSpy = jasmine.createSpy('syncComplete');
+      service.onQueueChanged(queueChangeSpy);
+      service.onSyncComplete(syncCompleteSpy);
+
+      mockHolochainClient.isConnected.and.returnValue(false);
+
+      service.enqueue({
+        type: 'zome_call',
+        zomeName: 'content_store',
+        fnName: 'create_content',
+        payload: { title: 'Test' },
+      });
+
+      // Queue change notified and persisted to IDB
+      expect(queueChangeSpy).toHaveBeenCalled();
+      expect(mockIdbCache.setMetadata).toHaveBeenCalledWith(
+        'offline-operation-queue',
+        jasmine.arrayContaining([jasmine.objectContaining({ type: 'zome_call' })])
+      );
+
+      // Reconnect and sync
+      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.callZome.and.resolveTo({ success: true });
+
+      (service as any).wasConnected = false;
+      service.handleConnectionChange(true);
+      tick(1600);
+      tick(0);
+
+      // Sync complete notification
+      expect(syncCompleteSpy).toHaveBeenCalledWith(1, 0);
+    }));
+  });
 });

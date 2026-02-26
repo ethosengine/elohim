@@ -27,6 +27,10 @@ export type { ElohimBackend, ElohimBackendType } from './elohim-backend';
 // Elohim presence orchestrator
 export { ElohimPresenceService } from './elohim-presence.service';
 
+// Context assembly (reach negotiation orchestrator)
+export { ContextAssemblyService } from './context-assembly.service';
+export type { ContextAssemblyResult, AssemblyOptions } from './context-assembly.service';
+
 // Cross-pillar services (formerly in shared/)
 export { ProfileService } from './profile.service';
 export { HumanConsentService } from './human-consent.service';

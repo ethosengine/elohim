@@ -1,15 +1,35 @@
 import { TestBed } from '@angular/core/testing';
-import { ContentEditorService, ContentDraft, SaveResult } from './content-editor.service';
-import { ContentFormatRegistryService } from './content-format-registry.service';
+
+import { of, throwError } from 'rxjs';
+
+import { ContextAssemblyService } from '@app/elohim';
+
 import { ContentNode } from '../../models/content-node.model';
 import {
   ContentFormatPlugin,
   DEFAULT_EDITOR_CONFIG,
 } from '../interfaces/content-format-plugin.interface';
 
+import { ContentEditorService, ContentDraft, SaveResult } from './content-editor.service';
+import { ContentFormatRegistryService } from './content-format-registry.service';
+
+import type { ContextAssemblyResult } from '@app/elohim';
+
 describe('ContentEditorService', () => {
   let service: ContentEditorService;
   let mockRegistry: jasmine.SpyObj<ContentFormatRegistryService>;
+  let mockContextAssembly: jasmine.SpyObj<ContextAssemblyService>;
+
+  const buildAssemblyResult = (
+    overrides: Partial<ContextAssemblyResult> = {}
+  ): ContextAssemblyResult =>
+    ({
+      createContext: { layers: {} },
+      negotiationResult: { grantedReach: 'local', reasoning: 'test' },
+      birthContext: { negotiatedReach: 'local', createdAt: new Date().toISOString() },
+      timedOut: false,
+      ...overrides,
+    }) as unknown as ContextAssemblyResult;
 
   const createMockNode = (overrides: Partial<ContentNode> = {}): ContentNode => ({
     id: 'test-node-1',
@@ -36,10 +56,14 @@ describe('ContentEditorService', () => {
     mockRegistry.getEditorComponent.and.returnValue(null);
     mockRegistry.getEditorConfig.and.returnValue(DEFAULT_EDITOR_CONFIG);
 
+    mockContextAssembly = jasmine.createSpyObj('ContextAssemblyService', ['assembleAndNegotiate']);
+    mockContextAssembly.assembleAndNegotiate.and.returnValue(of(buildAssemblyResult()));
+
     TestBed.configureTestingModule({
       providers: [
         ContentEditorService,
         { provide: ContentFormatRegistryService, useValue: mockRegistry },
+        { provide: ContextAssemblyService, useValue: mockContextAssembly },
       ],
     });
     service = TestBed.inject(ContentEditorService);
@@ -343,6 +367,126 @@ describe('ContentEditorService', () => {
       service.saveContent(draft.id).subscribe({
         next: (result: SaveResult) => {
           expect(result.nodeId).toBe(node.id);
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Context assembly integration
+    // ═════════════════════════════════════════════════════════════════════════
+
+    it('should call assembleAndNegotiate with CreatePayload', done => {
+      const node = createMockNode({ contentType: 'concept', contentFormat: 'markdown' });
+      const draft = service.createDraft(node);
+      service.updateDraft(draft.id, { title: 'Changed' });
+
+      service.saveContent(draft.id).subscribe({
+        next: () => {
+          expect(mockContextAssembly.assembleAndNegotiate).toHaveBeenCalledOnceWith(
+            jasmine.objectContaining({
+              actionType: 'content-create',
+              contentType: 'concept',
+              contentFormat: 'markdown',
+            })
+          );
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    it('should include birthContext in save result', done => {
+      const node = createMockNode();
+      const draft = service.createDraft(node);
+
+      service.saveContent(draft.id).subscribe({
+        next: (result: SaveResult) => {
+          expect(result.birthContext).toBeDefined();
+          expect(result.birthContext!.negotiatedReach).toBe('local');
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    it('should include contextAssembly in save result', done => {
+      const assemblyResult = buildAssemblyResult();
+      mockContextAssembly.assembleAndNegotiate.and.returnValue(of(assemblyResult));
+
+      const node = createMockNode();
+      const draft = service.createDraft(node);
+
+      service.saveContent(draft.id).subscribe({
+        next: (result: SaveResult) => {
+          expect(result.contextAssembly).toBe(assemblyResult);
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    it('should succeed even when assembly fails', done => {
+      mockContextAssembly.assembleAndNegotiate.and.returnValue(
+        throwError(() => new Error('Assembly failed'))
+      );
+
+      const node = createMockNode();
+      const draft = service.createDraft(node);
+
+      service.saveContent(draft.id).subscribe({
+        next: (result: SaveResult) => {
+          expect(result.success).toBeTrue();
+          expect(result.contextAssembly).toBeUndefined();
+          expect(result.message).toContain('unavailable');
+          done();
+        },
+        error: () => done.fail('Should not error — assembly failure is caught'),
+      });
+    });
+
+    it('should reflect timeout in message', done => {
+      mockContextAssembly.assembleAndNegotiate.and.returnValue(
+        of(buildAssemblyResult({ timedOut: true }))
+      );
+
+      const node = createMockNode();
+      const draft = service.createDraft(node);
+
+      service.saveContent(draft.id).subscribe({
+        next: (result: SaveResult) => {
+          expect(result.success).toBeTrue();
+          expect(result.message).toContain('timed out');
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    it('should map requestedReach from draft', done => {
+      const node = createMockNode();
+      const draft = service.createDraft(node);
+      draft.requestedReach = 'commons';
+
+      service.saveContent(draft.id).subscribe({
+        next: () => {
+          const payload = mockContextAssembly.assembleAndNegotiate.calls.mostRecent().args[0];
+          expect(payload.requestedReach).toBe('commons');
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    it('should map relatedNodeIds to citedContentIds', done => {
+      const node = createMockNode({ relatedNodeIds: ['ref-1', 'ref-2'] });
+      const draft = service.createDraft(node);
+
+      service.saveContent(draft.id).subscribe({
+        next: () => {
+          const payload = mockContextAssembly.assembleAndNegotiate.calls.mostRecent().args[0];
+          expect(payload.citedContentIds).toEqual(['ref-1', 'ref-2']);
           done();
         },
         error: done.fail,

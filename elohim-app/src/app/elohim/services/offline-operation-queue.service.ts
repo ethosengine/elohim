@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, effect } from '@angular/core';
 
 // @coverage: 92.5% (2026-02-24)
 
@@ -72,6 +72,9 @@ export class OfflineOperationQueueService {
   readonly syncInProgress = this.isSyncing.asReadonly();
   readonly lastSync = this.lastSyncTime.asReadonly();
 
+  /** Tracks previous connection state for detecting transitions */
+  private wasConnected = false;
+
   // Event callbacks
   private readonly onQueueChangedCallbacks: ((queue: OfflineOperation[]) => void)[] = [];
   private readonly onSyncCompleteCallbacks: ((succeeded: number, failed: number) => void)[] = [];
@@ -84,12 +87,48 @@ export class OfflineOperationQueueService {
     this.loadQueueFromStorage();
   }
 
+  /** Timeout ID for the debounced auto-sync */
+  private autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+
   /**
-   * Watch Holochain connection state and auto-sync when ready
+   * Watch Holochain connection state and auto-sync when ready.
+   * Uses effect() to reactively track the isConnected signal.
+   * Pattern: content-mastery.service.ts:89-100
    */
   private setupConnectionWatcher(): void {
-    // In a real implementation, would watch the connection signal
-    // For now, this is a placeholder that could be enhanced
+    effect(() => {
+      this.handleConnectionChange(this.holochainClient.isConnected());
+    });
+  }
+
+  /**
+   * Handle connection state transitions.
+   * Triggers auto-sync when transitioning from disconnected to connected
+   * with a 1500ms debounce to avoid hammering on flaky connections.
+   */
+  handleConnectionChange(connected: boolean): void {
+    const wasConnected = this.wasConnected;
+    this.wasConnected = connected;
+
+    if (connected && !wasConnected && this.queue().length > 0) {
+      // Clear any existing debounce timer
+      if (this.autoSyncTimeout !== null) {
+        clearTimeout(this.autoSyncTimeout);
+      }
+
+      // Debounce: wait 1500ms to avoid hammering on flaky reconnects
+      this.autoSyncTimeout = setTimeout(() => {
+        this.autoSyncTimeout = null;
+
+        // Re-check: still connected, have ops, not already syncing
+        if (this.holochainClient.isConnected() && !this.isSyncing() && this.queue().length > 0) {
+          this.logger.info('Connection restored, auto-syncing queue', {
+            queueSize: this.queue().length,
+          });
+          void this.syncAll();
+        }
+      }, 1500);
+    }
   }
 
   /** IndexedDB metadata key for the persisted queue */

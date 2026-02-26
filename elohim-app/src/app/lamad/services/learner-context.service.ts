@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 
 import { type MasteryLevel, compareMasteryLevels } from '@app/elohim/models/agent.model';
 
@@ -36,8 +36,13 @@ const MASTERY_UNLOCK_THRESHOLD: MasteryLevel = 'understand';
 @Injectable({ providedIn: 'root' })
 export class LearnerContextService {
   private readonly contentMastery = inject(ContentMasteryService);
-  private readonly pathAdaptation = inject(PathAdaptationService);
+  private readonly injector = inject(Injector);
   private readonly discoveryAttestation = inject(DiscoveryAttestationService);
+
+  /** Lazily resolved to break circular DI: PathAdaptation → QuestionPool → Path → LearnerContext */
+  private get pathAdaptation(): PathAdaptationService {
+    return this.injector.get(PathAdaptationService);
+  }
 
   // =========================================================================
   // Mastery-Aware Fog-of-War

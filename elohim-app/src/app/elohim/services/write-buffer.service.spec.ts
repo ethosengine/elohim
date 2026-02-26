@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { WriteBufferService, WritePriority, WriteOpType, type WriteOperation } from './write-buffer.service';
+import { IndexedDBCacheService } from './indexeddb-cache.service';
 
 /**
  * Unit tests for WriteBufferService
@@ -11,8 +12,20 @@ describe('WriteBufferService', () => {
   let service: WriteBufferService;
 
   beforeEach(() => {
+    const idbSpy = jasmine.createSpyObj('IndexedDBCacheService', [
+      'init',
+      'getMetadata',
+      'setMetadata',
+    ]);
+    idbSpy.init.and.returnValue(Promise.resolve(false));
+    idbSpy.getMetadata.and.returnValue(Promise.resolve(null));
+    idbSpy.setMetadata.and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
-      providers: [WriteBufferService],
+      providers: [
+        WriteBufferService,
+        { provide: IndexedDBCacheService, useValue: idbSpy },
+      ],
     });
     service = TestBed.inject(WriteBufferService);
   });
@@ -641,6 +654,123 @@ describe('WriteBufferService', () => {
       const batch = service.getPendingBatch();
 
       expect(batch.hasBatch).toBeTrue();
+    });
+  });
+
+  describe('IDB persistence', () => {
+    let idbMock: jasmine.SpyObj<IndexedDBCacheService>;
+    let persistService: WriteBufferService;
+
+    beforeEach(() => {
+      const idbSpy = jasmine.createSpyObj('IndexedDBCacheService', [
+        'init',
+        'getMetadata',
+        'setMetadata',
+      ]);
+      idbSpy.init.and.returnValue(Promise.resolve(true));
+      idbSpy.getMetadata.and.returnValue(Promise.resolve(null));
+      idbSpy.setMetadata.and.returnValue(Promise.resolve());
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          WriteBufferService,
+          { provide: IndexedDBCacheService, useValue: idbSpy },
+        ],
+      });
+
+      persistService = TestBed.inject(WriteBufferService);
+      idbMock = TestBed.inject(IndexedDBCacheService) as jasmine.SpyObj<IndexedDBCacheService>;
+    });
+
+    it('should restore persisted operations on initialize', async () => {
+      const persistedOps: WriteOperation[] = [
+        {
+          opId: 'persisted-1',
+          opType: WriteOpType.CreateEntry,
+          payload: '{"restored":true}',
+          priority: WritePriority.Normal,
+          queuedAt: Date.now() - 5000,
+          retryCount: 0,
+          dedupKey: null,
+        },
+        {
+          opId: 'persisted-2',
+          opType: WriteOpType.CreateLink,
+          payload: '{"link":true}',
+          priority: WritePriority.High,
+          queuedAt: Date.now() - 3000,
+          retryCount: 1,
+          dedupKey: null,
+        },
+      ];
+      idbMock.getMetadata.and.returnValue(Promise.resolve(persistedOps));
+
+      await persistService.initialize();
+
+      expect(persistService.totalQueued()).toBe(2);
+      expect(idbMock.getMetadata).toHaveBeenCalledWith('write-buffer-ops');
+      // Should clear persisted state after restore
+      expect(idbMock.setMetadata).toHaveBeenCalledWith('write-buffer-ops', []);
+    });
+
+    it('should persist operations via persistToIdb', async () => {
+      await persistService.initialize();
+
+      persistService.queueWrite('op-a', WriteOpType.CreateEntry, '{"a":1}');
+      persistService.queueWrite('op-b', WriteOpType.UpdateEntry, '{"b":2}');
+
+      await persistService.persistToIdb();
+
+      expect(idbMock.setMetadata).toHaveBeenCalledWith(
+        'write-buffer-ops',
+        jasmine.arrayContaining([
+          jasmine.objectContaining({ opId: 'op-a' }),
+          jasmine.objectContaining({ opId: 'op-b' }),
+        ])
+      );
+      // Buffer should still have ops (non-destructive persist)
+      expect(persistService.totalQueued()).toBe(2);
+    });
+
+    it('should skip persist when buffer is empty', async () => {
+      await persistService.initialize();
+
+      idbMock.setMetadata.calls.reset();
+      await persistService.persistToIdb();
+
+      // Should clear stale data but not persist operations
+      expect(idbMock.setMetadata).toHaveBeenCalledWith('write-buffer-ops', []);
+    });
+
+    it('should handle IDB unavailable gracefully on restore', async () => {
+      idbMock.init.and.returnValue(Promise.resolve(false));
+
+      await persistService.initialize();
+
+      expect(persistService.isReady).toBeTrue();
+      expect(idbMock.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should handle IDB error gracefully on restore', async () => {
+      idbMock.init.and.returnValue(Promise.reject(new Error('IDB broken')));
+
+      await persistService.initialize();
+
+      // Should still initialize successfully (IDB is non-critical)
+      expect(persistService.isReady).toBeTrue();
+    });
+
+    it('should skip persist when IDB not available', async () => {
+      idbMock.init.and.returnValue(Promise.resolve(false));
+
+      await persistService.initialize();
+      persistService.queueWrite('op-1', WriteOpType.CreateEntry, '{"x":1}');
+
+      idbMock.setMetadata.calls.reset();
+      await persistService.persistToIdb();
+
+      expect(idbMock.setMetadata).not.toHaveBeenCalled();
     });
   });
 });
