@@ -1716,14 +1716,13 @@ describe('DiscoveryAttestationService', () => {
     });
 
     it('should include top traits from featured results', () => {
+      // enneagram is auto-featured, so no toggleFeatured needed
       recordDefault({}, {}, { type4: 0.85, type5: 0.6 });
-      service.toggleFeatured(service.results()[0].id);
 
       const profile = service.getDiscoveryProfile();
       expect(profile).toBeTruthy();
       expect(profile!.topTraits.length).toBeGreaterThan(0);
-      expect(profile!.topTraits[0].framework).toBeTruthy();
-      expect(profile!.topTraits[0].label).toBeTruthy();
+      expect(profile!.topTraits[0].framework).toBe('enneagram');
     });
 
     it('should aggregate multiple assessments', () => {
