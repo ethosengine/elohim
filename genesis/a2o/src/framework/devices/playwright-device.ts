@@ -47,6 +47,7 @@ export interface PWLocator {
   click(options?: Record<string, unknown>): Promise<void>;
   count(): Promise<number>;
   first(): PWLocator;
+  nth(index: number): PWLocator;
   waitFor(options?: Record<string, unknown>): Promise<void>;
   textContent(): Promise<string | null>;
   fill(value: string): Promise<void>;
