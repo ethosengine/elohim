@@ -16,8 +16,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -59,12 +57,10 @@ impl StreamTracker {
     pub fn with_persistence(db: sled::Tree) -> Self {
         // Load existing positions from disk
         let mut positions = HashMap::new();
-        for item in db.iter() {
-            if let Ok((key, value)) = item {
-                if let Ok(pos) = rmp_serde::from_slice::<StreamPosition>(&value) {
-                    let key_str = String::from_utf8_lossy(&key).to_string();
-                    positions.insert(key_str, pos);
-                }
+        for (key, value) in db.iter().flatten() {
+            if let Ok(pos) = rmp_serde::from_slice::<StreamPosition>(&value) {
+                let key_str = String::from_utf8_lossy(&key).to_string();
+                positions.insert(key_str, pos);
             }
         }
 

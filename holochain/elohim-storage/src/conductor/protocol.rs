@@ -45,6 +45,7 @@ use std::io::Cursor;
 use crate::error::StorageError;
 
 /// A request ready to be sent over the wire.
+#[allow(dead_code)]
 pub struct EncodedRequest {
     pub id: u64,
     pub bytes: Vec<u8>,

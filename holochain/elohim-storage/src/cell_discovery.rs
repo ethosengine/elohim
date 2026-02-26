@@ -131,7 +131,7 @@ where
 
     // Send request
     write
-        .send(Message::Binary(envelope_buf.into()))
+        .send(Message::Binary(envelope_buf))
         .await
         .map_err(|e| StorageError::Connection(format!("Failed to send: {}", e)))?;
 

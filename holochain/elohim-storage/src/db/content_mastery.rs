@@ -645,7 +645,7 @@ pub fn bulk_upsert_mastery(
         for input in inputs {
             // Check if exists
             let existing = get_mastery_for_content(conn, ctx, &input.human_id, &input.content_id)
-                .map_err(|e| diesel::result::Error::RollbackTransaction)?;
+                .map_err(|_e| diesel::result::Error::RollbackTransaction)?;
 
             match existing {
                 Some(_) => match upsert_mastery(conn, ctx, input.clone()) {

@@ -9,7 +9,7 @@ use super::context::AppContext;
 use super::diesel_schema::{chapters, path_attestations, path_tags, paths, steps};
 use super::models::{
     Chapter, ChapterWithSteps, NewChapter, NewPath, NewPathAttestation, NewPathTag, NewStep, Path,
-    PathAttestation, PathTag, PathWithDetails, PathWithSteps, Step,
+    PathAttestation, PathWithDetails, PathWithSteps, Step,
 };
 use crate::error::StorageError;
 

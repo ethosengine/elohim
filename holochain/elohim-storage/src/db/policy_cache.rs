@@ -11,10 +11,10 @@
 //! - `policy_daily_usage` - Daily usage tracking
 //! - `policy_events` - Policy violation/block logs
 
-use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::db::{DbPool, PooledConn};
 use crate::error::StorageError;
@@ -947,11 +947,9 @@ fn is_rating_allowed(content_rating: &str, max_rating: &str) -> bool {
 
 /// Check if a route matches a pattern (supports wildcards)
 fn route_matches(route: &str, pattern: &str) -> bool {
-    if pattern.ends_with("/*") {
-        let prefix = &pattern[..pattern.len() - 2];
+    if let Some(prefix) = pattern.strip_suffix("/*") {
         route.starts_with(prefix)
-    } else if pattern.ends_with("*") {
-        let prefix = &pattern[..pattern.len() - 1];
+    } else if let Some(prefix) = pattern.strip_suffix('*') {
         route.starts_with(prefix)
     } else {
         route == pattern

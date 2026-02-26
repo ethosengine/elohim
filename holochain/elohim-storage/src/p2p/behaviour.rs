@@ -19,20 +19,15 @@ use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::P2PConfig;
 
 /// Relay operating mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RelayMode {
     /// Desktop stewards behind NAT — connect through relay servers
+    #[default]
     Client,
     /// K8s edgenode pods with stable IPs — serve as relays for others
     Server,
     /// Doorway hosts — both relay client and server
     Both,
-}
-
-impl Default for RelayMode {
-    fn default() -> Self {
-        Self::Client
-    }
 }
 
 impl std::str::FromStr for RelayMode {

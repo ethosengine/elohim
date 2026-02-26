@@ -11,7 +11,7 @@ use hyper_tungstenite::tungstenite::Message;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tracing::{debug, info};
+use tracing::debug;
 
 /// Debug event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -270,7 +270,7 @@ pub async fn handle_debug_websocket(
     // Send welcome
     let welcome = DebugEvent::info("connected", "Debug stream connected to elohim-storage");
     if let Ok(json) = serde_json::to_string(&welcome) {
-        let _ = ws_write.send(Message::Text(json.into())).await;
+        let _ = ws_write.send(Message::Text(json)).await;
     }
 
     loop {
@@ -279,7 +279,7 @@ pub async fn handle_debug_websocket(
                 match event {
                     Ok(evt) => {
                         if let Ok(json) = serde_json::to_string(&evt) {
-                            if ws_write.send(Message::Text(json.into())).await.is_err() {
+                            if ws_write.send(Message::Text(json)).await.is_err() {
                                 break;
                             }
                         }
@@ -287,7 +287,7 @@ pub async fn handle_debug_websocket(
                     Err(broadcast::error::RecvError::Lagged(n)) => {
                         let lag = DebugEvent::warn("lag", &format!("Dropped {} events", n));
                         if let Ok(json) = serde_json::to_string(&lag) {
-                            let _ = ws_write.send(Message::Text(json.into())).await;
+                            let _ = ws_write.send(Message::Text(json)).await;
                         }
                     }
                     Err(_) => break,
@@ -301,7 +301,7 @@ pub async fn handle_debug_websocket(
                         if text.contains("ping") {
                             let pong = DebugEvent::debug("pong", "pong");
                             if let Ok(json) = serde_json::to_string(&pong) {
-                                let _ = ws_write.send(Message::Text(json.into())).await;
+                                let _ = ws_write.send(Message::Text(json)).await;
                             }
                         }
                     }

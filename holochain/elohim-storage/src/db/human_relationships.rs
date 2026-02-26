@@ -369,12 +369,10 @@ pub fn update_custody(
     let custody_value = if custody.custody_enabled { 1 } else { 0 };
 
     // Check that mutual consent exists before enabling custody
-    if custody.custody_enabled {
-        if rel.consent_given_by_a != 1 || rel.consent_given_by_b != 1 {
-            return Err(StorageError::InvalidInput(
-                "Cannot enable custody without mutual consent".into(),
-            ));
-        }
+    if custody.custody_enabled && (rel.consent_given_by_a != 1 || rel.consent_given_by_b != 1) {
+        return Err(StorageError::InvalidInput(
+            "Cannot enable custody without mutual consent".into(),
+        ));
     }
 
     if rel.party_a_id == party_id {
@@ -429,17 +427,18 @@ pub fn update_custody(
         .ok_or_else(|| StorageError::Internal("Failed to retrieve updated relationship".into()))?;
 
     // Auto-enable custody at intimate level if both parties have enabled custody
-    if intimacy_levels::triggers_auto_custody(&updated.intimacy_level) {
-        if updated.custody_enabled_by_a == 1 && updated.custody_enabled_by_b == 1 {
-            diesel::update(
-                human_relationships::table
-                    .filter(human_relationships::app_id.eq(&ctx.app_id))
-                    .filter(human_relationships::id.eq(id)),
-            )
-            .set(human_relationships::auto_custody_enabled.eq(1))
-            .execute(conn)
-            .map_err(|e| StorageError::Internal(format!("Auto-custody update failed: {}", e)))?;
-        }
+    if intimacy_levels::triggers_auto_custody(&updated.intimacy_level)
+        && updated.custody_enabled_by_a == 1
+        && updated.custody_enabled_by_b == 1
+    {
+        diesel::update(
+            human_relationships::table
+                .filter(human_relationships::app_id.eq(&ctx.app_id))
+                .filter(human_relationships::id.eq(id)),
+        )
+        .set(human_relationships::auto_custody_enabled.eq(1))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("Auto-custody update failed: {}", e)))?;
     }
 
     get_human_relationship(conn, ctx, id)?

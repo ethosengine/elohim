@@ -50,14 +50,11 @@ use crate::sharding::{ShardEncoder, ShardManifest};
 use crate::sync::SyncManager;
 use crate::views::{
     validate_schema_versions,
-    ChapterView,
     ContentMasteryView,
     ContentStewardshipView,
     ContentView,
-    ContentWithTagsView,
     ContributorPresenceView,
     CreateAllocationInputView,
-    CreateChapterInputView,
     // InputView types for API boundary (camelCase with parsed JSON)
     CreateContentInputView,
     CreateContributorPresenceInputView,
@@ -66,18 +63,13 @@ use crate::views::{
     CreateMasteryInputView,
     CreatePathInputView,
     CreateRelationshipInputView,
-    CreateStepInputView,
     EconomicEventView,
-    HumanRelationshipView,
     InitiateClaimInputView,
     LocalSessionView,
     PathView,
     PathWithDetailsView,
     RelationshipView,
-    RelationshipWithContentView,
-    StepView,
     StewardshipAllocationView,
-    StewardshipAllocationWithPresenceView,
     UpdateAllocationInputView,
     SUPPORTED_SCHEMA_VERSIONS,
 };
@@ -88,7 +80,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{header, Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;

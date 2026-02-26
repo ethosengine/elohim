@@ -62,6 +62,7 @@ pub enum BlobSignal {
 const MAX_SIGNAL_CHUNK_SIZE: usize = 256 * 1024;
 
 /// Pending blob requests
+#[allow(dead_code)]
 struct PendingRequest {
     hash: String,
     requester: String,
@@ -143,8 +144,7 @@ impl SignalHandler {
         Ok(Some(BlobSignal::Announce {
             hash: hash.to_string(),
             size_bytes,
-            chunk_count: ((size_bytes + MAX_SIGNAL_CHUNK_SIZE as u64 - 1)
-                / MAX_SIGNAL_CHUNK_SIZE as u64) as u32,
+            chunk_count: size_bytes.div_ceil(MAX_SIGNAL_CHUNK_SIZE as u64) as u32,
             provider: self.my_agent_id.clone(),
         }))
     }
@@ -244,7 +244,7 @@ impl SignalHandler {
         hash: &str,
         size_bytes: u64,
         transfer_id: &str,
-        connection_info: &str,
+        _connection_info: &str,
     ) -> Result<Option<BlobSignal>, StorageError> {
         // TODO: Implement WebRTC or direct TCP transfer for large blobs
         warn!(
@@ -292,7 +292,7 @@ impl SignalHandler {
     pub async fn provide_blob(
         &self,
         hash: &str,
-        requester: &str,
+        _requester: &str,
     ) -> Result<Vec<BlobSignal>, StorageError> {
         let data = self.store.get(hash).await?;
         let size = data.len();
@@ -307,7 +307,7 @@ impl SignalHandler {
             }])
         } else if size <= MAX_SIGNAL_CHUNK_SIZE * 10 {
             // Send as multiple chunks via signals
-            let chunk_count = (size + MAX_SIGNAL_CHUNK_SIZE - 1) / MAX_SIGNAL_CHUNK_SIZE;
+            let chunk_count = size.div_ceil(MAX_SIGNAL_CHUNK_SIZE);
             let mut signals = Vec::with_capacity(chunk_count);
 
             for (i, chunk) in data.chunks(MAX_SIGNAL_CHUNK_SIZE).enumerate() {

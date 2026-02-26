@@ -221,6 +221,7 @@ impl P2PNode {
         Ok(Self {
             identity,
             config,
+            #[allow(clippy::arc_with_non_send_sync)]
             swarm: Arc::new(RwLock::new(swarm)),
             blob_store,
             sync_manager,

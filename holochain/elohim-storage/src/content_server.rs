@@ -26,7 +26,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::conductor_client::ConductorClient;
 use crate::error::StorageError;
@@ -158,6 +158,7 @@ pub struct ContentServerBridge {
     /// Cell ID (dna_hash + agent_pubkey) - cached after first discovery
     cell_id: Option<Vec<u8>>,
     /// Agent public key
+    #[allow(dead_code)]
     agent_pubkey: String,
     /// Registered content servers (action_hash by content_hash)
     registrations: std::collections::HashMap<String, Vec<u8>>,
@@ -201,8 +202,7 @@ impl ContentServerBridge {
     /// Get the cell ID (returns error if not set)
     fn get_cell_id(&self) -> Result<&[u8], StorageError> {
         self.cell_id
-            .as_ref()
-            .map(|v| v.as_slice())
+            .as_deref()
             .ok_or_else(|| StorageError::Config("Cell ID not set".into()))
     }
 

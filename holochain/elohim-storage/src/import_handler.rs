@@ -563,7 +563,7 @@ impl ImportHandler {
 
         // Send request
         write
-            .send(Message::Binary(envelope_buf.into()))
+            .send(Message::Binary(envelope_buf))
             .await
             .map_err(|e| StorageError::Connection(format!("Failed to send: {}", e)))?;
 
@@ -665,7 +665,7 @@ impl ImportHandler {
             .map_err(|e| StorageError::Parse(format!("Failed to encode envelope: {}", e)))?;
 
         write
-            .send(Message::Binary(buf.into()))
+            .send(Message::Binary(buf))
             .await
             .map_err(|e| StorageError::Connection(format!("Failed to send auth request: {}", e)))?;
 
@@ -698,12 +698,10 @@ impl ImportHandler {
                         Some(Ok(Message::Binary(data))) => {
                             // Check if this is an error message
                             let mut cursor = Cursor::new(&data[..]);
-                            if let Ok(value) = rmpv::decode::read_value(&mut cursor) {
-                                if let Value::Map(ref map) = value {
-                                    if let Some(resp_type) = get_string_field(map, "type") {
-                                        if resp_type == "error" {
-                                            return Err(StorageError::Auth("Authentication rejected".to_string()));
-                                        }
+                            if let Ok(Value::Map(ref map)) = rmpv::decode::read_value(&mut cursor) {
+                                if let Some(resp_type) = get_string_field(map, "type") {
+                                    if resp_type == "error" {
+                                        return Err(StorageError::Auth("Authentication rejected".to_string()));
                                     }
                                 }
                             }
@@ -851,7 +849,7 @@ impl ImportHandler {
 
         let total_items = items.len();
         let chunk_size = self.config.chunk_size;
-        let total_chunks = (total_items + chunk_size - 1) / chunk_size;
+        let total_chunks = total_items.div_ceil(chunk_size);
 
         info!(
             batch_id = %payload.batch_id,
@@ -991,6 +989,7 @@ impl ImportHandler {
     // ========================================================================
 
     /// Call process_import_chunk on zome and wait for response
+    #[allow(clippy::too_many_arguments)]
     async fn call_process_chunk<S>(
         &self,
         ws: &mut S,
@@ -1076,7 +1075,7 @@ impl ImportHandler {
             .map_err(|e| StorageError::Parse(format!("Failed to encode envelope: {}", e)))?;
 
         // Send request
-        ws.send(Message::Binary(envelope_buf.into()))
+        ws.send(Message::Binary(envelope_buf))
             .await
             .map_err(|e| StorageError::Connection(format!("Failed to send: {}", e)))?;
 

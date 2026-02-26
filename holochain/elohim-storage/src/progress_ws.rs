@@ -169,7 +169,7 @@ async fn handle_connection(
 
                                 let initial = ProgressMessage::InitialState { batches: states };
                                 let json = serde_json::to_string(&initial)?;
-                                ws_sink.send(WsMessage::Text(json.into())).await?;
+                                ws_sink.send(WsMessage::Text(json)).await?;
                             }
                             Ok(ClientMessage::Unsubscribe { batch_ids }) => {
                                 for id in batch_ids {
@@ -188,7 +188,7 @@ async fn handle_connection(
                                     timestamp: chrono::Utc::now().to_rfc3339(),
                                 };
                                 let json = serde_json::to_string(&heartbeat)?;
-                                ws_sink.send(WsMessage::Text(json.into())).await?;
+                                ws_sink.send(WsMessage::Text(json)).await?;
                             }
                             Err(e) => {
                                 warn!(error = %e, text = %text, "Failed to parse client message");
@@ -236,7 +236,7 @@ async fn handle_connection(
 
                         if should_send {
                             let json = serde_json::to_string(&message)?;
-                            if let Err(e) = ws_sink.send(WsMessage::Text(json.into())).await {
+                            if let Err(e) = ws_sink.send(WsMessage::Text(json)).await {
                                 warn!(error = %e, "Failed to send progress to client");
                                 break;
                             }
@@ -258,7 +258,7 @@ async fn handle_connection(
                     timestamp: chrono::Utc::now().to_rfc3339(),
                 };
                 let json = serde_json::to_string(&heartbeat)?;
-                if let Err(e) = ws_sink.send(WsMessage::Text(json.into())).await {
+                if let Err(e) = ws_sink.send(WsMessage::Text(json)).await {
                     warn!(error = %e, "Failed to send heartbeat");
                     break;
                 }

@@ -13,7 +13,6 @@ use crate::blob_store::BlobStore;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 use serde::{Deserialize, Serialize};
 use std::io;
-use tracing::{debug, info};
 
 /// Default shard size (1MB)
 pub const DEFAULT_SHARD_SIZE: usize = 1024 * 1024;
@@ -136,7 +135,7 @@ impl ShardEncoder {
             "chunked" => {
                 // Split into sequential chunks
                 let shard_size = self.config.shard_size as u64;
-                let num_shards = (data.len() + self.config.shard_size - 1) / self.config.shard_size;
+                let num_shards = data.len().div_ceil(self.config.shard_size);
                 let mut hashes = Vec::with_capacity(num_shards);
 
                 for i in 0..num_shards {
@@ -156,8 +155,7 @@ impl ShardEncoder {
                 )
                 .unwrap();
 
-                let shard_size = (data.len() + self.config.rs_data_shards as usize - 1)
-                    / self.config.rs_data_shards as usize;
+                let shard_size = data.len().div_ceil(self.config.rs_data_shards as usize);
 
                 // Pad data to align with shard size
                 let mut padded_data = data.to_vec();
@@ -226,8 +224,7 @@ impl ShardEncoder {
                 )
                 .unwrap();
 
-                let shard_size = (data.len() + self.config.rs_data_shards as usize - 1)
-                    / self.config.rs_data_shards as usize;
+                let shard_size = data.len().div_ceil(self.config.rs_data_shards as usize);
 
                 // Pad data
                 let mut padded_data = data.to_vec();
@@ -329,8 +326,8 @@ impl ShardEncoder {
 
                 // Concatenate data shards (shard_vecs updated in place by reconstruct)
                 let mut data = Vec::with_capacity(manifest.total_size as usize);
-                for i in 0..manifest.data_shards as usize {
-                    data.extend_from_slice(&shard_vecs[i]);
+                for shard in shard_vecs.iter().take(manifest.data_shards as usize) {
+                    data.extend_from_slice(shard);
                 }
                 data.truncate(manifest.total_size as usize);
 

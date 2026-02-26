@@ -109,12 +109,12 @@ impl RelationshipService {
         }
 
         // Check for cycles if this is a hierarchical relationship
-        if self.is_hierarchical(&input.relationship_type) {
-            if self.would_create_cycle(&input.source_id, &input.target_id)? {
-                return Err(StorageError::InvalidInput(
-                    "This relationship would create a cycle in the content graph".into(),
-                ));
-            }
+        if self.is_hierarchical(&input.relationship_type)
+            && self.would_create_cycle(&input.source_id, &input.target_id)?
+        {
+            return Err(StorageError::InvalidInput(
+                "This relationship would create a cycle in the content graph".into(),
+            ));
         }
 
         // Create relationship

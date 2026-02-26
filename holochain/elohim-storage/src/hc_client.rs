@@ -76,6 +76,7 @@ pub struct HcClientConfig {
 }
 
 /// Holochain client with proper signing support
+#[allow(dead_code)]
 pub struct HcClient {
     config: HcClientConfig,
     /// Admin websocket connection

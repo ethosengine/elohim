@@ -71,6 +71,7 @@ pub struct ConductorClient {
     next_id: AtomicU64,
 }
 
+#[allow(dead_code)]
 struct PendingRequest {
     id: u64,
     payload: Vec<u8>,
@@ -260,9 +261,9 @@ async fn connection_loop(
                 }
 
                 // Pending responses by ID
-                let pending: Arc<
-                    Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>,
-                > = Arc::new(Mutex::new(HashMap::new()));
+                type PendingMap =
+                    Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Vec<u8>, StorageError>>>>>;
+                let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
                 let pending_for_recv = Arc::clone(&pending);
 
                 // Spawn receiver task
@@ -444,8 +445,7 @@ async fn connect_to_conductor(
 
 /// Get auth token from admin interface (Holochain 0.6+ format)
 async fn get_auth_token(admin_url: &str, app_id: &str) -> Result<Vec<u8>, StorageError> {
-    use rmpv::{decode::read_value, encode::write_value};
-    use std::io::Cursor;
+    use rmpv::encode::write_value;
 
     debug!(admin_url = %admin_url, app_id = %app_id, "Getting auth token from admin interface");
 

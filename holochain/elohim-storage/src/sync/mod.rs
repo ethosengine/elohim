@@ -29,14 +29,14 @@ pub use stream::{StreamPosition, StreamTracker};
 use crate::error::StorageError;
 use automerge::Automerge;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::debug;
 
 /// Sync manager coordinates document synchronization
 pub struct SyncManager {
     /// Document store
     doc_store: Arc<DocStore>,
     /// Stream position tracker
+    #[allow(dead_code)]
     stream_tracker: Arc<StreamTracker>,
 }
 

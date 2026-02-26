@@ -241,6 +241,7 @@ enum ZomeResultWrapper {
 // ============================================================================
 
 /// State for an active import batch
+#[allow(dead_code)]
 struct ImportBatch {
     batch_id: String,
     batch_type: String,
@@ -918,6 +919,7 @@ impl ImportApi {
 /// Separate struct for processing to avoid lifetime issues
 struct ImportApiProcessor {
     config: ImportApiConfig,
+    #[allow(dead_code)]
     blob_store: Arc<BlobStore>,
     hc_client: Option<Arc<HcClient>>,
     batches: Arc<RwLock<HashMap<String, ImportBatch>>>,
@@ -989,7 +991,7 @@ impl ImportApiProcessor {
             .map(Duration::from_millis)
             .unwrap_or(self.config.chunk_delay);
 
-        let estimated_chunks = (total + chunk_size - 1) / chunk_size;
+        let estimated_chunks = total.div_ceil(chunk_size);
 
         info!(
             batch_id = %batch_id,

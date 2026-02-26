@@ -1,10 +1,8 @@
 //! Path and Step CRUD operations
 
+use crate::error::StorageError;
 use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
-use tracing::debug;
-
-use crate::error::StorageError;
 
 /// Path row from database
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -257,7 +255,7 @@ fn get_chapters_for_path(
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let chapter_rows = stmt
-        .query_map(params![path_id], |row| ChapterRow::from_row(row))
+        .query_map(params![path_id], ChapterRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
     let mut chapters = vec![];
@@ -283,7 +281,7 @@ fn get_steps_for_chapter(
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![chapter_id], |row| StepRow::from_row(row))
+        .query_map(params![chapter_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -300,7 +298,7 @@ fn get_ungrouped_steps(conn: &Connection, path_id: &str) -> Result<Vec<StepRow>,
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![path_id], |row| StepRow::from_row(row))
+        .query_map(params![path_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -517,7 +515,7 @@ pub fn get_steps_for_path(conn: &Connection, path_id: &str) -> Result<Vec<StepRo
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![path_id], |row| StepRow::from_row(row))
+        .query_map(params![path_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -532,7 +530,7 @@ pub fn get_chapters(conn: &Connection, path_id: &str) -> Result<Vec<ChapterRow>,
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let chapter_rows = stmt
-        .query_map(params![path_id], |row| ChapterRow::from_row(row))
+        .query_map(params![path_id], ChapterRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
     let mut chapters = vec![];
@@ -558,7 +556,7 @@ fn get_steps_for_chapter_internal(
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
     let steps: Vec<StepRow> = stmt
-        .query_map(params![chapter_id], |row| StepRow::from_row(row))
+        .query_map(params![chapter_id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| StorageError::Internal(format!("Row parse failed: {}", e)))?;
@@ -596,7 +594,7 @@ pub fn create_step(conn: &mut Connection, input: CreateStepInput) -> Result<Step
         .prepare("SELECT * FROM steps WHERE id = ?")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
-    stmt.query_row(params![input.id], |row| StepRow::from_row(row))
+    stmt.query_row(params![input.id], StepRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Step not found after insert: {}", e)))
 }
 
@@ -636,7 +634,7 @@ pub fn create_chapter(
         .prepare("SELECT * FROM chapters WHERE id = ?")
         .map_err(|e| StorageError::Internal(format!("Prepare failed: {}", e)))?;
 
-    stmt.query_row(params![input.id], |row| ChapterRow::from_row(row))
+    stmt.query_row(params![input.id], ChapterRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Chapter not found after insert: {}", e)))
 }
 

@@ -5,8 +5,7 @@
 use automerge::Automerge;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::error::StorageError;
 

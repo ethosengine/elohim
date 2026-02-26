@@ -29,7 +29,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use tracing::info;
 
 use crate::error::StorageError;
 use crate::sovereignty::ClusterRole;
@@ -38,7 +38,9 @@ use crate::sovereignty::ClusterRole;
 use libp2p::PeerId;
 
 /// Trust level determines replication priority
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum TrustLevel {
     /// Immediate family - highest replication priority
     Family,
@@ -49,13 +51,8 @@ pub enum TrustLevel {
     /// Association/organization members
     Association,
     /// Public network (lowest priority)
+    #[default]
     Network,
-}
-
-impl Default for TrustLevel {
-    fn default() -> Self {
-        Self::Network
-    }
 }
 
 /// A member of the trust network

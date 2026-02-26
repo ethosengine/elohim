@@ -266,7 +266,7 @@ async fn async_main(
             // Generate a placeholder agent key if none provided
             format!(
                 "uhCAk_{}",
-                uuid::Uuid::new_v4().to_string().replace("-", "")[..32].to_string()
+                &uuid::Uuid::new_v4().to_string().replace("-", "")[..32]
             )
         });
 

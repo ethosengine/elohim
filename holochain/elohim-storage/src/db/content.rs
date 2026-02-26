@@ -209,7 +209,7 @@ pub fn list_content(
     let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
     let rows = stmt
-        .query_map(param_refs.as_slice(), |row| ContentRow::from_row(row))
+        .query_map(param_refs.as_slice(), ContentRow::from_row)
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
 
     let mut results = vec![];

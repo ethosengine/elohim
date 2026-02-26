@@ -212,7 +212,7 @@ impl NodeIdentity {
     }
 
     /// Check if this node should serve a given agent
-    pub fn should_serve(&self, requester_agent: &str) -> bool {
+    pub fn should_serve(&self, _requester_agent: &str) -> bool {
         if self.capabilities.serve_public {
             return true;
         }

@@ -29,8 +29,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tokio::fs;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Raw codec for CID (raw bytes, no structure)
 const RAW_CODEC: u64 = 0x55;
@@ -295,7 +294,7 @@ impl BlobStore {
 
         fs::create_dir_all(&chunk_dir).await?;
 
-        let chunk_count = (data.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        let chunk_count = data.len().div_ceil(CHUNK_SIZE);
         let mut chunk_hashes = Vec::with_capacity(chunk_count);
 
         for (i, chunk) in data.chunks(CHUNK_SIZE).enumerate() {
@@ -410,7 +409,7 @@ impl BlobStore {
         let blob_path = self.blob_path(hash);
 
         // Check if file exists
-        if !fs::metadata(&blob_path).await.is_ok() {
+        if fs::metadata(&blob_path).await.is_err() {
             return Err(StorageError::NotFound(hash.to_string()));
         }
 

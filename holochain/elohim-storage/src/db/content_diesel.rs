@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::context::AppContext;
 use super::diesel_schema::{content, content_tags};
-use super::models::{Content, ContentTag, ContentWithTags, NewContent, NewContentTag};
+use super::models::{Content, ContentWithTags, NewContent, NewContentTag};
 use crate::error::StorageError;
 
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
