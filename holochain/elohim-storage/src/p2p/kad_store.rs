@@ -322,7 +322,7 @@ mod tests {
         let db = sled::open(dir.path()).unwrap();
         let mut store = SledRecordStore::from_db(db).unwrap();
 
-        let key = RecordKey::new(&b"test-key"[..]);
+        let key = RecordKey::new(b"test-key");
         let record = Record {
             key: key.clone(),
             value: b"test-value".to_vec(),
@@ -343,7 +343,7 @@ mod tests {
     fn test_records_persist_across_reopen() {
         let dir = tempfile::tempdir().unwrap();
 
-        let key = RecordKey::new(&b"persist-key"[..]);
+        let key = RecordKey::new(b"persist-key");
         let record = Record {
             key: key.clone(),
             value: b"persist-value".to_vec(),

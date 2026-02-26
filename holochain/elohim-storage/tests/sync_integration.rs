@@ -49,7 +49,7 @@ async fn test_single_node_document_lifecycle() {
     .unwrap();
 
     // Get heads before saving
-    let heads_before: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
+    let _heads_before: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
 
     // Save via apply_changes (simulating receiving changes)
     let changes = doc.save();
@@ -172,7 +172,7 @@ async fn test_offline_merge() {
         Ok(())
     })
     .unwrap();
-    let node1_offline_changes = doc1.save_after(
+    let _node1_offline_changes = doc1.save_after(
         &node1_heads_initial
             .iter()
             .filter_map(|h| {

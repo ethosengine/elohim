@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_validate_empty_id() {
-        let events = Arc::new(EventBus::new());
+        let _events = Arc::new(EventBus::new());
         // Can't test without ContentDb, but validation is straightforward
     }
 }

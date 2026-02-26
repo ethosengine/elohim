@@ -257,8 +257,6 @@ fn extract_token_from_response(data: &[u8]) -> Result<Vec<u8>, StorageError> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // Integration tests would require a running conductor
     // Unit tests for the extraction logic could go here
 }
