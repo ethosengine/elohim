@@ -22,15 +22,41 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
 
-/// Parse a JSON string to Value, returning null on parse failure.
+/// Wrapper for `serde_json::Value` that controls ts-rs export location.
+///
+/// This replaces the `serde-json-impl` feature of ts-rs, which exports
+/// `JsonValue.ts` to `bindings/serde_json/` — a different directory than
+/// our View types. When other generated files import `JsonValue`, ts-rs
+/// calculates a cross-directory relative path that breaks at build time.
+///
+/// By owning the type locally, we set `export_to` to the same directory
+/// as all View types, so all imports resolve as `"./JsonValue"`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(transparent)]
+#[ts(
+    export,
+    export_to = "../../sdk/storage-client-ts/src/generated/",
+    rename = "JsonValue"
+)]
+pub struct JsonVal(
+    #[ts(
+        type = "number | string | boolean | Array<JsonValue> | { [key in string]?: JsonValue } | null"
+    )]
+    pub Value,
+);
+
+/// Parse a JSON string to JsonVal, returning None on parse failure.
 /// This encapsulates the storage format (TEXT) from the API contract.
-fn parse_json_opt(json_str: &Option<String>) -> Option<Value> {
-    json_str.as_ref().and_then(|s| serde_json::from_str(s).ok())
+fn parse_json_opt(json_str: &Option<String>) -> Option<JsonVal> {
+    json_str
+        .as_ref()
+        .and_then(|s| serde_json::from_str(s).ok())
+        .map(JsonVal)
 }
 
-/// Parse a required JSON string to Value, returning empty object on failure.
-fn parse_json(json_str: &str) -> Value {
-    serde_json::from_str(json_str).unwrap_or(Value::Object(serde_json::Map::new()))
+/// Parse a required JSON string to JsonVal, returning empty object on failure.
+fn parse_json(json_str: &str) -> JsonVal {
+    JsonVal(serde_json::from_str(json_str).unwrap_or(Value::Object(serde_json::Map::new())))
 }
 
 /// Default schema version for InputView types.
@@ -114,7 +140,7 @@ pub struct ContentView {
     pub blob_cid: Option<String>,
     pub content_size_bytes: Option<i32>,
     /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     pub reach: String,
     pub validation_status: String,
     pub created_by: Option<String>,
@@ -206,7 +232,7 @@ pub struct PathView {
     pub thumbnail_url: Option<String>,
     pub thumbnail_alt: Option<String>,
     /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     pub visibility: String,
     pub created_by: Option<String>,
     pub created_at: String,
@@ -322,7 +348,7 @@ pub struct StepView {
     pub order_index: i32,
     pub estimated_duration: Option<String>,
     /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<Step> for StepView {
@@ -500,11 +526,11 @@ pub struct RelationshipView {
     pub is_bidirectional: bool,
     pub inverse_relationship_id: Option<String>,
     /// Parsed provenance chain (was provenance_chain_json string in storage)
-    pub provenance_chain: Option<Value>,
+    pub provenance_chain: Option<JsonVal>,
     pub governance_layer: Option<String>,
     pub reach: String,
     /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -601,7 +627,7 @@ pub struct HumanRelationshipView {
     pub governance_layer: Option<String>,
     pub reach: String,
     /// Parsed context object (was context_json string in storage)
-    pub context: Option<Value>,
+    pub context: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
     pub expires_at: Option<String>,
@@ -648,15 +674,15 @@ pub struct ContributorPresenceView {
     pub display_name: String,
     pub presence_state: String,
     /// Parsed external identifiers (was external_identifiers_json string in storage)
-    pub external_identifiers: Option<Value>,
+    pub external_identifiers: Option<JsonVal>,
     /// Parsed establishing content IDs (was establishing_content_ids_json string in storage)
-    pub establishing_content_ids: Value,
+    pub establishing_content_ids: JsonVal,
     pub affinity_total: f32,
     pub unique_engagers: i32,
     pub citation_count: i32,
     pub recognition_score: f32,
     /// Parsed recognition by content (was recognition_by_content_json string in storage)
-    pub recognition_by_content: Option<Value>,
+    pub recognition_by_content: Option<JsonVal>,
     pub last_recognition_at: Option<String>,
     pub steward_id: Option<String>,
     pub stewardship_started_at: Option<String>,
@@ -666,14 +692,14 @@ pub struct ContributorPresenceView {
     pub claim_verified_at: Option<String>,
     pub claim_verification_method: Option<String>,
     /// Parsed claim evidence (was claim_evidence_json string in storage)
-    pub claim_evidence: Option<Value>,
+    pub claim_evidence: Option<JsonVal>,
     pub claimed_agent_id: Option<String>,
     pub claim_recognition_transferred_value: Option<f32>,
     pub claim_facilitated_by: Option<String>,
     pub image: Option<String>,
     pub note: Option<String>,
     /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -729,7 +755,7 @@ pub struct EconomicEventView {
     pub resource_conforms_to: Option<String>,
     pub resource_inventoried_as: Option<String>,
     /// Parsed resource classification (was resource_classified_as_json string in storage)
-    pub resource_classified_as: Option<Value>,
+    pub resource_classified_as: Option<JsonVal>,
     pub resource_quantity_value: Option<f32>,
     pub resource_quantity_unit: Option<String>,
     pub effort_quantity_value: Option<f32>,
@@ -746,7 +772,7 @@ pub struct EconomicEventView {
     pub state: String,
     pub note: Option<String>,
     /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     pub created_at: String,
 }
 
@@ -804,9 +830,9 @@ pub struct ContentMasteryView {
     pub level_achieved_at: Option<String>,
     pub content_version_at_mastery: Option<String>,
     /// Parsed assessment evidence (was assessment_evidence_json string in storage)
-    pub assessment_evidence: Option<Value>,
+    pub assessment_evidence: Option<JsonVal>,
     /// Parsed privileges (was privileges_json string in storage)
-    pub privileges: Option<Value>,
+    pub privileges: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -851,7 +877,7 @@ pub struct StewardshipAllocationView {
     pub allocation_method: String,
     pub contribution_type: String,
     /// Parsed contribution evidence (was contribution_evidence_json string in storage)
-    pub contribution_evidence: Option<Value>,
+    pub contribution_evidence: Option<JsonVal>,
     pub governance_state: String,
     pub dispute_id: Option<String>,
     pub dispute_reason: Option<String>,
@@ -867,7 +893,7 @@ pub struct StewardshipAllocationView {
     pub last_recognition_at: Option<String>,
     pub note: Option<String>,
     /// Parsed metadata object (was metadata_json string in storage)
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -996,9 +1022,9 @@ impl From<LocalSession> for LocalSessionView {
 // objects. They convert to internal DB Input types which use snake_case with
 // String fields. This encapsulates JSON serialization at the API boundary.
 
-/// Serialize a Value to JSON string for DB storage, or None if null/absent.
-fn serialize_json_opt(value: &Option<Value>) -> Option<String> {
-    value.as_ref().map(|v| v.to_string())
+/// Serialize a JsonVal to JSON string for DB storage, or None if null/absent.
+fn serialize_json_opt(value: &Option<JsonVal>) -> Option<String> {
+    value.as_ref().map(|v| v.0.to_string())
 }
 
 // ============================================================================
@@ -1032,7 +1058,7 @@ pub struct CreateContentInputView {
     pub content_size_bytes: Option<i64>,
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     #[serde(default)]
     pub reach: Option<String>,
     #[serde(default)]
@@ -1093,7 +1119,7 @@ pub struct CreateStepInputView {
     pub estimated_duration: Option<String>,
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<CreateStepInputView> for CreateStepInput {
@@ -1169,7 +1195,7 @@ pub struct CreatePathInputView {
     pub thumbnail_alt: Option<String>,
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
     #[serde(default)]
     pub visibility: Option<String>,
     #[serde(default)]
@@ -1224,7 +1250,7 @@ pub struct CreateRelationshipInputView {
     pub inference_source: Option<String>,
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<CreateRelationshipInputView> for CreateRelationshipInput {
@@ -1274,7 +1300,7 @@ pub struct CreateHumanRelationshipInputView {
     pub reach: Option<String>,
     /// Parsed context object (serialized to JSON string for DB)
     #[serde(default)]
-    pub context: Option<Value>,
+    pub context: Option<JsonVal>,
     #[serde(default)]
     pub expires_at: Option<String>,
 }
@@ -1319,7 +1345,7 @@ pub struct CreateContributorPresenceInputView {
     pub display_name: String,
     /// Parsed external identifiers (serialized to JSON string for DB)
     #[serde(default)]
-    pub external_identifiers: Option<Value>,
+    pub external_identifiers: Option<JsonVal>,
     pub establishing_content_ids: Vec<String>,
     #[serde(default)]
     pub image: Option<String>,
@@ -1327,7 +1353,7 @@ pub struct CreateContributorPresenceInputView {
     pub note: Option<String>,
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<CreateContributorPresenceInputView> for CreateContributorPresenceInput {
@@ -1355,7 +1381,7 @@ pub struct InitiateClaimInputView {
     pub verification_method: String,
     /// Parsed evidence object (serialized to JSON string for DB)
     #[serde(default)]
-    pub evidence: Option<Value>,
+    pub evidence: Option<JsonVal>,
     #[serde(default)]
     pub facilitated_by: Option<String>,
 }
@@ -1425,7 +1451,7 @@ pub struct CreateEconomicEventInputView {
     pub note: Option<String>,
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<CreateEconomicEventInputView> for CreateEconomicEventInput {
@@ -1480,12 +1506,12 @@ pub struct CreateAllocationInputView {
     pub contribution_type: Option<String>,
     /// Parsed contribution evidence (serialized to JSON string for DB)
     #[serde(default)]
-    pub contribution_evidence: Option<Value>,
+    pub contribution_evidence: Option<JsonVal>,
     #[serde(default)]
     pub note: Option<String>,
     /// Parsed metadata object (serialized to JSON string for DB)
     #[serde(default)]
-    pub metadata: Option<Value>,
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<CreateAllocationInputView> for CreateAllocationInput {
@@ -1520,7 +1546,7 @@ pub struct UpdateAllocationInputView {
     pub contribution_type: Option<String>,
     /// Parsed contribution evidence (serialized to JSON string for DB)
     #[serde(default)]
-    pub contribution_evidence: Option<Value>,
+    pub contribution_evidence: Option<JsonVal>,
     #[serde(default)]
     pub governance_state: Option<String>,
     #[serde(default)]
