@@ -57,6 +57,7 @@ pub mod progress_ws;
 pub mod cell_discovery;
 pub mod debug_stream;
 pub mod services;
+pub mod node_registry_api;
 
 // View types for HTTP API responses (camelCase serialization for TypeScript)
 pub mod views;
@@ -87,6 +88,7 @@ pub use http::HttpServer;
 pub use import_handler::{ImportHandler, ImportHandlerConfig, ImportProgress};
 pub use progress_hub::{ProgressHub, ProgressHubConfig, ProgressMessage};
 pub use debug_stream::{DebugBroadcaster, DebugEvent};
+pub use node_registry_api::{NodeRegistryApi, ShardAssignment, ShardStatus, ShardingStrategy};
 
 // P2P re-exports
 pub use identity::{NodeCapabilities, NodeIdentityInfo};

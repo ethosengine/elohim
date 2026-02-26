@@ -443,6 +443,24 @@ async fn async_main(import_runtime: tokio::runtime::Handle) -> Result<(), Box<dy
         http_server = http_server.with_import_api(Arc::clone(api));
     }
 
+    // Initialize and attach Node Registry API
+    info!("Initializing Node Registry API connection...");
+    match elohim_storage::NodeRegistryApi::connect(
+        args.admin_url.clone().unwrap_or_else(|| "ws://localhost:4444".to_string()),
+        args.app_url.clone(),
+        args.app_id.clone(),
+    )
+    .await
+    {
+        Ok(api) => {
+            info!("  ✅ Node Registry API connected");
+            http_server = http_server.with_node_registry_api(Arc::new(api));
+        }
+        Err(e) => {
+            warn!("  ⚠️ Node Registry API connection failed: {}", e);
+        }
+    }
+
     // Attach ContentDb and Services to HttpServer if enabled
     if let Some(ref db) = content_db {
         http_server = http_server.with_content_db(Arc::clone(db));

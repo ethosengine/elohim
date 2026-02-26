@@ -376,6 +376,11 @@ impl ImportApi {
         self.hc_client.is_none()
     }
 
+    /// Get the active HcClient if connected
+    pub fn hc_client(&self) -> Option<Arc<HcClient>> {
+        self.hc_client.clone()
+    }
+
     /// Initialize Holochain client with retry logic.
     ///
     /// Uses the official `holochain_client` crate for properly signed zome calls.

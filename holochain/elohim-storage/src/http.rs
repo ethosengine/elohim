@@ -90,6 +90,8 @@ pub struct HttpServer {
     services: Option<Arc<Services>>,
     /// Policy enforcement for stewardship content filtering
     policy_enforcement: Option<Arc<PolicyEnforcement>>,
+    /// Node Registry API for tracking shards
+    node_registry_api: Option<Arc<crate::node_registry_api::NodeRegistryApi>>,
     /// P2P handle for status endpoint (Send+Sync safe)
     #[cfg(feature = "p2p")]
     p2p_handle: Option<crate::p2p::P2PHandle>,
@@ -133,6 +135,7 @@ impl HttpServer {
             db_pool: None,
             services: None,
             policy_enforcement: None,
+            node_registry_api: None,
             #[cfg(feature = "p2p")]
             p2p_handle: None,
         }
@@ -147,6 +150,12 @@ impl HttpServer {
     /// Set the Progress Hub for WebSocket streaming
     pub fn with_progress_hub(mut self, hub: Arc<ProgressHub>) -> Self {
         self.progress_hub = Some(hub);
+        self
+    }
+
+    /// Set the Node Registry API
+    pub fn with_node_registry_api(mut self, api: Arc<crate::node_registry_api::NodeRegistryApi>) -> Self {
+        self.node_registry_api = Some(api);
         self
     }
 
@@ -581,6 +590,8 @@ impl HttpServer {
             .unwrap_or("application/octet-stream")
             .to_string();
 
+        let agent_id = Self::extract_agent_id(&req).unwrap_or_else(|| "did:elohim:storage".to_string());
+        
         // Read body
         let body = req.collect().await.map_err(|e| {
             StorageError::Internal(format!("Failed to read body: {}", e))
@@ -631,6 +642,36 @@ impl HttpServer {
             }
 
             self.blob_store.store(&shard_data).await?;
+
+            // Register with Node Registry if available
+            if let Some(ref nr_api) = self.node_registry_api {
+                let assignment = crate::node_registry_api::ShardAssignment {
+                    assignment_hash: None,
+                    content_hash: expected_hex.to_string(), // The full content hash
+                    // Ideally, use the actual agent ID (e.g. from X-Agent-Id header) if provided;
+                    // fallback to a generic placeholder or the configured connection's role for now.
+                    custodian_did: agent_id.clone(),
+                    shard_index: i as u32,
+                    strategy: crate::node_registry_api::ShardingStrategy::Geographic,
+                    status: crate::node_registry_api::ShardStatus::Active,
+                    verified_at: None,
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    updated_at: chrono::Utc::now().to_rfc3339(),
+                };
+                if let Err(e) = nr_api.create_shard_assignment(assignment).await {
+                    warn!(
+                        error = %e,
+                        shard_index = i,
+                        "Failed to register shard assignment with Node Registry"
+                    );
+                } else {
+                    info!(
+                        shard_index = i,
+                        content_hash = %expected_hex,
+                        "Registered shard assignment with Node Registry"
+                    );
+                }
+            }
         }
 
         // Store manifest
