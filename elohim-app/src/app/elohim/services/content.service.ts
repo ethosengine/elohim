@@ -314,7 +314,9 @@ export class ContentService {
         const contentBody = data.contentBody ?? '';
 
         const isBlobReference =
-          contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
+          contentBody.startsWith('sha256:') ||
+          contentBody.startsWith('sha256-') ||
+          contentBody.startsWith('bafk');
         const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 
@@ -347,8 +349,11 @@ export class ContentService {
    * Fetch blob content by CID from storage
    */
   private fetchBlobContent(blobCid: string): Observable<string> {
-    // Normalize hash format: storage expects sha256- (hyphen) not sha256: (colon)
-    const normalizedCid = blobCid.replace('sha256:', 'sha256-');
+    // Normalize content address: CIDv1 (bafkrei...) passes through,
+    // legacy formats normalized to sha256-{hex}. Backend handles all formats.
+    const normalizedCid = blobCid.startsWith('bafk')
+      ? blobCid
+      : blobCid.replace('sha256:', 'sha256-');
 
     // Check cache first
     const cached = this.blobCache.get(normalizedCid);
@@ -863,9 +868,13 @@ export class ContentService {
       blobHash = value.slice(5);
     }
 
-    // Only convert to blob URL if it looks like a hash (sha256-... or sha256:...)
-    // Other relative paths should pass through unchanged
-    if (!blobHash.startsWith('sha256-') && !blobHash.startsWith('sha256:')) {
+    // Only convert to blob URL if it looks like a content address
+    // (CIDv1 bafk..., sha256-..., or sha256:...). Other relative paths pass through.
+    if (
+      !blobHash.startsWith('sha256-') &&
+      !blobHash.startsWith('sha256:') &&
+      !blobHash.startsWith('bafk')
+    ) {
       return value;
     }
 

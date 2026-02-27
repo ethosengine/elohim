@@ -315,6 +315,19 @@
   text-decoration: underline;
 }
 
+/* EPR protocol links — visually distinct from regular links */
+:host ::ng-deep .markdown-content a.epr-link-inline {
+  color: var(--lamad-accent-secondary, #4f46e5);
+  border-bottom: 1px dashed var(--lamad-accent-secondary, #4f46e5);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+:host ::ng-deep .markdown-content a.epr-link-inline:hover {
+  border-bottom-style: solid;
+  text-decoration: none;
+}
+
 /* =============================================================================
    Heading Anchors
    ============================================================================= */

@@ -31,6 +31,20 @@ export { ElohimPresenceService } from './elohim-presence.service';
 export { ContextAssemblyService } from './context-assembly.service';
 export type { ContextAssemblyResult, AssemblyOptions } from './context-assembly.service';
 
+// EPR resolution
+export {
+  EprResolverService,
+  isContentAddress,
+  normalizeContentAddress,
+} from './epr-resolver.service';
+export type {
+  ResolvedEpr,
+  ResolvedContent,
+  ContextResolvedRoute,
+  StepRef,
+  CrossPathMatch,
+} from './epr-resolver.service';
+
 // Cross-pillar services (formerly in shared/)
 export { ProfileService } from './profile.service';
 export { HumanConsentService } from './human-consent.service';

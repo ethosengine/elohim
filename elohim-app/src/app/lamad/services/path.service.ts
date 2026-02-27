@@ -14,6 +14,7 @@ import {
 } from '@app/elohim/models/agent.model';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
+import { type CrossPathMatch } from '@app/elohim/services/epr-resolver.service';
 
 import {
   LearningPath,
@@ -1110,5 +1111,45 @@ export class PathService {
       }
     }
     return false;
+  }
+
+  // =========================================================================
+  // CROSS-PATH CONTENT LOOKUP (for context-aware EPR resolution)
+  // =========================================================================
+
+  /**
+   * Find which paths contain a given content ID.
+   *
+   * Used by the EPR context-aware resolver to provide cross-path links:
+   * when the user clicks an epr: link and the target content isn't in
+   * the current path, this finds OTHER paths that contain it.
+   *
+   * @param contentId - The content node ID to search for
+   * @param excludePathId - Path to exclude (typically the current path)
+   * @returns Array of CrossPathMatch sorted by step index (earliest first)
+   */
+  findContentInPaths(contentId: string, excludePathId?: string): Observable<CrossPathMatch[]> {
+    return this.listPaths().pipe(
+      switchMap(index => {
+        const pathIds = index.paths.map(p => p.id).filter(id => id !== excludePathId);
+
+        if (pathIds.length === 0) return of([]);
+
+        // Load each path and search its steps
+        const pathLoads = pathIds.map(id => this.getPath(id));
+        return forkJoin(pathLoads).pipe(
+          map(paths => {
+            const matches: CrossPathMatch[] = [];
+            for (const path of paths) {
+              const stepIndex = path.steps.findIndex(s => s.resourceId === contentId);
+              if (stepIndex >= 0) {
+                matches.push({ pathId: path.id, stepIndex });
+              }
+            }
+            return matches;
+          })
+        );
+      })
+    );
   }
 }

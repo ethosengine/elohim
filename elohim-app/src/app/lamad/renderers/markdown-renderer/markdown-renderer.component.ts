@@ -13,6 +13,7 @@ import {
   inject,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Router } from '@angular/router';
 
 // @coverage: 72.8% (2026-02-24)
 
@@ -20,9 +21,11 @@ import hljs from 'highlight.js';
 import { Marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 
+import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resolver.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
 import { ContentNode } from '../../models/content-node.model';
+import { PathContextService } from '../../services/path-context.service';
 
 /**
  * Table of Contents entry extracted from markdown headings.
@@ -102,6 +105,8 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   @Input() node!: ContentNode;
   /** When true, renderer adapts to fit within parent container without TOC/back-to-top */
   @Input() embedded = false;
+  /** Path steps for context-aware EPR link resolution (provided by path step view) */
+  @Input() pathSteps: StepRef[] = [];
   @Output() tocGenerated = new EventEmitter<TocEntry[]>();
 
   @ViewChild('contentEl') contentEl!: ElementRef<HTMLElement>;
@@ -114,8 +119,12 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
   private readonly marked: Marked;
   private scrollListener?: () => void;
+  private eprClickListener?: (e: Event) => void;
   private headingElements: HTMLElement[] = [];
   private readonly storageClient = inject(StorageClientService);
+  private readonly eprResolver = inject(EprResolverService);
+  private readonly pathContext = inject(PathContextService);
+  private readonly router = inject(Router);
 
   constructor(private readonly sanitizer: DomSanitizer) {
     // Configure marked with syntax highlighting
@@ -135,7 +144,7 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       breaks: false,
     });
 
-    // Configure custom renderer to transform blob URLs in images
+    // Configure custom renderer to transform blob URLs and intercept epr: links
     this.marked.use({
       renderer: {
         image: token => {
@@ -143,6 +152,19 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
           const resolvedHref = this.resolveBlobUrl(token.href);
           const title = token.title ? ` title="${token.title}"` : '';
           return `<img src="${resolvedHref}" alt="${token.text}"${title}>`;
+        },
+        link: token => {
+          if (token.href?.startsWith('epr:')) {
+            // EPR link — render as data attribute for click handler interception
+            const escapedHref = token.href.replaceAll('"', '&quot;');
+            const escapedText = token.text ?? token.href;
+            return `<a href="#" data-epr="${escapedHref}" class="epr-link-inline">${escapedText}</a>`;
+          }
+          // Non-EPR links render normally as standard anchors
+          const href = token.href ?? '';
+          const title = token.title ? ` title="${token.title}"` : '';
+          const text = token.text ?? href;
+          return `<a href="${href}"${title}>${text}</a>`;
         },
       },
     });
@@ -184,11 +206,15 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
   ngAfterViewInit(): void {
     this.setupScrollListener();
+    this.setupEprClickHandler();
   }
 
   ngOnDestroy(): void {
     if (this.scrollListener) {
       window.removeEventListener('scroll', this.scrollListener);
+    }
+    if (this.eprClickListener && this.contentEl) {
+      this.contentEl.nativeElement.removeEventListener('click', this.eprClickListener);
     }
   }
 
@@ -310,6 +336,37 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
       .replaceAll(/\s+/g, '-')
       .replaceAll(/-+/g, '-')
       .substring(0, 50);
+  }
+
+  /**
+   * Set up event delegation for epr: link clicks.
+   * Uses event delegation on the content element to catch clicks on
+   * dynamically rendered [data-epr] anchors.
+   */
+  private setupEprClickHandler(): void {
+    if (!this.contentEl) return;
+
+    this.eprClickListener = (e: Event) => {
+      const target = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-epr]');
+      if (!target) return;
+
+      e.preventDefault();
+
+      const eprUri = target.dataset['epr'];
+      if (!eprUri) return;
+
+      // Get current path context for context-aware resolution
+      const ctx = this.pathContext.currentContext;
+      const currentPathId = ctx?.pathId ?? null;
+
+      // Use path steps from @Input (provided by path step view parent)
+      // Cross-path matches not yet wired — standalone fallback for now
+      const resolved = this.eprResolver.resolveInContext(eprUri, currentPathId, this.pathSteps);
+
+      void this.router.navigate(resolved.route);
+    };
+
+    this.contentEl.nativeElement.addEventListener('click', this.eprClickListener);
   }
 
   private setupScrollListener(): void {

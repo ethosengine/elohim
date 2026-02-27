@@ -83,6 +83,7 @@
     "highlight.js": "^11.11.1",
     "holochain-cache-core": "file:../holochain/holochain-cache-core/pkg",
     "marked": "^17.0.1",
+    "multiformats": "^13.4.2",
     "marked-highlight": "^2.2.3",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

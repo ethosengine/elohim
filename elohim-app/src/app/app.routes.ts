@@ -37,6 +37,14 @@ export const routes: Routes = [
       ),
     title: 'Signing In...',
   },
+  // EPR protocol handler redirect (web+epr:// links from outside the app)
+  {
+    path: 'resolve',
+    loadComponent: async () =>
+      import('./elohim/components/epr-resolve-redirect/epr-resolve-redirect.component').then(
+        m => m.EprResolveRedirectComponent
+      ),
+  },
   // 404 catch-all - must be last
   {
     path: '**',

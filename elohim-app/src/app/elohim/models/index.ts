@@ -39,6 +39,9 @@ export * from './elohim-presence.model';
 // Create context (reach negotiation, birth context)
 export * from './create-context.model';
 
+// EPR Head (IPLD-compatible content metadata)
+export * from './epr-head.model';
+
 // Infrastructure
 export * from './source-chain.model';
 export * from './json-ld.model';

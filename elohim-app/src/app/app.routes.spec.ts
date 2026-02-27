@@ -18,7 +18,7 @@ describe('App Routes', () => {
   });
 
   it('should have correct number of routes', () => {
-    expect(routes.length).toBe(8); // home, lamad, community, shefa, identity, doorway, auth/callback, and 404 catch-all
+    expect(routes.length).toBe(9); // home, lamad, community, shefa, identity, doorway, auth/callback, resolve, and 404 catch-all
   });
 
   it('should have an auth callback route for OAuth', () => {
@@ -49,6 +49,12 @@ describe('App Routes', () => {
     const doorwayRoute = routes.find(r => r.path === 'doorway');
     expect(doorwayRoute).toBeDefined();
     expect(doorwayRoute?.loadChildren).toBeDefined();
+  });
+
+  it('should have an EPR resolve redirect route', () => {
+    const resolveRoute = routes.find(r => r.path === 'resolve');
+    expect(resolveRoute).toBeDefined();
+    expect(resolveRoute?.loadComponent).toBeDefined();
   });
 
   it('should have a 404 catch-all route as last route', () => {
