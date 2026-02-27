@@ -512,7 +512,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     script {
                         try {
                             dir('doorway-app') {
-                                sh 'npm ci && npx eslint src --ext .ts,.html'
+                                sh 'pnpm install --frozen-lockfile && pnpm exec eslint src --ext .ts,.html'
                             }
                         } catch (Exception e) {
                             echo "Quality Gate: Doorway App - issues found (non-blocking): ${e.message}"

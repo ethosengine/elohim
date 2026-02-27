@@ -3,7 +3,6 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "prepare": "cd .. && node elohim-app/node_modules/husky/bin.js",
     "prebuild": "bash ../scripts/check-sophia.sh && bash ../scripts/fetch-fonts.sh",
     "build:sophia": "cd ../sophia && pnpm install && pnpm build && pnpm build:umd",
     "start": "ng serve --proxy-config proxy.conf.mjs --disable-host-check",
@@ -74,7 +73,7 @@
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
     "buffer": "^5.2.1",
-    "@elohim/storage-client": "file:../holochain/sdk/storage-client-ts",
+    "@elohim/storage-client": "workspace:*",
     "@holochain/client": "0.20.0",
     "@phosphor-icons/core": "^2.1.1",
     "@popperjs/core": "^2.11.8",

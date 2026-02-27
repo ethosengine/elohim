@@ -341,24 +341,21 @@ spec:
                                     # 1. Init and build sophia (UMD bundle for prebuild check)
                                     git submodule update --init sophia
                                     cd sophia
-                                    if ! command -v pnpm > /dev/null 2>&1; then
-                                        npm install -g pnpm
-                                    fi
                                     pnpm install --frozen-lockfile
                                     pnpm build
                                     pnpm --filter @ethosengine/sophia-element build:umd
                                     cd ..
 
                                     # 2. Install elohim-library deps (provides @angular/core for elohim-service)
-                                    cd elohim-library && npm ci && cd ..
+                                    cd elohim-library && pnpm install --frozen-lockfile && cd ..
 
                                     # 3. Build storage-client-ts (provides @elohim/storage-client/generated)
-                                    cd holochain/sdk/storage-client-ts && npm ci && npm run build && cd ../../..
+                                    cd holochain/sdk/storage-client-ts && pnpm install --frozen-lockfile && pnpm run build && cd ../../..
 
                                     # 4. Build elohim-app
                                     cd elohim-app
-                                    npm ci
-                                    npm run build
+                                    pnpm install --frozen-lockfile
+                                    pnpm run build
                                     cp -r dist/elohim-app/browser/* ../steward/ui/
                                 '''
                             }
@@ -439,8 +436,8 @@ DEDUP_SCRIPT
                                 ELOHIM_ENV="$ELOHIM_ENV" nix develop --impure --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
-                                    echo "=== Installing npm dependencies ==="
-                                    npm install
+                                    echo "=== Installing pnpm dependencies ==="
+                                    pnpm install
 
                                     echo ""
                                     echo "=== Using committed app icons ==="

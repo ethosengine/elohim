@@ -214,7 +214,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                     dir('genesis/seeder') {
                         sh '''
                             echo "Installing seeder dependencies..."
-                            npm ci --prefer-offline
+                            pnpm install --frozen-lockfile
                             echo "✅ Seeder ready"
                         '''
                     }
@@ -573,7 +573,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         // Install E2E driver dependencies
                         dir('genesis/a2o') {
-                            sh 'npm ci --prefer-offline 2>/dev/null || npm install'
+                            sh 'pnpm install --frozen-lockfile 2>/dev/null || pnpm install'
                         }
 
                         // Always run API-level tests (@e2e tag, fast, no browser)

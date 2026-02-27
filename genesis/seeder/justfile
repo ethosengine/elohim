@@ -10,19 +10,19 @@ default:
 
 # Install dependencies (skip if node_modules is current)
 install:
-    npm ci --ignore-scripts
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # Validate seed data schemas
 validate:
-    npm run validate
+    pnpm run validate
 
 # Run tests
 test:
-    npx vitest run
+    pnpm exec vitest run
 
 # Type-check without building
 check:
-    npx tsc --noEmit
+    pnpm exec tsc --noEmit
 
 # Quality gate: install + validate + test
 gate: install validate test

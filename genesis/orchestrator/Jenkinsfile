@@ -538,8 +538,8 @@ def printDeploymentVerification(commit, results) {
  */
 def runBddCoverageGap() {
     dir('genesis/a2o') {
-        sh 'npm ci'
-        sh 'npx tsx scripts/scan-coverage.ts --ci'
+        sh 'pnpm install --frozen-lockfile'
+        sh 'pnpm exec tsx scripts/scan-coverage.ts --ci'
     }
 }
 
@@ -1061,11 +1061,11 @@ spec:
 └──────────────────────────────────────────────────────────────────────────────┘'''
                         }
                         dir('genesis/a2o') {
-                            sh 'npm ci'
+                            sh 'pnpm install --frozen-lockfile'
                             sh '''
                                 E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host \
                                 E2E_DOORWAY_STAGING=https://doorway-staging.elohim.host \
-                                npx cucumber-js --tags "@e2e and @federation"
+                                pnpm exec cucumber-js --tags "@e2e and @federation"
                             '''
                         }
                     }

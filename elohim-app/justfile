@@ -10,35 +10,35 @@ default:
 
 # Install dependencies
 install:
-    npm install
+    pnpm install
 
 # Start dev server
 dev:
-    npm start
+    pnpm start
 
 # Build for production
 build:
-    npx ng build --configuration=development
+    pnpm exec ng build --configuration=development
 
 # Run unit tests
 test:
-    npx ng test --watch=false --browsers=ChromeHeadlessCI
+    pnpm exec ng test --watch=false --browsers=ChromeHeadlessCI
 
 # Lint
 lint:
-    npm run lint
+    pnpm run lint
 
 # Lint with auto-fix
 lint-fix:
-    npm run lint:fix
+    pnpm run lint:fix
 
 # Format check
 fmt-check:
-    npx prettier --check "src/**/*.{ts,html,scss}"
+    pnpm exec prettier --check "src/**/*.{ts,html,scss}"
 
 # Format
 fmt:
-    npx prettier --write "src/**/*.{ts,html,scss}"
+    pnpm exec prettier --write "src/**/*.{ts,html,scss}"
 
 # Quality gate: build + test
 gate: build test

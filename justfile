@@ -69,11 +69,11 @@ status:
 
 # Build + run steward Tauri app in dev mode
 steward-dev:
-    cd {{steward_dir}} && npm run tauri:dev
+    cd {{steward_dir}} && pnpm run tauri:dev
 
 # Production build of steward
 steward-build:
-    cd {{steward_dir}} && npm run tauri:build
+    cd {{steward_dir}} && pnpm run tauri:build
 
 # Production bundle: build storage binary, then steward (which bundles it)
 # TAURI_CONFIG injects bundle.resources so elohim-storage is included in the package
@@ -135,7 +135,7 @@ session-list:
         || echo "Storage not running"
 
 # ─────────────────────────────────────────────────────────────────────
-# Doorway Stack (wraps existing npm scripts)
+# Doorway Stack (wraps existing pnpm scripts)
 # ─────────────────────────────────────────────────────────────────────
 
 # Start full stack (conductor + storage + doorway)
@@ -216,11 +216,11 @@ sophia-check:
 
 # Seed content to local stack
 seed:
-    cd {{genesis_dir}}/seeder && npx tsx src/seed.ts
+    cd {{genesis_dir}}/seeder && pnpm exec tsx src/seed.ts
 
 # Validate seed data without writing
 seed-dry-run:
-    cd {{genesis_dir}}/seeder && npx tsx src/seed.ts --dry-run
+    cd {{genesis_dir}}/seeder && pnpm exec tsx src/seed.ts --dry-run
 
 # ─────────────────────────────────────────────────────────────────────
 # Angular Dev
@@ -228,8 +228,8 @@ seed-dry-run:
 
 # Start Angular dev server (proxy to doorway)
 app-dev:
-    cd {{app_dir}} && npx ng serve --proxy-config proxy.conf.mjs --disable-host-check
+    cd {{app_dir}} && pnpm exec ng serve --proxy-config proxy.conf.mjs --disable-host-check
 
 # Production build of elohim-app
 app-build:
-    cd {{app_dir}} && npx ng build
+    cd {{app_dir}} && pnpm exec ng build

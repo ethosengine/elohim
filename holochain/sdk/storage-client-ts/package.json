@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build",
+    "prepublishOnly": "pnpm run clean && pnpm run build",
     "generate:transformers": "tsx scripts/generate-transformers.ts"
   },
   "keywords": [

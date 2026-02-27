@@ -123,7 +123,7 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
 }
 
 def buildSophiaPlugin() {
-    // First, build the sophia monorepo (submodule) since its packages aren't on npm
+    // First, build the sophia monorepo (submodule) since its packages aren't published
     echo 'Building sophia monorepo packages...'
 
     // Initialize and update submodule if needed
@@ -131,12 +131,7 @@ def buildSophiaPlugin() {
 
     dir('sophia') {
         sh '''
-            # Install pnpm if not available
-            if ! command -v pnpm &> /dev/null; then
-                npm install -g pnpm
-            fi
-
-            # Install dependencies
+            # Install dependencies (pnpm pre-installed in builder image)
             pnpm install --frozen-lockfile
 
             # Build all packages (creates dist/ in each package)
@@ -189,7 +184,7 @@ def runE2ETests(String environment, String baseUrl, String gitCommitHash) {
     // Install Cypress if needed
     sh '''
         if [ ! -d "node_modules/cypress" ]; then
-            npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
+            pnpm add cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
         fi
     '''
 
@@ -561,20 +556,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     dir('elohim-library') {
                         script {
                             echo 'Installing elohim-library dependencies (required for elohim-service imports)'
-                            sh 'npm ci'
+                            sh 'pnpm install --frozen-lockfile'
                         }
                     }
                     dir('holochain/sdk/storage-client-ts') {
                         script {
                             echo 'Building storage-client-ts (required for @elohim/storage-client/generated types)'
-                            sh 'npm ci && npm run build'
+                            sh 'pnpm install --frozen-lockfile && pnpm run build'
                             sh 'ls -la dist/ dist/generated/'
                         }
                     }
                     dir('elohim-app') {
                         script {
-                            echo 'Installing npm dependencies'
-                            sh 'npm ci'
+                            echo 'Installing pnpm dependencies'
+                            sh 'pnpm install --frozen-lockfile'
 
                             // Copy WASM files from fetched location to node_modules
                             // This is needed because Angular expects WASM in node_modules/holochain-cache-core
@@ -639,7 +634,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 }
 
                                 echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
-                                sh "npm run build -- --configuration=${buildConfig}"
+                                sh "pnpm run build -- --configuration=${buildConfig}"
 
                                 // Generate version.json for deployment verification
                                 sh """
@@ -668,7 +663,7 @@ VEOF
                     dir('elohim-app') {
                         script {
                             echo 'Running Angular tests with coverage'
-                            sh 'npm run test -- --watch=false --browsers=ChromeHeadless --code-coverage'
+                            sh 'pnpm run test -- --watch=false --browsers=ChromeHeadless --code-coverage'
                         }
                     }
                 }

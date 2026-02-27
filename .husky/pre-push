@@ -121,8 +121,8 @@ run_gate() {
     echo "[$PROJECT_NAME] just not found, using fallback..."
     case "$PROJECT_NAME" in
       elohim-app)
-        npx ng build --configuration=development 2>&1 && \
-        npx ng test --watch=false --browsers=ChromeHeadlessCI 2>&1
+        pnpm exec ng build --configuration=development 2>&1 && \
+        pnpm exec ng test --watch=false --browsers=ChromeHeadlessCI 2>&1
         rc=$?
         ;;
       doorway|elohim-node)
@@ -132,8 +132,8 @@ run_gate() {
         rc=$?
         ;;
       doorway-app)
-        npx eslint src --ext .ts,.html 2>&1 && \
-        npx ng build --configuration=development 2>&1
+        pnpm exec eslint src --ext .ts,.html 2>&1 && \
+        pnpm exec ng build --configuration=development 2>&1
         rc=$?
         ;;
       sophia)
@@ -147,21 +147,21 @@ run_gate() {
         rc=$?
         ;;
       elohim-library)
-        npx eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
-        (cd projects/elohim-service && npx tsc --noEmit) 2>&1 && \
-        npx jest --config projects/elohim-service/jest.config.js --ci 2>&1
+        pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
+        (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
+        pnpm exec jest --config projects/elohim-service/jest.config.js --ci 2>&1
         rc=$?
         ;;
       genesis)
-        npm ci --ignore-scripts 2>&1 && npm run validate 2>&1 && npx vitest run 2>&1
+        pnpm install --frozen-lockfile --ignore-scripts 2>&1 && pnpm run validate 2>&1 && pnpm exec vitest run 2>&1
         rc=$?
         ;;
       orchestrator)
-        npx npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
+        pnpm exec npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1
         rc=$?
         ;;
       genesis-a2o)
-        npm run lint 2>&1 && npm run format:check 2>&1 && npm run typecheck 2>&1
+        pnpm run lint 2>&1 && pnpm run format:check 2>&1 && pnpm run typecheck 2>&1
         rc=$?
         ;;
       *)

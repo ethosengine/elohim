@@ -58,6 +58,8 @@ components:
           value: /nix-xdg/config
         - name: NPM_CONFIG_CACHE
           value: /nix-xdg/cache/npm
+        - name: PNPM_HOME
+          value: /nix-xdg/cache/pnpm
         - name: CYPRESS_CACHE_FOLDER
           value: /nix-xdg/cache/cypress
         # Jenkins integration
@@ -136,11 +138,12 @@ components:
     volume:
       size: 5Gi
 commands:
-  - id: setup-npm-env
+  - id: setup-pnpm-env
     exec:
       component: tools
       commandLine: |
-        echo 'export NPM_CONFIG_CACHE=/tmp/npm-cache' >> ~/.bashrc
+        echo 'export PNPM_HOME=/nix-xdg/cache/pnpm' >> ~/.bashrc
+        echo 'export PATH="$PNPM_HOME:$PATH"' >> ~/.bashrc
         source ~/.bashrc
 
   - id: setup-vscode-cli
@@ -217,7 +220,7 @@ commands:
       component: tools
       workingDir: /projects/elohim/genesis/seeder
       commandLine: |
-        npm install && npm run seed
+        pnpm install && pnpm run seed
 
 events:
   postStart:

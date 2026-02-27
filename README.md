@@ -228,9 +228,8 @@ This repository is configured for development with Eclipse Che / OpenShift Dev S
 ### Local Development
 
 ```bash
-cd elohim-app
-npm install
-npm start
+pnpm install          # From repo root (workspace install)
+pnpm app:dev          # Or: cd elohim-app && pnpm start
 ```
 
 The application will be available at `http://localhost:4200/`
@@ -241,7 +240,7 @@ The project includes:
 - **devfile.yaml**: Eclipse Che workspace configuration (root level)
 - **Jenkinsfile**: CI/CD pipeline for automated builds, testing, and deployment
 - **Angular dev server**: Configured for remote development with host checking disabled
-- **NPM environment**: Optimized for containerized development with `/tmp` directories
+- **pnpm workspace**: All Node.js projects managed via pnpm workspaces from repo root
 - **Kubernetes manifests**: Production deployment configurations in `manifests/`
 
 ## Philosophy

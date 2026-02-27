@@ -186,11 +186,11 @@ console.log('[SophiaRenderer] loadMoments:', { nodeId, contentFormat });
 
 ```bash
 # Start with seeding (recommended for fresh start)
-npm run hc:start:seed
+pnpm run hc:start:seed
 
 # Start without seeding (if data exists)
-npm run hc:start
+pnpm run hc:start
 
 # Angular dev server only (if doorway already running)
-npm start
+pnpm start
 ```

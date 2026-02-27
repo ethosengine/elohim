@@ -11,15 +11,15 @@ default:
 
 # Install dependencies
 install:
-    npm install
+    pnpm install
 
 # Lint all Jenkinsfiles in the repo
 lint:
-    npx npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error
+    pnpm exec npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error
 
 # Lint with auto-fix
 lint-fix:
-    npx npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --fix
+    pnpm exec npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --fix
 
 # Quality gate: lint Jenkinsfiles
 gate: lint
