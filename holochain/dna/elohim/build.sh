@@ -30,13 +30,18 @@ echo "Compiling imagodei zomes..."
 (cd ../imagodei && cargo build --release --target wasm32-unknown-unknown)
 hc dna pack ../imagodei -o workdir/imagodei.dna
 
+# Build node-registry DNA
+echo "Compiling node-registry zomes..."
+(cd ../node-registry && cargo build --release --target wasm32-unknown-unknown)
+hc dna pack ../node-registry -o ../node-registry/node-registry.dna
+
 # Package hApp
 echo "Packaging hApp..."
 hc app pack workdir -o elohim.happ
 
 echo ""
 echo "Build complete!"
-echo "  DNAs: workdir/lamad.dna, workdir/infrastructure.dna, workdir/imagodei.dna"
+echo "  DNAs: workdir/lamad.dna, workdir/infrastructure.dna, workdir/imagodei.dna, ../node-registry/node-registry.dna"
 echo "  hApp: elohim.happ"
 echo ""
 echo "Next steps:"
