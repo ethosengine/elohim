@@ -25,8 +25,11 @@ use libp2p::request_response;
 use serde::{Deserialize, Serialize};
 use std::io;
 
-/// Protocol identifier for sync
-pub const SYNC_PROTOCOL_ID: &str = "/elohim/sync/1.0.0";
+/// Protocol identifier for storage CRDT sync.
+///
+/// Renamed from `/elohim/sync/1.0.0` to avoid collision with elohim-node's
+/// `/elohim/doc-sync/1.0.0` when both run in the unified swarm.
+pub const SYNC_PROTOCOL_ID: &str = "/elohim/storage-sync/1.0.0";
 
 /// Sync protocol definition
 #[derive(Debug, Clone)]

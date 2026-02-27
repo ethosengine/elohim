@@ -17,6 +17,8 @@ pub struct Config {
     pub update: UpdateConfig,
     #[serde(default)]
     pub pod: PodConfig,
+    #[serde(default)]
+    pub bitswap: BitswapConfig,
 }
 
 /// Pod (cluster operator) configuration
@@ -119,6 +121,35 @@ pub struct StorageConfig {
     /// Reed-Solomon shard redundancy
     #[serde(default = "default_shard_redundancy")]
     pub shard_redundancy: u8,
+
+    /// HTTP port for the storage API (doorway/Tauri connect here)
+    #[serde(default = "default_storage_http_port")]
+    pub http_port: u16,
+
+    /// Blob storage directory (relative to data_dir if not absolute)
+    #[serde(default)]
+    pub blob_dir: Option<String>,
+}
+
+/// Bitswap block exchange configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BitswapConfig {
+    /// Enable Bitswap protocol (off by default, opt-in)
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Request timeout in seconds
+    #[serde(default = "default_bitswap_timeout")]
+    pub request_timeout_secs: u64,
+}
+
+impl Default for BitswapConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            request_timeout_secs: default_bitswap_timeout(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -160,6 +191,12 @@ fn default_http_port() -> u16 {
 fn default_grpc_port() -> u16 {
     9090
 }
+fn default_storage_http_port() -> u16 {
+    8090
+}
+fn default_bitswap_timeout() -> u64 {
+    10
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -185,6 +222,8 @@ impl Default for Config {
             storage: StorageConfig {
                 max_capacity: default_max_capacity(),
                 shard_redundancy: default_shard_redundancy(),
+                http_port: default_storage_http_port(),
+                blob_dir: None,
             },
             api: ApiConfig {
                 http_port: default_http_port(),
@@ -192,6 +231,7 @@ impl Default for Config {
             },
             update: UpdateConfig::default(),
             pod: PodConfig::default(),
+            bitswap: BitswapConfig::default(),
         }
     }
 }

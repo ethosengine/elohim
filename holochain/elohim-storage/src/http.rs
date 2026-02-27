@@ -64,6 +64,8 @@ use crate::views::{
     CreatePathInputView,
     CreateRelationshipInputView,
     EconomicEventView,
+    EprHeadInputView,
+    EprHeadView,
     InitiateClaimInputView,
     LocalSessionView,
     PathView,
@@ -82,6 +84,7 @@ use hyper::{header, Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use serde::Deserialize;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
@@ -432,6 +435,39 @@ impl HttpServer {
                 } else {
                     Ok(response::service_unavailable("Database not enabled"))
                 }
+            }
+
+            // EPR Head API: DAG-CBOR encoded three-pillar metadata
+            (Method::PUT, p) if p.starts_with("/epr-head/") => {
+                let id = p.strip_prefix("/epr-head/").unwrap_or("");
+                self.handle_put_epr_head(req, id).await
+            }
+            (Method::GET, p) if p.starts_with("/epr-head/") => {
+                let id = p.strip_prefix("/epr-head/").unwrap_or("");
+                self.handle_get_epr_head(req, id).await
+            }
+
+            // IPFS block API: raw block retrieval by CID
+            (Method::GET, p) if p.starts_with("/ipfs/") => {
+                let cid_str = p.strip_prefix("/ipfs/").unwrap_or("");
+                self.handle_get_ipfs_block(cid_str).await
+            }
+            (Method::HEAD, p) if p.starts_with("/ipfs/") => {
+                let cid_str = p.strip_prefix("/ipfs/").unwrap_or("");
+                self.handle_head_ipfs_block(cid_str).await
+            }
+
+            // DAG API: decoded IPLD operations
+            (Method::GET, p) if p.starts_with("/dag/") && p.ends_with("/links") => {
+                let cid_str = p
+                    .strip_prefix("/dag/")
+                    .and_then(|s| s.strip_suffix("/links"))
+                    .unwrap_or("");
+                self.handle_get_dag_links(cid_str).await
+            }
+            (Method::GET, p) if p.starts_with("/dag/") => {
+                let cid_str = p.strip_prefix("/dag/").unwrap_or("");
+                self.handle_get_dag(cid_str).await
             }
 
             // Not found
@@ -4693,6 +4729,377 @@ impl HttpServer {
         let views: Vec<LocalSessionView> =
             sessions.into_iter().map(LocalSessionView::from).collect();
         Ok(response::ok(&views))
+    }
+
+    // =========================================================================
+    // EPR Head Handlers
+    // =========================================================================
+
+    /// PUT /epr-head/{id} — Accept JSON, encode as DAG-CBOR, store blob, return CID.
+    async fn handle_put_epr_head(
+        &self,
+        req: Request<Incoming>,
+        id: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if id.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"Missing EPR Head ID"}"#)))
+                .unwrap());
+        }
+
+        let body = req
+            .collect()
+            .await
+            .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
+        let data = body.to_bytes();
+
+        // Parse JSON input
+        let input: EprHeadInputView = match serde_json::from_slice(&data) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error":"Invalid JSON: {e}"}}"#
+                    ))))
+                    .unwrap());
+            }
+        };
+
+        // Convert to EprHead and encode as DAG-CBOR
+        let mut head: crate::epr_codec::EprHead = input.into();
+        // Override id from URL path
+        head.id = id.to_string();
+
+        let (cbor_bytes, cid) = match crate::epr_codec::encode_epr_head(&head) {
+            Ok(result) => result,
+            Err(e) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error":"Encoding failed: {e}"}}"#
+                    ))))
+                    .unwrap());
+            }
+        };
+
+        // Store DAG-CBOR blob
+        let store_result = self.blob_store.store_dag_cbor(&cbor_bytes).await?;
+
+        // Build response
+        let mut view: EprHeadView = head.into();
+        view.cid = Some(cid.to_string());
+
+        let response_body = serde_json::json!({
+            "head": view,
+            "cid": store_result.cid,
+            "hash": store_result.hash,
+            "sizeBytes": store_result.size_bytes,
+            "alreadyExisted": store_result.already_existed,
+        });
+
+        Ok(Response::builder()
+            .status(if store_result.already_existed {
+                StatusCode::OK
+            } else {
+                StatusCode::CREATED
+            })
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(response_body.to_string())))
+            .unwrap())
+    }
+
+    /// GET /epr-head/{id} — Retrieve EPR Head.
+    /// Content-negotiation via Accept header:
+    /// - `application/vnd.ipld.dag-cbor` → raw CBOR bytes
+    /// - `application/json` (default) → JSON
+    async fn handle_get_epr_head(
+        &self,
+        req: Request<Incoming>,
+        id: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if id.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"Missing EPR Head ID"}"#)))
+                .unwrap());
+        }
+
+        // Look up EPR Head from content DB by ID
+        if let Some(ref content_db) = self.content_db {
+            let content_opt = content_db.with_conn(|conn| {
+                db::content::get_content(conn, id)
+            })?;
+
+            if let Some(content) = content_opt {
+                // Build an EprHead from the content row
+                let head = crate::epr_codec::EprHead {
+                    version: 1,
+                    id: content.id.clone(),
+                    content: content.blob_cid.clone().unwrap_or_default(),
+                    lamad: crate::epr_codec::EprLamadContext {
+                        title: content.title.clone(),
+                        content_type: content.content_type.clone(),
+                        description: content.description.clone(),
+                        content_format: Some(content.content_format.clone()),
+                        tags: content.tags.clone(),
+                    },
+                    shefa: crate::epr_codec::EprShefaContext {
+                        stewards: vec![],
+                        allocations: vec![],
+                    },
+                    qahal: crate::epr_codec::EprQahalContext {
+                        reach: Some(content.reach.clone()),
+                        layer: None,
+                    },
+                    relationships: vec![],
+                    author: content.created_by.clone(),
+                    updated: Some(content.updated_at.clone()),
+                };
+
+                // Check Accept header for content negotiation
+                let wants_cbor = req
+                    .headers()
+                    .get(header::ACCEPT)
+                    .and_then(|v| v.to_str().ok())
+                    .map(|a| a.contains("application/vnd.ipld.dag-cbor"))
+                    .unwrap_or(false);
+
+                if wants_cbor {
+                    match crate::epr_codec::encode_epr_head(&head) {
+                        Ok((cbor_bytes, _cid)) => {
+                            return Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header(
+                                    header::CONTENT_TYPE,
+                                    "application/vnd.ipld.dag-cbor",
+                                )
+                                .body(Full::new(Bytes::from(cbor_bytes)))
+                                .unwrap());
+                        }
+                        Err(e) => {
+                            return Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Full::new(Bytes::from(format!(
+                                    r#"{{"error":"Encoding failed: {e}"}}"#
+                                ))))
+                                .unwrap());
+                        }
+                    }
+                }
+
+                // Default: JSON response
+                let mut view: EprHeadView = head.clone().into();
+                if let Ok((_bytes, cid)) = crate::epr_codec::encode_epr_head(&head) {
+                    view.cid = Some(cid.to_string());
+                }
+
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(serde_json::to_string(&view).unwrap())))
+                    .unwrap());
+            }
+        }
+
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(format!(
+                r#"{{"error":"EPR Head not found: {id}"}}"#
+            ))))
+            .unwrap())
+    }
+
+    // =========================================================================
+    // IPFS Block API
+    // =========================================================================
+
+    /// GET /ipfs/{cid} — Raw block retrieval by CID.
+    ///
+    /// Returns the raw bytes of a block stored by its CID.
+    async fn handle_get_ipfs_block(
+        &self,
+        cid_str: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if cid_str.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"Missing CID"}"#)))
+                .unwrap());
+        }
+
+        match self.blob_store.get_by_address(cid_str).await {
+            Ok(data) => Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/octet-stream")
+                .header(header::CONTENT_LENGTH, data.len().to_string())
+                .body(Full::new(Bytes::from(data)))
+                .unwrap()),
+            Err(StorageError::NotFound(_)) | Err(StorageError::InvalidContentAddress(_)) => {
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error":"Block not found: {cid_str}"}}"#
+                    ))))
+                    .unwrap())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// HEAD /ipfs/{cid} — Block existence check.
+    async fn handle_head_ipfs_block(
+        &self,
+        cid_str: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if cid_str.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Full::new(Bytes::new()))
+                .unwrap());
+        }
+
+        match self.blob_store.exists_by_address(cid_str).await {
+            Ok(true) => {
+                let size = self
+                    .blob_store
+                    .size_by_address(cid_str)
+                    .await
+                    .unwrap_or(0);
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/octet-stream")
+                    .header(header::CONTENT_LENGTH, size.to_string())
+                    .body(Full::new(Bytes::new()))
+                    .unwrap())
+            }
+            _ => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Full::new(Bytes::new()))
+                .unwrap()),
+        }
+    }
+
+    // =========================================================================
+    // DAG API
+    // =========================================================================
+
+    /// GET /dag/{cid} — Decode DAG-CBOR block to JSON.
+    ///
+    /// Retrieves a block by CID and decodes it from DAG-CBOR to JSON for display.
+    async fn handle_get_dag(
+        &self,
+        cid_str: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if cid_str.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"Missing CID"}"#)))
+                .unwrap());
+        }
+
+        let data = match self.blob_store.get_by_address(cid_str).await {
+            Ok(data) => data,
+            Err(StorageError::NotFound(_)) | Err(StorageError::InvalidContentAddress(_)) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error":"Block not found: {cid_str}"}}"#
+                    ))))
+                    .unwrap());
+            }
+            Err(e) => return Err(e),
+        };
+
+        // Try decoding as DAG-CBOR → JSON
+        match serde_ipld_dagcbor::from_slice::<serde_json::Value>(&data) {
+            Ok(value) => {
+                let json = serde_json::to_string_pretty(&value).unwrap_or_default();
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(json)))
+                    .unwrap())
+            }
+            Err(_) => {
+                // Not DAG-CBOR, return error with hint
+                Ok(Response::builder()
+                    .status(StatusCode::UNPROCESSABLE_ENTITY)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error":"Block is not DAG-CBOR","cid":"{cid_str}","hint":"Use /ipfs/{cid_str} for raw bytes"}}"#
+                    ))))
+                    .unwrap())
+            }
+        }
+    }
+
+    /// GET /dag/{cid}/links — List CIDs linked from a DAG-CBOR block.
+    async fn handle_get_dag_links(
+        &self,
+        cid_str: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if cid_str.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(r#"{"error":"Missing CID"}"#)))
+                .unwrap());
+        }
+
+        // Parse CID to determine codec
+        let cid = match cid::Cid::from_str(cid_str) {
+            Ok(c) => c,
+            Err(_) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error":"Invalid CID: {cid_str}"}}"#
+                    ))))
+                    .unwrap());
+            }
+        };
+
+        let data = match self.blob_store.get_by_address(cid_str).await {
+            Ok(data) => data,
+            Err(StorageError::NotFound(_)) | Err(StorageError::InvalidContentAddress(_)) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Full::new(Bytes::from(format!(
+                        r#"{{"error":"Block not found: {cid_str}"}}"#
+                    ))))
+                    .unwrap());
+            }
+            Err(e) => return Err(e),
+        };
+
+        let links = crate::dag_store::extract_links(&data, cid.codec());
+        let link_strs: Vec<String> = links.iter().map(|c| c.to_string()).collect();
+
+        let response = serde_json::json!({
+            "cid": cid_str,
+            "links": link_strs,
+            "count": link_strs.len(),
+        });
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(response.to_string())))
+            .unwrap())
     }
 
     // =========================================================================

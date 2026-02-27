@@ -1304,6 +1304,58 @@ Only EPR-aware nodes can:
 
 This is by design: interoperable by default, EPR extensions prove their value through use. If EPR gains adoption, the three-pillar coupling becomes a candidate for IPLD spec extension.
 
+### F.6: Multicodec Registration
+
+EPR defines three application-specific multicodec entries in the private-use range `0x300000–0x3FFFFF`, alongside the standard DAG-CBOR codec used for EPR Head encoding:
+
+| Code | Name | Description |
+|------|------|-------------|
+| `0x71` | dag-cbor | Standard IPLD DAG-CBOR codec (used for EPR Head encoding) |
+| `0x300001` | epr-head | EPR Head metadata envelope (private-use range) |
+| `0x300002` | epr-document | EPR Document body (private-use range) |
+| `0x300003` | epr-relationship | EPR Relationship edge (private-use range) |
+
+EPR uses the private-use range `0x300000–0x3FFFFF` per the [multicodec specification](https://github.com/multiformats/multicodec). These codes are not registered upstream and are only meaningful within the Elohim Protocol ecosystem. If EPR gains broader adoption, these codes will be submitted for formal IANA registration.
+
+The `dag-cbor` codec (`0x71`) is the standard IPLD codec and is used directly for EPR Head serialization. The EPR-specific codes (`0x300001`–`0x300003`) identify the semantic type of the encoded document, enabling EPR-aware tools to distinguish an EPR Head from a generic DAG-CBOR document without inspecting the payload.
+
+### F.7: Wire Format Migration (JSON to DAG-CBOR)
+
+EPR Heads are migrating from raw JSON to DAG-CBOR as the canonical wire format. The migration proceeds in three phases:
+
+1. **Phase 1 (current)**: EPR Heads stored as DAG-CBOR with codec `0x71`. Backward compatibility via first-byte detection: `0x7B` (ASCII `{`) indicates JSON, anything else indicates CBOR. All readers MUST support both formats during this phase.
+2. **Phase 2 (planned)**: All new EPR Heads written exclusively as DAG-CBOR. JSON reading retained for migration of existing content. New implementations MAY omit JSON writing support.
+3. **Phase 3 (future)**: JSON fallback deprecated. All content IPLD-native. Implementations MAY drop JSON reading support after a migration period (to be defined by constitutional governance).
+
+**First-byte detection** (pseudo-code):
+```
+fn decode_epr_head(bytes: &[u8]) -> EprHead {
+    if bytes[0] == 0x7B {   // '{' — JSON
+        serde_json::from_slice(bytes)
+    } else {                 // DAG-CBOR
+        serde_cbor::from_slice(bytes)
+    }
+}
+```
+
+This approach avoids version negotiation or content-type headers at the storage layer — the format is self-describing from the first byte.
+
+### F.8: CID Format Convention
+
+CID prefixes encode both the hash function and the codec, providing a visual distinction between structured metadata and raw content bytes:
+
+- **EPR Head CIDs** use codec `0x71` (dag-cbor), producing `bafyr...` prefixed strings (base32lower multibase + CIDv1 + dag-cbor + sha256)
+- **Content blob CIDs** use codec `0x55` (raw), producing `bafkrei...` prefixed strings (base32lower multibase + CIDv1 + raw + sha256)
+
+The CID prefix distinguishes structured metadata from raw bytes at a glance:
+
+| Prefix | Codec | Meaning | Example |
+|--------|-------|---------|---------|
+| `bafyr...` | `0x71` (dag-cbor) | Structured IPLD document (EPR Head, EPR Document) | EPR Head for "rea-foundations" |
+| `bafkrei...` | `0x55` (raw) | Opaque content bytes (markdown, images, video) | Blob for a unit's markdown body |
+
+This convention means that any system processing EPR references can immediately determine whether a CID points to traversable structured data or opaque bytes, without resolving the reference first.
+
 ---
 
 ## License and Openness

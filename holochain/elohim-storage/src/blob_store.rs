@@ -22,6 +22,7 @@
 //! infrastructure DNA for discovery by other nodes using `store_and_announce()`.
 
 use crate::content_server::{ContentServerBridge, StorageEndpointInput};
+use crate::epr_codec::DAG_CBOR_CODEC;
 use crate::error::StorageError;
 use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
@@ -223,6 +224,50 @@ impl BlobStore {
             // Store as chunks
             self.store_chunked(&hash, &cid_str, data).await
         }
+    }
+
+    /// Store DAG-CBOR encoded data, returning a CID with codec 0x71 (dag-cbor).
+    ///
+    /// Like `store()` but computes the CID with the DAG-CBOR multicodec
+    /// instead of raw (0x55). The data is stored using the same SHA256 hash
+    /// filesystem layout for deduplication.
+    pub async fn store_dag_cbor(&self, data: &[u8]) -> Result<StoreResult, StorageError> {
+        let hash = Self::compute_hash(data);
+        let mh = Code::Sha2_256.digest(data);
+        let cid = Cid::new_v1(DAG_CBOR_CODEC, mh);
+        let cid_str = cid.to_string();
+        let blob_path = self.blob_path(&hash);
+
+        // Check if already exists
+        if fs::metadata(&blob_path).await.is_ok() {
+            debug!(cid = %cid_str, hash = %hash, "DAG-CBOR blob already exists");
+            return Ok(StoreResult {
+                cid: cid_str,
+                hash,
+                size_bytes: data.len() as u64,
+                chunk_count: 1,
+                chunked: false,
+                already_existed: true,
+            });
+        }
+
+        // Ensure parent directory exists
+        if let Some(parent) = blob_path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        fs::write(&blob_path, data).await?;
+
+        info!(cid = %cid_str, hash = %hash, size = data.len(), "Stored DAG-CBOR blob");
+
+        Ok(StoreResult {
+            cid: cid_str,
+            hash,
+            size_bytes: data.len() as u64,
+            chunk_count: 1,
+            chunked: false,
+            already_existed: false,
+        })
     }
 
     /// Store a blob and announce it to the P2P network

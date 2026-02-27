@@ -92,4 +92,7 @@ pub enum StorageError {
 
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    #[error("Codec error: {0}")]
+    Codec(String),
 }

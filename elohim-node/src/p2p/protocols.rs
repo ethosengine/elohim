@@ -7,12 +7,15 @@ use std::io;
 
 use futures::prelude::*;
 use libp2p::request_response;
-use libp2p::StreamProtocol;
 
 use crate::sync::protocol::SyncMessage;
 
 /// Protocol identifiers
-pub const SYNC_PROTOCOL: &str = "/elohim/sync/1.0.0";
+///
+/// Renamed from `/elohim/sync/1.0.0` to `/elohim/doc-sync/1.0.0` to avoid
+/// collision with elohim-storage's `/elohim/storage-sync/1.0.0` in the
+/// unified swarm.
+pub const DOC_SYNC_PROTOCOL: &str = "/elohim/doc-sync/1.0.0";
 #[allow(dead_code)]
 pub const SHARD_PROTOCOL: &str = "/elohim/shard/1.0.0";
 #[allow(dead_code)]
@@ -24,21 +27,24 @@ const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
 /// Length prefix size (4 bytes big-endian)
 const LENGTH_PREFIX_SIZE: usize = 4;
 
-/// Codec for the Elohim sync protocol.
-/// Uses MessagePack serialization with length-prefixed framing.
+/// Protocol type for the doc-sync protocol (required by libp2p 0.54 Codec trait).
 #[derive(Debug, Clone)]
-pub struct SyncCodec;
+pub struct DocSyncProtocol;
 
-impl SyncCodec {
-    #[allow(dead_code)]
-    pub fn protocol() -> StreamProtocol {
-        StreamProtocol::new(SYNC_PROTOCOL)
+impl AsRef<str> for DocSyncProtocol {
+    fn as_ref(&self) -> &str {
+        DOC_SYNC_PROTOCOL
     }
 }
 
+/// Codec for the Elohim doc-sync protocol.
+/// Uses MessagePack serialization with length-prefixed framing.
+#[derive(Debug, Clone, Default)]
+pub struct SyncCodec;
+
 #[async_trait::async_trait]
 impl request_response::Codec for SyncCodec {
-    type Protocol = StreamProtocol;
+    type Protocol = DocSyncProtocol;
     type Request = SyncMessage;
     type Response = SyncMessage;
 

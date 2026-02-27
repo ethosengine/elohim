@@ -39,6 +39,8 @@ mod getrandom_custom;
 
 // Core modules (always available)
 pub mod blob_store;
+pub mod dag_store;
+pub mod epr_codec;
 pub mod conductor; // Custom conductor connection (unsigned - deprecated)
 pub mod conductor_client; // Legacy: kept for backward compatibility during migration
 pub mod config;

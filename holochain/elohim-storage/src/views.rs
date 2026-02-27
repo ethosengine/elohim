@@ -1614,6 +1614,152 @@ impl From<CreateMasteryInputView> for CreateMasteryInput {
 }
 
 // ============================================================================
+// EPR Head Views
+// ============================================================================
+
+use crate::epr_codec::{
+    EprHead, EprLamadContext, EprQahalContext, EprRelationship, EprShefaContext,
+};
+
+/// EPR Head input — accepts camelCase JSON from TypeScript clients.
+/// Converts to `EprHead` for DAG-CBOR encoding.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EprHeadInputView {
+    pub version: Option<u32>,
+    pub id: String,
+    pub content: String,
+    pub lamad: EprLamadContextInputView,
+    pub shefa: Option<EprShefaContextInputView>,
+    pub qahal: Option<EprQahalContextInputView>,
+    #[serde(default)]
+    pub relationships: Vec<EprRelationshipInputView>,
+    pub author: Option<String>,
+    pub updated: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EprLamadContextInputView {
+    pub title: String,
+    pub content_type: String,
+    pub description: Option<String>,
+    pub content_format: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EprShefaContextInputView {
+    #[serde(default)]
+    pub stewards: Vec<String>,
+    #[serde(default)]
+    pub allocations: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EprQahalContextInputView {
+    pub reach: Option<String>,
+    pub layer: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EprRelationshipInputView {
+    #[serde(rename = "type")]
+    pub rel_type: String,
+    pub target: String,
+    pub target_cid: Option<String>,
+}
+
+impl From<EprHeadInputView> for EprHead {
+    fn from(v: EprHeadInputView) -> Self {
+        Self {
+            version: v.version.unwrap_or(1),
+            id: v.id,
+            content: v.content,
+            lamad: EprLamadContext {
+                title: v.lamad.title,
+                content_type: v.lamad.content_type,
+                description: v.lamad.description,
+                content_format: v.lamad.content_format,
+                tags: v.lamad.tags,
+            },
+            shefa: v.shefa.map_or_else(
+                || EprShefaContext {
+                    stewards: vec![],
+                    allocations: vec![],
+                },
+                |s| EprShefaContext {
+                    stewards: s.stewards,
+                    allocations: s.allocations,
+                },
+            ),
+            qahal: v.qahal.map_or_else(
+                || EprQahalContext {
+                    reach: None,
+                    layer: None,
+                },
+                |q| EprQahalContext {
+                    reach: q.reach,
+                    layer: q.layer,
+                },
+            ),
+            relationships: v
+                .relationships
+                .into_iter()
+                .map(|r| EprRelationship {
+                    rel_type: r.rel_type,
+                    target: r.target,
+                    target_cid: r.target_cid,
+                })
+                .collect(),
+            author: v.author,
+            updated: v.updated,
+        }
+    }
+}
+
+/// EPR Head response — camelCase output for TypeScript clients.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EprHeadView {
+    pub version: u32,
+    pub id: String,
+    pub content: String,
+    pub lamad: EprLamadContext,
+    pub shefa: EprShefaContext,
+    pub qahal: EprQahalContext,
+    pub relationships: Vec<EprRelationship>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated: Option<String>,
+    /// CID of the DAG-CBOR encoded head (set after encoding)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cid: Option<String>,
+}
+
+impl From<EprHead> for EprHeadView {
+    fn from(h: EprHead) -> Self {
+        Self {
+            version: h.version,
+            id: h.id,
+            content: h.content,
+            lamad: h.lamad,
+            shefa: h.shefa,
+            qahal: h.qahal,
+            relationships: h.relationships,
+            author: h.author,
+            updated: h.updated,
+            cid: None,
+        }
+    }
+}
+
+// ============================================================================
 // Schema Version Tests
 // ============================================================================
 

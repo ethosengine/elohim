@@ -1,3 +1,7 @@
 [submodule "sophia"]
 	path = sophia
 	url = https://github.com/ethosengine/sophia.git
+[submodule "rust-ipfs"]
+	path = rust-ipfs
+	url = https://github.com/ethosengine/rust-ipfs.git
+	branch = elohim

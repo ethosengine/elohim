@@ -22,9 +22,13 @@ import { CommonModule } from '@angular/common';
 import {
   Component,
   ChangeDetectionStrategy,
+  ComponentRef,
+  ElementRef,
+  HostListener,
   Input,
   OnChanges,
   SimpleChanges,
+  ViewContainerRef,
   inject,
   ChangeDetectorRef,
   OnDestroy,
@@ -35,6 +39,9 @@ import { Subject, takeUntil } from 'rxjs';
 
 import { EprResolverService, type ResolvedContent } from '../../services/epr-resolver.service';
 import { formatEpr, parseEpr } from '../../utils/epr-ref';
+import { EprPopoverComponent } from '../epr-popover/epr-popover.component';
+
+import type { EprHead } from '../../models/epr-head.model';
 
 export type EprLinkDisplay = 'inline' | 'card' | 'chip';
 
@@ -218,7 +225,33 @@ export class EprLinkComponent implements OnChanges, OnDestroy {
 
   private readonly resolver = inject(EprResolverService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly elRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly vcRef = inject(ViewContainerRef);
   private readonly destroy$ = new Subject<void>();
+
+  private popoverRef: ComponentRef<EprPopoverComponent> | null = null;
+  private hoverTimer: ReturnType<typeof setTimeout> | null = null;
+  private eprHead: EprHead | null = null;
+
+  @HostListener('mouseenter', ['$event'])
+  onMouseEnter(event: MouseEvent): void {
+    // Debounce: wait 300ms before showing popover
+    this.hoverTimer = setTimeout(() => {
+      this.showPopover(event);
+    }, 300);
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave(): void {
+    if (this.hoverTimer) {
+      clearTimeout(this.hoverTimer);
+      this.hoverTimer = null;
+    }
+    // Delay dismiss to allow mouse to enter popover
+    setTimeout(() => {
+      this.dismissPopover();
+    }, 100);
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['epr']) {
@@ -227,13 +260,63 @@ export class EprLinkComponent implements OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.dismissPopover();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private showPopover(event: MouseEvent): void {
+    if (this.popoverRef) return;
+
+    // Lazy-load EPR Head if not cached
+    if (!this.eprHead) {
+      this.resolver
+        .resolveEprHead(this.epr)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(head => {
+          if (head) {
+            this.eprHead = head;
+            this.createPopover(event);
+          }
+        });
+      return;
+    }
+
+    this.createPopover(event);
+  }
+
+  private createPopover(_event: MouseEvent): void {
+    if (this.popoverRef || !this.eprHead) return;
+
+    this.popoverRef = this.vcRef.createComponent(EprPopoverComponent);
+    this.popoverRef.instance.head = this.eprHead;
+    this.popoverRef.instance.route = this.resolved?.route ?? null;
+
+    // Position below the link
+    const rect = this.elRef.nativeElement.getBoundingClientRect();
+    this.popoverRef.instance.position = {
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.left),
+    };
+
+    this.popoverRef.instance.dismissed.subscribe(() => {
+      this.dismissPopover();
+    });
+
+    this.popoverRef.changeDetectorRef.markForCheck();
+  }
+
+  private dismissPopover(): void {
+    if (this.popoverRef) {
+      this.popoverRef.destroy();
+      this.popoverRef = null;
+    }
   }
 
   private loadEpr(input: string): void {
     this.resolved = null;
     this.error = null;
+    this.eprHead = null;
 
     const ref = parseEpr(input);
     this.eprUri = formatEpr(ref);

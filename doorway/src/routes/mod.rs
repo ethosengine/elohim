@@ -10,6 +10,7 @@ pub mod blob;
 pub mod dashboard_ws;
 pub mod db;
 pub mod debug_stream;
+pub mod epr;
 pub mod federation;
 pub mod health;
 pub mod identity;
@@ -66,3 +67,5 @@ pub use seed::{handle_check_blob, handle_seed_blob, BlobUploadResponse};
 pub use status::status_check;
 pub use stream::handle_stream_request;
 pub use threshold::handle_threshold_request;
+
+pub use epr::handle_epr_head_request;

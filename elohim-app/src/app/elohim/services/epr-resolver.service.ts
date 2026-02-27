@@ -14,13 +14,17 @@
  * See: protocol-specification.md Appendix E (Resolution Matrix)
  */
 
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable, of, switchMap, map, catchError } from 'rxjs';
 
+import { decodeEprHead } from '../utils/epr-codec';
 import { type EprRef, parseEpr, eprToRoute } from '../utils/epr-ref';
 
 import { StorageClientService, type StorageContentNode } from './storage-client.service';
+
+import type { EprHead } from '../models/epr-head.model';
 
 export interface ResolvedEpr {
   /** The parsed EPR reference */
@@ -81,6 +85,7 @@ export interface CrossPathMatch {
 
 @Injectable({ providedIn: 'root' })
 export class EprResolverService {
+  private readonly http = inject(HttpClient);
   private readonly storage = inject(StorageClientService);
 
   /**
@@ -200,6 +205,26 @@ export class EprResolverService {
       route: eprToRoute(ref) ?? ['/lamad/resource', targetId],
       resolution: 'standalone',
     };
+  }
+
+  /**
+   * Resolve an EPR Head directly, with DAG-CBOR content negotiation.
+   *
+   * Fetches from `/epr-head/{id}`, handling both JSON and DAG-CBOR responses
+   * via the Accept header. Returns the typed EprHead metadata.
+   */
+  resolveEprHead(input: string): Observable<EprHead | null> {
+    const ref = parseEpr(input);
+    const base = this.storage.getStorageBaseUrl();
+    const url = `${base}/epr-head/${encodeURIComponent(ref.id)}`;
+
+    return this.http.get(url, { responseType: 'arraybuffer' }).pipe(
+      map(buffer => {
+        const bytes = new Uint8Array(buffer);
+        return decodeEprHead(bytes);
+      }),
+      catchError(() => of(null))
+    );
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────

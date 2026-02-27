@@ -30,10 +30,10 @@ components:
   - name: tools
     container:
       image: harbor.ethosengine.com/devspaces/rust-nix-dev:latest
-      memoryLimit: 16Gi
-      memoryRequest: 4Gi
-      cpuLimit: '4'
-      cpuRequest: '1'
+      memoryLimit: 18Gi
+      memoryRequest: 6Gi
+      cpuLimit: '6'
+      cpuRequest: '2'
       mountSources: true
       sourceMapping: /projects
       env:
@@ -47,21 +47,21 @@ components:
         # Nix experimental features (required for flakes and nix develop)
         - name: NIX_CONFIG
           value: 'experimental-features = nix-command flakes'
-        # XDG directories - use /nix-xdg subdirs (persists in nix PVC)
+        # XDG directories - subdirs under /nix volume (single PVC)
         - name: XDG_CACHE_HOME
-          value: /nix-xdg/cache
+          value: /nix/xdg/cache
         - name: XDG_DATA_HOME
-          value: /nix-xdg/data
+          value: /nix/xdg/data
         - name: XDG_STATE_HOME
-          value: /nix-xdg/state
+          value: /nix/xdg/state
         - name: XDG_CONFIG_HOME
-          value: /nix-xdg/config
+          value: /nix/xdg/config
         - name: NPM_CONFIG_CACHE
-          value: /nix-xdg/cache/npm
+          value: /nix/xdg/cache/npm
         - name: PNPM_HOME
-          value: /nix-xdg/cache/pnpm
+          value: /nix/xdg/cache/pnpm
         - name: CYPRESS_CACHE_FOLDER
-          value: /nix-xdg/cache/cypress
+          value: /nix/xdg/cache/cypress
         # Jenkins integration
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
@@ -121,28 +121,20 @@ components:
           exposure: public
           protocol: http
       volumeMounts:
-        - name: nix-store
+        - name: persistent
           path: /nix
-        - name: nix-xdg
-          path: /nix-xdg
-        # Note: Rust toolchain is in /opt/rust (baked into image), not ~/.cargo or ~/.rustup
-        # The /home/user/.cargo and /home/user/.rustup paths are NOT mounted as volumes
-        # because the toolchain lives in /opt/rust and CARGO_HOME/RUSTUP_HOME point there
 
-  # Nix store volume - required for Nix/Holochain tooling
-  - name: nix-store
+  # Single PVC — Che consolidates all volumes into one PVC anyway.
+  # Nix store lives at /nix/store, XDG caches at /nix/xdg/.
+  - name: persistent
     volume:
-      size: 40Gi
-  # XDG directories for Nix cache/config (npm, cypress, typescript caches)
-  - name: nix-xdg
-    volume:
-      size: 5Gi
+      size: 100Gi
 commands:
   - id: setup-pnpm-env
     exec:
       component: tools
       commandLine: |
-        echo 'export PNPM_HOME=/nix-xdg/cache/pnpm' >> ~/.bashrc
+        echo 'export PNPM_HOME=/nix/xdg/cache/pnpm' >> ~/.bashrc
         echo 'export PATH="$PNPM_HOME:$PATH"' >> ~/.bashrc
         source ~/.bashrc
 
@@ -162,9 +154,6 @@ commands:
         rm -rf /home/user/.claude 2>/dev/null || true
         ln -sf "$CLAUDE_CONFIG_DIR" /home/user/.claude
         mkdir -p /home/user/.claude/ide
-
-        # Install/update Claude Code via native installer (always gets latest version)
-        curl -fsSL https://claude.ai/install.sh | bash
 
   - id: setup-claude-mcp
     exec:
@@ -222,8 +211,8 @@ commands:
       commandLine: |
         pnpm install && pnpm run seed
 
-events:
-  postStart:
-    - setup-vscode-cli
+##events:
+#  postStart:
+#    - setup-vscode-cli
 #    - setup-npm-env
 #    - setup-claude-mcp

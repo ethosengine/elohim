@@ -130,6 +130,12 @@ impl SyncCoordinator {
             SwarmEvent::OutboundFailure { peer_id, error, .. } => {
                 warn!(%peer_id, %error, "Sync request failed");
             }
+
+            // Storage and Bitswap events — handled by dedicated handlers (not the doc-sync coordinator)
+            SwarmEvent::ShardRequest { .. }
+            | SwarmEvent::StorageSyncRequest { .. }
+            | SwarmEvent::BitswapProgress { .. }
+            | SwarmEvent::BitswapComplete { .. } => {}
         }
     }
 

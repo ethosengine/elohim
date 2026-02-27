@@ -103,3 +103,25 @@ export interface EprHead {
   /** ISO 8601 timestamp of last update */
   updated?: string;
 }
+
+// ── IPLD Link Helpers ──────────────────────────────────────────────────────
+
+/**
+ * An IPLD link — the canonical DAG-CBOR representation of a CID reference.
+ *
+ * In DAG-CBOR, CID references serialize as `{ "/": "bafkrei..." }`.
+ * This interface enables type-safe IPLD link construction.
+ */
+export interface IpldLink {
+  '/': string;
+}
+
+/** Convert a CID string to an IPLD link object. */
+export function cidToLink(cidStr: string): IpldLink {
+  return { '/': cidStr };
+}
+
+/** Extract the CID string from an IPLD link object. */
+export function linkToCid(link: IpldLink): string {
+  return link['/'];
+}
