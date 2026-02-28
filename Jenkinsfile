@@ -638,7 +638,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 }
 
                                 echo "Building with configuration: ${buildConfig} (target: ${targetBranch}, source: ${sourceBranch})"
-                                sh "pnpm run build -- --configuration=${buildConfig}"
+                                sh "pnpm exec ng build --configuration=${buildConfig}"
 
                                 // Generate version.json for deployment verification
                                 sh """
