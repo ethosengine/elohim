@@ -133,6 +133,9 @@ importers:
       '@holochain/client':
         specifier: 0.20.0
         version: 0.20.0
+      '@ipld/dag-cbor':
+        specifier: ^9.2.5
+        version: 9.2.5
       '@phosphor-icons/core':
         specifier: ^2.1.1
         version: 2.1.1

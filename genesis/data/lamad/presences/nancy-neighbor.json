@@ -1,0 +1,15 @@
+{
+  "id": "nancy-neighbor",
+  "displayName": "Nancy",
+  "presenceState": "claimed",
+  "externalIdentifiers": [],
+  "establishingContentIds": ["governance-epic"],
+  "claimedAgentId": "agent-nancy-neighbor",
+  "note": "Community organizer and block captain. Stewards governance content - constitutional oversight, community leadership, and municipal governance.",
+  "metadata": {
+    "bootstrapSteward": false,
+    "role": "steward-governance",
+    "affinityDomains": ["governance"],
+    "humanId": "human-nancy-neighbor"
+  }
+}

@@ -170,13 +170,13 @@ stack-reset:
 # ─────────────────────────────────────────────────────────────────────
 
 # Build all Holochain DNAs + pack hApp (delegates to per-project justfiles)
-dna-build: dna-lamad dna-imagodei dna-infrastructure
+dna-build: dna-lamad dna-imagodei dna-infrastructure dna-node-registry
     #!/usr/bin/env bash
     set -e
     WORKDIR="{{hc_dir}}/dna/elohim/workdir"
     echo "Packing elohim.happ..."
     hc app pack "$WORKDIR" -o "$WORKDIR/elohim.happ"
-    echo "DNAs built (lamad + imagodei + infrastructure)"
+    echo "DNAs built (lamad + imagodei + infrastructure + node-registry)"
 
 # Build lamad DNA
 dna-lamad:
