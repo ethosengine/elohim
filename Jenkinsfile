@@ -391,6 +391,10 @@ spec:
                         // Verify git state
                         sh 'git rev-parse --short HEAD'
                         sh 'git status'
+
+                        // Enable pnpm via corepack (uses packageManager field in root package.json)
+                        sh 'corepack enable'
+                        sh 'pnpm --version'
                     }
                 }
             }
