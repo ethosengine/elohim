@@ -11,22 +11,25 @@ import { EconomicService } from './economic.service';
 import { StewardedResourceService } from './stewarded-resources.service';
 import type { ComputeGap } from '../models/shefa-dashboard.model';
 import { REAAction } from '@app/elohim/models/rea-bridge.model';
+import { vi } from 'vitest';
 
 describe('ShefaComputeService', () => {
   let service: ShefaComputeService;
-  let mockHolochain: jasmine.SpyObj<HolochainClientService>;
-  let mockEconomic: jasmine.SpyObj<EconomicService>;
-  let mockStewardedResources: jasmine.SpyObj<StewardedResourceService>;
+  let mockHolochain: any;
+  let mockEconomic: any;
+  let mockStewardedResources: any;
 
   beforeEach(() => {
-    mockHolochain = jasmine.createSpyObj('HolochainClientService', ['callZome']);
-    mockEconomic = jasmine.createSpyObj('EconomicService', [
-      'getEventsForAgent',
-      'getEventsByLamadType',
-    ]);
-    mockStewardedResources = jasmine.createSpyObj('StewardedResourceService', [
-      'getResourceById',
-    ]);
+    mockHolochain = {
+    callZome: vi.fn(),
+  };
+    mockEconomic = {
+    getEventsForAgent: vi.fn(),
+    getEventsByLamadType: vi.fn(),
+  };
+    mockStewardedResources = {
+    getResourceById: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [
@@ -468,7 +471,7 @@ describe('ShefaComputeService', () => {
   // ==========================================================================
 
   describe('getInfrastructureTokenBalance', () => {
-    it('should aggregate token events correctly', done => {
+    it('should aggregate token events correctly', () => new Promise<void>(done => {
       const mockEvents = [
         {
           id: 'evt1',
@@ -494,7 +497,7 @@ describe('ShefaComputeService', () => {
         },
       ];
 
-      mockEconomic.getEventsForAgent.and.returnValue(of(mockEvents));
+      mockEconomic.getEventsForAgent.mockReturnValue(of(mockEvents));
 
       (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
         expect(result.balance.tokens).toBe(80); // 100 - 20
@@ -503,19 +506,19 @@ describe('ShefaComputeService', () => {
         expect(result.transactions[1].type).toBe('earned');
         done();
       });
-    });
+    }));
 
-    it('should handle empty events', done => {
-      mockEconomic.getEventsForAgent.and.returnValue(of([]));
+    it('should handle empty events', () => new Promise<void>(done => {
+      mockEconomic.getEventsForAgent.mockReturnValue(of([]));
 
       (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
         expect(result.balance.tokens).toBe(0);
         expect(result.transactions.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should filter only token-related events', done => {
+    it('should filter only token-related events', () => new Promise<void>(done => {
       const mockEvents = [
         {
           id: 'evt1',
@@ -541,13 +544,13 @@ describe('ShefaComputeService', () => {
         },
       ];
 
-      mockEconomic.getEventsForAgent.and.returnValue(of(mockEvents));
+      mockEconomic.getEventsForAgent.mockReturnValue(of(mockEvents));
 
       (service as any).getInfrastructureTokenBalance('operator1').subscribe((result: any) => {
         expect(result.balance.tokens).toBe(100); // Only infrastructure-token event counted
         expect(result.transactions.length).toBe(1);
         done();
       });
-    });
+    }));
   });
 });

@@ -1,10 +1,8 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import {
-  HttpClientTestingModule,
-  HttpTestingController,
-} from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { StorageApiService } from './storage-api.service';
+import { provideHttpClient } from '@angular/common/http';
 
 /**
  * Comprehensive tests for StorageApiService
@@ -25,8 +23,7 @@ describe('StorageApiService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [StorageApiService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), StorageApiService],
     });
 
     service = TestBed.inject(StorageApiService);

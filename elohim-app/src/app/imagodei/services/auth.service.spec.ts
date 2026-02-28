@@ -16,10 +16,11 @@ import {
   AUTH_EXPIRY_KEY,
   AUTH_IDENTIFIER_KEY,
 } from '../models/auth.model';
+import { vi, Mock } from 'vitest';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
+  let mockDoorwayRegistry: any;
   let localStorageMock: { [key: string]: string };
 
   // Mock provider factory
@@ -28,7 +29,7 @@ describe('AuthService', () => {
     overrides: Partial<AuthProvider> = {}
   ): AuthProvider => ({
     type,
-    login: jasmine.createSpy('login').and.returnValue(
+    login: vi.fn().mockReturnValue(
       Promise.resolve({
         success: true,
         token: 'test-token-123',
@@ -38,8 +39,8 @@ describe('AuthService', () => {
         identifier: 'test@example.com',
       } as AuthResult)
     ),
-    logout: jasmine.createSpy('logout').and.returnValue(Promise.resolve()),
-    register: jasmine.createSpy('register').and.returnValue(
+    logout: vi.fn().mockReturnValue(Promise.resolve()),
+    register: vi.fn().mockReturnValue(
       Promise.resolve({
         success: true,
         token: 'test-token-456',
@@ -49,7 +50,7 @@ describe('AuthService', () => {
         identifier: 'newuser@example.com',
       } as AuthResult)
     ),
-    refreshToken: jasmine.createSpy('refreshToken').and.returnValue(
+    refreshToken: vi.fn().mockReturnValue(
       Promise.resolve({
         success: true,
         token: 'refreshed-token-789',
@@ -65,24 +66,18 @@ describe('AuthService', () => {
   beforeEach(() => {
     // Setup localStorage mock
     localStorageMock = {};
-    spyOn(localStorage, 'getItem').and.callFake((key: string) => localStorageMock[key] || null);
-    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => localStorageMock[key] || null);
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
-    spyOn(localStorage, 'removeItem').and.callFake((key: string) => {
+    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
       delete localStorageMock[key];
     });
 
     // Create mock doorway registry
-    mockDoorwayRegistry = jasmine.createSpyObj(
-      'DoorwayRegistryService',
-      ['selectDoorway', 'clearSelection'],
-      {
-        selected: jasmine.createSpy().and.returnValue(null),
-        selectedUrl: jasmine.createSpy().and.returnValue(null),
-        hasSelection: jasmine.createSpy().and.returnValue(false),
-      }
-    );
+    mockDoorwayRegistry = { selectDoorway: vi.fn(), clearSelection: vi.fn(), selected: vi.fn().mockReturnValue(null),
+        selectedUrl: vi.fn().mockReturnValue(null),
+        hasSelection: vi.fn().mockReturnValue(false), };
 
     TestBed.configureTestingModule({
       providers: [AuthService, { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry }],
@@ -220,7 +215,7 @@ describe('AuthService', () => {
 
     it('should set loading state during login', async () => {
       const provider = createMockProvider('password', {
-        login: jasmine.createSpy('login').and.callFake(() => {
+        login: vi.fn().mockImplementation(() => {
           expect(service.isLoading()).toBe(true);
           return Promise.resolve({
             success: true,
@@ -245,9 +240,8 @@ describe('AuthService', () => {
 
     it('should handle login failure', async () => {
       const provider = createMockProvider('password', {
-        login: jasmine
-          .createSpy('login')
-          .and.returnValue(Promise.resolve({ success: false, error: 'Invalid credentials' })),
+        login: vi.fn()
+          .mockReturnValue(Promise.resolve({ success: false, error: 'Invalid credentials' })),
       });
       service.registerProvider(provider);
 
@@ -264,9 +258,8 @@ describe('AuthService', () => {
 
     it('should handle login network error', async () => {
       const provider = createMockProvider('password', {
-        login: jasmine
-          .createSpy('login')
-          .and.returnValue(Promise.reject(new Error('Network error'))),
+        login: vi.fn()
+          .mockReturnValue(Promise.reject(new Error('Network error'))),
       });
       service.registerProvider(provider);
 
@@ -366,9 +359,8 @@ describe('AuthService', () => {
 
     it('should handle registration failure', async () => {
       const provider = createMockProvider('password', {
-        register: jasmine
-          .createSpy('register')
-          .and.returnValue(Promise.resolve({ success: false, error: 'User already exists' })),
+        register: vi.fn()
+          .mockReturnValue(Promise.resolve({ success: false, error: 'User already exists' })),
       });
       service.registerProvider(provider);
 
@@ -385,9 +377,8 @@ describe('AuthService', () => {
 
     it('should handle registration network error', async () => {
       const provider = createMockProvider('password', {
-        register: jasmine
-          .createSpy('register')
-          .and.returnValue(Promise.reject(new Error('Connection failed'))),
+        register: vi.fn()
+          .mockReturnValue(Promise.reject(new Error('Connection failed'))),
       });
       service.registerProvider(provider);
 
@@ -466,9 +457,8 @@ describe('AuthService', () => {
 
     it('should handle provider logout error gracefully', async () => {
       const provider = createMockProvider('password', {
-        logout: jasmine
-          .createSpy('logout')
-          .and.returnValue(Promise.reject(new Error('Logout failed'))),
+        logout: vi.fn()
+          .mockReturnValue(Promise.reject(new Error('Logout failed'))),
       });
       service.registerProvider(provider);
       await service.login('password', {
@@ -478,7 +468,7 @@ describe('AuthService', () => {
       });
 
       // Should not throw, just warn
-      await expectAsync(service.logout()).toBeResolved();
+      await await expect(service.logout()).resolves.toBeDefined();
       expect(service.isAuthenticated()).toBe(false);
     });
   });
@@ -536,9 +526,8 @@ describe('AuthService', () => {
 
     it('should handle refresh failure', async () => {
       const provider = createMockProvider('password', {
-        refreshToken: jasmine
-          .createSpy('refreshToken')
-          .and.returnValue(Promise.reject(new Error('Refresh token expired'))),
+        refreshToken: vi.fn()
+          .mockReturnValue(Promise.reject(new Error('Refresh token expired'))),
       });
       service.registerProvider(provider);
       await service.login('password', {
@@ -714,9 +703,8 @@ describe('AuthService', () => {
     it('should clear error state', async () => {
       // Create an error
       const provider = createMockProvider('password', {
-        login: jasmine
-          .createSpy('login')
-          .and.returnValue(Promise.resolve({ success: false, error: 'Test error' })),
+        login: vi.fn()
+          .mockReturnValue(Promise.resolve({ success: false, error: 'Test error' })),
       });
       service.registerProvider(provider);
       await service.login('password', {

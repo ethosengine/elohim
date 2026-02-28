@@ -12,13 +12,14 @@ import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SeoService } from '../../../services/seo.service';
 import { PathStepView, LearningPath } from '../../models/learning-path.model';
 import { provideElohimClient } from '@app/elohim/providers/elohim-client.provider';
+import { vi, Mock } from 'vitest';
 
 describe('PathNavigatorComponent', () => {
   let component: PathNavigatorComponent;
   let fixture: ComponentFixture<PathNavigatorComponent>;
-  let pathService: jasmine.SpyObj<PathService>;
-  let agentService: jasmine.SpyObj<AgentService>;
-  let contentMasteryService: jasmine.SpyObj<ContentMasteryService>;
+  let pathService: any;
+  let agentService: any;
+  let contentMasteryService: any;
   let router: Router;
   let paramsSubject: BehaviorSubject<any>;
 
@@ -95,36 +96,36 @@ describe('PathNavigatorComponent', () => {
   };
 
   beforeEach(async () => {
-    const pathServiceSpy = jasmine.createSpyObj('PathService', [
-      'getPath',
-      'getPathStep',
-      'getContentById',
-    ]);
-    const agentServiceSpy = jasmine.createSpyObj('AgentService', [
-      'completeStep',
-      'markContentSeen',
-      'getContentMastery',
-      'updateContentMastery',
-    ]);
-    const contentMasteryServiceSpy = jasmine.createSpyObj('ContentMasteryService', [
-      'recordView',
-      'setMasteryLevel',
-      'getMasteryLevelSync',
-    ]);
-    const pathContextServiceSpy = jasmine.createSpyObj('PathContextService', [
-      'enterPath',
-      'exitPath',
-      'startDetour',
-    ]);
-    const seoServiceSpy = jasmine.createSpyObj('SeoService', [
-      'updateSeo',
-      'updateForPath',
-      'setTitle',
-    ]);
-    const governanceSignalServiceSpy = jasmine.createSpyObj('GovernanceSignalService', [
-      'recordLearningSignal',
-      'recordInteractiveCompletion',
-    ]);
+    const pathServiceSpy = {
+    getPath: vi.fn(),
+    getPathStep: vi.fn(),
+    getContentById: vi.fn(),
+  };
+    const agentServiceSpy = {
+    completeStep: vi.fn(),
+    markContentSeen: vi.fn(),
+    getContentMastery: vi.fn(),
+    updateContentMastery: vi.fn(),
+  };
+    const contentMasteryServiceSpy = {
+    recordView: vi.fn(),
+    setMasteryLevel: vi.fn(),
+    getMasteryLevelSync: vi.fn(),
+  };
+    const pathContextServiceSpy = {
+    enterPath: vi.fn(),
+    exitPath: vi.fn(),
+    startDetour: vi.fn(),
+  };
+    const seoServiceSpy = {
+    updateSeo: vi.fn(),
+    updateForPath: vi.fn(),
+    setTitle: vi.fn(),
+  };
+    const governanceSignalServiceSpy = {
+    recordLearningSignal: vi.fn(),
+    recordInteractiveCompletion: vi.fn(),
+  };
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path', stepIndex: '1' });
 
@@ -150,22 +151,22 @@ describe('PathNavigatorComponent', () => {
       ],
     }).compileComponents();
 
-    pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
-    agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
-    contentMasteryService = TestBed.inject(ContentMasteryService) as jasmine.SpyObj<ContentMasteryService>;
+    pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
+    agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
+    contentMasteryService = TestBed.inject(ContentMasteryService) as { [K in keyof ContentMasteryService]?: Mock };
     router = TestBed.inject(Router);
-    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
 
-    pathService.getPath.and.returnValue(of(mockPath));
-    pathService.getPathStep.and.returnValue(of(mockStepView));
-    pathService.getContentById.and.returnValue(of(mockStepView.content));
-    agentService.completeStep.and.returnValue(of(undefined));
-    agentService.markContentSeen.and.returnValue(of(undefined));
-    agentService.getContentMastery.and.returnValue(of('not_started'));
-    agentService.updateContentMastery.and.returnValue(of(undefined));
-    contentMasteryServiceSpy.getMasteryLevelSync.and.returnValue('not_started');
-    governanceSignalServiceSpy.recordLearningSignal.and.returnValue(of(undefined));
-    governanceSignalServiceSpy.recordInteractiveCompletion.and.returnValue(of(undefined));
+    pathService.getPath.mockReturnValue(of(mockPath));
+    pathService.getPathStep.mockReturnValue(of(mockStepView));
+    pathService.getContentById.mockReturnValue(of(mockStepView.content));
+    agentService.completeStep.mockReturnValue(of(undefined));
+    agentService.markContentSeen.mockReturnValue(of(undefined));
+    agentService.getContentMastery.mockReturnValue(of('not_started'));
+    agentService.updateContentMastery.mockReturnValue(of(undefined));
+    contentMasteryServiceSpy.getMasteryLevelSync.mockReturnValue('not_started');
+    governanceSignalServiceSpy.recordLearningSignal.mockReturnValue(of(undefined));
+    governanceSignalServiceSpy.recordInteractiveCompletion.mockReturnValue(of(undefined));
 
     fixture = TestBed.createComponent(PathNavigatorComponent);
     component = fixture.componentInstance;
@@ -198,7 +199,7 @@ describe('PathNavigatorComponent', () => {
   });
 
   it('should handle path load error', () => {
-    pathService.getPath.and.returnValue(throwError(() => new Error('Network error')));
+    pathService.getPath.mockReturnValue(throwError(() => new Error('Network error')));
 
     fixture.detectChanges();
 
@@ -243,7 +244,7 @@ describe('PathNavigatorComponent', () => {
 
   it('should cycle through Bloom levels on markComplete', () => {
     // Use NEVER to prevent completeStep from triggering loadContext reload
-    agentService.completeStep.and.returnValue(NEVER);
+    agentService.completeStep.mockReturnValue(NEVER);
     fixture.detectChanges();
     expect(component.currentBloomLevel).toBe('not_started');
 
@@ -265,7 +266,7 @@ describe('PathNavigatorComponent', () => {
 
   it('should reload context after marking complete at remember level', () => {
     fixture.detectChanges();
-    pathService.getPath.calls.reset();
+    pathService.getPath.mockClear();
 
     component.markComplete(); // seen
     component.markComplete(); // remember - triggers reload
@@ -305,7 +306,7 @@ describe('PathNavigatorComponent', () => {
   });
 
   it('should set stepView.isCompleted from mastery state', () => {
-    contentMasteryService.getMasteryLevelSync.and.returnValue('seen');
+    contentMasteryService.getMasteryLevelSync.mockReturnValue('seen');
     fixture.detectChanges();
 
     expect(component.stepView?.isCompleted).toBe(true);
@@ -335,8 +336,8 @@ describe('PathNavigatorComponent', () => {
   it('should cleanup on destroy', () => {
     fixture.detectChanges();
 
-    spyOn(component['destroy$'], 'next');
-    spyOn(component['destroy$'], 'complete');
+    vi.spyOn(component['destroy$'], 'next');
+    vi.spyOn(component['destroy$'], 'complete');
 
     component.ngOnDestroy();
 
@@ -346,7 +347,7 @@ describe('PathNavigatorComponent', () => {
 
   it('should reload step when route params change', () => {
     fixture.detectChanges();
-    pathService.getPath.calls.reset();
+    pathService.getPath.mockClear();
 
     paramsSubject.next({ pathId: 'test-path', stepIndex: '2' });
 
@@ -433,8 +434,8 @@ describe('PathNavigatorComponent', () => {
     };
 
     it('should build lesson context for hierarchical path', () => {
-      pathService.getPath.and.returnValue(of(hierarchicalPath));
-      pathService.getContentById.and.returnValue(
+      pathService.getPath.mockReturnValue(of(hierarchicalPath));
+      pathService.getContentById.mockReturnValue(
         of({
           id: 'concept-1',
           title: 'Concept 1',
@@ -460,8 +461,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should navigate between concepts in hierarchical path', () => {
-      pathService.getPath.and.returnValue(of(hierarchicalPath));
-      pathService.getContentById.and.returnValue(
+      pathService.getPath.mockReturnValue(of(hierarchicalPath));
+      pathService.getContentById.mockReturnValue(
         of({
           id: 'concept-2',
           title: 'Concept 2',
@@ -483,8 +484,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should calculate total concepts in hierarchical path', () => {
-      pathService.getPath.and.returnValue(of(hierarchicalPath));
-      pathService.getContentById.and.returnValue(of(mockStepView.content));
+      pathService.getPath.mockReturnValue(of(hierarchicalPath));
+      pathService.getContentById.mockReturnValue(of(mockStepView.content));
 
       paramsSubject.next({ pathId: 'hierarchical-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -494,8 +495,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should get lesson progress percentage in hierarchical context', () => {
-      pathService.getPath.and.returnValue(of(hierarchicalPath));
-      pathService.getContentById.and.returnValue(of(mockStepView.content));
+      pathService.getPath.mockReturnValue(of(hierarchicalPath));
+      pathService.getContentById.mockReturnValue(of(mockStepView.content));
 
       paramsSubject.next({ pathId: 'hierarchical-path', stepIndex: '1' });
       fixture.detectChanges();
@@ -505,8 +506,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should get current module title from lesson context', () => {
-      pathService.getPath.and.returnValue(of(hierarchicalPath));
-      pathService.getContentById.and.returnValue(of(mockStepView.content));
+      pathService.getPath.mockReturnValue(of(hierarchicalPath));
+      pathService.getContentById.mockReturnValue(of(mockStepView.content));
 
       paramsSubject.next({ pathId: 'hierarchical-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -515,8 +516,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should get current section title from lesson context', () => {
-      pathService.getPath.and.returnValue(of(hierarchicalPath));
-      pathService.getContentById.and.returnValue(of(mockStepView.content));
+      pathService.getPath.mockReturnValue(of(hierarchicalPath));
+      pathService.getContentById.mockReturnValue(of(mockStepView.content));
 
       paramsSubject.next({ pathId: 'hierarchical-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -525,8 +526,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should navigate to specific concept by index', () => {
-      pathService.getPath.and.returnValue(of(hierarchicalPath));
-      pathService.getContentById.and.returnValue(of(mockStepView.content));
+      pathService.getPath.mockReturnValue(of(hierarchicalPath));
+      pathService.getContentById.mockReturnValue(of(mockStepView.content));
 
       paramsSubject.next({ pathId: 'hierarchical-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -575,7 +576,7 @@ describe('PathNavigatorComponent', () => {
       expect(component.isFocusedView).toBe(false);
     });
 
-    it('should increment content refresh key when toggling focused view', done => {
+    it('should increment content refresh key when toggling focused view', () => new Promise<void>(done => {
       fixture.detectChanges();
       const initialKey = component.contentRefreshKey;
 
@@ -585,7 +586,7 @@ describe('PathNavigatorComponent', () => {
         expect(component.contentRefreshKey).toBeGreaterThan(initialKey);
         done();
       }, 350);
-    });
+    }));
   });
 
   describe('exploration events', () => {
@@ -599,7 +600,7 @@ describe('PathNavigatorComponent', () => {
       component.onExploreContent('related-node-1');
 
       expect(pathContextService.startDetour).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           toContentId: 'related-node-1',
           detourType: 'related',
         })
@@ -614,14 +615,14 @@ describe('PathNavigatorComponent', () => {
       component.onExploreInGraph();
 
       expect(pathContextService.startDetour).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           detourType: 'graph-explore',
         })
       );
       expect(router.navigate).toHaveBeenCalledWith(
         ['/lamad/explore'],
-        jasmine.objectContaining({
-          queryParams: jasmine.objectContaining({
+        expect.objectContaining({
+          queryParams: expect.objectContaining({
             focus: 'node-2',
             fromPath: 'test-path',
             returnStep: 1,
@@ -648,7 +649,7 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should handle lesson completion event', () => {
-      const governanceSignalService = TestBed.inject(GovernanceSignalService) as jasmine.SpyObj<GovernanceSignalService>;
+      const governanceSignalService = TestBed.inject(GovernanceSignalService) as { [K in keyof GovernanceSignalService]?: Mock };
 
       const completionEvent = {
         type: 'quiz' as const,
@@ -660,7 +661,7 @@ describe('PathNavigatorComponent', () => {
       component.onLessonComplete(completionEvent);
 
       expect(governanceSignalService.recordInteractiveCompletion).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           contentId: 'node-2',
           interactionType: 'quiz',
           passed: true,
@@ -671,7 +672,7 @@ describe('PathNavigatorComponent', () => {
 
     it('should advance mastery level on successful completion', () => {
       // Use NEVER to prevent completeStep reload
-      agentService.completeStep.and.returnValue(NEVER);
+      agentService.completeStep.mockReturnValue(NEVER);
 
       component.currentBloomLevel = 'not_started';
       const completionEvent = {
@@ -735,9 +736,11 @@ describe('PathNavigatorComponent', () => {
 
   describe('learning signal tracking', () => {
     it('should emit progress signal on navigation', () => {
-      const governanceSignalService: any = jasmine.createSpyObj('GovernanceSignalService', ['recordLearningSignal']);
+      const governanceSignalService: any = {
+    recordLearningSignal: vi.fn(),
+  };
       (component as any).governanceSignalService = governanceSignalService;
-      governanceSignalService.recordLearningSignal.and.returnValue(of(undefined));
+      governanceSignalService.recordLearningSignal.mockReturnValue(of(undefined));
 
       fixture.detectChanges();
       component.stepView = mockStepView;
@@ -746,16 +749,18 @@ describe('PathNavigatorComponent', () => {
       component.goToNext();
 
       expect(governanceSignalService.recordLearningSignal).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           signalType: 'progress_update',
         })
       );
     });
 
     it('should not emit progress signal if time is too short', () => {
-      const governanceSignalService: any = jasmine.createSpyObj('GovernanceSignalService', ['recordLearningSignal']);
+      const governanceSignalService: any = {
+    recordLearningSignal: vi.fn(),
+  };
       (component as any).governanceSignalService = governanceSignalService;
-      governanceSignalService.recordLearningSignal.and.returnValue(of(undefined));
+      governanceSignalService.recordLearningSignal.mockReturnValue(of(undefined));
 
       fixture.detectChanges();
       component.stepView = mockStepView;
@@ -770,7 +775,7 @@ describe('PathNavigatorComponent', () => {
   describe('error handling', () => {
     it('should handle content not found', () => {
       // Mock getPathStep to return a step with null content (since mockPath has no chapters)
-      pathService.getPathStep.and.returnValue(of({
+      pathService.getPathStep.mockReturnValue(of({
         step: mockPath.steps[0],
         content: null,
         hasNext: true,
@@ -787,7 +792,7 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should handle generic load errors', () => {
-      pathService.getPath.and.returnValue(
+      pathService.getPath.mockReturnValue(
         throwError(() => ({ message: 'Server unreachable' }))
       );
 
@@ -799,7 +804,7 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should handle errors without message', () => {
-      pathService.getPath.and.returnValue(throwError(() => ({})));
+      pathService.getPath.mockReturnValue(throwError(() => ({})));
 
       paramsSubject.next({ pathId: 'test-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -811,7 +816,7 @@ describe('PathNavigatorComponent', () => {
   describe('edge cases', () => {
     it('should handle path with no chapters', () => {
       const emptyPath = { ...mockPath, chapters: [] };
-      pathService.getPath.and.returnValue(of(emptyPath));
+      pathService.getPath.mockReturnValue(of(emptyPath));
 
       paramsSubject.next({ pathId: 'test-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -822,7 +827,7 @@ describe('PathNavigatorComponent', () => {
 
     it('should handle undefined path chapters', () => {
       const noChaptersPath = { ...mockPath, chapters: undefined };
-      pathService.getPath.and.returnValue(of(noChaptersPath));
+      pathService.getPath.mockReturnValue(of(noChaptersPath));
 
       paramsSubject.next({ pathId: 'test-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -856,7 +861,7 @@ describe('PathNavigatorComponent', () => {
         ...mockStepView,
         step: { ...mockStepView.step, resourceId: '' },
       };
-      pathService.getPathStep.and.returnValue(of(stepWithoutResource));
+      pathService.getPathStep.mockReturnValue(of(stepWithoutResource));
 
       paramsSubject.next({ pathId: 'test-path', stepIndex: '0' });
       fixture.detectChanges();
@@ -899,8 +904,8 @@ describe('PathNavigatorComponent', () => {
     };
 
     it('should handle 2-level path format', () => {
-      pathService.getPath.and.returnValue(of(twoLevelPath));
-      pathService.getContentById.and.returnValue(
+      pathService.getPath.mockReturnValue(of(twoLevelPath));
+      pathService.getContentById.mockReturnValue(
         of({
           id: 'step-1',
           title: 'Step 1',
@@ -922,8 +927,8 @@ describe('PathNavigatorComponent', () => {
     });
 
     it('should calculate total concepts for 2-level path', () => {
-      pathService.getPath.and.returnValue(of(twoLevelPath));
-      pathService.getContentById.and.returnValue(of(mockStepView.content));
+      pathService.getPath.mockReturnValue(of(twoLevelPath));
+      pathService.getContentById.mockReturnValue(of(mockStepView.content));
 
       paramsSubject.next({ pathId: 'test-path', stepIndex: '0' });
       fixture.detectChanges();

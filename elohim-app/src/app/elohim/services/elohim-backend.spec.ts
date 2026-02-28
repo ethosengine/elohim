@@ -8,6 +8,7 @@ import type {
   ElohimResponse,
 } from '../models/elohim-agent.model';
 import type { ElohimBackend } from './elohim-backend';
+import { type Mock, vi } from 'vitest';
 
 describe('MockBackend', () => {
   let backend: MockBackend;
@@ -212,13 +213,11 @@ describe('ElohimBackendCatalog', () => {
 
   const createMockBackend = (
     overrides: Partial<ElohimBackend> = {},
-  ): jasmine.SpyObj<ElohimBackend> => {
-    const spy = jasmine.createSpyObj('ElohimBackend', ['isAvailable', 'invoke'], {
-      id: overrides.id ?? 'test-backend',
+  ): any => {
+    const spy = { isAvailable: vi.fn(), invoke: vi.fn(), id: overrides.id ?? 'test-backend',
       name: overrides.name ?? 'Test Backend',
-      type: overrides.type ?? 'mock',
-    });
-    spy.isAvailable.and.returnValue(Promise.resolve(overrides.isAvailable?.() ?? true));
+      type: overrides.type ?? 'mock', };
+    spy.isAvailable.mockReturnValue(Promise.resolve(overrides.isAvailable?.() ?? true));
     return spy;
   };
 
@@ -294,7 +293,7 @@ describe('ElohimBackendCatalog', () => {
         id: 'native',
         type: 'native',
       } as unknown as Partial<ElohimBackend>);
-      native.isAvailable.and.returnValue(Promise.resolve(true));
+      native.isAvailable.mockReturnValue(Promise.resolve(true));
 
       catalog.register(mock);
       catalog.register(native);
@@ -310,13 +309,13 @@ describe('ElohimBackendCatalog', () => {
         id: 'native',
         type: 'native',
       } as unknown as Partial<ElohimBackend>);
-      preferred.isAvailable.and.returnValue(Promise.resolve(false));
+      preferred.isAvailable.mockReturnValue(Promise.resolve(false));
 
       const fallback = createMockBackend({
         id: 'native-2',
         type: 'native',
       } as unknown as Partial<ElohimBackend>);
-      fallback.isAvailable.and.returnValue(Promise.resolve(true));
+      fallback.isAvailable.mockReturnValue(Promise.resolve(true));
 
       catalog.register(mock);
       catalog.register(preferred);
@@ -333,7 +332,7 @@ describe('ElohimBackendCatalog', () => {
         id: 'native',
         type: 'native',
       } as unknown as Partial<ElohimBackend>);
-      native.isAvailable.and.returnValue(Promise.resolve(false));
+      native.isAvailable.mockReturnValue(Promise.resolve(false));
 
       catalog.register(mock);
       catalog.register(native);

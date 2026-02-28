@@ -9,14 +9,17 @@ import { TestBed } from '@angular/core/testing';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 
 import { StewardshipService } from './stewardship.service';
+import { vi } from 'vitest';
 
 describe('StewardshipService', () => {
   let service: StewardshipService;
-  let mockHolochain: jasmine.SpyObj<HolochainClientService>;
+  let mockHolochain: any;
 
   beforeEach(() => {
     // Create mock for HolochainClientService
-    mockHolochain = jasmine.createSpyObj('HolochainClientService', ['callZome']);
+    mockHolochain = {
+    callZome: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [StewardshipService, { provide: HolochainClientService, useValue: mockHolochain }],
@@ -250,7 +253,7 @@ describe('StewardshipService', () => {
       subjectCanView: true,
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockPolicy }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockPolicy }));
 
     const result = await service.getMyPolicy();
 
@@ -265,7 +268,7 @@ describe('StewardshipService', () => {
       resolvePromise = resolve;
     });
 
-    mockHolochain.callZome.and.returnValue(delayedPromise);
+    mockHolochain.callZome.mockReturnValue(delayedPromise);
 
     // Start the fetch (don't await yet)
     const policyPromise = service.getMyPolicy();
@@ -282,7 +285,7 @@ describe('StewardshipService', () => {
   });
 
   it('should handle policy fetch error gracefully', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.reject(new Error('Network error')));
+    mockHolochain.callZome.mockReturnValue(Promise.reject(new Error('Network error')));
 
     const result = await service.getMyPolicy();
 
@@ -291,7 +294,7 @@ describe('StewardshipService', () => {
   });
 
   it('should return null when policy fetch fails', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.getMyPolicy();
 
@@ -303,7 +306,7 @@ describe('StewardshipService', () => {
   // ==========================================================================
 
   it('should allow content access when no restrictions', async () => {
-    mockHolochain.callZome.and.returnValue(
+    mockHolochain.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: { Allow: null } })
     );
 
@@ -315,7 +318,7 @@ describe('StewardshipService', () => {
 
   it('should block content access when restricted', async () => {
     const blockData = { Block: { reason: 'Age restricted' } };
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: blockData }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: blockData }));
 
     const result = await service.checkContentAccess('hash-456', ['adult']);
 
@@ -326,7 +329,7 @@ describe('StewardshipService', () => {
   });
 
   it('should fail open for content access on error', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.checkContentAccess('hash-789', []);
 
@@ -359,7 +362,7 @@ describe('StewardshipService', () => {
       subjectCanView: true,
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: policy }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: policy }));
 
     const result = await service.checkFeatureAccess('analytics');
 
@@ -388,7 +391,7 @@ describe('StewardshipService', () => {
       subjectCanView: true,
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: policy }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: policy }));
 
     const result = await service.checkFeatureAccess('social-sharing');
 
@@ -396,7 +399,7 @@ describe('StewardshipService', () => {
   });
 
   it('should fail open for feature access when no policy', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.checkFeatureAccess('any-feature');
 
@@ -429,7 +432,7 @@ describe('StewardshipService', () => {
       subjectCanView: true,
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: policy }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: policy }));
 
     const result = await service.checkRouteAccess('/dashboard');
 
@@ -458,7 +461,7 @@ describe('StewardshipService', () => {
       subjectCanView: true,
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: policy }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: policy }));
 
     const result = await service.checkRouteAccess('/admin/users');
 
@@ -491,7 +494,7 @@ describe('StewardshipService', () => {
       subjectCanView: true,
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: policy }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: policy }));
 
     const result = await service.checkTimeAccess();
 
@@ -537,7 +540,7 @@ describe('StewardshipService', () => {
       },
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockGrant }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockGrant }));
 
     const input = {
       subjectId: 'subject-1',
@@ -566,7 +569,7 @@ describe('StewardshipService', () => {
   // ==========================================================================
 
   it('should revoke grant successfully', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
     const result = await service.revokeGrant('grant-001');
 
@@ -574,7 +577,7 @@ describe('StewardshipService', () => {
   });
 
   it('should return false when revoke grant fails', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.revokeGrant('grant-001');
 
@@ -616,7 +619,7 @@ describe('StewardshipService', () => {
       },
     ];
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockGrants }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockGrants }));
 
     const result = await service.getMySubjects();
 
@@ -626,7 +629,7 @@ describe('StewardshipService', () => {
   });
 
   it('should return empty array when getMySubjects fails', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.getMySubjects();
 
@@ -668,7 +671,7 @@ describe('StewardshipService', () => {
       },
     ];
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockStewards }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockStewards }));
 
     const result = await service.getMyStewards();
 
@@ -728,7 +731,7 @@ describe('StewardshipService', () => {
       },
     ];
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockPolicies }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockPolicies }));
 
     const result = await service.getPoliciesForSubject('subject-1');
 
@@ -737,7 +740,7 @@ describe('StewardshipService', () => {
   });
 
   it('should return empty array when getPoliciesForSubject fails', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.getPoliciesForSubject('subject-1');
 
@@ -775,7 +778,7 @@ describe('StewardshipService', () => {
       },
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockAppeal }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockAppeal }));
 
     const input = {
       grantId: 'grant-1',
@@ -821,7 +824,7 @@ describe('StewardshipService', () => {
       },
     ];
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockAppeals }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockAppeals }));
 
     const result = await service.getMyAppeals();
 
@@ -850,7 +853,7 @@ describe('StewardshipService', () => {
       },
     };
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockLog }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockLog }));
 
     const result = await service.logActivity('session-1', 60, ['educational'], []);
 
@@ -877,7 +880,7 @@ describe('StewardshipService', () => {
       },
     ];
 
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: mockLogs }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockLogs }));
 
     const result = await service.getMyActivityLogs();
 
@@ -890,7 +893,7 @@ describe('StewardshipService', () => {
   // ==========================================================================
 
   it('should initialize successfully', async () => {
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
     await service.initialize();
 

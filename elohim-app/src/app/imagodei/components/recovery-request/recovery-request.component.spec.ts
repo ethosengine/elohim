@@ -10,37 +10,30 @@ import { RecoveryCoordinatorService } from '../../services/recovery-coordinator.
 import { DoorwayRegistryService } from '../../services/doorway-registry.service';
 import { Router } from '@angular/router';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('RecoveryRequestComponent', () => {
   let component: RecoveryRequestComponent;
   let fixture: ComponentFixture<RecoveryRequestComponent>;
-  let mockRecoveryService: jasmine.SpyObj<RecoveryCoordinatorService>;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockRecoveryService: any;
+  let mockDoorwayRegistry: any;
+  let mockRouter: any;
 
   beforeEach(async () => {
-    // Create mocks
-    mockRecoveryService = jasmine.createSpyObj(
-      'RecoveryCoordinatorService',
-      ['initiateRecovery', 'checkProgress', 'completeRecovery'],
-      {
-        activeRequest: signal(null),
-        progress: signal(null),
-        credential: signal(null),
-        isLoading: signal(false),
-        error: signal(null),
-      }
-    );
+    mockRecoveryService = {
+      initiateRecovery: vi.fn(),
+      checkProgress: vi.fn(),
+      completeRecovery: vi.fn(),
+      activeRequest: signal(null),
+      progress: signal(null),
+      credential: signal(null),
+      isLoading: signal(false),
+      error: signal(null),
+    };
 
-    mockDoorwayRegistry = jasmine.createSpyObj(
-      'DoorwayRegistryService',
-      [],
-      {
-        hasSelection: signal(false),
-      }
-    );
+    mockDoorwayRegistry = {};
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = { navigate: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [RecoveryRequestComponent],

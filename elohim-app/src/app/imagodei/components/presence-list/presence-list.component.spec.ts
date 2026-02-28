@@ -5,12 +5,13 @@ import { PresenceListComponent } from './presence-list.component';
 import { PresenceService } from '../../services/presence.service';
 import { IdentityService } from '../../services/identity.service';
 import type { ContributorPresenceView } from '../../models/presence.model';
+import { vi } from 'vitest';
 
 describe('PresenceListComponent', () => {
   let component: PresenceListComponent;
   let fixture: ComponentFixture<PresenceListComponent>;
-  let mockPresenceService: jasmine.SpyObj<PresenceService>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
+  let mockPresenceService: any;
+  let mockIdentityService: any;
 
   const mockPresences: ContributorPresenceView[] = [
     {
@@ -66,31 +67,22 @@ describe('PresenceListComponent', () => {
   ];
 
   beforeEach(async () => {
-    mockPresenceService = jasmine.createSpyObj(
-      'PresenceService',
-      [
-        'getPresencesByState',
-        'getMyStewardedPresences',
-        'createPresence',
-        'beginStewardship',
-      ],
-      {
-        isLoading: signal(false),
-        myStewardedPresences: signal([]),
-      }
-    );
+    mockPresenceService = {
+      getPresencesByState: vi.fn(),
+      getMyStewardedPresences: vi.fn(),
+      createPresence: vi.fn(),
+      beginStewardship: vi.fn(),
+      isLoading: signal(false),
+      myStewardedPresences: signal([]),
+    };
 
-    mockIdentityService = jasmine.createSpyObj(
-      'IdentityService',
-      [],
-      {
-        isAuthenticated: signal(true),
-        agentPubKey: signal('agent-123'),
-      }
-    );
+    mockIdentityService = {
+      isAuthenticated: signal(true),
+      agentPubKey: signal('agent-123'),
+    };
 
-    mockPresenceService.getPresencesByState.and.returnValue(Promise.resolve([]));
-    mockPresenceService.getMyStewardedPresences.and.returnValue(Promise.resolve([]));
+    mockPresenceService.getPresencesByState.mockReturnValue(Promise.resolve([]));
+    mockPresenceService.getMyStewardedPresences.mockReturnValue(Promise.resolve([]));
 
     await TestBed.configureTestingModule({
       imports: [PresenceListComponent],

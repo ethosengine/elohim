@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
@@ -7,7 +8,7 @@ import { HealthCheckService, type HealthStatus } from '../../services/health-che
 describe('HealthIndicatorComponent', () => {
   let component: HealthIndicatorComponent;
   let fixture: ComponentFixture<HealthIndicatorComponent>;
-  let mockHealthService: jasmine.SpyObj<HealthCheckService>;
+  let mockHealthService: any;
 
   const mockHealthStatus: HealthStatus = {
     status: 'healthy',
@@ -43,16 +44,10 @@ describe('HealthIndicatorComponent', () => {
   };
 
   beforeEach(async () => {
-    mockHealthService = jasmine.createSpyObj(
-      'HealthCheckService',
-      ['refresh', 'getQuickStatus'],
-      {
-        status: signal(mockHealthStatus),
-        isChecking: signal(false),
-      }
-    );
-    mockHealthService.refresh.and.returnValue(Promise.resolve(mockHealthStatus));
-    mockHealthService.getQuickStatus.and.returnValue({
+    mockHealthService = { refresh: vi.fn(), getQuickStatus: vi.fn(), status: signal(mockHealthStatus),
+        isChecking: signal(false), };
+    mockHealthService.refresh.mockReturnValue(Promise.resolve(mockHealthStatus));
+    mockHealthService.getQuickStatus.mockReturnValue({
       icon: '✓',
       label: 'All systems operational',
       color: '#34a853',

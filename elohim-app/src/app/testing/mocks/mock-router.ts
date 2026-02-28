@@ -1,9 +1,8 @@
 /**
  * Angular Router mock factories for unit testing
  */
-
 import { ActivatedRouteSnapshot, ParamMap } from '@angular/router';
-
+import { type Mock, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
 // ============================================================================
@@ -11,22 +10,19 @@ import { BehaviorSubject } from 'rxjs';
 // ============================================================================
 
 export interface MockRouter {
-  navigate: jasmine.Spy;
-  navigateByUrl: jasmine.Spy;
+  navigate: Mock;
+  navigateByUrl: Mock;
   events: BehaviorSubject<unknown>;
   url: string;
 }
 
 export function createMockRouter(): MockRouter {
-  const mock = jasmine.createSpyObj('Router', ['navigate', 'navigateByUrl']) as MockRouter;
-
-  // Set up spy return values to simulate successful navigation
-  mock.navigate.and.returnValue(Promise.resolve(true));
-  mock.navigateByUrl.and.returnValue(Promise.resolve(true));
-  mock.events = new BehaviorSubject<unknown>(null);
-  mock.url = '/';
-
-  return mock;
+  return {
+    navigate: vi.fn().mockReturnValue(Promise.resolve(true)),
+    navigateByUrl: vi.fn().mockReturnValue(Promise.resolve(true)),
+    events: new BehaviorSubject<unknown>(null),
+    url: '/',
+  };
 }
 
 // ============================================================================
@@ -74,18 +70,3 @@ function createParamMap(params: Record<string, string>): ParamMap {
     keys: Object.keys(params),
   };
 }
-
-// ============================================================================
-// Usage Example
-// ============================================================================
-//
-// TestBed.configureTestingModule({
-//   providers: [
-//     { provide: Router, useValue: createMockRouter() },
-//     { provide: ActivatedRoute, useValue: createMockActivatedRoute(
-//       { id: '123' },           // route params
-//       { filter: 'active' },   // query params
-//       { title: 'Page Title' } // route data
-//     )}
-//   ]
-// });

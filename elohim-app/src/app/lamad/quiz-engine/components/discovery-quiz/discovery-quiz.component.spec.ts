@@ -4,16 +4,19 @@ import { of } from 'rxjs';
 import { DiscoveryQuizComponent } from './discovery-quiz.component';
 import { DiscoveryAttestationService } from '../../services/discovery-attestation.service';
 import { QuestionPoolService } from '../../services/question-pool.service';
+import { vi } from 'vitest';
 
 describe('DiscoveryQuizComponent', () => {
   let component: DiscoveryQuizComponent;
   let fixture: ComponentFixture<DiscoveryQuizComponent>;
-  let mockQuestionPool: jasmine.SpyObj<QuestionPoolService>;
-  let mockDiscoveryService: jasmine.SpyObj<DiscoveryAttestationService>;
+  let mockQuestionPool: any;
+  let mockDiscoveryService: any;
 
   beforeEach(async () => {
-    mockQuestionPool = jasmine.createSpyObj('QuestionPoolService', ['getPoolForContent']);
-    mockQuestionPool.getPoolForContent.and.returnValue(
+    mockQuestionPool = {
+    getPoolForContent: vi.fn(),
+  };
+    mockQuestionPool.getPoolForContent.mockReturnValue(
       of({
         id: 'test-pool',
         contentId: 'test-content',
@@ -28,9 +31,9 @@ describe('DiscoveryQuizComponent', () => {
       } as any)
     );
 
-    mockDiscoveryService = jasmine.createSpyObj('DiscoveryAttestationService', [
-      'recordAttestation',
-    ]);
+    mockDiscoveryService = {
+    recordAttestation: vi.fn(),
+  };
 
     await TestBed.configureTestingModule({
       imports: [DiscoveryQuizComponent],

@@ -29,23 +29,32 @@ import {
   ImportBatch,
   CategorizationResponse,
 } from '../models/transaction-import.model';
+import { vi } from 'vitest';
 
 describe('TransactionImportService', () => {
   let service: TransactionImportService;
-  let mockPlaid: jasmine.SpyObj<PlaidIntegrationService>;
-  let mockDuplicates: jasmine.SpyObj<DuplicateDetectionService>;
-  let mockCategorization: jasmine.SpyObj<AICategorizationService>;
-  let mockEventFactory: jasmine.SpyObj<EconomicEventFactoryService>;
-  let mockBudgetReconciliation: jasmine.SpyObj<BudgetReconciliationService>;
+  let mockPlaid: any;
+  let mockDuplicates: any;
+  let mockCategorization: any;
+  let mockEventFactory: any;
+  let mockBudgetReconciliation: any;
 
   beforeEach(() => {
-    mockPlaid = jasmine.createSpyObj('PlaidIntegrationService', ['fetchTransactions']);
-    mockDuplicates = jasmine.createSpyObj('DuplicateDetectionService', ['filterDuplicates']);
-    mockCategorization = jasmine.createSpyObj('AICategorizationService', ['categorizeBatch']);
-    mockEventFactory = jasmine.createSpyObj('EconomicEventFactoryService', ['createFromStaged']);
-    mockBudgetReconciliation = jasmine.createSpyObj('BudgetReconciliationService', [
-      'reconcileBudget',
-    ]);
+    mockPlaid = {
+    fetchTransactions: vi.fn(),
+  };
+    mockDuplicates = {
+    filterDuplicates: vi.fn(),
+  };
+    mockCategorization = {
+    categorizeBatch: vi.fn(),
+  };
+    mockEventFactory = {
+    createFromStaged: vi.fn(),
+  };
+    mockBudgetReconciliation = {
+    reconcileBudget: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [
@@ -69,7 +78,7 @@ describe('TransactionImportService', () => {
   // ==========================================================================
 
   describe('observables', () => {
-    it('should provide progress observable', done => {
+    it('should provide progress observable', () => new Promise<void>(done => {
       const progress$ = service.getProgress$();
       expect(progress$).toBeDefined();
 
@@ -78,7 +87,7 @@ describe('TransactionImportService', () => {
         expect(progress.progress).toBe(0);
         done();
       });
-    });
+    }));
 
     it('should provide errors observable', () => {
       const errors$ = service.getErrors$();
@@ -114,9 +123,9 @@ describe('TransactionImportService', () => {
         ],
       };
 
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve(mockPlaidTransactions));
-      mockDuplicates.filterDuplicates.and.returnValue(mockPlaidTransactions);
-      mockCategorization.categorizeBatch.and.returnValue(
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve(mockPlaidTransactions));
+      mockDuplicates.filterDuplicates.mockReturnValue(mockPlaidTransactions);
+      mockCategorization.categorizeBatch.mockReturnValue(
         mockCategorizationResponse as any
       );
 
@@ -138,7 +147,7 @@ describe('TransactionImportService', () => {
     });
 
     it('should handle empty transaction list', async () => {
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([]));
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([]));
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -161,8 +170,8 @@ describe('TransactionImportService', () => {
 
       const uniqueTransactions = [mockPlaidTransactions[0], mockPlaidTransactions[2]];
 
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve(mockPlaidTransactions));
-      mockDuplicates.filterDuplicates.and.returnValue(uniqueTransactions);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve(mockPlaidTransactions));
+      mockDuplicates.filterDuplicates.mockReturnValue(uniqueTransactions);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -181,8 +190,8 @@ describe('TransactionImportService', () => {
         createMockPlaidTransaction('tx-1', -50.0, 'Store'),
       ];
 
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve(mockPlaidTransactions));
-      mockDuplicates.filterDuplicates.and.returnValue(mockPlaidTransactions);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve(mockPlaidTransactions));
+      mockDuplicates.filterDuplicates.mockReturnValue(mockPlaidTransactions);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -197,7 +206,7 @@ describe('TransactionImportService', () => {
     });
 
     it('should propagate errors from Plaid fetch', async () => {
-      mockPlaid.fetchTransactions.and.returnValue(
+      mockPlaid.fetchTransactions.mockReturnValue(
         Promise.reject(new Error('Plaid API error'))
       );
 
@@ -206,11 +215,11 @@ describe('TransactionImportService', () => {
         dateRange: { start: '2024-01-01', end: '2024-01-31' },
       };
 
-      await expectAsync(service.executeImport(request)).toBeRejectedWithError('Plaid API error');
+      await await expect(service.executeImport(request)).rejects.toThrow('Plaid API error');
     });
 
     it('should handle null transactions from Plaid', async () => {
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve(null as any));
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve(null as any));
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -231,8 +240,8 @@ describe('TransactionImportService', () => {
   describe('transaction normalization', () => {
     it('should normalize debit transactions', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Store Purchase');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -249,8 +258,8 @@ describe('TransactionImportService', () => {
 
     it('should normalize credit transactions', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', 500.0, 'Paycheck Deposit');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -267,8 +276,8 @@ describe('TransactionImportService', () => {
 
     it('should detect fee transactions', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -5.0, 'ATM Fee');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -284,8 +293,8 @@ describe('TransactionImportService', () => {
 
     it('should detect transfer transactions', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Transfer to Savings');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -312,8 +321,8 @@ describe('TransactionImportService', () => {
         pending: false,
       };
 
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -338,8 +347,8 @@ describe('TransactionImportService', () => {
 
     beforeEach(async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Test Purchase');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -352,10 +361,10 @@ describe('TransactionImportService', () => {
     });
 
     it('should approve transaction and create economic event', async () => {
-      mockEventFactory.createFromStaged.and.returnValue(
+      mockEventFactory.createFromStaged.mockReturnValue(
         Promise.resolve({ id: 'event-123' } as any)
       );
-      mockBudgetReconciliation.reconcileBudget.and.returnValue(Promise.resolve({} as any));
+      mockBudgetReconciliation.reconcileBudget.mockReturnValue(Promise.resolve({} as any));
 
       await service.approveTransaction(stagedId);
 
@@ -366,10 +375,10 @@ describe('TransactionImportService', () => {
     });
 
     it('should reconcile budget if budgetId present', async () => {
-      mockEventFactory.createFromStaged.and.returnValue(
+      mockEventFactory.createFromStaged.mockReturnValue(
         Promise.resolve({ id: 'event-123' } as any)
       );
-      mockBudgetReconciliation.reconcileBudget.and.returnValue(Promise.resolve({} as any));
+      mockBudgetReconciliation.reconcileBudget.mockReturnValue(Promise.resolve({} as any));
 
       // Update staged to have budget linkage
       const staged = service.getStagedTransaction(stagedId);
@@ -383,7 +392,7 @@ describe('TransactionImportService', () => {
     });
 
     it('should skip budget reconciliation if no budgetId', async () => {
-      mockEventFactory.createFromStaged.and.returnValue(
+      mockEventFactory.createFromStaged.mockReturnValue(
         Promise.resolve({ id: 'event-123' } as any)
       );
 
@@ -393,13 +402,11 @@ describe('TransactionImportService', () => {
     });
 
     it('should throw error for non-existent transaction', async () => {
-      await expectAsync(service.approveTransaction('non-existent-id')).toBeRejectedWithError(
-        /not found/
-      );
+      await await expect(service.approveTransaction('non-existent-id')).rejects.toThrow(/not found/);
     });
 
     it('should handle idempotent approval', async () => {
-      mockEventFactory.createFromStaged.and.returnValue(
+      mockEventFactory.createFromStaged.mockReturnValue(
         Promise.resolve({ id: 'event-123' } as any)
       );
 
@@ -411,13 +418,11 @@ describe('TransactionImportService', () => {
     });
 
     it('should propagate errors from event creation', async () => {
-      mockEventFactory.createFromStaged.and.returnValue(
+      mockEventFactory.createFromStaged.mockReturnValue(
         Promise.reject(new Error('Event creation failed'))
       );
 
-      await expectAsync(service.approveTransaction(stagedId)).toBeRejectedWithError(
-        /Event creation failed/
-      );
+      await await expect(service.approveTransaction(stagedId)).rejects.toThrow(/Event creation failed/);
     });
   });
 
@@ -427,8 +432,8 @@ describe('TransactionImportService', () => {
 
     beforeEach(async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Test Purchase');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -455,9 +460,7 @@ describe('TransactionImportService', () => {
     });
 
     it('should throw error for non-existent transaction', async () => {
-      await expectAsync(service.rejectTransaction('non-existent')).toBeRejectedWithError(
-        /not found/
-      );
+      await await expect(service.rejectTransaction('non-existent')).rejects.toThrow(/not found/);
     });
   });
 
@@ -472,8 +475,8 @@ describe('TransactionImportService', () => {
         createMockPlaidTransaction('tx-3', -75.0, 'Purchase 3'),
       ];
 
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve(plaidTransactions));
-      mockDuplicates.filterDuplicates.and.returnValue(plaidTransactions);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve(plaidTransactions));
+      mockDuplicates.filterDuplicates.mockReturnValue(plaidTransactions);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -486,7 +489,7 @@ describe('TransactionImportService', () => {
     });
 
     it('should approve multiple transactions', async () => {
-      mockEventFactory.createFromStaged.and.returnValue(Promise.resolve({ id: 'event-1' } as any));
+      mockEventFactory.createFromStaged.mockReturnValue(Promise.resolve({ id: 'event-1' } as any));
 
       await service.approveBatch(stagedIds);
 
@@ -497,11 +500,10 @@ describe('TransactionImportService', () => {
     });
 
     it('should continue processing after individual failure', async () => {
-      mockEventFactory.createFromStaged.and.returnValues(
-        Promise.resolve({ id: 'event-1' } as any),
-        Promise.reject(new Error('Failed')), // Second fails
-        Promise.resolve({ id: 'event-3' } as any)
-      );
+      mockEventFactory.createFromStaged
+        .mockResolvedValueOnce({ id: 'event-1' } as any)
+        .mockRejectedValueOnce(new Error('Failed')) // Second fails
+        .mockResolvedValueOnce({ id: 'event-3' } as any);
 
       await service.approveBatch(stagedIds);
 
@@ -519,8 +521,8 @@ describe('TransactionImportService', () => {
   describe('batch management', () => {
     it('should retrieve batch by ID', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Purchase');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -557,8 +559,8 @@ describe('TransactionImportService', () => {
 
     beforeEach(async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Purchase');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -603,9 +605,7 @@ describe('TransactionImportService', () => {
     });
 
     it('should throw error when updating non-existent transaction', async () => {
-      await expectAsync(
-        service.updateStagedTransactionCategory('non-existent', 'Category')
-      ).toBeRejectedWithError(/not found/);
+      await await expect(service.updateStagedTransactionCategory('non-existent', 'Category')).rejects.toThrow(/not found/);
     });
   });
 
@@ -629,9 +629,9 @@ describe('TransactionImportService', () => {
         })),
       };
 
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve(plaidTransactions));
-      mockDuplicates.filterDuplicates.and.returnValue(plaidTransactions);
-      mockCategorization.categorizeBatch.and.returnValue(mockCategorizationResp as any);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve(plaidTransactions));
+      mockDuplicates.filterDuplicates.mockReturnValue(plaidTransactions);
+      mockCategorization.categorizeBatch.mockReturnValue(mockCategorizationResp as any);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -648,8 +648,8 @@ describe('TransactionImportService', () => {
     it('should update staged transactions with categorization results', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Whole Foods');
 
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -681,8 +681,8 @@ describe('TransactionImportService', () => {
       });
 
       const plaidTx = createMockPlaidTransaction('tx-1', -100.0, 'Purchase');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -704,8 +704,8 @@ describe('TransactionImportService', () => {
   // ==========================================================================
 
   describe('error handling', () => {
-    it('should emit error on progress stream', done => {
-      mockPlaid.fetchTransactions.and.returnValue(Promise.reject(new Error('API Error')));
+    it('should emit error on progress stream', () => new Promise<void>(done => {
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.reject(new Error('API Error')));
 
       service.getErrors$().subscribe(error => {
         expect(error.stage).toBe('pipeline');
@@ -721,7 +721,7 @@ describe('TransactionImportService', () => {
       service.executeImport(request).catch(() => {
         // Expected to fail
       });
-    });
+    }));
   });
 
   // ==========================================================================
@@ -731,8 +731,8 @@ describe('TransactionImportService', () => {
   describe('edge cases', () => {
     it('should handle very large transaction amounts', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', -999999999.99, 'Large Purchase');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -748,8 +748,8 @@ describe('TransactionImportService', () => {
 
     it('should handle zero amount transactions', async () => {
       const plaidTx = createMockPlaidTransaction('tx-1', 0.0, 'Zero Amount');
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',
@@ -769,8 +769,8 @@ describe('TransactionImportService', () => {
         -50.0,
         'Store™ & Café® - "Special" (Deal)'
       );
-      mockPlaid.fetchTransactions.and.returnValue(Promise.resolve([plaidTx]));
-      mockDuplicates.filterDuplicates.and.returnValue([plaidTx]);
+      mockPlaid.fetchTransactions.mockReturnValue(Promise.resolve([plaidTx]));
+      mockDuplicates.filterDuplicates.mockReturnValue([plaidTx]);
 
       const request: ImportRequest = {
         connectionId: 'conn-1',

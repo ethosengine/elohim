@@ -17,10 +17,11 @@ import { ContentNode, ContentType } from '@app/lamad/models/content-node.model';
 import { HumanAffinity } from '@app/qahal/models/human-affinity.model';
 
 import { AffinityTrackingService } from './affinity-tracking.service';
+import { vi } from 'vitest';
 
 describe('AffinityTrackingService', () => {
   let service: AffinityTrackingService;
-  let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
+  let mockSessionHumanService: any;
 
   beforeEach(() => {
     // Create mock SessionHumanService
@@ -46,15 +47,15 @@ describe('AffinityTrackingService', () => {
     const sessionObservable: Observable<SessionHuman | null> = new BehaviorSubject<SessionHuman | null>(
       mockSession
     ).asObservable();
-    mockSessionHumanService = jasmine.createSpyObj<SessionHumanService>(
-      'SessionHumanService',
-      ['getAffinityStorageKey', 'getSessionId', 'recordAffinityChange', 'recordContentView'],
-      {
-        session$: sessionObservable,
-      }
-    );
-    mockSessionHumanService.getAffinityStorageKey.and.returnValue('test-session-key');
-    mockSessionHumanService.getSessionId.and.returnValue('test-session-id');
+    mockSessionHumanService = {
+      getAffinityStorageKey: vi.fn(),
+      getSessionId: vi.fn(),
+      recordAffinityChange: vi.fn(),
+      recordContentView: vi.fn(),
+      session$: sessionObservable,
+    };
+    mockSessionHumanService.getAffinityStorageKey.mockReturnValue('test-session-key');
+    mockSessionHumanService.getSessionId.mockReturnValue('test-session-id');
 
     TestBed.configureTestingModule({
       providers: [
@@ -203,7 +204,7 @@ describe('AffinityTrackingService', () => {
       });
     });
 
-    it('should emit change event on affinity change', done => {
+    it('should emit change event on affinity change', () => new Promise<void>(done => {
       service.setAffinity('node-1', 0.3);
 
       service.changes$.pipe(take(1)).subscribe(change => {
@@ -214,7 +215,7 @@ describe('AffinityTrackingService', () => {
           done();
         }
       });
-    });
+    }));
 
     it('should record affinity change via session service', () => {
       service.setAffinity('node-1', 0.6);
@@ -222,7 +223,7 @@ describe('AffinityTrackingService', () => {
       expect(mockSessionHumanService.recordAffinityChange).toHaveBeenCalledWith('node-1', 0.6);
     });
 
-    it('should update lastUpdated timestamp', done => {
+    it('should update lastUpdated timestamp', () => new Promise<void>(done => {
       const beforeTime = Date.now();
       service.setAffinity('node-1', 0.5);
 
@@ -232,9 +233,9 @@ describe('AffinityTrackingService', () => {
         expect(lastUpdated).toBeGreaterThanOrEqual(beforeTime);
         done();
       });
-    });
+    }));
 
-    it('should not emit change if value unchanged', done => {
+    it('should not emit change if value unchanged', () => new Promise<void>(done => {
       service.setAffinity('node-1', 0.5);
 
       let changeCount = 0;
@@ -248,7 +249,7 @@ describe('AffinityTrackingService', () => {
         expect(changeCount).toBeLessThanOrEqual(2); // Initial null + one change
         done();
       }, 100);
-    });
+    }));
   });
 
   // ==========================================================================
@@ -431,7 +432,7 @@ describe('AffinityTrackingService', () => {
       expect(service.getAffinity('node-2')).toBe(0.0);
     });
 
-    it('should emit updated affinity$ on reset', done => {
+    it('should emit updated affinity$ on reset', () => new Promise<void>(done => {
       service.setAffinity('node-1', 0.5);
       service.reset();
 
@@ -439,9 +440,9 @@ describe('AffinityTrackingService', () => {
         expect(affinity.affinity).toEqual({});
         done();
       });
-    });
+    }));
 
-    it('should update lastUpdated on reset', done => {
+    it('should update lastUpdated on reset', () => new Promise<void>(done => {
       const beforeTime = Date.now();
       service.reset();
 
@@ -450,7 +451,7 @@ describe('AffinityTrackingService', () => {
         expect(lastUpdated).toBeGreaterThanOrEqual(beforeTime);
         done();
       });
-    });
+    }));
   });
 
   // ==========================================================================
@@ -475,7 +476,7 @@ describe('AffinityTrackingService', () => {
   // ==========================================================================
 
   describe('observable return types', () => {
-    it('affinity$ should be Observable<HumanAffinity>', done => {
+    it('affinity$ should be Observable<HumanAffinity>', () => new Promise<void>(done => {
       service.affinity$.pipe(take(1)).subscribe(value => {
         expect(value).toBeDefined();
         expect(typeof value === 'object').toBe(true);
@@ -484,9 +485,9 @@ describe('AffinityTrackingService', () => {
         expect('lastUpdated' in value).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('changes$ should be Observable<AffinityChangeEvent | null>', done => {
+    it('changes$ should be Observable<AffinityChangeEvent | null>', () => new Promise<void>(done => {
       service.changes$.pipe(take(1)).subscribe(value => {
         expect(value === null || typeof value === 'object').toBe(true);
         if (value !== null) {
@@ -497,9 +498,9 @@ describe('AffinityTrackingService', () => {
         }
         done();
       });
-    });
+    }));
 
-    it('affinity$ should emit new value on setAffinity', done => {
+    it('affinity$ should emit new value on setAffinity', () => new Promise<void>(done => {
       service.affinity$.subscribe(affinity => {
         if (affinity.affinity['test-node']) {
           expect(affinity.affinity['test-node']).toBe(0.5);
@@ -508,9 +509,9 @@ describe('AffinityTrackingService', () => {
       });
 
       service.setAffinity('test-node', 0.5);
-    });
+    }));
 
-    it('changes$ should emit AffinityChangeEvent on setAffinity', done => {
+    it('changes$ should emit AffinityChangeEvent on setAffinity', () => new Promise<void>(done => {
       const changeNodeId = 'test-node-2';
       service.changes$.subscribe(change => {
         if (change?.nodeId === changeNodeId) {
@@ -522,7 +523,7 @@ describe('AffinityTrackingService', () => {
       });
 
       service.setAffinity(changeNodeId, 0.8);
-    });
+    }));
   });
 
   // ==========================================================================
@@ -530,7 +531,7 @@ describe('AffinityTrackingService', () => {
   // ==========================================================================
 
   describe('storage integration', () => {
-    it('should load affinity from localStorage on creation', done => {
+    it('should load affinity from localStorage on creation', () => new Promise<void>(done => {
       const testAffinity: HumanAffinity = {
         humanId: 'test-session-id',
         affinity: { 'node-1': 0.5 },
@@ -553,9 +554,9 @@ describe('AffinityTrackingService', () => {
         }
         done();
       }, 50);
-    });
+    }));
 
-    it('should save affinity to localStorage on setAffinity', done => {
+    it('should save affinity to localStorage on setAffinity', () => new Promise<void>(done => {
       service.setAffinity('node-1', 0.6);
 
       // Check localStorage after a small delay to ensure async write
@@ -570,10 +571,10 @@ describe('AffinityTrackingService', () => {
 
         done();
       }, 50);
-    });
+    }));
 
     it('should handle localStorage read failure gracefully', () => {
-      spyOn(localStorage, 'getItem').and.throwError('Storage error');
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw 'Storage error'; });
 
       // Should not throw, should return default affinity
       expect(() => service.getAffinity('any-node')).not.toThrow();
@@ -581,7 +582,7 @@ describe('AffinityTrackingService', () => {
     });
 
     it('should handle localStorage write failure gracefully', () => {
-      spyOn(localStorage, 'setItem').and.throwError('Storage error');
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw 'Storage error'; });
 
       // Should not throw
       expect(() => service.setAffinity('node-1', 0.5)).not.toThrow();

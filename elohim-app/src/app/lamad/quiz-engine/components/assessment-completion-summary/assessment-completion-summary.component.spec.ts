@@ -16,13 +16,14 @@ import {
   AssessmentCompletionSummaryComponent,
   type CompletionMode,
 } from './assessment-completion-summary.component';
+import { vi } from 'vitest';
 
 describe('AssessmentCompletionSummaryComponent', () => {
   let fixture: ComponentFixture<TestHostComponent>;
   let host: TestHostComponent;
-  let mockDiscoveryService: jasmine.SpyObj<DiscoveryAttestationService>;
-  let mockMasteryStats: jasmine.SpyObj<MasteryStatsService>;
-  let mockPresenceService: jasmine.SpyObj<ElohimPresenceService>;
+  let mockDiscoveryService: any;
+  let mockMasteryStats: any;
+  let mockPresenceService: any;
   let profileSubject: BehaviorSubject<LearnerMasteryProfile | null>;
 
   // ─── Fixtures ──────────────────────────────────────────────────────────────
@@ -111,11 +112,14 @@ describe('AssessmentCompletionSummaryComponent', () => {
   beforeEach(async () => {
     profileSubject = new BehaviorSubject<LearnerMasteryProfile | null>(null);
 
-    mockPresenceService = jasmine.createSpyObj(
-      'ElohimPresenceService',
-      ['onDiscoveryCompleted', 'onContentCompleted', 'dismissNotice', 'handleAction'],
-      {
-        presence$: of([]),
+    mockPresenceService = {
+    onDiscoveryCompleted: vi.fn(),
+    onContentCompleted: vi.fn(),
+    dismissNotice: vi.fn(),
+    handleAction']: vi.fn(),
+    {
+        presence$: of([: vi.fn(),
+  },
         cost$: of({
           tokensProcessed: 0,
           timeMs: 0,
@@ -126,19 +130,20 @@ describe('AssessmentCompletionSummaryComponent', () => {
         providerId: 'elohim-presence',
       },
     );
-    mockPresenceService.onDiscoveryCompleted.and.returnValue(of(mockFulfilledResponse));
-    mockPresenceService.onContentCompleted.and.returnValue(of(mockFulfilledResponse));
+    mockPresenceService.onDiscoveryCompleted.mockReturnValue(of(mockFulfilledResponse));
+    mockPresenceService.onContentCompleted.mockReturnValue(of(mockFulfilledResponse));
 
-    mockDiscoveryService = jasmine.createSpyObj(
-      'DiscoveryAttestationService',
-      ['recordFromCompletion', 'getBadgeDisplay'],
-      {
-        results: signal([]),
+    mockDiscoveryService = {
+    recordFromCompletion: vi.fn(),
+    getBadgeDisplay']: vi.fn(),
+    {
+        results: signal([: vi.fn(),
+  },
         attestations: signal([]),
         featuredResults: signal([]),
       },
     );
-    mockDiscoveryService.recordFromCompletion.and.returnValue({
+    mockDiscoveryService.recordFromCompletion.mockReturnValue({
       id: 'discovery-result-1',
       assessmentId: 'attachment-style-discovery',
       assessmentTitle: 'Attachment Style Assessment',
@@ -151,15 +156,13 @@ describe('AssessmentCompletionSummaryComponent', () => {
       displayString: 'Secure',
       shortDisplay: 'Secure',
     });
-    mockDiscoveryService.getBadgeDisplay.and.returnValue({
+    mockDiscoveryService.getBadgeDisplay.mockReturnValue({
       label: 'Secure',
       icon: '🎭',
       color: '#8B5CF6',
     });
 
-    mockMasteryStats = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
-      learnerProfile$: profileSubject.asObservable(),
-    });
+    mockMasteryStats = { recordDailyEngagement: vi.fn(), learnerProfile$: profileSubject.asObservable(), };
 
     await TestBed.configureTestingModule({
       imports: [TestHostComponent, AssessmentCompletionSummaryComponent],
@@ -193,7 +196,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
 
     it('should record attestation on init', () => {
       expect(mockDiscoveryService.recordFromCompletion).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           contentNodeId: 'content-attachment-001',
           assessmentTitle: 'Attachment Style Assessment',
           instrumentId: 'attachment-style-discovery',
@@ -259,7 +262,7 @@ describe('AssessmentCompletionSummaryComponent', () => {
     });
 
     it('should not record attestation when instrumentId is null', () => {
-      mockDiscoveryService.recordFromCompletion.calls.reset();
+      mockDiscoveryService.recordFromCompletion.mockClear();
 
       host.instrumentId.set(null);
       fixture.detectChanges();

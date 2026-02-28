@@ -13,18 +13,26 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 
 import { CircuitBreakerService, CircuitBreakerConfig } from './circuit-breaker.service';
 import { LoggerService } from './logger.service';
+import { vi } from 'vitest';
 
 describe('CircuitBreakerService', () => {
   let service: CircuitBreakerService;
-  let mockLogger: jasmine.SpyObj<LoggerService>;
+  let mockLogger: any;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  let mockChildLogger: jasmine.SpyObj<ReturnType<LoggerService['createChild']>>;
+  let mockChildLogger: any;
 
   beforeEach(() => {
-    mockChildLogger = jasmine.createSpyObj('ChildLogger', ['debug', 'info', 'warn', 'error']);
-    mockLogger = jasmine.createSpyObj('LoggerService', ['createChild']);
+    mockChildLogger = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+    mockLogger = {
+    createChild: vi.fn(),
+  };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    mockLogger.createChild.and.returnValue(mockChildLogger);
+    mockLogger.createChild.mockReturnValue(mockChildLogger);
 
     TestBed.configureTestingModule({
       providers: [CircuitBreakerService, { provide: LoggerService, useValue: mockLogger }],
@@ -172,19 +180,19 @@ describe('CircuitBreakerService', () => {
 
   describe('Mechanical: execute() Input/Output', () => {
     it('should accept circuit name and async function', async () => {
-      const fn = jasmine.createSpy('fn').and.resolveTo('data');
+      const fn = vi.fn().mockResolvedValue('data');
       const result = await service.execute('mech-exec-1', fn);
       expect(result).toBeTruthy();
     });
 
     it('should accept optional config partial', async () => {
-      const fn = jasmine.createSpy('fn').and.resolveTo('data');
+      const fn = vi.fn().mockResolvedValue('data');
       const result = await service.execute('mech-exec-2', fn, { failureThreshold: 3 });
       expect(result).toBeTruthy();
     });
 
     it('should return CircuitBreakerResult with required properties', async () => {
-      const fn = jasmine.createSpy('fn').and.resolveTo('test-data');
+      const fn = vi.fn().mockResolvedValue('test-data');
       const result = await service.execute('mech-exec-3', fn);
 
       expect(result.success).toBeDefined();
@@ -196,7 +204,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should be async and return Promise', () => {
-      const fn = jasmine.createSpy('fn').and.resolveTo('data');
+      const fn = vi.fn().mockResolvedValue('data');
       const result = service.execute('mech-exec-4', fn);
       expect(result instanceof Promise).toBe(true);
     });
@@ -299,7 +307,7 @@ describe('CircuitBreakerService', () => {
 
   describe('execute - CLOSED state', () => {
     it('should execute function successfully', async () => {
-      const fn = jasmine.createSpy('fn').and.resolveTo('success');
+      const fn = vi.fn().mockResolvedValue('success');
 
       const result = await service.execute('test', fn);
 
@@ -311,7 +319,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should record failure on error', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('test error'));
+      const fn = vi.fn().mockRejectedValue(new Error('test error'));
 
       const result = await service.execute('test', fn);
 
@@ -324,7 +332,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should open circuit after reaching failure threshold', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       // Default threshold is 5
       for (let i = 0; i < 5; i++) {
@@ -336,8 +344,8 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should clear failures on success', async () => {
-      const failFn = jasmine.createSpy('fail').and.rejectWith(new Error('fail'));
-      const successFn = jasmine.createSpy('success').and.resolveTo('ok');
+      const failFn = vi.fn().mockRejectedValue(new Error('fail'));
+      const successFn = vi.fn().mockResolvedValue('ok');
 
       // Add some failures
       await service.execute('clear-test', failFn);
@@ -356,7 +364,7 @@ describe('CircuitBreakerService', () => {
 
   describe('execute - OPEN state', () => {
     it('should fail fast when circuit is open', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       // Open the circuit
       service.register('open-test', { failureThreshold: 2 });
@@ -366,7 +374,7 @@ describe('CircuitBreakerService', () => {
       expect(service.getState('open-test')).toBe('OPEN');
 
       // Should fail fast without calling fn
-      fn.calls.reset();
+      fn.mockClear();
       const result = await service.execute('open-test', fn);
 
       expect(result.success).toBe(false);
@@ -379,7 +387,7 @@ describe('CircuitBreakerService', () => {
 
   describe('execute - HALF_OPEN state', () => {
     it('should transition to HALF_OPEN after timeout', fakeAsync(async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       service.register('halfopen-test', {
         failureThreshold: 2,
@@ -404,8 +412,8 @@ describe('CircuitBreakerService', () => {
     }));
 
     it('should close circuit after success threshold in HALF_OPEN', async () => {
-      const failFn = jasmine.createSpy('fail').and.rejectWith(new Error('fail'));
-      const successFn = jasmine.createSpy('success').and.resolveTo('ok');
+      const failFn = vi.fn().mockRejectedValue(new Error('fail'));
+      const successFn = vi.fn().mockResolvedValue('ok');
 
       service.register('recovery-test', {
         failureThreshold: 2,
@@ -429,7 +437,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should re-open circuit on failure in HALF_OPEN', async () => {
-      const failFn = jasmine.createSpy('fail').and.rejectWith(new Error('fail'));
+      const failFn = vi.fn().mockRejectedValue(new Error('fail'));
 
       service.register('reopen-test', {
         failureThreshold: 2,
@@ -458,7 +466,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should return accurate statistics', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       await service.execute('stats-test', fn);
       await service.execute('stats-test', fn);
@@ -474,7 +482,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should clean old failures from window', fakeAsync(async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       service.register('window-test', {
         failureThreshold: 10,
@@ -498,7 +506,7 @@ describe('CircuitBreakerService', () => {
 
   describe('reset', () => {
     it('should reset circuit to CLOSED state', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       service.register('reset-test', { failureThreshold: 2 });
 
@@ -531,7 +539,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should update state signal on transitions', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       service.register('transition-test', { failureThreshold: 2 });
 
@@ -545,7 +553,7 @@ describe('CircuitBreakerService', () => {
 
   describe('auto-registration', () => {
     it('should auto-register circuit on first execute', async () => {
-      const fn = jasmine.createSpy('fn').and.resolveTo('ok');
+      const fn = vi.fn().mockResolvedValue('ok');
 
       await service.execute('auto-registered', fn);
 
@@ -553,7 +561,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should use provided config on auto-registration', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(new Error('fail'));
+      const fn = vi.fn().mockRejectedValue(new Error('fail'));
 
       await service.execute('auto-config', fn, { failureThreshold: 1 });
 
@@ -564,7 +572,7 @@ describe('CircuitBreakerService', () => {
 
   describe('error handling', () => {
     it('should handle non-Error throws', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith('string error');
+      const fn = vi.fn().mockRejectedValue('string error');
 
       const result = await service.execute('error-test', fn);
 
@@ -573,7 +581,7 @@ describe('CircuitBreakerService', () => {
     });
 
     it('should handle undefined throws', async () => {
-      const fn = jasmine.createSpy('fn').and.rejectWith(undefined);
+      const fn = vi.fn().mockRejectedValue(undefined);
 
       const result = await service.execute('undefined-test', fn);
 

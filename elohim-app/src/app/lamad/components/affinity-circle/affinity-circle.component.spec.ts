@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AffinityCircleComponent } from './affinity-circle.component';
 
@@ -223,7 +224,7 @@ describe('AffinityCircleComponent', () => {
     });
 
     it('should return default color for undefined level', () => {
-      spyOn(component, 'getAffinityLevel').and.returnValue('unknown' as any);
+      vi.spyOn(component, 'getAffinityLevel').mockReturnValue('unknown' as any);
       expect(component.getStrokeColor()).toBe('#e0e0e0');
     });
   });

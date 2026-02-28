@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FocusedViewToggleComponent } from './focused-view-toggle.component';
 
@@ -41,16 +42,16 @@ describe('FocusedViewToggleComponent', () => {
       expect(typeof component.toggle).toBe('function');
     });
 
-    it('should emit toggled output when toggle is called', (done) => {
+    it('should emit toggled output when toggle is called', () => new Promise<void>(done => {
       component.toggled.subscribe((value: boolean) => {
         expect(value).toBe(true);
         done();
       });
 
       component.toggle();
-    });
+    }));
 
-    it('should emit negated isActive value when toggled', (done) => {
+    it('should emit negated isActive value when toggled', () => new Promise<void>(done => {
       component.isActive = true;
       component.toggled.subscribe((value: boolean) => {
         expect(value).toBe(false);
@@ -58,9 +59,9 @@ describe('FocusedViewToggleComponent', () => {
       });
 
       component.toggle();
-    });
+    }));
 
-    it('should emit true when isActive is false', (done) => {
+    it('should emit true when isActive is false', () => new Promise<void>(done => {
       component.isActive = false;
       component.toggled.subscribe((value: boolean) => {
         expect(value).toBe(true);
@@ -68,7 +69,7 @@ describe('FocusedViewToggleComponent', () => {
       });
 
       component.toggle();
-    });
+    }));
   });
 
   describe('Template', () => {
@@ -87,14 +88,14 @@ describe('FocusedViewToggleComponent', () => {
       expect(button.getAttribute('aria-pressed')).toBeDefined();
     });
 
-    it('should call toggle on button click', (done) => {
-      spyOn(component, 'toggle');
+    it('should call toggle on button click', () => new Promise<void>(done => {
+      vi.spyOn(component, 'toggle');
       const button = fixture.nativeElement.querySelector('button.focused-view-btn');
 
       button.click();
 
       expect(component.toggle).toHaveBeenCalled();
       done();
-    });
+    }));
   });
 });

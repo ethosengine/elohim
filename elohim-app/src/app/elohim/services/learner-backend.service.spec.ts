@@ -2,17 +2,18 @@ import { TestBed } from '@angular/core/testing';
 
 import { LearnerBackendService } from './learner-backend.service';
 import { HolochainClientService } from './holochain-client.service';
+import { vi } from 'vitest';
 
 describe('LearnerBackendService', () => {
   let service: LearnerBackendService;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
+  let mockHolochainClient: any;
 
   beforeEach(() => {
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', [
-      'callZome',
-      'isConnected',
-    ]);
-    mockHolochainClient.isConnected.and.returnValue(true);
+    mockHolochainClient = {
+      callZome: vi.fn(),
+      isConnected: vi.fn(),
+    };
+    mockHolochainClient.isConnected.mockReturnValue(true);
 
     TestBed.configureTestingModule({
       providers: [
@@ -39,13 +40,13 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return true when holochain is connected', () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
       const result = service.isAvailable();
       expect(result).toBe(true);
     });
 
     it('should return false when holochain is disconnected', () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       const result = service.isAvailable();
       expect(result).toBe(false);
     });
@@ -63,7 +64,7 @@ describe('LearnerBackendService', () => {
 
     it('should return mastery output on success', async () => {
       const mockOutput = { id: 'mastery-1', level: 'not_started' } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -71,7 +72,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'content_store',
           fnName: 'initialize_mastery',
           payload: { content_id: 'content-123' },
@@ -80,7 +81,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on zome call failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -90,7 +91,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when zome returns no data', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: null })
       );
 
@@ -113,7 +114,7 @@ describe('LearnerBackendService', () => {
         engagement_type: 'view',
       };
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -121,7 +122,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'record_engagement',
           payload: engagementInput,
         })
@@ -129,7 +130,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on engagement failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -160,7 +161,7 @@ describe('LearnerBackendService', () => {
         correct_count: 9,
       };
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -168,7 +169,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'record_assessment',
           payload: assessmentInput,
         })
@@ -176,7 +177,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on assessment failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -202,7 +203,7 @@ describe('LearnerBackendService', () => {
 
     it('should return mastery for specific content', async () => {
       const mockOutput = { id: 'mastery-1', level: 'practicing' } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -210,7 +211,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_my_mastery',
           payload: 'content-123',
         })
@@ -218,7 +219,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when mastery not found', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -240,7 +241,7 @@ describe('LearnerBackendService', () => {
         { id: 'mastery-2', level: 'mastered' },
       ] as any;
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -251,7 +252,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array on failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -261,7 +262,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array when data is null', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: null })
       );
 
@@ -283,7 +284,7 @@ describe('LearnerBackendService', () => {
         { contentId: 'c2', level: 'mastered' },
       ] as any;
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -291,7 +292,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_mastery_batch',
           payload: ['c1', 'c2'],
         })
@@ -299,7 +300,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array on failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -317,7 +318,7 @@ describe('LearnerBackendService', () => {
 
     it('should return path mastery overview', async () => {
       const mockOutput = { pathId: 'path-1', nodes: [] } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -325,7 +326,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_path_mastery_overview',
           payload: 'path-1',
         })
@@ -333,7 +334,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when overview not available', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -351,7 +352,7 @@ describe('LearnerBackendService', () => {
 
     it('should return mastery statistics', async () => {
       const mockOutput = { nodesAttempted: 10, nodesMastered: 5 } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -359,7 +360,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_my_mastery_stats',
           payload: null,
         })
@@ -367,7 +368,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null when stats unavailable', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -387,7 +388,7 @@ describe('LearnerBackendService', () => {
       const mockOutput = { allowed: true, reason: 'Licensed' } as any;
       const checkInput = { content_id: 'content-123', privilege: 'view' };
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -395,7 +396,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'check_privilege',
           payload: checkInput,
         })
@@ -403,7 +404,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on privilege check failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -430,7 +431,7 @@ describe('LearnerBackendService', () => {
       const mockOutput = { id: 'pool-1', contentIds: [] } as any;
       const poolInput = { contributing_path_ids: ['path-1', 'path-2'] };
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -438,7 +439,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_or_create_practice_pool',
           payload: poolInput,
         })
@@ -446,7 +447,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on pool creation failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -466,7 +467,7 @@ describe('LearnerBackendService', () => {
 
     it('should refresh practice pool', async () => {
       const mockOutput = { id: 'pool-1', contentIds: ['c1', 'c2'] } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -474,7 +475,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'refresh_practice_pool',
           payload: null,
         })
@@ -482,7 +483,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on refresh failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -500,7 +501,7 @@ describe('LearnerBackendService', () => {
 
     it('should add path to practice pool', async () => {
       const mockOutput = { id: 'pool-1', contentIds: ['c1', 'c2', 'c3'] } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -508,7 +509,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'add_path_to_pool',
           payload: 'path-1',
         })
@@ -516,7 +517,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on add failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -534,7 +535,7 @@ describe('LearnerBackendService', () => {
 
     it('should return pool recommendations', async () => {
       const mockOutput = { recommendations: ['c1', 'c2', 'c3'] } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -542,7 +543,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_pool_recommendations',
           payload: null,
         })
@@ -550,7 +551,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on recommendation failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -568,7 +569,7 @@ describe('LearnerBackendService', () => {
 
     it('should check challenge cooldown status', async () => {
       const mockOutput = { allowed: true, nextAvailableAt: 0 } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -576,7 +577,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'check_challenge_cooldown',
           payload: null,
         })
@@ -584,7 +585,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on cooldown check failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -608,7 +609,7 @@ describe('LearnerBackendService', () => {
       const mockOutput = { id: 'challenge-1', questions: [] } as any;
       const challengeInput = { question_count: 5, include_discoveries: true };
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -616,7 +617,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'start_mastery_challenge',
           payload: challengeInput,
         })
@@ -624,7 +625,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on challenge start failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -653,7 +654,7 @@ describe('LearnerBackendService', () => {
         actual_time_seconds: 120,
       };
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -661,7 +662,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'submit_mastery_challenge',
           payload: submitInput,
         })
@@ -669,7 +670,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on challenge submission failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -695,7 +696,7 @@ describe('LearnerBackendService', () => {
         { id: 'challenge-2', score: 90 },
       ] as any;
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -706,7 +707,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array on history fetch failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -716,7 +717,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array when data is null', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: null })
       );
 
@@ -743,7 +744,7 @@ describe('LearnerBackendService', () => {
         content_id: 'content-1',
       };
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -751,7 +752,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'earn_lamad_points',
           payload: pointsInput,
         })
@@ -759,7 +760,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on point earning failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -780,7 +781,7 @@ describe('LearnerBackendService', () => {
 
     it('should return point balance', async () => {
       const mockOutput = { balance: 150 } as any;
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -788,7 +789,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_my_lamad_point_balance',
           payload: null,
         })
@@ -796,7 +797,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return null on balance fetch failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -818,7 +819,7 @@ describe('LearnerBackendService', () => {
         { id: 'event-2', points: 5, type: 'engagement' },
       ] as any;
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -831,7 +832,7 @@ describe('LearnerBackendService', () => {
     it('should accept optional limit parameter', async () => {
       const mockOutput = [{ id: 'event-1', points: 10 }] as any;
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
@@ -839,7 +840,7 @@ describe('LearnerBackendService', () => {
 
       expect(result).toEqual(mockOutput);
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_my_lamad_point_history',
           payload: 10,
         })
@@ -849,21 +850,21 @@ describe('LearnerBackendService', () => {
     it('should send null when no limit specified', async () => {
       const mockOutput: any[] = [];
 
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockOutput })
       );
 
       await service.getMyLamadPointHistory();
 
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           payload: null,
         })
       );
     });
 
     it('should return empty array on history fetch failure', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false })
       );
 
@@ -873,7 +874,7 @@ describe('LearnerBackendService', () => {
     });
 
     it('should return empty array when data is null', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: null })
       );
 

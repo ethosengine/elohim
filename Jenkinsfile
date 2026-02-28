@@ -666,8 +666,8 @@ VEOF
                 container('builder'){
                     dir('elohim-app') {
                         script {
-                            echo 'Running Angular tests with coverage'
-                            sh 'NODE_OPTIONS="--max-old-space-size=4096" pnpm exec ng test --watch=false --browsers=ChromeHeadless --code-coverage'
+                            echo 'Running Angular tests with coverage (Vitest)'
+                            sh 'pnpm exec vitest run --config vite.config.ts --coverage'
                         }
                     }
                 }

@@ -4,6 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { BannerService } from './banner.service';
 import { BannerNotice, BannerNoticeProvider } from '../models/banner-notice.model';
+import { vi } from 'vitest';
 
 function makeNotice(overrides: Partial<BannerNotice> = {}): BannerNotice {
   return {
@@ -28,8 +29,8 @@ function makeProvider(
     providerId: id,
     notices$: subject.asObservable(),
     notices$$: subject,
-    dismissNotice: jasmine.createSpy('dismissNotice'),
-    handleAction: jasmine.createSpy('handleAction'),
+    dismissNotice: vi.fn(),
+    handleAction: vi.fn(),
   };
 }
 
@@ -45,14 +46,14 @@ describe('BannerService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should emit empty array when no providers registered', done => {
+  it('should emit empty array when no providers registered', () => new Promise<void>(done => {
     service.allNotices$.subscribe(notices => {
       expect(notices).toEqual([]);
       done();
     });
-  });
+  }));
 
-  it('should emit notices from a registered provider', done => {
+  it('should emit notices from a registered provider', () => new Promise<void>(done => {
     const notice = makeNotice();
     const provider = makeProvider('test', [notice]);
 
@@ -63,9 +64,9 @@ describe('BannerService', () => {
       expect(notices[0].id).toBe('notice-1');
       done();
     });
-  });
+  }));
 
-  it('should merge notices from multiple providers', done => {
+  it('should merge notices from multiple providers', () => new Promise<void>(done => {
     const p1 = makeProvider('p1', [makeNotice({ id: 'n1', providerId: 'p1' })]);
     const p2 = makeProvider('p2', [makeNotice({ id: 'n2', providerId: 'p2' })]);
 
@@ -76,9 +77,9 @@ describe('BannerService', () => {
       expect(notices.length).toBe(2);
       done();
     });
-  });
+  }));
 
-  it('should deduplicate notices by id', done => {
+  it('should deduplicate notices by id', () => new Promise<void>(done => {
     const notice = makeNotice({ id: 'dup' });
     const p1 = makeProvider('p1', [{ ...notice, providerId: 'p1' }]);
     const p2 = makeProvider('p2', [{ ...notice, providerId: 'p2' }]);
@@ -90,9 +91,9 @@ describe('BannerService', () => {
       expect(notices.length).toBe(1);
       done();
     });
-  });
+  }));
 
-  it('should sort by priority then severity', done => {
+  it('should sort by priority then severity', () => new Promise<void>(done => {
     const system = makeNotice({ id: 'sys', priority: 'system', severity: 'warning' });
     const info = makeNotice({ id: 'inf', priority: 'info', severity: 'info' });
     const agent = makeNotice({ id: 'agt', priority: 'agent', severity: 'error' });
@@ -104,9 +105,9 @@ describe('BannerService', () => {
       expect(notices.map(n => n.id)).toEqual(['sys', 'agt', 'inf']);
       done();
     });
-  });
+  }));
 
-  it('should filter notices by context', done => {
+  it('should filter notices by context', () => new Promise<void>(done => {
     const global = makeNotice({ id: 'g', contexts: ['global'] });
     const lamad = makeNotice({ id: 'l', contexts: ['lamad'] });
     const shefa = makeNotice({ id: 's', contexts: ['shefa'] });
@@ -118,7 +119,7 @@ describe('BannerService', () => {
       expect(notices.map(n => n.id)).toEqual(['g', 'l']);
       done();
     });
-  });
+  }));
 
   it('should delegate dismissNotice to the correct provider', () => {
     const notice = makeNotice({ providerId: 'p1' });
@@ -140,7 +141,7 @@ describe('BannerService', () => {
     expect(provider.handleAction).toHaveBeenCalledWith('notice-1', 'learn-more');
   });
 
-  it('should stop emitting notices when provider is unregistered', done => {
+  it('should stop emitting notices when provider is unregistered', () => new Promise<void>(done => {
     const provider = makeProvider('p1', [makeNotice()]);
     service.registerProvider(provider);
     service.unregisterProvider('p1');
@@ -149,5 +150,5 @@ describe('BannerService', () => {
       expect(notices).toEqual([]);
       done();
     });
-  });
+  }));
 });

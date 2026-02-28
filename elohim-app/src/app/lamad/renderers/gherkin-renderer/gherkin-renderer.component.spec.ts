@@ -339,13 +339,13 @@ Scenario: Test
         node: new SimpleChange(null, component.node, true),
       });
 
-      expect(component.feature!.scenarios[0].collapsed).toBeFalse();
+      expect(component.feature!.scenarios[0].collapsed).toBe(false);
 
       component.toggleScenario(0);
-      expect(component.feature!.scenarios[0].collapsed).toBeTrue();
+      expect(component.feature!.scenarios[0].collapsed).toBe(true);
 
       component.toggleScenario(0);
-      expect(component.feature!.scenarios[0].collapsed).toBeFalse();
+      expect(component.feature!.scenarios[0].collapsed).toBe(false);
     });
 
     it('should return correct scenario keyword', () => {
@@ -433,7 +433,7 @@ Scenario: Second
 
       const container = fixture.nativeElement.querySelector('.gherkin-container');
       expect(container).toBeTruthy();
-      expect(container.classList.contains('embedded')).toBeTrue();
+      expect(container.classList.contains('embedded')).toBe(true);
     });
 
     it('should display fallback for unparseable content', () => {

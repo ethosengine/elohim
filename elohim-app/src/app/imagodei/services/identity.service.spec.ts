@@ -18,6 +18,7 @@ import type {
   EdgeNodeDisplayInfo,
   HolochainConnectionState,
 } from '../../elohim/models/holochain-connection.model';
+import { vi, Mock } from 'vitest';
 
 // Helper to create mock display info matching EdgeNodeDisplayInfo interface
 function createMockDisplayInfo(): EdgeNodeDisplayInfo {
@@ -39,12 +40,12 @@ function createMockDisplayInfo(): EdgeNodeDisplayInfo {
 
 describe('IdentityService', () => {
   let service: IdentityService;
-  let mockAuthService: jasmine.SpyObj<AuthService>;
-  let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
-  let mockAgencyService: jasmine.SpyObj<AgencyService>;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockPasswordProvider: jasmine.SpyObj<PasswordAuthProvider>;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
+  let mockAuthService: any;
+  let mockSessionHumanService: any;
+  let mockAgencyService: any;
+  let mockHolochainClient: any;
+  let mockPasswordProvider: any;
+  let mockDoorwayRegistry: any;
 
   // Mock session data matching SessionHuman interface
   const mockSession = {
@@ -90,7 +91,7 @@ describe('IdentityService', () => {
   // Create writable signal mocks
   const createSignalMock = <T>(initialValue: T) => {
     const sig = signal(initialValue);
-    return jasmine.createSpy().and.callFake(() => sig());
+    return vi.fn().mockImplementation(() => sig());
   };
 
   beforeEach(() => {
@@ -107,92 +108,82 @@ describe('IdentityService', () => {
       error: null,
     });
 
-    mockAuthService = jasmine.createSpyObj(
-      'AuthService',
-      ['registerProvider', 'hasProvider', 'getProvider', 'login', 'register', 'logout'],
-      {
-        auth: jasmine.createSpy().and.callFake(() => authSignal()),
-        isAuthenticated: jasmine.createSpy().and.returnValue(false),
-        token: jasmine.createSpy().and.returnValue(null),
-        humanId: jasmine.createSpy().and.returnValue(null),
-        agentPubKey: jasmine.createSpy().and.returnValue(null),
-      }
+    mockAuthService = {
+    registerProvider: vi.fn(),
+    hasProvider: vi.fn(),
+    getProvider: vi.fn(),
+    login: vi.fn(),
+    register: vi.fn(),
+    logout']: vi.fn(),
+    {
+        auth: vi.fn().mockImplementation(() => authSignal()): vi.fn(),
+    isAuthenticated: vi.fn().mockReturnValue(false): vi.fn(),
+    token: vi.fn().mockReturnValue(null): vi.fn(),
+    humanId: vi.fn().mockReturnValue(null): vi.fn(),
+    agentPubKey: vi.fn().mockReturnValue(null): vi.fn(),
+    }
     );
-    mockAuthService.hasProvider.and.returnValue(false);
-    mockAuthService.login.and.returnValue(
+    mockAuthService.hasProvider.mockReturnValue(false);
+    mockAuthService.login.mockReturnValue(
       Promise.resolve({
-        success: true,
-        token: 'token',
-        humanId: 'human-123',
-        agentPubKey: 'agent-123',
-        expiresAt: Date.now() + 3600000,
-        identifier: 'test@example.com',
-      })
+        success: true: vi.fn(),
+    token: 'token: vi.fn(),
+    humanId: 'human-123: vi.fn(),
+    agentPubKey: 'agent-123: vi.fn(),
+    expiresAt: Date.now() + 3600000: vi.fn(),
+    identifier: 'test@example.com: vi.fn(),
+    })
     );
-    mockAuthService.register.and.returnValue(
+    mockAuthService.register.mockReturnValue(
       Promise.resolve({
-        success: true,
-        token: 'token',
-        humanId: 'human-123',
-        agentPubKey: 'agent-123',
-        expiresAt: Date.now() + 3600000,
-        identifier: 'test@example.com',
-      })
+        success: true: vi.fn(),
+    token: 'token: vi.fn(),
+    humanId: 'human-123: vi.fn(),
+    agentPubKey: 'agent-123: vi.fn(),
+    expiresAt: Date.now() + 3600000: vi.fn(),
+    identifier: 'test@example.com: vi.fn(),
+    })
     );
-    mockAuthService.logout.and.returnValue(Promise.resolve());
+    mockAuthService.logout.mockReturnValue(Promise.resolve());
 
     // Create mock session human service
-    mockSessionHumanService = jasmine.createSpyObj(
-      'SessionHumanService',
-      ['getSession', 'hasSession', 'linkToHolochainIdentity', 'markAsMigrated'],
-      {
-        hasSession: jasmine.createSpy().and.returnValue(false),
-      }
-    );
-    mockSessionHumanService.getSession.and.returnValue(null);
+    mockSessionHumanService = { getSession: vi.fn(): vi.fn(), hasSession: vi.fn(): vi.fn(), linkToHolochainIdentity: vi.fn(): vi.fn(), markAsMigrated: vi.fn() };
+    mockSessionHumanService.getSession.mockReturnValue(null);
 
     // Create mock sovereignty service
-    mockAgencyService = jasmine.createSpyObj('AgencyService', [], {
-      sovereigntyState: jasmine.createSpy().and.returnValue({ currentStage: 'visitor' }),
-      currentStage: jasmine.createSpy().and.returnValue('visitor'),
-    });
+    mockAgencyService = {};
 
     // Create mock Holochain client with signals
     const isConnectedSignal = signal(false);
-    mockHolochainClient = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['callZome', 'getDisplayInfo'],
-      {
-        isConnected: jasmine.createSpy().and.callFake(() => isConnectedSignal()),
-      }
-    );
-    mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
-    mockHolochainClient.callZome.and.returnValue(
-      Promise.resolve({ success: false, error: 'Not connected' })
+    mockHolochainClient = { callZome: vi.fn(): vi.fn(), getDisplayInfo: vi.fn() };
+    mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
+    mockHolochainClient.callZome.mockReturnValue(
+      Promise.resolve({ success: false: vi.fn(),
+    error: 'Not connected' })
     );
 
     // Create mock password provider
-    mockPasswordProvider = jasmine.createSpyObj('PasswordAuthProvider', ['getCurrentUser'], {
-      type: 'password',
-    });
+    mockPasswordProvider = { getCurrentUser: vi.fn() };
 
     // Create mock doorway registry
-    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', ['selectDoorway'], {
-      selected: jasmine.createSpy().and.returnValue(null),
-      selectedUrl: jasmine.createSpy().and.returnValue(null),
-      hasSelection: jasmine.createSpy().and.returnValue(false),
-    });
+    mockDoorwayRegistry = { selectDoorway: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
-        IdentityService,
-        { provide: AuthService, useValue: mockAuthService },
-        { provide: SessionHumanService, useValue: mockSessionHumanService },
-        { provide: AgencyService, useValue: mockAgencyService },
-        { provide: HolochainClientService, useValue: mockHolochainClient },
-        { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
-        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
-      ],
+        IdentityService: vi.fn(),
+    { provide: AuthService: vi.fn(),
+    useValue: mockAuthService }: vi.fn(),
+    { provide: SessionHumanService: vi.fn(),
+    useValue: mockSessionHumanService }: vi.fn(),
+    { provide: AgencyService: vi.fn(),
+    useValue: mockAgencyService }: vi.fn(),
+    { provide: HolochainClientService: vi.fn(),
+    useValue: mockHolochainClient }: vi.fn(),
+    { provide: PasswordAuthProvider: vi.fn(),
+    useValue: mockPasswordProvider }: vi.fn(),
+    { provide: DoorwayRegistryService: vi.fn(),
+    useValue: mockDoorwayRegistry }: vi.fn(),
+    ]: vi.fn(),
     });
 
     service = TestBed.inject(IdentityService);
@@ -202,21 +193,26 @@ describe('IdentityService', () => {
   // Initial State Tests
   // ==========================================================================
 
-  describe('initial state', () => {
-    it('should be created', () => {
+  describe('initial state: vi.fn(),
+    () => {
+    it('should be created: vi.fn(),
+    () => {
       expect(service).toBeTruthy();
     });
 
-    it('should register password provider on construction', () => {
+    it('should register password provider on construction: vi.fn(),
+    () => {
       expect(mockAuthService.registerProvider).toHaveBeenCalled();
     });
 
-    it('should start with anonymous/session mode when no session exists', () => {
+    it('should start with anonymous/session mode when no session exists: vi.fn(),
+    () => {
       // Initial state depends on session presence
       expect(service.mode()).toBeDefined();
     });
 
-    it('should expose identity signals', () => {
+    it('should expose identity signals: vi.fn(),
+    () => {
       expect(service.identity).toBeDefined();
       expect(service.mode).toBeDefined();
       expect(service.isAuthenticated).toBeDefined();
@@ -230,18 +226,21 @@ describe('IdentityService', () => {
       expect(service.error).toBeDefined();
     });
 
-    it('should expose derived signals', () => {
+    it('should expose derived signals: vi.fn(),
+    () => {
       expect(service.canAccessGatedContent).toBeDefined();
       expect(service.hasSession).toBeDefined();
       expect(service.isHolochainConnected).toBeDefined();
       expect(service.canUpgrade).toBeDefined();
     });
 
-    it('should start not loading', () => {
+    it('should start not loading: vi.fn(),
+    () => {
       expect(service.isLoading()).toBe(false);
     });
 
-    it('should start without error', () => {
+    it('should start without error: vi.fn(),
+    () => {
       expect(service.error()).toBeNull();
     });
   });
@@ -250,9 +249,10 @@ describe('IdentityService', () => {
   // Session Identity Tests
   // ==========================================================================
 
-  describe('session identity', () => {
+  describe('session identity: vi.fn(),
+    () => {
     // These tests need a fresh service instance initialized with session
-    // The outer beforeEach already injected a service with no session,
+    // The outer beforeEach already injected a service with no session: vi.fn(),
     // so we must reset and reconfigure TestBed
 
     beforeEach(() => {
@@ -260,27 +260,34 @@ describe('IdentityService', () => {
       TestBed.resetTestingModule();
 
       // Reconfigure mocks with session enabled
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      (mockSessionHumanService.hasSession as jasmine.Spy).and.returnValue(true);
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      (mockSessionHumanService.hasSession as Mock).mockReturnValue(true);
 
       // Reconfigure TestBed
       TestBed.configureTestingModule({
         providers: [
-          IdentityService,
-          { provide: AuthService, useValue: mockAuthService },
-          { provide: SessionHumanService, useValue: mockSessionHumanService },
-          { provide: AgencyService, useValue: mockAgencyService },
-          { provide: HolochainClientService, useValue: mockHolochainClient },
-          { provide: PasswordAuthProvider, useValue: mockPasswordProvider },
-          { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
-        ],
-      });
+          IdentityService: vi.fn(),
+    { provide: AuthService: vi.fn(),
+    useValue: mockAuthService }: vi.fn(),
+    { provide: SessionHumanService: vi.fn(),
+    useValue: mockSessionHumanService }: vi.fn(),
+    { provide: AgencyService: vi.fn(),
+    useValue: mockAgencyService }: vi.fn(),
+    { provide: HolochainClientService: vi.fn(),
+    useValue: mockHolochainClient }: vi.fn(),
+    { provide: PasswordAuthProvider: vi.fn(),
+    useValue: mockPasswordProvider }: vi.fn(),
+    { provide: DoorwayRegistryService: vi.fn(),
+    useValue: mockDoorwayRegistry }: vi.fn(),
+    ]: vi.fn(),
+    });
 
       // Now inject fresh service instance with session
       service = TestBed.inject(IdentityService);
     });
 
-    it('should initialize with session identity when session exists', fakeAsync(() => {
+    it('should initialize with session identity when session exists: vi.fn(),
+    fakeAsync(() => {
       tick();
 
       expect(service.mode()).toBe('session');
@@ -288,7 +295,8 @@ describe('IdentityService', () => {
       expect(service.displayName()).toBe('Test User');
     }));
 
-    it('should generate session DID', fakeAsync(() => {
+    it('should generate session DID: vi.fn(),
+    fakeAsync(() => {
       tick();
 
       const did = service.did();
@@ -296,7 +304,8 @@ describe('IdentityService', () => {
       expect(did).toContain('session');
     }));
 
-    it('should indicate session cannot access gated content', fakeAsync(() => {
+    it('should indicate session cannot access gated content: vi.fn(),
+    fakeAsync(() => {
       tick();
 
       expect(service.canAccessGatedContent()).toBe(false);
@@ -307,24 +316,31 @@ describe('IdentityService', () => {
   // Login Tests
   // ==========================================================================
 
-  describe('loginWithPassword', () => {
-    it('should delegate to auth service', async () => {
-      const result = await service.loginWithPassword('test@example.com', 'password123');
+  describe('loginWithPassword: vi.fn(),
+    () => {
+    it('should delegate to auth service: vi.fn(),
+    async () => {
+      const result = await service.loginWithPassword('test@example.com: vi.fn(),
+    password123');
 
-      expect(mockAuthService.login).toHaveBeenCalledWith('password', {
-        type: 'password',
-        identifier: 'test@example.com',
-        password: 'password123',
-      });
+      expect(mockAuthService.login).toHaveBeenCalledWith('password: vi.fn(),
+    {
+        type: 'password: vi.fn(),
+    identifier: 'test@example.com: vi.fn(),
+    password: 'password123: vi.fn(),
+    });
       expect(result.success).toBe(true);
     });
 
-    it('should handle login failure', async () => {
-      mockAuthService.login.and.returnValue(
-        Promise.resolve({ success: false, error: 'Invalid credentials' })
+    it('should handle login failure: vi.fn(),
+    async () => {
+      mockAuthService.login.mockReturnValue(
+        Promise.resolve({ success: false: vi.fn(),
+    error: 'Invalid credentials' })
       );
 
-      const result = await service.loginWithPassword('test@example.com', 'wrong');
+      const result = await service.loginWithPassword('test@example.com: vi.fn(),
+    wrong');
 
       expect(result.success).toBe(false);
     });
@@ -334,8 +350,10 @@ describe('IdentityService', () => {
   // Logout Tests
   // ==========================================================================
 
-  describe('logout', () => {
-    it('should delegate to auth service', async () => {
+  describe('logout: vi.fn(),
+    () => {
+    it('should delegate to auth service: vi.fn(),
+    async () => {
       await service.logout();
 
       expect(mockAuthService.logout).toHaveBeenCalled();
@@ -346,54 +364,58 @@ describe('IdentityService', () => {
   // Registration Tests (Hosted Mode)
   // ==========================================================================
 
-  describe('registerHuman (hosted mode)', () => {
+  describe('registerHuman (hosted mode): vi.fn(),
+    () => {
     const registrationRequest: RegisterHumanRequest = {
-      displayName: 'New User',
-      email: 'new@example.com',
-      password: 'password123',
-      affinities: ['learning'],
-      profileReach: 'community',
+      displayName: 'New User: vi.fn(),
+    email: 'new@example.com: vi.fn(),
+    password: 'password123: vi.fn(),
+    affinities: ['learning']: vi.fn(),
+    profileReach: 'community: vi.fn(),
     };
 
-    it('should require email for registration', async () => {
-      const requestWithoutEmail = { ...registrationRequest, email: undefined };
+    it('should require email for registration: vi.fn(),
+    async () => {
+      const requestWithoutEmail = { ...registrationRequest: vi.fn(),
+    email: undefined };
 
-      await expectAsync(service.registerHuman(requestWithoutEmail)).toBeRejectedWithError(
-        'Email is required for registration'
-      );
+      await await expect(service.registerHuman(requestWithoutEmail)).rejects.toThrow('Email is required for registration');
     });
 
-    it('should require password for registration', async () => {
-      const requestWithoutPassword = { ...registrationRequest, password: undefined };
+    it('should require password for registration: vi.fn(),
+    async () => {
+      const requestWithoutPassword = { ...registrationRequest: vi.fn(),
+    password: undefined };
 
-      await expectAsync(service.registerHuman(requestWithoutPassword)).toBeRejectedWithError(
-        'Password is required for registration'
-      );
+      await await expect(service.registerHuman(requestWithoutPassword)).rejects.toThrow('Password is required for registration');
     });
 
-    it('should register via auth service', async () => {
+    it('should register via auth service: vi.fn(),
+    async () => {
       const profile = await service.registerHuman(registrationRequest);
 
       expect(mockAuthService.register).toHaveBeenCalledWith(
-        'password',
-        jasmine.objectContaining({
-          identifier: 'new@example.com',
-          identifierType: 'email',
-          password: 'password123',
-          displayName: 'New User',
-        })
+        'password: vi.fn(),
+    expect.objectContaining({
+          identifier: 'new@example.com: vi.fn(),
+    identifierType: 'email: vi.fn(),
+    password: 'password123: vi.fn(),
+    displayName: 'New User: vi.fn(),
+    })
       );
       expect(profile.displayName).toBe('New User');
     });
 
-    it('should update identity state after registration', async () => {
+    it('should update identity state after registration: vi.fn(),
+    async () => {
       await service.registerHuman(registrationRequest);
 
       expect(service.mode()).toBe('hosted');
       expect(service.isAuthenticated()).toBe(true);
     });
 
-    it('should generate hosted DID after registration', async () => {
+    it('should generate hosted DID after registration: vi.fn(),
+    async () => {
       await service.registerHuman(registrationRequest);
 
       const did = service.did();
@@ -401,19 +423,20 @@ describe('IdentityService', () => {
       expect(did).toContain('hosted');
     });
 
-    it('should handle registration failure', async () => {
-      mockAuthService.register.and.returnValue(
-        Promise.resolve({ success: false, error: 'Email already exists' })
+    it('should handle registration failure: vi.fn(),
+    async () => {
+      mockAuthService.register.mockReturnValue(
+        Promise.resolve({ success: false: vi.fn(),
+    error: 'Email already exists' })
       );
 
-      await expectAsync(service.registerHuman(registrationRequest)).toBeRejectedWithError(
-        'Email already exists'
-      );
+      await await expect(service.registerHuman(registrationRequest)).rejects.toThrow('Email already exists');
       expect(service.error()).toBe('Email already exists');
     });
 
-    it('should mark session as migrated after registration', async () => {
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
+    it('should mark session as migrated after registration: vi.fn(),
+    async () => {
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
 
       await service.registerHuman(registrationRequest);
 
@@ -425,46 +448,50 @@ describe('IdentityService', () => {
   // Registration Tests (Native/Steward Mode)
   // ==========================================================================
 
-  describe('registerHumanNative (steward mode)', () => {
+  describe('registerHumanNative (steward mode): vi.fn(),
+    () => {
     const registrationRequest: RegisterHumanRequest = {
-      displayName: 'Steward User',
-      affinities: ['teaching'],
-      profileReach: 'community',
+      displayName: 'Steward User: vi.fn(),
+    affinities: ['teaching']: vi.fn(),
+    profileReach: 'community: vi.fn(),
     };
 
-    it('should require Holochain connection', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
+    it('should require Holochain connection: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
 
-      await expectAsync(service.registerHumanNative(registrationRequest)).toBeRejectedWithError(
-        'Holochain not connected'
-      );
+      await await expect(service.registerHumanNative(registrationRequest)).rejects.toThrow('Holochain not connected');
     });
 
-    it('should call imagodei zome for registration', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: mockHumanSessionResult })
+    it('should call imagodei zome for registration: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
+        Promise.resolve({ success: true: vi.fn(),
+    data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       const profile = await service.registerHumanNative(registrationRequest);
 
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
-          zomeName: 'imagodei',
-          fnName: 'create_human',
-          roleName: 'imagodei',
-        })
+        expect.objectContaining({
+          zomeName: 'imagodei: vi.fn(),
+    fnName: 'create_human: vi.fn(),
+    roleName: 'imagodei: vi.fn(),
+    })
       );
       expect(profile.displayName).toBe('Holochain User');
     });
 
-    it('should set steward mode after native registration', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: mockHumanSessionResult })
+    it('should set steward mode after native registration: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
+        Promise.resolve({ success: true: vi.fn(),
+    data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       await service.registerHumanNative(registrationRequest);
 
@@ -472,12 +499,14 @@ describe('IdentityService', () => {
       expect(service.isAuthenticated()).toBe(true);
     });
 
-    it('should generate did:key for steward mode', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: mockHumanSessionResult })
+    it('should generate did:key for steward mode: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
+        Promise.resolve({ success: true: vi.fn(),
+    data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       await service.registerHumanNative(registrationRequest);
 
@@ -485,15 +514,15 @@ describe('IdentityService', () => {
       expect(did).toContain('did:key:');
     });
 
-    it('should handle zome call failure', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: false, error: 'Zome error' })
+    it('should handle zome call failure: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
+        Promise.resolve({ success: false: vi.fn(),
+    error: 'Zome error' })
       );
 
-      await expectAsync(service.registerHumanNative(registrationRequest)).toBeRejectedWithError(
-        'Zome error'
-      );
+      await await expect(service.registerHumanNative(registrationRequest)).rejects.toThrow('Zome error');
     });
   });
 
@@ -501,35 +530,40 @@ describe('IdentityService', () => {
   // Profile Management Tests
   // ==========================================================================
 
-  describe('getCurrentHuman', () => {
-    it('should return null when Holochain not connected', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
+  describe('getCurrentHuman: vi.fn(),
+    () => {
+    it('should return null when Holochain not connected: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
 
       const result = await service.getCurrentHuman();
 
       expect(result).toBeNull();
     });
 
-    it('should fetch profile from Holochain', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: mockHumanSessionResult })
+    it('should fetch profile from Holochain: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
+        Promise.resolve({ success: true: vi.fn(),
+    data: mockHumanSessionResult })
       );
 
       const profile = await service.getCurrentHuman();
 
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
-          zomeName: 'imagodei',
-          fnName: 'get_my_human',
-        })
+        expect.objectContaining({
+          zomeName: 'imagodei: vi.fn(),
+    fnName: 'get_my_human: vi.fn(),
+    })
       );
       expect(profile?.displayName).toBe('Holochain User');
     });
 
-    it('should return null on zome error', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(Promise.reject(new Error('Zome error')));
+    it('should return null on zome error: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(Promise.reject(new Error('Zome error')));
 
       const result = await service.getCurrentHuman();
 
@@ -537,38 +571,43 @@ describe('IdentityService', () => {
     });
   });
 
-  describe('updateProfile', () => {
+  describe('updateProfile: vi.fn(),
+    () => {
     beforeEach(() => {
       // Set up as hosted user first
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
     });
 
-    it('should require Holochain connection', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
+    it('should require Holochain connection: vi.fn(),
+    async () => {
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
 
-      await expectAsync(service.updateProfile({ displayName: 'New Name' })).toBeRejectedWithError(
-        'Holochain not connected'
-      );
+      await await expect(service.updateProfile({ displayName: 'New Name' })).rejects.toThrow('Holochain not connected');
     });
 
-    it('should call update zome function', async () => {
+    it('should call update zome function: vi.fn(),
+    async () => {
       // First register to set mode
-      mockHolochainClient.callZome.and.returnValue(
-        Promise.resolve({ success: true, data: mockHumanSessionResult })
+      mockHolochainClient.callZome.mockReturnValue(
+        Promise.resolve({ success: true: vi.fn(),
+    data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
       await service.registerHumanNative({
-        displayName: 'Test',
-        affinities: [],
-        profileReach: 'community',
-      });
+        displayName: 'Test: vi.fn(),
+    affinities: []: vi.fn(),
+    profileReach: 'community: vi.fn(),
+    });
 
       // Mock update response
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
-          success: true,
-          data: {
-            actionHash: new Uint8Array([1, 2, 3]),
+          success: true: vi.fn(),
+    data: {
+            actionHash: new Uint8Array([1: vi.fn(),
+    2: vi.fn(),
+    3: vi.fn(),
+  },
             human: { ...mockHumanSessionResult.human, displayName: 'Updated Name' },
           },
         })
@@ -577,7 +616,7 @@ describe('IdentityService', () => {
       const profile = await service.updateProfile({ displayName: 'Updated Name' });
 
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'imagodei',
           fnName: 'update_human',
         })
@@ -596,15 +635,15 @@ describe('IdentityService', () => {
     });
 
     it('canUpgrade should be false when Holochain not connected', () => {
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      (mockSessionHumanService.hasSession as jasmine.Spy).and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      (mockSessionHumanService.hasSession as Mock).mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
 
       expect(service.canUpgrade()).toBe(false);
     });
 
     it('isHolochainConnected should delegate to client', () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
 
       expect(service.isHolochainConnected()).toBe(true);
     });
@@ -622,16 +661,16 @@ describe('IdentityService', () => {
    * These tests need refactored async/await patterns or proper test harness to verify
    * reactive signal updates without manual setTimeout polling.
    */
-  xdescribe('checkHolochainIdentity (extracted methods)', () => {
+  describe.skip('checkHolochainIdentity (extracted methods)', () => {
     beforeEach(() => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
     });
 
     it('should handle successful identity fetch', async () => {
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       // Trigger checkHolochainIdentity via initialization
       const newService = TestBed.inject(IdentityService);
@@ -642,7 +681,7 @@ describe('IdentityService', () => {
     });
 
     it('should handle no Holochain identity gracefully', async () => {
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: false }));
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const newService = TestBed.inject(IdentityService);
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -651,11 +690,11 @@ describe('IdentityService', () => {
     });
 
     it('should link session when Holochain identity exists', async () => {
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      mockHolochainClient.callZome.and.returnValue(
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       const newService = TestBed.inject(IdentityService);
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -667,7 +706,7 @@ describe('IdentityService', () => {
     });
 
     it('should handle expected errors without setting error state', async () => {
-      mockHolochainClient.callZome.and.returnValue(Promise.reject(new Error('No human found')));
+      mockHolochainClient.callZome.mockReturnValue(Promise.reject(new Error('No human found')));
 
       const newService = TestBed.inject(IdentityService);
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -678,8 +717,8 @@ describe('IdentityService', () => {
     });
 
     it('should log unexpected errors', async () => {
-      spyOn(console, 'warn');
-      mockHolochainClient.callZome.and.returnValue(
+      vi.spyOn(console, 'warn');
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.reject(new Error('Unexpected zome error'))
       );
 
@@ -687,8 +726,8 @@ describe('IdentityService', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       expect(console.warn).toHaveBeenCalledWith(
-        jasmine.stringContaining('Unexpected error checking Holochain identity'),
-        jasmine.any(String)
+        expect.stringContaining('Unexpected error checking Holochain identity'),
+        expect.any(String)
       );
     });
   });
@@ -705,13 +744,13 @@ describe('IdentityService', () => {
    * - Manual setTimeout polling doesn't guarantee state stability
    * These need integration with fakeAsync/tick or proper async/await refactoring.
    */
-  xdescribe('connectAsAuthenticatedUser (extracted methods)', () => {
+  describe.skip('connectAsAuthenticatedUser (extracted methods)', () => {
     beforeEach(() => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
     });
 
     it('should update identity state with full profile when connected', async () => {
@@ -725,7 +764,7 @@ describe('IdentityService', () => {
     });
 
     it('should set minimal state when Holochain not connected', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
 
       await service.loginWithPassword('test@example.com', 'password');
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -735,22 +774,22 @@ describe('IdentityService', () => {
     });
 
     it('should fall back to minimal state on profile fetch error', async () => {
-      spyOn(console, 'warn');
-      mockHolochainClient.callZome.and.returnValue(Promise.reject(new Error('Network error')));
+      vi.spyOn(console, 'warn');
+      mockHolochainClient.callZome.mockReturnValue(Promise.reject(new Error('Network error')));
 
       await service.loginWithPassword('test@example.com', 'password');
       await new Promise(resolve => setTimeout(resolve, 100));
 
       expect(console.warn).toHaveBeenCalledWith(
-        jasmine.stringContaining('Failed to load full profile'),
-        jasmine.any(String)
+        expect.stringContaining('Failed to load full profile'),
+        expect.any(String)
       );
     });
 
     it('should detect local conductor and set steward mode', async () => {
       const localDisplayInfo = createMockDisplayInfo();
       localDisplayInfo.appUrl = 'ws://localhost:8888/app';
-      mockHolochainClient.getDisplayInfo.and.returnValue(localDisplayInfo);
+      mockHolochainClient.getDisplayInfo.mockReturnValue(localDisplayInfo);
 
       await service.loginWithPassword('test@example.com', 'password');
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -761,7 +800,7 @@ describe('IdentityService', () => {
     it('should detect remote conductor and set hosted mode', async () => {
       const remoteDisplayInfo = createMockDisplayInfo();
       remoteDisplayInfo.appUrl = 'wss://edge.elohim.host/app';
-      mockHolochainClient.getDisplayInfo.and.returnValue(remoteDisplayInfo);
+      mockHolochainClient.getDisplayInfo.mockReturnValue(remoteDisplayInfo);
 
       await service.loginWithPassword('test@example.com', 'password');
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -783,12 +822,11 @@ describe('IdentityService', () => {
    * Needs refactoring to use proper async test patterns (fakeAsync/tick or async/await)
    * instead of manual setTimeout polling which is unreliable.
    */
-  xdescribe('fetchRestoredSessionIdentity', () => {
+  describe.skip('fetchRestoredSessionIdentity', () => {
     beforeEach(() => {
-      mockPasswordProvider.getCurrentUser = jasmine
-        .createSpy('getCurrentUser')
-        .and.returnValue(Promise.resolve({ humanId: 'human-123', agentPubKey: 'agent-123' }));
-      mockAuthService.getProvider.and.returnValue(mockPasswordProvider);
+      mockPasswordProvider.getCurrentUser = vi.fn()
+        .mockReturnValue(Promise.resolve({ humanId: 'human-123', agentPubKey: 'agent-123' }));
+      mockAuthService.getProvider.mockReturnValue(mockPasswordProvider);
     });
 
     it('should restore session when token exists but identity missing', async () => {
@@ -804,13 +842,13 @@ describe('IdentityService', () => {
         isLoading: false,
         error: null,
       });
-      (mockAuthService.auth as jasmine.Spy).and.returnValue(authSignal());
+      (mockAuthService.auth as Mock).mockReturnValue(authSignal());
 
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       // Create new service to trigger initialization
       const newService = TestBed.inject(IdentityService);
@@ -820,11 +858,10 @@ describe('IdentityService', () => {
     });
 
     it('should handle network errors during session restoration', async () => {
-      spyOn(console, 'warn');
-      mockPasswordProvider.getCurrentUser = jasmine
-        .createSpy('getCurrentUser')
-        .and.returnValue(Promise.reject(new Error('NetworkError: timeout')));
-      mockAuthService.getProvider.and.returnValue(mockPasswordProvider);
+      vi.spyOn(console, 'warn');
+      mockPasswordProvider.getCurrentUser = vi.fn()
+        .mockReturnValue(Promise.reject(new Error('NetworkError: timeout')));
+      mockAuthService.getProvider.mockReturnValue(mockPasswordProvider);
 
       const authSignal = signal({
         isAuthenticated: true,
@@ -837,23 +874,22 @@ describe('IdentityService', () => {
         isLoading: false,
         error: null,
       });
-      (mockAuthService.auth as jasmine.Spy).and.returnValue(authSignal());
+      (mockAuthService.auth as Mock).mockReturnValue(authSignal());
 
       const newService = TestBed.inject(IdentityService);
       await new Promise(resolve => setTimeout(resolve, 100));
 
       expect(console.warn).toHaveBeenCalledWith(
-        jasmine.stringContaining('Session restoration failed due to network'),
-        jasmine.any(String)
+        expect.stringContaining('Session restoration failed due to network'),
+        expect.any(String)
       );
     });
 
     it('should skip restoration for expired tokens silently', async () => {
-      spyOn(console, 'warn');
-      mockPasswordProvider.getCurrentUser = jasmine
-        .createSpy('getCurrentUser')
-        .and.returnValue(Promise.reject(new Error('Token expired')));
-      mockAuthService.getProvider.and.returnValue(mockPasswordProvider);
+      vi.spyOn(console, 'warn');
+      mockPasswordProvider.getCurrentUser = vi.fn()
+        .mockReturnValue(Promise.reject(new Error('Token expired')));
+      mockAuthService.getProvider.mockReturnValue(mockPasswordProvider);
 
       const authSignal = signal({
         isAuthenticated: true,
@@ -866,7 +902,7 @@ describe('IdentityService', () => {
         isLoading: false,
         error: null,
       });
-      (mockAuthService.auth as jasmine.Spy).and.returnValue(authSignal());
+      (mockAuthService.auth as Mock).mockReturnValue(authSignal());
 
       const newService = TestBed.inject(IdentityService);
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -934,11 +970,11 @@ describe('IdentityService', () => {
   describe('waitForAuthenticatedState', () => {
     it('should return true immediately if already authenticated', async () => {
       // Set up authenticated state
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       await service.registerHumanNative({
         displayName: 'Test',
@@ -964,8 +1000,8 @@ describe('IdentityService', () => {
 
   describe('edge cases', () => {
     it('should handle getCurrentHuman when not authenticated', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'Not authenticated' })
       );
 
@@ -975,21 +1011,19 @@ describe('IdentityService', () => {
     });
 
     it('should handle updateProfile when not in network mode', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
       // Service starts in anonymous/session mode
 
-      await expectAsync(service.updateProfile({ displayName: 'New Name' })).toBeRejectedWithError(
-        'Cannot update profile in session mode'
-      );
+      await await expect(service.updateProfile({ displayName: 'New Name' })).rejects.toThrow('Cannot update profile in session mode');
     });
 
     it('should handle updateProfile with partial data', async () => {
       // First register to set mode
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       await service.registerHumanNative({
         displayName: 'Test',
@@ -998,7 +1032,7 @@ describe('IdentityService', () => {
       });
 
       // Mock update response
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: {
@@ -1014,11 +1048,11 @@ describe('IdentityService', () => {
     });
 
     it('should handle updateProfile zome failure', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       await service.registerHumanNative({
         displayName: 'Test',
@@ -1027,40 +1061,34 @@ describe('IdentityService', () => {
       });
 
       // Mock update failure
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'Update failed' })
       );
 
-      await expectAsync(service.updateProfile({ displayName: 'New' })).toBeRejectedWithError(
-        'Update failed'
-      );
+      await await expect(service.updateProfile({ displayName: 'New' })).rejects.toThrow('Update failed');
     });
 
     it('should handle registerHumanNative with missing data in response', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
-      await expectAsync(
-        service.registerHumanNative({
+      await await expect(service.registerHumanNative({
           displayName: 'Test',
           affinities: [],
           profileReach: 'community',
-        })
-      ).toBeRejectedWithError('Registration failed. Please try again.');
+        })).rejects.toThrow('Registration failed. Please try again.');
     });
 
     it('should handle registerHuman with generic error', async () => {
-      mockAuthService.register.and.returnValue(Promise.reject(new Error('Network error')));
+      mockAuthService.register.mockReturnValue(Promise.reject(new Error('Network error')));
 
-      await expectAsync(
-        service.registerHuman({
+      await await expect(service.registerHuman({
           displayName: 'Test',
           email: 'test@example.com',
           password: 'password',
           affinities: [],
           profileReach: 'community',
-        })
-      ).toBeRejected();
+        })).rejects.toThrow();
     });
 
     it('should handle loginWithPassword with various credential formats', async () => {
@@ -1068,7 +1096,7 @@ describe('IdentityService', () => {
 
       expect(mockAuthService.login).toHaveBeenCalledWith(
         'password',
-        jasmine.objectContaining({
+        expect.objectContaining({
           type: 'password',
           identifier: 'user@example.com',
           password: 'pass123',
@@ -1084,11 +1112,11 @@ describe('IdentityService', () => {
   describe('DID generation edge cases', () => {
     it('should generate session DID with humanId', fakeAsync(() => {
       TestBed.resetTestingModule();
-      mockSessionHumanService.getSession.and.returnValue({
+      mockSessionHumanService.getSession.mockReturnValue({
         ...mockSession,
         sessionId: 'session-abc-123',
       });
-      (mockSessionHumanService.hasSession as jasmine.Spy).and.returnValue(true);
+      (mockSessionHumanService.hasSession as Mock).mockReturnValue(true);
 
       TestBed.configureTestingModule({
         providers: [
@@ -1186,7 +1214,7 @@ describe('IdentityService', () => {
 
   describe('session migration', () => {
     it('should mark session as migrated after hosted registration', async () => {
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
 
       await service.registerHuman({
         displayName: 'Migrated User',
@@ -1200,7 +1228,7 @@ describe('IdentityService', () => {
     });
 
     it('should not call markAsMigrated if no session exists', async () => {
-      mockSessionHumanService.getSession.and.returnValue(null);
+      mockSessionHumanService.getSession.mockReturnValue(null);
 
       await service.registerHuman({
         displayName: 'No Session',
@@ -1214,12 +1242,12 @@ describe('IdentityService', () => {
     });
 
     it('should mark session as migrated after native registration', async () => {
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo());
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo());
 
       await service.registerHumanNative({
         displayName: 'Native Migrated',
@@ -1237,7 +1265,7 @@ describe('IdentityService', () => {
 
   describe('logout and state reset', () => {
     it('should reset to session identity after logout', async () => {
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
 
       await service.logout();
 
@@ -1245,7 +1273,7 @@ describe('IdentityService', () => {
     });
 
     it('should handle logout when no session exists', async () => {
-      mockSessionHumanService.getSession.and.returnValue(null);
+      mockSessionHumanService.getSession.mockReturnValue(null);
 
       await service.logout();
 
@@ -1264,9 +1292,9 @@ describe('IdentityService', () => {
     it('should detect localhost conductor', async () => {
       const localDisplayInfo = createMockDisplayInfo();
       localDisplayInfo.appUrl = 'ws://localhost:8888/app';
-      mockHolochainClient.getDisplayInfo.and.returnValue(localDisplayInfo);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(localDisplayInfo);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
 
@@ -1282,9 +1310,9 @@ describe('IdentityService', () => {
     it('should detect 127.0.0.1 conductor', async () => {
       const localDisplayInfo = createMockDisplayInfo();
       localDisplayInfo.appUrl = 'ws://127.0.0.1:8888/app';
-      mockHolochainClient.getDisplayInfo.and.returnValue(localDisplayInfo);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(localDisplayInfo);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
 
@@ -1300,9 +1328,9 @@ describe('IdentityService', () => {
     it('should detect remote conductor', async () => {
       const remoteDisplayInfo = createMockDisplayInfo();
       remoteDisplayInfo.appUrl = 'wss://edge.elohim.host/app';
-      mockHolochainClient.getDisplayInfo.and.returnValue(remoteDisplayInfo);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(remoteDisplayInfo);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockHumanSessionResult })
       );
 

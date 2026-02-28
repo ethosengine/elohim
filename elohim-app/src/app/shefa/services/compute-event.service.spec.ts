@@ -9,33 +9,38 @@
  */
 
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { ComputeEventService } from './compute-event.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { EconomicService } from './economic.service';
 import { ShefaComputeService } from './shefa-compute.service';
 import { ComputeMetrics, AllocationSnapshot } from '../models/shefa-dashboard.model';
+import { vi } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('ComputeEventService', () => {
   let service: ComputeEventService;
-  let mockHolochain: jasmine.SpyObj<HolochainClientService>;
-  let mockEconomic: jasmine.SpyObj<EconomicService>;
-  let mockShefaCompute: jasmine.SpyObj<ShefaComputeService>;
+  let mockHolochain: any;
+  let mockEconomic: any;
+  let mockShefaCompute: any;
 
   beforeEach(() => {
-    mockHolochain = jasmine.createSpyObj('HolochainClientService', ['callZome']);
-    mockEconomic = jasmine.createSpyObj('EconomicService', ['createEvent']);
-    mockShefaCompute = jasmine.createSpyObj('ShefaComputeService', ['getDashboardState']);
+    mockHolochain = {
+    callZome: vi.fn(),
+  };
+    mockEconomic = {
+    createEvent: vi.fn(),
+  };
+    mockShefaCompute = {
+    getDashboardState: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [
-        ComputeEventService,
+      providers: [provideHttpClient(), provideHttpClientTesting(), ComputeEventService,
         { provide: HolochainClientService, useValue: mockHolochain },
         { provide: EconomicService, useValue: mockEconomic },
-        { provide: ShefaComputeService, useValue: mockShefaCompute }
-      ],
+        { provide: ShefaComputeService, useValue: mockShefaCompute }],
     });
     service = TestBed.inject(ComputeEventService);
   });
@@ -177,8 +182,8 @@ describe('ComputeEventService', () => {
   // =========================================================================
 
   describe('event generation', () => {
-    it('should handle null dashboard state', (done) => {
-      mockShefaCompute.getDashboardState.and.returnValue(null);
+    it('should handle null dashboard state', () => new Promise<void>(done => {
+      mockShefaCompute.getDashboardState.mockReturnValue(null);
 
       const emission$ = service.initializeEventEmission('operator-1', 'resource-1');
       emission$.subscribe({
@@ -194,21 +199,21 @@ describe('ComputeEventService', () => {
       setTimeout(() => {
         // Allow time for subscription and initial emission
       }, 10);
-    });
+    }));
 
-    it('should emit compute events on interval', (done) => {
+    it('should emit compute events on interval', () => new Promise<void>(done => {
       // Set short interval for testing
       service.setConfig({ eventEmissionInterval: 10 });
 
       const mockMetrics = createMockComputeMetrics(50, 100, 10);
       const mockAllocations = createMockAllocationSnapshot();
 
-      mockShefaCompute.getDashboardState.and.returnValue({
+      mockShefaCompute.getDashboardState.mockReturnValue({
         computeMetrics: mockMetrics,
         allocations: mockAllocations
       } as any);
 
-      mockHolochain.callZome.and.returnValue(Promise.resolve({
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({
         success: true,
         data: [{ id: 'event-1' }]
       }));
@@ -229,21 +234,21 @@ describe('ComputeEventService', () => {
         },
         error: (err) => done.fail(err)
       });
-    });
+    }));
 
-    it('should generate events with correct operator ID', (done) => {
+    it('should generate events with correct operator ID', () => new Promise<void>(done => {
       // Set short interval for testing
       service.setConfig({ eventEmissionInterval: 10 });
 
       const mockMetrics = createMockComputeMetrics(50, 100, 10);
       const mockAllocations = createMockAllocationSnapshot();
 
-      mockShefaCompute.getDashboardState.and.returnValue({
+      mockShefaCompute.getDashboardState.mockReturnValue({
         computeMetrics: mockMetrics,
         allocations: mockAllocations
       } as any);
 
-      mockHolochain.callZome.and.returnValue(Promise.resolve({
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({
         success: true,
         data: [{ id: 'event-1' }]
       }));
@@ -262,21 +267,21 @@ describe('ComputeEventService', () => {
         },
         error: (err) => done.fail(err)
       });
-    });
+    }));
 
-    it('should generate events with resource usage snapshot', (done) => {
+    it('should generate events with resource usage snapshot', () => new Promise<void>(done => {
       // Set short interval for testing
       service.setConfig({ eventEmissionInterval: 10 });
 
       const mockMetrics = createMockComputeMetrics(50, 100, 10);
       const mockAllocations = createMockAllocationSnapshot();
 
-      mockShefaCompute.getDashboardState.and.returnValue({
+      mockShefaCompute.getDashboardState.mockReturnValue({
         computeMetrics: mockMetrics,
         allocations: mockAllocations
       } as any);
 
-      mockHolochain.callZome.and.returnValue(Promise.resolve({
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({
         success: true,
         data: [{ id: 'event-1' }]
       }));
@@ -297,21 +302,21 @@ describe('ComputeEventService', () => {
         },
         error: (err) => done.fail(err)
       });
-    });
+    }));
 
-    it('should calculate tokens earned in events', (done) => {
+    it('should calculate tokens earned in events', () => new Promise<void>(done => {
       // Set short interval for testing
       service.setConfig({ eventEmissionInterval: 10 });
 
       const mockMetrics = createMockComputeMetrics(50, 100, 10);
       const mockAllocations = createMockAllocationSnapshot();
 
-      mockShefaCompute.getDashboardState.and.returnValue({
+      mockShefaCompute.getDashboardState.mockReturnValue({
         computeMetrics: mockMetrics,
         allocations: mockAllocations
       } as any);
 
-      mockHolochain.callZome.and.returnValue(Promise.resolve({
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({
         success: true,
         data: [{ id: 'event-1' }]
       }));
@@ -332,7 +337,7 @@ describe('ComputeEventService', () => {
         },
         error: (err) => done.fail(err)
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -340,8 +345,8 @@ describe('ComputeEventService', () => {
   // =========================================================================
 
   describe('error handling', () => {
-    it('should handle errors in dashboard state retrieval', (done) => {
-      mockShefaCompute.getDashboardState.and.returnValue(null);
+    it('should handle errors in dashboard state retrieval', () => new Promise<void>(done => {
+      mockShefaCompute.getDashboardState.mockReturnValue(null);
 
       const emission$ = service.initializeEventEmission('operator-1', 'resource-1');
       let called = false;
@@ -364,14 +369,14 @@ describe('ComputeEventService', () => {
       setTimeout(() => {
         if (called || !called) done();
       }, 50);
-    });
+    }));
 
-    it('should continue emission on individual event errors', (done) => {
+    it('should continue emission on individual event errors', () => new Promise<void>(done => {
       const mockMetrics = createMockComputeMetrics(50, 100, 10);
       const mockAllocations = createMockAllocationSnapshot();
 
       let callCount = 0;
-      mockShefaCompute.getDashboardState.and.callFake(() => {
+      mockShefaCompute.getDashboardState.mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
           return {
@@ -398,7 +403,7 @@ describe('ComputeEventService', () => {
         expect(eventCount >= 0).toBe(true);
         done();
       }, 100);
-    });
+    }));
   });
 
   // =========================================================================
@@ -406,19 +411,19 @@ describe('ComputeEventService', () => {
   // =========================================================================
 
   describe('holochain integration', () => {
-    it('should call Holochain zome for batch event creation', (done) => {
+    it('should call Holochain zome for batch event creation', () => new Promise<void>(done => {
       // Set short interval for testing
       service.setConfig({ eventEmissionInterval: 10 });
 
       const mockMetrics = createMockComputeMetrics(50, 100, 10);
       const mockAllocations = createMockAllocationSnapshot();
 
-      mockShefaCompute.getDashboardState.and.returnValue({
+      mockShefaCompute.getDashboardState.mockReturnValue({
         computeMetrics: mockMetrics,
         allocations: mockAllocations
       } as any);
 
-      mockHolochain.callZome.and.returnValue(Promise.resolve({
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({
         success: true,
         data: [{ id: 'event-1' }]
       }));
@@ -438,7 +443,7 @@ describe('ComputeEventService', () => {
         },
         error: (err) => done.fail(err)
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -452,16 +457,16 @@ describe('ComputeEventService', () => {
       expect(events$.subscribe).toBeDefined();
     });
 
-    it('should emit events to stream', (done) => {
+    it('should emit events to stream', () => new Promise<void>(done => {
       const mockMetrics = createMockComputeMetrics(50, 100, 10);
       const mockAllocations = createMockAllocationSnapshot();
 
-      mockShefaCompute.getDashboardState.and.returnValue({
+      mockShefaCompute.getDashboardState.mockReturnValue({
         computeMetrics: mockMetrics,
         allocations: mockAllocations
       } as any);
 
-      mockHolochain.callZome.and.returnValue(Promise.resolve({
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({
         success: true,
         data: []
       }));
@@ -482,7 +487,7 @@ describe('ComputeEventService', () => {
         expect(eventCount >= 0).toBe(true);
         done();
       }, 100);
-    });
+    }));
   });
 });
 

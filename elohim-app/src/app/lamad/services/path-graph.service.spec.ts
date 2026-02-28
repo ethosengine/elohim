@@ -5,17 +5,21 @@ import { PathGraphService } from './path-graph.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { LearningPath, PathStep, PathChapter } from '../models/learning-path.model';
 import { ContentNode } from '../models/content-node.model';
+import { vi } from 'vitest';
 
 describe('PathGraphService', () => {
   let service: PathGraphService;
-  let mockDataLoader: jasmine.SpyObj<DataLoaderService>;
+  let mockDataLoader: any;
 
   beforeEach(() => {
-    mockDataLoader = jasmine.createSpyObj('DataLoaderService', ['getPathIndex', 'getPath']);
-    mockDataLoader.getPathIndex.and.returnValue(
+    mockDataLoader = {
+      getPathIndex: vi.fn(),
+      getPath: vi.fn(),
+    };
+    mockDataLoader.getPathIndex.mockReturnValue(
       of({ paths: [], lastUpdated: new Date().toISOString(), totalCount: 0 })
     );
-    mockDataLoader.getPath.and.returnValue(of(null as any));
+    mockDataLoader.getPath.mockReturnValue(of(null as any));
 
     TestBed.configureTestingModule({
       providers: [
@@ -31,7 +35,7 @@ describe('PathGraphService', () => {
   });
 
   describe('registerPathAsNode', () => {
-    it('should return observable with content node', (done) => {
+    it('should return observable with content node', () => new Promise<void>(done => {
       const mockPath: LearningPath = {
         id: 'path-123',
         version: '1.0.0',
@@ -67,9 +71,9 @@ describe('PathGraphService', () => {
         expect(node.title).toBe('Test Path');
         done();
       });
-    });
+    }));
 
-    it('should include path metadata with step count', (done) => {
+    it('should include path metadata with step count', () => new Promise<void>(done => {
       const mockPath: LearningPath = {
         id: 'path-456',
         version: '1.0.0',
@@ -112,9 +116,9 @@ describe('PathGraphService', () => {
         expect(node.metadata).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should map visibility to reach level', (done) => {
+    it('should map visibility to reach level', () => new Promise<void>(done => {
       const mockPath: LearningPath = {
         id: 'path-789',
         version: '1.0.0',
@@ -136,12 +140,12 @@ describe('PathGraphService', () => {
         expect(node.reach).toBe('private');
         done();
       });
-    });
+    }));
   });
 
   describe('findPathsContainingNode', () => {
-    it('should return observable of path references', (done) => {
-      mockDataLoader.getPathIndex.and.returnValue(
+    it('should return observable of path references', () => new Promise<void>(done => {
+      mockDataLoader.getPathIndex.mockReturnValue(
         of({
           paths: [{
             id: 'path-1',
@@ -185,18 +189,18 @@ describe('PathGraphService', () => {
         visibility: 'public',
       };
 
-      mockDataLoader.getPath.and.returnValue(of(mockPath));
+      mockDataLoader.getPath.mockReturnValue(of(mockPath));
 
       service.findPathsContainingNode('content-123').subscribe((results) => {
         expect(results).toBeDefined();
         expect(Array.isArray(results)).toBe(true);
         done();
       });
-    });
+    }));
   });
 
   describe('getPathContentNodes', () => {
-    it('should return observable of content node IDs', (done) => {
+    it('should return observable of content node IDs', () => new Promise<void>(done => {
       const mockPath: LearningPath = {
         id: 'path-123',
         version: '1.0.0',
@@ -235,18 +239,18 @@ describe('PathGraphService', () => {
         visibility: 'public',
       };
 
-      mockDataLoader.getPath.and.returnValue(of(mockPath));
+      mockDataLoader.getPath.mockReturnValue(of(mockPath));
 
       service.getPathContentNodes('path-123').subscribe((nodeIds) => {
         expect(Array.isArray(nodeIds)).toBe(true);
         expect(nodeIds.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
   });
 
   describe('getRelatedPaths', () => {
-    it('should return observable of related path references', (done) => {
+    it('should return observable of related path references', () => new Promise<void>(done => {
       const mockPath: LearningPath = {
         id: 'path-1',
         version: '1.0.0',
@@ -275,8 +279,8 @@ describe('PathGraphService', () => {
         visibility: 'public',
       };
 
-      mockDataLoader.getPath.and.returnValue(of(mockPath));
-      mockDataLoader.getPathIndex.and.returnValue(
+      mockDataLoader.getPath.mockReturnValue(of(mockPath));
+      mockDataLoader.getPathIndex.mockReturnValue(
         of({
           paths: [{
             id: 'path-1',
@@ -296,11 +300,11 @@ describe('PathGraphService', () => {
         expect(Array.isArray(results)).toBe(true);
         done();
       });
-    });
+    }));
   });
 
   describe('syncPathNode', () => {
-    it('should return observable with synced content node', (done) => {
+    it('should return observable with synced content node', () => new Promise<void>(done => {
       const mockPath: LearningPath = {
         id: 'path-123',
         version: '1.0.0',
@@ -323,63 +327,63 @@ describe('PathGraphService', () => {
         expect(node.title).toBe('Updated Path');
         done();
       });
-    });
+    }));
   });
 
   describe('loadPathNodes', () => {
-    it('should return observable of path nodes map', (done) => {
+    it('should return observable of path nodes map', () => new Promise<void>(done => {
       service.loadPathNodes().subscribe((nodes) => {
         expect(nodes instanceof Map).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should cache path nodes on second call', (done) => {
+    it('should cache path nodes on second call', () => new Promise<void>(done => {
       service.loadPathNodes().subscribe(() => {
         service.loadPathNodes().subscribe(() => {
-          expect(mockDataLoader.getPathIndex.calls.count()).toBe(1);
+          expect(mockDataLoader.getPathIndex.mock.calls.length).toBe(1);
           done();
         });
       });
-    });
+    }));
   });
 
   describe('clearCache', () => {
-    it('should clear path nodes cache', (done) => {
+    it('should clear path nodes cache', () => new Promise<void>(done => {
       service.loadPathNodes().subscribe(() => {
         service.clearCache();
         service.loadPathNodes().subscribe(() => {
-          expect(mockDataLoader.getPathIndex.calls.count()).toBe(2);
+          expect(mockDataLoader.getPathIndex.mock.calls.length).toBe(2);
           done();
         });
       });
-    });
+    }));
   });
 
   describe('getPathNodesByTag', () => {
-    it('should return observable of content nodes with tag', (done) => {
+    it('should return observable of content nodes with tag', () => new Promise<void>(done => {
       service.getPathNodesByTag('test').subscribe((results) => {
         expect(Array.isArray(results)).toBe(true);
         done();
       });
-    });
+    }));
   });
 
   describe('getPathNodesByDifficulty', () => {
-    it('should return observable of content nodes by difficulty', (done) => {
+    it('should return observable of content nodes by difficulty', () => new Promise<void>(done => {
       service.getPathNodesByDifficulty('beginner').subscribe((results) => {
         expect(Array.isArray(results)).toBe(true);
         done();
       });
-    });
+    }));
   });
 
   describe('linkPathToContent', () => {
-    it('should return observable of void', (done) => {
+    it('should return observable of void', () => new Promise<void>(done => {
       service.linkPathToContent('path-1', ['content-1', 'content-2']).subscribe(() => {
         expect(true).toBe(true);
         done();
       });
-    });
+    }));
   });
 });

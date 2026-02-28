@@ -1,16 +1,22 @@
 import { TestBed } from '@angular/core/testing';
 import { ElementRef, RendererFactory2, Renderer2 } from '@angular/core';
 import { DomInteractionService } from './dom-interaction.service';
+import { vi } from 'vitest';
 
 describe('DomInteractionService', () => {
   let service: DomInteractionService;
-  let mockRenderer: jasmine.SpyObj<Renderer2>;
-  let mockRendererFactory: jasmine.SpyObj<RendererFactory2>;
+  let mockRenderer: any;
+  let mockRendererFactory: any;
 
   beforeEach(() => {
-    mockRenderer = jasmine.createSpyObj('Renderer2', ['listen', 'setStyle']);
-    mockRendererFactory = jasmine.createSpyObj('RendererFactory2', ['createRenderer']);
-    mockRendererFactory.createRenderer.and.returnValue(mockRenderer);
+    mockRenderer = {
+    listen: vi.fn(),
+    setStyle: vi.fn(),
+  };
+    mockRendererFactory = {
+    createRenderer: vi.fn(),
+  };
+    mockRendererFactory.createRenderer.mockReturnValue(mockRenderer);
 
     TestBed.configureTestingModule({
       providers: [
@@ -27,17 +33,17 @@ describe('DomInteractionService', () => {
   });
 
   describe('setupScrollIndicator', () => {
-    it('should setup scroll indicator click listener', done => {
+    it('should setup scroll indicator click listener', () => new Promise<void>(done => {
       const mockElement = document.createElement('div');
       const scrollIndicator = document.createElement('div');
       scrollIndicator.className = 'scroll-indicator';
       mockElement.appendChild(scrollIndicator);
 
       const elementRef = new ElementRef(mockElement);
-      const scrollSpy = spyOn(window, 'scrollTo');
+      const scrollSpy = vi.spyOn(window, 'scrollTo');
       let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.and.callFake(
+      mockRenderer.listen.mockImplementation(
         (element: any, event: string, handler: (event: any) => void) => {
           if (event === 'click') {
             clickHandler = handler;
@@ -52,7 +58,7 @@ describe('DomInteractionService', () => {
         expect(mockRenderer.listen).toHaveBeenCalledWith(
           scrollIndicator,
           'click',
-          jasmine.any(Function)
+          expect.any(Function)
         );
 
         // Trigger the click handler
@@ -61,15 +67,15 @@ describe('DomInteractionService', () => {
         }
 
         expect(scrollSpy).toHaveBeenCalled();
-        const callArgs = scrollSpy.calls.mostRecent().args[0] as ScrollToOptions;
+        const callArgs = scrollSpy.mock.lastCall[0] as ScrollToOptions;
         expect(callArgs.top).toBe(window.innerHeight);
         expect(callArgs.behavior).toBe('smooth');
 
         done();
       }, 10);
-    });
+    }));
 
-    it('should handle missing scroll indicator gracefully', done => {
+    it('should handle missing scroll indicator gracefully', () => new Promise<void>(done => {
       const mockElement = document.createElement('div');
       const elementRef = new ElementRef(mockElement);
 
@@ -79,11 +85,11 @@ describe('DomInteractionService', () => {
         expect(mockRenderer.listen).not.toHaveBeenCalled();
         done();
       }, 10);
-    });
+    }));
   });
 
   describe('setupHeroTitleAnimation', () => {
-    it('should setup hero title click animation', done => {
+    it('should setup hero title click animation', () => new Promise<void>(done => {
       const mockElement = document.createElement('div');
       const heroSection = document.createElement('div');
       heroSection.className = 'hero';
@@ -94,7 +100,7 @@ describe('DomInteractionService', () => {
       const elementRef = new ElementRef(mockElement);
       let clickHandler: (event: any) => void;
 
-      mockRenderer.listen.and.callFake(
+      mockRenderer.listen.mockImplementation(
         (element: any, event: string, handler: (event: any) => void) => {
           if (event === 'click') {
             clickHandler = handler;
@@ -107,10 +113,10 @@ describe('DomInteractionService', () => {
 
       setTimeout(() => {
         expect(mockRenderer.setStyle).toHaveBeenCalledWith(heroTitle, 'cursor', 'pointer');
-        expect(mockRenderer.listen).toHaveBeenCalledWith(heroTitle, 'click', jasmine.any(Function));
+        expect(mockRenderer.listen).toHaveBeenCalledWith(heroTitle, 'click', expect.any(Function));
 
         // Reset the spy to check calls within click handler
-        mockRenderer.setStyle.calls.reset();
+        mockRenderer.setStyle.mockClear();
 
         // Trigger the click handler
         if (clickHandler!) {
@@ -129,9 +135,9 @@ describe('DomInteractionService', () => {
           done();
         }, 20);
       }, 10);
-    });
+    }));
 
-    it('should handle missing hero title gracefully', done => {
+    it('should handle missing hero title gracefully', () => new Promise<void>(done => {
       const mockElement = document.createElement('div');
       const elementRef = new ElementRef(mockElement);
 
@@ -142,9 +148,9 @@ describe('DomInteractionService', () => {
         expect(mockRenderer.listen).not.toHaveBeenCalled();
         done();
       }, 10);
-    });
+    }));
 
-    it('should handle hero section without h1', done => {
+    it('should handle hero section without h1', () => new Promise<void>(done => {
       const mockElement = document.createElement('div');
       const heroSection = document.createElement('div');
       heroSection.className = 'hero';
@@ -159,6 +165,6 @@ describe('DomInteractionService', () => {
         expect(mockRenderer.listen).not.toHaveBeenCalled();
         done();
       }, 10);
-    });
+    }));
   });
 });

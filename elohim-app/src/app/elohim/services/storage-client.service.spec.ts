@@ -1,26 +1,27 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { StorageClientService, StorageContentNode, StoragePath } from './storage-client.service';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { ListResponse, BulkCreateResult } from '../models/storage-response.model';
+import { vi } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('StorageClientService', () => {
   let service: StorageClientService;
   let httpMock: HttpTestingController;
-  let strategyMock: jasmine.SpyObj<any>;
+  let strategyMock: any;
 
   beforeEach(() => {
-    const strategySpy = jasmine.createSpyObj('ConnectionStrategy', ['getStorageBaseUrl']);
+    const strategySpy = {
+      getStorageBaseUrl: vi.fn(),
+    };
     strategySpy.mode = 'doorway'; // Set as writable property
-    strategySpy.getStorageBaseUrl.and.returnValue('http://localhost:8888');
+    strategySpy.getStorageBaseUrl.mockReturnValue('http://localhost:8888');
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [
-        StorageClientService,
-        { provide: CONNECTION_STRATEGY, useValue: strategySpy },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), StorageClientService,
+        { provide: CONNECTION_STRATEGY, useValue: strategySpy },],
     });
 
     service = TestBed.inject(StorageClientService);
@@ -99,7 +100,7 @@ describe('StorageClientService', () => {
       let errorThrown = false;
 
       service.fetchBlob('sha256-missing').subscribe({
-        next: () => fail('Should have errored'),
+        next: () => { throw new Error('Should have errored'); },
         error: () => {
           errorThrown = true;
         },
@@ -109,7 +110,7 @@ describe('StorageClientService', () => {
       req.error(new ProgressEvent('error'), { status: 404 });
 
       tick();
-      expect(errorThrown).toBeTrue();
+      expect(errorThrown).toBe(true);
     }));
 
     it('should timeout after default timeout', fakeAsync(() => {
@@ -123,7 +124,7 @@ describe('StorageClientService', () => {
 
       const req = httpMock.expectOne('http://localhost:8888/api/blob/sha256-slow');
       tick(31000); // > 30s default timeout
-      expect(timedOut).toBeTrue();
+      expect(timedOut).toBe(true);
 
       // Clean up the pending request
       if (!req.cancelled) {
@@ -145,7 +146,7 @@ describe('StorageClientService', () => {
       req.flush(null, { status: 200, statusText: 'OK' });
 
       tick();
-      expect(exists).toBeTrue();
+      expect(exists).toBe(true);
     }));
 
     it('should return false if blob does not exist', fakeAsync(() => {
@@ -159,7 +160,7 @@ describe('StorageClientService', () => {
       req.error(new ProgressEvent('error'), { status: 404 });
 
       tick();
-      expect(exists).toBeFalse();
+      expect(exists).toBe(false);
     }));
 
     it('should return false on network error', fakeAsync(() => {
@@ -173,7 +174,7 @@ describe('StorageClientService', () => {
       req.error(new ProgressEvent('error'));
 
       tick();
-      expect(exists).toBeFalse();
+      expect(exists).toBe(false);
     }));
   });
 
@@ -660,7 +661,7 @@ describe('StorageClientService', () => {
       req.error(new ProgressEvent('error'));
 
       tick();
-      expect(errorOccurred).toBeTrue();
+      expect(errorOccurred).toBe(true);
     }));
   });
 });

@@ -10,12 +10,13 @@ import { NativeBackend } from '../../services/backends/native-backend';
 import type { ElohimComputationCost } from '../../models/elohim-agent.model';
 
 import { ElohimConfigComponent } from './elohim-config.component';
+import { vi, Mock } from 'vitest';
 
 describe('ElohimConfigComponent', () => {
   let fixture: ComponentFixture<ElohimConfigComponent>;
   let component: ElohimConfigComponent;
-  let mockCatalog: jasmine.SpyObj<ElohimBackendCatalog>;
-  let mockPresenceService: jasmine.SpyObj<ElohimPresenceService>;
+  let mockCatalog: any;
+  let mockPresenceService: any;
   let costSubject: BehaviorSubject<ElohimComputationCost>;
 
   beforeEach(async () => {
@@ -26,17 +27,17 @@ describe('ElohimConfigComponent', () => {
       precedentLookups: 0,
     });
 
-    mockCatalog = jasmine.createSpyObj('ElohimBackendCatalog', [
-      'register',
-      'unregister',
-      'setPreferred',
-      'getPreferredId',
-      'get',
-      'selectBackend',
-    ]);
-    mockCatalog.getPreferredId.and.returnValue(null);
-    mockCatalog.get.and.returnValue(undefined);
-    mockCatalog.selectBackend.and.returnValue(
+    mockCatalog = {
+      register: vi.fn(),
+      unregister: vi.fn(),
+      setPreferred: vi.fn(),
+      getPreferredId: vi.fn(),
+      get: vi.fn(),
+      selectBackend: vi.fn(),
+    };
+    mockCatalog.getPreferredId.mockReturnValue(null);
+    mockCatalog.get.mockReturnValue(undefined);
+    mockCatalog.selectBackend.mockReturnValue(
       Promise.resolve({
         id: 'mock',
         name: 'Simulation (Mock)',
@@ -46,13 +47,7 @@ describe('ElohimConfigComponent', () => {
       }),
     );
 
-    mockPresenceService = jasmine.createSpyObj(
-      'ElohimPresenceService',
-      ['onContentCompleted', 'onDiscoveryCompleted'],
-      {
-        cost$: costSubject.asObservable(),
-      },
-    );
+    mockPresenceService = { onContentCompleted: vi.fn(), onDiscoveryCompleted: vi.fn(), cost$: costSubject.asObservable(), };
 
     await TestBed.configureTestingModule({
       imports: [ElohimConfigComponent],
@@ -144,7 +139,7 @@ describe('ElohimConfigComponent', () => {
 
     it('should forward BYOK key to NativeBackend instance', () => {
       const nativeBackend = new NativeBackend();
-      mockCatalog.get.and.callFake((id: string) =>
+      mockCatalog.get.mockImplementation((id: string) =>
         id === 'native' ? (nativeBackend as unknown as ElohimBackend) : undefined,
       );
 
@@ -163,7 +158,7 @@ describe('ElohimConfigComponent', () => {
     it('should clear BYOK key on NativeBackend when cleared', () => {
       const nativeBackend = new NativeBackend();
       nativeBackend.byokApiKey = 'old-key';
-      mockCatalog.get.and.callFake((id: string) =>
+      mockCatalog.get.mockImplementation((id: string) =>
         id === 'native' ? (nativeBackend as unknown as ElohimBackend) : undefined,
       );
 
@@ -202,7 +197,7 @@ describe('ElohimConfigComponent', () => {
     }));
 
     it('should show error when not available', fakeAsync(() => {
-      mockCatalog.selectBackend.and.returnValue(
+      mockCatalog.selectBackend.mockReturnValue(
         Promise.resolve({
           id: 'mock',
           name: 'Simulation (Mock)',
@@ -220,7 +215,7 @@ describe('ElohimConfigComponent', () => {
     }));
 
     it('should handle test failure gracefully', fakeAsync(() => {
-      mockCatalog.selectBackend.and.returnValue(Promise.reject(new Error('Network error')));
+      mockCatalog.selectBackend.mockReturnValue(Promise.reject(new Error('Network error')));
 
       component.testBackend();
       tick();

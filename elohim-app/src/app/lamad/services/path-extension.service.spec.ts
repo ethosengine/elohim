@@ -4,10 +4,11 @@ import { PathExtensionService } from './path-extension.service';
 import { PathService } from './path.service';
 import { LearningPath, PathStep } from '../models/learning-path.model';
 import { PathExtension } from '../models/path-extension.model';
+import { vi, Mock } from 'vitest';
 
 describe('PathExtensionService', () => {
   let service: PathExtensionService;
-  let pathServiceSpy: jasmine.SpyObj<PathService>;
+  let pathServiceSpy: any;
 
   const mockPath: LearningPath = {
     id: 'test-path',
@@ -31,14 +32,16 @@ describe('PathExtensionService', () => {
   };
 
   beforeEach(() => {
-    const pathServiceSpyObj = jasmine.createSpyObj('PathService', ['getPath']);
+    const pathServiceSpyObj = {
+      getPath: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [PathExtensionService, { provide: PathService, useValue: pathServiceSpyObj }],
     });
 
-    pathServiceSpy = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
-    pathServiceSpy.getPath.and.returnValue(of(mockPath));
+    pathServiceSpy = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
+    pathServiceSpy.getPath.mockReturnValue(of(mockPath));
 
     service = TestBed.inject(PathExtensionService);
     service.setCurrentAgent('demo-learner');
@@ -53,63 +56,63 @@ describe('PathExtensionService', () => {
   // =========================================================================
 
   describe('getExtensionIndex', () => {
-    it('should return extension index', done => {
+    it('should return extension index', () => new Promise<void>(done => {
       service.getExtensionIndex().subscribe(index => {
         expect(index).toBeDefined();
         expect(index.totalCount).toBeGreaterThanOrEqual(0);
         expect(index.extensions).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should include demo extension', done => {
+    it('should include demo extension', () => new Promise<void>(done => {
       service.getExtensionIndex().subscribe(index => {
         const demoExt = index.extensions.find(e => e.id === 'ext-demo-elohim-path');
         expect(demoExt).toBeDefined();
         done();
       });
-    });
+    }));
   });
 
   describe('getMyExtensions', () => {
-    it('should return only extensions by current agent', done => {
+    it('should return only extensions by current agent', () => new Promise<void>(done => {
       service.getMyExtensions().subscribe(extensions => {
         for (const ext of extensions) {
           expect(ext.extendedBy).toBe('demo-learner');
         }
         done();
       });
-    });
+    }));
   });
 
   describe('getExtensionsForPath', () => {
-    it('should filter extensions by base path', done => {
+    it('should filter extensions by base path', () => new Promise<void>(done => {
       service.getExtensionsForPath('elohim-protocol').subscribe(extensions => {
         for (const ext of extensions) {
           expect(ext.basePathId).toBe('elohim-protocol');
         }
         done();
       });
-    });
+    }));
   });
 
   describe('getExtension', () => {
-    it('should return null for non-existent extension', done => {
+    it('should return null for non-existent extension', () => new Promise<void>(done => {
       service.getExtension('non-existent').subscribe(ext => {
         expect(ext).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return extension when authorized', done => {
+    it('should return extension when authorized', () => new Promise<void>(done => {
       service.getExtension('ext-demo-elohim-path').subscribe(ext => {
         expect(ext).not.toBeNull();
         expect(ext?.id).toBe('ext-demo-elohim-path');
         done();
       });
-    });
+    }));
 
-    it('should error for unauthorized access to private extension', done => {
+    it('should error for unauthorized access to private extension', () => new Promise<void>(done => {
       // Create private extension as different user
       service.setCurrentAgent('other-user');
       service
@@ -129,7 +132,7 @@ describe('PathExtensionService', () => {
             },
           });
         });
-    });
+    }));
   });
 
   // =========================================================================
@@ -137,7 +140,7 @@ describe('PathExtensionService', () => {
   // =========================================================================
 
   describe('createExtension', () => {
-    it('should create new extension', done => {
+    it('should create new extension', () => new Promise<void>(done => {
       service
         .createExtension({
           basePathId: 'test-path',
@@ -151,9 +154,9 @@ describe('PathExtensionService', () => {
           expect(ext.visibility).toBe('private');
           done();
         });
-    });
+    }));
 
-    it('should set version from base path', done => {
+    it('should set version from base path', () => new Promise<void>(done => {
       service
         .createExtension({
           basePathId: 'test-path',
@@ -163,10 +166,10 @@ describe('PathExtensionService', () => {
           expect(ext.basePathVersion).toBe('1.0.0');
           done();
         });
-    });
+    }));
 
-    it('should error when base path not found', done => {
-      pathServiceSpy.getPath.and.returnValue(of(null as any));
+    it('should error when base path not found', () => new Promise<void>(done => {
+      pathServiceSpy.getPath.mockReturnValue(of(null as any));
 
       service
         .createExtension({
@@ -179,9 +182,9 @@ describe('PathExtensionService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should respect visibility parameter', done => {
+    it('should respect visibility parameter', () => new Promise<void>(done => {
       service
         .createExtension({
           basePathId: 'test-path',
@@ -192,11 +195,11 @@ describe('PathExtensionService', () => {
           expect(ext.visibility).toBe('public');
           done();
         });
-    });
+    }));
   });
 
   describe('forkExtension', () => {
-    it('should create fork of existing extension', done => {
+    it('should create fork of existing extension', () => new Promise<void>(done => {
       service
         .forkExtension('ext-demo-elohim-path', {
           title: 'My Forked Extension',
@@ -208,23 +211,23 @@ describe('PathExtensionService', () => {
           expect(forked.visibility).toBe('private');
           done();
         });
-    });
+    }));
 
-    it('should copy annotations from original', done => {
+    it('should copy annotations from original', () => new Promise<void>(done => {
       service.forkExtension('ext-demo-elohim-path').subscribe(forked => {
         expect(forked.annotations.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should error for non-existent extension', done => {
+    it('should error for non-existent extension', () => new Promise<void>(done => {
       service.forkExtension('non-existent').subscribe({
         error: err => {
           expect(err.code).toBe('NOT_FOUND');
           done();
         },
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -246,7 +249,7 @@ describe('PathExtensionService', () => {
         });
     });
 
-    it('should add insertion to extension', done => {
+    it('should add insertion to extension', () => new Promise<void>(done => {
       const newStep: PathStep = {
         order: 0,
         resourceId: 'new-resource',
@@ -266,18 +269,18 @@ describe('PathExtensionService', () => {
           expect(insertion.rationale).toBe('Adding extra content');
           done();
         });
-    });
+    }));
 
-    it('should error for non-existent extension', done => {
+    it('should error for non-existent extension', () => new Promise<void>(done => {
       service.addInsertion('non-existent', 0, [], 'test').subscribe({
         error: err => {
           expect(err.code).toBe('NOT_FOUND');
           done();
         },
       });
-    });
+    }));
 
-    it('should error for unauthorized edit', done => {
+    it('should error for unauthorized edit', () => new Promise<void>(done => {
       service.setCurrentAgent('other-user');
 
       service.addInsertion(testExtensionId, 0, [], 'test').subscribe({
@@ -286,7 +289,7 @@ describe('PathExtensionService', () => {
           done();
         },
       });
-    });
+    }));
   });
 
   describe('addAnnotation', () => {
@@ -304,7 +307,7 @@ describe('PathExtensionService', () => {
         });
     });
 
-    it('should add annotation to extension', done => {
+    it('should add annotation to extension', () => new Promise<void>(done => {
       service.addAnnotation(testExtensionId, 0, 'insight', 'My insight').subscribe(annotation => {
         expect(annotation.id).toBeDefined();
         expect(annotation.stepIndex).toBe(0);
@@ -312,9 +315,9 @@ describe('PathExtensionService', () => {
         expect(annotation.content).toBe('My insight');
         done();
       });
-    });
+    }));
 
-    it('should include additional resources', done => {
+    it('should include additional resources', () => new Promise<void>(done => {
       service
         .addAnnotation(testExtensionId, 1, 'note', 'Extra reading', {
           additionalResources: [
@@ -326,7 +329,7 @@ describe('PathExtensionService', () => {
           expect(annotation.additionalResources?.length).toBe(1);
           done();
         });
-    });
+    }));
   });
 
   describe('addReorder', () => {
@@ -344,7 +347,7 @@ describe('PathExtensionService', () => {
         });
     });
 
-    it('should add reorder to extension', done => {
+    it('should add reorder to extension', () => new Promise<void>(done => {
       service.addReorder(testExtensionId, 0, 2, 'Better flow').subscribe(reorder => {
         expect(reorder.id).toBeDefined();
         expect(reorder.fromIndex).toBe(0);
@@ -352,7 +355,7 @@ describe('PathExtensionService', () => {
         expect(reorder.rationale).toBe('Better flow');
         done();
       });
-    });
+    }));
   });
 
   describe('addExclusion', () => {
@@ -370,7 +373,7 @@ describe('PathExtensionService', () => {
         });
     });
 
-    it('should add exclusion to extension', done => {
+    it('should add exclusion to extension', () => new Promise<void>(done => {
       service
         .addExclusion(testExtensionId, 1, 'already-mastered', 'I know this already')
         .subscribe(exclusion => {
@@ -380,7 +383,7 @@ describe('PathExtensionService', () => {
           expect(exclusion.notes).toBe('I know this already');
           done();
         });
-    });
+    }));
   });
 
   describe('removeModification', () => {
@@ -415,14 +418,14 @@ describe('PathExtensionService', () => {
         });
     });
 
-    it('should remove modification from extension', done => {
+    it('should remove modification from extension', () => new Promise<void>(done => {
       service.removeModification(testExtensionId, insertionId).subscribe(() => {
         service.getExtension(testExtensionId).subscribe(ext => {
           expect(ext?.insertions.find(i => i.id === insertionId)).toBeUndefined();
           done();
         });
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -444,16 +447,16 @@ describe('PathExtensionService', () => {
         });
     });
 
-    it('should apply extension to get effective steps', done => {
+    it('should apply extension to get effective steps', () => new Promise<void>(done => {
       service.applyExtension(testExtensionId).subscribe(result => {
         expect(result.effectiveSteps).toBeDefined();
         expect(result.effectiveSteps.length).toBe(mockPath.steps.length);
         expect(result.warnings).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should include inserted steps', done => {
+    it('should include inserted steps', () => new Promise<void>(done => {
       service
         .addInsertion(testExtensionId, 0, [
           {
@@ -472,27 +475,27 @@ describe('PathExtensionService', () => {
             done();
           });
         });
-    });
+    }));
 
-    it('should exclude excluded steps', done => {
+    it('should exclude excluded steps', () => new Promise<void>(done => {
       service.addExclusion(testExtensionId, 1, 'not-relevant').subscribe(() => {
         service.applyExtension(testExtensionId).subscribe(result => {
           expect(result.effectiveSteps.length).toBe(mockPath.steps.length - 1);
           done();
         });
       });
-    });
+    }));
 
-    it('should warn on version mismatch', done => {
+    it('should warn on version mismatch', () => new Promise<void>(done => {
       const modifiedPath = { ...mockPath, version: '2.0.0' };
-      pathServiceSpy.getPath.and.returnValue(of(modifiedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(modifiedPath));
 
       service.applyExtension(testExtensionId).subscribe(result => {
         const versionWarning = result.warnings.find(w => w.type === 'version-mismatch');
         expect(versionWarning).toBeDefined();
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -514,22 +517,22 @@ describe('PathExtensionService', () => {
         });
     });
 
-    it('should submit upstream proposal', done => {
+    it('should submit upstream proposal', () => new Promise<void>(done => {
       service.submitUpstreamProposal(testExtensionId).subscribe(proposal => {
         expect(proposal.status).toBe('submitted');
         expect(proposal.submittedAt).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should error for non-existent extension', done => {
+    it('should error for non-existent extension', () => new Promise<void>(done => {
       service.submitUpstreamProposal('non-existent').subscribe({
         error: err => {
           expect(err.code).toBe('NOT_FOUND');
           done();
         },
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -540,21 +543,21 @@ describe('PathExtensionService', () => {
     beforeEach(() => {
       // Mock path ownership
       const ownedPath = { ...mockPath, createdBy: 'demo-learner' };
-      pathServiceSpy.getPath.and.returnValue(of(ownedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(ownedPath));
     });
 
-    it('should enable collaboration on owned path', done => {
+    it('should enable collaboration on owned path', () => new Promise<void>(done => {
       service.enableCollaboration('test-path', 'open').subscribe(collab => {
         expect(collab.pathId).toBe('test-path');
         expect(collab.collaborationType).toBe('open');
         expect(collab.roles.get('demo-learner')).toBe('owner');
         done();
       });
-    });
+    }));
 
-    it('should error when not path owner', done => {
+    it('should error when not path owner', () => new Promise<void>(done => {
       const otherPath = { ...mockPath, createdBy: 'other-user' };
-      pathServiceSpy.getPath.and.returnValue(of(otherPath));
+      pathServiceSpy.getPath.mockReturnValue(of(otherPath));
 
       service.enableCollaboration('test-path', 'open').subscribe({
         error: err => {
@@ -562,45 +565,45 @@ describe('PathExtensionService', () => {
           done();
         },
       });
-    });
+    }));
   });
 
   describe('addCollaborator', () => {
     beforeEach(done => {
       const ownedPath = { ...mockPath, createdBy: 'demo-learner' };
-      pathServiceSpy.getPath.and.returnValue(of(ownedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(ownedPath));
 
       service.enableCollaboration('test-path', 'open').subscribe(() => done());
     });
 
-    it('should add collaborator to path', done => {
+    it('should add collaborator to path', () => new Promise<void>(done => {
       service.addCollaborator('test-path', 'new-collaborator', 'editor').subscribe(() => {
         service.getCollaborativePath('test-path').subscribe(collab => {
           expect(collab?.roles.get('new-collaborator')).toBe('editor');
           done();
         });
       });
-    });
+    }));
 
-    it('should error for non-collaborative path', done => {
+    it('should error for non-collaborative path', () => new Promise<void>(done => {
       service.addCollaborator('non-collab-path', 'user', 'viewer').subscribe({
         error: err => {
           expect(err.code).toBe('NOT_FOUND');
           done();
         },
       });
-    });
+    }));
   });
 
   describe('submitProposal', () => {
     beforeEach(done => {
       const ownedPath = { ...mockPath, createdBy: 'demo-learner' };
-      pathServiceSpy.getPath.and.returnValue(of(ownedPath));
+      pathServiceSpy.getPath.mockReturnValue(of(ownedPath));
 
       service.enableCollaboration('test-path', 'open').subscribe(() => done());
     });
 
-    it('should submit proposal to collaborative path', done => {
+    it('should submit proposal to collaborative path', () => new Promise<void>(done => {
       service
         .submitProposal('test-path', 'add-step', { stepIndex: 0 }, 'Need more content')
         .subscribe(proposal => {
@@ -609,7 +612,7 @@ describe('PathExtensionService', () => {
           expect(proposal.changeType).toBe('add-step');
           done();
         });
-    });
+    }));
   });
 
   // =========================================================================
@@ -617,7 +620,7 @@ describe('PathExtensionService', () => {
   // =========================================================================
 
   describe('setCurrentAgent', () => {
-    it('should change current agent', done => {
+    it('should change current agent', () => new Promise<void>(done => {
       service.setCurrentAgent('new-agent');
 
       service
@@ -629,6 +632,6 @@ describe('PathExtensionService', () => {
           expect(ext.extendedBy).toBe('new-agent');
           done();
         });
-    });
+    }));
   });
 });

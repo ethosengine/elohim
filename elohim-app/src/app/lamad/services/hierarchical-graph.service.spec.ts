@@ -6,11 +6,12 @@ import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.
 import { LearningPath, PathChapter, PathModule, PathSection } from '../models/learning-path.model';
 import { ClusterNode, ClusterGraphData } from '../models/cluster-graph.model';
 import { ContentNode } from '../models/content-node.model';
+import { vi } from 'vitest';
 
 describe('HierarchicalGraphService', () => {
   let service: HierarchicalGraphService;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
-  let affinitySpy: jasmine.SpyObj<AffinityTrackingService>;
+  let dataLoaderSpy: any;
+  let affinitySpy: any;
 
   const mockPath: LearningPath = {
     id: 'test-path',
@@ -131,17 +132,19 @@ describe('HierarchicalGraphService', () => {
   ]);
 
   beforeEach(() => {
-    dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', [
-      'getPathHierarchy',
-      'getClusterConcepts',
-      'getClusterConnections',
-    ]);
-    affinitySpy = jasmine.createSpyObj('AffinityTrackingService', ['getAffinity']);
+    dataLoaderSpy = {
+      getPathHierarchy: vi.fn(),
+      getClusterConcepts: vi.fn(),
+      getClusterConnections: vi.fn(),
+    };
+    affinitySpy = {
+      getAffinity: vi.fn(),
+    };
 
     // Default return values
-    dataLoaderSpy.getPathHierarchy.and.returnValue(of(mockPath));
-    dataLoaderSpy.getClusterConcepts.and.returnValue(of(mockContentNodes));
-    dataLoaderSpy.getClusterConnections.and.returnValue(
+    dataLoaderSpy.getPathHierarchy.mockReturnValue(of(mockPath));
+    dataLoaderSpy.getClusterConcepts.mockReturnValue(of(mockContentNodes));
+    dataLoaderSpy.getClusterConnections.mockReturnValue(
       of({
         clusterId: 'default',
         totalConnections: 0,
@@ -149,7 +152,7 @@ describe('HierarchicalGraphService', () => {
         incomingByCluster: new Map(),
       })
     );
-    affinitySpy.getAffinity.and.returnValue(0.5);
+    affinitySpy.getAffinity.mockReturnValue(0.5);
 
     TestBed.configureTestingModule({
       providers: [
@@ -171,7 +174,7 @@ describe('HierarchicalGraphService', () => {
   });
 
   describe('initializeFromPath', () => {
-    it('should initialize cluster graph from learning path', done => {
+    it('should initialize cluster graph from learning path', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         expect(graph).toBeDefined();
         expect(graph.root.id).toBe('test-path');
@@ -180,9 +183,9 @@ describe('HierarchicalGraphService', () => {
         expect(graph.clusters.size).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should create chapter clusters', done => {
+    it('should create chapter clusters', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         const chapter1 = graph.clusters.get('chapter-1');
         expect(chapter1).toBeDefined();
@@ -191,17 +194,17 @@ describe('HierarchicalGraphService', () => {
         expect(chapter1?.childClusterIds.length).toBe(2); // 2 modules
         done();
       });
-    });
+    }));
 
-    it('should calculate total concept count', done => {
+    it('should calculate total concept count', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         // 3 + 2 + 2 + 3 = 10 total concepts
         expect(graph.root.totalConceptCount).toBe(10);
         done();
       });
-    });
+    }));
 
-    it('should cache graph for same path', done => {
+    it('should cache graph for same path', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph1 => {
         service.initializeFromPath('test-path').subscribe(graph2 => {
           // Should be the same cached observable
@@ -209,11 +212,11 @@ describe('HierarchicalGraphService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should reload graph for different path', done => {
+    it('should reload graph for different path', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(() => {
-        dataLoaderSpy.getPathHierarchy.and.returnValue(
+        dataLoaderSpy.getPathHierarchy.mockReturnValue(
           of({ ...mockPath, id: 'other-path' })
         );
         service.initializeFromPath('other-path').subscribe(() => {
@@ -221,10 +224,10 @@ describe('HierarchicalGraphService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should handle path load error gracefully', done => {
-      dataLoaderSpy.getPathHierarchy.and.returnValue(
+    it('should handle path load error gracefully', () => new Promise<void>(done => {
+      dataLoaderSpy.getPathHierarchy.mockReturnValue(
         throwError(() => new Error('Load failed'))
       );
 
@@ -233,15 +236,15 @@ describe('HierarchicalGraphService', () => {
         expect(graph.clusters.size).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should build concept-to-cluster mapping', done => {
+    it('should build concept-to-cluster mapping', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(() => {
         // Mapping is private, but we can test indirectly via getClusterConnections
         expect((service as any).conceptToClusterMap.size).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
   });
 
   describe('expandCluster', () => {
@@ -249,7 +252,7 @@ describe('HierarchicalGraphService', () => {
       service.initializeFromPath('test-path').subscribe(() => done());
     });
 
-    it('should expand chapter to show modules', done => {
+    it('should expand chapter to show modules', () => new Promise<void>(done => {
       service.expandCluster('chapter-1').subscribe(result => {
         expect(result.clusterId).toBe('chapter-1');
         expect(result.children.length).toBe(2); // 2 modules
@@ -257,27 +260,27 @@ describe('HierarchicalGraphService', () => {
         expect(result.edges.length).toBe(2); // 2 containment edges
         done();
       });
-    });
+    }));
 
-    it('should expand module to show sections', done => {
+    it('should expand module to show sections', () => new Promise<void>(done => {
       service.expandCluster('module-1-1').subscribe(result => {
         expect(result.clusterId).toBe('module-1-1');
         expect(result.children.length).toBe(2); // 2 sections
         expect(result.children[0].clusterType).toBe('section');
         done();
       });
-    });
+    }));
 
-    it('should expand section to show concepts', done => {
+    it('should expand section to show concepts', () => new Promise<void>(done => {
       service.expandCluster('section-1-1-1').subscribe(result => {
         expect(result.clusterId).toBe('section-1-1-1');
         expect(result.children.length).toBe(3); // section-1-1-1 has 3 concept IDs
         expect(result.children[0].isCluster).toBe(false);
         done();
       });
-    });
+    }));
 
-    it('should cache expanded children', done => {
+    it('should cache expanded children', () => new Promise<void>(done => {
       service.expandCluster('chapter-1').subscribe(() => {
         service.expandCluster('chapter-1').subscribe(() => {
           // Should use cache, not reload
@@ -285,33 +288,33 @@ describe('HierarchicalGraphService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should mark cluster as expanded', done => {
+    it('should mark cluster as expanded', () => new Promise<void>(done => {
       expect(service.isExpanded('chapter-1')).toBe(false);
       service.expandCluster('chapter-1').subscribe(() => {
         expect(service.isExpanded('chapter-1')).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should return empty result for nonexistent cluster', done => {
+    it('should return empty result for nonexistent cluster', () => new Promise<void>(done => {
       service.expandCluster('nonexistent').subscribe(result => {
         expect(result.children.length).toBe(0);
         expect(result.edges.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should load concepts from dataLoader for sections', done => {
+    it('should load concepts from dataLoader for sections', () => new Promise<void>(done => {
       service.expandCluster('section-1-1-1').subscribe(() => {
         expect(dataLoaderSpy.getClusterConcepts).toHaveBeenCalledWith(['concept-1', 'concept-2', 'concept-3']);
         done();
       });
-    });
+    }));
 
-    it('should handle concept load error', done => {
-      dataLoaderSpy.getClusterConcepts.and.returnValue(
+    it('should handle concept load error', () => new Promise<void>(done => {
+      dataLoaderSpy.getClusterConcepts.mockReturnValue(
         throwError(() => new Error('Concept load failed'))
       );
 
@@ -319,16 +322,16 @@ describe('HierarchicalGraphService', () => {
         expect(result.children.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should create child edges for expanded cluster', done => {
+    it('should create child edges for expanded cluster', () => new Promise<void>(done => {
       service.expandCluster('chapter-1').subscribe(result => {
         expect(result.edges.length).toBe(2);
         expect(result.edges[0].type).toBe('CONTAINS');
         expect(result.edges[0].source).toBe('chapter-1');
         done();
       });
-    });
+    }));
   });
 
   describe('collapseCluster', () => {
@@ -344,7 +347,7 @@ describe('HierarchicalGraphService', () => {
       expect(service.isExpanded('chapter-1')).toBe(false);
     });
 
-    it('should collapse descendant clusters', done => {
+    it('should collapse descendant clusters', () => new Promise<void>(done => {
       service.expandCluster('module-1-1').subscribe(() => {
         expect(service.isExpanded('module-1-1')).toBe(true);
 
@@ -354,7 +357,7 @@ describe('HierarchicalGraphService', () => {
         expect(service.isExpanded('module-1-1')).toBe(false);
         done();
       });
-    });
+    }));
   });
 
   describe('getVisibleNodes', () => {
@@ -362,7 +365,7 @@ describe('HierarchicalGraphService', () => {
       service.initializeFromPath('test-path').subscribe(() => done());
     });
 
-    it('should return root and chapters by default', done => {
+    it('should return root and chapters by default', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         const visible = service.getVisibleNodes(graph);
         expect(visible.length).toBeGreaterThan(0);
@@ -370,9 +373,9 @@ describe('HierarchicalGraphService', () => {
         expect(visible.find(n => n.id === 'chapter-1')).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should include expanded cluster children', done => {
+    it('should include expanded cluster children', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         service.expandCluster('chapter-1').subscribe(() => {
           const visible = service.getVisibleNodes(graph);
@@ -381,15 +384,15 @@ describe('HierarchicalGraphService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should not include collapsed cluster children', done => {
+    it('should not include collapsed cluster children', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         const visible = service.getVisibleNodes(graph);
         expect(visible.find(n => n.id === 'module-1-1')).toBeUndefined();
         done();
       });
-    });
+    }));
   });
 
   describe('getVisibleEdges', () => {
@@ -397,7 +400,7 @@ describe('HierarchicalGraphService', () => {
       service.initializeFromPath('test-path').subscribe(() => done());
     });
 
-    it('should return edges between visible nodes', done => {
+    it('should return edges between visible nodes', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         service.expandCluster('chapter-1').subscribe(() => {
           const visible = service.getVisibleNodes(graph);
@@ -409,9 +412,9 @@ describe('HierarchicalGraphService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should create progression edges for siblings', done => {
+    it('should create progression edges for siblings', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(graph => {
         service.expandCluster('chapter-1').subscribe(() => {
           const visible = service.getVisibleNodes(graph);
@@ -426,7 +429,7 @@ describe('HierarchicalGraphService', () => {
           done();
         });
       });
-    });
+    }));
   });
 
   describe('getClusterConnections', () => {
@@ -434,7 +437,7 @@ describe('HierarchicalGraphService', () => {
       service.initializeFromPath('test-path').subscribe(() => done());
     });
 
-    it('should get connections for a cluster', done => {
+    it('should get connections for a cluster', () => new Promise<void>(done => {
       const mockConnections = {
         clusterId: 'section-1-1-1',
         totalConnections: 3,
@@ -451,7 +454,7 @@ describe('HierarchicalGraphService', () => {
         ]),
         incomingByCluster: new Map(),
       };
-      dataLoaderSpy.getClusterConnections.and.returnValue(of(mockConnections));
+      dataLoaderSpy.getClusterConnections.mockReturnValue(of(mockConnections));
 
       service.getClusterConnections('section-1-1-1').subscribe(connections => {
         expect(connections.length).toBe(1);
@@ -459,18 +462,18 @@ describe('HierarchicalGraphService', () => {
         expect(connections[0].connectionCount).toBe(3);
         done();
       });
-    });
+    }));
 
-    it('should cache cluster connections', done => {
+    it('should cache cluster connections', () => new Promise<void>(done => {
       service.getClusterConnections('section-1-1-1').subscribe(() => {
         service.getClusterConnections('section-1-1-1').subscribe(() => {
           expect(dataLoaderSpy.getClusterConnections).toHaveBeenCalledTimes(1);
           done();
         });
       });
-    });
+    }));
 
-    it('should exclude self-connections', done => {
+    it('should exclude self-connections', () => new Promise<void>(done => {
       const mockConnections = {
         clusterId: 'section-1-1-1',
         totalConnections: 2,
@@ -487,24 +490,24 @@ describe('HierarchicalGraphService', () => {
         ]),
         incomingByCluster: new Map(),
       };
-      dataLoaderSpy.getClusterConnections.and.returnValue(of(mockConnections));
+      dataLoaderSpy.getClusterConnections.mockReturnValue(of(mockConnections));
 
       service.getClusterConnections('section-1-1-1').subscribe(connections => {
         expect(connections.length).toBe(0); // Self-connection excluded
         done();
       });
-    });
+    }));
 
-    it('should return empty for nonexistent cluster', done => {
+    it('should return empty for nonexistent cluster', () => new Promise<void>(done => {
       service.getClusterConnections('nonexistent').subscribe(connections => {
         expect(connections.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('reset', () => {
-    it('should clear all state', done => {
+    it('should clear all state', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(() => {
         service.expandCluster('chapter-1').subscribe(() => {
           expect(service.isExpanded('chapter-1')).toBe(true);
@@ -517,12 +520,12 @@ describe('HierarchicalGraphService', () => {
           done();
         });
       });
-    });
+    }));
   });
 
   describe('affinity calculation', () => {
-    it('should calculate cluster affinity from children', done => {
-      affinitySpy.getAffinity.and.callFake((conceptId: string) => {
+    it('should calculate cluster affinity from children', () => new Promise<void>(done => {
+      affinitySpy.getAffinity.mockImplementation((conceptId: string) => {
         const affinities: Record<string, number> = {
           'concept-1': 0.8,
           'concept-2': 0.6,
@@ -536,42 +539,42 @@ describe('HierarchicalGraphService', () => {
         expect(section?.affinityScore).toBeCloseTo((0.8 + 0.6 + 0.4) / 3, 2);
         done();
       });
-    });
+    }));
 
-    it('should determine cluster state based on affinity', done => {
-      affinitySpy.getAffinity.and.returnValue(0.9);
+    it('should determine cluster state based on affinity', () => new Promise<void>(done => {
+      affinitySpy.getAffinity.mockReturnValue(0.9);
 
       service.initializeFromPath('test-path').subscribe(graph => {
         const section = graph.clusters.get('section-1-1-1');
         expect(section?.state).toBe('proficient');
         done();
       });
-    });
+    }));
 
-    it('should mark first chapter as recommended if unseen', done => {
-      affinitySpy.getAffinity.and.returnValue(0);
+    it('should mark first chapter as recommended if unseen', () => new Promise<void>(done => {
+      affinitySpy.getAffinity.mockReturnValue(0);
 
       service.initializeFromPath('test-path').subscribe(graph => {
         const chapter1 = graph.clusters.get('chapter-1');
         expect(chapter1?.state).toBe('recommended');
         done();
       });
-    });
+    }));
   });
 
   describe('edge cases', () => {
-    it('should handle path with no chapters', done => {
+    it('should handle path with no chapters', () => new Promise<void>(done => {
       const emptyPath = { ...mockPath, chapters: [] };
-      dataLoaderSpy.getPathHierarchy.and.returnValue(of(emptyPath));
+      dataLoaderSpy.getPathHierarchy.mockReturnValue(of(emptyPath));
 
       service.initializeFromPath('empty-path').subscribe(graph => {
         expect(graph.root.childClusterIds.length).toBe(0);
         expect(graph.root.totalConceptCount).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should handle section with no concepts', done => {
+    it('should handle section with no concepts', () => new Promise<void>(done => {
       service.initializeFromPath('test-path').subscribe(() => {
         const emptySectionPath = {
           ...mockPath,
@@ -595,7 +598,7 @@ describe('HierarchicalGraphService', () => {
             },
           ],
         };
-        dataLoaderSpy.getPathHierarchy.and.returnValue(of(emptySectionPath));
+        dataLoaderSpy.getPathHierarchy.mockReturnValue(of(emptySectionPath));
 
         service.reset();
         service.initializeFromPath('empty-section-path').subscribe(() => {
@@ -605,6 +608,6 @@ describe('HierarchicalGraphService', () => {
           });
         });
       });
-    });
+    }));
   });
 });

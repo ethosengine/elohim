@@ -7,14 +7,17 @@ import { TestBed } from '@angular/core/testing';
 import { FamilyCommunityProtectionService } from './family-community-protection.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { of, take } from 'rxjs';
+import { vi } from 'vitest';
 
 describe('FamilyCommunityProtectionService', () => {
   let service: FamilyCommunityProtectionService;
-  let mockHolochain: jasmine.SpyObj<HolochainClientService>;
+  let mockHolochain: any;
 
   beforeEach(() => {
-    mockHolochain = jasmine.createSpyObj('HolochainClientService', ['callZome']);
-    mockHolochain.callZome.and.returnValue(Promise.resolve({ success: false, data: [] }));
+    mockHolochain = {
+    callZome: vi.fn(),
+  };
+    mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: false, data: [] }));
 
     TestBed.configureTestingModule({
       providers: [
@@ -39,22 +42,22 @@ describe('FamilyCommunityProtectionService', () => {
       expect(typeof service.initializeProtectionMonitoring).toBe('function');
     });
 
-    it('should return observable', (done) => {
+    it('should return observable', () => new Promise<void>(done => {
       const result = service.initializeProtectionMonitoring('operator-1');
       expect(result).toBeDefined();
       result.pipe(take(1)).subscribe(() => {
         done();
       });
-    });
+    }));
 
-    it('should return protection status observable', (done) => {
+    it('should return protection status observable', () => new Promise<void>(done => {
       const result = service.initializeProtectionMonitoring('operator-1', 100);
       result.pipe(take(1)).subscribe((status) => {
         expect(status).toBeDefined();
         expect(status.custodians).toEqual([]);
         done();
       });
-    });
+    }));
   });
 
   describe('getProtectionStatus', () => {
@@ -75,14 +78,14 @@ describe('FamilyCommunityProtectionService', () => {
       expect(typeof service.getProtectionStatus$).toBe('function');
     });
 
-    it('should return observable', (done) => {
+    it('should return observable', () => new Promise<void>(done => {
       const result = service.getProtectionStatus$();
       expect(result).toBeDefined();
       result.subscribe((status) => {
         expect(status).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getCustodiansByType', () => {
@@ -98,27 +101,27 @@ describe('FamilyCommunityProtectionService', () => {
 
     it('should return custodians of type family', () => {
       const result = service.getCustodiansByType('family');
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
 
     it('should return custodians of type friend', () => {
       const result = service.getCustodiansByType('friend');
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
 
     it('should return custodians of type community', () => {
       const result = service.getCustodiansByType('community');
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
 
     it('should return custodians of type professional', () => {
       const result = service.getCustodiansByType('professional');
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
 
     it('should return custodians of type institution', () => {
       const result = service.getCustodiansByType('institution');
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
   });
 
@@ -135,7 +138,7 @@ describe('FamilyCommunityProtectionService', () => {
 
     it('should return array of regions', () => {
       const result = service.getHighRiskRegions();
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
   });
 
@@ -147,7 +150,7 @@ describe('FamilyCommunityProtectionService', () => {
 
     it('should return false when no status', () => {
       const result = service.isCustodianHealthy('custodian-1');
-      expect(result).toBeFalse();
+      expect(result).toBe(false);
     });
 
     it('should return boolean', () => {
@@ -186,7 +189,7 @@ describe('FamilyCommunityProtectionService', () => {
 
     it('should return array of strings', () => {
       const result = service.getProtectionAlerts();
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
   });
 });

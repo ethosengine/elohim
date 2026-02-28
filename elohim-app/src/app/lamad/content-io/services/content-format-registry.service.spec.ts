@@ -9,6 +9,7 @@ import {
   DEFAULT_EDITOR_CONFIG,
 } from '../interfaces/content-format-plugin.interface';
 import { ContentNode } from '../../models/content-node.model';
+import { vi, Mock } from 'vitest';
 
 describe('ContentFormatRegistryService', () => {
   let service: ContentFormatRegistryService;
@@ -35,13 +36,11 @@ describe('ContentFormatRegistryService', () => {
     canValidate: false,
     canRender: true,
     canEdit: false,
-    import: jasmine
-      .createSpy('import')
-      .and.returnValue(Promise.resolve({ nodes: [], warnings: [] })),
-    export: jasmine.createSpy('export').and.returnValue(Promise.resolve('exported')),
-    validate: jasmine
-      .createSpy('validate')
-      .and.returnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
+    import: vi.fn()
+      .mockReturnValue(Promise.resolve({ nodes: [], warnings: [] })),
+    export: vi.fn().mockReturnValue(Promise.resolve('exported')),
+    validate: vi.fn()
+      .mockReturnValue(Promise.resolve({ valid: true, errors: [], warnings: [] })),
     getFormatMetadata: () => ({
       formatId: overrides.formatId ?? 'test-format',
       displayName: overrides.displayName ?? 'Test Format',
@@ -55,12 +54,11 @@ describe('ContentFormatRegistryService', () => {
       category: 'document',
       supportsRoundTrip: true,
     }),
-    getRendererComponent: jasmine
-      .createSpy('getRendererComponent')
-      .and.returnValue(MockRendererComponent),
+    getRendererComponent: vi.fn()
+      .mockReturnValue(MockRendererComponent),
     getRendererPriority: () => 0,
-    getEditorComponent: jasmine.createSpy('getEditorComponent').and.returnValue(null),
-    getEditorConfig: jasmine.createSpy('getEditorConfig').and.returnValue(DEFAULT_EDITOR_CONFIG),
+    getEditorComponent: vi.fn().mockReturnValue(null),
+    getEditorConfig: vi.fn().mockReturnValue(DEFAULT_EDITOR_CONFIG),
     ...overrides,
   });
 
@@ -378,18 +376,18 @@ describe('ContentFormatRegistryService', () => {
       const plugin = createMockPlugin({ canRender: true });
       service.register(plugin);
 
-      expect(service.canRender('test-format')).toBeTrue();
+      expect(service.canRender('test-format')).toBe(true);
     });
 
     it('should return false for non-renderable format', () => {
       const plugin = createMockPlugin({ canRender: false });
       service.register(plugin);
 
-      expect(service.canRender('test-format')).toBeFalse();
+      expect(service.canRender('test-format')).toBe(false);
     });
 
     it('should return false for unknown format', () => {
-      expect(service.canRender('unknown')).toBeFalse();
+      expect(service.canRender('unknown')).toBe(false);
     });
   });
 
@@ -415,7 +413,7 @@ describe('ContentFormatRegistryService', () => {
       });
       service.register(plugin);
 
-      expect(service.hasSpecializedEditor('test-format')).toBeTrue();
+      expect(service.hasSpecializedEditor('test-format')).toBe(true);
     });
 
     it('should return false when plugin uses default editor', () => {
@@ -425,7 +423,7 @@ describe('ContentFormatRegistryService', () => {
       });
       service.register(plugin);
 
-      expect(service.hasSpecializedEditor('test-format')).toBeFalse();
+      expect(service.hasSpecializedEditor('test-format')).toBe(false);
     });
   });
 
@@ -456,7 +454,7 @@ describe('ContentFormatRegistryService', () => {
       expect(stats.editableFormats).toBe(1);
       expect(stats.importableFormats).toBe(2);
       expect(stats.exportableFormats).toBe(1);
-      expect(stats.hasDefaultEditor).toBeTrue();
+      expect(stats.hasDefaultEditor).toBe(true);
     });
   });
 });

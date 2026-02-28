@@ -1,16 +1,18 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ContentMasteryService } from './content-mastery.service';
 import { LocalSourceChainService } from '@app/elohim/services/local-source-chain.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { MasteryLevel, FRESHNESS_THRESHOLDS } from '../models';
 import { SessionHuman } from '@app/imagodei/models/session-human.model';
 import { BehaviorSubject } from 'rxjs';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('ContentMasteryService', () => {
   let service: ContentMasteryService;
   let sourceChainService: LocalSourceChainService;
-  let sessionHumanService: jasmine.SpyObj<SessionHumanService>;
+  let sessionHumanService: any;
   let localStorageMock: { [key: string]: string };
   let mockStorage: Storage;
   let sessionSubject: BehaviorSubject<SessionHuman | null>;
@@ -57,29 +59,20 @@ describe('ContentMasteryService', () => {
         localStorageMock = {};
       },
     };
-    spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(mockStorage);
 
     // Create session subject for mock
     sessionSubject = new BehaviorSubject<SessionHuman | null>(createMockSession());
 
     // Create mock SessionHumanService
-    sessionHumanService = jasmine.createSpyObj(
-      'SessionHumanService',
-      ['getSession', 'getSessionId', 'recordContentView'],
-      {
-        session$: sessionSubject.asObservable(),
-      }
-    );
-    sessionHumanService.getSession.and.returnValue(createMockSession());
-    sessionHumanService.getSessionId.and.returnValue(TEST_SESSION_ID);
+    sessionHumanService = { getSession: vi.fn(), getSessionId: vi.fn(), recordContentView: vi.fn(), session$: sessionSubject.asObservable(), };
+    sessionHumanService.getSession.mockReturnValue(createMockSession());
+    sessionHumanService.getSessionId.mockReturnValue(TEST_SESSION_ID);
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [
-        ContentMasteryService,
+      providers: [provideHttpClient(), provideHttpClientTesting(), ContentMasteryService,
         LocalSourceChainService,
-        { provide: SessionHumanService, useValue: sessionHumanService },
-      ],
+        { provide: SessionHumanService, useValue: sessionHumanService },],
     });
 
     sourceChainService = TestBed.inject(LocalSourceChainService);
@@ -170,7 +163,7 @@ describe('ContentMasteryService', () => {
       expect(service.getMasteryLevelSync(TEST_CONTENT_ID)).toBe('apply');
     });
 
-    it('should track level history', done => {
+    it('should track level history', () => new Promise<void>(done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'seen');
       service.setMasteryLevel(TEST_CONTENT_ID, 'understand');
       service.setMasteryLevel(TEST_CONTENT_ID, 'apply');
@@ -184,7 +177,7 @@ describe('ContentMasteryService', () => {
         expect(mastery?.levelHistory[1].toLevel).toBe('apply');
         done();
       });
-    });
+    }));
 
     it('should record activity with session human service', () => {
       service.recordView(TEST_CONTENT_ID);
@@ -200,93 +193,93 @@ describe('ContentMasteryService', () => {
       service.setMasteryLevel('content-4', 'analyze');
     });
 
-    it('should get mastery for content', done => {
+    it('should get mastery for content', () => new Promise<void>(done => {
       service.getMastery('content-2').subscribe(mastery => {
         expect(mastery).toBeTruthy();
         expect(mastery?.level).toBe('understand');
         done();
       });
-    });
+    }));
 
-    it('should return null for unknown content', done => {
+    it('should return null for unknown content', () => new Promise<void>(done => {
       service.getMastery('unknown-content').subscribe(mastery => {
         expect(mastery).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should get mastery level', done => {
+    it('should get mastery level', () => new Promise<void>(done => {
       service.getMasteryLevel('content-3').subscribe(level => {
         expect(level).toBe('apply');
         done();
       });
-    });
+    }));
 
-    it('should return not_started for unknown content level', done => {
+    it('should return not_started for unknown content level', () => new Promise<void>(done => {
       service.getMasteryLevel('unknown-content').subscribe(level => {
         expect(level).toBe('not_started');
         done();
       });
-    });
+    }));
 
-    it('should get all mastery records', done => {
+    it('should get all mastery records', () => new Promise<void>(done => {
       service.getAllMastery().subscribe(all => {
         expect(all.length).toBe(4);
         done();
       });
-    });
+    }));
   });
 
   describe('Privileges', () => {
-    it('should have view and practice privileges without mastery', done => {
+    it('should have view and practice privileges without mastery', () => new Promise<void>(done => {
       service.hasPrivilege('new-content', 'view').subscribe(has => {
         expect(has).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should have practice privilege without mastery', done => {
+    it('should have practice privilege without mastery', () => new Promise<void>(done => {
       service.hasPrivilege('new-content', 'practice').subscribe(has => {
         expect(has).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should not have comment privilege at seen level', done => {
+    it('should not have comment privilege at seen level', () => new Promise<void>(done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'seen');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'comment').subscribe(has => {
         expect(has).toBe(false);
         done();
       });
-    });
+    }));
 
-    it('should have comment privilege at analyze level', done => {
+    it('should have comment privilege at analyze level', () => new Promise<void>(done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'analyze');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'comment').subscribe(has => {
         expect(has).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should have peer_review privilege at evaluate level', done => {
+    it('should have peer_review privilege at evaluate level', () => new Promise<void>(done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'evaluate');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'peer_review').subscribe(has => {
         expect(has).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should have govern privilege at create level', done => {
+    it('should have govern privilege at create level', () => new Promise<void>(done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'create');
 
       service.hasPrivilege(TEST_CONTENT_ID, 'govern').subscribe(has => {
         expect(has).toBe(true);
         done();
       });
-    });
+    }));
 
     it('should check privilege synchronously', () => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'analyze');
@@ -295,7 +288,7 @@ describe('ContentMasteryService', () => {
       expect(service.hasPrivilegeSync(TEST_CONTENT_ID, 'peer_review')).toBe(false);
     });
 
-    it('should get all privileges for content', done => {
+    it('should get all privileges for content', () => new Promise<void>(done => {
       service.setMasteryLevel(TEST_CONTENT_ID, 'apply');
 
       service.getPrivileges(TEST_CONTENT_ID).subscribe(privileges => {
@@ -306,7 +299,7 @@ describe('ContentMasteryService', () => {
         expect(commentPriv?.active).toBe(false);
         done();
       });
-    });
+    }));
   });
 
   describe('Attestation Gate', () => {
@@ -372,7 +365,7 @@ describe('ContentMasteryService', () => {
       expect(freshness).toBeGreaterThan(0);
     });
 
-    it('should identify content needing refresh', done => {
+    it('should identify content needing refresh', () => new Promise<void>(done => {
       service.setMasteryLevel('content-1', 'seen');
       service.setMasteryLevel('content-2', 'understand');
 
@@ -381,7 +374,7 @@ describe('ContentMasteryService', () => {
         expect(needing.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('Statistics', () => {
@@ -393,14 +386,14 @@ describe('ContentMasteryService', () => {
       service.setMasteryLevel('content-5', 'analyze');
     });
 
-    it('should compute total mastered nodes', done => {
+    it('should compute total mastered nodes', () => new Promise<void>(done => {
       service.getMasteryStats().subscribe(stats => {
         expect(stats.totalMasteredNodes).toBe(5);
         done();
       });
-    });
+    }));
 
-    it('should compute level distribution', done => {
+    it('should compute level distribution', () => new Promise<void>(done => {
       service.getMasteryStats().subscribe(stats => {
         expect(stats.levelDistribution.seen).toBe(1);
         expect(stats.levelDistribution.remember).toBe(1);
@@ -409,21 +402,21 @@ describe('ContentMasteryService', () => {
         expect(stats.levelDistribution.analyze).toBe(1);
         done();
       });
-    });
+    }));
 
-    it('should compute nodes above gate', done => {
+    it('should compute nodes above gate', () => new Promise<void>(done => {
       service.getMasteryStats().subscribe(stats => {
         expect(stats.nodesAboveGate).toBe(2); // apply and analyze
         done();
       });
-    });
+    }));
 
-    it('should compute fresh percentage', done => {
+    it('should compute fresh percentage', () => new Promise<void>(done => {
       service.getMasteryStats().subscribe(stats => {
         expect(stats.freshPercentage).toBe(100); // All fresh
         done();
       });
-    });
+    }));
   });
 
   describe('Source Chain Integration', () => {

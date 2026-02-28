@@ -3,17 +3,20 @@ import { TestBed } from '@angular/core/testing';
 import { CustodianMetricsReporterService } from './custodian-metrics-reporter.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
 import { ShefaService } from './shefa.service';
+import { vi, Mock } from 'vitest';
 
 describe('CustodianMetricsReporterService', () => {
   let service: CustodianMetricsReporterService;
-  let metricsMock: jasmine.SpyObj<PerformanceMetricsService>;
-  let shefaMock: jasmine.SpyObj<ShefaService>;
+  let metricsMock: any;
+  let shefaMock: any;
 
   beforeEach(() => {
-    const metricsSpy = jasmine.createSpyObj('PerformanceMetricsService', [
-      'getMetricsForReport',
-    ]);
-    const shefaSpy = jasmine.createSpyObj('ShefaService', ['reportMetrics']);
+    const metricsSpy = {
+    getMetricsForReport: vi.fn(),
+  };
+    const shefaSpy = {
+    reportMetrics: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [
@@ -24,8 +27,8 @@ describe('CustodianMetricsReporterService', () => {
     });
 
     service = TestBed.inject(CustodianMetricsReporterService);
-    metricsMock = TestBed.inject(PerformanceMetricsService) as jasmine.SpyObj<PerformanceMetricsService>;
-    shefaMock = TestBed.inject(ShefaService) as jasmine.SpyObj<ShefaService>;
+    metricsMock = TestBed.inject(PerformanceMetricsService) as { [K in keyof PerformanceMetricsService]?: Mock };
+    shefaMock = TestBed.inject(ShefaService) as { [K in keyof ShefaService]?: Mock };
   });
 
   it('should be created', () => {

@@ -4,17 +4,18 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { RelatedConceptsPanelComponent } from './related-concepts-panel.component';
 import { RelatedConceptsService } from '../../services/related-concepts.service';
 import { of } from 'rxjs';
+import { vi } from 'vitest';
 
 describe('RelatedConceptsPanelComponent', () => {
   let component: RelatedConceptsPanelComponent;
   let fixture: ComponentFixture<RelatedConceptsPanelComponent>;
-  let mockRelatedConceptsService: jasmine.SpyObj<RelatedConceptsService>;
+  let mockRelatedConceptsService: any;
 
   beforeEach(async () => {
-    mockRelatedConceptsService = jasmine.createSpyObj('RelatedConceptsService', [
-      'getRelatedConcepts',
-    ]);
-    mockRelatedConceptsService.getRelatedConcepts.and.returnValue(
+    mockRelatedConceptsService = {
+    getRelatedConcepts: vi.fn(),
+  };
+    mockRelatedConceptsService.getRelatedConcepts.mockReturnValue(
       of({
         prerequisites: [],
         extensions: [],

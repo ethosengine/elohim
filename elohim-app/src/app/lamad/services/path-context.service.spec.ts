@@ -44,7 +44,7 @@ describe('PathContextService', () => {
   });
 
   describe('enterPath', () => {
-    it('should set active path context', done => {
+    it('should set active path context', () => new Promise<void>(done => {
       service.context$.subscribe(context => {
         if (context) {
           expect(context.pathId).toBe('test-path');
@@ -55,7 +55,7 @@ describe('PathContextService', () => {
       });
 
       service.enterPath(getMockPathContext());
-    });
+    }));
 
     it('should initialize detour stack', () => {
       const contextWithoutStack = { ...getMockPathContext() };
@@ -103,7 +103,7 @@ describe('PathContextService', () => {
 
     it('should return active context', () => {
       service.enterPath(getMockPathContext());
-      expect(service.currentContext).toEqual(jasmine.objectContaining(getMockPathContext()));
+      expect(service.currentContext).toEqual(expect.objectContaining(getMockPathContext()));
     });
   });
 
@@ -394,7 +394,7 @@ describe('PathContextService', () => {
   });
 
   describe('context$ observable', () => {
-    it('should emit when context changes', done => {
+    it('should emit when context changes', () => new Promise<void>(done => {
       let emitCount = 0;
       service.context$.subscribe(() => {
         emitCount++;
@@ -405,9 +405,9 @@ describe('PathContextService', () => {
       });
 
       service.enterPath(getMockPathContext());
-    });
+    }));
 
-    it('should emit when detour starts', done => {
+    it('should emit when detour starts', () => new Promise<void>(done => {
       let emitCount = 0;
       service.context$.subscribe(context => {
         emitCount++;
@@ -420,9 +420,9 @@ describe('PathContextService', () => {
 
       service.enterPath(getMockPathContext());
       service.startDetour(getMockDetour());
-    });
+    }));
 
-    it('should emit when position updates', done => {
+    it('should emit when position updates', () => new Promise<void>(done => {
       let emitCount = 0;
       service.context$.subscribe(context => {
         emitCount++;
@@ -435,7 +435,7 @@ describe('PathContextService', () => {
 
       service.enterPath(getMockPathContext());
       service.updatePosition(7);
-    });
+    }));
   });
 
   describe('edge cases', () => {

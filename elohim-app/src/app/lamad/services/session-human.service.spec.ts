@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import {
@@ -35,7 +36,7 @@ describe('SessionHumanService', () => {
     };
 
     // Replace global localStorage with our mock
-    spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(mockStorage);
 
     TestBed.configureTestingModule({});
     service = TestBed.inject(SessionHumanService);

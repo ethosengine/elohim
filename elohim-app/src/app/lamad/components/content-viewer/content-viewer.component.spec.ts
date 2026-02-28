@@ -14,20 +14,21 @@ import { PathContextService } from '../../services/path-context.service';
 import { SeoService } from '../../../services/seo.service';
 import { RendererRegistryService } from '../../renderers/renderer-registry.service';
 import { ContentNode } from '../../models/content-node.model';
+import { vi, Mock } from 'vitest';
 
 describe('ContentViewerComponent', () => {
   let component: ContentViewerComponent;
   let fixture: ComponentFixture<ContentViewerComponent>;
-  let affinityServiceSpy: jasmine.SpyObj<AffinityTrackingService>;
-  let agentServiceSpy: jasmine.SpyObj<AgentService>;
-  let contentServiceSpy: jasmine.SpyObj<ContentService>;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
-  let trustBadgeServiceSpy: jasmine.SpyObj<TrustBadgeService>;
-  let governanceServiceSpy: jasmine.SpyObj<GovernanceService>;
-  let editorServiceSpy: jasmine.SpyObj<ContentEditorService>;
-  let pathContextServiceSpy: jasmine.SpyObj<PathContextService>;
-  let rendererRegistrySpy: jasmine.SpyObj<RendererRegistryService>;
-  let routerSpy: jasmine.SpyObj<Router>;
+  let affinityServiceSpy: any;
+  let agentServiceSpy: any;
+  let contentServiceSpy: any;
+  let dataLoaderSpy: any;
+  let trustBadgeServiceSpy: any;
+  let governanceServiceSpy: any;
+  let editorServiceSpy: any;
+  let pathContextServiceSpy: any;
+  let rendererRegistrySpy: any;
+  let routerSpy: any;
   let affinityChangesSubject: Subject<any>;
   let pathContextSubject: Subject<any>;
 
@@ -59,96 +60,35 @@ describe('ContentViewerComponent', () => {
     affinityChangesSubject = new Subject();
     pathContextSubject = new Subject();
 
-    const affinitySpyObj = jasmine.createSpyObj(
-      'AffinityTrackingService',
-      ['getAffinity', 'trackView', 'incrementAffinity', 'setAffinity'],
-      { changes$: affinityChangesSubject.asObservable() }
+    const affinitySpyObj = {
+    getAffinity: vi.fn(),
+    trackView: vi.fn(),
+    incrementAffinity: vi.fn(),
+    setAffinity']: vi.fn(),
+    { changes$: affinityChangesSubject.asObservable() }
     );
 
-    const agentSpyObj = jasmine.createSpyObj('AgentService', ['markContentSeen']);
-    const contentSpyObj = jasmine.createSpyObj('ContentService', ['getContainingPathsSummary']);
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
-      'getContent',
-      'getGovernanceState',
-    ]);
-    const trustBadgeSpyObj = jasmine.createSpyObj('TrustBadgeService', ['getBadge']);
-    const governanceSpyObj = jasmine.createSpyObj('GovernanceService', [
-      'getGovernanceState',
-      'getChallengesForEntity',
-      'getDiscussionsForEntity',
-    ]);
-    const editorSpyObj = jasmine.createSpyObj('ContentEditorService', ['canEdit']);
-    const pathContextSpyObj = jasmine.createSpyObj(
-      'PathContextService',
-      ['startDetour', 'returnToPath'],
-      { context$: pathContextSubject.asObservable() }
-    );
-    const rendererRegistrySpyObj = jasmine.createSpyObj('RendererRegistryService', ['getRenderer']);
-    const routerSpyObj = jasmine.createSpyObj('Router', ['navigate']);
-    const seoServiceSpyObj = jasmine.createSpyObj('SeoService', [
-      'updateForContent',
-      'updateSeo',
-      'setTitle',
-    ]);
+    const agentSpyObj = { markContentSeen: vi.fn(): vi.fn(), };
+    const contentSpyObj = {
+    getContainingPathsSummary: vi.fn(): vi.fn(), };
+    const dataLoaderSpyObj = {
+    getContent: vi.fn(): vi.fn(), getGovernanceState: vi.fn(): vi.fn(), };
+    const trustBadgeSpyObj = {
+    getBadge: vi.fn(): vi.fn(), };
+    const governanceSpyObj = {
+    getGovernanceState: vi.fn(): vi.fn(), getChallengesForEntity: vi.fn(): vi.fn(), getDiscussionsForEntity: vi.fn(): vi.fn(), };
+    const editorSpyObj = {
+    canEdit: vi.fn(): vi.fn(), };
+    const pathContextSpyObj = {
+    startDetour: vi.fn(): vi.fn(), returnToPath: vi.fn() };
+    const rendererRegistrySpyObj = { getRenderer: vi.fn(): vi.fn(), };
+    const routerSpyObj = {
+    navigate: vi.fn(): vi.fn(), };
+    const seoServiceSpyObj = {
+    updateForContent: vi.fn(): vi.fn(), updateSeo: vi.fn(): vi.fn(), setTitle: vi.fn(): vi.fn(), };
 
     await TestBed.configureTestingModule({
-      imports: [ContentViewerComponent],
-      providers: [
-        provideHttpClient(),
-        provideRouter([]), // Provide empty routes for RouterLink support
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            params: of({ resourceId: 'test-content-1' }),
-          },
-        },
-        { provide: AffinityTrackingService, useValue: affinitySpyObj },
-        { provide: AgentService, useValue: agentSpyObj },
-        { provide: ContentService, useValue: contentSpyObj },
-        { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: TrustBadgeService, useValue: trustBadgeSpyObj },
-        { provide: GovernanceService, useValue: governanceSpyObj },
-        { provide: ContentEditorService, useValue: editorSpyObj },
-        { provide: PathContextService, useValue: pathContextSpyObj },
-        { provide: RendererRegistryService, useValue: rendererRegistrySpyObj },
-        { provide: SeoService, useValue: seoServiceSpyObj },
-      ],
-    }).compileComponents();
-
-    affinityServiceSpy = TestBed.inject(
-      AffinityTrackingService
-    ) as jasmine.SpyObj<AffinityTrackingService>;
-    agentServiceSpy = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
-    contentServiceSpy = TestBed.inject(ContentService) as jasmine.SpyObj<ContentService>;
-    dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    trustBadgeServiceSpy = TestBed.inject(TrustBadgeService) as jasmine.SpyObj<TrustBadgeService>;
-    governanceServiceSpy = TestBed.inject(GovernanceService) as jasmine.SpyObj<GovernanceService>;
-    editorServiceSpy = TestBed.inject(ContentEditorService) as jasmine.SpyObj<ContentEditorService>;
-    pathContextServiceSpy = TestBed.inject(
-      PathContextService
-    ) as jasmine.SpyObj<PathContextService>;
-    rendererRegistrySpy = TestBed.inject(
-      RendererRegistryService
-    ) as jasmine.SpyObj<RendererRegistryService>;
-    routerSpy = TestBed.inject(Router) as any; // Use real router from provideRouter
-    spyOn(routerSpy, 'navigate');
-
-    // Default spy returns
-    affinityServiceSpy.getAffinity.and.returnValue(0.5);
-    agentServiceSpy.markContentSeen.and.returnValue(of(undefined));
-    dataLoaderSpy.getContent.and.returnValue(of(mockContentNode));
-    dataLoaderSpy.getGovernanceState.and.returnValue(of(null));
-    contentServiceSpy.getContainingPathsSummary.and.returnValue(of([]));
-    trustBadgeServiceSpy.getBadge.and.returnValue(of(null as any));
-    governanceServiceSpy.getGovernanceState.and.returnValue(of(null));
-    governanceServiceSpy.getChallengesForEntity.and.returnValue(of([]));
-    governanceServiceSpy.getDiscussionsForEntity.and.returnValue(of([]));
-    editorServiceSpy.canEdit.and.returnValue(false);
-    rendererRegistrySpy.getRenderer.and.returnValue(null);
-
-    fixture = TestBed.createComponent(ContentViewerComponent);
-    component = fixture.componentInstance;
-  });
+      imports: [ContentViewerComponent: vi.fn() };
 
   it('should create', () => {
     expect(component).toBeTruthy();
@@ -161,7 +101,7 @@ describe('ContentViewerComponent', () => {
 
       expect(dataLoaderSpy.getContent).toHaveBeenCalledWith('test-content-1');
       expect(component.node).toEqual(mockContentNode);
-      expect(component.isLoading).toBeFalse();
+      expect(component.isLoading).toBe(false);
     }));
 
     it('should track view on content load', fakeAsync(() => {
@@ -172,7 +112,7 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('should load related nodes', fakeAsync(() => {
-      dataLoaderSpy.getContent.and.callFake((id: string) => {
+      dataLoaderSpy.getContent.mockImplementation((id: string) => {
         if (id === 'test-content-1') return of(mockContentNode);
         if (id === 'related-1') return of(mockRelatedNode);
         return of(null as any);
@@ -185,17 +125,17 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('should handle content load error', fakeAsync(() => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Load failed')));
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Load failed')));
 
       fixture.detectChanges();
       tick();
 
       expect(component.error).toBe('Failed to load content');
-      expect(component.isLoading).toBeFalse();
+      expect(component.isLoading).toBe(false);
     }));
 
     it('should handle content not found', fakeAsync(() => {
-      dataLoaderSpy.getContent.and.returnValue(of(null as any));
+      dataLoaderSpy.getContent.mockReturnValue(of(null as any));
 
       fixture.detectChanges();
       tick();
@@ -374,7 +314,7 @@ describe('ContentViewerComponent', () => {
 
   describe('related node affinity', () => {
     it('should get affinity for related node', () => {
-      affinityServiceSpy.getAffinity.and.returnValue(0.65);
+      affinityServiceSpy.getAffinity.mockReturnValue(0.65);
       expect(component.getRelatedNodeAffinity('some-node')).toBe(65);
     });
   });
@@ -434,13 +374,13 @@ describe('ContentViewerComponent', () => {
   describe('containing paths', () => {
     it('should load containing paths', fakeAsync(() => {
       const mockPaths = [{ pathId: 'path-1', pathTitle: 'Path 1', stepIndex: 0 }];
-      contentServiceSpy.getContainingPathsSummary.and.returnValue(of(mockPaths));
+      contentServiceSpy.getContainingPathsSummary.mockReturnValue(of(mockPaths));
 
       fixture.detectChanges();
       tick();
 
       expect(component.containingPaths).toEqual(mockPaths);
-      expect(component.loadingPaths).toBeFalse();
+      expect(component.loadingPaths).toBe(false);
     }));
   });
 
@@ -452,7 +392,7 @@ describe('ContentViewerComponent', () => {
       component.ngOnDestroy();
 
       // Should not throw errors
-      expect(true).toBeTrue();
+      expect(true).toBe(true);
     }));
   });
 
@@ -581,7 +521,7 @@ describe('ContentViewerComponent', () => {
         returnRoute: ['/lamad/path', 'test-path', 'step', '2'],
         detourStack: [],
       };
-      pathContextServiceSpy.returnToPath.and.returnValue(['/lamad/path', 'test-path', 'step', '2']);
+      pathContextServiceSpy.returnToPath.mockReturnValue(['/lamad/path', 'test-path', 'step', '2']);
 
       component.returnToPath();
 
@@ -591,7 +531,7 @@ describe('ContentViewerComponent', () => {
 
     it('should not navigate if no return path', () => {
       component.pathContext = null;
-      pathContextServiceSpy.returnToPath.and.returnValue(null);
+      pathContextServiceSpy.returnToPath.mockReturnValue(null);
 
       component.returnToPath();
 
@@ -612,7 +552,7 @@ describe('ContentViewerComponent', () => {
       component.onGraphNodeSelected('related-node');
 
       expect(pathContextServiceSpy.startDetour).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fromContentId: 'current-node',
           toContentId: 'related-node',
           detourType: 'related',
@@ -635,7 +575,7 @@ describe('ContentViewerComponent', () => {
       component.exploreInGraph();
 
       expect(pathContextServiceSpy.startDetour).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fromContentId: 'current-node',
           toContentId: 'current-node',
           detourType: 'graph-explore',
@@ -643,8 +583,8 @@ describe('ContentViewerComponent', () => {
       );
       expect(routerSpy.navigate).toHaveBeenCalledWith(
         ['/lamad/explore'],
-        jasmine.objectContaining({
-          queryParams: jasmine.objectContaining({
+        expect.objectContaining({
+          queryParams: expect.objectContaining({
             focus: 'current-node',
             fromPath: 'test-path',
             returnStep: 2,
@@ -704,7 +644,7 @@ describe('ContentViewerComponent', () => {
 
     it('should not exit if not in focused view', () => {
       component.isFocusedView = false;
-      spyOn(component, 'onFocusedViewToggle');
+      vi.spyOn(component, 'onFocusedViewToggle');
 
       component.onEscapeKey();
 
@@ -731,7 +671,7 @@ describe('ContentViewerComponent', () => {
 
       expect(affinityServiceSpy.incrementAffinity).toHaveBeenCalledWith(
         'test-content-1',
-        jasmine.any(Number)
+        expect.any(Number)
       );
     });
 
@@ -765,7 +705,7 @@ describe('ContentViewerComponent', () => {
 
   describe('loading states and errors', () => {
     it('should handle related nodes load error', fakeAsync(() => {
-      dataLoaderSpy.getContent.and.callFake((id: string) => {
+      dataLoaderSpy.getContent.mockImplementation((id: string) => {
         if (id === 'test-content-1') return of(mockContentNode);
         return throwError(() => new Error('Failed'));
       });
@@ -777,7 +717,7 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('should handle containing paths load error', fakeAsync(() => {
-      contentServiceSpy.getContainingPathsSummary.and.returnValue(
+      contentServiceSpy.getContainingPathsSummary.mockReturnValue(
         throwError(() => new Error('Failed'))
       );
 
@@ -789,7 +729,7 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('should handle trust badge load error', fakeAsync(() => {
-      trustBadgeServiceSpy.getBadge.and.returnValue(throwError(() => new Error('Failed')));
+      trustBadgeServiceSpy.getBadge.mockReturnValue(throwError(() => new Error('Failed')));
 
       fixture.detectChanges();
       tick();
@@ -799,10 +739,10 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('should handle governance data load errors gracefully', fakeAsync(() => {
-      governanceServiceSpy.getGovernanceState.and.returnValue(
+      governanceServiceSpy.getGovernanceState.mockReturnValue(
         throwError(() => new Error('Failed'))
       );
-      governanceServiceSpy.getChallengesForEntity.and.returnValue(
+      governanceServiceSpy.getChallengesForEntity.mockReturnValue(
         throwError(() => new Error('Failed'))
       );
 
@@ -816,7 +756,7 @@ describe('ContentViewerComponent', () => {
   describe('empty related nodes', () => {
     it('should handle content with no related nodes', fakeAsync(() => {
       const nodeWithoutRelated = { ...mockContentNode, relatedNodeIds: [] };
-      dataLoaderSpy.getContent.and.returnValue(of(nodeWithoutRelated));
+      dataLoaderSpy.getContent.mockReturnValue(of(nodeWithoutRelated));
 
       fixture.detectChanges();
       tick();
@@ -826,7 +766,7 @@ describe('ContentViewerComponent', () => {
 
     it('should handle content with null related node IDs', fakeAsync(() => {
       const nodeWithNullRelated = { ...mockContentNode, relatedNodeIds: null as any };
-      dataLoaderSpy.getContent.and.returnValue(of(nodeWithNullRelated));
+      dataLoaderSpy.getContent.mockReturnValue(of(nodeWithNullRelated));
 
       fixture.detectChanges();
       tick();
@@ -839,7 +779,7 @@ describe('ContentViewerComponent', () => {
         ...mockContentNode,
         relatedNodeIds: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7'],
       };
-      dataLoaderSpy.getContent.and.callFake((id: string) => {
+      dataLoaderSpy.getContent.mockImplementation((id: string) => {
         if (id === 'test-content-1') return of(nodeWithManyRelated);
         return of(mockRelatedNode);
       });
@@ -854,7 +794,7 @@ describe('ContentViewerComponent', () => {
 
   describe('content editor capability', () => {
     it('should check edit capability on content load', fakeAsync(() => {
-      editorServiceSpy.canEdit.and.returnValue(true);
+      editorServiceSpy.canEdit.mockReturnValue(true);
 
       fixture.detectChanges();
       tick();
@@ -864,7 +804,7 @@ describe('ContentViewerComponent', () => {
     }));
 
     it('should set canEdit to false when user cannot edit', fakeAsync(() => {
-      editorServiceSpy.canEdit.and.returnValue(false);
+      editorServiceSpy.canEdit.mockReturnValue(false);
 
       fixture.detectChanges();
       tick();

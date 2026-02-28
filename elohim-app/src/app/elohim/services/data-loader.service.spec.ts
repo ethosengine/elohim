@@ -1,5 +1,5 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 
 import { ContentNode } from '../../lamad/models/content-node.model';
@@ -12,89 +12,91 @@ import { ProjectionAPIService } from './projection-api.service';
 import { ContentResolverService } from './content-resolver.service';
 import { ContentService } from './content.service';
 import { LoggerService } from './logger.service';
+import { vi, Mock } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('DataLoaderService', () => {
   let service: DataLoaderService;
-  let holochainMock: jasmine.SpyObj<HolochainContentService>;
-  let idbMock: jasmine.SpyObj<IndexedDBCacheService>;
-  let projectionApiMock: jasmine.SpyObj<ProjectionAPIService>;
-  let contentResolverMock: jasmine.SpyObj<ContentResolverService>;
-  let contentServiceMock: jasmine.SpyObj<ContentService>;
-  let loggerMock: jasmine.SpyObj<LoggerService>;
+  let holochainMock: any;
+  let idbMock: any;
+  let projectionApiMock: any;
+  let contentResolverMock: any;
+  let contentServiceMock: any;
+  let loggerMock: any;
 
   beforeEach(() => {
-    const holochainSpy = jasmine.createSpyObj('HolochainContentService', [
-      'isAvailable',
-      'clearCache',
-      'prefetchRelatedContent',
-    ]);
-    const idbSpy = jasmine.createSpyObj('IndexedDBCacheService', [
-      'init',
-      'getStats',
-      'setPath',
-      'setContent',
-      'setContentBatch',
-      'clearAll',
-      'getContent',
-      'getPath',
-      'getContentBatch',
-      'getMetadata',
-      'setMetadata',
-    ]);
-    const projectionApiSpy = jasmine.createSpyObj(
-      'ProjectionAPIService',
-      ['getPathOverview'],
-      { enabled: false }
-    );
-    const contentResolverSpy = jasmine.createSpyObj('ContentResolverService', [
-      'initialize',
-      'registerStandardSource',
-      'setSourceAvailable',
-    ]);
-    const contentServiceSpy = jasmine.createSpyObj('ContentService', [
-      'getPath',
-      'getContent',
-      'batchGetContent',
-      'queryContent',
-      'queryPaths',
-    ]);
-    const loggerSpy = jasmine.createSpyObj('LoggerService', ['createChild']);
+    const holochainSpy = {
+      isAvailable: vi.fn(),
+      clearCache: vi.fn(),
+      prefetchRelatedContent: vi.fn(),
+    };
+    const idbSpy = {
+      init: vi.fn(),
+      getStats: vi.fn(),
+      setPath: vi.fn(),
+      setContent: vi.fn(),
+      setContentBatch: vi.fn(),
+      clearAll: vi.fn(),
+      getContent: vi.fn(),
+      getPath: vi.fn(),
+      getContentBatch: vi.fn(),
+      getMetadata: vi.fn(),
+      setMetadata: vi.fn(),
+    };
+    const projectionApiSpy = {
+      getPathOverview: vi.fn(),
+      enabled: false,
+    };
+    const contentResolverSpy = {
+      initialize: vi.fn(),
+      registerStandardSource: vi.fn(),
+      setSourceAvailable: vi.fn(),
+    };
+    const contentServiceSpy = {
+      getPath: vi.fn(),
+      getContent: vi.fn(),
+      batchGetContent: vi.fn(),
+      queryContent: vi.fn(),
+      queryPaths: vi.fn(),
+    };
+    const loggerSpy = {
+      createChild: vi.fn(),
+    };
 
     // Setup default return values
-    holochainSpy.isAvailable.and.returnValue(false);
-    idbSpy.init.and.returnValue(Promise.resolve(false));
-    idbSpy.getStats.and.returnValue(
+    holochainSpy.isAvailable.mockReturnValue(false);
+    idbSpy.init.mockReturnValue(Promise.resolve(false));
+    idbSpy.getStats.mockReturnValue(
       Promise.resolve({ contentCount: 0, pathCount: 0, isAvailable: false })
     );
-    idbSpy.setPath.and.returnValue(Promise.resolve());
-    idbSpy.setContent.and.returnValue(Promise.resolve());
-    idbSpy.setContentBatch.and.returnValue(Promise.resolve());
-    idbSpy.clearAll.and.returnValue(Promise.resolve());
-    idbSpy.getContent.and.returnValue(Promise.resolve(null));
-    idbSpy.getPath.and.returnValue(Promise.resolve(null));
-    idbSpy.getContentBatch.and.returnValue(Promise.resolve(new Map()));
-    idbSpy.getMetadata.and.returnValue(Promise.resolve(null));
-    idbSpy.setMetadata.and.returnValue(Promise.resolve());
+    idbSpy.setPath.mockReturnValue(Promise.resolve());
+    idbSpy.setContent.mockReturnValue(Promise.resolve());
+    idbSpy.setContentBatch.mockReturnValue(Promise.resolve());
+    idbSpy.clearAll.mockReturnValue(Promise.resolve());
+    idbSpy.getContent.mockReturnValue(Promise.resolve(null));
+    idbSpy.getPath.mockReturnValue(Promise.resolve(null));
+    idbSpy.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
+    idbSpy.getMetadata.mockReturnValue(Promise.resolve(null));
+    idbSpy.setMetadata.mockReturnValue(Promise.resolve());
 
-    contentResolverSpy.initialize.and.returnValue(
+    contentResolverSpy.initialize.mockReturnValue(
       Promise.resolve({ success: true, implementation: 'typescript' })
     );
-    contentResolverSpy.registerStandardSource.and.returnValue(undefined);
-    contentResolverSpy.setSourceAvailable.and.returnValue(undefined);
+    contentResolverSpy.registerStandardSource.mockReturnValue(undefined);
+    contentResolverSpy.setSourceAvailable.mockReturnValue(undefined);
 
-    contentServiceSpy.getPath.and.returnValue(of(null));
-    contentServiceSpy.getContent.and.returnValue(of(null));
-    contentServiceSpy.batchGetContent.and.returnValue(of(new Map()));
-    contentServiceSpy.queryContent.and.returnValue(of([]));
-    contentServiceSpy.queryPaths.and.returnValue(of([]));
+    contentServiceSpy.getPath.mockReturnValue(of(null));
+    contentServiceSpy.getContent.mockReturnValue(of(null));
+    contentServiceSpy.batchGetContent.mockReturnValue(of(new Map()));
+    contentServiceSpy.queryContent.mockReturnValue(of([]));
+    contentServiceSpy.queryPaths.mockReturnValue(of([]));
 
-    // Logger mock returns itself for createChild
-    const childLoggerSpy = jasmine.createSpyObj('Logger', ['debug', 'info', 'warn', 'error']);
-    loggerSpy.createChild.and.returnValue(childLoggerSpy);
+    loggerSpy.createChild.mockReturnValue(loggerSpy);
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         DataLoaderService,
         { provide: HolochainContentService, useValue: holochainSpy },
         { provide: IndexedDBCacheService, useValue: idbSpy },
@@ -106,14 +108,12 @@ describe('DataLoaderService', () => {
     });
 
     service = TestBed.inject(DataLoaderService);
-    holochainMock = TestBed.inject(HolochainContentService) as jasmine.SpyObj<HolochainContentService>;
-    idbMock = TestBed.inject(IndexedDBCacheService) as jasmine.SpyObj<IndexedDBCacheService>;
-    projectionApiMock = TestBed.inject(ProjectionAPIService) as jasmine.SpyObj<ProjectionAPIService>;
-    contentResolverMock = TestBed.inject(
-      ContentResolverService
-    ) as jasmine.SpyObj<ContentResolverService>;
-    contentServiceMock = TestBed.inject(ContentService) as jasmine.SpyObj<ContentService>;
-    loggerMock = TestBed.inject(LoggerService) as jasmine.SpyObj<LoggerService>;
+    holochainMock = holochainSpy;
+    idbMock = idbSpy;
+    projectionApiMock = projectionApiSpy;
+    contentResolverMock = contentResolverSpy;
+    contentServiceMock = contentServiceSpy;
+    loggerMock = loggerSpy;
   });
 
   it('should be created', () => {
@@ -228,10 +228,10 @@ describe('DataLoaderService', () => {
 
     describe('getContent', () => {
       it('should fall back to IDB cache when network fails', fakeAsync(() => {
-        contentServiceMock.getContent.and.returnValue(
+        contentServiceMock.getContent.mockReturnValue(
           throwError(() => new Error('Network error'))
         );
-        idbMock.getContent.and.returnValue(Promise.resolve(mockContent));
+        idbMock.getContent.mockReturnValue(Promise.resolve(mockContent));
 
         let result: ContentNode | undefined;
         service.getContent('test-content-1').subscribe(content => {
@@ -245,10 +245,10 @@ describe('DataLoaderService', () => {
       }));
 
       it('should return placeholder when both network and IDB fail', fakeAsync(() => {
-        contentServiceMock.getContent.and.returnValue(
+        contentServiceMock.getContent.mockReturnValue(
           throwError(() => new Error('Network error'))
         );
-        idbMock.getContent.and.returnValue(Promise.resolve(null));
+        idbMock.getContent.mockReturnValue(Promise.resolve(null));
 
         let result: ContentNode | undefined;
         service.getContent('missing-id').subscribe(content => {
@@ -261,7 +261,7 @@ describe('DataLoaderService', () => {
 
       it('should return placeholder when IDB not initialized', fakeAsync(() => {
         (service as any).idbInitialized = false;
-        contentServiceMock.getContent.and.returnValue(
+        contentServiceMock.getContent.mockReturnValue(
           throwError(() => new Error('Network error'))
         );
 
@@ -276,10 +276,10 @@ describe('DataLoaderService', () => {
       }));
 
       it('should return placeholder when IDB itself throws', fakeAsync(() => {
-        contentServiceMock.getContent.and.returnValue(
+        contentServiceMock.getContent.mockReturnValue(
           throwError(() => new Error('Network error'))
         );
-        idbMock.getContent.and.returnValue(Promise.reject(new Error('IDB corrupt')));
+        idbMock.getContent.mockReturnValue(Promise.reject(new Error('IDB corrupt')));
 
         let result: ContentNode | undefined;
         service.getContent('test-id').subscribe(content => {
@@ -293,10 +293,10 @@ describe('DataLoaderService', () => {
 
     describe('getPath', () => {
       it('should fall back to IDB cache when network fails', fakeAsync(() => {
-        contentServiceMock.getPath.and.returnValue(
+        contentServiceMock.getPath.mockReturnValue(
           throwError(() => new Error('Network timeout'))
         );
-        idbMock.getPath.and.returnValue(Promise.resolve(mockPath));
+        idbMock.getPath.mockReturnValue(Promise.resolve(mockPath));
 
         let result: LearningPath | undefined;
         service.getPath('test-path-1').subscribe(path => {
@@ -310,7 +310,7 @@ describe('DataLoaderService', () => {
       }));
 
       it('should re-throw when path not found (404, not connectivity)', fakeAsync(() => {
-        contentServiceMock.getPath.and.returnValue(of(null));
+        contentServiceMock.getPath.mockReturnValue(of(null));
 
         let error: Error | undefined;
         service.getPath('missing-path').subscribe({
@@ -325,10 +325,10 @@ describe('DataLoaderService', () => {
       }));
 
       it('should re-throw when IDB also misses', fakeAsync(() => {
-        contentServiceMock.getPath.and.returnValue(
+        contentServiceMock.getPath.mockReturnValue(
           throwError(() => new Error('Network timeout'))
         );
-        idbMock.getPath.and.returnValue(Promise.resolve(null));
+        idbMock.getPath.mockReturnValue(Promise.resolve(null));
 
         let error: Error | undefined;
         service.getPath('uncached-path').subscribe({
@@ -344,7 +344,7 @@ describe('DataLoaderService', () => {
 
       it('should not attempt IDB when IDB not initialized', fakeAsync(() => {
         (service as any).idbInitialized = false;
-        contentServiceMock.getPath.and.returnValue(
+        contentServiceMock.getPath.mockReturnValue(
           throwError(() => new Error('Network timeout'))
         );
 
@@ -363,11 +363,11 @@ describe('DataLoaderService', () => {
 
     describe('batchGetContent', () => {
       it('should fall back to IDB cache when network fails', fakeAsync(() => {
-        contentServiceMock.batchGetContent.and.returnValue(
+        contentServiceMock.batchGetContent.mockReturnValue(
           throwError(() => new Error('Network error'))
         );
         const cachedMap = new Map<string, ContentNode>([['id-a', mockContent]]);
-        idbMock.getContentBatch.and.returnValue(Promise.resolve(cachedMap));
+        idbMock.getContentBatch.mockReturnValue(Promise.resolve(cachedMap));
 
         let result: Map<string, ContentNode> | undefined;
         service.batchGetContent(['id-a', 'id-b']).subscribe(r => {
@@ -380,10 +380,10 @@ describe('DataLoaderService', () => {
       }));
 
       it('should fill placeholders for IDB cache misses', fakeAsync(() => {
-        contentServiceMock.batchGetContent.and.returnValue(
+        contentServiceMock.batchGetContent.mockReturnValue(
           throwError(() => new Error('Network error'))
         );
-        idbMock.getContentBatch.and.returnValue(Promise.resolve(new Map()));
+        idbMock.getContentBatch.mockReturnValue(Promise.resolve(new Map()));
 
         let result: Map<string, ContentNode> | undefined;
         service.batchGetContent(['id-x', 'id-y']).subscribe(r => {
@@ -398,7 +398,7 @@ describe('DataLoaderService', () => {
 
       it('should return all placeholders when IDB not initialized', fakeAsync(() => {
         (service as any).idbInitialized = false;
-        contentServiceMock.batchGetContent.and.returnValue(
+        contentServiceMock.batchGetContent.mockReturnValue(
           throwError(() => new Error('Network error'))
         );
 
@@ -444,7 +444,7 @@ describe('DataLoaderService', () => {
 
     describe('getAgentProgress', () => {
       it('should read from IDB when available', fakeAsync(() => {
-        idbMock.getMetadata.and.returnValue(Promise.resolve(mockProgress));
+        idbMock.getMetadata.mockReturnValue(Promise.resolve(mockProgress));
 
         let result: AgentProgress | null | undefined;
         service.getAgentProgress('agent-1', 'path-1').subscribe(p => {
@@ -457,7 +457,7 @@ describe('DataLoaderService', () => {
       }));
 
       it('should fall back to localStorage when IDB misses', fakeAsync(() => {
-        idbMock.getMetadata.and.returnValue(Promise.resolve(null));
+        idbMock.getMetadata.mockReturnValue(Promise.resolve(null));
         localStorage.setItem(
           'lamad-progress-agent-1-path-1',
           JSON.stringify(mockProgress)
@@ -473,12 +473,12 @@ describe('DataLoaderService', () => {
         // Should trigger migration to IDB
         expect(idbMock.setMetadata).toHaveBeenCalledWith(
           'progress-agent-1-path-1',
-          jasmine.objectContaining({ agentId: 'agent-1' })
+          expect.objectContaining({ agentId: 'agent-1' })
         );
       }));
 
       it('should return null when neither IDB nor localStorage has data', fakeAsync(() => {
-        idbMock.getMetadata.and.returnValue(Promise.resolve(null));
+        idbMock.getMetadata.mockReturnValue(Promise.resolve(null));
 
         let result: AgentProgress | null | undefined;
         service.getAgentProgress('agent-1', 'path-1').subscribe(p => {
@@ -506,7 +506,7 @@ describe('DataLoaderService', () => {
       });
 
       it('should fall back to localStorage when IDB throws', fakeAsync(() => {
-        idbMock.getMetadata.and.returnValue(
+        idbMock.getMetadata.mockReturnValue(
           Promise.reject(new Error('IDB error'))
         );
         localStorage.setItem(

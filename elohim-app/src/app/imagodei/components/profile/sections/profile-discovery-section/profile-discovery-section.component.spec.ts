@@ -6,12 +6,13 @@ import type { DiscoveryResult } from '@app/lamad/quiz-engine/models/discovery-as
 import { DiscoveryAttestationService } from '@app/lamad/quiz-engine/services/discovery-attestation.service';
 
 import { ProfileDiscoverySectionComponent } from './profile-discovery-section.component';
+import { vi } from 'vitest';
 
 describe('ProfileDiscoverySectionComponent', () => {
   let component: ProfileDiscoverySectionComponent;
   let fixture: ComponentFixture<TestHostComponent>;
-  let mockDiscoveryService: jasmine.SpyObj<DiscoveryAttestationService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockDiscoveryService: any;
+  let mockRouter: any;
 
   const buildResult = (overrides: Partial<DiscoveryResult> = {}): DiscoveryResult => ({
     id: 'discovery-1',
@@ -45,26 +46,25 @@ describe('ProfileDiscoverySectionComponent', () => {
   }
 
   beforeEach(async () => {
-    mockDiscoveryService = jasmine.createSpyObj(
-      'DiscoveryAttestationService',
-      ['getBadgeDisplay'],
-      {
-        results: signal([]),
-        attestations: signal([]),
-        featuredResults: signal([]),
-        resultsByCategory: signal({}),
-        resultsByFramework: signal(new Map()),
-        aggregatableResults: signal([]),
-      }
-    );
-    mockDiscoveryService.getBadgeDisplay.and.returnValue({
+    mockDiscoveryService = {
+      getBadgeDisplay: vi.fn(),
+      results: signal([]),
+      attestations: signal([]),
+      featuredResults: signal([]),
+      resultsByCategory: signal({}),
+      resultsByFramework: signal(new Map()),
+      aggregatableResults: signal([]),
+    };
+    mockDiscoveryService.getBadgeDisplay.mockReturnValue({
       label: '4w5',
       icon: '🎭',
       color: '#8B5CF6',
     });
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
-    mockRouter.navigate.and.returnValue(Promise.resolve(true));
+    mockRouter = {
+    navigate: vi.fn(),
+  };
+    mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
     await TestBed.configureTestingModule({
       imports: [TestHostComponent, ProfileDiscoverySectionComponent],
@@ -142,7 +142,7 @@ describe('ProfileDiscoverySectionComponent', () => {
     });
 
     it('should return different colors for different categories', () => {
-      mockDiscoveryService.getBadgeDisplay.and.returnValue({
+      mockDiscoveryService.getBadgeDisplay.mockReturnValue({
         label: 'test',
         icon: '💪',
         color: '#10B981',

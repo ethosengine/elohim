@@ -1,13 +1,12 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import {
-  HttpClientTestingModule,
-  HttpTestingController,
-} from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { ProjectionAPIService } from './projection-api.service';
 import { StorageClientService } from './storage-client.service';
 import { ContentNode, ContentType } from '../../lamad/models/content-node.model';
 import { LearningPath } from '../../lamad/models/learning-path.model';
+import { vi, Mock } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 /**
  * Comprehensive tests for ProjectionAPIService
@@ -24,7 +23,7 @@ import { LearningPath } from '../../lamad/models/learning-path.model';
 describe('ProjectionAPIService', () => {
   let service: ProjectionAPIService;
   let httpMock: HttpTestingController;
-  let mockStorageClient: jasmine.SpyObj<StorageClientService>;
+  let mockStorageClient: any;
 
   const mockContentData = {
     id: 'content-1',
@@ -70,15 +69,14 @@ describe('ProjectionAPIService', () => {
 
   beforeEach(() => {
     // Mock StorageClientService
-    mockStorageClient = jasmine.createSpyObj('StorageClientService', ['getBlobUrl']);
-    mockStorageClient.getBlobUrl.and.callFake((hash: string) => `https://blob.example.com/${hash}`);
+    mockStorageClient = {
+      getBlobUrl: vi.fn(),
+    };
+    mockStorageClient.getBlobUrl.mockImplementation((hash: string) => `https://blob.example.com/${hash}`);
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [
-        ProjectionAPIService,
-        { provide: StorageClientService, useValue: mockStorageClient },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), ProjectionAPIService,
+        { provide: StorageClientService, useValue: mockStorageClient },],
     });
 
     service = TestBed.inject(ProjectionAPIService);
@@ -859,7 +857,7 @@ describe('ProjectionAPIService', () => {
       ];
 
       testCases.forEach(testCase => {
-        mockStorageClient.getBlobUrl.calls.reset();
+        mockStorageClient.getBlobUrl.mockClear();
 
         const data = { ...mockContentData, thumbnailUrl: testCase.input };
         let result: ContentNode | null = null;

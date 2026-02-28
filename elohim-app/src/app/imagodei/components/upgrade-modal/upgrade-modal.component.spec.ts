@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { UpgradeModalComponent } from './upgrade-modal.component';
@@ -36,25 +37,25 @@ describe('UpgradeModalComponent', () => {
   });
 
   it('should emit closed when close is called', () => {
-    spyOn(component.closed, 'emit');
+    vi.spyOn(component.closed, 'emit');
     component.close();
     expect(component.closed.emit).toHaveBeenCalled();
   });
 
   it('should emit closed on overlay click', () => {
-    spyOn(component.closed, 'emit');
+    vi.spyOn(component.closed, 'emit');
     component.onOverlayClick();
     expect(component.closed.emit).toHaveBeenCalled();
   });
 
   it('should emit closed on Escape keydown', () => {
-    spyOn(component.closed, 'emit');
+    vi.spyOn(component.closed, 'emit');
     component.onOverlayKeydown(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(component.closed.emit).toHaveBeenCalled();
   });
 
   it('should not emit closed on non-Escape keydown', () => {
-    spyOn(component.closed, 'emit');
+    vi.spyOn(component.closed, 'emit');
     component.onOverlayKeydown(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(component.closed.emit).not.toHaveBeenCalled();
   });

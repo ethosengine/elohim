@@ -4,19 +4,24 @@ import { CustodianCommitmentService } from './custodian-commitment.service';
 import { HolochainClientService } from './holochain-client.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
 import { ShefaService } from './shefa.service';
+import { vi, Mock } from 'vitest';
 
 describe('ShefaService', () => {
   let service: ShefaService;
-  let clientMock: jasmine.SpyObj<HolochainClientService>;
-  let perfMock: jasmine.SpyObj<PerformanceMetricsService>;
-  let commitmentMock: jasmine.SpyObj<CustodianCommitmentService>;
+  let clientMock: any;
+  let perfMock: any;
+  let commitmentMock: any;
 
   beforeEach(() => {
-    const clientSpy = jasmine.createSpyObj('HolochainClientService', ['callZome']);
-    const perfSpy = jasmine.createSpyObj('PerformanceMetricsService', ['getMetrics']);
-    const commitmentSpy = jasmine.createSpyObj('CustodianCommitmentService', [
-      'getActiveCommitmentCount',
-    ]);
+    const clientSpy = {
+      callZome: vi.fn(),
+    };
+    const perfSpy = {
+      getMetrics: vi.fn(),
+    };
+    const commitmentSpy = {
+      getActiveCommitmentCount: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -28,11 +33,11 @@ describe('ShefaService', () => {
     });
 
     service = TestBed.inject(ShefaService);
-    clientMock = TestBed.inject(HolochainClientService) as jasmine.SpyObj<HolochainClientService>;
-    perfMock = TestBed.inject(PerformanceMetricsService) as jasmine.SpyObj<PerformanceMetricsService>;
+    clientMock = TestBed.inject(HolochainClientService) as { [K in keyof HolochainClientService]?: Mock };
+    perfMock = TestBed.inject(PerformanceMetricsService) as { [K in keyof PerformanceMetricsService]?: Mock };
     commitmentMock = TestBed.inject(
       CustodianCommitmentService
-    ) as jasmine.SpyObj<CustodianCommitmentService>;
+    ) as { [K in keyof CustodianCommitmentService]?: Mock };
   });
 
   afterEach(() => {
@@ -180,7 +185,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     };
 
-    clientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: mockMetrics }));
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     const result = await service.getMetrics('custodian-1');
 
@@ -190,7 +195,7 @@ describe('ShefaService', () => {
   });
 
   it('should return null when getMetrics fails', async () => {
-    clientMock.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.getMetrics('custodian-1');
 
@@ -257,7 +262,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     };
 
-    clientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: mockMetrics }));
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     await service.getMetrics('custodian-1');
     await service.getMetrics('custodian-1');
@@ -331,7 +336,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockAllMetrics })
     );
 
@@ -342,7 +347,7 @@ describe('ShefaService', () => {
   });
 
   it('should return empty array when getAllMetrics fails', async () => {
-    clientMock.callZome.and.returnValue(Promise.resolve({ success: false, data: null }));
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: false, data: null }));
 
     const result = await service.getAllMetrics();
 
@@ -413,7 +418,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     };
 
-    clientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
     const result = await service.reportMetrics(mockMetrics);
 
@@ -480,7 +485,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     };
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: false, error: 'Storage full' })
     );
 
@@ -556,7 +561,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockMetrics })
     );
 
@@ -626,7 +631,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     }));
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockMetrics })
     );
 
@@ -697,7 +702,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockMetrics })
     );
 
@@ -769,7 +774,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockMetrics })
     );
 
@@ -845,7 +850,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockMetrics })
     );
 
@@ -921,7 +926,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockMetrics })
     );
 
@@ -997,7 +1002,7 @@ describe('ShefaService', () => {
       },
     ];
 
-    clientMock.callZome.and.returnValue(
+    clientMock.callZome.mockReturnValue(
       Promise.resolve({ success: true, data: mockMetrics })
     );
 
@@ -1071,7 +1076,7 @@ describe('ShefaService', () => {
       lastUpdatedAt: Date.now(),
     };
 
-    clientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: mockMetrics }));
+    clientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: mockMetrics }));
 
     await service.getMetrics('custodian-1');
     service.clearCache();

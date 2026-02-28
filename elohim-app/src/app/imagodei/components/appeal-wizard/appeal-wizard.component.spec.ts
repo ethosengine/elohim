@@ -4,12 +4,13 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AppealWizardComponent } from './appeal-wizard.component';
 import { StewardshipService } from '../../services/stewardship.service';
 import type { StewardshipGrant, StewardshipAppeal } from '../../models/stewardship.model';
+import { vi, Mock } from 'vitest';
 
 describe('AppealWizardComponent', () => {
   let component: AppealWizardComponent;
   let fixture: ComponentFixture<AppealWizardComponent>;
-  let mockStewardshipService: jasmine.SpyObj<StewardshipService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockStewardshipService: any;
+  let mockRouter: any;
   let mockActivatedRoute: Partial<ActivatedRoute>;
 
   const mockGrant: StewardshipGrant = {
@@ -50,23 +51,25 @@ describe('AppealWizardComponent', () => {
   };
 
   beforeEach(async () => {
-    mockStewardshipService = jasmine.createSpyObj('StewardshipService', [
-      'getMyStewards',
-      'fileAppeal',
-    ]);
+    mockStewardshipService = {
+    getMyStewards: vi.fn(),
+    fileAppeal: vi.fn(),
+  };
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = {
+    navigate: vi.fn(),
+  };
 
     mockActivatedRoute = {
       snapshot: {
         paramMap: {
-          get: jasmine.createSpy('get').and.returnValue('grant-123'),
+          get: vi.fn().mockReturnValue('grant-123'),
         } as any,
       } as any,
     };
 
-    mockStewardshipService.getMyStewards.and.returnValue(Promise.resolve([mockGrant]));
-    mockStewardshipService.fileAppeal.and.returnValue(Promise.resolve(mockAppeal));
+    mockStewardshipService.getMyStewards.mockReturnValue(Promise.resolve([mockGrant]));
+    mockStewardshipService.fileAppeal.mockReturnValue(Promise.resolve(mockAppeal));
 
     await TestBed.configureTestingModule({
       imports: [AppealWizardComponent],
@@ -95,7 +98,7 @@ describe('AppealWizardComponent', () => {
     });
 
     it('should set error if grant not found', async () => {
-      mockStewardshipService.getMyStewards.and.returnValue(Promise.resolve([]));
+      mockStewardshipService.getMyStewards.mockReturnValue(Promise.resolve([]));
 
       await component.loadGrant('nonexistent');
 
@@ -103,7 +106,7 @@ describe('AppealWizardComponent', () => {
     });
 
     it('should handle load failure', async () => {
-      mockStewardshipService.getMyStewards.and.returnValue(Promise.reject(new Error('Network error')));
+      mockStewardshipService.getMyStewards.mockReturnValue(Promise.reject(new Error('Network error')));
 
       await component.loadGrant('grant-123');
 
@@ -417,7 +420,7 @@ describe('AppealWizardComponent', () => {
     });
 
     it('should set submitting state during submission', async () => {
-      mockStewardshipService.fileAppeal.and.returnValue(new Promise(() => {})); // Never resolves
+      mockStewardshipService.fileAppeal.mockReturnValue(new Promise(() => {})); // Never resolves
 
       const submitPromise = component.submitAppeal();
       expect(component.isSubmitting()).toBe(true);
@@ -440,7 +443,7 @@ describe('AppealWizardComponent', () => {
       await component.submitAppeal();
 
       expect(mockStewardshipService.fileAppeal).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           grounds: ['Ground 1', 'Ground 2', 'Custom ground'],
         })
       );
@@ -451,7 +454,7 @@ describe('AppealWizardComponent', () => {
 
       await component.submitAppeal();
 
-      const call = mockStewardshipService.fileAppeal.calls.mostRecent();
+      const call = mockStewardshipService.fileAppeal.mock.lastCall;
       const input = call.args[0];
       const evidence = JSON.parse(input.evidenceJson);
 
@@ -465,7 +468,7 @@ describe('AppealWizardComponent', () => {
       await component.submitAppeal();
 
       expect(mockStewardshipService.fileAppeal).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           advocateId: 'elohim',
         })
       );
@@ -477,14 +480,14 @@ describe('AppealWizardComponent', () => {
       await component.submitAppeal();
 
       expect(mockStewardshipService.fileAppeal).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           advocateId: undefined,
         })
       );
     });
 
     it('should emit appeal filed event on success', async () => {
-      spyOn(component.appealFiled, 'emit');
+      vi.spyOn(component.appealFiled, 'emit');
 
       await component.submitAppeal();
 
@@ -496,12 +499,12 @@ describe('AppealWizardComponent', () => {
 
       expect(mockRouter.navigate).toHaveBeenCalledWith(
         ['../appeal-filed', mockAppeal.id],
-        jasmine.any(Object)
+        expect.any(Object)
       );
     });
 
     it('should handle submission error gracefully', async () => {
-      mockStewardshipService.fileAppeal.and.returnValue(Promise.reject(new Error('Network error')));
+      mockStewardshipService.fileAppeal.mockReturnValue(Promise.reject(new Error('Network error')));
 
       await component.submitAppeal();
 
@@ -510,7 +513,7 @@ describe('AppealWizardComponent', () => {
     });
 
     it('should handle null appeal response', async () => {
-      mockStewardshipService.fileAppeal.and.returnValue(Promise.resolve(null));
+      mockStewardshipService.fileAppeal.mockReturnValue(Promise.resolve(null));
 
       await component.submitAppeal();
 
@@ -528,7 +531,7 @@ describe('AppealWizardComponent', () => {
 
       await component.submitAppeal();
 
-      const call = mockStewardshipService.fileAppeal.calls.mostRecent();
+      const call = mockStewardshipService.fileAppeal.mock.lastCall;
       const grounds = call.args[0].grounds;
 
       expect(grounds[grounds.length - 1]).toBe('Custom ground');
@@ -540,7 +543,7 @@ describe('AppealWizardComponent', () => {
 
       await component.submitAppeal();
 
-      const call = mockStewardshipService.fileAppeal.calls.mostRecent();
+      const call = mockStewardshipService.fileAppeal.mock.lastCall;
 
       expect(call.args[0].grounds).toEqual(['Ground 1']);
     });
@@ -565,7 +568,7 @@ describe('AppealWizardComponent', () => {
 
   describe('Error States', () => {
     it('should show error when no grant ID provided', () => {
-      (mockActivatedRoute.snapshot!.paramMap.get as jasmine.Spy).and.returnValue(null);
+      (mockActivatedRoute.snapshot!.paramMap.get as Mock).mockReturnValue(null);
 
       component.ngOnInit();
 
@@ -573,7 +576,7 @@ describe('AppealWizardComponent', () => {
     });
 
     it('should initialize loading false when no grant ID', () => {
-      (mockActivatedRoute.snapshot!.paramMap.get as jasmine.Spy).and.returnValue(null);
+      (mockActivatedRoute.snapshot!.paramMap.get as Mock).mockReturnValue(null);
 
       component.ngOnInit();
 
@@ -604,7 +607,7 @@ describe('AppealWizardComponent', () => {
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
       };
-      mockStewardshipService.getMyStewards.and.returnValue(Promise.resolve([minimalGrant]));
+      mockStewardshipService.getMyStewards.mockReturnValue(Promise.resolve([minimalGrant]));
 
       await component.loadGrant('grant-minimal');
 

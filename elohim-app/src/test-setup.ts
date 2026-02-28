@@ -1,4 +1,5 @@
 import '@analogjs/vitest-angular/setup-zone';
+import 'fake-indexeddb/auto';
 
 // jsdom lacks matchMedia — stub it for component tests that check prefers-color-scheme
 Object.defineProperty(globalThis, 'matchMedia', {

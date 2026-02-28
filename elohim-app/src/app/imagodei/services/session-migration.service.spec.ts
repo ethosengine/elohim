@@ -15,13 +15,14 @@ import { SessionHumanService } from './session-human.service';
 import type { SessionHuman } from '../models/session-human.model';
 import type { HumanProfile } from '../models/identity.model';
 import type { HolochainConnection } from '../../elohim/models/holochain-connection.model';
+import { vi, Mock } from 'vitest';
 
 describe('SessionMigrationService', () => {
   let service: SessionMigrationService;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockContentMasteryService: jasmine.SpyObj<ContentMasteryService>;
+  let mockHolochainClient: any;
+  let mockSessionHumanService: any;
+  let mockIdentityService: any;
+  let mockContentMasteryService: any;
 
   const mockSession: SessionHuman = {
     sessionId: 'session-123',
@@ -84,22 +85,25 @@ describe('SessionMigrationService', () => {
 
   beforeEach(() => {
     // Create mock services
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', ['callZome'], {
-      isConnected: jasmine.createSpy().and.returnValue(true),
-    });
+    mockHolochainClient = {
+      callZome: vi.fn(),
+      isConnected: vi.fn().mockReturnValue(true),
+    };
 
-    mockSessionHumanService = jasmine.createSpyObj('SessionHumanService', [
-      'getSession',
-      'prepareMigration',
-      'clearAfterMigration',
-      'hasSession',
-    ]);
+    mockSessionHumanService = {
+      getSession: vi.fn(),
+      prepareMigration: vi.fn(),
+      clearAfterMigration: vi.fn(),
+      hasSession: vi.fn(),
+    };
 
-    mockIdentityService = jasmine.createSpyObj('IdentityService', ['registerHuman'], {
-      mode: jasmine.createSpy().and.returnValue('session'),
-    });
+    mockIdentityService = {
+      registerHuman: vi.fn(),
+    };
 
-    mockContentMasteryService = jasmine.createSpyObj('ContentMasteryService', ['migrateToBackend']);
+    mockContentMasteryService = {
+      migrateToBackend: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -134,33 +138,33 @@ describe('SessionMigrationService', () => {
 
   describe('canMigrate', () => {
     it('should allow migration when session exists and connected', () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
 
       expect(service.canMigrate()).toBe(true);
     });
 
     it('should not allow migration when no session exists', () => {
-      mockSessionHumanService.hasSession.and.returnValue(false);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
+      mockSessionHumanService.hasSession.mockReturnValue(false);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
 
       expect(service.canMigrate()).toBe(false);
     });
 
     it('should not allow migration when not connected', () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
 
       expect(service.canMigrate()).toBe(false);
     });
 
     it('should not allow migration when already in network mode', () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('hosted');
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('hosted');
 
       expect(service.canMigrate()).toBe(false);
     });
@@ -172,17 +176,17 @@ describe('SessionMigrationService', () => {
 
   describe('migrate', () => {
     beforeEach(() => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
     });
 
     it('should successfully migrate session to network identity', async () => {
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
       );
 
@@ -198,24 +202,12 @@ describe('SessionMigrationService', () => {
     });
 
     it('should update status during migration phases', async () => {
-      let statusUpdates: string[] = [];
-
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
       );
-
-      // Track status changes
-      const originalState = service.state;
-      const statusSpy = jasmine.createSpy('status').and.callFake(() => {
-        const currentStatus = service.status();
-        if (statusUpdates[statusUpdates.length - 1] !== currentStatus) {
-          statusUpdates.push(currentStatus);
-        }
-        return currentStatus;
-      });
 
       await service.migrate();
 
@@ -225,7 +217,7 @@ describe('SessionMigrationService', () => {
     });
 
     it('should fail when migration not available', async () => {
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(false);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(false);
 
       const result = await service.migrate();
 
@@ -234,7 +226,7 @@ describe('SessionMigrationService', () => {
     });
 
     it('should fail when no session exists', async () => {
-      mockSessionHumanService.getSession.and.returnValue(null);
+      mockSessionHumanService.getSession.mockReturnValue(null);
 
       const result = await service.migrate();
 
@@ -243,7 +235,7 @@ describe('SessionMigrationService', () => {
     });
 
     it('should fail when migration package cannot be created', async () => {
-      mockSessionHumanService.prepareMigration.and.returnValue(null);
+      mockSessionHumanService.prepareMigration.mockReturnValue(null);
 
       const result = await service.migrate();
 
@@ -253,8 +245,8 @@ describe('SessionMigrationService', () => {
     });
 
     it('should fail when registration fails', async () => {
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(
         Promise.reject(new Error('Registration failed'))
       );
 
@@ -266,10 +258,10 @@ describe('SessionMigrationService', () => {
     });
 
     it('should apply profile overrides when provided', async () => {
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: true, migrated: 0, failed: 0, errors: [] })
       );
 
@@ -280,7 +272,7 @@ describe('SessionMigrationService', () => {
       });
 
       expect(mockIdentityService.registerHuman).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           displayName: 'Custom Name',
           bio: 'Custom Bio',
           profileReach: 'public',
@@ -289,12 +281,12 @@ describe('SessionMigrationService', () => {
     });
 
     it('should continue migration even if individual path progress fails', async () => {
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
 
       // Mock callZome to fail on first two calls (get_or_create and update), succeed on subsequent
       let callCount = 0;
-      mockHolochainClient.callZome.and.callFake(() => {
+      mockHolochainClient.callZome.mockImplementation(() => {
         callCount++;
         if (callCount <= 2) {
           return Promise.reject(new Error('Path progress failed'));
@@ -302,7 +294,7 @@ describe('SessionMigrationService', () => {
         return Promise.resolve({ success: true, data: {} as any });
       });
 
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
       );
 
@@ -313,10 +305,10 @@ describe('SessionMigrationService', () => {
     });
 
     it('should handle mastery migration failure gracefully', async () => {
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: false, migrated: 0, failed: 5, errors: ['Migration failed'] })
       );
 
@@ -333,14 +325,14 @@ describe('SessionMigrationService', () => {
 
   describe('migration state', () => {
     it('should track current step during migration', async () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
       );
 
@@ -356,12 +348,12 @@ describe('SessionMigrationService', () => {
     });
 
     it('should track error state on failure', async () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(
         Promise.reject(new Error('Network error'))
       );
 
@@ -379,12 +371,12 @@ describe('SessionMigrationService', () => {
 
   describe('reset', () => {
     it('should reset migration state', async () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(
         Promise.reject(new Error('Test error'))
       );
 
@@ -405,16 +397,16 @@ describe('SessionMigrationService', () => {
 
   describe('path progress transfer', () => {
     it('should call zome functions for each path progress item', async () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
       // Mock humanId to return the profile id (needed for transferPathProgress)
-      (mockIdentityService as any).humanId = jasmine.createSpy('humanId').and.returnValue(mockProfile.id);
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      (mockIdentityService as any).humanId = vi.fn().mockReturnValue(mockProfile.id);
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
       );
 
@@ -422,14 +414,14 @@ describe('SessionMigrationService', () => {
 
       // Should call get_or_create and update for each path
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'imagodei',
           fnName: 'get_or_create_agent_progress',
         })
       );
 
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'imagodei',
           fnName: 'update_agent_progress',
         })
@@ -443,14 +435,14 @@ describe('SessionMigrationService', () => {
 
   describe('affinity transfer', () => {
     it('should handle affinity data during migration', async () => {
-      mockSessionHumanService.hasSession.and.returnValue(true);
-      (mockHolochainClient.isConnected as jasmine.Spy).and.returnValue(true);
-      (mockIdentityService.mode as jasmine.Spy).and.returnValue('session');
-      mockSessionHumanService.getSession.and.returnValue(mockSession);
-      mockSessionHumanService.prepareMigration.and.returnValue(mockMigrationPackage as any);
-      mockIdentityService.registerHuman.and.returnValue(Promise.resolve(mockProfile));
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockContentMasteryService.migrateToBackend.and.returnValue(
+      mockSessionHumanService.hasSession.mockReturnValue(true);
+      (mockHolochainClient.isConnected as Mock).mockReturnValue(true);
+      (mockIdentityService.mode as Mock).mockReturnValue('session');
+      mockSessionHumanService.getSession.mockReturnValue(mockSession);
+      mockSessionHumanService.prepareMigration.mockReturnValue(mockMigrationPackage as any);
+      mockIdentityService.registerHuman.mockReturnValue(Promise.resolve(mockProfile));
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockContentMasteryService.migrateToBackend.mockReturnValue(
         Promise.resolve({ success: true, migrated: 5, failed: 0, errors: [] })
       );
 

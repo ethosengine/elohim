@@ -9,23 +9,28 @@ import { ConfigService } from '../../services/config.service';
 import { DomInteractionService } from '../../services/dom-interaction.service';
 
 import { HomeComponent } from './home.component';
+import { vi } from 'vitest';
 
 describe('HomeComponent', () => {
   let component: HomeComponent;
   let fixture: ComponentFixture<HomeComponent>;
-  let mockConfigService: jasmine.SpyObj<ConfigService>;
-  let mockAnalyticsService: jasmine.SpyObj<AnalyticsService>;
-  let mockDomInteractionService: jasmine.SpyObj<DomInteractionService>;
+  let mockConfigService: any;
+  let mockAnalyticsService: any;
+  let mockDomInteractionService: any;
 
   beforeEach(async () => {
-    mockConfigService = jasmine.createSpyObj('ConfigService', ['getConfig']);
-    mockAnalyticsService = jasmine.createSpyObj('AnalyticsService', ['trackEvent']);
-    mockDomInteractionService = jasmine.createSpyObj('DomInteractionService', [
-      'setupScrollIndicator',
-      'setupHeroTitleAnimation',
-    ]);
+    mockConfigService = {
+    getConfig: vi.fn(),
+  };
+    mockAnalyticsService = {
+    trackEvent: vi.fn(),
+  };
+    mockDomInteractionService = {
+    setupScrollIndicator: vi.fn(),
+    setupHeroTitleAnimation: vi.fn(),
+  };
 
-    mockConfigService.getConfig.and.returnValue(
+    mockConfigService.getConfig.mockReturnValue(
       of({
         logLevel: 'info' as const,
         environment: 'test',
@@ -56,11 +61,11 @@ describe('HomeComponent', () => {
     expect(mockConfigService.getConfig).toHaveBeenCalled();
   });
 
-  it('should setup scroll listeners on init', done => {
+  it('should setup scroll listeners on init', () => new Promise<void>(done => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
-    const scrollSpy = spyOn<any>(component, 'setupParallaxScrolling');
+    const scrollSpy = vi.spyOn(component as any, 'setupParallaxScrolling');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spying on private method
-    const observerSpy = spyOn<any>(component, 'setupIntersectionObserver');
+    const observerSpy = vi.spyOn(component as any, 'setupIntersectionObserver');
 
     fixture.detectChanges();
 
@@ -72,7 +77,7 @@ describe('HomeComponent', () => {
       expect(mockDomInteractionService.setupHeroTitleAnimation).toHaveBeenCalled();
       done();
     }, 100);
-  });
+  }));
 
   it('should cleanup on destroy', () => {
     fixture.detectChanges();
@@ -81,14 +86,14 @@ describe('HomeComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).scrollListener = () => {};
     const mockObserver = {
-      disconnect: jasmine.createSpy('disconnect'),
+      disconnect: vi.fn(),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).intersectionObserver = mockObserver;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing private property
     (component as any).rafId = 123;
 
-    const cancelSpy = spyOn(window, 'cancelAnimationFrame');
+    const cancelSpy = vi.spyOn(window, 'cancelAnimationFrame');
 
     component.ngOnDestroy();
 

@@ -10,32 +10,28 @@ import { IdentityService } from '../../services/identity.service';
 import { PresenceService } from '../../services/presence.service';
 import { StewardshipAllocationService } from '@app/lamad/services/stewardship-allocation.service';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('StewardshipDashboardComponent', () => {
   let component: StewardshipDashboardComponent;
   let fixture: ComponentFixture<StewardshipDashboardComponent>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockPresenceService: jasmine.SpyObj<PresenceService>;
-  let mockStewardshipService: jasmine.SpyObj<StewardshipAllocationService>;
+  let mockIdentityService: any;
+  let mockPresenceService: any;
+  let mockStewardshipService: any;
 
   beforeEach(async () => {
-    // Create mocks
-    mockIdentityService = jasmine.createSpyObj(
-      'IdentityService',
-      [],
-      {
-        profile: signal(null),
-        humanId: signal(null),
-      }
-    );
+    mockIdentityService = {
+      profile: signal(null),
+      humanId: signal(null),
+    };
 
-    mockPresenceService = jasmine.createSpyObj('PresenceService', ['loadPresences']);
+    mockPresenceService = {
+      loadPresences: vi.fn(),
+    };
 
-    mockStewardshipService = jasmine.createSpyObj(
-      'StewardshipAllocationService',
-      ['getStewardPortfolio'],
-      {}
-    );
+    mockStewardshipService = {
+      getStewardPortfolio: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [StewardshipDashboardComponent],
@@ -187,7 +183,7 @@ describe('StewardshipDashboardComponent', () => {
     it('should set error when no presence ID', () => {
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(null),
-        configurable: true
+        configurable: true,
       });
 
       component.loadPortfolio();
@@ -200,10 +196,10 @@ describe('StewardshipDashboardComponent', () => {
       const presenceId = 'human-123';
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
-        subscribe: jasmine.createSpy('subscribe')
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
+        subscribe: vi.fn(),
       } as any);
 
       component.loadPortfolio();
@@ -211,21 +207,21 @@ describe('StewardshipDashboardComponent', () => {
       expect(mockStewardshipService.getStewardPortfolio).toHaveBeenCalledWith(presenceId);
     });
 
-    it('should handle successful portfolio load', (done) => {
+    it('should handle successful portfolio load', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockPortfolio = {
         stewardPresenceId: presenceId,
         totalRecognition: 1000,
         contentCount: 5,
         activeDisputeCount: 2,
-        allocations: []
+        allocations: [],
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next(mockPortfolio);
 
@@ -234,19 +230,19 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
 
-    it('should handle portfolio load error', (done) => {
+    it('should handle portfolio load error', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.error(new Error('Network error'));
 
@@ -255,11 +251,11 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
   });
 
   // ==========================================================================
@@ -268,7 +264,7 @@ describe('StewardshipDashboardComponent', () => {
 
   describe('Refresh', () => {
     it('should call loadPortfolio', () => {
-      spyOn(component, 'loadPortfolio');
+      vi.spyOn(component, 'loadPortfolio');
 
       component.refresh();
 
@@ -336,7 +332,7 @@ describe('StewardshipDashboardComponent', () => {
   // ==========================================================================
 
   describe('Portfolio Display', () => {
-    it('should transform allocations for display', (done) => {
+    it('should transform allocations for display', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocation = {
         id: 'alloc-1',
@@ -362,21 +358,21 @@ describe('StewardshipDashboardComponent', () => {
         note: null,
         metadataJson: null,
         createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
+        updatedAt: '2024-01-01T00:00:00Z',
       };
       const mockPortfolio = {
         stewardPresenceId: presenceId,
         totalRecognition: 1000,
         contentCount: 1,
         activeDisputeCount: 0,
-        allocations: [mockAllocation]
+        allocations: [mockAllocation],
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next(mockPortfolio);
 
@@ -389,13 +385,13 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
 
-    it('should handle multiple allocations', (done) => {
+    it('should handle multiple allocations', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocations = [
         {
@@ -405,7 +401,7 @@ describe('StewardshipDashboardComponent', () => {
           governanceState: 'active' as const,
           totalRecognition: 100,
           createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
+          updatedAt: '2024-01-01T00:00:00Z',
         },
         {
           contentId: 'content-2',
@@ -414,22 +410,22 @@ describe('StewardshipDashboardComponent', () => {
           governanceState: 'disputed' as const,
           totalRecognition: 50,
           createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        }
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
       ];
       const mockPortfolio = {
         stewardId: presenceId,
         totalRecognition: 150,
         contentCount: 2,
         activeDisputeCount: 1,
-        allocations: mockAllocations
+        allocations: mockAllocations,
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next(mockPortfolio);
 
@@ -441,15 +437,15 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
   });
 
   describe('Governance State Formatting', () => {
-    it('should format active state', (done) => {
+    it('should format active state', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocation = {
         contentId: 'test-content',
@@ -458,21 +454,21 @@ describe('StewardshipDashboardComponent', () => {
         governanceState: 'active' as const,
         totalRecognition: 100,
         createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next({
             stewardId: presenceId,
             totalRecognition: 100,
             contentCount: 1,
             activeDisputeCount: 0,
-            allocations: [mockAllocation]
+            allocations: [mockAllocation],
           });
 
           const allocation = component.allocations()[0];
@@ -481,13 +477,13 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
 
-    it('should format disputed state', (done) => {
+    it('should format disputed state', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocation = {
         contentId: 'test-content',
@@ -496,21 +492,21 @@ describe('StewardshipDashboardComponent', () => {
         governanceState: 'disputed' as const,
         totalRecognition: 50,
         createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next({
             stewardId: presenceId,
             totalRecognition: 50,
             contentCount: 1,
             activeDisputeCount: 1,
-            allocations: [mockAllocation]
+            allocations: [mockAllocation],
           });
 
           const allocation = component.allocations()[0];
@@ -519,13 +515,13 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
 
-    it('should format pending_review state', (done) => {
+    it('should format pending_review state', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocation = {
         contentId: 'test-content',
@@ -534,21 +530,21 @@ describe('StewardshipDashboardComponent', () => {
         governanceState: 'pending_review' as const,
         totalRecognition: 70,
         createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next({
             stewardId: presenceId,
             totalRecognition: 70,
             contentCount: 1,
             activeDisputeCount: 0,
-            allocations: [mockAllocation]
+            allocations: [mockAllocation],
           });
 
           const allocation = component.allocations()[0];
@@ -557,13 +553,13 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
 
-    it('should format superseded state', (done) => {
+    it('should format superseded state', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocation = {
         contentId: 'test-content',
@@ -572,21 +568,21 @@ describe('StewardshipDashboardComponent', () => {
         governanceState: 'superseded' as const,
         totalRecognition: 0,
         createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next({
             stewardId: presenceId,
             totalRecognition: 0,
             contentCount: 1,
             activeDisputeCount: 0,
-            allocations: [mockAllocation]
+            allocations: [mockAllocation],
           });
 
           const allocation = component.allocations()[0];
@@ -595,15 +591,15 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
   });
 
   describe('Content ID Formatting', () => {
-    it('should format kebab-case to Title Case', (done) => {
+    it('should format kebab-case to Title Case', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocation = {
         contentId: 'quiz-manifesto-foundations',
@@ -612,21 +608,21 @@ describe('StewardshipDashboardComponent', () => {
         governanceState: 'active' as const,
         totalRecognition: 100,
         createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next({
             stewardId: presenceId,
             totalRecognition: 100,
             contentCount: 1,
             activeDisputeCount: 0,
-            allocations: [mockAllocation]
+            allocations: [mockAllocation],
           });
 
           const allocation = component.allocations()[0];
@@ -634,13 +630,13 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
 
-    it('should handle single word content IDs', (done) => {
+    it('should handle single word content IDs', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockAllocation = {
         contentId: 'introduction',
@@ -649,21 +645,21 @@ describe('StewardshipDashboardComponent', () => {
         governanceState: 'active' as const,
         totalRecognition: 50,
         createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next({
             stewardId: presenceId,
             totalRecognition: 50,
             contentCount: 1,
             activeDisputeCount: 0,
-            allocations: [mockAllocation]
+            allocations: [mockAllocation],
           });
 
           const allocation = component.allocations()[0];
@@ -671,29 +667,29 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty portfolio', (done) => {
+    it('should handle empty portfolio', () => new Promise<void>(done => {
       const presenceId = 'human-123';
       const mockPortfolio = {
         stewardId: presenceId,
         totalRecognition: 0,
         contentCount: 0,
         activeDisputeCount: 0,
-        allocations: []
+        allocations: [],
       };
 
       Object.defineProperty(mockIdentityService, 'humanId', {
         get: () => signal(presenceId),
-        configurable: true
+        configurable: true,
       });
-      mockStewardshipService.getStewardPortfolio.and.returnValue({
+      mockStewardshipService.getStewardPortfolio.mockReturnValue({
         subscribe: (callbacks: any) => {
           callbacks.next(mockPortfolio);
 
@@ -704,11 +700,11 @@ describe('StewardshipDashboardComponent', () => {
           done();
 
           return { unsubscribe: () => {} };
-        }
+        },
       } as any);
 
       component.loadPortfolio();
-    });
+    }));
 
     it('should handle very large recognition values', () => {
       expect(component.formatRecognition(1234567890)).toBe('1234.6M');

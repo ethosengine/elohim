@@ -1,5 +1,5 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Injector } from '@angular/core';
 import {
   BlobManagerService,
@@ -12,6 +12,8 @@ import { BlobVerificationService } from './blob-verification.service';
 import { BlobFallbackService, BlobFetchResult, UrlHealth } from './blob-fallback.service';
 import { ContentBlob } from '../models/content-node.model';
 import { of, throwError } from 'rxjs';
+import { vi, Mock } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('BlobManagerService', () => {
   let service: BlobManagerService;
@@ -39,8 +41,7 @@ describe('BlobManagerService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [BlobManagerService, BlobVerificationService, BlobFallbackService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), BlobManagerService, BlobVerificationService, BlobFallbackService],
     });
     service = TestBed.inject(BlobManagerService);
     verificationService = TestBed.inject(BlobVerificationService);
@@ -71,7 +72,7 @@ describe('BlobManagerService', () => {
   it('should initialize cache lock as resolved promise', async () => {
     const lock = service['cacheLock'];
     expect(lock).toBeInstanceOf(Promise);
-    await expectAsync(Promise.resolve(lock)).toBeResolved();
+    await await expect(Promise.resolve(lock)).resolves.toBeDefined();
   });
 
   it('should initialize storageClient as null', () => {
@@ -256,8 +257,8 @@ describe('BlobManagerService', () => {
   describe('Strategy-Aware Blob URL Methods', () => {
     it('should get blob URL', () => {
       const blobHash = 'test_hash_123';
-      spyOn(service as any, 'getStorageClient').and.returnValue({
-        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://doorway.host/blob/test_hash_123'),
+      vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
+        getBlobUrl: vi.fn().mockReturnValue('https://doorway.host/blob/test_hash_123'),
       });
 
       const url = service.getBlobUrl(blobHash);
@@ -276,8 +277,8 @@ describe('BlobManagerService', () => {
         'https://fallback.com/blob.mp4',
       ];
 
-      spyOn(service as any, 'getStorageClient').and.returnValue({
-        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://strategy.host/blob'),
+      vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
+        getBlobUrl: vi.fn().mockReturnValue('https://strategy.host/blob'),
       });
 
       const urls = service.getPriorityUrls(contentBlob);
@@ -290,8 +291,8 @@ describe('BlobManagerService', () => {
       const strategyUrl = 'https://strategy.host/blob';
       contentBlob.fallbackUrls = [strategyUrl, 'https://fallback.com/blob.mp4'];
 
-      spyOn(service as any, 'getStorageClient').and.returnValue({
-        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue(strategyUrl),
+      vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
+        getBlobUrl: vi.fn().mockReturnValue(strategyUrl),
       });
 
       const urls = service.getPriorityUrls(contentBlob);
@@ -301,8 +302,8 @@ describe('BlobManagerService', () => {
 
     it('should lazy inject StorageClientService', () => {
       expect(service['storageClient']).toBeNull();
-      spyOn(injector, 'get').and.returnValue({
-        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://test.com'),
+      vi.spyOn(injector, 'get').mockReturnValue({
+        getBlobUrl: vi.fn().mockReturnValue('https://test.com'),
       });
 
       service['getStorageClient']();
@@ -333,12 +334,12 @@ describe('BlobManagerService', () => {
       const blob = new Blob(['test content']);
       const filename = 'test.mp4';
 
-      spyOn(document.body, 'appendChild');
-      const removeSpy = jasmine.createSpy('remove');
-      spyOn(document, 'createElement').and.returnValue({
+      vi.spyOn(document.body, 'appendChild');
+      const removeSpy = vi.fn();
+      vi.spyOn(document, 'createElement').mockReturnValue({
         set href(_: string) { /* noop */ },
         set download(_: string) { /* noop */ },
-        click: jasmine.createSpy('click'),
+        click: vi.fn(),
         remove: removeSpy,
       } as unknown as HTMLElement);
 
@@ -359,9 +360,9 @@ describe('BlobManagerService', () => {
       const filename = 'download.mp4';
 
       const mockAnchor = document.createElement('a');
-      spyOn(document, 'createElement').and.returnValue(mockAnchor);
-      spyOn(document.body, 'appendChild');
-      spyOn(document.body, 'removeChild');
+      vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor);
+      vi.spyOn(document.body, 'appendChild');
+      vi.spyOn(document.body, 'removeChild');
 
       service.downloadBlobToFile(blob, filename);
 
@@ -395,10 +396,10 @@ describe('BlobManagerService', () => {
       service.maxCacheSizeBytes = 1000;
       const largeBlob = new Blob(['x'.repeat(2000)]);
 
-      spyOn(console, 'warn');
+      vi.spyOn(console, 'warn');
       await service['cacheBlob']('large_hash', largeBlob, largeBlob.size);
 
-      expect(console.warn).toHaveBeenCalledWith(jasmine.stringMatching(/Blob too large to cache/));
+      expect(console.warn).toHaveBeenCalledWith(expect.stringMatching(/Blob too large to cache/));
     });
   });
 
@@ -501,23 +502,23 @@ describe('BlobManagerService', () => {
       const blob = new Blob(['test']);
       const filename = 'test.txt';
 
-      spyOn(document.body, 'appendChild');
-      spyOn(document.body, 'removeChild');
+      vi.spyOn(document.body, 'appendChild');
+      vi.spyOn(document.body, 'removeChild');
 
       expect(() => service.downloadBlobToFile(blob, filename)).not.toThrow();
     });
 
     it('removeFromCache should accept hash string', async () => {
-      await expectAsync(service.removeFromCache('test_hash')).toBeResolved();
+      await await expect(service.removeFromCache('test_hash')).resolves.toBeDefined();
     });
 
     it('clearCache should return resolved Promise', async () => {
-      await expectAsync(service.clearCache()).toBeResolved();
+      await await expect(service.clearCache()).resolves.toBeDefined();
     });
 
     it('testBlobAccess should accept ContentBlob and return Promise', async () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'testFallbackUrls').and.returnValue(Promise.resolve([]));
+      vi.spyOn(fallbackService, 'testFallbackUrls').mockReturnValue(Promise.resolve([]));
 
       const result = service.testBlobAccess(contentBlob);
       expect(result).toBeInstanceOf(Promise);
@@ -525,7 +526,7 @@ describe('BlobManagerService', () => {
 
     it('isAccessible should accept ContentBlob and return boolean', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([]);
+      vi.spyOn(fallbackService, 'getUrlsHealth').mockReturnValue([]);
 
       const result = service.isAccessible(contentBlob);
       expect(typeof result).toBe('boolean');
@@ -533,7 +534,7 @@ describe('BlobManagerService', () => {
 
     it('getUrlHealth should accept ContentBlob and return array', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([]);
+      vi.spyOn(fallbackService, 'getUrlsHealth').mockReturnValue([]);
 
       const result = service.getUrlHealth(contentBlob);
       expect(Array.isArray(result)).toBe(true);
@@ -541,8 +542,8 @@ describe('BlobManagerService', () => {
 
     it('getPriorityUrls should accept ContentBlob and return string array', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(service as any, 'getStorageClient').and.returnValue({
-        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://test.com'),
+      vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
+        getBlobUrl: vi.fn().mockReturnValue('https://test.com'),
       });
 
       const result = service.getPriorityUrls(contentBlob);
@@ -552,8 +553,8 @@ describe('BlobManagerService', () => {
 
     it('getBlobUrl should accept string and return string', () => {
       const hash = 'test_hash';
-      spyOn(service as any, 'getStorageClient').and.returnValue({
-        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://test.com/blob'),
+      vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
+        getBlobUrl: vi.fn().mockReturnValue('https://test.com/blob'),
       });
 
       const result = service.getBlobUrl(hash);
@@ -566,25 +567,25 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Holochain Metadata Retrieval', () => {
-    it('should retrieve blobs for content', done => {
+    it('should retrieve blobs for content', () => new Promise<void>(done => {
       const contentId = 'content_123';
 
       service.getBlobsForContent(contentId).subscribe(blobs => {
         expect(Array.isArray(blobs)).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should return empty array on metadata retrieval error', done => {
+    it('should return empty array on metadata retrieval error', () => new Promise<void>(done => {
       const contentId = 'content_nonexistent';
 
       service.getBlobsForContent(contentId).subscribe(blobs => {
         expect(blobs).toEqual([]);
         done();
       });
-    });
+    }));
 
-    it('should retrieve specific blob metadata by hash', done => {
+    it('should retrieve specific blob metadata by hash', () => new Promise<void>(done => {
       const contentId = 'content_123';
       const blobHash = 'test_hash_123';
 
@@ -592,9 +593,9 @@ describe('BlobManagerService', () => {
         expect(metadata === null || metadata instanceof Object).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should check if blob exists in DHT', done => {
+    it('should check if blob exists in DHT', () => new Promise<void>(done => {
       const contentId = 'content_123';
       const blobHash = 'test_hash_123';
 
@@ -602,9 +603,9 @@ describe('BlobManagerService', () => {
         expect(typeof exists).toBe('boolean');
         done();
       });
-    });
+    }));
 
-    it('should retrieve blobs for multiple content nodes', done => {
+    it('should retrieve blobs for multiple content nodes', () => new Promise<void>(done => {
       const contentIds = ['content_1', 'content_2', 'content_3'];
 
       service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
@@ -612,7 +613,7 @@ describe('BlobManagerService', () => {
         expect(blobMap.size).toBeLessThanOrEqual(contentIds.length);
         done();
       });
-    });
+    }));
 
     it('should transform BlobMetadataOutput to ContentBlob', () => {
       const metadata: BlobMetadataOutput = {
@@ -662,7 +663,7 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Cached Blob Download', () => {
-    it('should report 100% progress when cached', done => {
+    it('should report 100% progress when cached', () => new Promise<void>(done => {
       const contentBlob = createMockContentBlob();
       const progressUpdates: BlobDownloadProgress[] = [];
 
@@ -680,9 +681,9 @@ describe('BlobManagerService', () => {
         expect(progressUpdates[0].percentComplete).toBe(100);
         done();
       });
-    });
+    }));
 
-    it('should return cached blob result with wasCached flag true', done => {
+    it('should return cached blob result with wasCached flag true', () => new Promise<void>(done => {
       const contentBlob = createMockContentBlob();
       const testBlob = new Blob(['cached']);
       service['blobCache'].set(contentBlob.hash, testBlob);
@@ -694,9 +695,9 @@ describe('BlobManagerService', () => {
         expect(result.fetch.successUrl).toBe('(cached)');
         done();
       });
-    });
+    }));
 
-    it('downloadBlob should return BlobDownloadResult with all required properties', done => {
+    it('downloadBlob should return BlobDownloadResult with all required properties', () => new Promise<void>(done => {
       const contentBlob = createMockContentBlob();
       const testBlob = new Blob(['cached']);
       service['blobCache'].set(contentBlob.hash, testBlob);
@@ -710,7 +711,7 @@ describe('BlobManagerService', () => {
         expect(typeof result.wasCached).toBe('boolean');
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -744,7 +745,7 @@ describe('BlobManagerService', () => {
   describe('URL Health Operations', () => {
     it('should get URL health information', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([
+      vi.spyOn(fallbackService, 'getUrlsHealth').mockReturnValue([
         {
           url: 'https://example.com/blob.mp4',
           successCount: 10,
@@ -761,7 +762,7 @@ describe('BlobManagerService', () => {
 
     it('should check if blob is accessible', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([
+      vi.spyOn(fallbackService, 'getUrlsHealth').mockReturnValue([
         {
           url: 'https://example.com/blob.mp4',
           successCount: 10,
@@ -776,7 +777,7 @@ describe('BlobManagerService', () => {
 
     it('should return false if no healthy URLs', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([
+      vi.spyOn(fallbackService, 'getUrlsHealth').mockReturnValue([
         {
           url: 'https://example.com/blob.mp4',
           successCount: 0,
@@ -791,7 +792,7 @@ describe('BlobManagerService', () => {
 
     it('should test blob access', async () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'testFallbackUrls').and.returnValue(
+      vi.spyOn(fallbackService, 'testFallbackUrls').mockReturnValue(
         Promise.resolve([
           {
             url: 'https://example.com/blob.mp4',
@@ -810,7 +811,7 @@ describe('BlobManagerService', () => {
 
     it('getUrlHealth should return array of UrlHealth objects', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(fallbackService, 'getUrlsHealth').and.returnValue([]);
+      vi.spyOn(fallbackService, 'getUrlsHealth').mockReturnValue([]);
 
       const result = service.getUrlHealth(contentBlob);
       expect(Array.isArray(result)).toBe(true);
@@ -818,7 +819,7 @@ describe('BlobManagerService', () => {
 
     it('isAccessible should use getUrlHealth internally', () => {
       const contentBlob = createMockContentBlob();
-      spyOn(service, 'getUrlHealth').and.returnValue([]);
+      vi.spyOn(service, 'getUrlHealth').mockReturnValue([]);
 
       service.isAccessible(contentBlob);
       expect(service.getUrlHealth).toHaveBeenCalledWith(contentBlob);
@@ -830,7 +831,7 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Multiple Blob Download', () => {
-    it('should download multiple blobs in parallel', done => {
+    it('should download multiple blobs in parallel', () => new Promise<void>(done => {
       const blob1 = createMockContentBlob();
       const blob2 = createMockContentBlob();
       blob2.hash = 'hash2';
@@ -845,7 +846,7 @@ describe('BlobManagerService', () => {
         expect(results[1].wasCached).toBe(true);
         done();
       });
-    });
+    }));
 
     it('downloadBlobs should accept array of ContentBlobs', () => {
       const blobs = [createMockContentBlob(), createMockContentBlob()];
@@ -928,8 +929,8 @@ describe('BlobManagerService', () => {
       const contentBlob = createMockContentBlob();
       contentBlob.fallbackUrls = ['https://fallback1.com/blob'];
 
-      spyOn(service as any, 'getStorageClient').and.returnValue({
-        getBlobUrl: jasmine.createSpy('getBlobUrl').and.returnValue('https://strategy.com/blob'),
+      vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
+        getBlobUrl: vi.fn().mockReturnValue('https://strategy.com/blob'),
       });
 
       const urls = service.getPriorityUrls(contentBlob);
@@ -942,16 +943,16 @@ describe('BlobManagerService', () => {
   // =========================================================================
 
   describe('Metadata Retrieval from Holochain - Integration', () => {
-    it('getBlobsForContent should return Observable of ContentBlob array', done => {
+    it('getBlobsForContent should return Observable of ContentBlob array', () => new Promise<void>(done => {
       const contentId = 'content_123';
 
       service.getBlobsForContent(contentId).subscribe(blobs => {
         expect(Array.isArray(blobs)).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('getBlobMetadata should return Observable of ContentBlob or null', done => {
+    it('getBlobMetadata should return Observable of ContentBlob or null', () => new Promise<void>(done => {
       const contentId = 'content_123';
       const blobHash = 'test_hash_123';
 
@@ -959,9 +960,9 @@ describe('BlobManagerService', () => {
         expect(metadata === null || metadata instanceof Object).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('blobExists should return Observable of boolean', done => {
+    it('blobExists should return Observable of boolean', () => new Promise<void>(done => {
       const contentId = 'content_123';
       const blobHash = 'test_hash_123';
 
@@ -969,25 +970,25 @@ describe('BlobManagerService', () => {
         expect(typeof exists).toBe('boolean');
         done();
       });
-    });
+    }));
 
-    it('getBlobsForMultipleContent should return Observable of Map', done => {
+    it('getBlobsForMultipleContent should return Observable of Map', () => new Promise<void>(done => {
       const contentIds = ['content_1', 'content_2', 'content_3'];
 
       service.getBlobsForMultipleContent(contentIds).subscribe(blobMap => {
         expect(blobMap instanceof Map).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should return empty array on metadata retrieval error', done => {
+    it('should return empty array on metadata retrieval error', () => new Promise<void>(done => {
       const contentId = 'content_nonexistent';
 
       service.getBlobsForContent(contentId).subscribe(blobs => {
         expect(blobs).toEqual([]);
         done();
       });
-    });
+    }));
 
     // TODO: Add async flow tests
     // - Mock HolochainClientService.callZome with proper success/failure paths

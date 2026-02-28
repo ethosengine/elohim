@@ -14,10 +14,11 @@ import {
   AppreciationDisplay,
   CreateAppreciationInput,
 } from './appreciation.service';
+import { vi } from 'vitest';
 
 describe('AppreciationService', () => {
   let service: AppreciationService;
-  let holochainClientMock: jasmine.SpyObj<HolochainClientService>;
+  let holochainClientMock: any;
 
   const mockAppreciation: AppreciationDisplay = {
     id: 'appreciation-1',
@@ -31,14 +32,14 @@ describe('AppreciationService', () => {
   };
 
   beforeEach(() => {
-    holochainClientMock = jasmine.createSpyObj('HolochainClientService', [
-      'callZome',
-      'isConnected',
-    ]);
+    holochainClientMock = {
+    callZome: vi.fn(),
+    isConnected: vi.fn(),
+  };
 
     // Default: not connected
-    holochainClientMock.isConnected.and.returnValue(false);
-    holochainClientMock.callZome.and.returnValue(
+    holochainClientMock.isConnected.mockReturnValue(false);
+    holochainClientMock.callZome.mockReturnValue(
       Promise.resolve({ success: false, error: 'Not connected' })
     );
 
@@ -61,22 +62,22 @@ describe('AppreciationService', () => {
 
   describe('availability', () => {
     it('should start as not available', () => {
-      expect(service.isAvailable()).toBeFalse();
-      expect(service.available()).toBeFalse();
+      expect(service.isAvailable()).toBe(false);
+      expect(service.available()).toBe(false);
     });
 
     it('should report ready as false when not connected', () => {
-      expect(service.ready()).toBeFalse();
+      expect(service.ready()).toBe(false);
     });
 
     describe('testAvailability', () => {
       it('should set available to true when zome responds successfully', async () => {
-        holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+        holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
 
         const result = await service.testAvailability();
 
-        expect(result).toBeTrue();
-        expect(service.isAvailable()).toBeTrue();
+        expect(result).toBe(true);
+        expect(service.isAvailable()).toBe(true);
         expect(holochainClientMock.callZome).toHaveBeenCalledWith({
           zomeName: 'content_store',
           fnName: 'get_appreciations_for',
@@ -85,23 +86,23 @@ describe('AppreciationService', () => {
       });
 
       it('should set available to false when zome call fails', async () => {
-        holochainClientMock.callZome.and.returnValue(
+        holochainClientMock.callZome.mockReturnValue(
           Promise.resolve({ success: false, error: 'Zome not found' })
         );
 
         const result = await service.testAvailability();
 
-        expect(result).toBeFalse();
-        expect(service.isAvailable()).toBeFalse();
+        expect(result).toBe(false);
+        expect(service.isAvailable()).toBe(false);
       });
 
       it('should handle exceptions gracefully', async () => {
-        holochainClientMock.callZome.and.returnValue(Promise.reject(new Error('Connection lost')));
+        holochainClientMock.callZome.mockReturnValue(Promise.reject(new Error('Connection lost')));
 
         const result = await service.testAvailability();
 
-        expect(result).toBeFalse();
-        expect(service.isAvailable()).toBeFalse();
+        expect(result).toBe(false);
+        expect(service.isAvailable()).toBe(false);
       });
     });
   });
@@ -111,21 +112,21 @@ describe('AppreciationService', () => {
   // ==========================================================================
 
   describe('getAppreciationsFor', () => {
-    it('should return empty array when service not available', done => {
+    it('should return empty array when service not available', () => new Promise<void>(done => {
       service.getAppreciationsFor('entity-1').subscribe(result => {
         expect(result).toEqual([]);
         expect(holochainClientMock.callZome).not.toHaveBeenCalled();
         done();
       });
-    });
+    }));
 
     it('should fetch appreciations when service is available', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // Now set up the actual response
-      holochainClientMock.callZome.and.returnValue(
+      holochainClientMock.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -158,7 +159,7 @@ describe('AppreciationService', () => {
 
     it('should cache results for same entity', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // First call
@@ -181,11 +182,11 @@ describe('AppreciationService', () => {
 
     it('should handle errors gracefully', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // Set up error response
-      holochainClientMock.callZome.and.returnValue(
+      holochainClientMock.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'Network error' })
       );
 
@@ -198,10 +199,10 @@ describe('AppreciationService', () => {
 
     it('should sort results by date descending', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
-      holochainClientMock.callZome.and.returnValue(
+      holochainClientMock.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -249,19 +250,19 @@ describe('AppreciationService', () => {
   // ==========================================================================
 
   describe('getAppreciationsBy', () => {
-    it('should return empty array when service not available', done => {
+    it('should return empty array when service not available', () => new Promise<void>(done => {
       service.getAppreciationsBy('agent-1').subscribe(result => {
         expect(result).toEqual([]);
         done();
       });
-    });
+    }));
 
     it('should fetch appreciations given by an agent', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
-      holochainClientMock.callZome.and.returnValue(
+      holochainClientMock.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: [
@@ -310,10 +311,10 @@ describe('AppreciationService', () => {
 
     it('should create appreciation when service is available', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
-      holochainClientMock.callZome.and.returnValue(
+      holochainClientMock.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: {
@@ -353,7 +354,7 @@ describe('AppreciationService', () => {
 
     it('should handle null note', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       const inputWithoutNote: CreateAppreciationInput = {
@@ -363,7 +364,7 @@ describe('AppreciationService', () => {
         quantityUnit: 'points',
       };
 
-      holochainClientMock.callZome.and.returnValue(
+      holochainClientMock.callZome.mockReturnValue(
         Promise.resolve({
           success: true,
           data: {
@@ -387,8 +388,8 @@ describe('AppreciationService', () => {
       });
 
       expect(holochainClientMock.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
-          payload: jasmine.objectContaining({
+        expect.objectContaining({
+          payload: expect.objectContaining({
             note: null,
           }),
         })
@@ -397,18 +398,16 @@ describe('AppreciationService', () => {
 
     it('should throw error when zome call fails', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
-      holochainClientMock.callZome.and.returnValue(
+      holochainClientMock.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'Validation failed' })
       );
 
-      await expectAsync(
-        new Promise<AppreciationDisplay>((resolve, reject) => {
+      await await expect(new Promise<AppreciationDisplay>((resolve, reject) => {
           service.appreciate(input).subscribe({ next: resolve, error: reject });
-        })
-      ).toBeRejectedWithError('Validation failed');
+        })).rejects.toThrow('Validation failed');
     });
   });
 
@@ -419,7 +418,7 @@ describe('AppreciationService', () => {
   describe('clearCache', () => {
     it('should clear both caches', async () => {
       // Make service available
-      holochainClientMock.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      holochainClientMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
       await service.testAvailability();
 
       // Populate caches

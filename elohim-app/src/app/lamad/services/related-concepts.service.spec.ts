@@ -3,10 +3,11 @@ import { of, throwError } from 'rxjs';
 import { RelatedConceptsService } from './related-concepts.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ContentNode, ContentGraph, ContentRelationship, ContentRelationshipType } from '../models/content-node.model';
+import { vi, Mock } from 'vitest';
 
 describe('RelatedConceptsService', () => {
   let service: RelatedConceptsService;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
+  let dataLoaderSpy: any;
 
   const mockNodes: Map<string, ContentNode> = new Map([
     [
@@ -175,14 +176,14 @@ describe('RelatedConceptsService', () => {
   };
 
   beforeEach(() => {
-    dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', [
-      'getGraph',
-      'getRelationshipsForNode',
-      'getContent',
-    ]);
+    dataLoaderSpy = {
+    getGraph: vi.fn(),
+    getRelationshipsForNode: vi.fn(),
+    getContent: vi.fn(),
+  };
 
-    dataLoaderSpy.getGraph.and.returnValue(of(mockGraph));
-    dataLoaderSpy.getRelationshipsForNode.and.returnValue(
+    dataLoaderSpy.getGraph.mockReturnValue(of(mockGraph));
+    dataLoaderSpy.getRelationshipsForNode.mockReturnValue(
       of([
         mockRelationships.get('rel-1')!,
         mockRelationships.get('rel-2')!,
@@ -191,7 +192,7 @@ describe('RelatedConceptsService', () => {
         mockRelationships.get('rel-5')!,
       ])
     );
-    dataLoaderSpy.getContent.and.callFake((id: string) => {
+    dataLoaderSpy.getContent.mockImplementation((id: string) => {
       const node = mockNodes.get(id);
       return node ? of(node) : throwError(() => new Error('Not found'));
     });
@@ -215,7 +216,7 @@ describe('RelatedConceptsService', () => {
   });
 
   describe('getRelatedConcepts', () => {
-    it('should get related concepts grouped by type', done => {
+    it('should get related concepts grouped by type', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(result => {
         expect(result.prerequisites.length).toBeGreaterThan(0);
         expect(result.extensions.length).toBeGreaterThan(0);
@@ -225,16 +226,16 @@ describe('RelatedConceptsService', () => {
         expect(result.allRelationships.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should use lazy loading for simple queries', done => {
+    it('should use lazy loading for simple queries', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1', { limit: 5 }).subscribe(() => {
         expect(dataLoaderSpy.getRelationshipsForNode).toHaveBeenCalled();
         done();
       });
-    });
+    }));
 
-    it('should use full graph for complex queries with filters', done => {
+    it('should use full graph for complex queries with filters', () => new Promise<void>(done => {
       service
         .getRelatedConcepts('concept-1', {
           includeTypes: ['RELATES_TO'],
@@ -243,17 +244,17 @@ describe('RelatedConceptsService', () => {
           expect(dataLoaderSpy.getGraph).toHaveBeenCalled();
           done();
         });
-    });
+    }));
 
-    it('should respect limit parameter', done => {
+    it('should respect limit parameter', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1', { limit: 2 }).subscribe(result => {
         expect(result.related.length).toBeLessThanOrEqual(2);
         expect(result.prerequisites.length).toBeLessThanOrEqual(2);
         done();
       });
-    });
+    }));
 
-    it('should filter by includeTypes', done => {
+    it('should filter by includeTypes', () => new Promise<void>(done => {
       service
         .getRelatedConcepts('concept-1', {
           includeTypes: ['RELATES_TO'],
@@ -263,9 +264,9 @@ describe('RelatedConceptsService', () => {
           expect(result.extensions.length).toBe(0); // EXTENDS filtered out
           done();
         });
-    });
+    }));
 
-    it('should filter by excludeTypes', done => {
+    it('should filter by excludeTypes', () => new Promise<void>(done => {
       service
         .getRelatedConcepts('concept-1', {
           excludeTypes: ['RELATES_TO'],
@@ -275,9 +276,9 @@ describe('RelatedConceptsService', () => {
           expect(result.extensions.length).toBeGreaterThan(0);
           done();
         });
-    });
+    }));
 
-    it('should cache results', done => {
+    it('should cache results', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(() => {
         service.getRelatedConcepts('concept-1').subscribe(() => {
           // Second call should use cache
@@ -285,18 +286,18 @@ describe('RelatedConceptsService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should strip content by default', done => {
+    it('should strip content by default', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(result => {
         if (result.related.length > 0) {
           expect(result.related[0].content).toBe('');
         }
         done();
       });
-    });
+    }));
 
-    it('should include content when requested', done => {
+    it('should include content when requested', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1', { includeContent: true }).subscribe(result => {
         // Should use lazy loading but include content in results
         expect(dataLoaderSpy.getRelationshipsForNode).toHaveBeenCalled();
@@ -306,27 +307,27 @@ describe('RelatedConceptsService', () => {
         }
         done();
       });
-    });
+    }));
 
-    it('should categorize prerequisites correctly', done => {
+    it('should categorize prerequisites correctly', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(result => {
         const prereq = result.prerequisites.find(n => n.id === 'concept-4');
         expect(prereq).toBeDefined();
         expect(prereq?.title).toBe('Prerequisite');
         done();
       });
-    });
+    }));
 
-    it('should categorize extensions correctly', done => {
+    it('should categorize extensions correctly', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(result => {
         const ext = result.extensions.find(n => n.id === 'concept-3');
         expect(ext).toBeDefined();
         expect(ext?.title).toBe('Extension Concept');
         done();
       });
-    });
+    }));
 
-    it('should categorize hierarchy (parents/children) correctly', done => {
+    it('should categorize hierarchy (parents/children) correctly', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(result => {
         const child = result.children.find(n => n.id === 'concept-5');
         const parent = result.parents.find(n => n.id === 'concept-6');
@@ -334,9 +335,9 @@ describe('RelatedConceptsService', () => {
         expect(parent).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should avoid duplicate related concepts', done => {
+    it('should avoid duplicate related concepts', () => new Promise<void>(done => {
       // Add bidirectional RELATES_TO
       const biRelationships = [
         ...Array.from(mockRelationships.values()),
@@ -348,7 +349,7 @@ describe('RelatedConceptsService', () => {
           metadata: {},
         },
       ];
-      dataLoaderSpy.getRelationshipsForNode.and.returnValue(of(biRelationships));
+      dataLoaderSpy.getRelationshipsForNode.mockReturnValue(of(biRelationships));
 
       service.getRelatedConcepts('concept-1').subscribe(result => {
         const relatedIds = result.related.map(n => n.id);
@@ -356,11 +357,11 @@ describe('RelatedConceptsService', () => {
         expect(relatedIds.length).toBe(uniqueIds.size); // No duplicates
         done();
       });
-    });
+    }));
   });
 
   describe('getNeighborhood', () => {
-    it('should build neighborhood graph', done => {
+    it('should build neighborhood graph', () => new Promise<void>(done => {
       service.getNeighborhood('concept-1').subscribe(graph => {
         expect(graph.focus.id).toBe('concept-1');
         expect(graph.focus.isFocus).toBe(true);
@@ -368,24 +369,24 @@ describe('RelatedConceptsService', () => {
         expect(graph.edges.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should respect depth parameter', done => {
+    it('should respect depth parameter', () => new Promise<void>(done => {
       service.getNeighborhood('concept-1', { depth: 2 }).subscribe(graph => {
         const hasDepth2 = graph.neighbors.some(n => n.depth === 2);
         expect(hasDepth2).toBe(false); // Mock graph isn't deep enough
         done();
       });
-    });
+    }));
 
-    it('should respect maxNodes parameter', done => {
+    it('should respect maxNodes parameter', () => new Promise<void>(done => {
       service.getNeighborhood('concept-1', { maxNodes: 3 }).subscribe(graph => {
         expect(graph.neighbors.length).toBeLessThanOrEqual(2); // maxNodes - 1 (focus)
         done();
       });
-    });
+    }));
 
-    it('should filter by relationship types', done => {
+    it('should filter by relationship types', () => new Promise<void>(done => {
       service
         .getNeighborhood('concept-1', {
           relationshipTypes: ['RELATES_TO'],
@@ -395,27 +396,27 @@ describe('RelatedConceptsService', () => {
           expect(edges.length).toBeGreaterThan(0);
           done();
         });
-    });
+    }));
 
-    it('should cache neighborhood queries', done => {
+    it('should cache neighborhood queries', () => new Promise<void>(done => {
       service.getNeighborhood('concept-1').subscribe(() => {
         service.getNeighborhood('concept-1').subscribe(() => {
           expect(dataLoaderSpy.getGraph).toHaveBeenCalledTimes(1);
           done();
         });
       });
-    });
+    }));
 
-    it('should return empty neighbors for unknown node', done => {
+    it('should return empty neighbors for unknown node', () => new Promise<void>(done => {
       service.getNeighborhood('unknown').subscribe(graph => {
         expect(graph.focus.id).toBe('unknown');
         expect(graph.neighbors.length).toBe(0);
         expect(graph.edges.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should include both incoming and outgoing edges', done => {
+    it('should include both incoming and outgoing edges', () => new Promise<void>(done => {
       service.getNeighborhood('concept-1').subscribe(graph => {
         expect(graph.edges.length).toBeGreaterThan(0);
         // Should have both directions
@@ -424,45 +425,45 @@ describe('RelatedConceptsService', () => {
         expect(hasOutgoing || hasIncoming).toBe(true);
         done();
       });
-    });
+    }));
   });
 
   describe('getByRelationshipType', () => {
-    it('should get outgoing relationships by type', done => {
+    it('should get outgoing relationships by type', () => new Promise<void>(done => {
       service.getByRelationshipType('concept-1', 'RELATES_TO', 'outgoing').subscribe(nodes => {
         expect(nodes.length).toBe(1);
         expect(nodes[0].id).toBe('concept-2');
         done();
       });
-    });
+    }));
 
-    it('should get incoming relationships by type', done => {
+    it('should get incoming relationships by type', () => new Promise<void>(done => {
       service.getByRelationshipType('concept-1', 'CONTAINS', 'incoming').subscribe(nodes => {
         expect(nodes.length).toBe(1);
         expect(nodes[0].id).toBe('concept-6');
         done();
       });
-    });
+    }));
 
-    it('should return empty array for non-existent relationships', done => {
+    it('should return empty array for non-existent relationships', () => new Promise<void>(done => {
       service
         .getByRelationshipType('concept-1', 'NON_EXISTENT' as any, 'outgoing')
         .subscribe(nodes => {
           expect(nodes.length).toBe(0);
           done();
         });
-    });
+    }));
   });
 
   describe('hasRelatedConcepts', () => {
-    it('should return true for node with relationships', done => {
+    it('should return true for node with relationships', () => new Promise<void>(done => {
       service.hasRelatedConcepts('concept-1').subscribe(hasRelated => {
         expect(hasRelated).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should return false for isolated node', done => {
+    it('should return false for isolated node', () => new Promise<void>(done => {
       // Add isolated node to graph
       const isolatedGraph = {
         ...mockGraph,
@@ -470,17 +471,17 @@ describe('RelatedConceptsService', () => {
         adjacency: new Map(mockGraph.adjacency),
         reverseAdjacency: new Map(mockGraph.reverseAdjacency),
       };
-      dataLoaderSpy.getGraph.and.returnValue(of(isolatedGraph));
+      dataLoaderSpy.getGraph.mockReturnValue(of(isolatedGraph));
 
       service.hasRelatedConcepts('isolated').subscribe(hasRelated => {
         expect(hasRelated).toBe(false);
         done();
       });
-    });
+    }));
   });
 
   describe('clearCache', () => {
-    it('should clear all caches', done => {
+    it('should clear all caches', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(() => {
         const statsBefore = service.getCacheStats();
         expect(statsBefore.relationshipCacheSize).toBeGreaterThan(0);
@@ -493,11 +494,11 @@ describe('RelatedConceptsService', () => {
         expect(statsAfter.hasGraph).toBe(false);
         done();
       });
-    });
+    }));
   });
 
   describe('getCacheStats', () => {
-    it('should return cache statistics', done => {
+    it('should return cache statistics', () => new Promise<void>(done => {
       service.getRelatedConcepts('concept-1').subscribe(() => {
         const stats = service.getCacheStats();
         expect(stats.relationshipCacheSize).toBeGreaterThan(0);
@@ -506,19 +507,19 @@ describe('RelatedConceptsService', () => {
         expect(stats.hasGraph).toBe(false);
         done();
       });
-    });
+    }));
 
-    it('should show hasGraph=true after neighborhood query', done => {
+    it('should show hasGraph=true after neighborhood query', () => new Promise<void>(done => {
       service.getNeighborhood('concept-1').subscribe(() => {
         const stats = service.getCacheStats();
         expect(stats.hasGraph).toBe(true);
         done();
       });
-    });
+    }));
   });
 
   describe('edge cases', () => {
-    it('should handle empty graph', done => {
+    it('should handle empty graph', () => new Promise<void>(done => {
       const emptyGraph: ContentGraph = {
         nodes: new Map(),
         relationships: new Map(),
@@ -534,9 +535,9 @@ describe('RelatedConceptsService', () => {
           version: '1.0',
         },
       };
-      dataLoaderSpy.getGraph.and.returnValue(of(emptyGraph));
+      dataLoaderSpy.getGraph.mockReturnValue(of(emptyGraph));
       // Also mock empty relationships for lazy loading path
-      dataLoaderSpy.getRelationshipsForNode.and.returnValue(of([]));
+      dataLoaderSpy.getRelationshipsForNode.mockReturnValue(of([]));
 
       service.getRelatedConcepts('concept-1').subscribe(result => {
         expect(result.prerequisites.length).toBe(0);
@@ -544,10 +545,10 @@ describe('RelatedConceptsService', () => {
         expect(result.related.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should handle relationship load error in lazy loading', done => {
-      dataLoaderSpy.getRelationshipsForNode.and.returnValue(
+    it('should handle relationship load error in lazy loading', () => new Promise<void>(done => {
+      dataLoaderSpy.getRelationshipsForNode.mockReturnValue(
         throwError(() => new Error('Load failed'))
       );
 
@@ -557,19 +558,19 @@ describe('RelatedConceptsService', () => {
           done();
         },
       });
-    });
+    }));
 
-    it('should handle content load error gracefully', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should handle content load error gracefully', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getRelatedConcepts('concept-1').subscribe(result => {
         // Should still complete, just with fewer loaded nodes
         expect(result).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should handle missing nodes in relationships', done => {
+    it('should handle missing nodes in relationships', () => new Promise<void>(done => {
       const relationshipsWithMissing = [
         {
           id: 'rel-missing',
@@ -579,8 +580,8 @@ describe('RelatedConceptsService', () => {
           metadata: {},
         },
       ];
-      dataLoaderSpy.getRelationshipsForNode.and.returnValue(of(relationshipsWithMissing));
-      dataLoaderSpy.getContent.and.callFake((id: string) => {
+      dataLoaderSpy.getRelationshipsForNode.mockReturnValue(of(relationshipsWithMissing));
+      dataLoaderSpy.getContent.mockImplementation((id: string) => {
         if (id === 'missing-node') {
           return throwError(() => new Error('Not found'));
         }
@@ -592,11 +593,11 @@ describe('RelatedConceptsService', () => {
         expect(result).toBeDefined();
         done();
       });
-    });
+    }));
   });
 
   describe('LRU cache behavior', () => {
-    it('should evict old entries when cache is full', done => {
+    it('should evict old entries when cache is full', () => new Promise<void>(done => {
       // Fill cache with many queries
       let completed = 0;
       const total = 210; // More than cache limit (200)
@@ -611,6 +612,6 @@ describe('RelatedConceptsService', () => {
           }
         });
       }
-    });
+    }));
   });
 });

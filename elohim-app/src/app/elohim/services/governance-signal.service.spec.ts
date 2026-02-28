@@ -58,7 +58,7 @@ describe('GovernanceSignalService', () => {
       expect(typeof service.recordGraduatedFeedback).toBe('function');
     });
 
-    it('should recordReaction return Observable', (done) => {
+    it('should recordReaction return Observable', () => new Promise<void>(done => {
       const reaction = {
         type: 'positive' as any,
         context: 'test',
@@ -73,9 +73,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should recordMediationProceed return Observable', (done) => {
+    it('should recordMediationProceed return Observable', () => new Promise<void>(done => {
       const log = {
         contentId: 'content-123',
         initialReaction: 'negative' as any,
@@ -94,9 +94,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should recordGraduatedFeedback return Observable', (done) => {
+    it('should recordGraduatedFeedback return Observable', () => new Promise<void>(done => {
       const feedback = {
         contentId: 'content-123',
         rating: 4,
@@ -114,7 +114,7 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   // ==========================================================================
@@ -138,7 +138,7 @@ describe('GovernanceSignalService', () => {
       expect(typeof service.getFeedbackStats).toBe('function');
     });
 
-    it('should getReactions return Observable', (done) => {
+    it('should getReactions return Observable', () => new Promise<void>(done => {
       service.getReactions('content-123').subscribe({
         next: (reactions) => {
           expect(Array.isArray(reactions)).toBe(true);
@@ -146,9 +146,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should getReactionCounts return Observable', (done) => {
+    it('should getReactionCounts return Observable', () => new Promise<void>(done => {
       service.getReactionCounts('content-123').subscribe({
         next: (counts) => {
           expect(counts).toBeDefined();
@@ -156,9 +156,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should getGraduatedFeedback return Observable', (done) => {
+    it('should getGraduatedFeedback return Observable', () => new Promise<void>(done => {
       service.getGraduatedFeedback('content-123').subscribe({
         next: (feedback) => {
           expect(Array.isArray(feedback)).toBe(true);
@@ -166,9 +166,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should getFeedbackStats return Observable', (done) => {
+    it('should getFeedbackStats return Observable', () => new Promise<void>(done => {
       service.getFeedbackStats('content-123').subscribe({
         next: (stats) => {
           expect(stats).toBeDefined();
@@ -176,7 +176,7 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   // ==========================================================================
@@ -189,7 +189,7 @@ describe('GovernanceSignalService', () => {
       expect(service.signalChanges$.subscribe).toBeDefined();
     });
 
-    it('should have signalChanges$ subscription', (done) => {
+    it('should have signalChanges$ subscription', () => new Promise<void>(done => {
       let sub: any;
       sub = service.signalChanges$.subscribe({
         next: () => {
@@ -198,7 +198,7 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   // ==========================================================================
@@ -225,7 +225,7 @@ describe('GovernanceSignalService', () => {
   // ==========================================================================
 
   describe('return types', () => {
-    it('recordReaction should return Observable<boolean>', (done) => {
+    it('recordReaction should return Observable<boolean>', () => new Promise<void>(done => {
       const reaction = {
         type: 'positive' as any,
         context: 'test',
@@ -243,9 +243,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('getReactions should return Observable<Array>', (done) => {
+    it('getReactions should return Observable<Array>', () => new Promise<void>(done => {
       const result = service.getReactions('content-123');
 
       expect(result.subscribe).toBeDefined();
@@ -256,9 +256,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('getReactionCounts should return Observable<Object>', (done) => {
+    it('getReactionCounts should return Observable<Object>', () => new Promise<void>(done => {
       const result = service.getReactionCounts('content-123');
 
       expect(result.subscribe).toBeDefined();
@@ -269,9 +269,9 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('getFeedbackStats should return Observable<Object>', (done) => {
+    it('getFeedbackStats should return Observable<Object>', () => new Promise<void>(done => {
       const result = service.getFeedbackStats('content-123');
 
       expect(result.subscribe).toBeDefined();
@@ -282,7 +282,7 @@ describe('GovernanceSignalService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
     it('signalChanges$ should be Observable', () => {
       expect(service.signalChanges$.subscribe).toBeDefined();
@@ -348,7 +348,7 @@ describe('GovernanceSignalService', () => {
       }).not.toThrow();
     });
 
-    it('should allow concurrent retrieval operations', (done) => {
+    it('should allow concurrent retrieval operations', () => new Promise<void>(done => {
       let completed = 0;
       const checkDone = () => {
         completed++;
@@ -364,6 +364,6 @@ describe('GovernanceSignalService', () => {
         next: () => checkDone(),
         error: done.fail
       });
-    });
+    }));
   });
 });

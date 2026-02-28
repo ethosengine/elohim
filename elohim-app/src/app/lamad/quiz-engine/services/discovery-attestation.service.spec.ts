@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 
 import type { ReachLevel } from '@app/elohim/models/protocol-core.model';
@@ -210,11 +211,11 @@ describe('DiscoveryAttestationService', () => {
     });
 
     it('should handle localStorage.getItem throwing', () => {
-      const spy = spyOn(Storage.prototype, 'getItem').and.throwError('storage unavailable');
+      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw 'storage unavailable'; });
       const svc = createService();
       expect(svc.results()).toEqual([]);
       expect(svc.attestations()).toEqual([]);
-      spy.and.callThrough();
+      spy.mockRestore();
     });
   });
 
@@ -369,14 +370,14 @@ describe('DiscoveryAttestationService', () => {
       for (const fw of autoFeatured) {
         it(`should auto-feature ${fw} results`, () => {
           recordDefault({ id: `assess-${fw}`, framework: fw });
-          expect(service.attestations()[0].featured).toBeTrue();
+          expect(service.attestations()[0].featured).toBe(true);
         });
       }
 
       for (const fw of notAutoFeatured) {
         it(`should NOT auto-feature ${fw} results`, () => {
           recordDefault({ id: `assess-${fw}`, framework: fw });
-          expect(service.attestations()[0].featured).toBeFalse();
+          expect(service.attestations()[0].featured).toBe(false);
         });
       }
     });
@@ -541,17 +542,17 @@ describe('DiscoveryAttestationService', () => {
 
   describe('hasCompletedAssessment()', () => {
     it('should return false when no results exist', () => {
-      expect(service.hasCompletedAssessment('any')).toBeFalse();
+      expect(service.hasCompletedAssessment('any')).toBe(false);
     });
 
     it('should return true for a completed assessment', () => {
       recordDefault({ id: 'my-assessment' });
-      expect(service.hasCompletedAssessment('my-assessment')).toBeTrue();
+      expect(service.hasCompletedAssessment('my-assessment')).toBe(true);
     });
 
     it('should return false for a non-completed assessment', () => {
       recordDefault({ id: 'assessment-a' });
-      expect(service.hasCompletedAssessment('assessment-b')).toBeFalse();
+      expect(service.hasCompletedAssessment('assessment-b')).toBe(false);
     });
   });
 
@@ -603,25 +604,25 @@ describe('DiscoveryAttestationService', () => {
   describe('toggleFeatured()', () => {
     it('should flip featured from true to false', () => {
       const result = recordDefault({ framework: 'enneagram' }); // auto-featured
-      expect(service.attestations()[0].featured).toBeTrue();
+      expect(service.attestations()[0].featured).toBe(true);
 
       service.toggleFeatured(result.id);
-      expect(service.attestations()[0].featured).toBeFalse();
+      expect(service.attestations()[0].featured).toBe(false);
     });
 
     it('should flip featured from false to true', () => {
       const result = recordDefault({ framework: 'love-languages' }); // not auto-featured
-      expect(service.attestations()[0].featured).toBeFalse();
+      expect(service.attestations()[0].featured).toBe(false);
 
       service.toggleFeatured(result.id);
-      expect(service.attestations()[0].featured).toBeTrue();
+      expect(service.attestations()[0].featured).toBe(true);
     });
 
     it('should persist to localStorage after toggle', () => {
       const result = recordDefault({ framework: 'enneagram' });
       service.toggleFeatured(result.id);
       const stored = JSON.parse(localStorage.getItem('elohim:discovery-attestations')!);
-      expect(stored[0].featured).toBeFalse();
+      expect(stored[0].featured).toBe(false);
     });
 
     it('should not modify other attestations when toggling one', () => {
@@ -630,7 +631,7 @@ describe('DiscoveryAttestationService', () => {
 
       service.toggleFeatured(r1.id);
       const other = service.attestations().find(a => a.result.assessmentId === 'a2');
-      expect(other!.featured).toBeTrue();
+      expect(other!.featured).toBe(true);
     });
   });
 
@@ -751,7 +752,7 @@ describe('DiscoveryAttestationService', () => {
     });
 
     it('should set revocable to false', () => {
-      expect(standard.revocable).toBeFalse();
+      expect(standard.revocable).toBe(false);
     });
 
     it('should include framework and category in metadata', () => {
@@ -816,7 +817,7 @@ describe('DiscoveryAttestationService', () => {
       expect(s.description).toBeDefined();
       expect(s.type).toBe('discovery');
       expect(s.earnedAt).toBeDefined();
-      expect(s.revocable).toBeFalse();
+      expect(s.revocable).toBe(false);
     });
   });
 
@@ -1081,19 +1082,19 @@ describe('DiscoveryAttestationService', () => {
 
   describe('Storage Error Handling', () => {
     it('should handle localStorage write failure silently', () => {
-      const spy = spyOn(Storage.prototype, 'setItem').and.throwError('quota exceeded');
+      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw 'quota exceeded'; });
       expect(() => recordDefault()).not.toThrow();
       // The result should still be in the signal even if storage failed
       expect(service.results().length).toBe(1);
-      spy.and.callThrough();
+      spy.mockRestore();
     });
 
     it('should handle localStorage read failure on construction silently', () => {
-      const spy = spyOn(Storage.prototype, 'getItem').and.throwError('storage unavailable');
+      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw 'storage unavailable'; });
       const svc = createService();
       expect(svc.results()).toEqual([]);
       expect(svc.attestations()).toEqual([]);
-      spy.and.callThrough();
+      spy.mockRestore();
     });
   });
 
@@ -1471,20 +1472,20 @@ describe('DiscoveryAttestationService', () => {
 
     it('should return true when scope equals required', () => {
       for (const level of levels) {
-        expect(consentEncompasses(level, level)).toBeTrue();
+        expect(consentEncompasses(level, level)).toBe(true);
       }
     });
 
     it('should return true when scope exceeds required', () => {
-      expect(consentEncompasses('identifiable', 'none')).toBeTrue();
-      expect(consentEncompasses('anonymized', 'aggregate-only')).toBeTrue();
-      expect(consentEncompasses('aggregate-only', 'none')).toBeTrue();
+      expect(consentEncompasses('identifiable', 'none')).toBe(true);
+      expect(consentEncompasses('anonymized', 'aggregate-only')).toBe(true);
+      expect(consentEncompasses('aggregate-only', 'none')).toBe(true);
     });
 
     it('should return false when scope is below required', () => {
-      expect(consentEncompasses('none', 'aggregate-only')).toBeFalse();
-      expect(consentEncompasses('aggregate-only', 'anonymized')).toBeFalse();
-      expect(consentEncompasses('anonymized', 'identifiable')).toBeFalse();
+      expect(consentEncompasses('none', 'aggregate-only')).toBe(false);
+      expect(consentEncompasses('aggregate-only', 'anonymized')).toBe(false);
+      expect(consentEncompasses('anonymized', 'identifiable')).toBe(false);
     });
 
     it('should enforce full ordering: none < aggregate-only < anonymized < identifiable', () => {

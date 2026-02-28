@@ -3,17 +3,18 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { StewardService } from './steward.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { vi } from 'vitest';
 
 describe('StewardService', () => {
   let service: StewardService;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
+  let mockHolochainClient: any;
 
   beforeEach(() => {
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', [
-      'callZome',
-      'isConnected',
-    ]);
-    mockHolochainClient.isConnected.and.returnValue(false);
+    mockHolochainClient = {
+    callZome: vi.fn(),
+    isConnected: vi.fn(),
+  };
+    mockHolochainClient.isConnected.mockReturnValue(false);
 
     TestBed.configureTestingModule({
       providers: [
@@ -83,28 +84,28 @@ describe('StewardService', () => {
       expect(typeof service.getCredentialsForHuman).toBe('function');
     });
 
-    it('getCredential should return observable when not available', (done) => {
+    it('getCredential should return observable when not available', () => new Promise<void>(done => {
       service.getCredential('cred-123').subscribe((result) => {
         expect(result).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('getMyCredentials should return empty array when not available', (done) => {
+    it('getMyCredentials should return empty array when not available', () => new Promise<void>(done => {
       service.getMyCredentials().subscribe((result) => {
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('getCredentialsForHuman should return empty array when not available', (done) => {
+    it('getCredentialsForHuman should return empty array when not available', () => new Promise<void>(done => {
       service.getCredentialsForHuman('human-1').subscribe((result) => {
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('Gate Methods', () => {
@@ -123,20 +124,20 @@ describe('StewardService', () => {
       expect(typeof service.getGatesForResource).toBe('function');
     });
 
-    it('getGate should return observable when not available', (done) => {
+    it('getGate should return observable when not available', () => new Promise<void>(done => {
       service.getGate('gate-123').subscribe((result) => {
         expect(result).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('getGatesForResource should return empty array when not available', (done) => {
+    it('getGatesForResource should return empty array when not available', () => new Promise<void>(done => {
       service.getGatesForResource('resource-1').subscribe((result) => {
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('Access Control Methods', () => {
@@ -155,20 +156,20 @@ describe('StewardService', () => {
       expect(typeof service.getMyAccessGrants).toBe('function');
     });
 
-    it('checkAccess should return observable when not available', (done) => {
+    it('checkAccess should return observable when not available', () => new Promise<void>(done => {
       service.checkAccess('gate-123').subscribe((result) => {
         expect(result).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('getMyAccessGrants should return empty array when not available', (done) => {
+    it('getMyAccessGrants should return empty array when not available', () => new Promise<void>(done => {
       service.getMyAccessGrants().subscribe((result) => {
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('Revenue Methods', () => {
@@ -177,12 +178,12 @@ describe('StewardService', () => {
       expect(typeof service.getRevenueSummary).toBe('function');
     });
 
-    it('getRevenueSummary should return observable when not available', (done) => {
+    it('getRevenueSummary should return observable when not available', () => new Promise<void>(done => {
       service.getRevenueSummary('steward-1').subscribe((result) => {
         expect(result).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('Cache Management', () => {

@@ -4,21 +4,20 @@ import { AgencyBadgeComponent } from './agency-badge.component';
 import { AgencyService } from '@app/imagodei/services/agency.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { signal, computed } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('AgencyBadgeComponent', () => {
   let component: AgencyBadgeComponent;
   let fixture: ComponentFixture<AgencyBadgeComponent>;
-  let routerSpy: jasmine.SpyObj<Router>;
-  let agencySpy: jasmine.SpyObj<AgencyService>;
-  let holochainSpy: jasmine.SpyObj<HolochainClientService>;
+  let routerSpy: any;
+  let agencySpy: any;
+  let holochainSpy: any;
 
   beforeEach(async () => {
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
-    agencySpy = jasmine.createSpyObj(
-      'AgencyService',
-      ['getStageSummary'],
-      {
-        agencyState: signal({
+    routerSpy = {
+    navigate: vi.fn(),
+  };
+    agencySpy = { getStageSummary: vi.fn(), agencyState: signal({
           currentStage: 'citizen',
           networked: true,
           edgeNodeConnected: true,
@@ -33,22 +32,14 @@ describe('AgencyBadgeComponent', () => {
           message: 'Connected',
           isOnline: true,
         }),
-        canUpgrade: signal(false),
-      }
-    );
-    agencySpy.getStageSummary.and.returnValue({
+        canUpgrade: signal(false), };
+    agencySpy.getStageSummary.mockReturnValue({
       data: 'Test summary',
       progress: '0%',
     });
 
-    holochainSpy = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['getDisplayInfo', 'disconnect', 'connect'],
-      {
-        isConnected: signal(true),
-      }
-    );
-    holochainSpy.getDisplayInfo.and.returnValue({
+    holochainSpy = { getDisplayInfo: vi.fn(), disconnect: vi.fn(), connect: vi.fn(), isConnected: signal(true), };
+    holochainSpy.getDisplayInfo.mockReturnValue({
       state: 'connected',
       mode: 'doorway',
       adminUrl: 'ws://localhost:4444',
@@ -164,13 +155,13 @@ describe('AgencyBadgeComponent', () => {
       expect(typeof component.onViewDetails).toBe('function');
     });
 
-    it('should emit viewDetails output', (done) => {
+    it('should emit viewDetails output', () => new Promise<void>(done => {
       component.viewDetails.subscribe(() => {
         expect(true).toBe(true);
         done();
       });
       component.onViewDetails();
-    });
+    }));
 
     it('should navigate to identity profile network section', () => {
       component.onViewDetails();
@@ -186,13 +177,13 @@ describe('AgencyBadgeComponent', () => {
       expect(typeof component.onUpgrade).toBe('function');
     });
 
-    it('should emit upgrade output', (done) => {
+    it('should emit upgrade output', () => new Promise<void>(done => {
       component.upgrade.subscribe(() => {
         expect(true).toBe(true);
         done();
       });
       component.onUpgrade();
-    });
+    }));
 
     it('should navigate to profile upgrade section', () => {
       component.onUpgrade();
@@ -209,8 +200,8 @@ describe('AgencyBadgeComponent', () => {
     });
 
     it('should disconnect and reconnect to holochain service', async () => {
-      holochainSpy.disconnect.and.returnValue(Promise.resolve());
-      holochainSpy.connect.and.returnValue(Promise.resolve());
+      holochainSpy.disconnect.mockReturnValue(Promise.resolve());
+      holochainSpy.connect.mockReturnValue(Promise.resolve());
 
       await component.onReconnect();
 
@@ -227,8 +218,8 @@ describe('AgencyBadgeComponent', () => {
 
     it('should copy text to clipboard', async () => {
       const mockEvent = new MouseEvent('click');
-      spyOn(mockEvent, 'stopPropagation');
-      spyOn(navigator.clipboard, 'writeText').and.returnValue(
+      vi.spyOn(mockEvent, 'stopPropagation');
+      vi.spyOn(navigator.clipboard, 'writeText').mockReturnValue(
         Promise.resolve()
       );
 

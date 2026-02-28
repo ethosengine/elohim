@@ -31,7 +31,7 @@ describe('ElohimStubService', () => {
       expect(typeof service.categorizeTransactions).toBe('function');
     });
 
-    it('should return observable', (done) => {
+    it('should return observable', () => new Promise<void>(done => {
       const transactions: StagedTransaction[] = [
         {
           id: 'txn-1',
@@ -57,9 +57,9 @@ describe('ElohimStubService', () => {
         expect(categorized.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should categorize amazon purchases as Shopping', (done) => {
+    it('should categorize amazon purchases as Shopping', () => new Promise<void>(done => {
       const transactions: StagedTransaction[] = [
         {
           id: 'txn-1',
@@ -85,9 +85,9 @@ describe('ElohimStubService', () => {
         expect(categorized[0].confidence).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should generate alternatives for uncertain matches', (done) => {
+    it('should generate alternatives for uncertain matches', () => new Promise<void>(done => {
       const transactions: StagedTransaction[] = [
         {
           id: 'txn-1',
@@ -112,7 +112,7 @@ describe('ElohimStubService', () => {
         expect(categorized[0]?.alternatives?.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
   });
 
   describe('adjudicateClaim', () => {
@@ -121,7 +121,7 @@ describe('ElohimStubService', () => {
       expect(typeof service.adjudicateClaim).toBe('function');
     });
 
-    it('should return observable', (done) => {
+    it('should return observable', () => new Promise<void>(done => {
       const result = service.adjudicateClaim({
         claimId: 'claim-1',
         claimType: 'health',
@@ -139,9 +139,9 @@ describe('ElohimStubService', () => {
         expect(decision.decision).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should approve low-amount claims with evidence', (done) => {
+    it('should approve low-amount claims with evidence', () => new Promise<void>(done => {
       const result = service.adjudicateClaim({
         claimId: 'claim-1',
         claimType: 'health',
@@ -159,9 +159,9 @@ describe('ElohimStubService', () => {
         expect(decision.confidence).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should flag high-risk members for review', (done) => {
+    it('should flag high-risk members for review', () => new Promise<void>(done => {
       const result = service.adjudicateClaim({
         claimId: 'claim-1',
         claimType: 'health',
@@ -178,9 +178,9 @@ describe('ElohimStubService', () => {
         expect(decision.decision).toBe('review');
         done();
       });
-    });
+    }));
 
-    it('should flag claims without evidence for review', (done) => {
+    it('should flag claims without evidence for review', () => new Promise<void>(done => {
       const result = service.adjudicateClaim({
         claimId: 'claim-1',
         claimType: 'health',
@@ -197,7 +197,7 @@ describe('ElohimStubService', () => {
         expect(decision.decision).toBe('review');
         done();
       });
-    });
+    }));
   });
 
   describe('getCallLogs', () => {
@@ -208,7 +208,7 @@ describe('ElohimStubService', () => {
 
     it('should return array of call logs', () => {
       const result = service.getCallLogs();
-      expect(result).toEqual(jasmine.any(Array));
+      expect(result).toEqual(expect.any(Array));
     });
 
     it('should initially be empty', () => {
@@ -217,7 +217,7 @@ describe('ElohimStubService', () => {
       expect(result.length).toBe(0);
     });
 
-    it('should record call logs after categorization', (done) => {
+    it('should record call logs after categorization', () => new Promise<void>(done => {
       service.clearLogs();
       const transactions: StagedTransaction[] = [
         {
@@ -244,7 +244,7 @@ describe('ElohimStubService', () => {
         expect(logs[0].agentType).toBe('categorizer');
         done();
       });
-    });
+    }));
   });
 
   describe('getCallsByAgent', () => {
@@ -259,7 +259,7 @@ describe('ElohimStubService', () => {
       expect(result.length).toBe(0);
     });
 
-    it('should filter logs by agent type', (done) => {
+    it('should filter logs by agent type', () => new Promise<void>(done => {
       service.clearLogs();
       const transactions: StagedTransaction[] = [
         {
@@ -283,10 +283,10 @@ describe('ElohimStubService', () => {
       result.subscribe(() => {
         const logs = service.getCallsByAgent('categorizer');
         expect(logs.length).toBeGreaterThan(0);
-        expect(logs.every(log => log.agentType === 'categorizer')).toBeTrue();
+        expect(logs.every(log => log.agentType === 'categorizer')).toBe(true);
         done();
       });
-    });
+    }));
   });
 
   describe('clearLogs', () => {
@@ -295,7 +295,7 @@ describe('ElohimStubService', () => {
       expect(typeof service.clearLogs).toBe('function');
     });
 
-    it('should clear all logs', (done) => {
+    it('should clear all logs', () => new Promise<void>(done => {
       const transactions: StagedTransaction[] = [
         {
           id: 'txn-1',
@@ -321,7 +321,7 @@ describe('ElohimStubService', () => {
         expect(service.getCallLogs().length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('exportLogs', () => {
@@ -343,7 +343,7 @@ describe('ElohimStubService', () => {
       expect(parsed).toEqual([]);
     });
 
-    it('should export logs as valid JSON', (done) => {
+    it('should export logs as valid JSON', () => new Promise<void>(done => {
       service.clearLogs();
       const transactions: StagedTransaction[] = [
         {
@@ -367,10 +367,10 @@ describe('ElohimStubService', () => {
       result.subscribe(() => {
         const exported = service.exportLogs();
         const parsed = JSON.parse(exported);
-        expect(parsed).toEqual(jasmine.any(Array));
+        expect(parsed).toEqual(expect.any(Array));
         expect(parsed.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
   });
 });

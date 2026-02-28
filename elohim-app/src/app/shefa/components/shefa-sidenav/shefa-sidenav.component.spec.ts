@@ -6,6 +6,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
 import { ShefaSidenavComponent } from './shefa-sidenav.component';
+import { vi } from 'vitest';
 
 describe('ShefaSidenavComponent', () => {
   let component: ShefaSidenavComponent;
@@ -95,7 +96,7 @@ describe('ShefaSidenavComponent', () => {
 
   describe('user interactions', () => {
     it('should emit navItemClicked when a nav item is clicked', () => {
-      const spy = jasmine.createSpy('navItemClicked');
+      const spy = vi.fn();
       component.navItemClicked.subscribe(spy);
 
       const items: HTMLAnchorElement[] = fixture.nativeElement.querySelectorAll('.nav-item');
@@ -105,7 +106,7 @@ describe('ShefaSidenavComponent', () => {
     });
 
     it('should emit collapseClicked when collapse button is clicked', () => {
-      const spy = jasmine.createSpy('collapseClicked');
+      const spy = vi.fn();
       component.collapseClicked.subscribe(spy);
 
       const btn: HTMLButtonElement =

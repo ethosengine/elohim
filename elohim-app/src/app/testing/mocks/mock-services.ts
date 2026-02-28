@@ -1,29 +1,30 @@
 /**
  * Mock service factories for unit testing
  */
+import { type Mock, vi } from 'vitest';
 
 // ============================================================================
 // Content Service Mock
 // ============================================================================
 
 export interface MockContentService {
-  getContent: jasmine.Spy;
-  getContentByPath: jasmine.Spy;
-  listContent: jasmine.Spy;
-  createContent: jasmine.Spy;
-  updateContent: jasmine.Spy;
-  deleteContent: jasmine.Spy;
+  getContent: Mock;
+  getContentByPath: Mock;
+  listContent: Mock;
+  createContent: Mock;
+  updateContent: Mock;
+  deleteContent: Mock;
 }
 
 export function createMockContentService(): MockContentService {
-  return jasmine.createSpyObj<MockContentService>('ContentService', [
-    'getContent',
-    'getContentByPath',
-    'listContent',
-    'createContent',
-    'updateContent',
-    'deleteContent',
-  ]);
+  return {
+    getContent: vi.fn(),
+    getContentByPath: vi.fn(),
+    listContent: vi.fn(),
+    createContent: vi.fn(),
+    updateContent: vi.fn(),
+    deleteContent: vi.fn(),
+  };
 }
 
 // ============================================================================
@@ -31,30 +32,23 @@ export function createMockContentService(): MockContentService {
 // ============================================================================
 
 export interface MockAuthService {
-  login: jasmine.Spy;
-  logout: jasmine.Spy;
-  isAuthenticated: jasmine.Spy;
-  getToken: jasmine.Spy;
-  getCurrentHuman: jasmine.Spy;
-  refreshToken: jasmine.Spy;
+  login: Mock;
+  logout: Mock;
+  isAuthenticated: Mock;
+  getToken: Mock;
+  getCurrentHuman: Mock;
+  refreshToken: Mock;
 }
 
 export function createMockAuthService(): MockAuthService {
-  const mock = jasmine.createSpyObj<MockAuthService>('AuthService', [
-    'login',
-    'logout',
-    'isAuthenticated',
-    'getToken',
-    'getCurrentHuman',
-    'refreshToken',
-  ]);
-
-  // Default behaviors
-  mock.isAuthenticated.and.returnValue(false);
-  mock.getToken.and.returnValue(null);
-  mock.getCurrentHuman.and.returnValue(null);
-
-  return mock;
+  return {
+    login: vi.fn(),
+    logout: vi.fn(),
+    isAuthenticated: vi.fn().mockReturnValue(false),
+    getToken: vi.fn().mockReturnValue(null),
+    getCurrentHuman: vi.fn().mockReturnValue(null),
+    refreshToken: vi.fn(),
+  };
 }
 
 // ============================================================================
@@ -62,29 +56,25 @@ export function createMockAuthService(): MockAuthService {
 // ============================================================================
 
 export interface MockStorageClientService {
-  get: jasmine.Spy;
-  put: jasmine.Spy;
-  delete: jasmine.Spy;
-  list: jasmine.Spy;
-  getBlob: jasmine.Spy;
-  putBlob: jasmine.Spy;
-  getBaseUrl: jasmine.Spy;
+  get: Mock;
+  put: Mock;
+  delete: Mock;
+  list: Mock;
+  getBlob: Mock;
+  putBlob: Mock;
+  getBaseUrl: Mock;
 }
 
 export function createMockStorageClient(): MockStorageClientService {
-  const mock = jasmine.createSpyObj<MockStorageClientService>('StorageClientService', [
-    'get',
-    'put',
-    'delete',
-    'list',
-    'getBlob',
-    'putBlob',
-    'getBaseUrl',
-  ]);
-
-  mock.getBaseUrl.and.returnValue('http://localhost:8888');
-
-  return mock;
+  return {
+    get: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn(),
+    getBlob: vi.fn(),
+    putBlob: vi.fn(),
+    getBaseUrl: vi.fn().mockReturnValue('http://localhost:8888'),
+  };
 }
 
 // ============================================================================
@@ -92,27 +82,21 @@ export function createMockStorageClient(): MockStorageClientService {
 // ============================================================================
 
 export interface MockHolochainClientService {
-  connect: jasmine.Spy;
-  disconnect: jasmine.Spy;
-  callZome: jasmine.Spy;
-  isConnected: jasmine.Spy;
-  onSignal: jasmine.Spy;
+  connect: Mock;
+  disconnect: Mock;
+  callZome: Mock;
+  isConnected: Mock;
+  onSignal: Mock;
 }
 
 export function createMockHolochainClient(): MockHolochainClientService {
-  const mock = jasmine.createSpyObj<MockHolochainClientService>('HolochainClientService', [
-    'connect',
-    'disconnect',
-    'callZome',
-    'isConnected',
-    'onSignal',
-  ]);
-
-  mock.isConnected.and.returnValue(false);
-  mock.callZome.and.returnValue(Promise.resolve(null));
-  mock.connect.and.returnValue(Promise.resolve());
-
-  return mock;
+  return {
+    connect: vi.fn().mockReturnValue(Promise.resolve()),
+    disconnect: vi.fn(),
+    callZome: vi.fn().mockReturnValue(Promise.resolve(null)),
+    isConnected: vi.fn().mockReturnValue(false),
+    onSignal: vi.fn(),
+  };
 }
 
 // ============================================================================
@@ -120,22 +104,17 @@ export function createMockHolochainClient(): MockHolochainClientService {
 // ============================================================================
 
 export interface MockDoorwayClientService {
-  getStatus: jasmine.Spy;
-  callEndpoint: jasmine.Spy;
-  isAvailable: jasmine.Spy;
+  getStatus: Mock;
+  callEndpoint: Mock;
+  isAvailable: Mock;
 }
 
 export function createMockDoorwayClient(): MockDoorwayClientService {
-  const mock = jasmine.createSpyObj<MockDoorwayClientService>('DoorwayClientService', [
-    'getStatus',
-    'callEndpoint',
-    'isAvailable',
-  ]);
-
-  mock.isAvailable.and.returnValue(true);
-  mock.getStatus.and.returnValue(Promise.resolve({ healthy: true }));
-
-  return mock;
+  return {
+    getStatus: vi.fn().mockReturnValue(Promise.resolve({ healthy: true })),
+    callEndpoint: vi.fn(),
+    isAvailable: vi.fn().mockReturnValue(true),
+  };
 }
 
 // ============================================================================
@@ -143,21 +122,21 @@ export function createMockDoorwayClient(): MockDoorwayClientService {
 // ============================================================================
 
 export interface MockPathService {
-  getPath: jasmine.Spy;
-  getPathSteps: jasmine.Spy;
-  getCurrentStep: jasmine.Spy;
-  advanceStep: jasmine.Spy;
-  completeStep: jasmine.Spy;
+  getPath: Mock;
+  getPathSteps: Mock;
+  getCurrentStep: Mock;
+  advanceStep: Mock;
+  completeStep: Mock;
 }
 
 export function createMockPathService(): MockPathService {
-  return jasmine.createSpyObj<MockPathService>('PathService', [
-    'getPath',
-    'getPathSteps',
-    'getCurrentStep',
-    'advanceStep',
-    'completeStep',
-  ]);
+  return {
+    getPath: vi.fn(),
+    getPathSteps: vi.fn(),
+    getCurrentStep: vi.fn(),
+    advanceStep: vi.fn(),
+    completeStep: vi.fn(),
+  };
 }
 
 // ============================================================================
@@ -165,21 +144,17 @@ export function createMockPathService(): MockPathService {
 // ============================================================================
 
 export interface MockMasteryService {
-  getMastery: jasmine.Spy;
-  updateMastery: jasmine.Spy;
-  getPathMastery: jasmine.Spy;
+  getMastery: Mock;
+  updateMastery: Mock;
+  getPathMastery: Mock;
 }
 
 export function createMockMasteryService(): MockMasteryService {
-  const mock = jasmine.createSpyObj<MockMasteryService>('MasteryService', [
-    'getMastery',
-    'updateMastery',
-    'getPathMastery',
-  ]);
-
-  mock.getMastery.and.returnValue(Promise.resolve({ level: 0, score: 0 }));
-
-  return mock;
+  return {
+    getMastery: vi.fn().mockReturnValue(Promise.resolve({ level: 0, score: 0 })),
+    updateMastery: vi.fn(),
+    getPathMastery: vi.fn(),
+  };
 }
 
 // ============================================================================
@@ -187,23 +162,19 @@ export function createMockMasteryService(): MockMasteryService {
 // ============================================================================
 
 export interface MockPresenceService {
-  setPresence: jasmine.Spy;
-  getPresence: jasmine.Spy;
-  subscribeToPresence: jasmine.Spy;
-  unsubscribe: jasmine.Spy;
+  setPresence: Mock;
+  getPresence: Mock;
+  subscribeToPresence: Mock;
+  unsubscribe: Mock;
 }
 
 export function createMockPresenceService(): MockPresenceService {
-  const mock = jasmine.createSpyObj<MockPresenceService>('PresenceService', [
-    'setPresence',
-    'getPresence',
-    'subscribeToPresence',
-    'unsubscribe',
-  ]);
-
-  mock.getPresence.and.returnValue(Promise.resolve({ status: 'offline' }));
-
-  return mock;
+  return {
+    setPresence: vi.fn(),
+    getPresence: vi.fn().mockReturnValue(Promise.resolve({ status: 'offline' })),
+    subscribeToPresence: vi.fn(),
+    unsubscribe: vi.fn(),
+  };
 }
 
 // ============================================================================
@@ -211,23 +182,18 @@ export function createMockPresenceService(): MockPresenceService {
 // ============================================================================
 
 export interface MockStorageApiService {
-  createEconomicEvent: jasmine.Spy;
-  getEconomicEvents: jasmine.Spy;
-  updateEconomicEvent: jasmine.Spy;
-  deleteEconomicEvent: jasmine.Spy;
+  createEconomicEvent: Mock;
+  getEconomicEvents: Mock;
+  updateEconomicEvent: Mock;
+  deleteEconomicEvent: Mock;
 }
 
 export function createMockStorageApiService(): MockStorageApiService {
-  const mock = jasmine.createSpyObj<MockStorageApiService>('StorageApiService', [
-    'createEconomicEvent',
-    'getEconomicEvents',
-    'updateEconomicEvent',
-    'deleteEconomicEvent',
-  ]);
-
-  // Default: return empty observable for queries
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  mock.getEconomicEvents.and.returnValue({ pipe: () => ({ subscribe: () => {} }) });
-
-  return mock;
+  return {
+    createEconomicEvent: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    getEconomicEvents: vi.fn().mockReturnValue({ pipe: () => ({ subscribe: () => {} }) }),
+    updateEconomicEvent: vi.fn(),
+    deleteEconomicEvent: vi.fn(),
+  };
 }

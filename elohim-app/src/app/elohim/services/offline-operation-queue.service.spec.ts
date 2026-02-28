@@ -7,28 +7,29 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { HolochainClientService } from './holochain-client.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { OfflineOperationQueueService } from './offline-operation-queue.service';
+import { vi } from 'vitest';
 
 describe('OfflineOperationQueueService', () => {
   let service: OfflineOperationQueueService;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockIdbCache: jasmine.SpyObj<IndexedDBCacheService>;
+  let mockHolochainClient: any;
+  let mockIdbCache: any;
 
   const unknownOperationId = 'unknown-id';
 
   beforeEach(() => {
-    mockHolochainClient = jasmine.createSpyObj<HolochainClientService>('HolochainClientService', [
-      'isConnected',
-      'callZome',
-    ]);
+    mockHolochainClient = {
+      isConnected: vi.fn(),
+      callZome: vi.fn(),
+    };
 
-    mockIdbCache = jasmine.createSpyObj<IndexedDBCacheService>('IndexedDBCacheService', [
-      'init',
-      'getMetadata',
-      'setMetadata',
-    ]);
-    mockIdbCache.init.and.returnValue(Promise.resolve(true));
-    mockIdbCache.getMetadata.and.returnValue(Promise.resolve(null));
-    mockIdbCache.setMetadata.and.returnValue(Promise.resolve());
+    mockIdbCache = {
+      init: vi.fn(),
+      getMetadata: vi.fn(),
+      setMetadata: vi.fn(),
+    };
+    mockIdbCache.init.mockReturnValue(Promise.resolve(true));
+    mockIdbCache.getMetadata.mockReturnValue(Promise.resolve(null));
+    mockIdbCache.setMetadata.mockReturnValue(Promise.resolve());
 
     TestBed.configureTestingModule({
       providers: [
@@ -243,7 +244,7 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('syncAll should return a Promise with succeeded and failed', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       const result = await service.syncAll();
       expect(result).toBeDefined();
       expect(typeof result.succeeded).toBe('number');
@@ -326,18 +327,18 @@ describe('OfflineOperationQueueService', () => {
 
   describe('Callback Registration Tests', () => {
     it('should accept queue change callback', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       expect(() => service.onQueueChanged(callback)).not.toThrow();
     });
 
     it('should accept sync complete callback', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       expect(() => service.onSyncComplete(callback)).not.toThrow();
     });
 
     it('should allow multiple queue change callbacks', () => {
-      const callback1 = jasmine.createSpy('callback1');
-      const callback2 = jasmine.createSpy('callback2');
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
 
       service.onQueueChanged(callback1);
       service.onQueueChanged(callback2);
@@ -349,11 +350,11 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should allow multiple sync complete callbacks', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
 
-      const callback1 = jasmine.createSpy('callback1');
-      const callback2 = jasmine.createSpy('callback2');
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
 
       service.onSyncComplete(callback1);
       service.onSyncComplete(callback2);
@@ -409,13 +410,13 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should notify queue changed callbacks', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       service.onQueueChanged(callback);
 
       service.enqueue({ type: 'create' });
 
       expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(jasmine.any(Array));
+      expect(callback).toHaveBeenCalledWith(expect.any(Array));
     });
   });
 
@@ -437,11 +438,11 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should notify queue changed on dequeue', () => {
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       const opId = service.enqueue({ type: 'create' });
 
       service.onQueueChanged(callback);
-      callback.calls.reset();
+      callback.mockClear();
 
       service.dequeue(opId);
 
@@ -451,7 +452,7 @@ describe('OfflineOperationQueueService', () => {
 
   describe('syncAll', () => {
     it('should return early if not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       service.enqueue({
         type: 'zome_call',
@@ -467,8 +468,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should sync operations when connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true, data: {} });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true, data: {} });
 
       service.enqueue({
         type: 'zome_call',
@@ -485,8 +486,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should count failed operations', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       service.enqueue({
         type: 'zome_call',
@@ -501,7 +502,7 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should skip operations without zomeName', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       service.enqueue({
         type: 'write', // No zomeName/fnName
@@ -514,10 +515,10 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should notify sync complete callbacks', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       service.onSyncComplete(callback);
 
       service.enqueue({
@@ -532,8 +533,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should update lastSync timestamp', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       service.enqueue({
         type: 'zome_call',
@@ -550,8 +551,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should prevent concurrent syncs', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.callFake(async () => {
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockImplementation(async () => {
         await new Promise(r => setTimeout(r, 50));
         return { success: true };
       });
@@ -578,8 +579,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('syncOperation', () => {
     it('should sync single operation', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -599,8 +600,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should return false on failure', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -632,9 +633,9 @@ describe('OfflineOperationQueueService', () => {
     it('should notify queue changed', () => {
       service.enqueue({ type: 'create' });
 
-      const callback = jasmine.createSpy('callback');
+      const callback = vi.fn();
       service.onQueueChanged(callback);
-      callback.calls.reset();
+      callback.mockClear();
 
       service.clearQueue();
 
@@ -654,8 +655,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('cancelRetry', () => {
     it('should cancel pending retry timeout', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -765,8 +766,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('exponential backoff retry', () => {
     it('should increment retry count on failure', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -785,8 +786,8 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should schedule retry with exponential delay', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       service.enqueue({
         type: 'zome_call',
@@ -798,20 +799,20 @@ describe('OfflineOperationQueueService', () => {
       // Initial sync
       await service.syncAll();
       tick(0);
-      const initialCalls = mockHolochainClient.callZome.calls.count();
+      const initialCalls = mockHolochainClient.callZome.mock.calls.length;
 
       // Wait 500ms - should not retry yet (delay is 1000ms for retry count 0)
       tick(500);
-      expect(mockHolochainClient.callZome.calls.count()).toBe(initialCalls);
+      expect(mockHolochainClient.callZome.mock.calls.length).toBe(initialCalls);
 
       // Wait another 600ms (total 1100ms) - should retry now
       tick(600);
-      expect(mockHolochainClient.callZome.calls.count()).toBeGreaterThan(initialCalls);
+      expect(mockHolochainClient.callZome.mock.calls.length).toBeGreaterThan(initialCalls);
     }));
 
     it('should stop retrying after max retries exceeded', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -840,8 +841,8 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should calculate exponential backoff correctly', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       service.enqueue({
         type: 'zome_call',
@@ -851,22 +852,22 @@ describe('OfflineOperationQueueService', () => {
       });
 
       const callCounts: number[] = [];
-      callCounts.push(mockHolochainClient.callZome.calls.count());
+      callCounts.push(mockHolochainClient.callZome.mock.calls.length);
 
       // Initial sync
       await service.syncAll();
       tick(0);
-      callCounts.push(mockHolochainClient.callZome.calls.count());
+      callCounts.push(mockHolochainClient.callZome.mock.calls.length);
 
       // Retry 1: 1000ms (2^0 * 1000)
       tick(1000);
       tick(0);
-      callCounts.push(mockHolochainClient.callZome.calls.count());
+      callCounts.push(mockHolochainClient.callZome.mock.calls.length);
 
       // Retry 2: 2000ms (2^1 * 1000)
       tick(2000);
       tick(0);
-      callCounts.push(mockHolochainClient.callZome.calls.count());
+      callCounts.push(mockHolochainClient.callZome.mock.calls.length);
 
       // Verify each retry happened
       expect(callCounts[1]).toBeGreaterThan(callCounts[0]); // Initial sync
@@ -875,8 +876,8 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should not schedule duplicate retries', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -893,13 +894,13 @@ describe('OfflineOperationQueueService', () => {
       await service.syncOperation(opId);
       tick(0);
 
-      const callCount = mockHolochainClient.callZome.calls.count();
+      const callCount = mockHolochainClient.callZome.mock.calls.length;
 
       // Wait for scheduled retry
       tick(1100);
 
       // Should only be 1 additional call (the scheduled retry)
-      expect(mockHolochainClient.callZome.calls.count()).toBe(callCount + 1);
+      expect(mockHolochainClient.callZome.mock.calls.length).toBe(callCount + 1);
     }));
   });
 
@@ -909,8 +910,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('concurrent operations', () => {
     it('should handle multiple operations in queue', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       service.enqueue({
         type: 'zome_call',
@@ -935,10 +936,10 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should process operations in FIFO order', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       const callOrder: string[] = [];
-      mockHolochainClient.callZome.and.callFake(async (params: any) => {
+      mockHolochainClient.callZome.mockImplementation(async (params: any) => {
         callOrder.push(params.fnName);
         return { success: true };
       });
@@ -965,10 +966,10 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should handle mixed success/failure in batch', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       let callCount = 0;
-      mockHolochainClient.callZome.and.callFake(async () => {
+      mockHolochainClient.callZome.mockImplementation(async () => {
         callCount++;
         // Fail every other call
         return { success: callCount % 2 === 1 };
@@ -1003,10 +1004,10 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should handle errors thrown during sync', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       let callCount = 0;
-      mockHolochainClient.callZome.and.callFake(async () => {
+      mockHolochainClient.callZome.mockImplementation(async () => {
         callCount++;
         if (callCount === 2) {
           throw new Error('Network error');
@@ -1043,8 +1044,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('connection state handling', () => {
     it('should defer retry when connection lost', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       service.enqueue({
         type: 'zome_call',
@@ -1058,18 +1059,18 @@ describe('OfflineOperationQueueService', () => {
       tick(0);
 
       // Lose connection
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       // Wait for retry attempt
       tick(1100);
 
       // Retry should be deferred, not executed
-      expect(mockHolochainClient.callZome.calls.count()).toBe(1); // Only initial
+      expect(mockHolochainClient.callZome.mock.calls.length).toBe(1); // Only initial
     }));
 
     it('should skip operations removed from queue during retry', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -1089,7 +1090,7 @@ describe('OfflineOperationQueueService', () => {
       tick(1100);
 
       // Should not retry removed operation
-      expect(mockHolochainClient.callZome.calls.count()).toBe(1);
+      expect(mockHolochainClient.callZome.mock.calls.length).toBe(1);
     }));
   });
 
@@ -1099,7 +1100,7 @@ describe('OfflineOperationQueueService', () => {
 
   describe('error recovery', () => {
     it('should handle malformed operation gracefully', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       service.enqueue({
         type: 'zome_call',
@@ -1114,8 +1115,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should handle exceptions in callZome', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.rejectWith(new Error('Connection timeout'));
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockRejectedValue(new Error('Connection timeout'));
 
       service.enqueue({
         type: 'zome_call',
@@ -1130,8 +1131,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should handle payload serialization issues', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       // Create circular reference
       const circular: any = { prop: 'value' };
@@ -1181,9 +1182,9 @@ describe('OfflineOperationQueueService', () => {
 
     it('should notify all callbacks for each change', () => {
       const callbacks = [
-        jasmine.createSpy('callback1'),
-        jasmine.createSpy('callback2'),
-        jasmine.createSpy('callback3'),
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
       ];
 
       callbacks.forEach(cb => service.onQueueChanged(cb));
@@ -1227,8 +1228,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('stats calculation edge cases', () => {
     it('should calculate average retries correctly', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       service.enqueue({
         type: 'zome_call',
@@ -1272,8 +1273,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should round average retries to 1 decimal', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       // Create operations with different retry counts
       const op1 = service.enqueue({
@@ -1320,8 +1321,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('memory management', () => {
     it('should clean up retry timeouts when operation dequeued', fakeAsync(async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: false });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: false });
 
       const opId = service.enqueue({
         type: 'zome_call',
@@ -1341,7 +1342,7 @@ describe('OfflineOperationQueueService', () => {
       tick(2000);
 
       // Should not have any more calls
-      expect(mockHolochainClient.callZome.calls.count()).toBe(1);
+      expect(mockHolochainClient.callZome.mock.calls.length).toBe(1);
     }));
 
     it('should handle many operations without memory issues', () => {
@@ -1369,10 +1370,10 @@ describe('OfflineOperationQueueService', () => {
 
   describe('complex async scenarios', () => {
     it('should handle operation added during sync', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       let syncStarted = false;
-      mockHolochainClient.callZome.and.callFake(async () => {
+      mockHolochainClient.callZome.mockImplementation(async () => {
         syncStarted = true;
         await new Promise(r => setTimeout(r, 10));
         return { success: true };
@@ -1406,8 +1407,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should handle rapid sync calls', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       service.enqueue({
         type: 'zome_call',
@@ -1431,8 +1432,8 @@ describe('OfflineOperationQueueService', () => {
 
   describe('connection watcher', () => {
     it('should auto-sync when transitioning from disconnected to connected', fakeAsync(() => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       // Enqueue while "disconnected"
       service.enqueue({
@@ -1460,7 +1461,7 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should not auto-sync when already connected (no transition)', fakeAsync(() => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       service.enqueue({
         type: 'zome_call',
@@ -1478,7 +1479,7 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should not auto-sync when queue is empty', fakeAsync(() => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       // Empty queue
       expect(service.queueSize()).toBe(0);
@@ -1493,10 +1494,10 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should not auto-sync if already syncing', fakeAsync(() => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       // Make callZome take time so sync is "in progress"
-      mockHolochainClient.callZome.and.callFake(
+      mockHolochainClient.callZome.mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 3000))
       );
 
@@ -1525,8 +1526,8 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should debounce auto-sync with 1500ms delay', fakeAsync(() => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       service.enqueue({
         type: 'zome_call',
@@ -1552,8 +1553,8 @@ describe('OfflineOperationQueueService', () => {
     }));
 
     it('should re-check connection state after debounce delay', fakeAsync(() => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       service.enqueue({
         type: 'zome_call',
@@ -1566,7 +1567,7 @@ describe('OfflineOperationQueueService', () => {
       service.handleConnectionChange(true);
 
       // Lose connection again before debounce fires
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       // After debounce: should re-check and NOT sync (disconnected again)
       tick(1600);
@@ -1592,8 +1593,8 @@ describe('OfflineOperationQueueService', () => {
     });
 
     it('should cancel previous debounce on rapid reconnections', fakeAsync(() => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       service.enqueue({
         type: 'zome_call',
@@ -1627,7 +1628,7 @@ describe('OfflineOperationQueueService', () => {
   describe('full offline cycle', () => {
     it('should enqueue offline, auto-sync on reconnect, and drain queue', fakeAsync(() => {
       // Start disconnected
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       // Enqueue 3 operations while offline
       service.enqueue({
@@ -1650,7 +1651,7 @@ describe('OfflineOperationQueueService', () => {
       });
 
       expect(service.queueSize()).toBe(3);
-      expect(service.isPending()).toBeTrue();
+      expect(service.isPending()).toBe(true);
 
       // Attempt manual sync while offline — should be a no-op
       tick(0);
@@ -1665,8 +1666,8 @@ describe('OfflineOperationQueueService', () => {
       tick(0);
 
       // Connection restored
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       // Simulate reconnection transition
       (service as any).wasConnected = false;
@@ -1679,16 +1680,16 @@ describe('OfflineOperationQueueService', () => {
       // All 3 operations should have been synced
       expect(mockHolochainClient.callZome).toHaveBeenCalledTimes(3);
       expect(service.queueSize()).toBe(0);
-      expect(service.isPending()).toBeFalse();
+      expect(service.isPending()).toBe(false);
     }));
 
     it('should persist queue to IDB and notify listeners during cycle', fakeAsync(() => {
-      const queueChangeSpy = jasmine.createSpy('queueChange');
-      const syncCompleteSpy = jasmine.createSpy('syncComplete');
+      const queueChangeSpy = vi.fn();
+      const syncCompleteSpy = vi.fn();
       service.onQueueChanged(queueChangeSpy);
       service.onSyncComplete(syncCompleteSpy);
 
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       service.enqueue({
         type: 'zome_call',
@@ -1701,12 +1702,12 @@ describe('OfflineOperationQueueService', () => {
       expect(queueChangeSpy).toHaveBeenCalled();
       expect(mockIdbCache.setMetadata).toHaveBeenCalledWith(
         'offline-operation-queue',
-        jasmine.arrayContaining([jasmine.objectContaining({ type: 'zome_call' })])
+        expect.arrayContaining([expect.objectContaining({ type: 'zome_call' })])
       );
 
       // Reconnect and sync
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({ success: true });
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({ success: true });
 
       (service as any).wasConnected = false;
       service.handleConnectionChange(true);

@@ -5,6 +5,7 @@ import type { AggregationContext } from '../models/community-insights.model';
 
 import { DiscoveryAttestationService } from './discovery-attestation.service';
 import { CommunityInsightsService } from './community-insights.service';
+import { vi } from 'vitest';
 
 // =============================================================================
 // Fixtures
@@ -31,17 +32,17 @@ const buildPublicResult = (overrides: Partial<DiscoveryResult> = {}): DiscoveryR
 
 describe('CommunityInsightsService', () => {
   let service: CommunityInsightsService;
-  let attestationSpy: jasmine.SpyObj<DiscoveryAttestationService>;
+  let attestationSpy: any;
 
   beforeEach(() => {
-    attestationSpy = jasmine.createSpyObj(
-      'DiscoveryAttestationService',
-      ['getResultsForContext'],
-      {
-        aggregatableResults: jasmine.createSpy('aggregatableResults').and.returnValue([]),
+    attestationSpy = {
+    getResultsForContext']: vi.fn(),
+    {
+        aggregatableResults: vi.fn().mockReturnValue([: vi.fn(),
+  },
       }
     );
-    attestationSpy.getResultsForContext.and.returnValue([]);
+    attestationSpy.getResultsForContext.mockReturnValue([]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -76,7 +77,7 @@ describe('CommunityInsightsService', () => {
         buildPublicResult({ primaryType: { typeId: 'a', name: 'Type A', score: 0.7 } }),
         buildPublicResult({ primaryType: { typeId: 'b', name: 'Type B', score: 0.9 } }),
       ];
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       const dist = service.getInstrumentDistribution('test-instrument');
 
@@ -96,7 +97,7 @@ describe('CommunityInsightsService', () => {
         buildPublicResult({ subscaleScores: { 'sub-a': 20, 'sub-b': 15 } }),
         buildPublicResult({ subscaleScores: { 'sub-a': 30, 'sub-b': 25 } }),
       ];
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       const dist = service.getInstrumentDistribution('test-instrument');
 
@@ -109,7 +110,7 @@ describe('CommunityInsightsService', () => {
 
     it('should flag noisy data for small cohorts', () => {
       const results = [buildPublicResult()];
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       const dist = service.getInstrumentDistribution('test-instrument');
 
@@ -118,7 +119,7 @@ describe('CommunityInsightsService', () => {
 
     it('should not flag noisy data for large cohorts', () => {
       const results = Array.from({ length: 35 }, () => buildPublicResult());
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       const dist = service.getInstrumentDistribution('test-instrument');
 
@@ -132,7 +133,7 @@ describe('CommunityInsightsService', () => {
 
     it('should use custom context when provided', () => {
       const contextResults = [buildPublicResult()];
-      attestationSpy.getResultsForContext.and.returnValue(contextResults);
+      attestationSpy.getResultsForContext.mockReturnValue(contextResults);
 
       const context: AggregationContext = {
         requiredReach: 'commons',
@@ -165,7 +166,7 @@ describe('CommunityInsightsService', () => {
         buildPublicResult({ subscaleScores: { 'sub-a': 15 } }),
         buildPublicResult({ subscaleScores: { 'sub-a': 20 } }),
       ];
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       // Score of 15 is above 2 of 4 (5, 10) = 50th percentile
       const result = service.getPercentile('test-instrument', 'sub-a', 15);
@@ -179,7 +180,7 @@ describe('CommunityInsightsService', () => {
         buildPublicResult({ subscaleScores: { 'sub-a': 5 } }),
         buildPublicResult({ subscaleScores: { 'sub-a': 10 } }),
       ];
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       const result = service.getPercentile('test-instrument', 'sub-a', 100);
 
@@ -191,7 +192,7 @@ describe('CommunityInsightsService', () => {
         buildPublicResult({ subscaleScores: { 'sub-a': 5 } }),
         buildPublicResult({ subscaleScores: { 'sub-a': 15 } }),
       ];
-      attestationSpy.getResultsForContext.and.returnValue(contextResults);
+      attestationSpy.getResultsForContext.mockReturnValue(contextResults);
 
       const context: AggregationContext = {
         requiredReach: 'commons',
@@ -219,7 +220,7 @@ describe('CommunityInsightsService', () => {
         buildPublicResult({ completedAt: '2025-01-20T00:00:00Z' }),
         buildPublicResult({ completedAt: '2025-02-10T00:00:00Z' }),
       ];
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       const trends = service.getCommunityTrends('test-instrument');
 
@@ -241,7 +242,7 @@ describe('CommunityInsightsService', () => {
           primaryType: { typeId: 'b', name: 'Type B', score: 0.9 },
         }),
       ];
-      attestationSpy.aggregatableResults.and.returnValue(results);
+      attestationSpy.aggregatableResults.mockReturnValue(results);
 
       const trends = service.getCommunityTrends('test-instrument');
 
@@ -252,7 +253,7 @@ describe('CommunityInsightsService', () => {
       const contextResults = [
         buildPublicResult({ completedAt: '2025-03-15T12:00:00Z' }),
       ];
-      attestationSpy.getResultsForContext.and.returnValue(contextResults);
+      attestationSpy.getResultsForContext.mockReturnValue(contextResults);
 
       const context: AggregationContext = {
         requiredReach: 'commons',

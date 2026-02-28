@@ -11,54 +11,57 @@ import { HolochainContentService } from './elohim/services/holochain-content.ser
 import { AuthService } from './imagodei/services/auth.service';
 import { TauriAuthService } from './imagodei/services/tauri-auth.service';
 import { BlobBootstrapService } from './lamad/services/blob-bootstrap.service';
+import { type Mock, vi } from 'vitest';
 
 describe('AppComponent', () => {
   let routerEventsSubject: Subject<NavigationEnd>;
-  let mockRouter: { events: Observable<NavigationEnd>; url: string; navigate: jasmine.Spy };
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockHolochainContent: jasmine.SpyObj<HolochainContentService>;
+  let mockRouter: { events: Observable<NavigationEnd>; url: string; navigate: Mock };
+  let mockHolochainClient: any;
+  let mockHolochainContent: any;
   let mockAuthService: { isAuthenticated: ReturnType<typeof signal<boolean>> };
-  let mockTauriAuth: jasmine.SpyObj<TauriAuthService>;
-  let mockBlobBootstrap: jasmine.SpyObj<BlobBootstrapService>;
+  let mockTauriAuth: any;
+  let mockBlobBootstrap: any;
 
   beforeEach(async () => {
     routerEventsSubject = new Subject();
     mockRouter = {
       events: routerEventsSubject.asObservable(),
       url: '/',
-      navigate: jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true)),
+      navigate: vi.fn().mockReturnValue(Promise.resolve(true)),
     };
 
-    // Create mock services
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', ['connect', 'isConnected']);
-    mockHolochainContent = jasmine.createSpyObj('HolochainContentService', ['testAvailability']);
-    mockTauriAuth = jasmine.createSpyObj('TauriAuthService', [
-      'isTauriEnvironment',
-      'initialize',
-      'needsLogin',
-      'needsUnlock',
-      'destroy',
-    ], {
+    mockHolochainClient = {
+      connect: vi.fn(),
+      isConnected: vi.fn(),
+    };
+    mockHolochainContent = {
+      testAvailability: vi.fn(),
+    };
+    mockTauriAuth = {
+      isTauriEnvironment: vi.fn(),
+      initialize: vi.fn(),
+      needsLogin: vi.fn(),
+      needsUnlock: vi.fn(),
+      destroy: vi.fn(),
       status: signal('idle'),
-    });
-    mockBlobBootstrap = jasmine.createSpyObj('BlobBootstrapService', ['startBootstrap']);
+    };
+    mockBlobBootstrap = { startBootstrap: vi.fn() };
     mockAuthService = { isAuthenticated: signal(true) };
 
     // Default mock behavior
-    mockHolochainClient.connect.and.returnValue(Promise.resolve());
-    mockHolochainClient.isConnected.and.returnValue(true);
-    mockHolochainContent.testAvailability.and.returnValue(Promise.resolve(true));
-    mockTauriAuth.isTauriEnvironment.and.returnValue(false);
-    mockTauriAuth.initialize.and.returnValue(Promise.resolve());
-    mockTauriAuth.needsLogin.and.returnValue(false);
-    mockTauriAuth.needsUnlock.and.returnValue(false);
-    // startBootstrap returns void, no need to set return value
+    mockHolochainClient.connect.mockReturnValue(Promise.resolve());
+    mockHolochainClient.isConnected.mockReturnValue(true);
+    mockHolochainContent.testAvailability.mockReturnValue(Promise.resolve(true));
+    mockTauriAuth.isTauriEnvironment.mockReturnValue(false);
+    mockTauriAuth.initialize.mockReturnValue(Promise.resolve());
+    mockTauriAuth.needsLogin.mockReturnValue(false);
+    mockTauriAuth.needsUnlock.mockReturnValue(false);
 
     await TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [
-        provideHttpClient(),
         provideRouter([]),
+        provideHttpClient(),
         { provide: Router, useValue: mockRouter },
         { provide: HolochainClientService, useValue: mockHolochainClient },
         { provide: HolochainContentService, useValue: mockHolochainContent },
@@ -258,7 +261,7 @@ describe('AppComponent', () => {
       const app = fixture.componentInstance;
       fixture.detectChanges();
 
-      mockHolochainClient.connect.calls.reset();
+      mockHolochainClient.connect.mockClear();
 
       app.retryConnection();
       await fixture.whenStable();
@@ -269,8 +272,8 @@ describe('AppComponent', () => {
 
   describe('Tauri environment initialization', () => {
     it('should check for Tauri session when in Tauri environment', async () => {
-      mockTauriAuth.isTauriEnvironment.and.returnValue(true);
-      mockTauriAuth.needsLogin.and.returnValue(false);
+      mockTauriAuth.isTauriEnvironment.mockReturnValue(true);
+      mockTauriAuth.needsLogin.mockReturnValue(false);
 
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
@@ -280,8 +283,8 @@ describe('AppComponent', () => {
     });
 
     it('should navigate to login when Tauri session needs login', async () => {
-      mockTauriAuth.isTauriEnvironment.and.returnValue(true);
-      mockTauriAuth.needsLogin.and.returnValue(true);
+      mockTauriAuth.isTauriEnvironment.mockReturnValue(true);
+      mockTauriAuth.needsLogin.mockReturnValue(true);
 
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
@@ -293,8 +296,8 @@ describe('AppComponent', () => {
     });
 
     it('should continue initialization when Tauri session exists', async () => {
-      mockTauriAuth.isTauriEnvironment.and.returnValue(true);
-      mockTauriAuth.needsLogin.and.returnValue(false);
+      mockTauriAuth.isTauriEnvironment.mockReturnValue(true);
+      mockTauriAuth.needsLogin.mockReturnValue(false);
 
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
@@ -304,7 +307,7 @@ describe('AppComponent', () => {
     });
 
     it('should skip Tauri check in non-Tauri environment', async () => {
-      mockTauriAuth.isTauriEnvironment.and.returnValue(false);
+      mockTauriAuth.isTauriEnvironment.mockReturnValue(false);
 
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
@@ -341,7 +344,7 @@ describe('AppComponent', () => {
     });
 
     it('should handle connection failure gracefully', async () => {
-      mockHolochainClient.connect.and.returnValue(Promise.reject(new Error('Connection failed')));
+      mockHolochainClient.connect.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       const fixture = TestBed.createComponent(AppComponent);
       const app = fixture.componentInstance;
@@ -357,7 +360,7 @@ describe('AppComponent', () => {
     });
 
     it('should handle content availability test failure', async () => {
-      mockHolochainContent.testAvailability.and.returnValue(
+      mockHolochainContent.testAvailability.mockReturnValue(
         Promise.reject(new Error('Zome unavailable'))
       );
 
@@ -390,7 +393,7 @@ describe('AppComponent', () => {
 
   describe('Connection retry logic', () => {
     it('should increment attempt counter on connection failure', async () => {
-      mockHolochainClient.connect.and.returnValue(Promise.reject(new Error('Connection failed')));
+      mockHolochainClient.connect.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       const fixture = TestBed.createComponent(AppComponent);
       const app = fixture.componentInstance;
@@ -406,7 +409,7 @@ describe('AppComponent', () => {
     });
 
     it('should schedule retry timeout on connection failure', async () => {
-      mockHolochainClient.connect.and.returnValue(Promise.reject(new Error('Connection failed')));
+      mockHolochainClient.connect.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       const fixture = TestBed.createComponent(AppComponent);
       const app = fixture.componentInstance;
@@ -422,7 +425,7 @@ describe('AppComponent', () => {
     });
 
     it('should not schedule retry if component is destroyed', async () => {
-      mockHolochainClient.connect.and.returnValue(Promise.reject(new Error('Connection failed')));
+      mockHolochainClient.connect.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       const fixture = TestBed.createComponent(AppComponent);
       const app = fixture.componentInstance;
@@ -437,7 +440,7 @@ describe('AppComponent', () => {
     });
 
     it('should handle max retry attempts gracefully', async () => {
-      mockHolochainClient.connect.and.returnValue(Promise.reject(new Error('Connection failed')));
+      mockHolochainClient.connect.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       const fixture = TestBed.createComponent(AppComponent);
       const app = fixture.componentInstance;

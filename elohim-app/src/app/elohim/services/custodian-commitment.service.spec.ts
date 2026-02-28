@@ -2,13 +2,16 @@ import { TestBed } from '@angular/core/testing';
 
 import { CustodianCommitmentService } from './custodian-commitment.service';
 import { HolochainClientService } from './holochain-client.service';
+import { vi, Mock } from 'vitest';
 
 describe('CustodianCommitmentService', () => {
   let service: CustodianCommitmentService;
-  let holochainMock: jasmine.SpyObj<HolochainClientService>;
+  let holochainMock: any;
 
   beforeEach(() => {
-    const holochainSpy = jasmine.createSpyObj('HolochainClientService', ['callZome']);
+    const holochainSpy = {
+    callZome: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [
@@ -18,7 +21,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     service = TestBed.inject(CustodianCommitmentService);
-    holochainMock = TestBed.inject(HolochainClientService) as jasmine.SpyObj<HolochainClientService>;
+    holochainMock = TestBed.inject(HolochainClientService) as { [K in keyof HolochainClientService]?: Mock };
   });
 
   it('should be created', () => {
@@ -65,7 +68,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -73,7 +76,7 @@ describe('CustodianCommitmentService', () => {
 
       expect(result).toEqual(mockCommitments);
       expect(holochainMock.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'replication',
           fnName: 'get_custodian_commitments_for_content',
           payload: { content_id: 'content-123' },
@@ -82,7 +85,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return empty array on zome failure', async () => {
-      holochainMock.callZome.and.returnValue(Promise.resolve({ success: false }));
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getCommitmentsForContent('content-123');
 
@@ -90,7 +93,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return empty array when call throws exception', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Network error')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Network error')));
 
       const result = await service.getCommitmentsForContent('content-123');
 
@@ -98,7 +101,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return empty array when data is null', async () => {
-      holochainMock.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
       const result = await service.getCommitmentsForContent('content-123');
 
@@ -146,7 +149,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -154,7 +157,7 @@ describe('CustodianCommitmentService', () => {
 
       expect(result).toEqual(mockCommitments);
       expect(holochainMock.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_custodian_all_commitments',
           payload: { custodian_id: 'custodian-1' },
         })
@@ -162,7 +165,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return empty array on zome failure', async () => {
-      holochainMock.callZome.and.returnValue(Promise.resolve({ success: false }));
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: false }));
 
       const result = await service.getCommitmentsByCustomian('custodian-1');
 
@@ -170,7 +173,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return empty array on exception', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Connection failed')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       const result = await service.getCommitmentsByCustomian('custodian-1');
 
@@ -185,7 +188,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should create commitment and return success with ID', async () => {
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: 'commitment-123' })
       );
 
@@ -200,7 +203,7 @@ describe('CustodianCommitmentService', () => {
       expect(result.success).toBe(true);
       expect(result.commitmentId).toBe('commitment-123');
       expect(holochainMock.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'create_custodian_commitment',
         })
       );
@@ -208,14 +211,14 @@ describe('CustodianCommitmentService', () => {
 
     it('should use default expiration of 30 days', async () => {
       const now = Date.now();
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: 'commitment-123' })
       );
 
       await service.createCommitment('custodian-1', 'content-1', 'full_replica', 1000000, 100);
 
-      const call = holochainMock.callZome.calls.mostRecent();
-      const payload = call.args[0].payload as Record<string, any>;
+      const call = holochainMock.callZome.mock.lastCall;
+      const payload = call![0].payload as Record<string, any>;
       const expirationDelta = payload['expires_at'] - now;
 
       expect(expirationDelta).toBeGreaterThan(29 * 24 * 60 * 60 * 1000);
@@ -224,7 +227,7 @@ describe('CustodianCommitmentService', () => {
 
     it('should accept custom expiration days', async () => {
       const now = Date.now();
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: 'commitment-123' })
       );
 
@@ -237,8 +240,8 @@ describe('CustodianCommitmentService', () => {
         7
       );
 
-      const call = holochainMock.callZome.calls.mostRecent();
-      const payload = call.args[0].payload as Record<string, any>;
+      const call = holochainMock.callZome.mock.lastCall;
+      const payload = call![0].payload as Record<string, any>;
       const expirationDelta = payload['expires_at'] - now;
 
       expect(expirationDelta).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
@@ -246,7 +249,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return error on zome failure', async () => {
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'Invalid custodian' })
       );
 
@@ -263,7 +266,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should catch exceptions and return error', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Network error')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Network error')));
 
       const result = await service.createCommitment(
         'custodian-1',
@@ -285,14 +288,14 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should renew commitment successfully', async () => {
-      holochainMock.callZome.and.returnValue(Promise.resolve({ success: true }));
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: true }));
 
       const result = await service.renewCommitment('commitment-123');
 
       expect(result.success).toBe(true);
       expect(result.error).toBeUndefined();
       expect(holochainMock.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'renew_custodian_commitment',
           payload: {
             commitment_id: 'commitment-123',
@@ -303,12 +306,12 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should accept custom extension days', async () => {
-      holochainMock.callZome.and.returnValue(Promise.resolve({ success: true }));
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: true }));
 
       await service.renewCommitment('commitment-123', 7);
 
       expect(holochainMock.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           payload: {
             commitment_id: 'commitment-123',
             extension_days: 7,
@@ -318,7 +321,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return error on zome failure', async () => {
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'Commitment expired' })
       );
 
@@ -329,7 +332,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should catch exceptions', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Call failed')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Call failed')));
 
       const result = await service.renewCommitment('commitment-123');
 
@@ -345,13 +348,13 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should revoke commitment successfully', async () => {
-      holochainMock.callZome.and.returnValue(Promise.resolve({ success: true }));
+      holochainMock.callZome.mockReturnValue(Promise.resolve({ success: true }));
 
       const result = await service.revokeCommitment('commitment-123');
 
       expect(result.success).toBe(true);
       expect(holochainMock.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'revoke_custodian_commitment',
           payload: { commitment_id: 'commitment-123' },
         })
@@ -359,7 +362,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return error on zome failure', async () => {
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: false, error: 'Commitment not found' })
       );
 
@@ -370,7 +373,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should catch exceptions', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Revoke failed')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Revoke failed')));
 
       const result = await service.revokeCommitment('commitment-123');
 
@@ -414,7 +417,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -462,7 +465,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -473,7 +476,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return empty array on exception', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Query failed')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Query failed')));
 
       const result = await service.getExpiringCommitments('cust-1', 7);
 
@@ -536,7 +539,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -546,7 +549,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return 0 when no commitments', async () => {
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [] })
       );
 
@@ -556,7 +559,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return 0 on exception', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Query failed')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Query failed')));
 
       const result = await service.getActiveCommitmentCount('cust-1');
 
@@ -619,7 +622,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -662,7 +665,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -672,7 +675,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return 0 when no commitments', async () => {
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: [] })
       );
 
@@ -682,7 +685,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return 0 on exception', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Query failed')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Query failed')));
 
       const result = await service.getTotalCommittedStorage('cust-1');
 
@@ -730,7 +733,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -758,7 +761,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -786,7 +789,7 @@ describe('CustodianCommitmentService', () => {
         },
       ];
 
-      holochainMock.callZome.and.returnValue(
+      holochainMock.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockCommitments })
       );
 
@@ -796,7 +799,7 @@ describe('CustodianCommitmentService', () => {
     });
 
     it('should return false on exception', async () => {
-      holochainMock.callZome.and.returnValue(Promise.reject(new Error('Check failed')));
+      holochainMock.callZome.mockReturnValue(Promise.reject(new Error('Check failed')));
 
       const result = await service.isCommittedTo('cust-1', 'content-1');
 

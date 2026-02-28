@@ -17,14 +17,15 @@ import type { ContentMastery } from '../../models/content-mastery.model';
 import type { MasteryLevel } from '../../models/content-mastery.model';
 import type { LearnerMasteryProfile } from '../../models/learner-mastery-profile.model';
 import type { PathIndex } from '../../models/learning-path.model';
+import { vi } from 'vitest';
 
 describe('LearnerDashboardComponent', () => {
   let component: LearnerDashboardComponent;
   let fixture: ComponentFixture<LearnerDashboardComponent>;
-  let mockMasteryStats: jasmine.SpyObj<MasteryStatsService>;
-  let mockContentMastery: jasmine.SpyObj<ContentMasteryService>;
-  let mockPathService: jasmine.SpyObj<PathService>;
-  let mockAgentService: jasmine.SpyObj<AgentService>;
+  let mockMasteryStats: any;
+  let mockContentMastery: any;
+  let mockPathService: any;
+  let mockAgentService: any;
   let profileSubject: BehaviorSubject<LearnerMasteryProfile | null>;
   let masterySubject: BehaviorSubject<ContentMastery[]>;
 
@@ -96,36 +97,15 @@ describe('LearnerDashboardComponent', () => {
     profileSubject = new BehaviorSubject<LearnerMasteryProfile | null>(null);
     masterySubject = new BehaviorSubject<ContentMastery[]>([]);
 
-    mockMasteryStats = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
-      learnerProfile$: profileSubject.asObservable(),
+    mockMasteryStats = {
+    recordDailyEngagement']: vi.fn(),
+    {
+      learnerProfile$: profileSubject.asObservable(): vi.fn(),
     });
 
-    mockContentMastery = jasmine.createSpyObj('ContentMasteryService', [
-      'getAllMastery',
-      'getContentNeedingRefresh',
-    ]);
-    mockContentMastery.getAllMastery.and.returnValue(masterySubject.asObservable());
-    mockContentMastery.getContentNeedingRefresh.and.returnValue(of([]));
-
-    mockPathService = jasmine.createSpyObj('PathService', ['listPaths']);
-    mockPathService.listPaths.and.returnValue(of(emptyPathIndex));
-
-    mockAgentService = jasmine.createSpyObj('AgentService', ['getAgentProgress']);
-    mockAgentService.getAgentProgress.and.returnValue(of([]));
-
-    await TestBed.configureTestingModule({
-      imports: [LearnerDashboardComponent, RouterTestingModule],
-      providers: [
-        { provide: MasteryStatsService, useValue: mockMasteryStats },
-        { provide: ContentMasteryService, useValue: mockContentMastery },
-        { provide: PathService, useValue: mockPathService },
-        { provide: AgentService, useValue: mockAgentService },
-      ],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(LearnerDashboardComponent);
-    component = fixture.componentInstance;
-  });
+    mockContentMastery = { getAllMastery: vi.fn(): vi.fn(), getContentNeedingRefresh: vi.fn(): vi.fn(), };
+    mockContentMastery.getAllMastery.mockReturnValue(masterySubject.asObservable());
+    mockContentMastery.getContentNeedingRefresh.mockReturnValue(of([: vi.fn() };
 
   describe('Loading state', () => {
     it('should create', () => {
@@ -285,8 +265,8 @@ describe('LearnerDashboardComponent', () => {
     };
 
     function configurePathMocks(): void {
-      mockAgentService.getAgentProgress.and.returnValue(of([mockProgressForPath1]));
-      mockPathService.listPaths.and.returnValue(of(mockPathIndex));
+      mockAgentService.getAgentProgress.mockReturnValue(of([mockProgressForPath1]));
+      mockPathService.listPaths.mockReturnValue(of(mockPathIndex));
     }
 
     it('should display path entries when paths exist', () => {
@@ -326,8 +306,8 @@ describe('LearnerDashboardComponent', () => {
         completedStepIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         completedAt: '2026-02-15T10:00:00.000Z',
       };
-      mockAgentService.getAgentProgress.and.returnValue(of([completedProgress]));
-      mockPathService.listPaths.and.returnValue(of(mockPathIndex));
+      mockAgentService.getAgentProgress.mockReturnValue(of([completedProgress]));
+      mockPathService.listPaths.mockReturnValue(of(mockPathIndex));
 
       profileSubject.next(buildProfile());
       fixture.detectChanges();
@@ -342,8 +322,8 @@ describe('LearnerDashboardComponent', () => {
         ...mockProgressForPath1,
         pathId: '__global__',
       };
-      mockAgentService.getAgentProgress.and.returnValue(of([globalProgress]));
-      mockPathService.listPaths.and.returnValue(of(mockPathIndex));
+      mockAgentService.getAgentProgress.mockReturnValue(of([globalProgress]));
+      mockPathService.listPaths.mockReturnValue(of(mockPathIndex));
 
       profileSubject.next(buildProfile());
       fixture.detectChanges();

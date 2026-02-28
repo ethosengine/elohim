@@ -178,7 +178,6 @@
             ],
             "tsConfig": "tsconfig.spec.json",
             "codeCoverage": true,
-            "karmaConfig": "karma.conf.js",
             "assets": [
               {
                 "glob": "**/*",
@@ -193,10 +192,7 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": [],
-            "exclude": [
-              "src/**/*.vitest.spec.ts"
-            ]
+            "scripts": []
           }
         }
       }

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
 
@@ -143,7 +144,7 @@ describe('EprPopoverComponent', () => {
     component.head = mockHead;
     fixture.detectChanges();
 
-    const spy = spyOn(component.dismissed, 'emit');
+    const spy = vi.spyOn(component.dismissed, 'emit');
     component.onMouseLeave();
     expect(spy).toHaveBeenCalled();
   });

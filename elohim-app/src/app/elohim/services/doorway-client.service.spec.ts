@@ -1,9 +1,7 @@
-import {
-  HttpClientTestingModule,
-  HttpTestingController,
-} from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 
+import { provideHttpClient } from '@angular/common/http';
 import {
   DoorwayClientService,
   VerifyBlobResponse,
@@ -35,8 +33,7 @@ describe('DoorwayClientService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [DoorwayClientService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), DoorwayClientService],
     });
 
     service = TestBed.inject(DoorwayClientService);
@@ -474,7 +471,7 @@ describe('DoorwayClientService', () => {
       tick();
 
       expect(result).toBeTruthy();
-      expect(result!.isValid).toBeTrue();
+      expect(result!.isValid).toBe(true);
       expect(result!.computedHash).toBe('abc123');
     }));
 
@@ -505,7 +502,7 @@ describe('DoorwayClientService', () => {
       req.flush(mockResponse);
       tick();
 
-      expect(result!.isValid).toBeFalse();
+      expect(result!.isValid).toBe(false);
       expect(result!.error).toBe('Hash mismatch');
     }));
 
@@ -552,7 +549,7 @@ describe('DoorwayClientService', () => {
       req.flush(mockResponse);
       tick();
 
-      expect(result!.isValid).toBeTrue();
+      expect(result!.isValid).toBe(true);
     }));
 
     it('should verify blob data from ArrayBuffer', fakeAsync(() => {
@@ -580,7 +577,7 @@ describe('DoorwayClientService', () => {
       req.flush(mockResponse);
       tick();
 
-      expect(result!.isValid).toBeTrue();
+      expect(result!.isValid).toBe(true);
     }));
   });
 

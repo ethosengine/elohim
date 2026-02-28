@@ -8,9 +8,10 @@
  * Integration testing of the real Helia path requires an E2E environment.
  */
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { StorageClientService } from './storage-client.service';
+import { provideHttpClient } from '@angular/common/http';
 
 /** Minimal interface matching HeliaFetchService's public API */
 interface HeliaFetchApi {
@@ -21,9 +22,8 @@ describe('HeliaFetchService (mock)', () => {
   let httpMock: HttpTestingController;
 
   const mockStorageClient = {
-    getBlobUrl: jasmine
-      .createSpy('getBlobUrl')
-      .and.callFake((cid: string) => `http://localhost:8888/store/${cid}`),
+    getBlobUrl: vi.fn()
+      .mockImplementation((cid: string) => `http://localhost:8888/store/${cid}`),
   };
 
   /**
@@ -45,12 +45,11 @@ describe('HeliaFetchService (mock)', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [{ provide: StorageClientService, useValue: mockStorageClient }],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: StorageClientService, useValue: mockStorageClient }],
     });
     httpMock = TestBed.inject(HttpTestingController);
     service = new MockHeliaFetchService(mockStorageClient);
-    mockStorageClient.getBlobUrl.calls.reset();
+    mockStorageClient.getBlobUrl.mockClear();
   });
 
   afterEach(() => {

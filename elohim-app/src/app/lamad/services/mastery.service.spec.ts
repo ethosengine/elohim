@@ -10,10 +10,11 @@ import {
   MasteryLevelType,
   MASTERY_LEVEL_ORDER,
 } from './mastery.service';
+import { vi } from 'vitest';
 
 describe('MasteryService', () => {
   let service: MasteryService;
-  let storageApiSpy: jasmine.SpyObj<StorageApiService>;
+  let storageApiSpy: any;
 
   const createMockMastery = (overrides: Partial<ContentMasteryView> = {}): ContentMasteryView => ({
     id: 'mastery-1',
@@ -37,10 +38,10 @@ describe('MasteryService', () => {
   });
 
   beforeEach(() => {
-    storageApiSpy = jasmine.createSpyObj('StorageApiService', [
-      'getMasteryRecords',
-      'upsertMastery',
-    ]);
+    storageApiSpy = {
+      getMasteryRecords: vi.fn(),
+      upsertMastery: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [MasteryService, { provide: StorageApiService, useValue: storageApiSpy }],
@@ -77,25 +78,25 @@ describe('MasteryService', () => {
   });
 
   describe('getMasteryForHuman', () => {
-    it('should fetch all mastery records for a human', done => {
+    it('should fetch all mastery records for a human', () => new Promise<void>(done => {
       const mockRecords = [
         createMockMastery({ contentId: 'content-1' }),
         createMockMastery({ contentId: 'content-2' }),
       ];
-      storageApiSpy.getMasteryRecords.and.returnValue(of(mockRecords));
+      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
       service.getMasteryForHuman('human-1').subscribe(records => {
         expect(records.length).toBe(2);
         expect(storageApiSpy.getMasteryRecords).toHaveBeenCalledWith({ humanId: 'human-1' });
         done();
       });
-    });
+    }));
   });
 
   describe('getMasteryForContent', () => {
-    it('should return mastery record when found', done => {
+    it('should return mastery record when found', () => new Promise<void>(done => {
       const mockRecord = createMockMastery();
-      storageApiSpy.getMasteryRecords.and.returnValue(of([mockRecord]));
+      storageApiSpy.getMasteryRecords.mockReturnValue(of([mockRecord]));
 
       service.getMasteryForContent('human-1', 'content-1').subscribe(record => {
         expect(record).toEqual(mockRecord);
@@ -105,49 +106,49 @@ describe('MasteryService', () => {
         });
         done();
       });
-    });
+    }));
 
-    it('should return null when no record found', done => {
-      storageApiSpy.getMasteryRecords.and.returnValue(of([]));
+    it('should return null when no record found', () => new Promise<void>(done => {
+      storageApiSpy.getMasteryRecords.mockReturnValue(of([]));
 
       service.getMasteryForContent('human-1', 'nonexistent').subscribe(record => {
         expect(record).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getMasteryState', () => {
-    it('should return map of contentId to mastery records', done => {
+    it('should return map of contentId to mastery records', () => new Promise<void>(done => {
       const mockRecords = [
         createMockMastery({ contentId: 'content-1', masteryLevel: 'aware' }),
         createMockMastery({ contentId: 'content-2', masteryLevel: 'mastered' }),
         createMockMastery({ contentId: 'content-3', masteryLevel: 'understanding' }),
       ];
-      storageApiSpy.getMasteryRecords.and.returnValue(of(mockRecords));
+      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
       service.getMasteryState('human-1', ['content-1', 'content-2']).subscribe(result => {
         expect(result.size).toBe(2);
         expect(result.get('content-1')?.masteryLevel).toBe('aware');
         expect(result.get('content-2')?.masteryLevel).toBe('mastered');
-        expect(result.has('content-3')).toBeFalse();
+        expect(result.has('content-3')).toBe(false);
         done();
       });
-    });
+    }));
 
-    it('should return empty map for empty contentIds', done => {
+    it('should return empty map for empty contentIds', () => new Promise<void>(done => {
       service.getMasteryState('human-1', []).subscribe(result => {
         expect(result.size).toBe(0);
         expect(storageApiSpy.getMasteryRecords).not.toHaveBeenCalled();
         done();
       });
-    });
+    }));
   });
 
   describe('getMasteryAtLevel', () => {
-    it('should fetch mastery records at or above minimum level', done => {
+    it('should fetch mastery records at or above minimum level', () => new Promise<void>(done => {
       const mockRecords = [createMockMastery({ masteryLevel: 'applying' })];
-      storageApiSpy.getMasteryRecords.and.returnValue(of(mockRecords));
+      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
       service.getMasteryAtLevel('human-1', 'understanding').subscribe(records => {
         expect(records).toEqual(mockRecords);
@@ -157,13 +158,13 @@ describe('MasteryService', () => {
         });
         done();
       });
-    });
+    }));
   });
 
   describe('getRefreshNeeded', () => {
-    it('should fetch content needing refresh', done => {
+    it('should fetch content needing refresh', () => new Promise<void>(done => {
       const mockRecords = [createMockMastery({ freshnessScore: 0.3 })];
-      storageApiSpy.getMasteryRecords.and.returnValue(of(mockRecords));
+      storageApiSpy.getMasteryRecords.mockReturnValue(of(mockRecords));
 
       service.getRefreshNeeded('human-1').subscribe(records => {
         expect(records).toEqual(mockRecords);
@@ -173,13 +174,13 @@ describe('MasteryService', () => {
         });
         done();
       });
-    });
+    }));
   });
 
   describe('recordEngagement', () => {
-    it('should record engagement and return updated mastery', done => {
+    it('should record engagement and return updated mastery', () => new Promise<void>(done => {
       const updatedMastery = createMockMastery({ engagementCount: 6 });
-      storageApiSpy.upsertMastery.and.returnValue(of(updatedMastery));
+      storageApiSpy.upsertMastery.mockReturnValue(of(updatedMastery));
 
       service.recordEngagement('human-1', 'content-1', 'view').subscribe(result => {
         expect(result).toEqual(updatedMastery);
@@ -190,13 +191,13 @@ describe('MasteryService', () => {
         });
         done();
       });
-    });
+    }));
   });
 
   describe('updateMasteryLevel', () => {
-    it('should update mastery level directly', done => {
+    it('should update mastery level directly', () => new Promise<void>(done => {
       const updatedMastery = createMockMastery({ masteryLevel: 'mastered' });
-      storageApiSpy.upsertMastery.and.returnValue(of(updatedMastery));
+      storageApiSpy.upsertMastery.mockReturnValue(of(updatedMastery));
 
       service.updateMasteryLevel('human-1', 'content-1', 'mastered').subscribe(result => {
         expect(result.masteryLevel).toBe('mastered');
@@ -207,16 +208,16 @@ describe('MasteryService', () => {
         });
         done();
       });
-    });
+    }));
   });
 
   describe('recordBulkEngagement', () => {
-    it('should record engagement for multiple content items', done => {
+    it('should record engagement for multiple content items', () => new Promise<void>(done => {
       const mockResults = [
         createMockMastery({ contentId: 'content-1' }),
         createMockMastery({ contentId: 'content-2' }),
       ];
-      storageApiSpy.upsertMastery.and.returnValues(of(mockResults[0]), of(mockResults[1]));
+      storageApiSpy.upsertMastery.mockReturnValueOnce(of(mockResults[0])).mockReturnValueOnce(of(mockResults[1]));
 
       service
         .recordBulkEngagement('human-1', ['content-1', 'content-2'], 'view')
@@ -225,39 +226,39 @@ describe('MasteryService', () => {
           expect(storageApiSpy.upsertMastery).toHaveBeenCalledTimes(2);
           done();
         });
-    });
+    }));
 
-    it('should return empty array for empty contentIds', done => {
+    it('should return empty array for empty contentIds', () => new Promise<void>(done => {
       service.recordBulkEngagement('human-1', [], 'view').subscribe(results => {
         expect(results).toEqual([]);
         expect(storageApiSpy.upsertMastery).not.toHaveBeenCalled();
         done();
       });
-    });
+    }));
   });
 
   describe('isMasteryAtLeast', () => {
     it('should return true when level1 equals level2', () => {
-      expect(service.isMasteryAtLeast('understanding', 'understanding')).toBeTrue();
+      expect(service.isMasteryAtLeast('understanding', 'understanding')).toBe(true);
     });
 
     it('should return true when level1 is higher than level2', () => {
-      expect(service.isMasteryAtLeast('mastered', 'aware')).toBeTrue();
-      expect(service.isMasteryAtLeast('applying', 'understanding')).toBeTrue();
+      expect(service.isMasteryAtLeast('mastered', 'aware')).toBe(true);
+      expect(service.isMasteryAtLeast('applying', 'understanding')).toBe(true);
     });
 
     it('should return false when level1 is lower than level2', () => {
-      expect(service.isMasteryAtLeast('aware', 'mastered')).toBeFalse();
-      expect(service.isMasteryAtLeast('understanding', 'applying')).toBeFalse();
+      expect(service.isMasteryAtLeast('aware', 'mastered')).toBe(false);
+      expect(service.isMasteryAtLeast('understanding', 'applying')).toBe(false);
     });
 
     it('should return true for mastered vs any level', () => {
-      expect(service.isMasteryAtLeast('mastered', 'not_started')).toBeTrue();
-      expect(service.isMasteryAtLeast('mastered', 'mastered')).toBeTrue();
+      expect(service.isMasteryAtLeast('mastered', 'not_started')).toBe(true);
+      expect(service.isMasteryAtLeast('mastered', 'mastered')).toBe(true);
     });
 
     it('should return true for not_started vs not_started', () => {
-      expect(service.isMasteryAtLeast('not_started', 'not_started')).toBeTrue();
+      expect(service.isMasteryAtLeast('not_started', 'not_started')).toBe(true);
     });
   });
 
@@ -296,32 +297,32 @@ describe('MasteryService', () => {
 
   describe('hasStarted', () => {
     it('should return false for null mastery', () => {
-      expect(service.hasStarted(null)).toBeFalse();
+      expect(service.hasStarted(null)).toBe(false);
     });
 
     it('should return false for not_started level', () => {
       const mastery = createMockMastery({ masteryLevel: 'not_started' });
-      expect(service.hasStarted(mastery)).toBeFalse();
+      expect(service.hasStarted(mastery)).toBe(false);
     });
 
     it('should return true for any level above not_started', () => {
-      expect(service.hasStarted(createMockMastery({ masteryLevel: 'aware' }))).toBeTrue();
-      expect(service.hasStarted(createMockMastery({ masteryLevel: 'mastered' }))).toBeTrue();
+      expect(service.hasStarted(createMockMastery({ masteryLevel: 'aware' }))).toBe(true);
+      expect(service.hasStarted(createMockMastery({ masteryLevel: 'mastered' }))).toBe(true);
     });
   });
 
   describe('isMastered', () => {
     it('should return false for null mastery', () => {
-      expect(service.isMastered(null)).toBeFalse();
+      expect(service.isMastered(null)).toBe(false);
     });
 
     it('should return false for non-mastered levels', () => {
-      expect(service.isMastered(createMockMastery({ masteryLevel: 'not_started' }))).toBeFalse();
-      expect(service.isMastered(createMockMastery({ masteryLevel: 'evaluating' }))).toBeFalse();
+      expect(service.isMastered(createMockMastery({ masteryLevel: 'not_started' }))).toBe(false);
+      expect(service.isMastered(createMockMastery({ masteryLevel: 'evaluating' }))).toBe(false);
     });
 
     it('should return true for mastered level', () => {
-      expect(service.isMastered(createMockMastery({ masteryLevel: 'mastered' }))).toBeTrue();
+      expect(service.isMastered(createMockMastery({ masteryLevel: 'mastered' }))).toBe(true);
     });
   });
 

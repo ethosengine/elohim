@@ -18,11 +18,12 @@ import {
   ResourceSummary,
   CustodianNetwork,
 } from '../../models/doorway.model';
+import { vi } from 'vitest';
 
 describe('DoorwayDashboardComponent', () => {
   let component: DoorwayDashboardComponent;
   let fixture: ComponentFixture<DoorwayDashboardComponent>;
-  let mockAdminService: jasmine.SpyObj<DoorwayAdminService>;
+  let mockAdminService: any;
 
   const mockNodesResponse: NodesResponse = {
     total: 3,
@@ -99,23 +100,28 @@ describe('DoorwayDashboardComponent', () => {
   };
 
   beforeEach(async () => {
-    mockAdminService = jasmine.createSpyObj(
-      'DoorwayAdminService',
-      ['getNodes', 'getClusterMetrics', 'getResources', 'getCustodians', 'connect', 'disconnect'],
-      {
-        connectionState: jasmine.createSpy('connectionState').and.returnValue('disconnected'),
-        isConnected: jasmine.createSpy('isConnected').and.returnValue(false),
-      }
-    );
+    mockAdminService = {
+      getNodes: vi.fn(),
+      getClusterMetrics: vi.fn(),
+      getResources: vi.fn(),
+      getCustodians: vi.fn(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      connectionState: vi.fn().mockReturnValue('disconnected'),
+      isConnected: vi.fn().mockReturnValue(false),
+    };
 
-    mockAdminService.getNodes.and.returnValue(of(mockNodesResponse));
-    mockAdminService.getClusterMetrics.and.returnValue(of(mockClusterMetrics));
-    mockAdminService.getResources.and.returnValue(of(mockResources));
-    mockAdminService.getCustodians.and.returnValue(of(mockCustodians));
+    mockAdminService.getNodes.mockReturnValue(of(mockNodesResponse));
+    mockAdminService.getClusterMetrics.mockReturnValue(of(mockClusterMetrics));
+    mockAdminService.getResources.mockReturnValue(of(mockResources));
+    mockAdminService.getCustodians.mockReturnValue(of(mockCustodians));
 
     await TestBed.configureTestingModule({
       imports: [DoorwayDashboardComponent],
-      providers: [{ provide: DoorwayAdminService, useValue: mockAdminService }, DecimalPipe],
+      providers: [
+        { provide: DoorwayAdminService, useValue: mockAdminService },
+        DecimalPipe,
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DoorwayDashboardComponent);
@@ -154,12 +160,12 @@ describe('DoorwayDashboardComponent', () => {
     }));
 
     it('should set loading to false after data loads', fakeAsync(() => {
-      expect(component.loading()).toBeTrue();
+      expect(component.loading()).toBe(true);
 
       fixture.detectChanges();
       tick();
 
-      expect(component.loading()).toBeFalse();
+      expect(component.loading()).toBe(false);
 
       discardPeriodicTasks();
     }));
@@ -274,7 +280,7 @@ describe('DoorwayDashboardComponent', () => {
       component.setStatusFilter('online');
       const sorted = component.sortedNodes();
       expect(sorted.length).toBe(2);
-      expect(sorted.every(n => n.status === 'online')).toBeTrue();
+      expect(sorted.every(n => n.status === 'online')).toBe(true);
     });
 
     it('should sort by combinedScore descending', () => {
@@ -404,7 +410,7 @@ describe('DoorwayDashboardComponent', () => {
       fixture.detectChanges();
       tick();
 
-      mockAdminService.getNodes.calls.reset();
+      mockAdminService.getNodes.mockClear();
 
       component.refresh();
       tick();
@@ -417,8 +423,8 @@ describe('DoorwayDashboardComponent', () => {
 
   describe('error handling', () => {
     it('should set error signal on load failure', fakeAsync(() => {
-      mockAdminService.getNodes.and.returnValue(of({ total: 0, byStatus: {} as any, nodes: [] }));
-      mockAdminService.getClusterMetrics.and.throwError('Network error');
+      mockAdminService.getNodes.mockReturnValue(of({ total: 0, byStatus: {} as any, nodes: [] }));
+      mockAdminService.getClusterMetrics.mockImplementation(() => { throw 'Network error'; });
 
       fixture.detectChanges();
       tick();

@@ -4,18 +4,26 @@ import { Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { DOCUMENT } from '@angular/common';
 import { Subject, of } from 'rxjs';
 import { SeoService, SeoConfig } from './seo.service';
+import { vi, Mock } from 'vitest';
 
 describe('SeoService', () => {
   let service: SeoService;
-  let titleService: jasmine.SpyObj<Title>;
-  let metaService: jasmine.SpyObj<Meta>;
+  let titleService: any;
+  let metaService: any;
   let mockDocument: Document;
   let routerEventsSubject: Subject<any>;
   let mockActivatedRoute: any;
 
   beforeEach(() => {
-    const titleSpy = jasmine.createSpyObj('Title', ['setTitle', 'getTitle']);
-    const metaSpy = jasmine.createSpyObj('Meta', ['updateTag', 'addTag', 'removeTag']);
+    const titleSpy = {
+    setTitle: vi.fn(),
+    getTitle: vi.fn(),
+  };
+    const metaSpy = {
+    updateTag: vi.fn(),
+    addTag: vi.fn(),
+    removeTag: vi.fn(),
+  };
 
     routerEventsSubject = new Subject();
 
@@ -45,8 +53,8 @@ describe('SeoService', () => {
       ],
     });
 
-    titleService = TestBed.inject(Title) as jasmine.SpyObj<Title>;
-    metaService = TestBed.inject(Meta) as jasmine.SpyObj<Meta>;
+    titleService = TestBed.inject(Title) as { [K in keyof Title]?: Mock };
+    metaService = TestBed.inject(Meta) as { [K in keyof Meta]?: Mock };
 
     service = TestBed.inject(SeoService);
   });

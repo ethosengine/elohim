@@ -1,7 +1,9 @@
+import { vi } from 'vitest';
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { DoorwayCacheService } from './doorway-cache.service';
+import { provideHttpClient } from '@angular/common/http';
 
 /**
  * Comprehensive tests for DoorwayCacheService
@@ -49,8 +51,7 @@ describe('DoorwayCacheService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [DoorwayCacheService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), DoorwayCacheService],
     });
 
     service = TestBed.inject(DoorwayCacheService);
@@ -600,7 +601,7 @@ describe('DoorwayCacheService', () => {
     }));
 
     it('should not log 404 errors (expected for missing content)', fakeAsync(() => {
-      spyOn(console, 'error');
+      vi.spyOn(console, 'error');
 
       service.get('Content', 'not-found').subscribe();
 

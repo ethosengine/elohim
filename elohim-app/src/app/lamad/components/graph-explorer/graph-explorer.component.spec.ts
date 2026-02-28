@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Router, ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -9,14 +9,15 @@ import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { HierarchicalGraphService } from '../../services/hierarchical-graph.service';
 import { ElementRef } from '@angular/core';
 import { ClusterNode, ClusterGraphData } from '../../models/cluster-graph.model';
+import { vi, Mock } from 'vitest';
 
 describe('GraphExplorerComponent', () => {
   let component: GraphExplorerComponent;
   let fixture: ComponentFixture<GraphExplorerComponent>;
   let router: Router;
-  let affinityService: jasmine.SpyObj<AffinityTrackingService>;
-  let hierarchicalGraphService: jasmine.SpyObj<HierarchicalGraphService>;
-  let dataLoaderService: jasmine.SpyObj<DataLoaderService>;
+  let affinityService: any;
+  let hierarchicalGraphService: any;
+  let dataLoaderService: any;
 
   const mockPathRoot: ClusterNode = {
     id: 'elohim-protocol',
@@ -69,24 +70,26 @@ describe('GraphExplorerComponent', () => {
   };
 
   beforeEach(async () => {
-    const affinityServiceSpy = jasmine.createSpyObj('AffinityTrackingService', ['getAffinity']);
-    const hierarchicalGraphSpy = jasmine.createSpyObj('HierarchicalGraphService', [
-      'initializeFromPath',
-      'expandCluster',
-      'collapseCluster',
-      'isExpanded',
-      'getVisibleNodes',
-      'getVisibleEdges',
-      'reset',
-    ]);
-    const dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', [
-      'getGraph',
-      'getPath',
-      'getPathHierarchy',
-    ]);
+    const affinityServiceSpy = {
+    getAffinity: vi.fn(),
+  };
+    const hierarchicalGraphSpy = {
+    initializeFromPath: vi.fn(),
+    expandCluster: vi.fn(),
+    collapseCluster: vi.fn(),
+    isExpanded: vi.fn(),
+    getVisibleNodes: vi.fn(),
+    getVisibleEdges: vi.fn(),
+    reset: vi.fn(),
+  };
+    const dataLoaderSpy = {
+    getGraph: vi.fn(),
+    getPath: vi.fn(),
+    getPathHierarchy: vi.fn(),
+  };
 
     await TestBed.configureTestingModule({
-      imports: [GraphExplorerComponent, HttpClientTestingModule, RouterTestingModule],
+      imports: [GraphExplorerComponent, RouterTestingModule],
       providers: [
         { provide: AffinityTrackingService, useValue: affinityServiceSpy },
         { provide: HierarchicalGraphService, useValue: hierarchicalGraphSpy },
@@ -96,18 +99,18 @@ describe('GraphExplorerComponent', () => {
 
     affinityService = TestBed.inject(
       AffinityTrackingService
-    ) as jasmine.SpyObj<AffinityTrackingService>;
+    ) as { [K in keyof AffinityTrackingService]?: Mock };
     hierarchicalGraphService = TestBed.inject(
       HierarchicalGraphService
-    ) as jasmine.SpyObj<HierarchicalGraphService>;
-    dataLoaderService = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
+    ) as { [K in keyof HierarchicalGraphService]?: Mock };
+    dataLoaderService = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
 
-    affinityService.getAffinity.and.returnValue(0);
-    hierarchicalGraphService.initializeFromPath.and.returnValue(of(mockGraphData));
-    hierarchicalGraphService.getVisibleNodes.and.returnValue([mockPathRoot, mockChapterCluster]);
-    hierarchicalGraphService.getVisibleEdges.and.returnValue([]);
-    hierarchicalGraphService.isExpanded.and.returnValue(false);
-    dataLoaderService.getGraph.and.returnValue(
+    affinityService.getAffinity.mockReturnValue(0);
+    hierarchicalGraphService.initializeFromPath.mockReturnValue(of(mockGraphData));
+    hierarchicalGraphService.getVisibleNodes.mockReturnValue([mockPathRoot, mockChapterCluster]);
+    hierarchicalGraphService.getVisibleEdges.mockReturnValue([]);
+    hierarchicalGraphService.isExpanded.mockReturnValue(false);
+    dataLoaderService.getGraph.mockReturnValue(
       of({
         nodes: new Map(),
         relationships: new Map(),
@@ -124,7 +127,7 @@ describe('GraphExplorerComponent', () => {
         },
       } as any)
     );
-    dataLoaderService.getPathHierarchy.and.returnValue(
+    dataLoaderService.getPathHierarchy.mockReturnValue(
       of({
         id: 'elohim-protocol',
         title: 'Elohim Protocol',
@@ -176,7 +179,7 @@ describe('GraphExplorerComponent', () => {
   });
 
   it('should expand cluster on double-click', () => {
-    hierarchicalGraphService.expandCluster.and.returnValue(
+    hierarchicalGraphService.expandCluster.mockReturnValue(
       of({
         clusterId: 'chapter-1',
         children: [],
@@ -209,7 +212,7 @@ describe('GraphExplorerComponent', () => {
   });
 
   it('should toggle cluster expansion on double-click', () => {
-    hierarchicalGraphService.expandCluster.and.returnValue(
+    hierarchicalGraphService.expandCluster.mockReturnValue(
       of({
         clusterId: 'chapter-1',
         children: [],
@@ -223,18 +226,18 @@ describe('GraphExplorerComponent', () => {
     const clusterNode: ClusterNode = { ...mockChapterCluster };
 
     // First double-click expands
-    hierarchicalGraphService.isExpanded.and.returnValue(false);
+    hierarchicalGraphService.isExpanded.mockReturnValue(false);
     component.handleNodeDoubleClick(clusterNode);
     expect(hierarchicalGraphService.expandCluster).toHaveBeenCalledWith('chapter-1');
 
     // Second double-click collapses
-    hierarchicalGraphService.isExpanded.and.returnValue(true);
+    hierarchicalGraphService.isExpanded.mockReturnValue(true);
     component.handleNodeDoubleClick(clusterNode);
     expect(hierarchicalGraphService.collapseCluster).toHaveBeenCalledWith('chapter-1');
   });
 
   it('should navigate to content on concept double-click', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
 
     const conceptNode: ClusterNode = {
       id: 'concept-1',
@@ -261,7 +264,7 @@ describe('GraphExplorerComponent', () => {
   });
 
   it('should not navigate for locked nodes', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
 
     const lockedNode: ClusterNode = {
       ...mockChapterCluster,
@@ -275,7 +278,7 @@ describe('GraphExplorerComponent', () => {
   });
 
   it('should check if cluster can expand', () => {
-    hierarchicalGraphService.isExpanded.and.returnValue(false);
+    hierarchicalGraphService.isExpanded.mockReturnValue(false);
 
     const clusterWithChildren: ClusterNode = { ...mockChapterCluster };
     expect(component.canExpand(clusterWithChildren)).toBe(true);
@@ -289,10 +292,10 @@ describe('GraphExplorerComponent', () => {
   });
 
   it('should check if cluster is expanded', () => {
-    hierarchicalGraphService.isExpanded.and.returnValue(true);
+    hierarchicalGraphService.isExpanded.mockReturnValue(true);
     expect(component.isExpanded(mockChapterCluster)).toBe(true);
 
-    hierarchicalGraphService.isExpanded.and.returnValue(false);
+    hierarchicalGraphService.isExpanded.mockReturnValue(false);
     expect(component.isExpanded(mockChapterCluster)).toBe(false);
   });
 
@@ -399,7 +402,7 @@ describe('GraphExplorerComponent', () => {
     });
 
     it('should handle overview mode with no chapters', () => {
-      dataLoaderService.getPathHierarchy.and.returnValue(
+      dataLoaderService.getPathHierarchy.mockReturnValue(
         of({
           id: 'test-path',
           title: 'Test',
@@ -419,7 +422,7 @@ describe('GraphExplorerComponent', () => {
       fixture.detectChanges();
       component.viewMode = 'overview';
 
-      dataLoaderService.getPathHierarchy.calls.reset();
+      dataLoaderService.getPathHierarchy.mockClear();
       component.setViewMode('overview');
 
       expect(dataLoaderService.getPathHierarchy).not.toHaveBeenCalled();
@@ -472,7 +475,7 @@ describe('GraphExplorerComponent', () => {
 
   describe('return navigation', () => {
     it('should return to path with context', () => {
-      spyOn(router, 'navigate');
+      vi.spyOn(router, 'navigate');
       fixture.detectChanges();
 
       component.returnContext = {
@@ -486,7 +489,7 @@ describe('GraphExplorerComponent', () => {
     });
 
     it('should navigate to lamad home if no return context', () => {
-      spyOn(router, 'navigate');
+      vi.spyOn(router, 'navigate');
       fixture.detectChanges();
 
       component.returnContext = null;
@@ -509,7 +512,7 @@ describe('GraphExplorerComponent', () => {
 
     it('should collapse clusters when navigating to non-root breadcrumb', () => {
       fixture.detectChanges();
-      hierarchicalGraphService.isExpanded.and.returnValue(true);
+      hierarchicalGraphService.isExpanded.mockReturnValue(true);
 
       component.visibleNodes = [
         { ...mockChapterCluster, clusterLevel: 2, id: 'cluster-1' },
@@ -654,7 +657,7 @@ describe('GraphExplorerComponent', () => {
 
   describe('error handling', () => {
     it('should handle path hierarchy load error', () => {
-      hierarchicalGraphService.initializeFromPath.and.returnValue(
+      hierarchicalGraphService.initializeFromPath.mockReturnValue(
         throwError(() => new Error('Load failed'))
       );
 
@@ -665,7 +668,7 @@ describe('GraphExplorerComponent', () => {
     });
 
     it('should handle cluster expansion error', () => {
-      hierarchicalGraphService.expandCluster.and.returnValue(
+      hierarchicalGraphService.expandCluster.mockReturnValue(
         throwError(() => new Error('Expansion failed'))
       );
 
@@ -677,7 +680,7 @@ describe('GraphExplorerComponent', () => {
     });
 
     it('should handle overview load error', () => {
-      dataLoaderService.getPathHierarchy.and.returnValue(
+      dataLoaderService.getPathHierarchy.mockReturnValue(
         throwError(() => new Error('Load failed'))
       );
 
@@ -704,7 +707,7 @@ describe('GraphExplorerComponent', () => {
 
   describe('affinity integration', () => {
     it('should convert content node to cluster node with affinity', () => {
-      affinityService.getAffinity.and.returnValue(0.75);
+      affinityService.getAffinity.mockReturnValue(0.75);
 
       const partialNode = {
         id: 'test-node',
@@ -720,7 +723,7 @@ describe('GraphExplorerComponent', () => {
     });
 
     it('should mark manifesto as recommended when unseen', () => {
-      affinityService.getAffinity.and.returnValue(0);
+      affinityService.getAffinity.mockReturnValue(0);
 
       const manifestoNode = {
         id: 'manifesto',
@@ -733,15 +736,15 @@ describe('GraphExplorerComponent', () => {
     });
 
     it('should categorize affinity levels correctly', () => {
-      affinityService.getAffinity.and.returnValue(0);
+      affinityService.getAffinity.mockReturnValue(0);
       let clusterNode = (component as any).convertToClusterNode({ id: 'n1' });
       expect(clusterNode.state).toBe('unseen');
 
-      affinityService.getAffinity.and.returnValue(0.5);
+      affinityService.getAffinity.mockReturnValue(0.5);
       clusterNode = (component as any).convertToClusterNode({ id: 'n2' });
       expect(clusterNode.state).toBe('in-progress');
 
-      affinityService.getAffinity.and.returnValue(0.8);
+      affinityService.getAffinity.mockReturnValue(0.8);
       clusterNode = (component as any).convertToClusterNode({ id: 'n3' });
       expect(clusterNode.state).toBe('proficient');
     });
@@ -749,7 +752,7 @@ describe('GraphExplorerComponent', () => {
 
   describe('navigation to content', () => {
     it('should navigate to content viewer', () => {
-      spyOn(router, 'navigate');
+      vi.spyOn(router, 'navigate');
 
       component.navigateToContent('node-123');
 
@@ -763,7 +766,7 @@ describe('GraphExplorerComponent', () => {
 
       // Initialize simulation by rendering graph
       if ((component as any).simulation) {
-        spyOn((component as any).simulation, 'stop');
+        vi.spyOn((component as any).simulation, 'stop');
       }
 
       component.ngOnDestroy();

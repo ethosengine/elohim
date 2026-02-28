@@ -6,27 +6,25 @@ import { BannerService } from '@app/elohim/services/banner.service';
 import { HolochainUpgradePrompt } from '../../models/session-human.model';
 import { SessionHumanService } from '../session-human.service';
 import { UpgradeBannerProvider } from './upgrade-banner.provider';
+import { vi, Mock } from 'vitest';
 
 describe('UpgradeBannerProvider', () => {
   let provider: UpgradeBannerProvider;
-  let mockBannerService: jasmine.SpyObj<BannerService>;
+  let mockBannerService: any;
   let upgradePromptsSubject: BehaviorSubject<HolochainUpgradePrompt[]>;
 
   beforeEach(() => {
     upgradePromptsSubject = new BehaviorSubject<HolochainUpgradePrompt[]>([]);
 
-    const mockSessionHumanService = jasmine.createSpyObj(
-      'SessionHumanService',
-      ['dismissUpgradePrompt'],
-      {
-        upgradePrompts$: upgradePromptsSubject.asObservable(),
-      }
-    );
+    const mockSessionHumanService = {
+      dismissUpgradePrompt: vi.fn(),
+      upgradePrompts$: upgradePromptsSubject.asObservable(),
+    };
 
-    mockBannerService = jasmine.createSpyObj('BannerService', [
-      'registerProvider',
-      'unregisterProvider',
-    ]);
+    mockBannerService = {
+      registerProvider: vi.fn(),
+      unregisterProvider: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -119,18 +117,18 @@ describe('UpgradeBannerProvider', () => {
   });
 
   it('should delegate dismissNotice to SessionHumanService', () => {
-    const mockService = TestBed.inject(SessionHumanService) as jasmine.SpyObj<SessionHumanService>;
+    const mockService = TestBed.inject(SessionHumanService) as { [K in keyof SessionHumanService]?: Mock };
     provider.dismissNotice('prompt-1');
     expect(mockService.dismissUpgradePrompt).toHaveBeenCalledWith('prompt-1');
   });
 
-  it('should emit on upgradeModalRequested$ when learn-more action is handled', done => {
+  it('should emit on upgradeModalRequested$ when learn-more action is handled', () => new Promise<void>(done => {
     provider.upgradeModalRequested$.subscribe(() => {
       done();
     });
 
     provider.handleAction('prompt-1', 'learn-more');
-  });
+  }));
 
   it('should not emit on upgradeModalRequested$ for unknown actions', () => {
     let emitted = false;

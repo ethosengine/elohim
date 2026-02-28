@@ -1,3 +1,4 @@
+import { vi, Mock } from 'vitest';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -90,7 +91,7 @@ describe('MarkdownRendererComponent', () => {
     }));
 
     it('should warn for non-string content', fakeAsync(() => {
-      spyOn(console, 'warn');
+      vi.spyOn(console, 'warn');
       const node = createContentNode('');
       (node as any).content = { invalid: 'object' };
       component.node = node;
@@ -153,13 +154,13 @@ describe('MarkdownRendererComponent', () => {
     }));
 
     it('should toggle TOC visibility', () => {
-      expect(component.tocVisible).toBeFalse();
+      expect(component.tocVisible).toBe(false);
 
       component.toggleToc();
-      expect(component.tocVisible).toBeTrue();
+      expect(component.tocVisible).toBe(true);
 
       component.toggleToc();
-      expect(component.tocVisible).toBeFalse();
+      expect(component.tocVisible).toBe(false);
     });
   });
 
@@ -176,10 +177,10 @@ describe('MarkdownRendererComponent', () => {
       const mockElement = document.createElement('div');
       mockElement.id = component.tocEntries[0].id;
       document.body.appendChild(mockElement);
-      spyOn(mockElement, 'scrollIntoView');
+      vi.spyOn(mockElement, 'scrollIntoView');
 
       const event = new Event('click');
-      spyOn(event, 'preventDefault');
+      vi.spyOn(event, 'preventDefault');
 
       component.scrollToHeading(event, component.tocEntries[0].id);
 
@@ -202,7 +203,7 @@ describe('MarkdownRendererComponent', () => {
       tick();
 
       // Mock mobile viewport
-      spyOnProperty(window, 'innerWidth').and.returnValue(500);
+      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(500);
 
       // Create mock element
       const mockElement = document.createElement('div');
@@ -213,13 +214,13 @@ describe('MarkdownRendererComponent', () => {
       const event = new Event('click');
       component.scrollToHeading(event, component.tocEntries[0].id);
 
-      expect(component.tocVisible).toBeFalse();
+      expect(component.tocVisible).toBe(false);
 
       document.body.removeChild(mockElement);
     }));
 
     it('should scroll to top when scrollToTop called', () => {
-      spyOn(window, 'scrollTo');
+      vi.spyOn(window, 'scrollTo');
       component.scrollToTop();
       expect(window.scrollTo).toHaveBeenCalled();
     });
@@ -237,21 +238,21 @@ describe('MarkdownRendererComponent', () => {
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.markdown-wrapper');
-      expect(wrapper.classList.contains('embedded')).toBeTrue();
+      expect(wrapper.classList.contains('embedded')).toBe(true);
     }));
   });
 
   describe('lifecycle', () => {
     it('should set up scroll listener after view init', () => {
-      spyOn(window, 'addEventListener');
+      vi.spyOn(window, 'addEventListener');
       component.ngAfterViewInit();
-      expect(window.addEventListener).toHaveBeenCalledWith('scroll', jasmine.any(Function), {
+      expect(window.addEventListener).toHaveBeenCalledWith('scroll', expect.any(Function), {
         passive: true,
       });
     });
 
     it('should remove scroll listener on destroy', () => {
-      spyOn(window, 'removeEventListener');
+      vi.spyOn(window, 'removeEventListener');
       component.ngAfterViewInit();
       component.ngOnDestroy();
       expect(window.removeEventListener).toHaveBeenCalled();
@@ -338,7 +339,7 @@ describe('MarkdownRendererComponent', () => {
 
   describe('back to top button', () => {
     it('should initially hide back to top button', () => {
-      expect(component.showBackToTop).toBeFalse();
+      expect(component.showBackToTop).toBe(false);
     });
 
     it('should show back to top button after scrolling', fakeAsync(() => {
@@ -350,7 +351,7 @@ describe('MarkdownRendererComponent', () => {
       window.dispatchEvent(new Event('scroll'));
       tick();
 
-      expect(component.showBackToTop).toBeTrue();
+      expect(component.showBackToTop).toBe(true);
     }));
   });
 });

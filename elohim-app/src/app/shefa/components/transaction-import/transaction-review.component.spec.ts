@@ -10,34 +10,39 @@ import { TransactionReviewComponent } from './transaction-review.component';
 import { TransactionImportService } from '../../services/transaction-import.service';
 import { AICategorizationService } from '../../services/ai-categorization.service';
 import { BudgetReconciliationService } from '../../services/budget-reconciliation.service';
+import { vi } from 'vitest';
 
 describe('TransactionReviewComponent', () => {
   let component: TransactionReviewComponent;
   let fixture: ComponentFixture<TransactionReviewComponent>;
-  let mockImportService: jasmine.SpyObj<TransactionImportService>;
-  let mockAIService: jasmine.SpyObj<AICategorizationService>;
-  let mockBudgetService: jasmine.SpyObj<BudgetReconciliationService>;
+  let mockImportService: any;
+  let mockAIService: any;
+  let mockBudgetService: any;
   let mockActivatedRoute: any;
 
   beforeEach(async () => {
-    mockImportService = jasmine.createSpyObj('TransactionImportService', [
-      'getBatch',
-      'getStagedTransactionsForBatch',
-      'approveTransaction',
-      'rejectTransaction',
-      'approveBatch',
-    ]);
-    mockImportService.getBatch.and.returnValue(undefined);
-    mockImportService.getStagedTransactionsForBatch.and.returnValue([]);
+    mockImportService = {
+    getBatch: vi.fn(),
+    getStagedTransactionsForBatch: vi.fn(),
+    approveTransaction: vi.fn(),
+    rejectTransaction: vi.fn(),
+    approveBatch: vi.fn(),
+  };
+    mockImportService.getBatch.mockReturnValue(undefined);
+    mockImportService.getStagedTransactionsForBatch.mockReturnValue([]);
 
-    mockAIService = jasmine.createSpyObj('AICategorizationService', ['categorize']);
+    mockAIService = {
+    categorize: vi.fn(),
+  };
 
-    mockBudgetService = jasmine.createSpyObj('BudgetReconciliationService', ['reconcile']);
+    mockBudgetService = {
+    reconcile: vi.fn(),
+  };
 
     mockActivatedRoute = {
       snapshot: {
         paramMap: {
-          get: jasmine.createSpy('get').and.returnValue('test-batch-id'),
+          get: vi.fn().mockReturnValue('test-batch-id'),
         },
       },
     };

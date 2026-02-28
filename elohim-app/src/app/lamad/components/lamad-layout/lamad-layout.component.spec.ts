@@ -3,16 +3,17 @@ import { LamadLayoutComponent } from './lamad-layout.component';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
+import { vi } from 'vitest';
 
 describe('LamadLayoutComponent', () => {
   let component: LamadLayoutComponent;
   let fixture: ComponentFixture<LamadLayoutComponent>;
 
   const mockElohimClient = {
-    get: jasmine.createSpy('get').and.returnValue(Promise.resolve(null)),
-    query: jasmine.createSpy('query').and.returnValue(Promise.resolve([])),
-    supportsOffline: jasmine.createSpy('supportsOffline').and.returnValue(false),
-    backpressure: jasmine.createSpy('backpressure').and.returnValue(Promise.resolve(0)),
+    get: vi.fn().mockReturnValue(Promise.resolve(null)),
+    query: vi.fn().mockReturnValue(Promise.resolve([])),
+    supportsOffline: vi.fn().mockReturnValue(false),
+    backpressure: vi.fn().mockReturnValue(Promise.resolve(0)),
   };
 
   beforeEach(async () => {

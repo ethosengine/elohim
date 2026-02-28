@@ -14,6 +14,7 @@ import {
 import type { InstrumentDefinition } from '../models/instrument-definition.model';
 
 import { InstrumentLoaderService } from './instrument-loader.service';
+import { vi } from 'vitest';
 
 // =============================================================================
 // Helpers
@@ -99,10 +100,13 @@ const buildStringContentNode = (def: InstrumentDefinition): ContentNode =>
 
 describe('InstrumentLoaderService', () => {
   let service: InstrumentLoaderService;
-  let contentServiceSpy: jasmine.SpyObj<ContentService>;
+  let contentServiceSpy: any;
 
   beforeEach(() => {
-    contentServiceSpy = jasmine.createSpyObj('ContentService', ['queryContent', 'getContent']);
+    contentServiceSpy = {
+    queryContent: vi.fn(),
+    getContent: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [InstrumentLoaderService, { provide: ContentService, useValue: contentServiceSpy }],
@@ -133,7 +137,7 @@ describe('InstrumentLoaderService', () => {
     it('should load instruments from content pipeline', async () => {
       const def = buildInstrumentDefinition({ id: 'pipeline-1' });
       const node = buildContentNode({}, { id: 'pipeline-1' });
-      contentServiceSpy.queryContent.and.returnValue(of([node]));
+      contentServiceSpy.queryContent.mockReturnValue(of([node]));
 
       const count = await service.loadInstruments();
 
@@ -149,7 +153,7 @@ describe('InstrumentLoaderService', () => {
         buildContentNode({}, { id: 'multi-1', framework: 'fw-1' }),
         buildContentNode({}, { id: 'multi-2', framework: 'fw-2' }),
       ];
-      contentServiceSpy.queryContent.and.returnValue(of(nodes));
+      contentServiceSpy.queryContent.mockReturnValue(of(nodes));
 
       const count = await service.loadInstruments();
 
@@ -161,7 +165,7 @@ describe('InstrumentLoaderService', () => {
     it('should parse stringified content bodies', async () => {
       const def = buildInstrumentDefinition({ id: 'string-body' });
       const node = buildStringContentNode(def);
-      contentServiceSpy.queryContent.and.returnValue(of([node]));
+      contentServiceSpy.queryContent.mockReturnValue(of([node]));
 
       const count = await service.loadInstruments();
 
@@ -172,7 +176,7 @@ describe('InstrumentLoaderService', () => {
     it('should skip nodes with wrong contentType', async () => {
       const node = buildContentNode({}, { id: 'wrong-type' });
       (node as unknown as Record<string, unknown>)['contentType'] = 'article';
-      contentServiceSpy.queryContent.and.returnValue(of([node]));
+      contentServiceSpy.queryContent.mockReturnValue(of([node]));
 
       const count = await service.loadInstruments();
 
@@ -190,7 +194,7 @@ describe('InstrumentLoaderService', () => {
         tags: [],
         relatedNodeIds: [],
       } as unknown as ContentNode;
-      contentServiceSpy.queryContent.and.returnValue(of([node]));
+      contentServiceSpy.queryContent.mockReturnValue(of([node]));
 
       const count = await service.loadInstruments();
 
@@ -208,7 +212,7 @@ describe('InstrumentLoaderService', () => {
         tags: [],
         relatedNodeIds: [],
       } as unknown as ContentNode;
-      contentServiceSpy.queryContent.and.returnValue(of([node]));
+      contentServiceSpy.queryContent.mockReturnValue(of([node]));
 
       const count = await service.loadInstruments();
 
@@ -216,7 +220,7 @@ describe('InstrumentLoaderService', () => {
     });
 
     it('should handle empty result set', async () => {
-      contentServiceSpy.queryContent.and.returnValue(of([]));
+      contentServiceSpy.queryContent.mockReturnValue(of([]));
 
       const count = await service.loadInstruments();
 
@@ -225,7 +229,7 @@ describe('InstrumentLoaderService', () => {
     });
 
     it('should set error signal on fetch failure', async () => {
-      contentServiceSpy.queryContent.and.returnValue(throwError(() => new Error('Network down')));
+      contentServiceSpy.queryContent.mockReturnValue(throwError(() => new Error('Network down')));
 
       const count = await service.loadInstruments();
 
@@ -236,7 +240,7 @@ describe('InstrumentLoaderService', () => {
     });
 
     it('should handle non-Error throws', async () => {
-      contentServiceSpy.queryContent.and.returnValue(throwError(() => 'string error'));
+      contentServiceSpy.queryContent.mockReturnValue(throwError(() => 'string error'));
 
       const count = await service.loadInstruments();
 
@@ -245,7 +249,7 @@ describe('InstrumentLoaderService', () => {
     });
 
     it('should prevent concurrent loads', async () => {
-      contentServiceSpy.queryContent.and.returnValue(of([buildContentNode({}, { id: 'conc-1' })]));
+      contentServiceSpy.queryContent.mockReturnValue(of([buildContentNode({}, { id: 'conc-1' })]));
 
       const promise1 = service.loadInstruments();
       const promise2 = service.loadInstruments();
@@ -258,7 +262,7 @@ describe('InstrumentLoaderService', () => {
     });
 
     it('should query for instrument contentType', async () => {
-      contentServiceSpy.queryContent.and.returnValue(of([]));
+      contentServiceSpy.queryContent.mockReturnValue(of([]));
 
       await service.loadInstruments();
 
@@ -273,7 +277,7 @@ describe('InstrumentLoaderService', () => {
   describe('loadInstrument()', () => {
     it('should load a single instrument by node ID', async () => {
       const node = buildContentNode({}, { id: 'single-load' });
-      contentServiceSpy.getContent.and.returnValue(of(node));
+      contentServiceSpy.getContent.mockReturnValue(of(node));
 
       const result = await service.loadInstrument('node-single');
 
@@ -282,7 +286,7 @@ describe('InstrumentLoaderService', () => {
     });
 
     it('should return false when node not found', async () => {
-      contentServiceSpy.getContent.and.returnValue(of(null));
+      contentServiceSpy.getContent.mockReturnValue(of(null));
 
       const result = await service.loadInstrument('nonexistent');
 
@@ -295,7 +299,7 @@ describe('InstrumentLoaderService', () => {
         contentType: 'instrument',
         content: { id: 'only-id' },
       } as unknown as ContentNode;
-      contentServiceSpy.getContent.and.returnValue(of(node));
+      contentServiceSpy.getContent.mockReturnValue(of(node));
 
       const result = await service.loadInstrument('bad');
 
@@ -303,7 +307,7 @@ describe('InstrumentLoaderService', () => {
     });
 
     it('should return false on fetch error', async () => {
-      contentServiceSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+      contentServiceSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       const result = await service.loadInstrument('error-node');
 

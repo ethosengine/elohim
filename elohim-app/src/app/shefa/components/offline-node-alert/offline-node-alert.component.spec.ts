@@ -8,19 +8,20 @@ import { of } from 'rxjs';
 
 import { OfflineNodeAlertComponent } from './offline-node-alert.component';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { vi } from 'vitest';
 
 describe('OfflineNodeAlertComponent', () => {
   let component: OfflineNodeAlertComponent;
   let fixture: ComponentFixture<OfflineNodeAlertComponent>;
-  let mockShefaCompute: jasmine.SpyObj<ShefaComputeService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockShefaCompute: any;
+  let mockRouter: any;
 
   beforeEach(async () => {
-    mockShefaCompute = jasmine.createSpyObj('ShefaComputeService', [
-      'getNodeTopology',
-      'getComputeNeedsAssessment',
-    ]);
-    mockShefaCompute.getNodeTopology.and.returnValue(
+    mockShefaCompute = {
+    getNodeTopology: vi.fn(),
+    getComputeNeedsAssessment: vi.fn(),
+  };
+    mockShefaCompute.getNodeTopology.mockReturnValue(
       of({
         nodes: [],
         totalNodes: 0,
@@ -32,7 +33,7 @@ describe('OfflineNodeAlertComponent', () => {
         lastUpdated: new Date().toISOString(),
       })
     );
-    mockShefaCompute.getComputeNeedsAssessment.and.returnValue(
+    mockShefaCompute.getComputeNeedsAssessment.mockReturnValue(
       of({
         currentCapacity: {
           totalCPUCores: 0,
@@ -49,7 +50,9 @@ describe('OfflineNodeAlertComponent', () => {
       })
     );
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
+    mockRouter = {
+    navigate: vi.fn(),
+  };
 
     await TestBed.configureTestingModule({
       imports: [OfflineNodeAlertComponent],

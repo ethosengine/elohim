@@ -8,11 +8,12 @@ import {
 } from '@app/elohim/services/data-loader.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 import { ContentNode } from '../models/content-node.model';
+import { vi, Mock } from 'vitest';
 
 describe('AssessmentService', () => {
   let service: AssessmentService;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
-  let sessionUserSpy: jasmine.SpyObj<SessionHumanService>;
+  let dataLoaderSpy: any;
+  let sessionUserSpy: any;
   let localStorageMock: { [key: string]: string };
   let mockStorage: Storage;
 
@@ -69,15 +70,15 @@ describe('AssessmentService', () => {
   };
 
   beforeEach(() => {
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
-      'getAssessmentIndex',
-      'getAssessmentsByDomain',
-      'getAssessment',
-    ]);
-    const sessionUserSpyObj = jasmine.createSpyObj('SessionHumanService', [
-      'getSessionId',
-      'getSession',
-    ]);
+    const dataLoaderSpyObj = {
+      getAssessmentIndex: vi.fn(),
+      getAssessmentsByDomain: vi.fn(),
+      getAssessment: vi.fn(),
+    };
+    const sessionUserSpyObj = {
+      getSessionId: vi.fn(),
+      getSession: vi.fn(),
+    };
 
     // Mock localStorage
     localStorageMock = {};
@@ -97,7 +98,7 @@ describe('AssessmentService', () => {
         localStorageMock = {};
       },
     };
-    spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
+    vi.spyOn(window, 'localStorage', 'get').mockReturnValue(mockStorage);
 
     TestBed.configureTestingModule({
       providers: [
@@ -107,15 +108,15 @@ describe('AssessmentService', () => {
       ],
     });
 
-    dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    sessionUserSpy = TestBed.inject(SessionHumanService) as jasmine.SpyObj<SessionHumanService>;
+    dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
+    sessionUserSpy = TestBed.inject(SessionHumanService) as { [K in keyof SessionHumanService]?: Mock };
 
     // Default spy return values
-    dataLoaderSpy.getAssessmentIndex.and.returnValue(of(mockAssessmentIndex));
-    dataLoaderSpy.getAssessmentsByDomain.and.returnValue(of(mockAssessmentIndex.assessments));
-    dataLoaderSpy.getAssessment.and.returnValue(of(mockAssessmentNode));
-    sessionUserSpy.getSessionId.and.returnValue('session-123');
-    sessionUserSpy.getSession.and.returnValue(null);
+    dataLoaderSpy.getAssessmentIndex.mockReturnValue(of(mockAssessmentIndex));
+    dataLoaderSpy.getAssessmentsByDomain.mockReturnValue(of(mockAssessmentIndex.assessments));
+    dataLoaderSpy.getAssessment.mockReturnValue(of(mockAssessmentNode));
+    sessionUserSpy.getSessionId.mockReturnValue('session-123');
+    sessionUserSpy.getSession.mockReturnValue(null);
 
     service = TestBed.inject(AssessmentService);
   });
@@ -133,62 +134,62 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('getAssessmentIndex', () => {
-    it('should return assessment index from data loader', done => {
+    it('should return assessment index from data loader', () => new Promise<void>(done => {
       service.getAssessmentIndex().subscribe(index => {
         expect(index).toEqual(mockAssessmentIndex);
         expect(dataLoaderSpy.getAssessmentIndex).toHaveBeenCalled();
         done();
       });
-    });
+    }));
   });
 
   describe('getAssessmentsByDomain', () => {
-    it('should filter assessments by domain', done => {
+    it('should filter assessments by domain', () => new Promise<void>(done => {
       service.getAssessmentsByDomain('values').subscribe(assessments => {
         expect(dataLoaderSpy.getAssessmentsByDomain).toHaveBeenCalledWith('values');
         done();
       });
-    });
+    }));
   });
 
   describe('getAssessment', () => {
-    it('should load assessment by ID', done => {
+    it('should load assessment by ID', () => new Promise<void>(done => {
       service.getAssessment('assessment-1').subscribe(assessment => {
         expect(assessment).toEqual(mockAssessmentNode);
         expect(dataLoaderSpy.getAssessment).toHaveBeenCalledWith('assessment-1');
         done();
       });
-    });
+    }));
 
-    it('should return null for missing assessment', done => {
-      dataLoaderSpy.getAssessment.and.returnValue(of(null));
+    it('should return null for missing assessment', () => new Promise<void>(done => {
+      dataLoaderSpy.getAssessment.mockReturnValue(of(null));
 
       service.getAssessment('missing').subscribe(assessment => {
         expect(assessment).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('canAccessAssessment', () => {
-    it('should allow access when no prerequisite', done => {
+    it('should allow access when no prerequisite', () => new Promise<void>(done => {
       service.canAccessAssessment('assessment-1').subscribe(canAccess => {
         expect(canAccess).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should deny access when prerequisite attestation is missing', done => {
-      dataLoaderSpy.getAssessment.and.returnValue(of(mockGatedAssessment));
+    it('should deny access when prerequisite attestation is missing', () => new Promise<void>(done => {
+      dataLoaderSpy.getAssessment.mockReturnValue(of(mockGatedAssessment));
 
       service.canAccessAssessment('gated-assessment').subscribe(canAccess => {
         expect(canAccess).toBe(false);
         done();
       });
-    });
+    }));
 
-    it('should allow access when prerequisite attestation is present', done => {
-      dataLoaderSpy.getAssessment.and.returnValue(of(mockGatedAssessment));
+    it('should allow access when prerequisite attestation is present', () => new Promise<void>(done => {
+      dataLoaderSpy.getAssessment.mockReturnValue(of(mockGatedAssessment));
       // Store the attestation in localStorage
       localStorageMock['lamad-assessment-attestations-session-123'] = JSON.stringify([
         'basic-attestation',
@@ -198,16 +199,16 @@ describe('AssessmentService', () => {
         expect(canAccess).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should return false for non-existent assessment', done => {
-      dataLoaderSpy.getAssessment.and.returnValue(of(null));
+    it('should return false for non-existent assessment', () => new Promise<void>(done => {
+      dataLoaderSpy.getAssessment.mockReturnValue(of(null));
 
       service.canAccessAssessment('missing').subscribe(canAccess => {
         expect(canAccess).toBe(false);
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -215,7 +216,7 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('startAssessment', () => {
-    it('should create a new session', done => {
+    it('should create a new session', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(session => {
         expect(session.assessmentId).toBe('assessment-1');
         expect(session.agentId).toBe('session-123');
@@ -224,35 +225,35 @@ describe('AssessmentService', () => {
         expect(session.timeSpentMs).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should save session to localStorage', done => {
+    it('should save session to localStorage', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         const key = 'lamad-assessment-session-session-123-assessment-1';
         expect(localStorageMock[key]).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should use anonymous for missing session ID', done => {
-      sessionUserSpy.getSessionId.and.returnValue(undefined as unknown as string);
+    it('should use anonymous for missing session ID', () => new Promise<void>(done => {
+      sessionUserSpy.getSessionId.mockReturnValue(undefined as unknown as string);
 
       service.startAssessment('assessment-1').subscribe(session => {
         expect(session.agentId).toBe('anonymous');
         done();
       });
-    });
+    }));
   });
 
   describe('getActiveSession', () => {
-    it('should return null when no active session', done => {
+    it('should return null when no active session', () => new Promise<void>(done => {
       service.getActiveSession().subscribe(session => {
         expect(session).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return active session after starting assessment', done => {
+    it('should return active session after starting assessment', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.getActiveSession().subscribe(session => {
           expect(session).not.toBeNull();
@@ -260,11 +261,11 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
   });
 
   describe('resumeAssessment', () => {
-    it('should resume session from localStorage', done => {
+    it('should resume session from localStorage', () => new Promise<void>(done => {
       const savedSession: AssessmentSession = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
@@ -289,18 +290,18 @@ describe('AssessmentService', () => {
         expect(Object.keys(session?.responses ?? {})).toContain('q1');
         done();
       });
-    });
+    }));
 
-    it('should return null when no saved session', done => {
+    it('should return null when no saved session', () => new Promise<void>(done => {
       service.resumeAssessment('missing').subscribe(session => {
         expect(session).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('recordResponse', () => {
-    it('should record response and increment question index', done => {
+    it('should record response and increment question index', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'likert', 5);
 
@@ -311,9 +312,9 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should handle string responses', done => {
+    it('should handle string responses', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'text', 'My answer');
 
@@ -322,9 +323,9 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should handle array responses', done => {
+    it('should handle array responses', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'multi-select', ['a', 'b']);
 
@@ -333,17 +334,17 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
     it('should do nothing when no active session', () => {
-      spyOn(console, 'error');
+      vi.spyOn(console, 'error');
       service.recordResponse('q1', 'likert', 5);
       expect(console.error).toHaveBeenCalled();
     });
   });
 
   describe('updateTimeSpent', () => {
-    it('should accumulate time spent', done => {
+    it('should accumulate time spent', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.updateTimeSpent(5000);
         service.updateTimeSpent(3000);
@@ -353,7 +354,7 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
     it('should do nothing when no active session', () => {
       service.updateTimeSpent(5000);
@@ -362,7 +363,7 @@ describe('AssessmentService', () => {
   });
 
   describe('abandonAssessment', () => {
-    it('should clear active session', done => {
+    it('should clear active session', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.abandonAssessment();
 
@@ -371,9 +372,9 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should remove session from localStorage', done => {
+    it('should remove session from localStorage', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         const key = 'lamad-assessment-session-session-123-assessment-1';
         expect(localStorageMock[key]).toBeDefined();
@@ -382,7 +383,7 @@ describe('AssessmentService', () => {
         expect(localStorageMock[key]).toBeUndefined();
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -390,14 +391,14 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('completeAssessment', () => {
-    it('should return null when no active session', done => {
+    it('should return null when no active session', () => new Promise<void>(done => {
       service.completeAssessment().subscribe(result => {
         expect(result).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should compute scores and return result', done => {
+    it('should compute scores and return result', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'likert', 7);
         service.recordResponse('q2', 'likert', 3);
@@ -411,9 +412,9 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should clear session after completion', done => {
+    it('should clear session after completion', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.completeAssessment().subscribe(() => {
           service.getActiveSession().subscribe(session => {
@@ -422,9 +423,9 @@ describe('AssessmentService', () => {
           });
         });
       });
-    });
+    }));
 
-    it('should save result to localStorage', done => {
+    it('should save result to localStorage', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.completeAssessment().subscribe(() => {
           const key = 'lamad-assessment-result-session-123-assessment-1';
@@ -432,10 +433,10 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should return null when assessment not found', done => {
-      dataLoaderSpy.getAssessment.and.returnValue(of(null));
+    it('should return null when assessment not found', () => new Promise<void>(done => {
+      dataLoaderSpy.getAssessment.mockReturnValue(of(null));
 
       service.startAssessment('missing').subscribe(() => {
         service.completeAssessment().subscribe(result => {
@@ -443,9 +444,9 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should handle quadrant interpretation', done => {
+    it('should handle quadrant interpretation', () => new Promise<void>(done => {
       const quadrantAssessment: ContentNode = {
         ...mockAssessmentNode,
         content: {
@@ -466,7 +467,7 @@ describe('AssessmentService', () => {
           },
         },
       };
-      dataLoaderSpy.getAssessment.and.returnValue(of(quadrantAssessment));
+      dataLoaderSpy.getAssessment.mockReturnValue(of(quadrantAssessment));
 
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'likert', 2); // Low anxiety
@@ -477,9 +478,9 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should handle ranking interpretation', done => {
+    it('should handle ranking interpretation', () => new Promise<void>(done => {
       service.startAssessment('assessment-1').subscribe(() => {
         service.recordResponse('q1', 'likert', 7);
         service.recordResponse('q2', 'likert', 5);
@@ -490,7 +491,7 @@ describe('AssessmentService', () => {
           done();
         });
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -498,14 +499,14 @@ describe('AssessmentService', () => {
   // =========================================================================
 
   describe('getMyResults', () => {
-    it('should return empty array when no results', done => {
+    it('should return empty array when no results', () => new Promise<void>(done => {
       service.getMyResults().subscribe(results => {
         expect(results).toEqual([]);
         done();
       });
-    });
+    }));
 
-    it('should return sorted results from localStorage', done => {
+    it('should return sorted results from localStorage', () => new Promise<void>(done => {
       const result1: AssessmentResult = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
@@ -533,20 +534,20 @@ describe('AssessmentService', () => {
         expect(results[0].assessmentId).toBe('assessment-2');
         done();
       });
-    });
+    }));
 
-    it('should skip malformed entries', done => {
+    it('should skip malformed entries', () => new Promise<void>(done => {
       localStorageMock['lamad-assessment-result-session-123-bad'] = 'invalid json';
 
       service.getMyResults().subscribe(results => {
         expect(results.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('getResultForAssessment', () => {
-    it('should return specific result', done => {
+    it('should return specific result', () => new Promise<void>(done => {
       const result: AssessmentResult = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
@@ -562,18 +563,18 @@ describe('AssessmentService', () => {
         expect(r?.assessmentId).toBe('assessment-1');
         done();
       });
-    });
+    }));
 
-    it('should return null for missing result', done => {
+    it('should return null for missing result', () => new Promise<void>(done => {
       service.getResultForAssessment('missing').subscribe(result => {
         expect(result).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('hasCompleted', () => {
-    it('should return true when result exists', done => {
+    it('should return true when result exists', () => new Promise<void>(done => {
       const result: AssessmentResult = {
         assessmentId: 'assessment-1',
         agentId: 'session-123',
@@ -588,13 +589,13 @@ describe('AssessmentService', () => {
         expect(hasCompleted).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should return false when no result', done => {
+    it('should return false when no result', () => new Promise<void>(done => {
       service.hasCompleted('missing').subscribe(hasCompleted => {
         expect(hasCompleted).toBe(false);
         done();
       });
-    });
+    }));
   });
 });

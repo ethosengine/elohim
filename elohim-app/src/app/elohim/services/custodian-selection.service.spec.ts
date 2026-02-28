@@ -3,17 +3,21 @@ import { TestBed } from '@angular/core/testing';
 import { CustodianSelectionService } from './custodian-selection.service';
 import { ShefaService } from './shefa.service';
 import { CustodianCommitmentService } from './custodian-commitment.service';
+import { vi, Mock } from 'vitest';
 
 describe('CustodianSelectionService', () => {
   let service: CustodianSelectionService;
-  let shefaMock: jasmine.SpyObj<ShefaService>;
-  let commitmentsMock: jasmine.SpyObj<CustodianCommitmentService>;
+  let shefaMock: any;
+  let commitmentsMock: any;
 
   beforeEach(() => {
-    const shefaSpy = jasmine.createSpyObj('ShefaService', ['getMetrics', 'getAllMetrics']);
-    const commitmentsSpy = jasmine.createSpyObj('CustodianCommitmentService', [
-      'getCommitmentsForContent',
-    ]);
+    const shefaSpy = {
+    getMetrics: vi.fn(),
+    getAllMetrics: vi.fn(),
+  };
+    const commitmentsSpy = {
+    getCommitmentsForContent: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [
@@ -24,10 +28,10 @@ describe('CustodianSelectionService', () => {
     });
 
     service = TestBed.inject(CustodianSelectionService);
-    shefaMock = TestBed.inject(ShefaService) as jasmine.SpyObj<ShefaService>;
+    shefaMock = TestBed.inject(ShefaService) as { [K in keyof ShefaService]?: Mock };
     commitmentsMock = TestBed.inject(
       CustodianCommitmentService
-    ) as jasmine.SpyObj<CustodianCommitmentService>;
+    ) as { [K in keyof CustodianCommitmentService]?: Mock };
   });
 
   it('should be created', () => {
@@ -41,7 +45,7 @@ describe('CustodianSelectionService', () => {
     });
 
     it('should return null when no custodians committed to content', async () => {
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve([]));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve([]));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -82,8 +86,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 2 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.callFake((custId: string) => {
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockImplementation((custId: string) => {
         if (custId === 'cust-1') return Promise.resolve(mockMetrics1 as any);
         return Promise.resolve(mockMetrics2 as any);
       });
@@ -114,8 +118,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -123,7 +127,7 @@ describe('CustodianSelectionService', () => {
     });
 
     it('should increment selections attempted counter', async () => {
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve([]));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve([]));
 
       const statsBefore = service.getStatistics();
       await service.selectBestCustodian('content-1');
@@ -151,14 +155,14 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result1 = await service.selectBestCustodian('content-1');
-      const callCountAfterFirst = shefaMock.getMetrics.calls.count();
+      const callCountAfterFirst = shefaMock.getMetrics.mock.calls.length;
 
       const result2 = await service.selectBestCustodian('content-1');
-      const callCountAfterSecond = shefaMock.getMetrics.calls.count();
+      const callCountAfterSecond = shefaMock.getMetrics.mock.calls.length;
 
       expect(result1).toEqual(result2);
       expect(callCountAfterSecond).toBe(callCountAfterFirst);
@@ -189,7 +193,7 @@ describe('CustodianSelectionService', () => {
         },
       ];
 
-      shefaMock.getAllMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      shefaMock.getAllMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.scoreAllCustodians();
 
@@ -200,7 +204,7 @@ describe('CustodianSelectionService', () => {
     });
 
     it('should return empty array on error', async () => {
-      shefaMock.getAllMetrics.and.returnValue(Promise.reject(new Error('Service error')));
+      shefaMock.getAllMetrics.mockReturnValue(Promise.reject(new Error('Service error')));
 
       const result = await service.scoreAllCustodians();
 
@@ -239,7 +243,7 @@ describe('CustodianSelectionService', () => {
         },
       ];
 
-      shefaMock.getAllMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      shefaMock.getAllMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.getTopCustodians(2);
 
@@ -248,7 +252,7 @@ describe('CustodianSelectionService', () => {
     });
 
     it('should accept default limit of 10', async () => {
-      shefaMock.getAllMetrics.and.returnValue(Promise.resolve([] as any));
+      shefaMock.getAllMetrics.mockReturnValue(Promise.resolve([] as any));
 
       const result = await service.getTopCustodians();
 
@@ -281,16 +285,16 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       await service.selectBestCustodian('content-1');
-      const callCountBefore = commitmentsMock.getCommitmentsForContent.calls.count();
+      const callCountBefore = commitmentsMock.getCommitmentsForContent.mock.calls.length;
 
       service.clearCache();
 
       await service.selectBestCustodian('content-1');
-      const callCountAfter = commitmentsMock.getCommitmentsForContent.calls.count();
+      const callCountAfter = commitmentsMock.getCommitmentsForContent.mock.calls.length;
 
       expect(callCountAfter).toBeGreaterThan(callCountBefore);
     });
@@ -306,11 +310,11 @@ describe('CustodianSelectionService', () => {
       const stats = service.getStatistics();
 
       expect(stats).toEqual(
-        jasmine.objectContaining({
-          selectionsAttempted: jasmine.any(Number),
-          selectionsSuccessful: jasmine.any(Number),
-          cacheHits: jasmine.any(Number),
-          cacheMisses: jasmine.any(Number),
+        expect.objectContaining({
+          selectionsAttempted: expect.any(Number),
+          selectionsSuccessful: expect.any(Number),
+          cacheHits: expect.any(Number),
+          cacheMisses: expect.any(Number),
         })
       );
     });
@@ -334,8 +338,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const statsBefore = service.getStatistics();
       await service.selectBestCustodian('content-1');
@@ -356,7 +360,7 @@ describe('CustodianSelectionService', () => {
     });
 
     it('should track selections attempted', async () => {
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve([]));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve([]));
 
       const statsBefore = service.selectionStats();
       await service.selectBestCustodian('content-1');
@@ -395,8 +399,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -428,8 +432,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -456,8 +460,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -484,8 +488,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -512,8 +516,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -547,8 +551,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 4 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.callFake((custId: string) => {
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockImplementation((custId: string) => {
         if (custId === 'cust-1') return Promise.resolve(mockMetrics as any);
         return Promise.resolve({
           ...mockMetrics,
@@ -582,8 +586,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -609,8 +613,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -630,8 +634,8 @@ describe('CustodianSelectionService', () => {
         },
       ];
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.reject(new Error('Metrics unavailable')));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.reject(new Error('Metrics unavailable')));
 
       const result = await service.selectBestCustodian('content-1');
 
@@ -639,7 +643,7 @@ describe('CustodianSelectionService', () => {
     });
 
     it('should handle commitments fetch errors gracefully', async () => {
-      commitmentsMock.getCommitmentsForContent.and.returnValue(
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(
         Promise.reject(new Error('Commitments unavailable'))
       );
 
@@ -674,8 +678,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.callFake((custId: string) => {
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockImplementation((custId: string) => {
         if (custId === 'cust-1') return Promise.resolve(mockMetrics1 as any);
         return Promise.reject(new Error('Metrics unavailable'));
       });
@@ -707,8 +711,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       const statsBefore = service.getStatistics();
       await service.selectBestCustodian('content-1');
@@ -736,8 +740,8 @@ describe('CustodianSelectionService', () => {
         economic: { stewardTier: 3 },
       };
 
-      commitmentsMock.getCommitmentsForContent.and.returnValue(Promise.resolve(mockCommitments as any));
-      shefaMock.getMetrics.and.returnValue(Promise.resolve(mockMetrics as any));
+      commitmentsMock.getCommitmentsForContent.mockReturnValue(Promise.resolve(mockCommitments as any));
+      shefaMock.getMetrics.mockReturnValue(Promise.resolve(mockMetrics as any));
 
       await service.selectBestCustodian('content-1');
       await service.selectBestCustodian('content-2');

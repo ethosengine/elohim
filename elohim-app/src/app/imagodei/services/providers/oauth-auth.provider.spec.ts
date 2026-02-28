@@ -5,16 +5,18 @@
  */
 
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { OAuthAuthProvider } from './oauth-auth.provider';
 import { DoorwayRegistryService } from '../doorway-registry.service';
 import type { OAuthCredentials } from '../../models/auth.model';
+import { vi, Mock } from 'vitest';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('OAuthAuthProvider', () => {
   let provider: OAuthAuthProvider;
   let httpMock: HttpTestingController;
-  let mockDoorwayRegistry: jasmine.SpyObj<DoorwayRegistryService>;
+  let mockDoorwayRegistry: any;
 
   const OAUTH_STATE_KEY = 'elohim-oauth-state';
 
@@ -23,16 +25,11 @@ describe('OAuthAuthProvider', () => {
     sessionStorage.clear();
 
     // Create mock doorway registry
-    mockDoorwayRegistry = jasmine.createSpyObj('DoorwayRegistryService', [], {
-      selectedUrl: jasmine.createSpy().and.returnValue('https://doorway.example.com'),
-    });
+    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue('https://doorway.example.com'), };
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [
-        OAuthAuthProvider,
-        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), OAuthAuthProvider,
+        { provide: DoorwayRegistryService, useValue: mockDoorwayRegistry },],
     });
 
     provider = TestBed.inject(OAuthAuthProvider);
@@ -59,7 +56,7 @@ describe('OAuthAuthProvider', () => {
   // ==========================================================================
 
   // Skipped: These tests set window.location.href which causes Karma to navigate/hang
-  xdescribe('initiateLogin', () => {
+  describe.skip('initiateLogin', () => {
     let mockLocation: Partial<Location>;
 
     beforeEach(() => {
@@ -419,7 +416,7 @@ describe('OAuthAuthProvider', () => {
     });
 
     it('should fail when no doorway selected', async () => {
-      (mockDoorwayRegistry.selectedUrl as jasmine.Spy).and.returnValue(null);
+      (mockDoorwayRegistry.selectedUrl as Mock).mockReturnValue(null);
 
       const result = await provider.refreshToken('old-token-123');
 
@@ -448,7 +445,7 @@ describe('OAuthAuthProvider', () => {
   // ==========================================================================
 
   // Skipped: These tests manipulate window.location which causes Karma to hang
-  xdescribe('callback detection', () => {
+  describe.skip('callback detection', () => {
     let originalLocation: Location;
 
     beforeEach(() => {
@@ -521,7 +518,7 @@ describe('OAuthAuthProvider', () => {
     });
 
     it('should clear callback params from URL', () => {
-      const mockReplaceState = jasmine.createSpy('replaceState');
+      const mockReplaceState = vi.fn();
       window.history.replaceState = mockReplaceState;
 
       delete (window as { location?: Location }).location;
@@ -532,7 +529,7 @@ describe('OAuthAuthProvider', () => {
       provider.clearCallbackParams();
 
       expect(mockReplaceState).toHaveBeenCalled();
-      const newUrl = mockReplaceState.calls.mostRecent().args[2];
+      const newUrl = mockReplaceState.mock.lastCall[2];
       expect(newUrl).not.toContain('code=');
       expect(newUrl).not.toContain('state=');
     });
@@ -543,7 +540,7 @@ describe('OAuthAuthProvider', () => {
   // ==========================================================================
 
   // Skipped: Calls initiateLogin() which sets window.location.href, causing Karma to navigate
-  xdescribe('state generation', () => {
+  describe.skip('state generation', () => {
     it('should generate unique state values', () => {
       const doorwayUrl = 'https://doorway.example.com';
 

@@ -10,19 +10,20 @@ import {
   type CrossPathMatch,
 } from './epr-resolver.service';
 import { StorageClientService } from './storage-client.service';
+import { vi } from 'vitest';
 
 describe('EprResolverService', () => {
   let service: EprResolverService;
-  let storageSpy: jasmine.SpyObj<StorageClientService>;
+  let storageSpy: any;
 
   beforeEach(() => {
-    storageSpy = jasmine.createSpyObj('StorageClientService', [
-      'getBlobUrl',
-      'getStorageBaseUrl',
-      'getContent',
-    ]);
-    storageSpy.getStorageBaseUrl.and.returnValue('https://doorway.host');
-    storageSpy.getBlobUrl.and.callFake((hash: string) => `https://doorway.host/blob/${hash}`);
+    storageSpy = {
+    getBlobUrl: vi.fn(),
+    getStorageBaseUrl: vi.fn(),
+    getContent: vi.fn(),
+  };
+    storageSpy.getStorageBaseUrl.mockReturnValue('https://doorway.host');
+    storageSpy.getBlobUrl.mockImplementation((hash: string) => `https://doorway.host/blob/${hash}`);
 
     TestBed.configureTestingModule({
       providers: [
@@ -38,35 +39,35 @@ describe('EprResolverService', () => {
 
   describe('isContentAddress', () => {
     it('recognizes CIDv1 base32', () => {
-      expect(isContentAddress('bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')).toBeTrue();
+      expect(isContentAddress('bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')).toBe(true);
     });
 
     it('recognizes CIDv0 base58', () => {
-      expect(isContentAddress('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')).toBeTrue();
+      expect(isContentAddress('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')).toBe(true);
     });
 
     it('recognizes sha256-{hex}', () => {
-      expect(isContentAddress('sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBeTrue();
+      expect(isContentAddress('sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBe(true);
     });
 
     it('recognizes sha256:{hex}', () => {
-      expect(isContentAddress('sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBeTrue();
+      expect(isContentAddress('sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBe(true);
     });
 
     it('recognizes raw 64-char hex', () => {
-      expect(isContentAddress('abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBeTrue();
+      expect(isContentAddress('abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBe(true);
     });
 
     it('rejects empty string', () => {
-      expect(isContentAddress('')).toBeFalse();
+      expect(isContentAddress('')).toBe(false);
     });
 
     it('rejects plain text', () => {
-      expect(isContentAddress('hello world')).toBeFalse();
+      expect(isContentAddress('hello world')).toBe(false);
     });
 
     it('rejects short hex', () => {
-      expect(isContentAddress('abcdef123')).toBeFalse();
+      expect(isContentAddress('abcdef123')).toBe(false);
     });
   });
 

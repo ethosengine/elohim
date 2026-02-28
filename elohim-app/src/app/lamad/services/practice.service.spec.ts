@@ -13,10 +13,11 @@ import type {
   PoolRecommendations,
   MasteryChallengeResponse,
 } from '../models/practice.model';
+import { vi } from 'vitest';
 
 describe('PracticeService', () => {
   let service: PracticeService;
-  let mockBackend: jasmine.SpyObj<LearnerBackendService>;
+  let mockBackend: any;
 
   // ===========================================================================
   // Fixture Builders
@@ -115,7 +116,7 @@ describe('PracticeService', () => {
 
   // Helper: initialize pool state through service method
   async function setPoolState(pool: PracticePool = buildPool()): Promise<void> {
-    mockBackend.getOrCreatePracticePool.and.returnValue(
+    mockBackend.getOrCreatePracticePool.mockReturnValue(
       Promise.resolve({ action_hash: new Uint8Array(), pool })
     );
     await firstValueFrom(service.initializePool(['path-1']));
@@ -126,21 +127,21 @@ describe('PracticeService', () => {
   // ===========================================================================
 
   beforeEach(() => {
-    mockBackend = jasmine.createSpyObj('LearnerBackendService', [
-      'getOrCreatePracticePool',
-      'addPathToPool',
-      'refreshPracticePool',
-      'getPoolRecommendations',
-      'checkChallengeCooldown',
-      'startMasteryChallenge',
-      'submitMasteryChallenge',
-      'getChallengeHistory',
-    ]);
+    mockBackend = {
+    getOrCreatePracticePool: vi.fn(),
+    addPathToPool: vi.fn(),
+    refreshPracticePool: vi.fn(),
+    getPoolRecommendations: vi.fn(),
+    checkChallengeCooldown: vi.fn(),
+    startMasteryChallenge: vi.fn(),
+    submitMasteryChallenge: vi.fn(),
+    getChallengeHistory: vi.fn(),
+  };
 
     // Default return values for fire-and-forget side-effect methods
-    mockBackend.getPoolRecommendations.and.returnValue(Promise.resolve(null));
-    mockBackend.checkChallengeCooldown.and.returnValue(Promise.resolve(null));
-    mockBackend.refreshPracticePool.and.returnValue(Promise.resolve(null));
+    mockBackend.getPoolRecommendations.mockReturnValue(Promise.resolve(null));
+    mockBackend.checkChallengeCooldown.mockReturnValue(Promise.resolve(null));
+    mockBackend.refreshPracticePool.mockReturnValue(Promise.resolve(null));
 
     TestBed.configureTestingModule({
       providers: [PracticeService, { provide: LearnerBackendService, useValue: mockBackend }],
@@ -159,7 +160,7 @@ describe('PracticeService', () => {
   describe('Pool Management', () => {
     describe('initializePool()', () => {
       it('should call backend with contributing_path_ids', async () => {
-        mockBackend.getOrCreatePracticePool.and.returnValue(Promise.resolve(null));
+        mockBackend.getOrCreatePracticePool.mockReturnValue(Promise.resolve(null));
         await firstValueFrom(service.initializePool(['path-1', 'path-2']));
         expect(mockBackend.getOrCreatePracticePool).toHaveBeenCalledWith({
           contributing_path_ids: ['path-1', 'path-2'],
@@ -168,7 +169,7 @@ describe('PracticeService', () => {
 
       it('should update pool$ when backend returns pool', async () => {
         const pool = buildPool();
-        mockBackend.getOrCreatePracticePool.and.returnValue(
+        mockBackend.getOrCreatePracticePool.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), pool })
         );
         const result = await firstValueFrom(service.initializePool(['path-1']));
@@ -178,7 +179,7 @@ describe('PracticeService', () => {
 
       it('should trigger refreshRecommendations and checkCooldown on success', fakeAsync(() => {
         const pool = buildPool();
-        mockBackend.getOrCreatePracticePool.and.returnValue(
+        mockBackend.getOrCreatePracticePool.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), pool })
         );
         service.initializePool(['path-1']).subscribe();
@@ -188,10 +189,10 @@ describe('PracticeService', () => {
       }));
 
       it('should NOT trigger side effects when backend returns null', fakeAsync(() => {
-        mockBackend.getOrCreatePracticePool.and.returnValue(Promise.resolve(null));
+        mockBackend.getOrCreatePracticePool.mockReturnValue(Promise.resolve(null));
         // Reset spy call counts since defaults are set in beforeEach
-        mockBackend.getPoolRecommendations.calls.reset();
-        mockBackend.checkChallengeCooldown.calls.reset();
+        mockBackend.getPoolRecommendations.mockClear();
+        mockBackend.checkChallengeCooldown.mockClear();
         service.initializePool(['path-1']).subscribe();
         tick();
         expect(mockBackend.getPoolRecommendations).not.toHaveBeenCalled();
@@ -199,7 +200,7 @@ describe('PracticeService', () => {
       }));
 
       it('should return null on backend error', async () => {
-        mockBackend.getOrCreatePracticePool.and.returnValue(
+        mockBackend.getOrCreatePracticePool.mockReturnValue(
           Promise.reject(new Error('network error'))
         );
         const result = await firstValueFrom(service.initializePool(['path-1']));
@@ -210,10 +211,10 @@ describe('PracticeService', () => {
     describe('addPathToPool()', () => {
       it('should update pool$ and trigger refreshRecommendations on success', fakeAsync(() => {
         const pool = buildPool();
-        mockBackend.addPathToPool.and.returnValue(
+        mockBackend.addPathToPool.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), pool })
         );
-        mockBackend.getPoolRecommendations.calls.reset();
+        mockBackend.getPoolRecommendations.mockClear();
         service.addPathToPool('new-path').subscribe();
         tick();
         expect(service.getPoolSync()).toEqual(pool);
@@ -221,13 +222,13 @@ describe('PracticeService', () => {
       }));
 
       it('should not update pool$ when backend returns null', async () => {
-        mockBackend.addPathToPool.and.returnValue(Promise.resolve(null));
+        mockBackend.addPathToPool.mockReturnValue(Promise.resolve(null));
         await firstValueFrom(service.addPathToPool('path-1'));
         expect(service.getPoolSync()).toBeNull();
       });
 
       it('should return null on error', async () => {
-        mockBackend.addPathToPool.and.returnValue(Promise.reject(new Error('fail')));
+        mockBackend.addPathToPool.mockReturnValue(Promise.reject(new Error('fail')));
         const result = await firstValueFrom(service.addPathToPool('path-1'));
         expect(result).toBeNull();
       });
@@ -236,7 +237,7 @@ describe('PracticeService', () => {
     describe('refreshPool()', () => {
       it('should update pool$ on success', async () => {
         const pool = buildPool({ total_challenges_taken: 20 });
-        mockBackend.refreshPracticePool.and.returnValue(
+        mockBackend.refreshPracticePool.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), pool })
         );
         const result = await firstValueFrom(service.refreshPool());
@@ -245,7 +246,7 @@ describe('PracticeService', () => {
       });
 
       it('should return null on error', async () => {
-        mockBackend.refreshPracticePool.and.returnValue(Promise.reject(new Error('fail')));
+        mockBackend.refreshPracticePool.mockReturnValue(Promise.reject(new Error('fail')));
         const result = await firstValueFrom(service.refreshPool());
         expect(result).toBeNull();
       });
@@ -266,7 +267,7 @@ describe('PracticeService', () => {
     describe('refreshRecommendations()', () => {
       it('should update recommendations$ from backend', fakeAsync(() => {
         const recs = buildRecommendations();
-        mockBackend.getPoolRecommendations.and.returnValue(Promise.resolve(recs));
+        mockBackend.getPoolRecommendations.mockReturnValue(Promise.resolve(recs));
         service.refreshRecommendations();
         tick();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -276,7 +277,7 @@ describe('PracticeService', () => {
       }));
 
       it('should set recommendations$ to null on backend error', fakeAsync(() => {
-        mockBackend.getPoolRecommendations.and.returnValue(Promise.reject(new Error('fail')));
+        mockBackend.getPoolRecommendations.mockReturnValue(Promise.reject(new Error('fail')));
         service.refreshRecommendations();
         tick();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -288,7 +289,7 @@ describe('PracticeService', () => {
 
     describe('getRecommendations$()', () => {
       it('should trigger refresh when no cached value exists', fakeAsync(() => {
-        mockBackend.getPoolRecommendations.calls.reset();
+        mockBackend.getPoolRecommendations.mockClear();
         service.getRecommendations$();
         tick();
         expect(mockBackend.getPoolRecommendations).toHaveBeenCalled();
@@ -296,10 +297,10 @@ describe('PracticeService', () => {
 
       it('should NOT trigger refresh when cached value exists', fakeAsync(() => {
         const recs = buildRecommendations();
-        mockBackend.getPoolRecommendations.and.returnValue(Promise.resolve(recs));
+        mockBackend.getPoolRecommendations.mockReturnValue(Promise.resolve(recs));
         service.refreshRecommendations();
         tick();
-        mockBackend.getPoolRecommendations.calls.reset();
+        mockBackend.getPoolRecommendations.mockClear();
         service.getRecommendations$();
         expect(mockBackend.getPoolRecommendations).not.toHaveBeenCalled();
       }));
@@ -314,14 +315,14 @@ describe('PracticeService', () => {
     describe('checkCooldown()', () => {
       it('should update cooldown$ from backend', fakeAsync(() => {
         const cooldown = buildCooldown();
-        mockBackend.checkChallengeCooldown.and.returnValue(Promise.resolve(cooldown));
+        mockBackend.checkChallengeCooldown.mockReturnValue(Promise.resolve(cooldown));
         service.checkCooldown();
         tick();
         expect(service.getCooldownSync()).toEqual(cooldown);
       }));
 
       it('should handle backend error gracefully', fakeAsync(() => {
-        mockBackend.checkChallengeCooldown.and.returnValue(Promise.reject(new Error('fail')));
+        mockBackend.checkChallengeCooldown.mockReturnValue(Promise.reject(new Error('fail')));
         service.checkCooldown();
         tick();
         // Should not throw; cooldown stays at initial null
@@ -331,7 +332,7 @@ describe('PracticeService', () => {
 
     describe('canTakeChallenge$()', () => {
       it('should emit true when cooldown allows', fakeAsync(() => {
-        mockBackend.checkChallengeCooldown.and.returnValue(
+        mockBackend.checkChallengeCooldown.mockReturnValue(
           Promise.resolve(buildCooldown({ can_take_challenge: true }))
         );
         service.checkCooldown();
@@ -342,7 +343,7 @@ describe('PracticeService', () => {
       }));
 
       it('should emit false when cooldown blocks', fakeAsync(() => {
-        mockBackend.checkChallengeCooldown.and.returnValue(
+        mockBackend.checkChallengeCooldown.mockReturnValue(
           Promise.resolve(buildCooldown({ can_take_challenge: false, cooldown_remaining_hours: 12 }))
         );
         service.checkCooldown();
@@ -367,7 +368,7 @@ describe('PracticeService', () => {
   describe('Challenge Flow', () => {
     describe('startChallenge()', () => {
       it('should return null immediately when cooldown blocks', fakeAsync(() => {
-        mockBackend.checkChallengeCooldown.and.returnValue(
+        mockBackend.checkChallengeCooldown.mockReturnValue(
           Promise.resolve(buildCooldown({ can_take_challenge: false }))
         );
         service.checkCooldown();
@@ -381,7 +382,7 @@ describe('PracticeService', () => {
 
       it('should proceed when cooldown is null (no data yet)', fakeAsync(() => {
         const challenge = buildChallenge();
-        mockBackend.startMasteryChallenge.and.returnValue(
+        mockBackend.startMasteryChallenge.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), challenge })
         );
         service.startChallenge(10).subscribe();
@@ -390,7 +391,7 @@ describe('PracticeService', () => {
       }));
 
       it('should call backend with correct StartChallengeInput', fakeAsync(() => {
-        mockBackend.startMasteryChallenge.and.returnValue(Promise.resolve(null));
+        mockBackend.startMasteryChallenge.mockReturnValue(Promise.resolve(null));
         service.startChallenge(10, 'path-1', false, 600).subscribe();
         tick();
         expect(mockBackend.startMasteryChallenge).toHaveBeenCalledWith({
@@ -402,16 +403,16 @@ describe('PracticeService', () => {
       }));
 
       it('should default include_discoveries to true', fakeAsync(() => {
-        mockBackend.startMasteryChallenge.and.returnValue(Promise.resolve(null));
+        mockBackend.startMasteryChallenge.mockReturnValue(Promise.resolve(null));
         service.startChallenge(5).subscribe();
         tick();
-        const callArgs = mockBackend.startMasteryChallenge.calls.mostRecent().args[0];
+        const callArgs = mockBackend.startMasteryChallenge.mock.lastCall[0];
         expect(callArgs.include_discoveries).toBe(true);
       }));
 
       it('should update currentChallenge$ with unwrapped challenge', async () => {
         const challenge = buildChallenge();
-        mockBackend.startMasteryChallenge.and.returnValue(
+        mockBackend.startMasteryChallenge.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), challenge })
         );
         const result = await firstValueFrom(service.startChallenge(10));
@@ -420,7 +421,7 @@ describe('PracticeService', () => {
       });
 
       it('should return null on backend error', async () => {
-        mockBackend.startMasteryChallenge.and.returnValue(Promise.reject(new Error('fail')));
+        mockBackend.startMasteryChallenge.mockReturnValue(Promise.reject(new Error('fail')));
         const result = await firstValueFrom(service.startChallenge(10));
         expect(result).toBeNull();
       });
@@ -438,7 +439,7 @@ describe('PracticeService', () => {
       ];
 
       it('should call backend with correct SubmitChallengeInput', fakeAsync(() => {
-        mockBackend.submitMasteryChallenge.and.returnValue(
+        mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(buildChallengeResult())
         );
         service.submitChallenge('challenge-1', responses, 300).subscribe();
@@ -453,13 +454,13 @@ describe('PracticeService', () => {
       it('should clear currentChallenge$ on success', fakeAsync(async () => {
         // Set a current challenge first
         const challenge = buildChallenge();
-        mockBackend.startMasteryChallenge.and.returnValue(
+        mockBackend.startMasteryChallenge.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), challenge })
         );
         await firstValueFrom(service.startChallenge(10));
         expect(service.getCurrentChallengeSync()).not.toBeNull();
 
-        mockBackend.submitMasteryChallenge.and.returnValue(
+        mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(buildChallengeResult())
         );
         service.submitChallenge('challenge-1', responses, 300).subscribe();
@@ -469,8 +470,8 @@ describe('PracticeService', () => {
 
       it('should call refreshPool when pool exists and result has challenge', fakeAsync(async () => {
         await setPoolState();
-        mockBackend.refreshPracticePool.calls.reset();
-        mockBackend.submitMasteryChallenge.and.returnValue(
+        mockBackend.refreshPracticePool.mockClear();
+        mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(buildChallengeResult())
         );
         service.submitChallenge('challenge-1', responses, 300).subscribe();
@@ -479,8 +480,8 @@ describe('PracticeService', () => {
       }));
 
       it('should NOT call refreshPool when pool is null', fakeAsync(() => {
-        mockBackend.refreshPracticePool.calls.reset();
-        mockBackend.submitMasteryChallenge.and.returnValue(
+        mockBackend.refreshPracticePool.mockClear();
+        mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(buildChallengeResult())
         );
         service.submitChallenge('challenge-1', responses, 300).subscribe();
@@ -489,8 +490,8 @@ describe('PracticeService', () => {
       }));
 
       it('should call checkCooldown on success', fakeAsync(() => {
-        mockBackend.checkChallengeCooldown.calls.reset();
-        mockBackend.submitMasteryChallenge.and.returnValue(
+        mockBackend.checkChallengeCooldown.mockClear();
+        mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(buildChallengeResult())
         );
         service.submitChallenge('challenge-1', responses, 300).subscribe();
@@ -503,7 +504,7 @@ describe('PracticeService', () => {
           id: 'challenge-completed',
           state: 'completed',
         });
-        mockBackend.submitMasteryChallenge.and.returnValue(
+        mockBackend.submitMasteryChallenge.mockReturnValue(
           Promise.resolve(
             buildChallengeResult({
               challenge: {
@@ -521,14 +522,14 @@ describe('PracticeService', () => {
       }));
 
       it('should not update history when result is null', fakeAsync(() => {
-        mockBackend.submitMasteryChallenge.and.returnValue(Promise.resolve(null));
+        mockBackend.submitMasteryChallenge.mockReturnValue(Promise.resolve(null));
         service.submitChallenge('challenge-1', responses, 300).subscribe();
         tick();
         expect(service.getChallengeHistorySync().length).toBe(0);
       }));
 
       it('should return null on backend error', async () => {
-        mockBackend.submitMasteryChallenge.and.returnValue(Promise.reject(new Error('fail')));
+        mockBackend.submitMasteryChallenge.mockReturnValue(Promise.reject(new Error('fail')));
         const result = await firstValueFrom(
           service.submitChallenge('challenge-1', responses, 300)
         );
@@ -540,7 +541,7 @@ describe('PracticeService', () => {
       it('should set currentChallenge$ to null', async () => {
         // Set a challenge first
         const challenge = buildChallenge();
-        mockBackend.startMasteryChallenge.and.returnValue(
+        mockBackend.startMasteryChallenge.mockReturnValue(
           Promise.resolve({ action_hash: new Uint8Array(), challenge })
         );
         await firstValueFrom(service.startChallenge(10));
@@ -557,7 +558,7 @@ describe('PracticeService', () => {
       });
 
       it('should return true when challenge state is in_progress', async () => {
-        mockBackend.startMasteryChallenge.and.returnValue(
+        mockBackend.startMasteryChallenge.mockReturnValue(
           Promise.resolve({
             action_hash: new Uint8Array(),
             challenge: buildChallenge({ state: 'in_progress' }),
@@ -568,7 +569,7 @@ describe('PracticeService', () => {
       });
 
       it('should return false when challenge state is completed', async () => {
-        mockBackend.startMasteryChallenge.and.returnValue(
+        mockBackend.startMasteryChallenge.mockReturnValue(
           Promise.resolve({
             action_hash: new Uint8Array(),
             challenge: buildChallenge({ state: 'completed' }),
@@ -579,7 +580,7 @@ describe('PracticeService', () => {
       });
 
       it('should return false when challenge state is abandoned', async () => {
-        mockBackend.startMasteryChallenge.and.returnValue(
+        mockBackend.startMasteryChallenge.mockReturnValue(
           Promise.resolve({
             action_hash: new Uint8Array(),
             challenge: buildChallenge({ state: 'abandoned' }),
@@ -600,7 +601,7 @@ describe('PracticeService', () => {
       it('should map MasteryChallengeOutputs to MasteryChallenges', async () => {
         const c1 = buildChallenge({ id: 'c1' });
         const c2 = buildChallenge({ id: 'c2' });
-        mockBackend.getChallengeHistory.and.returnValue(
+        mockBackend.getChallengeHistory.mockReturnValue(
           Promise.resolve([
             { action_hash: new Uint8Array(), challenge: c1 },
             { action_hash: new Uint8Array(), challenge: c2 },
@@ -613,7 +614,7 @@ describe('PracticeService', () => {
       });
 
       it('should update challengeHistory$ subject', async () => {
-        mockBackend.getChallengeHistory.and.returnValue(
+        mockBackend.getChallengeHistory.mockReturnValue(
           Promise.resolve([
             { action_hash: new Uint8Array(), challenge: buildChallenge({ id: 'c1' }) },
           ])
@@ -625,13 +626,13 @@ describe('PracticeService', () => {
       });
 
       it('should return empty array on backend error', async () => {
-        mockBackend.getChallengeHistory.and.returnValue(Promise.reject(new Error('fail')));
+        mockBackend.getChallengeHistory.mockReturnValue(Promise.reject(new Error('fail')));
         const result = await firstValueFrom(service.loadChallengeHistory());
         expect(result).toEqual([]);
       });
 
       it('should handle empty history from backend', async () => {
-        mockBackend.getChallengeHistory.and.returnValue(Promise.resolve([]));
+        mockBackend.getChallengeHistory.mockReturnValue(Promise.resolve([]));
         const result = await firstValueFrom(service.loadChallengeHistory());
         expect(result).toEqual([]);
       });

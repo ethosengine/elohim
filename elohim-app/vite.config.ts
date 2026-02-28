@@ -4,13 +4,19 @@ import angular from '@analogjs/vite-plugin-angular';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  plugins: [angular({ tsconfig: 'tsconfig.vitest.json' }), tsconfigPaths()],
+  plugins: [angular({ tsconfig: 'tsconfig.spec.json' }), tsconfigPaths()],
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['src/test-setup.vitest.ts'],
-    include: ['src/**/*.vitest.spec.ts'],
+    setupFiles: ['src/test-setup.ts'],
+    include: ['src/**/*.spec.ts'],
     exclude: ['node_modules', 'dist'],
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        maxForks: 4,
+      },
+    },
     reporters: ['default'],
     coverage: {
       provider: 'v8',
@@ -19,10 +25,9 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: [
         'src/**/*.spec.ts',
-        'src/**/*.vitest.spec.ts',
         'src/**/*.d.ts',
         'src/main.ts',
-        'src/test-setup.vitest.ts',
+        'src/test-setup.ts',
       ],
     },
   },

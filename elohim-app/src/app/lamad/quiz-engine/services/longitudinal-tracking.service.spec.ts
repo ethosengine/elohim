@@ -4,6 +4,7 @@ import type { DiscoveryResult } from '../models/discovery-assessment.model';
 
 import { DiscoveryAttestationService } from './discovery-attestation.service';
 import { LongitudinalTrackingService } from './longitudinal-tracking.service';
+import { vi } from 'vitest';
 
 // =============================================================================
 // Fixtures
@@ -30,11 +31,14 @@ const buildResult = (overrides: Partial<DiscoveryResult> = {}): DiscoveryResult 
 
 describe('LongitudinalTrackingService', () => {
   let service: LongitudinalTrackingService;
-  let attestationSpy: jasmine.SpyObj<DiscoveryAttestationService>;
+  let attestationSpy: any;
 
   beforeEach(() => {
-    attestationSpy = jasmine.createSpyObj('DiscoveryAttestationService', ['results'], {
-      results: jasmine.createSpy('results').and.returnValue([]),
+    attestationSpy = {
+    results']: vi.fn(),
+    {
+      results: vi.fn().mockReturnValue([: vi.fn(),
+  },
     });
 
     TestBed.configureTestingModule({
@@ -69,7 +73,7 @@ describe('LongitudinalTrackingService', () => {
         assessmentId: 'inst-1',
         completedAt: '2025-06-01T00:00:00Z',
       });
-      attestationSpy.results.and.returnValue([recent, old]);
+      attestationSpy.results.mockReturnValue([recent, old]);
 
       const history = service.getRetakeHistory('inst-1');
 
@@ -81,7 +85,7 @@ describe('LongitudinalTrackingService', () => {
     it('should filter by instrument ID', () => {
       const a = buildResult({ assessmentId: 'inst-a' });
       const b = buildResult({ assessmentId: 'inst-b' });
-      attestationSpy.results.and.returnValue([a, b]);
+      attestationSpy.results.mockReturnValue([a, b]);
 
       expect(service.getRetakeHistory('inst-a').length).toBe(1);
       expect(service.getRetakeHistory('inst-b').length).toBe(1);
@@ -94,7 +98,7 @@ describe('LongitudinalTrackingService', () => {
 
   describe('computeChanges()', () => {
     it('should return empty when fewer than 2 retakes', () => {
-      attestationSpy.results.and.returnValue([buildResult({ assessmentId: 'single' })]);
+      attestationSpy.results.mockReturnValue([buildResult({ assessmentId: 'single' })]);
 
       expect(service.computeChanges('single')).toEqual([]);
     });
@@ -110,7 +114,7 @@ describe('LongitudinalTrackingService', () => {
         completedAt: '2025-06-01T00:00:00Z',
         subscaleScores: { 'sub-a': 0.7, 'sub-b': 0.5 },
       });
-      attestationSpy.results.and.returnValue([prev, curr]);
+      attestationSpy.results.mockReturnValue([prev, curr]);
 
       const changes = service.computeChanges('change-test');
 
@@ -138,7 +142,7 @@ describe('LongitudinalTrackingService', () => {
         completedAt: '2025-06-01T00:00:00Z',
         subscaleScores: { 'sub-a': 0.52 },
       });
-      attestationSpy.results.and.returnValue([prev, curr]);
+      attestationSpy.results.mockReturnValue([prev, curr]);
 
       const changes = service.computeChanges('stable-test');
 
@@ -162,7 +166,7 @@ describe('LongitudinalTrackingService', () => {
         completedAt: '2025-06-01T00:00:00Z',
         subscaleScores: { 'sub-a': 0.7 },
       });
-      attestationSpy.results.and.returnValue([r1, r2, r3]);
+      attestationSpy.results.mockReturnValue([r1, r2, r3]);
 
       const changes = service.computeChanges('multi');
       const subA = changes.find(c => c.subscale === 'sub-a')!;

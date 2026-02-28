@@ -4,10 +4,11 @@ import { ExplorationService } from './exploration.service';
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { ContentNode, ContentGraph, ContentGraphMetadata } from '../models/content-node.model';
 import { RATE_LIMIT_CONFIGS } from '../models/exploration.model';
+import { vi, Mock } from 'vitest';
 
 describe('ExplorationService', () => {
   let service: ExplorationService;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
+  let dataLoaderSpy: any;
 
   // Mock content nodes
   const mockNodes: ContentNode[] = [
@@ -162,20 +163,20 @@ describe('ExplorationService', () => {
   };
 
   beforeEach(() => {
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
-      'getGraph',
-      'getAgentIndex',
-    ]);
+    const dataLoaderSpyObj = {
+      getGraph: vi.fn(),
+      getAgentIndex: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [ExplorationService, { provide: DataLoaderService, useValue: dataLoaderSpyObj }],
     });
 
-    dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
+    dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
 
     // Default spy returns
-    dataLoaderSpy.getGraph.and.returnValue(of(createMockGraph()));
-    dataLoaderSpy.getAgentIndex.and.returnValue(of(mockAgentIndex));
+    dataLoaderSpy.getGraph.mockReturnValue(of(createMockGraph()));
+    dataLoaderSpy.getAgentIndex.mockReturnValue(of(mockAgentIndex));
 
     service = TestBed.inject(ExplorationService);
   });
@@ -189,7 +190,7 @@ describe('ExplorationService', () => {
   // =========================================================================
 
   describe('exploreNeighborhood', () => {
-    it('should explore depth 1 from focus node', done => {
+    it('should explore depth 1 from focus node', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'node-1',
@@ -204,9 +205,9 @@ describe('ExplorationService', () => {
           expect(neighbors.some(n => n.id === 'node-2')).toBe(true);
           done();
         });
-    });
+    }));
 
-    it('should return metadata with query stats', done => {
+    it('should return metadata with query stats', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'node-1',
@@ -219,9 +220,9 @@ describe('ExplorationService', () => {
           expect(result.metadata.resourceCredits).toBeGreaterThan(0);
           done();
         });
-    });
+    }));
 
-    it('should error for non-existent focus node', done => {
+    it('should error for non-existent focus node', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'non-existent',
@@ -234,9 +235,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should respect maxNodes limit', done => {
+    it('should respect maxNodes limit', () => new Promise<void>(done => {
       // Use researcher agent which has depth 2 access
       service.setCurrentAgent('researcher-agent');
 
@@ -251,9 +252,9 @@ describe('ExplorationService', () => {
           expect(result.metadata.nodesReturned).toBeLessThanOrEqual(2);
           done();
         });
-    });
+    }));
 
-    it('should strip content when includeContent is false', done => {
+    it('should strip content when includeContent is false', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'node-1',
@@ -268,9 +269,9 @@ describe('ExplorationService', () => {
           }
           done();
         });
-    });
+    }));
 
-    it('should error when graph is empty', done => {
+    it('should error when graph is empty', () => new Promise<void>(done => {
       const emptyGraph: ContentGraph = {
         nodes: new Map(),
         relationships: new Map(),
@@ -281,7 +282,7 @@ describe('ExplorationService', () => {
         reverseAdjacency: new Map(),
         metadata: { nodeCount: 0, relationshipCount: 0, lastUpdated: '', version: '1.0.0' },
       };
-      dataLoaderSpy.getGraph.and.returnValue(of(emptyGraph));
+      dataLoaderSpy.getGraph.mockReturnValue(of(emptyGraph));
 
       service
         .exploreNeighborhood({
@@ -295,9 +296,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should deny depth 2 without proper attestation', done => {
+    it('should deny depth 2 without proper attestation', () => new Promise<void>(done => {
       // demo-learner has no attestations, so depth 2 should be denied
       service
         .exploreNeighborhood({
@@ -311,9 +312,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should allow depth 2 for graph-researcher', done => {
+    it('should allow depth 2 for graph-researcher', () => new Promise<void>(done => {
       service.setCurrentAgent('researcher-agent');
 
       service
@@ -327,7 +328,7 @@ describe('ExplorationService', () => {
           expect(result.metadata.depthTraversed).toBeLessThanOrEqual(2);
           done();
         });
-    });
+    }));
   });
 
   // =========================================================================
@@ -340,7 +341,7 @@ describe('ExplorationService', () => {
       service.setCurrentAgent('path-creator-agent');
     });
 
-    it('should find shortest path between two nodes', done => {
+    it('should find shortest path between two nodes', () => new Promise<void>(done => {
       service
         .findPath({
           from: 'node-1',
@@ -353,9 +354,9 @@ describe('ExplorationService', () => {
           expect(result.path[result.path.length - 1]).toBe('node-3');
           done();
         });
-    });
+    }));
 
-    it('should return edges in path result', done => {
+    it('should return edges in path result', () => new Promise<void>(done => {
       service
         .findPath({
           from: 'node-1',
@@ -367,9 +368,9 @@ describe('ExplorationService', () => {
           expect(result.edges[0].source).toBe('node-1');
           done();
         });
-    });
+    }));
 
-    it('should error when no path exists', done => {
+    it('should error when no path exists', () => new Promise<void>(done => {
       // Create isolated node
       const graph = createMockGraph();
       const isolatedNode: ContentNode = {
@@ -385,7 +386,7 @@ describe('ExplorationService', () => {
       };
       graph.nodes.set('isolated', isolatedNode);
       graph.adjacency.set('isolated', new Set());
-      dataLoaderSpy.getGraph.and.returnValue(of(graph));
+      dataLoaderSpy.getGraph.mockReturnValue(of(graph));
 
       service
         .findPath({
@@ -399,9 +400,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should error for non-existent from node', done => {
+    it('should error for non-existent from node', () => new Promise<void>(done => {
       service
         .findPath({
           from: 'non-existent',
@@ -414,9 +415,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should error for non-existent to node', done => {
+    it('should error for non-existent to node', () => new Promise<void>(done => {
       service
         .findPath({
           from: 'node-1',
@@ -429,9 +430,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should respect maxHops limit', done => {
+    it('should respect maxHops limit', () => new Promise<void>(done => {
       service
         .findPath({
           from: 'node-1',
@@ -445,9 +446,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should use semantic pathfinding when requested', done => {
+    it('should use semantic pathfinding when requested', () => new Promise<void>(done => {
       service
         .findPath({
           from: 'node-1',
@@ -459,9 +460,9 @@ describe('ExplorationService', () => {
           expect(result.semanticScore).toBeDefined();
           done();
         });
-    });
+    }));
 
-    it('should deny pathfinding for non-path-creator', done => {
+    it('should deny pathfinding for non-path-creator', () => new Promise<void>(done => {
       service.setCurrentAgent('demo-learner');
 
       service
@@ -476,7 +477,7 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
   });
 
   // =========================================================================
@@ -484,7 +485,7 @@ describe('ExplorationService', () => {
   // =========================================================================
 
   describe('estimateCost', () => {
-    it('should estimate cost for exploreNeighborhood', done => {
+    it('should estimate cost for exploreNeighborhood', () => new Promise<void>(done => {
       service.estimateCost('exploreNeighborhood', { depth: 1 }).subscribe(cost => {
         expect(cost.estimatedNodes).toBeGreaterThan(0);
         expect(cost.estimatedTimeMs).toBeDefined();
@@ -492,41 +493,41 @@ describe('ExplorationService', () => {
         expect(cost.rateLimitImpact).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should indicate canExecute for allowed queries', done => {
+    it('should indicate canExecute for allowed queries', () => new Promise<void>(done => {
       service.estimateCost('exploreNeighborhood', { depth: 1 }).subscribe(cost => {
         expect(cost.canExecute).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should indicate canExecute false for unauthorized depth', done => {
+    it('should indicate canExecute false for unauthorized depth', () => new Promise<void>(done => {
       // demo-learner can only go depth 1
       service.estimateCost('exploreNeighborhood', { depth: 3 }).subscribe(cost => {
         expect(cost.canExecute).toBe(false);
         expect(cost.blockedReason).toBe('insufficient-attestation');
         done();
       });
-    });
+    }));
 
-    it('should estimate cost for findPath', done => {
+    it('should estimate cost for findPath', () => new Promise<void>(done => {
       service.estimateCost('findPath', {}).subscribe(cost => {
         expect(cost.estimatedNodes).toBeGreaterThan(0);
         expect(cost.attestationRequired).toBe('path-creator');
         done();
       });
-    });
+    }));
 
-    it('should return canExecute false for unknown operation', done => {
+    it('should return canExecute false for unknown operation', () => new Promise<void>(done => {
       service.estimateCost('unknownOperation', {}).subscribe(cost => {
         expect(cost.canExecute).toBe(false);
         expect(cost.blockedReason).toBe('invalid-query');
         done();
       });
-    });
+    }));
 
-    it('should handle empty graph', done => {
+    it('should handle empty graph', () => new Promise<void>(done => {
       const emptyGraph: ContentGraph = {
         nodes: new Map(),
         relationships: new Map(),
@@ -537,13 +538,13 @@ describe('ExplorationService', () => {
         reverseAdjacency: new Map(),
         metadata: { nodeCount: 0, relationshipCount: 0, lastUpdated: '', version: '1.0.0' },
       };
-      dataLoaderSpy.getGraph.and.returnValue(of(emptyGraph));
+      dataLoaderSpy.getGraph.mockReturnValue(of(emptyGraph));
 
       service.estimateCost('exploreNeighborhood', { depth: 1 }).subscribe(cost => {
         expect(cost.canExecute).toBe(false);
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -551,7 +552,7 @@ describe('ExplorationService', () => {
   // =========================================================================
 
   describe('getRateLimitStatus', () => {
-    it('should return rate limit status for current agent', done => {
+    it('should return rate limit status for current agent', () => new Promise<void>(done => {
       service.getRateLimitStatus().subscribe(status => {
         expect(status.tier).toBeDefined();
         expect(status.explorationRemaining).toBeDefined();
@@ -559,9 +560,9 @@ describe('ExplorationService', () => {
         expect(status.resetsAt).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should return authenticated tier for demo-learner', done => {
+    it('should return authenticated tier for demo-learner', () => new Promise<void>(done => {
       service.setCurrentAgent('demo-learner');
 
       service.getRateLimitStatus().subscribe(status => {
@@ -569,9 +570,9 @@ describe('ExplorationService', () => {
         expect(status.maxDepth).toBe(1);
         done();
       });
-    });
+    }));
 
-    it('should return graph-researcher tier for researcher-agent', done => {
+    it('should return graph-researcher tier for researcher-agent', () => new Promise<void>(done => {
       service.setCurrentAgent('researcher-agent');
 
       service.getRateLimitStatus().subscribe(status => {
@@ -579,9 +580,9 @@ describe('ExplorationService', () => {
         expect(status.maxDepth).toBe(2);
         done();
       });
-    });
+    }));
 
-    it('should return path-creator tier for path-creator-agent', done => {
+    it('should return path-creator tier for path-creator-agent', () => new Promise<void>(done => {
       service.setCurrentAgent('path-creator-agent');
 
       service.getRateLimitStatus().subscribe(status => {
@@ -590,11 +591,11 @@ describe('ExplorationService', () => {
         expect(status.pathfindingLimit).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
   });
 
   describe('rate limit enforcement', () => {
-    it('should decrement exploration remaining after query', done => {
+    it('should decrement exploration remaining after query', () => new Promise<void>(done => {
       let initialRemaining: number;
 
       service.getRateLimitStatus().subscribe(status => {
@@ -613,9 +614,9 @@ describe('ExplorationService', () => {
             });
           });
       });
-    });
+    }));
 
-    it('should error when rate limit exceeded', done => {
+    it('should error when rate limit exceeded', () => new Promise<void>(done => {
       // Exhaust rate limit by making many queries
       const config = RATE_LIMIT_CONFIGS['authenticated'];
       const queries: Promise<void>[] = [];
@@ -653,7 +654,7 @@ describe('ExplorationService', () => {
             },
           });
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -667,7 +668,7 @@ describe('ExplorationService', () => {
       expect(true).toBe(true);
     });
 
-    it('should emit rate limit status update after query', done => {
+    it('should emit rate limit status update after query', () => new Promise<void>(done => {
       service.setCurrentAgent('researcher-agent');
 
       // Tier is determined during query execution (when attestations are checked)
@@ -684,7 +685,7 @@ describe('ExplorationService', () => {
             done();
           });
         });
-    });
+    }));
   });
 
   // =========================================================================
@@ -697,7 +698,7 @@ describe('ExplorationService', () => {
       expect(events).toEqual([]);
     });
 
-    it('should log successful queries', done => {
+    it('should log successful queries', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'node-1',
@@ -710,9 +711,9 @@ describe('ExplorationService', () => {
           expect(events[0].type).toBe('query-completed');
           done();
         });
-    });
+    }));
 
-    it('should log failed queries', done => {
+    it('should log failed queries', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'non-existent',
@@ -726,9 +727,9 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should respect limit parameter', done => {
+    it('should respect limit parameter', () => new Promise<void>(done => {
       // Make multiple queries
       service.exploreNeighborhood({ focus: 'node-1', depth: 1, view: 'graph' }).subscribe();
       service.exploreNeighborhood({ focus: 'node-2', depth: 1, view: 'graph' }).subscribe(() => {
@@ -736,11 +737,11 @@ describe('ExplorationService', () => {
         expect(events.length).toBe(1);
         done();
       });
-    });
+    }));
   });
 
   describe('getAgentEvents', () => {
-    it('should filter events by agent', done => {
+    it('should filter events by agent', () => new Promise<void>(done => {
       service.setCurrentAgent('demo-learner');
       service.exploreNeighborhood({ focus: 'node-1', depth: 1, view: 'graph' }).subscribe(() => {
         const events = service.getAgentEvents('demo-learner');
@@ -748,7 +749,7 @@ describe('ExplorationService', () => {
         expect(events.every(e => e.agentId === 'demo-learner')).toBe(true);
         done();
       });
-    });
+    }));
 
     it('should return empty for unknown agent', () => {
       const events = service.getAgentEvents('unknown-agent');
@@ -761,7 +762,7 @@ describe('ExplorationService', () => {
   // =========================================================================
 
   describe('serializeGraphView', () => {
-    it('should convert Map to plain object', done => {
+    it('should convert Map to plain object', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'node-1',
@@ -777,11 +778,11 @@ describe('ExplorationService', () => {
           expect(serialized.neighbors[1]).toBeDefined();
           done();
         });
-    });
+    }));
   });
 
   describe('deserializeGraphView', () => {
-    it('should convert plain object back to Map', done => {
+    it('should convert plain object back to Map', () => new Promise<void>(done => {
       service
         .exploreNeighborhood({
           focus: 'node-1',
@@ -796,7 +797,7 @@ describe('ExplorationService', () => {
           expect(deserialized.neighbors.get(1)).toBeDefined();
           done();
         });
-    });
+    }));
   });
 
   // =========================================================================
@@ -804,8 +805,8 @@ describe('ExplorationService', () => {
   // =========================================================================
 
   describe('error handling', () => {
-    it('should handle graph loading error gracefully', done => {
-      dataLoaderSpy.getGraph.and.returnValue(throwError(() => new Error('Network error')));
+    it('should handle graph loading error gracefully', () => new Promise<void>(done => {
+      dataLoaderSpy.getGraph.mockReturnValue(throwError(() => new Error('Network error')));
 
       service
         .exploreNeighborhood({
@@ -819,10 +820,10 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should handle agent index loading error', done => {
-      dataLoaderSpy.getAgentIndex.and.returnValue(throwError(() => new Error('Network error')));
+    it('should handle agent index loading error', () => new Promise<void>(done => {
+      dataLoaderSpy.getAgentIndex.mockReturnValue(throwError(() => new Error('Network error')));
 
       service
         .exploreNeighborhood({
@@ -836,6 +837,6 @@ describe('ExplorationService', () => {
             done();
           },
         });
-    });
+    }));
   });
 });

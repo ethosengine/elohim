@@ -1,3 +1,4 @@
+import { vi, Mock } from 'vitest';
 /**
  * IndexedDB Cache Service Tests
  *
@@ -485,7 +486,7 @@ describe('IndexedDBCacheService', () => {
 
       // Monkey-patch Date.now to return a time in the future past TTL
       const originalNow = Date.now;
-      spyOn(Date, 'now').and.returnValue(originalNow() + 25 * 60 * 60 * 1000); // 25 hours
+      vi.spyOn(Date, 'now').mockReturnValue(originalNow() + 25 * 60 * 60 * 1000); // 25 hours
 
       const result = await service.getContent(mockContent.id);
       expect(result).toBeNull();
@@ -496,7 +497,7 @@ describe('IndexedDBCacheService', () => {
 
       // 1 hour into the 24-hour TTL - should still be valid
       const originalNow = Date.now;
-      spyOn(Date, 'now').and.returnValue(originalNow() + 1 * 60 * 60 * 1000);
+      vi.spyOn(Date, 'now').mockReturnValue(originalNow() + 1 * 60 * 60 * 1000);
 
       const result = await service.getContent(mockContent.id);
       expect(result).toBeTruthy();
@@ -506,7 +507,7 @@ describe('IndexedDBCacheService', () => {
       await service.setPath(mockPath);
 
       const originalNow = Date.now;
-      spyOn(Date, 'now').and.returnValue(originalNow() + 13 * 60 * 60 * 1000); // 13 hours > 12h TTL
+      vi.spyOn(Date, 'now').mockReturnValue(originalNow() + 13 * 60 * 60 * 1000); // 13 hours > 12h TTL
 
       const result = await service.getPath(mockPath.id);
       expect(result).toBeNull();
@@ -611,7 +612,7 @@ describe('IndexedDBCacheService', () => {
 
       // Move time past all TTLs
       const originalNow = Date.now;
-      spyOn(Date, 'now').and.returnValue(originalNow() + 25 * 60 * 60 * 1000);
+      vi.spyOn(Date, 'now').mockReturnValue(originalNow() + 25 * 60 * 60 * 1000);
 
       const result = await service.cleanup();
       expect(result.contentRemoved).toBe(1);

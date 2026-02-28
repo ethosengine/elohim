@@ -119,7 +119,7 @@ This references [Feature: user authentication] and [Scenario: login flow].`;
       expect(embeddedRefs.some((ref: any) => ref.type === 'scenario')).toBe(true);
     });
 
-    xit('should infer category from title', () => {
+    it.skip('should infer category from title', () => {
       // Category inference is not currently used in ContentNode
       const observerEpic = MarkdownParser.parseEpic('# Observer System', 'epic.md');
       expect(observerEpic.metadata?.['category']).toBe('observer');
@@ -214,7 +214,7 @@ authors: John Doe, Jane Smith
       }
     });
 
-    xit('should use default version if not specified', () => {
+    it.skip('should use default version if not specified', () => {
       // Default version is not currently set by the parser
       const content = '# Epic';
       const result = MarkdownParser.parseEpic(content, 'epic.md');

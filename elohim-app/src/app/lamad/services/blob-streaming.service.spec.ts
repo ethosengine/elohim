@@ -1,5 +1,6 @@
+import { vi, Mock } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import {
   BlobStreamingService,
   StreamingProgress,
@@ -7,6 +8,7 @@ import {
   QualityRecommendation,
 } from './blob-streaming.service';
 import { ContentBlob, ContentBlobVariant } from '../models/content-node.model';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('BlobStreamingService', () => {
   let service: BlobStreamingService;
@@ -55,8 +57,7 @@ describe('BlobStreamingService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [BlobStreamingService],
+      providers: [provideHttpClient(), provideHttpClientTesting(), BlobStreamingService],
     });
     service = TestBed.inject(BlobStreamingService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -72,7 +73,7 @@ describe('BlobStreamingService', () => {
   });
 
   describe('Chunked Download', () => {
-    it('should check Range request support', done => {
+    it('should check Range request support', () => new Promise<void>(done => {
       const url = 'https://example.com/blob.mp4';
 
       service['checkRangeSupport'](url).then(supported => {
@@ -83,9 +84,9 @@ describe('BlobStreamingService', () => {
       const req = httpMock.expectOne(url);
       expect(req.request.headers.has('Range')).toBe(true);
       req.flush(null, { status: 206, statusText: 'Partial Content' });
-    });
+    }));
 
-    it('should fallback to single request if Range not supported', done => {
+    it('should fallback to single request if Range not supported', () => new Promise<void>(done => {
       const url = 'https://example.com/blob.mp4';
       const blob = createMockContentBlob();
       const testData = new Uint8Array(1024);
@@ -108,7 +109,7 @@ describe('BlobStreamingService', () => {
           downloadReq.flush(testData.buffer);
         }, 10);
       }, 10);
-    });
+    }));
   });
 
   describe('Bandwidth Probing', () => {
@@ -153,7 +154,7 @@ describe('BlobStreamingService', () => {
 
       // Mock performance.now() to simulate 1 second elapsed (1 MB / 1s = 1 MB/s)
       let callCount = 0;
-      spyOn(performance, 'now').and.callFake(() => {
+      vi.spyOn(performance, 'now').mockImplementation(() => {
         callCount++;
         // First call: startTime=0, second call: endTime=1000ms
         return callCount === 1 ? 0 : 1000;
@@ -249,7 +250,7 @@ describe('BlobStreamingService', () => {
 
       try {
         await probePromise;
-        fail('should have thrown');
+        throw new Error('should have thrown');
       } catch (error: any) {
         expect(error.message).toContain('Bandwidth probe failed');
       }

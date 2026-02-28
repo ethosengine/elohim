@@ -15,11 +15,12 @@ import type {
   HolochainConnectionState,
   HolochainConnection,
 } from '../../elohim/models/holochain-connection.model';
+import { vi } from 'vitest';
 
 describe('AgencyService', () => {
   let service: AgencyService;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockAuthService: jasmine.SpyObj<AuthService>;
+  let mockHolochainClient: any;
+  let mockAuthService: any;
   let connectionSignal: ReturnType<typeof signal<HolochainConnection>>;
 
   const createMockDisplayInfo = (
@@ -54,19 +55,18 @@ describe('AgencyService', () => {
     });
 
     // Create mock Holochain client
-    mockHolochainClient = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['getDisplayInfo'],
-      {
-        connection: connectionSignal.asReadonly(),
-      }
-    );
+    mockHolochainClient = {
+      getDisplayInfo: vi.fn(),
+      connection: connectionSignal.asReadonly(),
+    };
 
-    mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+    mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
     // Create mock AuthService - default: not authenticated
-    mockAuthService = jasmine.createSpyObj('AuthService', ['isAuthenticated']);
-    mockAuthService.isAuthenticated.and.returnValue(false);
+    mockAuthService = {
+      isAuthenticated: vi.fn(),
+    };
+    mockAuthService.isAuthenticated.mockReturnValue(false);
 
     TestBed.configureTestingModule({
       providers: [
@@ -98,7 +98,7 @@ describe('AgencyService', () => {
         agentPubKey: null,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       expect(service.currentStage()).toBe('visitor');
     });
@@ -113,7 +113,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'wss://edge.elohim.network')
       );
 
@@ -130,7 +130,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -147,7 +147,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://127.0.0.1:8888')
       );
 
@@ -162,9 +162,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connecting', 'ws://localhost:8888', false)
       );
 
@@ -179,9 +179,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connecting', 'wss://edge.elohim.network', true)
       );
 
@@ -210,7 +210,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -232,7 +232,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -251,7 +251,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -274,7 +274,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -291,9 +291,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connecting', 'ws://localhost:8888')
       );
 
@@ -311,9 +311,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        error: 'Network timeout'
+        error: 'Network timeout',
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue({
+      mockHolochainClient.getDisplayInfo.mockReturnValue({
         ...createMockDisplayInfo('error'),
         error: 'Network timeout',
       });
@@ -332,9 +332,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('disconnected', 'ws://localhost:8888')
       );
 
@@ -357,9 +357,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       const state = service.agencyState();
       expect(state.dataResidency.length).toBeGreaterThan(0);
@@ -376,7 +376,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'wss://edge.elohim.network')
       );
 
@@ -395,7 +395,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -418,9 +418,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       const state = service.agencyState();
       expect(state.keys).toEqual([]);
@@ -436,7 +436,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent-pub-key-123456789' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue({
+      mockHolochainClient.getDisplayInfo.mockReturnValue({
         ...createMockDisplayInfo('connected', 'ws://localhost:8888'),
         agentPubKey: 'agent-pub-key-123456789',
       });
@@ -458,7 +458,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent-pub-key-very-long-string-here' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue({
+      mockHolochainClient.getDisplayInfo.mockReturnValue({
         ...createMockDisplayInfo('connected', 'ws://localhost:8888'),
         agentPubKey: 'agent-pub-key-very-long-string-here',
       });
@@ -478,7 +478,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent-pub-key-123' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue({
+      mockHolochainClient.getDisplayInfo.mockReturnValue({
         ...createMockDisplayInfo('connected', 'wss://edge.elohim.network'),
         agentPubKey: 'agent-pub-key-123',
       });
@@ -498,7 +498,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent-pub-key-123' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue({
+      mockHolochainClient.getDisplayInfo.mockReturnValue({
         ...createMockDisplayInfo('connected', 'ws://localhost:8888'),
         agentPubKey: 'agent-pub-key-123',
       });
@@ -522,9 +522,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       const state = service.agencyState();
       expect(state.migrationAvailable).toBe(true);
@@ -541,7 +541,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'wss://edge.elohim.network')
       );
 
@@ -565,7 +565,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -588,9 +588,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       expect(service.canUpgrade()).toBe(true);
     });
@@ -603,9 +603,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       const info = service.stageInfo();
       expect(info.stage).toBe('visitor');
@@ -626,9 +626,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       const summary = service.getDataSummary();
       expect(summary).toContain('categories');
@@ -642,9 +642,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       const summary = service.getStageSummary();
       expect(summary.data).toBe('Browser only');
@@ -661,7 +661,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'wss://edge.elohim.network')
       );
 
@@ -683,7 +683,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
         createMockDisplayInfo('connected', 'ws://localhost:8888')
       );
 
@@ -709,7 +709,7 @@ describe('AgencyService', () => {
         agentPubKey: 'agent' as any,
         appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue({
+      mockHolochainClient.getDisplayInfo.mockReturnValue({
         ...createMockDisplayInfo('connected', 'ws://localhost:8888'),
         connectedAt,
       });
@@ -732,9 +732,9 @@ describe('AgencyService', () => {
         cellId: null,
         cellIds: new Map(),
         agentPubKey: null,
-        appInfo: null
+        appInfo: null,
       });
-      mockHolochainClient.getDisplayInfo.and.returnValue(createMockDisplayInfo('disconnected'));
+      mockHolochainClient.getDisplayInfo.mockReturnValue(createMockDisplayInfo('disconnected'));
 
       const state = service.agencyState();
       expect(state.networkStats).toBeUndefined();

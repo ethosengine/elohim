@@ -15,14 +15,15 @@ import { ElohimAgentService } from './elohim-agent.service';
 import { ElohimPresenceService } from './elohim-presence.service';
 
 import type { ElohimResponse } from '../models/elohim-agent.model';
+import { vi } from 'vitest';
 
 describe('ElohimPresenceService', () => {
   let service: ElohimPresenceService;
-  let mockAgentService: jasmine.SpyObj<ElohimAgentService>;
-  let mockBannerService: jasmine.SpyObj<BannerService>;
-  let mockRouter: jasmine.SpyObj<Router>;
-  let mockPathRecommendation: jasmine.SpyObj<PathRecommendationService>;
-  let mockLearnerContext: jasmine.SpyObj<LearnerContextService>;
+  let mockAgentService: any;
+  let mockBannerService: any;
+  let mockRouter: any;
+  let mockPathRecommendation: any;
+  let mockLearnerContext: any;
 
   const buildFulfilledResponse = (
     overrides: Partial<ElohimResponse> = {},
@@ -61,35 +62,37 @@ describe('ElohimPresenceService', () => {
   });
 
   beforeEach(() => {
-    mockAgentService = jasmine.createSpyObj('ElohimAgentService', [
-      'invoke',
-      'requestAttestationRecommendation',
-    ]);
-    mockAgentService.invoke.and.returnValue(of(buildFulfilledResponse()));
-    mockAgentService.requestAttestationRecommendation.and.returnValue(
+    mockAgentService = {
+    invoke: vi.fn(),
+    requestAttestationRecommendation: vi.fn(),
+  };
+    mockAgentService.invoke.mockReturnValue(of(buildFulfilledResponse()));
+    mockAgentService.requestAttestationRecommendation.mockReturnValue(
       of(buildFulfilledResponse()),
     );
 
-    mockBannerService = jasmine.createSpyObj('BannerService', [
-      'registerProvider',
-      'unregisterProvider',
-    ]);
+    mockBannerService = {
+    registerProvider: vi.fn(),
+    unregisterProvider: vi.fn(),
+  };
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate']);
-    mockRouter.navigate.and.returnValue(Promise.resolve(true));
+    mockRouter = {
+    navigate: vi.fn(),
+  };
+    mockRouter.navigate.mockReturnValue(Promise.resolve(true));
 
-    mockPathRecommendation = jasmine.createSpyObj('PathRecommendationService', [
-      'getTopRecommendation',
-      'getRecommendations',
-    ]);
-    mockPathRecommendation.getTopRecommendation.and.returnValue(of(null));
+    mockPathRecommendation = {
+    getTopRecommendation: vi.fn(),
+    getRecommendations: vi.fn(),
+  };
+    mockPathRecommendation.getTopRecommendation.mockReturnValue(of(null));
 
-    mockLearnerContext = jasmine.createSpyObj('LearnerContextService', [
-      'getDiscoveryProfile',
-      'isMasteryUnlocked',
-      'getAdaptationState',
-    ]);
-    mockLearnerContext.getDiscoveryProfile.and.returnValue(null);
+    mockLearnerContext = {
+    getDiscoveryProfile: vi.fn(),
+    isMasteryUnlocked: vi.fn(),
+    getAdaptationState: vi.fn(),
+  };
+    mockLearnerContext.getDiscoveryProfile.mockReturnValue(null);
 
     TestBed.configureTestingModule({
       providers: [
@@ -132,7 +135,7 @@ describe('ElohimPresenceService', () => {
       service.onDiscoveryCompleted('node-1', 'Attachment Style', 'user-1').subscribe();
 
       expect(mockAgentService.invoke).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           capability: 'path-recommendation',
           requesterId: 'user-1',
         }),
@@ -142,7 +145,7 @@ describe('ElohimPresenceService', () => {
     it('should include assessment title in constitutional context', () => {
       service.onDiscoveryCompleted('node-1', 'Attachment Style', 'user-1').subscribe();
 
-      const request = mockAgentService.invoke.calls.mostRecent().args[0];
+      const request = mockAgentService.invoke.mock.lastCall[0];
       expect(request.constitutionalContext).toContain('Attachment Style');
     });
 
@@ -180,7 +183,7 @@ describe('ElohimPresenceService', () => {
     }));
 
     it('should not add moment on declined response', fakeAsync(() => {
-      mockAgentService.invoke.and.returnValue(of(buildDeclinedResponse()));
+      mockAgentService.invoke.mockReturnValue(of(buildDeclinedResponse()));
 
       let moments: unknown[] = [];
       service.presence$.subscribe(m => (moments = m));
@@ -206,8 +209,8 @@ describe('ElohimPresenceService', () => {
         reason: 'Matches your values discovery results',
       };
 
-      mockLearnerContext.getDiscoveryProfile.and.returnValue(mockProfile as never);
-      mockPathRecommendation.getTopRecommendation.and.returnValue(of(mockRec));
+      mockLearnerContext.getDiscoveryProfile.mockReturnValue(mockProfile as never);
+      mockPathRecommendation.getTopRecommendation.mockReturnValue(of(mockRec));
 
       let moments: { metadata?: Record<string, unknown>; message: string }[] = [];
       service.presence$.subscribe(
@@ -230,8 +233,8 @@ describe('ElohimPresenceService', () => {
         topTraits: [],
       };
 
-      mockLearnerContext.getDiscoveryProfile.and.returnValue(mockProfile as never);
-      mockPathRecommendation.getTopRecommendation.and.returnValue(of(null));
+      mockLearnerContext.getDiscoveryProfile.mockReturnValue(mockProfile as never);
+      mockPathRecommendation.getTopRecommendation.mockReturnValue(of(null));
 
       let moments: { metadata?: Record<string, unknown> }[] = [];
       service.presence$.subscribe(
@@ -254,7 +257,7 @@ describe('ElohimPresenceService', () => {
       service.onContentCompleted('content-1', 'mastered', 'user-1').subscribe();
 
       expect(mockAgentService.invoke).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           capability: 'knowledge-map-synthesis',
         }),
       );
@@ -293,14 +296,14 @@ describe('ElohimPresenceService', () => {
       service.checkLearnerWellbeing('agent-1').subscribe();
 
       expect(mockAgentService.invoke).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           capability: 'spiral-detection',
         }),
       );
     });
 
     it('should add care moment when spiral detected', fakeAsync(() => {
-      mockAgentService.invoke.and.returnValue(
+      mockAgentService.invoke.mockReturnValue(
         of(
           buildFulfilledResponse({
             payload: { spiralDetected: true } as unknown as ElohimResponse['payload'],
@@ -319,7 +322,7 @@ describe('ElohimPresenceService', () => {
     }));
 
     it('should not add moment when no spiral detected', fakeAsync(() => {
-      mockAgentService.invoke.and.returnValue(
+      mockAgentService.invoke.mockReturnValue(
         of(
           buildFulfilledResponse({
             payload: { spiralDetected: false } as unknown as ElohimResponse['payload'],
@@ -337,7 +340,7 @@ describe('ElohimPresenceService', () => {
     }));
 
     it('should not add moment when no payload', fakeAsync(() => {
-      mockAgentService.invoke.and.returnValue(of(buildFulfilledResponse({ payload: undefined })));
+      mockAgentService.invoke.mockReturnValue(of(buildFulfilledResponse({ payload: undefined })));
 
       let moments: unknown[] = [];
       service.presence$.subscribe(m => (moments = m));
@@ -398,7 +401,7 @@ describe('ElohimPresenceService', () => {
 
   describe('BannerNoticeProvider', () => {
     it('should map care moment to warning severity', fakeAsync(() => {
-      mockAgentService.invoke.and.returnValue(
+      mockAgentService.invoke.mockReturnValue(
         of(
           buildFulfilledResponse({
             payload: { spiralDetected: true } as unknown as ElohimResponse['payload'],
@@ -546,8 +549,8 @@ describe('ElohimPresenceService', () => {
         reason: 'Matches your values results',
       };
 
-      mockLearnerContext.getDiscoveryProfile.and.returnValue(mockProfile as never);
-      mockPathRecommendation.getTopRecommendation.and.returnValue(of(mockRec));
+      mockLearnerContext.getDiscoveryProfile.mockReturnValue(mockProfile as never);
+      mockPathRecommendation.getTopRecommendation.mockReturnValue(of(mockRec));
 
       service.onDiscoveryCompleted('node-1', 'Values Hierarchy', 'user-1').subscribe();
       tick();

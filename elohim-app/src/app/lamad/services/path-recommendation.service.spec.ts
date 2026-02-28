@@ -9,11 +9,12 @@ import { PathRecommendationService } from './path-recommendation.service';
 
 import type { DiscoveryProfile, DiscoveryResult } from '../quiz-engine/models/discovery-assessment.model';
 import type { PathIndex, PathIndexEntry } from '../models/learning-path.model';
+import { vi } from 'vitest';
 
 describe('PathRecommendationService', () => {
   let service: PathRecommendationService;
-  let mockDataLoader: jasmine.SpyObj<DataLoaderService>;
-  let mockLearnerContext: jasmine.SpyObj<LearnerContextService>;
+  let mockDataLoader: any;
+  let mockLearnerContext: any;
 
   const buildPathEntry = (overrides: Partial<PathIndexEntry> = {}): PathIndexEntry => ({
     id: 'test-path',
@@ -56,8 +57,12 @@ describe('PathRecommendationService', () => {
   });
 
   beforeEach(() => {
-    mockDataLoader = jasmine.createSpyObj('DataLoaderService', ['getPathIndex']);
-    mockLearnerContext = jasmine.createSpyObj('LearnerContextService', ['getDiscoveryProfile']);
+    mockDataLoader = {
+    getPathIndex: vi.fn(),
+  };
+    mockLearnerContext = {
+    getDiscoveryProfile: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [
@@ -79,23 +84,23 @@ describe('PathRecommendationService', () => {
   // =========================================================================
 
   describe('empty profile', () => {
-    it('should return empty when totalAssessments is 0', done => {
+    it('should return empty when totalAssessments is 0', () => new Promise<void>(done => {
       const profile = buildProfile({ totalAssessments: 0 });
 
       service.getRecommendations(profile).subscribe(recs => {
         expect(recs).toEqual([]);
         done();
       });
-    });
+    }));
 
-    it('should not call dataLoader when profile has no assessments', done => {
+    it('should not call dataLoader when profile has no assessments', () => new Promise<void>(done => {
       const profile = buildProfile({ totalAssessments: 0 });
 
       service.getRecommendations(profile).subscribe(() => {
         expect(mockDataLoader.getPathIndex).not.toHaveBeenCalled();
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -103,7 +108,7 @@ describe('PathRecommendationService', () => {
   // =========================================================================
 
   describe('tag overlap scoring', () => {
-    it('should score paths by category tag overlap', done => {
+    it('should score paths by category tag overlap', () => new Promise<void>(done => {
       const knowThyself = buildPathEntry({
         id: 'know-thyself-path',
         title: 'Know Thyself',
@@ -115,7 +120,7 @@ describe('PathRecommendationService', () => {
         tags: ['governance', 'policy', 'ai-oversight'],
       });
 
-      mockDataLoader.getPathIndex.and.returnValue(of(buildPathIndex([knowThyself, unrelated])));
+      mockDataLoader.getPathIndex.mockReturnValue(of(buildPathIndex([knowThyself, unrelated])));
 
       const profile = buildProfile({
         totalAssessments: 1,
@@ -129,9 +134,9 @@ describe('PathRecommendationService', () => {
         expect(recs[0].pathId).toBe('know-thyself-path');
         done();
       });
-    });
+    }));
 
-    it('should rank paths with more tag matches higher', done => {
+    it('should rank paths with more tag matches higher', () => new Promise<void>(done => {
       const manyMatches = buildPathEntry({
         id: 'many-matches',
         title: 'Many Matches',
@@ -143,7 +148,7 @@ describe('PathRecommendationService', () => {
         tags: ['values', 'governance', 'policy'],
       });
 
-      mockDataLoader.getPathIndex.and.returnValue(of(buildPathIndex([fewMatches, manyMatches])));
+      mockDataLoader.getPathIndex.mockReturnValue(of(buildPathIndex([fewMatches, manyMatches])));
 
       const profile = buildProfile({
         totalAssessments: 2,
@@ -159,16 +164,16 @@ describe('PathRecommendationService', () => {
         expect(recs[0].relevanceScore).toBeGreaterThan(recs[1].relevanceScore);
         done();
       });
-    });
+    }));
 
-    it('should include matched categories in recommendation', done => {
+    it('should include matched categories in recommendation', () => new Promise<void>(done => {
       const path = buildPathEntry({
         id: 'test-path',
         title: 'Test',
         tags: ['values', 'personality', 'other'],
       });
 
-      mockDataLoader.getPathIndex.and.returnValue(of(buildPathIndex([path])));
+      mockDataLoader.getPathIndex.mockReturnValue(of(buildPathIndex([path])));
 
       const profile = buildProfile({
         totalAssessments: 1,
@@ -182,7 +187,7 @@ describe('PathRecommendationService', () => {
         expect(recs[0].matchedCategories).not.toContain('personality');
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -190,7 +195,7 @@ describe('PathRecommendationService', () => {
   // =========================================================================
 
   describe('framework affinity', () => {
-    it('should boost paths with framework-affinity tags', done => {
+    it('should boost paths with framework-affinity tags', () => new Promise<void>(done => {
       const selfKnowledge = buildPathEntry({
         id: 'self-knowledge-path',
         title: 'Self Knowledge',
@@ -202,7 +207,7 @@ describe('PathRecommendationService', () => {
         tags: ['coding', 'tech'],
       });
 
-      mockDataLoader.getPathIndex.and.returnValue(
+      mockDataLoader.getPathIndex.mockReturnValue(
         of(buildPathIndex([noAffinity, selfKnowledge]))
       );
 
@@ -220,7 +225,7 @@ describe('PathRecommendationService', () => {
         expect(selfKnowledgeRec!.relevanceScore).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -228,7 +233,7 @@ describe('PathRecommendationService', () => {
   // =========================================================================
 
   describe('intimate path filtering', () => {
-    it('should exclude paths with intimate visibility', done => {
+    it('should exclude paths with intimate visibility', () => new Promise<void>(done => {
       const publicPath = buildPathEntry({
         id: 'public-path',
         title: 'Public',
@@ -243,7 +248,7 @@ describe('PathRecommendationService', () => {
         { visibility: 'intimate' }
       );
 
-      mockDataLoader.getPathIndex.and.returnValue(
+      mockDataLoader.getPathIndex.mockReturnValue(
         of(buildPathIndex([publicPath, intimatePath as PathIndexEntry]))
       );
 
@@ -260,15 +265,15 @@ describe('PathRecommendationService', () => {
         expect(ids).toContain('public-path');
         done();
       });
-    });
+    }));
 
-    it('should exclude paths with private visibility', done => {
+    it('should exclude paths with private visibility', () => new Promise<void>(done => {
       const privatePath = Object.assign(
         buildPathEntry({ id: 'private-path', title: 'Private', tags: ['values'] }),
         { visibility: 'private' }
       );
 
-      mockDataLoader.getPathIndex.and.returnValue(
+      mockDataLoader.getPathIndex.mockReturnValue(
         of(buildPathIndex([privatePath as PathIndexEntry]))
       );
 
@@ -283,7 +288,7 @@ describe('PathRecommendationService', () => {
         expect(recs.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -291,14 +296,14 @@ describe('PathRecommendationService', () => {
   // =========================================================================
 
   describe('sorting', () => {
-    it('should return recommendations sorted by relevance descending', done => {
+    it('should return recommendations sorted by relevance descending', () => new Promise<void>(done => {
       const paths = [
         buildPathEntry({ id: 'low', title: 'Low', tags: ['other', 'unrelated', 'values'] }),
         buildPathEntry({ id: 'high', title: 'High', tags: ['values', 'personality'] }),
         buildPathEntry({ id: 'mid', title: 'Mid', tags: ['values', 'governance'] }),
       ];
 
-      mockDataLoader.getPathIndex.and.returnValue(of(buildPathIndex(paths)));
+      mockDataLoader.getPathIndex.mockReturnValue(of(buildPathIndex(paths)));
 
       const profile = buildProfile({
         totalAssessments: 2,
@@ -314,7 +319,7 @@ describe('PathRecommendationService', () => {
         }
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -322,13 +327,13 @@ describe('PathRecommendationService', () => {
   // =========================================================================
 
   describe('getTopRecommendation', () => {
-    it('should return the highest-scored recommendation', done => {
+    it('should return the highest-scored recommendation', () => new Promise<void>(done => {
       const paths = [
         buildPathEntry({ id: 'low', title: 'Low', tags: ['unrelated'] }),
         buildPathEntry({ id: 'best', title: 'Best', tags: ['values', 'personality'] }),
       ];
 
-      mockDataLoader.getPathIndex.and.returnValue(of(buildPathIndex(paths)));
+      mockDataLoader.getPathIndex.mockReturnValue(of(buildPathIndex(paths)));
 
       const profile = buildProfile({
         totalAssessments: 1,
@@ -343,14 +348,14 @@ describe('PathRecommendationService', () => {
         expect(rec!.pathId).toBe('best');
         done();
       });
-    });
+    }));
 
-    it('should return null when no recommendations match', done => {
+    it('should return null when no recommendations match', () => new Promise<void>(done => {
       const paths = [
         buildPathEntry({ id: 'unrelated', title: 'Unrelated', tags: ['governance'] }),
       ];
 
-      mockDataLoader.getPathIndex.and.returnValue(of(buildPathIndex(paths)));
+      mockDataLoader.getPathIndex.mockReturnValue(of(buildPathIndex(paths)));
 
       const profile = buildProfile({
         totalAssessments: 1,
@@ -363,16 +368,16 @@ describe('PathRecommendationService', () => {
         expect(rec).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return null when profile has no assessments', done => {
+    it('should return null when profile has no assessments', () => new Promise<void>(done => {
       const profile = buildProfile({ totalAssessments: 0 });
 
       service.getTopRecommendation(profile).subscribe(rec => {
         expect(rec).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   // =========================================================================
@@ -380,14 +385,14 @@ describe('PathRecommendationService', () => {
   // =========================================================================
 
   describe('reason text', () => {
-    it('should include matched category names in reason', done => {
+    it('should include matched category names in reason', () => new Promise<void>(done => {
       const path = buildPathEntry({
         id: 'path',
         title: 'Path',
         tags: ['values', 'personality'],
       });
 
-      mockDataLoader.getPathIndex.and.returnValue(of(buildPathIndex([path])));
+      mockDataLoader.getPathIndex.mockReturnValue(of(buildPathIndex([path])));
 
       const profile = buildProfile({
         totalAssessments: 1,
@@ -400,6 +405,6 @@ describe('PathRecommendationService', () => {
         expect(recs[0].reason).toContain('values');
         done();
       });
-    });
+    }));
   });
 });

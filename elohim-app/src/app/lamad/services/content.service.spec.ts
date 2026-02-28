@@ -9,11 +9,12 @@ import {
 import { DataLoaderService } from '@app/elohim/services/data-loader.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { ContentNode, ContentType } from '../models/content-node.model';
+import { vi, Mock } from 'vitest';
 
 describe('ContentService', () => {
   let service: ContentService;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
-  let agentServiceSpy: jasmine.SpyObj<AgentService>;
+  let dataLoaderSpy: any;
+  let agentServiceSpy: any;
 
   const mockContent: ContentNode = {
     id: 'test-content',
@@ -66,11 +67,13 @@ describe('ContentService', () => {
   };
 
   beforeEach(() => {
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', [
-      'getContent',
-      'getContentIndex',
-    ]);
-    const agentServiceSpyObj = jasmine.createSpyObj('AgentService', ['getAttestations']);
+    const dataLoaderSpyObj = {
+      getContent: vi.fn(),
+      getContentIndex: vi.fn(),
+    };
+    const agentServiceSpyObj = {
+      getAttestations: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -81,13 +84,13 @@ describe('ContentService', () => {
     });
 
     service = TestBed.inject(ContentService);
-    dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    agentServiceSpy = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+    dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
+    agentServiceSpy = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
 
     // Default spy return values
-    dataLoaderSpy.getContent.and.returnValue(of(mockContent));
-    dataLoaderSpy.getContentIndex.and.returnValue(of(mockContentIndex));
-    agentServiceSpy.getAttestations.and.returnValue([]);
+    dataLoaderSpy.getContent.mockReturnValue(of(mockContent));
+    dataLoaderSpy.getContentIndex.mockReturnValue(of(mockContentIndex));
+    agentServiceSpy.getAttestations.mockReturnValue([]);
   });
 
   it('should be created', () => {
@@ -95,16 +98,16 @@ describe('ContentService', () => {
   });
 
   describe('getContent', () => {
-    it('should get content by ID', done => {
+    it('should get content by ID', () => new Promise<void>(done => {
       service.getContent('test-content').subscribe(content => {
         expect(content).toEqual(mockContent);
         expect(dataLoaderSpy.getContent).toHaveBeenCalledWith('test-content');
         done();
       });
-    });
+    }));
 
-    it('should handle content load error', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should handle content load error', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getContent('missing').subscribe({
         error: err => {
@@ -112,163 +115,160 @@ describe('ContentService', () => {
           done();
         },
       });
-    });
+    }));
   });
 
   describe('getRelatedResourceIds', () => {
-    it('should get related resource IDs', done => {
+    it('should get related resource IDs', () => new Promise<void>(done => {
       service.getRelatedResourceIds('test-content').subscribe(ids => {
         expect(ids).toEqual(['related-1', 'related-2']);
         done();
       });
-    });
+    }));
 
-    it('should return empty array if no related nodes', done => {
+    it('should return empty array if no related nodes', () => new Promise<void>(done => {
       const contentNoRelated: ContentNode = {
         ...mockContent,
         relatedNodeIds: [],
       };
-      dataLoaderSpy.getContent.and.returnValue(of(contentNoRelated));
+      dataLoaderSpy.getContent.mockReturnValue(of(contentNoRelated));
 
       service.getRelatedResourceIds('test-content').subscribe(ids => {
         expect(ids).toEqual([]);
         done();
       });
-    });
+    }));
 
-    it('should handle undefined relatedNodeIds', done => {
+    it('should handle undefined relatedNodeIds', () => new Promise<void>(done => {
       const contentNoProperty: any = {
         ...mockContent,
       };
       delete contentNoProperty.relatedNodeIds;
-      dataLoaderSpy.getContent.and.returnValue(of(contentNoProperty));
+      dataLoaderSpy.getContent.mockReturnValue(of(contentNoProperty));
 
       service.getRelatedResourceIds('test-content').subscribe(ids => {
         expect(ids).toEqual([]);
         done();
       });
-    });
+    }));
   });
 
   describe('getRelatedResource', () => {
-    it('should get related resource by index', done => {
-      dataLoaderSpy.getContent.and.returnValues(of(mockContent), of(mockRelatedContent));
+    it('should get related resource by index', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValueOnce(of(mockContent)).mockReturnValueOnce(of(mockRelatedContent));
 
       service.getRelatedResource('test-content', 0).subscribe(content => {
         expect(content).toEqual(mockRelatedContent);
         expect(dataLoaderSpy.getContent).toHaveBeenCalledWith('related-1');
         done();
       });
-    });
+    }));
 
-    it('should return null for invalid index (negative)', done => {
+    it('should return null for invalid index (negative)', () => new Promise<void>(done => {
       service.getRelatedResource('test-content', -1).subscribe(content => {
         expect(content).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return null for invalid index (too large)', done => {
+    it('should return null for invalid index (too large)', () => new Promise<void>(done => {
       service.getRelatedResource('test-content', 5).subscribe(content => {
         expect(content).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return null if related content fails to load', done => {
-      dataLoaderSpy.getContent.and.returnValues(
-        of(mockContent),
-        throwError(() => new Error('Load failed'))
-      );
+    it('should return null if related content fails to load', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValueOnce(of(mockContent)).mockReturnValueOnce(throwError(() => new Error('Load failed')));
 
       service.getRelatedResource('test-content', 0).subscribe(content => {
         expect(content).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('searchContent', () => {
-    it('should search content by title', done => {
+    it('should search content by title', () => new Promise<void>(done => {
       service.searchContent('TypeScript').subscribe(results => {
         expect(results.length).toBe(1);
         expect(results[0].id).toBe('content-1');
         done();
       });
-    });
+    }));
 
-    it('should search content by description', done => {
+    it('should search content by description', () => new Promise<void>(done => {
       service.searchContent('Build apps').subscribe(results => {
         expect(results.length).toBe(1);
         expect(results[0].id).toBe('content-2');
         done();
       });
-    });
+    }));
 
-    it('should search content by tags', done => {
+    it('should search content by tags', () => new Promise<void>(done => {
       service.searchContent('angular').subscribe(results => {
         expect(results.length).toBe(2); // content-2 and content-3
         expect(results[0].id).toBe('content-2');
         expect(results[1].id).toBe('content-3');
         done();
       });
-    });
+    }));
 
-    it('should be case-insensitive', done => {
+    it('should be case-insensitive', () => new Promise<void>(done => {
       service.searchContent('TYPESCRIPT').subscribe(results => {
         expect(results.length).toBe(1);
         expect(results[0].id).toBe('content-1');
         done();
       });
-    });
+    }));
 
-    it('should return all content for empty query', done => {
+    it('should return all content for empty query', () => new Promise<void>(done => {
       service.searchContent('').subscribe(results => {
         expect(results.length).toBe(3);
         done();
       });
-    });
+    }));
 
-    it('should return all content for whitespace query', done => {
+    it('should return all content for whitespace query', () => new Promise<void>(done => {
       service.searchContent('   ').subscribe(results => {
         expect(results.length).toBe(3);
         done();
       });
-    });
+    }));
 
-    it('should return empty array for no matches', done => {
+    it('should return empty array for no matches', () => new Promise<void>(done => {
       service.searchContent('nonexistent').subscribe(results => {
         expect(results.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should trim search query', done => {
+    it('should trim search query', () => new Promise<void>(done => {
       service.searchContent('  TypeScript  ').subscribe(results => {
         expect(results.length).toBe(1);
         expect(results[0].id).toBe('content-1');
         done();
       });
-    });
+    }));
   });
 
   describe('getContentByType', () => {
-    it('should filter content by type', done => {
+    it('should filter content by type', () => new Promise<void>(done => {
       service.getContentByType('concept').subscribe(results => {
         expect(results.length).toBe(1);
         expect(results[0].id).toBe('content-1');
         done();
       });
-    });
+    }));
 
-    it('should return empty array for no matches', done => {
+    it('should return empty array for no matches', () => new Promise<void>(done => {
       service.getContentByType('assessment').subscribe(results => {
         expect(results.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should handle multiple matches', done => {
+    it('should handle multiple matches', () => new Promise<void>(done => {
       const indexWithDuplicates = {
         nodes: [
           ...mockContentIndex.nodes,
@@ -281,7 +281,7 @@ describe('ContentService', () => {
           },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithDuplicates));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(indexWithDuplicates));
 
       service.getContentByType('video').subscribe(results => {
         expect(results.length).toBe(2);
@@ -289,21 +289,21 @@ describe('ContentService', () => {
         expect(results[1].id).toBe('content-4');
         done();
       });
-    });
+    }));
 
-    it('should handle empty content index', done => {
+    it('should handle empty content index', () => new Promise<void>(done => {
       const emptyIndex = { nodes: [] };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(emptyIndex));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(emptyIndex));
 
       service.getContentByType('concept').subscribe(results => {
         expect(results.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('additional edge cases', () => {
-    it('should handle missing description in search', done => {
+    it('should handle missing description in search', () => new Promise<void>(done => {
       const indexWithNoDescription = {
         nodes: [
           {
@@ -315,15 +315,15 @@ describe('ContentService', () => {
           },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithNoDescription));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(indexWithNoDescription));
 
       service.searchContent('Test').subscribe(results => {
         expect(results.length).toBe(1);
         done();
       });
-    });
+    }));
 
-    it('should handle missing tags in search', done => {
+    it('should handle missing tags in search', () => new Promise<void>(done => {
       const indexWithNoTags = {
         nodes: [
           {
@@ -335,66 +335,66 @@ describe('ContentService', () => {
           },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithNoTags));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(indexWithNoTags));
 
       service.searchContent('Test').subscribe(results => {
         expect(results.length).toBe(1);
         done();
       });
-    });
+    }));
   });
 
   describe('getContentByTag', () => {
-    it('should filter content by tag', done => {
+    it('should filter content by tag', () => new Promise<void>(done => {
       service.getContentByTag('angular').subscribe(results => {
         expect(results.length).toBe(2);
         expect(results[0].id).toBe('content-2');
         expect(results[1].id).toBe('content-3');
         done();
       });
-    });
+    }));
 
-    it('should be case-insensitive', done => {
+    it('should be case-insensitive', () => new Promise<void>(done => {
       service.getContentByTag('TYPESCRIPT').subscribe(results => {
         expect(results.length).toBe(1);
         expect(results[0].id).toBe('content-1');
         done();
       });
-    });
+    }));
 
-    it('should return empty array for non-existent tag', done => {
+    it('should return empty array for non-existent tag', () => new Promise<void>(done => {
       service.getContentByTag('nonexistent').subscribe(results => {
         expect(results.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should handle empty content index', done => {
-      dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: [] }));
+    it('should handle empty content index', () => new Promise<void>(done => {
+      dataLoaderSpy.getContentIndex.mockReturnValue(of({ nodes: [] }));
       service.getContentByTag('test').subscribe(results => {
         expect(results.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('getAllTags', () => {
-    it('should return all unique tags sorted alphabetically', done => {
+    it('should return all unique tags sorted alphabetically', () => new Promise<void>(done => {
       service.getAllTags().subscribe(tags => {
         expect(tags).toEqual(['angular', 'framework', 'programming', 'testing', 'typescript']);
         done();
       });
-    });
+    }));
 
-    it('should handle empty content index', done => {
-      dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: [] }));
+    it('should handle empty content index', () => new Promise<void>(done => {
+      dataLoaderSpy.getContentIndex.mockReturnValue(of({ nodes: [] }));
       service.getAllTags().subscribe(tags => {
         expect(tags).toEqual([]);
         done();
       });
-    });
+    }));
 
-    it('should handle nodes without tags', done => {
+    it('should handle nodes without tags', () => new Promise<void>(done => {
       const indexWithNoTags = {
         nodes: [
           {
@@ -406,16 +406,16 @@ describe('ContentService', () => {
           },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithNoTags));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(indexWithNoTags));
       service.getAllTags().subscribe(tags => {
         expect(tags).toEqual([]);
         done();
       });
-    });
+    }));
   });
 
   describe('getAllContentTypes', () => {
-    it('should return all unique content types', done => {
+    it('should return all unique content types', () => new Promise<void>(done => {
       service.getAllContentTypes().subscribe(types => {
         expect(types.length).toBe(3);
         expect(types).toContain('concept');
@@ -423,17 +423,17 @@ describe('ContentService', () => {
         expect(types).toContain('book-chapter');
         done();
       });
-    });
+    }));
 
-    it('should handle empty content index', done => {
-      dataLoaderSpy.getContentIndex.and.returnValue(of({ nodes: [] }));
+    it('should handle empty content index', () => new Promise<void>(done => {
+      dataLoaderSpy.getContentIndex.mockReturnValue(of({ nodes: [] }));
       service.getAllContentTypes().subscribe(types => {
         expect(types).toEqual([]);
         done();
       });
-    });
+    }));
 
-    it('should skip nodes without contentType', done => {
+    it('should skip nodes without contentType', () => new Promise<void>(done => {
       const indexMixed = {
         nodes: [
           {
@@ -452,130 +452,130 @@ describe('ContentService', () => {
           },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(indexMixed));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(indexMixed));
       service.getAllContentTypes().subscribe(types => {
         expect(types).toEqual(['concept']);
         done();
       });
-    });
+    }));
   });
 
   describe('getContentWithAccessCheck', () => {
     beforeEach(() => {
-      agentServiceSpy.getCurrentAgentId = jasmine.createSpy().and.returnValue('agent-1');
+      agentServiceSpy.getCurrentAgentId = vi.fn().mockReturnValue('agent-1');
     });
 
-    it('should allow access to commons content', done => {
+    it('should allow access to commons content', () => new Promise<void>(done => {
       const commonsContent: ContentNode = {
         ...mockContent,
         reach: 'commons',
       };
-      dataLoaderSpy.getContent.and.returnValue(of(commonsContent));
+      dataLoaderSpy.getContent.mockReturnValue(of(commonsContent));
 
       service.getContentWithAccessCheck('test-content').subscribe(result => {
-        expect(result.canAccess).toBeTrue();
+        expect(result.canAccess).toBe(true);
         expect(result.content).toEqual(commonsContent);
         done();
       });
-    });
+    }));
 
-    it('should allow access to content when agent is author', done => {
+    it('should allow access to content when agent is author', () => new Promise<void>(done => {
       const privateContent: ContentNode = {
         ...mockContent,
         reach: 'private',
         authorId: 'agent-1',
       };
-      dataLoaderSpy.getContent.and.returnValue(of(privateContent));
+      dataLoaderSpy.getContent.mockReturnValue(of(privateContent));
 
       service.getContentWithAccessCheck('test-content').subscribe(result => {
-        expect(result.canAccess).toBeTrue();
+        expect(result.canAccess).toBe(true);
         expect(result.content).toEqual(privateContent);
         done();
       });
-    });
+    }));
 
-    it('should deny access to private content for non-author', done => {
+    it('should deny access to private content for non-author', () => new Promise<void>(done => {
       const privateContent: ContentNode = {
         ...mockContent,
         reach: 'private',
         authorId: 'agent-2',
       };
-      dataLoaderSpy.getContent.and.returnValue(of(privateContent));
-      agentServiceSpy.getAttestations.and.returnValue([]);
+      dataLoaderSpy.getContent.mockReturnValue(of(privateContent));
+      agentServiceSpy.getAttestations.mockReturnValue([]);
       // Override getCurrentAgentId to return null (unauthenticated)
-      agentServiceSpy.getCurrentAgentId = jasmine.createSpy().and.returnValue(null);
+      agentServiceSpy.getCurrentAgentId = vi.fn().mockReturnValue(null);
 
       service.getContentWithAccessCheck('test-content').subscribe(result => {
-        expect(result.canAccess).toBeFalse();
+        expect(result.canAccess).toBe(false);
         expect(result.reason).toBe('unauthenticated');
         expect(result.requiredReach).toBe('private');
         done();
       });
-    });
+    }));
 
-    it('should allow access for invited agents', done => {
+    it('should allow access for invited agents', () => new Promise<void>(done => {
       const invitedContent: ContentNode = {
         ...mockContent,
         reach: 'invited',
         invitedAgentIds: ['agent-1', 'agent-3'],
       };
-      dataLoaderSpy.getContent.and.returnValue(of(invitedContent));
-      agentServiceSpy.getAttestations.and.returnValue([]);
+      dataLoaderSpy.getContent.mockReturnValue(of(invitedContent));
+      agentServiceSpy.getAttestations.mockReturnValue([]);
 
       service.getContentWithAccessCheck('test-content').subscribe(result => {
-        expect(result.canAccess).toBeTrue();
+        expect(result.canAccess).toBe(true);
         expect(result.content).toEqual(invitedContent);
         done();
       });
-    });
+    }));
 
-    it('should handle not-found error', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should handle not-found error', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getContentWithAccessCheck('missing').subscribe(result => {
-        expect(result.canAccess).toBeFalse();
+        expect(result.canAccess).toBe(false);
         expect(result.reason).toBe('not-found');
         done();
       });
-    });
+    }));
 
-    it('should default to commons reach for content without reach property', done => {
+    it('should default to commons reach for content without reach property', () => new Promise<void>(done => {
       const contentNoReach: ContentNode = {
         ...mockContent,
       };
       delete (contentNoReach as any).reach;
-      dataLoaderSpy.getContent.and.returnValue(of(contentNoReach));
+      dataLoaderSpy.getContent.mockReturnValue(of(contentNoReach));
 
       service.getContentWithAccessCheck('test-content').subscribe(result => {
-        expect(result.canAccess).toBeTrue();
+        expect(result.canAccess).toBe(true);
         done();
       });
-    });
+    }));
 
-    it('should allow access when agent reach is sufficient', done => {
+    it('should allow access when agent reach is sufficient', () => new Promise<void>(done => {
       const municipalContent: ContentNode = {
         ...mockContent,
         reach: 'municipal',
       };
-      dataLoaderSpy.getContent.and.returnValue(of(municipalContent));
-      agentServiceSpy.getAttestations.and.returnValue(['regional-member']);
+      dataLoaderSpy.getContent.mockReturnValue(of(municipalContent));
+      agentServiceSpy.getAttestations.mockReturnValue(['regional-member']);
 
       service.getContentWithAccessCheck('test-content').subscribe(result => {
-        expect(result.canAccess).toBeTrue();
+        expect(result.canAccess).toBe(true);
         expect(result.agentReach).toBe('regional');
         done();
       });
-    });
+    }));
   });
 
   describe('extractYouTubeId', () => {
-    it('should extract video ID from watch URL', done => {
+    it('should extract video ID from watch URL', () => new Promise<void>(done => {
       const contentWithYouTube: any = {
         ...mockContentIndex.nodes[0],
         url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       };
       const index = { nodes: [contentWithYouTube] };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(index));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(index));
 
       service.getContentPreviewsForCategory('test').subscribe(previews => {
         if (previews.length > 0 && previews[0].thumbnailUrl) {
@@ -583,16 +583,16 @@ describe('ContentService', () => {
         }
         done();
       });
-    });
+    }));
 
-    it('should extract video ID from youtu.be URL', done => {
+    it('should extract video ID from youtu.be URL', () => new Promise<void>(done => {
       const contentWithYouTube: any = {
         ...mockContentIndex.nodes[0],
         category: 'test',
         url: 'https://youtu.be/dQw4w9WgXcQ',
       };
       const index = { nodes: [contentWithYouTube] };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(index));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(index));
 
       service.getContentPreviewsForCategory('test').subscribe(previews => {
         if (previews.length > 0 && previews[0].thumbnailUrl) {
@@ -600,16 +600,16 @@ describe('ContentService', () => {
         }
         done();
       });
-    });
+    }));
 
-    it('should extract video ID from embed URL', done => {
+    it('should extract video ID from embed URL', () => new Promise<void>(done => {
       const contentWithYouTube: any = {
         ...mockContentIndex.nodes[0],
         category: 'test',
         url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
       };
       const index = { nodes: [contentWithYouTube] };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(index));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(index));
 
       service.getContentPreviewsForCategory('test').subscribe(previews => {
         if (previews.length > 0 && previews[0].thumbnailUrl) {
@@ -617,11 +617,11 @@ describe('ContentService', () => {
         }
         done();
       });
-    });
+    }));
   });
 
   describe('getOpenGraphMetadata', () => {
-    it('should return Open Graph metadata', done => {
+    it('should return Open Graph metadata', () => new Promise<void>(done => {
       const ogMetadata = {
         ogTitle: 'Test Title',
         ogDescription: 'Test Description',
@@ -630,35 +630,35 @@ describe('ContentService', () => {
         ...mockContent,
         openGraphMetadata: ogMetadata as any,
       };
-      dataLoaderSpy.getContent.and.returnValue(of(contentWithOG));
+      dataLoaderSpy.getContent.mockReturnValue(of(contentWithOG));
 
       service.getOpenGraphMetadata('test-content').subscribe(metadata => {
         expect(metadata).toEqual(ogMetadata);
         done();
       });
-    });
+    }));
 
-    it('should return null if no Open Graph metadata', done => {
-      dataLoaderSpy.getContent.and.returnValue(of(mockContent));
+    it('should return null if no Open Graph metadata', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(of(mockContent));
 
       service.getOpenGraphMetadata('test-content').subscribe(metadata => {
         expect(metadata).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return null on error', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should return null on error', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getOpenGraphMetadata('missing').subscribe(metadata => {
         expect(metadata).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getActivityPubObject', () => {
-    it('should build ActivityPub object', done => {
+    it('should build ActivityPub object', () => new Promise<void>(done => {
       const apContent: ContentNode = {
         ...mockContent,
         activityPubType: 'Article',
@@ -667,7 +667,7 @@ describe('ContentService', () => {
         createdAt: '2024-01-01',
         updatedAt: '2024-01-02',
       };
-      dataLoaderSpy.getContent.and.returnValue(of(apContent));
+      dataLoaderSpy.getContent.mockReturnValue(of(apContent));
 
       service.getActivityPubObject('test-content').subscribe(obj => {
         expect(obj).not.toBeNull();
@@ -679,24 +679,24 @@ describe('ContentService', () => {
         }
         done();
       });
-    });
+    }));
 
-    it('should return null if no activityPubType', done => {
-      dataLoaderSpy.getContent.and.returnValue(of(mockContent));
+    it('should return null if no activityPubType', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(of(mockContent));
 
       service.getActivityPubObject('test-content').subscribe(obj => {
         expect(obj).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should include tags as hashtags', done => {
+    it('should include tags as hashtags', () => new Promise<void>(done => {
       const apContent: ContentNode = {
         ...mockContent,
         activityPubType: 'Article',
         tags: ['test', 'example'],
       };
-      dataLoaderSpy.getContent.and.returnValue(of(apContent));
+      dataLoaderSpy.getContent.mockReturnValue(of(apContent));
 
       service.getActivityPubObject('test-content').subscribe(obj => {
         expect(obj).not.toBeNull();
@@ -706,20 +706,20 @@ describe('ContentService', () => {
         }
         done();
       });
-    });
+    }));
 
-    it('should return null on error', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should return null on error', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getActivityPubObject('missing').subscribe(obj => {
         expect(obj).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getJsonLd', () => {
-    it('should return JSON-LD metadata', done => {
+    it('should return JSON-LD metadata', () => new Promise<void>(done => {
       const linkedData = {
         '@context': 'https://schema.org',
         '@type': 'Article',
@@ -728,68 +728,68 @@ describe('ContentService', () => {
         ...mockContent,
         linkedData: linkedData as any,
       };
-      dataLoaderSpy.getContent.and.returnValue(of(contentWithLD));
+      dataLoaderSpy.getContent.mockReturnValue(of(contentWithLD));
 
       service.getJsonLd('test-content').subscribe(metadata => {
         expect(metadata).toEqual(linkedData);
         done();
       });
-    });
+    }));
 
-    it('should return null if no linked data', done => {
-      dataLoaderSpy.getContent.and.returnValue(of(mockContent));
+    it('should return null if no linked data', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(of(mockContent));
 
       service.getJsonLd('test-content').subscribe(metadata => {
         expect(metadata).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return null on error', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should return null on error', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getJsonLd('missing').subscribe(metadata => {
         expect(metadata).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getDid', () => {
-    it('should return DID string', done => {
+    it('should return DID string', () => new Promise<void>(done => {
       const contentWithDid: ContentNode = {
         ...mockContent,
         did: 'did:web:elohim.host:content:test',
       };
-      dataLoaderSpy.getContent.and.returnValue(of(contentWithDid));
+      dataLoaderSpy.getContent.mockReturnValue(of(contentWithDid));
 
       service.getDid('test-content').subscribe(did => {
         expect(did).toBe('did:web:elohim.host:content:test');
         done();
       });
-    });
+    }));
 
-    it('should return null if no DID', done => {
-      dataLoaderSpy.getContent.and.returnValue(of(mockContent));
+    it('should return null if no DID', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(of(mockContent));
 
       service.getDid('test-content').subscribe(did => {
         expect(did).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return null on error', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should return null on error', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getDid('missing').subscribe(did => {
         expect(did).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getStandardsMetadata', () => {
-    it('should return all standards metadata', done => {
+    it('should return all standards metadata', () => new Promise<void>(done => {
       const fullContent: ContentNode = {
         ...mockContent,
         did: 'did:web:test',
@@ -797,7 +797,7 @@ describe('ContentService', () => {
         openGraphMetadata: { ogTitle: 'Test' } as any,
         linkedData: { '@type': 'Article' } as any,
       };
-      dataLoaderSpy.getContent.and.returnValue(of(fullContent));
+      dataLoaderSpy.getContent.mockReturnValue(of(fullContent));
 
       service.getStandardsMetadata('test-content').subscribe(metadata => {
         expect(metadata.did).toBe('did:web:test');
@@ -807,10 +807,10 @@ describe('ContentService', () => {
         expect(metadata.activityPubObject).not.toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should return null values for missing metadata', done => {
-      dataLoaderSpy.getContent.and.returnValue(of(mockContent));
+    it('should return null values for missing metadata', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(of(mockContent));
 
       service.getStandardsMetadata('test-content').subscribe(metadata => {
         expect(metadata.did).toBeNull();
@@ -820,10 +820,10 @@ describe('ContentService', () => {
         expect(metadata.activityPubObject).toBeNull();
         done();
       });
-    });
+    }));
 
-    it('should handle error gracefully', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should handle error gracefully', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getStandardsMetadata('missing').subscribe(metadata => {
         expect(metadata.did).toBeNull();
@@ -833,11 +833,11 @@ describe('ContentService', () => {
         expect(metadata.activityPubObject).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getContentPreviewsForCategory', () => {
-    it('should filter content by category', done => {
+    it('should filter content by category', () => new Promise<void>(done => {
       const categoryIndex = {
         nodes: [
           {
@@ -850,46 +850,46 @@ describe('ContentService', () => {
           },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(categoryIndex));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(categoryIndex));
 
       service.getContentPreviewsForCategory('governance').subscribe(previews => {
         expect(previews.length).toBe(1);
         expect(previews[0].category).toBe('governance');
         done();
       });
-    });
+    }));
 
-    it('should handle empty results', done => {
+    it('should handle empty results', () => new Promise<void>(done => {
       service.getContentPreviewsForCategory('nonexistent').subscribe(previews => {
         expect(previews.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('searchContentWithPreviews', () => {
-    it('should return previews instead of index entries', done => {
+    it('should return previews instead of index entries', () => new Promise<void>(done => {
       service.searchContentWithPreviews('TypeScript').subscribe(previews => {
         expect(previews.length).toBe(1);
         expect(previews[0].id).toBe('content-1');
         expect(previews[0].title).toBeDefined();
         done();
       });
-    });
+    }));
   });
 
   describe('getContentPreviewsByType', () => {
-    it('should return previews filtered by type', done => {
+    it('should return previews filtered by type', () => new Promise<void>(done => {
       service.getContentPreviewsByType('video').subscribe(previews => {
         expect(previews.length).toBe(1);
         expect(previews[0].contentType).toBe('video');
         done();
       });
-    });
+    }));
   });
 
   describe('getRichMediaForCategory', () => {
-    it('should categorize rich media content', done => {
+    it('should categorize rich media content', () => new Promise<void>(done => {
       const richMediaIndex = {
         nodes: [
           { ...mockContentIndex.nodes[0], category: 'test', contentType: 'video' as ContentType },
@@ -905,7 +905,7 @@ describe('ContentService', () => {
           },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(richMediaIndex));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(richMediaIndex));
 
       service.getRichMediaForCategory('test').subscribe(media => {
         expect(media.videos.length).toBe(1);
@@ -914,45 +914,45 @@ describe('ContentService', () => {
         expect(media.tools.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('getRelatedContentPreviews', () => {
-    it('should return previews for related content', done => {
+    it('should return previews for related content', () => new Promise<void>(done => {
       const relatedIndex = {
         nodes: [
           { ...mockContentIndex.nodes[0], id: 'related-1' },
           { ...mockContentIndex.nodes[1], id: 'related-2' },
         ],
       };
-      dataLoaderSpy.getContentIndex.and.returnValue(of(relatedIndex));
+      dataLoaderSpy.getContentIndex.mockReturnValue(of(relatedIndex));
 
       service.getRelatedContentPreviews('test-content').subscribe(previews => {
         expect(previews.length).toBe(2);
         done();
       });
-    });
+    }));
 
-    it('should handle content with no related nodes', done => {
+    it('should handle content with no related nodes', () => new Promise<void>(done => {
       const noRelatedContent: ContentNode = {
         ...mockContent,
         relatedNodeIds: [],
       };
-      dataLoaderSpy.getContent.and.returnValue(of(noRelatedContent));
+      dataLoaderSpy.getContent.mockReturnValue(of(noRelatedContent));
 
       service.getRelatedContentPreviews('test-content').subscribe(previews => {
         expect(previews.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should handle errors gracefully', done => {
-      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Not found')));
+    it('should handle errors gracefully', () => new Promise<void>(done => {
+      dataLoaderSpy.getContent.mockReturnValue(throwError(() => new Error('Not found')));
 
       service.getRelatedContentPreviews('missing').subscribe(previews => {
         expect(previews.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 });

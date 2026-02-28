@@ -7,12 +7,17 @@ import { KnowledgeMapType, MasteryLevel } from '../models/knowledge-map.model';
 
 describe('KnowledgeMapService', () => {
   let service: KnowledgeMapService;
-  let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
-  let elohimServiceSpy: jasmine.SpyObj<ElohimAgentService>;
+  let dataLoaderSpy: any;
+  let elohimServiceSpy: any;
 
   beforeEach(() => {
-    const dataLoaderSpyObj = jasmine.createSpyObj('DataLoaderService', ['getContent', 'getPath']);
-    const elohimServiceSpyObj = jasmine.createSpyObj('ElohimAgentService', ['invoke']);
+    const dataLoaderSpyObj = {
+      getContent: vi.fn(),
+      getPath: vi.fn(),
+    };
+    const elohimServiceSpyObj = {
+      invoke: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -23,8 +28,8 @@ describe('KnowledgeMapService', () => {
     });
 
     service = TestBed.inject(KnowledgeMapService);
-    dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    elohimServiceSpy = TestBed.inject(ElohimAgentService) as jasmine.SpyObj<ElohimAgentService>;
+    dataLoaderSpy = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
+    elohimServiceSpy = TestBed.inject(ElohimAgentService) as { [K in keyof ElohimAgentService]?: Mock };
   });
 
   it('should be created', () => {
@@ -32,25 +37,25 @@ describe('KnowledgeMapService', () => {
   });
 
   describe('getMapIndex', () => {
-    it('should return index with demo maps', done => {
+    it('should return index with demo maps', () => new Promise<void>(done => {
       service.getMapIndex().subscribe(index => {
         expect(index).toBeTruthy();
         expect(index.maps.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should include lastUpdated and totalCount', done => {
+    it('should include lastUpdated and totalCount', () => new Promise<void>(done => {
       service.getMapIndex().subscribe(index => {
         expect(index.lastUpdated).toBeTruthy();
         expect(index.totalCount).toBe(index.maps.length);
         done();
       });
-    });
+    }));
   });
 
   describe('getMyMaps', () => {
-    it('should return maps owned by current agent', done => {
+    it('should return maps owned by current agent', () => new Promise<void>(done => {
       service.getMyMaps().subscribe(maps => {
         expect(maps.length).toBeGreaterThan(0);
         maps.forEach(map => {
@@ -58,11 +63,11 @@ describe('KnowledgeMapService', () => {
         });
         done();
       });
-    });
+    }));
   });
 
   describe('getMapsByType', () => {
-    it('should filter by domain type', done => {
+    it('should filter by domain type', () => new Promise<void>(done => {
       service.getMapsByType('domain').subscribe(maps => {
         expect(maps.length).toBeGreaterThan(0);
         maps.forEach(map => {
@@ -70,9 +75,9 @@ describe('KnowledgeMapService', () => {
         });
         done();
       });
-    });
+    }));
 
-    it('should filter by collective type', done => {
+    it('should filter by collective type', () => new Promise<void>(done => {
       service.getMapsByType('collective').subscribe(maps => {
         expect(maps.length).toBeGreaterThan(0);
         maps.forEach(map => {
@@ -80,80 +85,80 @@ describe('KnowledgeMapService', () => {
         });
         done();
       });
-    });
+    }));
 
-    it('should return empty array for person type (no demo person maps)', done => {
+    it('should return empty array for person type (no demo person maps)', () => new Promise<void>(done => {
       service.getMapsByType('person').subscribe(maps => {
         expect(maps.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('getMap', () => {
-    it('should return existing map', done => {
+    it('should return existing map', () => new Promise<void>(done => {
       service.getMap('map-domain-elohim-protocol').subscribe(map => {
         expect(map).toBeTruthy();
         expect(map!.id).toBe('map-domain-elohim-protocol');
         done();
       });
-    });
+    }));
 
-    it('should return null for non-existent map', done => {
+    it('should return null for non-existent map', () => new Promise<void>(done => {
       service.getMap('non-existent').subscribe(map => {
         expect(map).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getDomainMap', () => {
-    it('should return domain map with type narrowing', done => {
+    it('should return domain map with type narrowing', () => new Promise<void>(done => {
       service.getDomainMap('map-domain-elohim-protocol').subscribe(map => {
         expect(map).toBeTruthy();
         expect(map!.mapType).toBe('domain');
         expect(map!.contentGraphId).toBeTruthy();
         done();
       });
-    });
+    }));
 
-    it('should return null for non-domain map', done => {
+    it('should return null for non-domain map', () => new Promise<void>(done => {
       service.getDomainMap('map-collective-learners').subscribe(map => {
         expect(map).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getPersonMap', () => {
-    it('should return null for non-person map', done => {
+    it('should return null for non-person map', () => new Promise<void>(done => {
       service.getPersonMap('map-domain-elohim-protocol').subscribe(map => {
         expect(map).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('getCollectiveMap', () => {
-    it('should return collective map with type narrowing', done => {
+    it('should return collective map with type narrowing', () => new Promise<void>(done => {
       service.getCollectiveMap('map-collective-learners').subscribe(map => {
         expect(map).toBeTruthy();
         expect(map!.mapType).toBe('collective');
         expect(map!.members).toBeDefined();
         done();
       });
-    });
+    }));
 
-    it('should return null for non-collective map', done => {
+    it('should return null for non-collective map', () => new Promise<void>(done => {
       service.getCollectiveMap('map-domain-elohim-protocol').subscribe(map => {
         expect(map).toBeNull();
         done();
       });
-    });
+    }));
   });
 
   describe('createDomainMap', () => {
-    it('should create a new domain map', done => {
+    it('should create a new domain map', () => new Promise<void>(done => {
       service
         .createDomainMap({
           title: 'Test Domain Map',
@@ -167,9 +172,9 @@ describe('KnowledgeMapService', () => {
           expect(map.visibility).toBe('private');
           done();
         });
-    });
+    }));
 
-    it('should respect visibility parameter', done => {
+    it('should respect visibility parameter', () => new Promise<void>(done => {
       service
         .createDomainMap({
           title: 'Public Map',
@@ -180,11 +185,11 @@ describe('KnowledgeMapService', () => {
           expect(map.visibility).toBe('public');
           done();
         });
-    });
+    }));
   });
 
   describe('createPersonMap', () => {
-    it('should create a new person map', done => {
+    it('should create a new person map', () => new Promise<void>(done => {
       service
         .createPersonMap({
           title: 'Test Person Map',
@@ -200,11 +205,11 @@ describe('KnowledgeMapService', () => {
           expect(map.subject.subjectId).toBe('subject-123');
           done();
         });
-    });
+    }));
   });
 
   describe('createCollectiveMap', () => {
-    it('should create a new collective map', done => {
+    it('should create a new collective map', () => new Promise<void>(done => {
       service
         .createCollectiveMap({
           title: 'Test Collective Map',
@@ -219,9 +224,9 @@ describe('KnowledgeMapService', () => {
           expect(map.members[0].role).toBe('steward');
           done();
         });
-    });
+    }));
 
-    it('should set default governance', done => {
+    it('should set default governance', () => new Promise<void>(done => {
       service
         .createCollectiveMap({
           title: 'Test Map',
@@ -233,9 +238,9 @@ describe('KnowledgeMapService', () => {
           expect(map.governance.membershipControl).toBe('steward-only');
           done();
         });
-    });
+    }));
 
-    it('should respect custom governance', done => {
+    it('should respect custom governance', () => new Promise<void>(done => {
       service
         .createCollectiveMap({
           title: 'Test Map',
@@ -251,11 +256,11 @@ describe('KnowledgeMapService', () => {
           expect(map.governance.membershipControl).toBe('member-invite');
           done();
         });
-    });
+    }));
   });
 
   describe('addNode', () => {
-    it('should add node to map', done => {
+    it('should add node to map', () => new Promise<void>(done => {
       const nodeData = {
         category: 'test',
         title: 'Test Node',
@@ -270,9 +275,9 @@ describe('KnowledgeMapService', () => {
         expect(node.title).toBe('Test Node');
         done();
       });
-    });
+    }));
 
-    it('should return error for non-existent map', done => {
+    it('should return error for non-existent map', () => new Promise<void>(done => {
       service
         .addNode('non-existent', {
           category: 'test',
@@ -288,11 +293,11 @@ describe('KnowledgeMapService', () => {
             done();
           },
         });
-    });
+    }));
   });
 
   describe('updateNode', () => {
-    it('should update existing node', done => {
+    it('should update existing node', () => new Promise<void>(done => {
       // First get the map to find an existing node
       service.getDomainMap('map-domain-elohim-protocol').subscribe(map => {
         const existingNodeId = map!.nodes[0].id;
@@ -306,9 +311,9 @@ describe('KnowledgeMapService', () => {
             done();
           });
       });
-    });
+    }));
 
-    it('should return error for non-existent node', done => {
+    it('should return error for non-existent node', () => new Promise<void>(done => {
       service
         .updateNode('map-domain-elohim-protocol', 'non-existent-node', {
           title: 'Updated',
@@ -319,11 +324,11 @@ describe('KnowledgeMapService', () => {
             done();
           },
         });
-    });
+    }));
   });
 
   describe('removeNode', () => {
-    it('should remove node from map', done => {
+    it('should remove node from map', () => new Promise<void>(done => {
       // First add a node
       service
         .addNode('map-domain-elohim-protocol', {
@@ -345,11 +350,11 @@ describe('KnowledgeMapService', () => {
             });
           });
         });
-    });
+    }));
   });
 
   describe('updateMastery', () => {
-    it('should update mastery level for content node', done => {
+    it('should update mastery level for content node', () => new Promise<void>(done => {
       const level: MasteryLevel = 'apply';
       service.updateMastery('map-domain-elohim-protocol', 'test-content', level).subscribe(() => {
         service.getDomainMap('map-domain-elohim-protocol').subscribe(map => {
@@ -357,9 +362,9 @@ describe('KnowledgeMapService', () => {
           done();
         });
       });
-    });
+    }));
 
-    it('should return error for non-domain map', done => {
+    it('should return error for non-domain map', () => new Promise<void>(done => {
       const level: MasteryLevel = 'apply';
       service.updateMastery('map-collective-learners', 'test-content', level).subscribe({
         error: err => {
@@ -367,11 +372,11 @@ describe('KnowledgeMapService', () => {
           done();
         },
       });
-    });
+    }));
   });
 
   describe('requestConsent', () => {
-    it('should handle consent request for person map', done => {
+    it('should handle consent request for person map', () => new Promise<void>(done => {
       // First create a person map
       service
         .createPersonMap({
@@ -383,24 +388,24 @@ describe('KnowledgeMapService', () => {
         .subscribe(map => {
           service.requestConsent(map.id, 'shared-only').subscribe(() => {
             // Request should complete without error
-            expect(true).toBeTrue();
+            expect(true).toBe(true);
             done();
           });
         });
-    });
+    }));
 
-    it('should return error for non-person map', done => {
+    it('should return error for non-person map', () => new Promise<void>(done => {
       service.requestConsent('map-domain-elohim-protocol', 'shared-only').subscribe({
         error: err => {
           expect(err.code).toBe('NOT_FOUND');
           done();
         },
       });
-    });
+    }));
   });
 
   describe('grantConsent', () => {
-    it('should return error when not the subject', done => {
+    it('should return error when not the subject', () => new Promise<void>(done => {
       // Create a person map about someone else
       service
         .createPersonMap({
@@ -424,12 +429,12 @@ describe('KnowledgeMapService', () => {
               },
             });
         });
-    });
+    }));
   });
 
   describe('requestElohimSynthesis', () => {
-    it('should return suggestions for valid map', done => {
-      elohimServiceSpy.invoke.and.returnValue(
+    it('should return suggestions for valid map', () => new Promise<void>(done => {
+      elohimServiceSpy.invoke.mockReturnValue(
         of({
           requestId: 'test-request',
           elohimId: 'test-elohim',
@@ -451,10 +456,10 @@ describe('KnowledgeMapService', () => {
         expect(suggestions[0].operation).toBe('add-node');
         done();
       });
-    });
+    }));
 
-    it('should return empty array for rejected response', done => {
-      elohimServiceSpy.invoke.and.returnValue(
+    it('should return empty array for rejected response', () => new Promise<void>(done => {
+      elohimServiceSpy.invoke.mockReturnValue(
         of({
           requestId: 'test-request',
           elohimId: 'test-elohim',
@@ -473,20 +478,20 @@ describe('KnowledgeMapService', () => {
         expect(suggestions.length).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should return error for non-existent map', done => {
+    it('should return error for non-existent map', () => new Promise<void>(done => {
       service.requestElohimSynthesis('non-existent').subscribe({
         error: err => {
           expect(err.code).toBe('NOT_FOUND');
           done();
         },
       });
-    });
+    }));
   });
 
   describe('setCurrentAgent', () => {
-    it('should update current agent ID', done => {
+    it('should update current agent ID', () => new Promise<void>(done => {
       service.setCurrentAgent('new-agent');
       service.getMyMaps().subscribe(maps => {
         // Should no longer see demo-learner's maps
@@ -494,27 +499,27 @@ describe('KnowledgeMapService', () => {
         expect(demoLearnerMaps.length).toBe(0);
         done();
       });
-    });
+    }));
   });
 
   describe('visibility and access control', () => {
-    it('should allow owner to view private map', done => {
+    it('should allow owner to view private map', () => new Promise<void>(done => {
       service.getMap('map-domain-elohim-protocol').subscribe(map => {
         expect(map).toBeTruthy();
         done();
       });
-    });
+    }));
 
-    it('should allow members to view collective map', done => {
+    it('should allow members to view collective map', () => new Promise<void>(done => {
       service.getMap('map-collective-learners').subscribe(map => {
         expect(map).toBeTruthy();
         done();
       });
-    });
+    }));
   });
 
   describe('affinity calculation', () => {
-    it('should recalculate affinity when adding node', done => {
+    it('should recalculate affinity when adding node', () => new Promise<void>(done => {
       service.getDomainMap('map-domain-elohim-protocol').subscribe(initialMap => {
         const initialAffinity = initialMap!.overallAffinity;
 
@@ -535,9 +540,10 @@ describe('KnowledgeMapService', () => {
             });
           });
       });
-    });
+    }));
   });
 });
 
 // Import tap operator for getMyMaps test
 import { tap } from 'rxjs/operators';
+import { vi, Mock } from 'vitest';

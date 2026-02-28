@@ -6,12 +6,13 @@ import { HumanConsentService } from '@app/elohim/services/human-consent.service'
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { HumanConsent, IntimacyLevel, ConsentState } from '@app/elohim/models/human-consent.model';
 import { NegotiationStatus, BridgingStrategy } from '../models/path-negotiation.model';
+import { vi } from 'vitest';
 
 describe('PathNegotiationService', () => {
   let service: PathNegotiationService;
-  let sourceChainSpy: jasmine.SpyObj<LocalSourceChainService>;
-  let consentServiceSpy: jasmine.SpyObj<HumanConsentService>;
-  let affinityServiceSpy: jasmine.SpyObj<AffinityTrackingService>;
+  let sourceChainSpy: any;
+  let consentServiceSpy: any;
+  let affinityServiceSpy: any;
 
   const AGENT_ID = 'test-agent-123';
   const OTHER_AGENT_ID = 'other-agent-456';
@@ -30,19 +31,23 @@ describe('PathNegotiationService', () => {
   };
 
   beforeEach(() => {
-    sourceChainSpy = jasmine.createSpyObj('LocalSourceChainService', [
-      'isInitialized',
-      'getAgentId',
-      'getEntriesByType',
-      'createEntry',
-    ]);
-    consentServiceSpy = jasmine.createSpyObj('HumanConsentService', ['getConsentWith']);
-    affinityServiceSpy = jasmine.createSpyObj('AffinityTrackingService', ['getAffinities']);
+    sourceChainSpy = {
+    isInitialized: vi.fn(),
+    getAgentId: vi.fn(),
+    getEntriesByType: vi.fn(),
+    createEntry: vi.fn(),
+  };
+    consentServiceSpy = {
+    getConsentWith: vi.fn(),
+  };
+    affinityServiceSpy = {
+    getAffinities: vi.fn(),
+  };
 
-    sourceChainSpy.isInitialized.and.returnValue(true);
-    sourceChainSpy.getAgentId.and.returnValue(AGENT_ID);
-    sourceChainSpy.getEntriesByType.and.returnValue([]);
-    sourceChainSpy.createEntry.and.callFake((type, content) => ({
+    sourceChainSpy.isInitialized.mockReturnValue(true);
+    sourceChainSpy.getAgentId.mockReturnValue(AGENT_ID);
+    sourceChainSpy.getEntriesByType.mockReturnValue([]);
+    sourceChainSpy.createEntry.mockImplementation((type, content) => ({
       entryHash: 'test-hash',
       authorAgent: AGENT_ID,
       entryType: type,
@@ -64,8 +69,8 @@ describe('PathNegotiationService', () => {
   });
 
   describe('proposeNegotiation', () => {
-    it('should create a negotiation with intimate consent', done => {
-      consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
+    it('should create a negotiation with intimate consent', () => new Promise<void>(done => {
+      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
       service
         .proposeNegotiation({
@@ -84,9 +89,9 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
 
-    it('should error when negotiating with self', done => {
+    it('should error when negotiating with self', () => new Promise<void>(done => {
       service
         .proposeNegotiation({
           participantId: AGENT_ID,
@@ -99,10 +104,10 @@ describe('PathNegotiationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should error when no consent exists', done => {
-      consentServiceSpy.getConsentWith.and.returnValue(of(null));
+    it('should error when no consent exists', () => new Promise<void>(done => {
+      consentServiceSpy.getConsentWith.mockReturnValue(of(null));
 
       service
         .proposeNegotiation({
@@ -116,14 +121,14 @@ describe('PathNegotiationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should error when consent is not at intimate level', done => {
+    it('should error when consent is not at intimate level', () => new Promise<void>(done => {
       const connectionConsent = {
         ...mockIntimateConsent,
         intimacyLevel: 'connection' as IntimacyLevel,
       };
-      consentServiceSpy.getConsentWith.and.returnValue(of(connectionConsent));
+      consentServiceSpy.getConsentWith.mockReturnValue(of(connectionConsent));
 
       service
         .proposeNegotiation({
@@ -137,14 +142,14 @@ describe('PathNegotiationService', () => {
             done();
           },
         });
-    });
+    }));
 
-    it('should error when consent is not accepted', done => {
+    it('should error when consent is not accepted', () => new Promise<void>(done => {
       const pendingConsent = {
         ...mockIntimateConsent,
         consentState: 'pending' as ConsentState,
       };
-      consentServiceSpy.getConsentWith.and.returnValue(of(pendingConsent));
+      consentServiceSpy.getConsentWith.mockReturnValue(of(pendingConsent));
 
       service
         .proposeNegotiation({
@@ -158,13 +163,13 @@ describe('PathNegotiationService', () => {
             done();
           },
         });
-    });
+    }));
   });
 
   describe('acceptNegotiation', () => {
-    it('should accept a proposed negotiation', done => {
+    it('should accept a proposed negotiation', () => new Promise<void>(done => {
       // First create a negotiation
-      consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
+      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
       service
         .proposeNegotiation({
@@ -174,7 +179,7 @@ describe('PathNegotiationService', () => {
         .subscribe({
           next: negotiation => {
             // Switch agent to participant
-            sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
+            sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
 
             service.acceptNegotiation(negotiation.id).subscribe({
               next: accepted => {
@@ -187,9 +192,9 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
 
-    it('should error when negotiation not found', done => {
+    it('should error when negotiation not found', () => new Promise<void>(done => {
       service.acceptNegotiation('nonexistent').subscribe({
         next: () => done.fail('Should have errored'),
         error: err => {
@@ -197,12 +202,12 @@ describe('PathNegotiationService', () => {
           done();
         },
       });
-    });
+    }));
   });
 
   describe('declineNegotiation', () => {
-    it('should decline a proposed negotiation', done => {
-      consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
+    it('should decline a proposed negotiation', () => new Promise<void>(done => {
+      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
       service
         .proposeNegotiation({
@@ -212,7 +217,7 @@ describe('PathNegotiationService', () => {
         .subscribe({
           next: negotiation => {
             // Switch agent to participant
-            sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
+            sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
 
             service.declineNegotiation(negotiation.id, 'Not ready').subscribe({
               next: () => {
@@ -226,11 +231,11 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
   });
 
   describe('generateBridgingPath', () => {
-    it('should generate a path structure', done => {
+    it('should generate a path structure', () => new Promise<void>(done => {
       // Create mock negotiation in negotiating state
       const mockNegotiation = {
         id: 'neg-123',
@@ -261,9 +266,9 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should generate complementary path with teaching concepts', done => {
+    it('should generate complementary path with teaching concepts', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -294,9 +299,9 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should error when negotiation not in negotiating state', done => {
+    it('should error when negotiation not in negotiating state', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -321,11 +326,11 @@ describe('PathNegotiationService', () => {
           done();
         },
       });
-    });
+    }));
   });
 
   describe('acceptGeneratedPath', () => {
-    it('should accept path and finalize negotiation', done => {
+    it('should accept path and finalize negotiation', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -370,11 +375,11 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
   });
 
   describe('getMyNegotiations', () => {
-    it('should return all negotiations for current agent', done => {
+    it('should return all negotiations for current agent', () => new Promise<void>(done => {
       const negotiations = [
         {
           id: 'neg-1',
@@ -415,9 +420,9 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should filter by status', done => {
+    it('should filter by status', () => new Promise<void>(done => {
       const negotiations = [
         {
           id: 'neg-1',
@@ -459,11 +464,11 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('sendMessage', () => {
-    it('should add a message to active negotiation', done => {
+    it('should add a message to active negotiation', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -490,9 +495,9 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should error on resolved negotiation', done => {
+    it('should error on resolved negotiation', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -517,7 +522,7 @@ describe('PathNegotiationService', () => {
           done();
         },
       });
-    });
+    }));
   });
 
   describe('initialization and loadNegotiations', () => {
@@ -538,7 +543,7 @@ describe('PathNegotiationService', () => {
         timestamp: new Date().toISOString(),
       };
 
-      sourceChainSpy.getEntriesByType.and.returnValue([mockNegotiationEntry]);
+      sourceChainSpy.getEntriesByType.mockReturnValue([mockNegotiationEntry]);
 
       const newService = new PathNegotiationService(
         sourceChainSpy,
@@ -554,7 +559,7 @@ describe('PathNegotiationService', () => {
     });
 
     it('should not load negotiations when source chain not initialized', () => {
-      sourceChainSpy.isInitialized.and.returnValue(false);
+      sourceChainSpy.isInitialized.mockReturnValue(false);
 
       const newService = new PathNegotiationService(
         sourceChainSpy,
@@ -600,7 +605,7 @@ describe('PathNegotiationService', () => {
         },
       ];
 
-      sourceChainSpy.getEntriesByType.and.returnValue(mockEntries);
+      sourceChainSpy.getEntriesByType.mockReturnValue(mockEntries);
 
       const newService = new PathNegotiationService(
         sourceChainSpy,
@@ -617,7 +622,7 @@ describe('PathNegotiationService', () => {
   });
 
   describe('analyzeSharedAffinities', () => {
-    it('should return placeholder affinity analysis', done => {
+    it('should return placeholder affinity analysis', () => new Promise<void>(done => {
       service.analyzeSharedAffinities('human-1', 'human-2').subscribe(analysis => {
         expect(analysis.human1Id).toBe('human-1');
         expect(analysis.human2Id).toBe('human-2');
@@ -629,7 +634,7 @@ describe('PathNegotiationService', () => {
         expect(analysis.recommendedStrategies).toContain('maximum_overlap');
         done();
       });
-    });
+    }));
   });
 
   describe('generateBridgingPath with different strategies', () => {
@@ -657,35 +662,35 @@ describe('PathNegotiationService', () => {
       (service as any).negotiationsSubject.next([mockNegotiation]);
     });
 
-    it('should generate shortest_path strategy', done => {
+    it('should generate shortest_path strategy', () => new Promise<void>(done => {
       service.generateBridgingPath('neg-123', 'shortest_path').subscribe(proposedPath => {
         expect(proposedPath.title).toBe('Quick Connection Path');
         expect(proposedPath.conceptIds.length).toBeLessThanOrEqual(5);
         expect(proposedPath.stats.sharedConcepts).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should generate exploration strategy', done => {
+    it('should generate exploration strategy', () => new Promise<void>(done => {
       service.generateBridgingPath('neg-123', 'exploration').subscribe(proposedPath => {
         expect(proposedPath.title).toBe('Shared Adventure Path');
         // Should have a mix of shared and divergent
         expect(proposedPath.conceptIds.length).toBeGreaterThan(0);
         done();
       });
-    });
+    }));
 
-    it('should fallback to default when unknown strategy', done => {
+    it('should fallback to default when unknown strategy', () => new Promise<void>(done => {
       service.generateBridgingPath('neg-123', 'unknown-strategy' as any).subscribe(proposedPath => {
         expect(proposedPath.title).toBe('Love Map Path');
         expect(proposedPath.conceptIds).toEqual(mockNegotiation.sharedAffinityNodes);
         done();
       });
-    });
+    }));
   });
 
   describe('acceptGeneratedPath with rejection', () => {
-    it('should request changes when accept is false', done => {
+    it('should request changes when accept is false', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -733,9 +738,9 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
 
-    it('should error when no proposed path exists', done => {
+    it('should error when no proposed path exists', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -766,11 +771,11 @@ describe('PathNegotiationService', () => {
             done();
           },
         });
-    });
+    }));
   });
 
   describe('getPendingNegotiations', () => {
-    it('should return negotiations where current user is participant and status is proposed', done => {
+    it('should return negotiations where current user is participant and status is proposed', () => new Promise<void>(done => {
       const negotiations = [
         {
           id: 'neg-1',
@@ -826,11 +831,11 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getNegotiation', () => {
-    it('should return specific negotiation by ID', done => {
+    it('should return specific negotiation by ID', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -856,9 +861,9 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should return null for non-existent ID', done => {
+    it('should return null for non-existent ID', () => new Promise<void>(done => {
       service.getNegotiation('nonexistent').subscribe({
         next: negotiation => {
           expect(negotiation).toBeNull();
@@ -866,12 +871,12 @@ describe('PathNegotiationService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('acceptNegotiation error cases', () => {
-    it('should error when only initiator tries to accept', done => {
-      consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
+    it('should error when only initiator tries to accept', () => new Promise<void>(done => {
+      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
       service
         .proposeNegotiation({
@@ -891,9 +896,9 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
 
-    it('should error when negotiation is not in proposed state', done => {
+    it('should error when negotiation is not in proposed state', () => new Promise<void>(done => {
       const mockNegotiation = {
         id: 'neg-123',
         initiatorId: AGENT_ID,
@@ -910,7 +915,7 @@ describe('PathNegotiationService', () => {
       };
 
       (service as any).negotiationsSubject.next([mockNegotiation]);
-      sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
+      sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
 
       service.acceptNegotiation('neg-123').subscribe({
         next: () => done.fail('Should have errored'),
@@ -919,10 +924,10 @@ describe('PathNegotiationService', () => {
           done();
         },
       });
-    });
+    }));
 
-    it('should apply participant strategy preference when accepting', done => {
-      consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
+    it('should apply participant strategy preference when accepting', () => new Promise<void>(done => {
+      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
       service
         .proposeNegotiation({
@@ -932,7 +937,7 @@ describe('PathNegotiationService', () => {
         })
         .subscribe({
           next: negotiation => {
-            sourceChainSpy.getAgentId.and.returnValue(OTHER_AGENT_ID);
+            sourceChainSpy.getAgentId.mockReturnValue(OTHER_AGENT_ID);
 
             service
               .acceptNegotiation(negotiation.id, {
@@ -951,12 +956,12 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
   });
 
   describe('proposeNegotiation with active negotiation check', () => {
-    it('should error when active negotiation already exists with participant', done => {
-      consentServiceSpy.getConsentWith.and.returnValue(of(mockIntimateConsent));
+    it('should error when active negotiation already exists with participant', () => new Promise<void>(done => {
+      consentServiceSpy.getConsentWith.mockReturnValue(of(mockIntimateConsent));
 
       // First proposal
       service
@@ -982,12 +987,12 @@ describe('PathNegotiationService', () => {
           },
           error: done.fail,
         });
-    });
+    }));
   });
 
   describe('error handling for uninitialized source chain', () => {
-    it('should throw when calling getCurrentAgentId with uninitialized source chain', done => {
-      sourceChainSpy.isInitialized.and.returnValue(false);
+    it('should throw when calling getCurrentAgentId with uninitialized source chain', () => new Promise<void>(done => {
+      sourceChainSpy.isInitialized.mockReturnValue(false);
 
       try {
         (service as any).getCurrentAgentId();
@@ -996,6 +1001,6 @@ describe('PathNegotiationService', () => {
         expect(err.message).toContain('Source chain not initialized');
         done();
       }
-    });
+    }));
   });
 });

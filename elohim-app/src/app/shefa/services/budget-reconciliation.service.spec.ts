@@ -37,7 +37,7 @@ describe('BudgetReconciliationService', () => {
 
       const result = await service.reconcileBudget(staged, 'event-123');
 
-      expect(result.reconciled).toBeFalse();
+      expect(result.reconciled).toBe(false);
       expect(result.budgetId).toBe('');
       expect(result.newHealthStatus).toBe('healthy');
     });
@@ -50,7 +50,7 @@ describe('BudgetReconciliationService', () => {
 
       const result = await service.reconcileBudget(staged, 'event-123');
 
-      expect(result.reconciled).toBeFalse();
+      expect(result.reconciled).toBe(false);
     });
 
     it('should return not reconciled when budgetCategoryId missing', async () => {
@@ -61,7 +61,7 @@ describe('BudgetReconciliationService', () => {
 
       const result = await service.reconcileBudget(staged, 'event-123');
 
-      expect(result.reconciled).toBeFalse();
+      expect(result.reconciled).toBe(false);
     });
 
     it('should reconcile transaction with valid budget linkage', async () => {
@@ -74,7 +74,7 @@ describe('BudgetReconciliationService', () => {
 
       const result = await service.reconcileBudget(staged, 'event-123');
 
-      expect(result.reconciled).toBeTrue();
+      expect(result.reconciled).toBe(true);
       expect(result.budgetId).toBe('budget-1');
       expect(result.budgetCategoryId).toBe('cat-1');
       expect(result.amountAdded).toBe(100);
@@ -89,9 +89,7 @@ describe('BudgetReconciliationService', () => {
         stewardId: 'steward-1',
       });
 
-      await expectAsync(service.reconcileBudget(staged, 'event-123')).toBeRejectedWithError(
-        /Budget category non-existent-category not found/
-      );
+      await await expect(service.reconcileBudget(staged, 'event-123')).rejects.toThrow(/Budget category non-existent-category not found/);
     });
 
     it('should calculate variance correctly', async () => {
@@ -202,8 +200,8 @@ describe('BudgetReconciliationService', () => {
       const results = await service.reconcileMultiple(transactions);
 
       expect(results.length).toBe(2);
-      expect(results[0].reconciled).toBeTrue();
-      expect(results[1].reconciled).toBeTrue();
+      expect(results[0].reconciled).toBe(true);
+      expect(results[1].reconciled).toBe(true);
     });
 
     it('should continue processing after individual transaction failure', async () => {
@@ -233,7 +231,7 @@ describe('BudgetReconciliationService', () => {
 
       // Only the successful one should be in results
       expect(results.length).toBe(1);
-      expect(results[0].reconciled).toBeTrue();
+      expect(results[0].reconciled).toBe(true);
     });
 
     it('should return empty array for empty input', async () => {
@@ -257,7 +255,7 @@ describe('BudgetReconciliationService', () => {
       const results = await service.reconcileMultiple(transactions);
 
       expect(results.length).toBe(1);
-      expect(results[0].reconciled).toBeFalse();
+      expect(results[0].reconciled).toBe(false);
     });
   });
 
@@ -361,7 +359,7 @@ describe('BudgetReconciliationService', () => {
 
       const result = await service.reconcileBudget(staged, 'event-123');
 
-      expect(result.reconciled).toBeTrue();
+      expect(result.reconciled).toBe(true);
       expect(result.newHealthStatus).toBe('critical');
     });
 
@@ -375,7 +373,7 @@ describe('BudgetReconciliationService', () => {
 
       const result = await service.reconcileBudget(staged, 'event-123');
 
-      expect(result.reconciled).toBeTrue();
+      expect(result.reconciled).toBe(true);
       expect(result.amountAdded).toBe(-100);
     });
 

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Session Human Service Tests
  */
@@ -13,14 +14,14 @@ describe('SessionHumanService', () => {
   beforeEach(() => {
     localStorageMock = {};
 
-    spyOn(localStorage, 'getItem').and.callFake((key: string) => localStorageMock[key] || null);
-    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => localStorageMock[key] || null);
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
-    spyOn(localStorage, 'removeItem').and.callFake((key: string) => {
+    vi.spyOn(localStorage, 'removeItem').mockImplementation((key: string) => {
       delete localStorageMock[key];
     });
-    spyOn(localStorage, 'key').and.callFake((index: number) => {
+    vi.spyOn(localStorage, 'key').mockImplementation((index: number) => {
       return Object.keys(localStorageMock)[index] || null;
     });
     // Note: Can't mock localStorage.length in browser environment
@@ -447,7 +448,7 @@ describe('SessionHumanService', () => {
   });
 
   describe('session observable', () => {
-    it('should emit session changes', done => {
+    it('should emit session changes', () => new Promise<void>(done => {
       const emissions: (SessionHuman | null)[] = [];
 
       service.session$.subscribe(session => {
@@ -459,7 +460,7 @@ describe('SessionHumanService', () => {
       });
 
       service.setDisplayName('Updated Name');
-    });
+    }));
   });
 
   describe('touch', () => {

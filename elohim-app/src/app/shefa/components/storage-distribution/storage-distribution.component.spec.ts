@@ -7,15 +7,18 @@ import { of } from 'rxjs';
 
 import { StorageDistributionComponent } from './storage-distribution.component';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
+import { vi } from 'vitest';
 
 describe('StorageDistributionComponent', () => {
   let component: StorageDistributionComponent;
   let fixture: ComponentFixture<StorageDistributionComponent>;
-  let mockShefaCompute: jasmine.SpyObj<ShefaComputeService>;
+  let mockShefaCompute: any;
 
   beforeEach(async () => {
-    mockShefaCompute = jasmine.createSpyObj('ShefaComputeService', ['getStorageContentDistribution']);
-    mockShefaCompute.getStorageContentDistribution.and.returnValue(
+    mockShefaCompute = {
+    getStorageContentDistribution: vi.fn(),
+  };
+    mockShefaCompute.getStorageContentDistribution.mockReturnValue(
       of({
         byContentType: [],
         byReachLevel: [],

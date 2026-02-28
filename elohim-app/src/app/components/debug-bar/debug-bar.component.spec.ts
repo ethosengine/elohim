@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -30,8 +31,8 @@ describe('DebugBarComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should show debug bar for staging environment', done => {
-    spyOn(configService, 'getConfig').and.returnValue(
+  it('should show debug bar for staging environment', () => new Promise<void>(done => {
+    vi.spyOn(configService, 'getConfig').mockReturnValue(
       of({
         logLevel: 'debug',
         environment: 'staging',
@@ -45,10 +46,10 @@ describe('DebugBarComponent', () => {
       expect(component.environmentLabel).toBe('STAGING');
       done();
     });
-  });
+  }));
 
-  it('should show debug bar for alpha environment', done => {
-    spyOn(configService, 'getConfig').and.returnValue(
+  it('should show debug bar for alpha environment', () => new Promise<void>(done => {
+    vi.spyOn(configService, 'getConfig').mockReturnValue(
       of({
         logLevel: 'debug',
         environment: 'alpha',
@@ -62,10 +63,10 @@ describe('DebugBarComponent', () => {
       expect(component.environmentLabel).toBe('ALPHA');
       done();
     });
-  });
+  }));
 
-  it('should not show debug bar for production environment', done => {
-    spyOn(configService, 'getConfig').and.returnValue(
+  it('should not show debug bar for production environment', () => new Promise<void>(done => {
+    vi.spyOn(configService, 'getConfig').mockReturnValue(
       of({
         logLevel: 'error',
         environment: 'production',
@@ -78,5 +79,5 @@ describe('DebugBarComponent', () => {
       expect(component.showDebugBar).toBe(false);
       done();
     });
-  });
+  }));
 });

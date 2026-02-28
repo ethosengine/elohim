@@ -10,16 +10,17 @@ import { TestBed } from '@angular/core/testing';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 import { EventService, LamadEventTypes, REAActions } from './event.service';
+import { vi } from 'vitest';
 
 describe('EventService', () => {
   let service: EventService;
-  let storageApiMock: jasmine.SpyObj<StorageApiService>;
+  let storageApiMock: any;
 
   beforeEach(() => {
-    storageApiMock = jasmine.createSpyObj('StorageApiService', [
-      'createEconomicEvent',
-      'getEconomicEvents',
-    ]);
+    storageApiMock = {
+    createEconomicEvent: vi.fn(),
+    getEconomicEvents: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [

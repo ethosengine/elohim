@@ -11,15 +11,16 @@ import { SessionHumanService } from '@app/imagodei/services/session-human.servic
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { MasteryStatsService } from '../../services/mastery-stats.service';
 import { ProfilePageComponent } from './profile-page.component';
+import { vi, Mock } from 'vitest';
 
 describe('ProfilePageComponent', () => {
   let component: ProfilePageComponent;
   let fixture: ComponentFixture<ProfilePageComponent>;
-  let profileServiceSpy: jasmine.SpyObj<ProfileService>;
-  let identityServiceSpy: jasmine.SpyObj<IdentityService>;
-  let sessionHumanSpy: jasmine.SpyObj<SessionHumanService>;
-  let masteryServiceSpy: jasmine.SpyObj<ContentMasteryService>;
-  let masteryStatsSpy: jasmine.SpyObj<MasteryStatsService>;
+  let profileServiceSpy: any;
+  let identityServiceSpy: any;
+  let sessionHumanSpy: any;
+  let masteryServiceSpy: any;
+  let masteryStatsSpy: any;
   let router: Router;
 
   beforeEach(async () => {
@@ -34,45 +35,39 @@ describe('ProfilePageComponent', () => {
       createdAt: new Date().toISOString(),
     });
 
-    profileServiceSpy = jasmine.createSpyObj('ProfileService', [
-      'getResumePoint',
-      'getPathsOverview',
-      'getTimeline',
-    ]);
+    profileServiceSpy = {
+    getResumePoint: vi.fn(),
+    getPathsOverview: vi.fn(),
+    getTimeline: vi.fn(),
+  };
     // Mock ProfileService methods with observables
-    profileServiceSpy.getResumePoint.and.returnValue(of(null));
-    profileServiceSpy.getPathsOverview.and.returnValue(
+    profileServiceSpy.getResumePoint.mockReturnValue(of(null));
+    profileServiceSpy.getPathsOverview.mockReturnValue(
       of({ inProgress: [], completed: [], suggested: [] })
     );
-    profileServiceSpy.getTimeline.and.returnValue(of([]));
+    profileServiceSpy.getTimeline.mockReturnValue(of([]));
 
-    identityServiceSpy = jasmine.createSpyObj(
-      'IdentityService',
-      ['updateProfile'],
-      {
-        mode: signal('session'),
-        currentHuman: signal(null),
-        profile: signal(null),
-        displayName: signal('Test User'),
-      }
+    identityServiceSpy = {
+    updateProfile']: vi.fn(),
+    {
+        mode: signal('session'): vi.fn(),
+    currentHuman: signal(null): vi.fn(),
+    profile: signal(null): vi.fn(),
+    displayName: signal('Test User'): vi.fn(),
+    }
     );
 
-    sessionHumanSpy = jasmine.createSpyObj(
-      'SessionHumanService',
-      ['getAllPathProgress', 'getActivityHistory'],
-      {
-        session$: mockSession$,
-      }
-    );
+    sessionHumanSpy = { getAllPathProgress: vi.fn(): vi.fn(), getActivityHistory: vi.fn() };
     // Mock SessionHumanService methods
-    sessionHumanSpy.getAllPathProgress.and.returnValue([]);
-    sessionHumanSpy.getActivityHistory.and.returnValue([]);
+    sessionHumanSpy.getAllPathProgress.mockReturnValue([: vi.fn(),
+  };
+    sessionHumanSpy.getActivityHistory.mockReturnValue([]);
 
-    masteryServiceSpy = jasmine.createSpyObj('ContentMasteryService', [
-      'getMasteryStats',
-    ]);
+    masteryServiceSpy = {
+    getMasteryStats: vi.fn(),
+  };
     // Mock ContentMasteryService with realistic mastery stats
-    masteryServiceSpy.getMasteryStats.and.returnValue(
+    masteryServiceSpy.getMasteryStats.mockReturnValue(
       of({
         humanId: 'test-session-123',
         computedAt: new Date().toISOString(),
@@ -95,24 +90,32 @@ describe('ProfilePageComponent', () => {
       })
     );
 
-    masteryStatsSpy = jasmine.createSpyObj('MasteryStatsService', ['recordDailyEngagement'], {
-      learnerProfile$: new BehaviorSubject(null),
+    masteryStatsSpy = {
+    recordDailyEngagement']: vi.fn(),
+    {
+      learnerProfile$: new BehaviorSubject(null): vi.fn(),
     });
 
     await TestBed.configureTestingModule({
-      imports: [ProfilePageComponent],
-      providers: [
-        { provide: ProfileService, useValue: profileServiceSpy },
-        { provide: IdentityService, useValue: identityServiceSpy },
-        { provide: SessionHumanService, useValue: sessionHumanSpy },
-        { provide: ContentMasteryService, useValue: masteryServiceSpy },
-        { provide: MasteryStatsService, useValue: masteryStatsSpy },
-        provideRouter([]),
+      imports: [ProfilePageComponent]: vi.fn(),
+    providers: [
+        { provide: ProfileService: vi.fn(),
+    useValue: profileServiceSpy }: vi.fn(),
+    { provide: IdentityService: vi.fn(),
+    useValue: identityServiceSpy }: vi.fn(),
+    { provide: SessionHumanService: vi.fn(),
+    useValue: sessionHumanSpy }: vi.fn(),
+    { provide: ContentMasteryService: vi.fn(),
+    useValue: masteryServiceSpy }: vi.fn(),
+    { provide: MasteryStatsService: vi.fn(),
+    useValue: masteryStatsSpy }: vi.fn(),
+    provideRouter([: vi.fn(),
+  },
       ],
     }).compileComponents();
 
     router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
 
     fixture = TestBed.createComponent(ProfilePageComponent);
     component = fixture.componentInstance;

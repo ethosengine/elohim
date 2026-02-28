@@ -67,7 +67,7 @@ describe('IframeRendererComponent', () => {
       // Empty URL results in error, not a safeUrl
       expect(component.safeUrl).toBeNull();
       expect(component.errorMessage).toBe('No content URL available');
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
     });
 
     it('should handle non-string content with error message', () => {
@@ -140,7 +140,7 @@ describe('IframeRendererComponent', () => {
       tick();
 
       const iframe = fixture.nativeElement.querySelector('iframe');
-      expect(iframe.hasAttribute('allowfullscreen')).toBeTrue();
+      expect(iframe.hasAttribute('allowfullscreen')).toBe(true);
     }));
   });
 
@@ -255,7 +255,7 @@ describe('IframeRendererComponent', () => {
         node: new SimpleChange(null, component.node, true),
       });
 
-      expect(component.loading).toBeTrue();
+      expect(component.loading).toBe(true);
     });
 
     it('should exit loading state on iframe load', () => {
@@ -266,7 +266,7 @@ describe('IframeRendererComponent', () => {
 
       component.onIframeLoad();
 
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
     });
 
     it('should reset loading state when node changes', () => {
@@ -275,14 +275,14 @@ describe('IframeRendererComponent', () => {
         node: new SimpleChange(null, component.node, true),
       });
       component.onIframeLoad();
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
 
       component.node = createContentNode('https://second.com');
       component.ngOnChanges({
         node: new SimpleChange(createContentNode('https://first.com'), component.node, false),
       });
 
-      expect(component.loading).toBeTrue();
+      expect(component.loading).toBe(true);
     });
   });
 
@@ -296,7 +296,7 @@ describe('IframeRendererComponent', () => {
       component.onIframeError();
 
       expect(component.errorMessage).toBe('Failed to load application');
-      expect(component.loading).toBeFalse();
+      expect(component.loading).toBe(false);
     });
 
     it('should clear error message when node changes', () => {

@@ -4,17 +4,24 @@ import { HolochainClientService } from '@app/elohim/services/holochain-client.se
 import { BlobCacheTiersService } from './blob-cache-tiers.service';
 import { BlobManagerService } from './blob-manager.service';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('BlobBootstrapService', () => {
   let service: BlobBootstrapService;
-  let holochainSpy: jasmine.SpyObj<HolochainClientService>;
-  let blobManagerSpy: jasmine.SpyObj<BlobManagerService>;
-  let blobCacheSpy: jasmine.SpyObj<BlobCacheTiersService>;
+  let holochainSpy: any;
+  let blobManagerSpy: any;
+  let blobCacheSpy: any;
 
   beforeEach(() => {
-    holochainSpy = jasmine.createSpyObj('HolochainClientService', ['isConnected']);
-    blobManagerSpy = jasmine.createSpyObj('BlobManagerService', ['fetch']);
-    blobCacheSpy = jasmine.createSpyObj('BlobCacheTiersService', ['init']);
+    holochainSpy = {
+      isConnected: vi.fn(),
+    };
+    blobManagerSpy = {
+      fetch: vi.fn(),
+    };
+    blobCacheSpy = {
+      init: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [

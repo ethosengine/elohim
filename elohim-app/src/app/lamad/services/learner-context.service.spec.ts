@@ -4,21 +4,24 @@ import { LearnerContextService } from './learner-context.service';
 import { ContentMasteryService } from './content-mastery.service';
 import { PathAdaptationService } from '../quiz-engine/services/path-adaptation.service';
 import { DiscoveryAttestationService } from '../quiz-engine/services/discovery-attestation.service';
+import { vi, Mock } from 'vitest';
 
 describe('LearnerContextService', () => {
   let service: LearnerContextService;
-  let contentMasterySpy: jasmine.SpyObj<ContentMasteryService>;
-  let pathAdaptationSpy: jasmine.SpyObj<PathAdaptationService>;
-  let discoveryAttestationSpy: jasmine.SpyObj<DiscoveryAttestationService>;
+  let contentMasterySpy: any;
+  let pathAdaptationSpy: any;
+  let discoveryAttestationSpy: any;
 
   beforeEach(() => {
-    const contentMasterySpyObj = jasmine.createSpyObj('ContentMasteryService', [
-      'getMasteryLevelSync',
-    ]);
-    const pathAdaptationSpyObj = jasmine.createSpyObj('PathAdaptationService', ['getState']);
-    const discoveryAttestationSpyObj = jasmine.createSpyObj('DiscoveryAttestationService', [
-      'getDiscoveryProfile',
-    ]);
+    const contentMasterySpyObj = {
+      getMasteryLevelSync: vi.fn(),
+    };
+    const pathAdaptationSpyObj = {
+      getState: vi.fn(),
+    };
+    const discoveryAttestationSpyObj = {
+      getDiscoveryProfile: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -32,17 +35,17 @@ describe('LearnerContextService', () => {
     service = TestBed.inject(LearnerContextService);
     contentMasterySpy = TestBed.inject(
       ContentMasteryService
-    ) as jasmine.SpyObj<ContentMasteryService>;
+    ) as { [K in keyof ContentMasteryService]?: Mock };
     pathAdaptationSpy = TestBed.inject(
       PathAdaptationService
-    ) as jasmine.SpyObj<PathAdaptationService>;
+    ) as { [K in keyof PathAdaptationService]?: Mock };
     discoveryAttestationSpy = TestBed.inject(
       DiscoveryAttestationService
-    ) as jasmine.SpyObj<DiscoveryAttestationService>;
+    ) as { [K in keyof DiscoveryAttestationService]?: Mock };
 
     // Defaults
-    contentMasterySpy.getMasteryLevelSync.and.returnValue('not_started');
-    pathAdaptationSpy.getState.and.returnValue({
+    contentMasterySpy.getMasteryLevelSync.mockReturnValue('not_started');
+    pathAdaptationSpy.getState.mockReturnValue({
       pathId: 'test-path',
       humanId: 'test-human',
       gates: new Map(),
@@ -51,7 +54,7 @@ describe('LearnerContextService', () => {
       skippedSections: new Set(),
       updatedAt: new Date().toISOString(),
     });
-    discoveryAttestationSpy.getDiscoveryProfile.and.returnValue(null);
+    discoveryAttestationSpy.getDiscoveryProfile.mockReturnValue(null);
   });
 
   it('should be created', () => {
@@ -64,32 +67,32 @@ describe('LearnerContextService', () => {
 
   describe('isMasteryUnlocked', () => {
     it('should return false for not_started mastery', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('not_started');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('not_started');
       expect(service.isMasteryUnlocked('content-1')).toBe(false);
     });
 
     it('should return false for seen mastery (below threshold)', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('seen');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('seen');
       expect(service.isMasteryUnlocked('content-1')).toBe(false);
     });
 
     it('should return false for remember mastery (below threshold)', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('remember');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('remember');
       expect(service.isMasteryUnlocked('content-1')).toBe(false);
     });
 
     it('should return true for understand mastery (at threshold)', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('understand');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('understand');
       expect(service.isMasteryUnlocked('content-1')).toBe(true);
     });
 
     it('should return true for apply mastery (above threshold)', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('apply');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('apply');
       expect(service.isMasteryUnlocked('content-1')).toBe(true);
     });
 
     it('should return true for create mastery (highest level)', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('create');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('create');
       expect(service.isMasteryUnlocked('content-1')).toBe(true);
     });
 
@@ -108,12 +111,12 @@ describe('LearnerContextService', () => {
 
   describe('getMasteryAccessReason', () => {
     it('should return "Prior mastery" for unlocked content', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('understand');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('understand');
       expect(service.getMasteryAccessReason('content-1')).toBe('Prior mastery');
     });
 
     it('should return null for content below threshold', () => {
-      contentMasterySpy.getMasteryLevelSync.and.returnValue('remember');
+      contentMasterySpy.getMasteryLevelSync.mockReturnValue('remember');
       expect(service.getMasteryAccessReason('content-1')).toBeNull();
     });
 
@@ -128,7 +131,7 @@ describe('LearnerContextService', () => {
 
   describe('isInSkippedSection', () => {
     it('should return true when section is in skippedSections', () => {
-      pathAdaptationSpy.getState.and.returnValue({
+      pathAdaptationSpy.getState.mockReturnValue({
         pathId: 'test-path',
         humanId: 'test-human',
         gates: new Map(),
@@ -160,7 +163,7 @@ describe('LearnerContextService', () => {
 
   describe('getDiscoveryProfile', () => {
     it('should return null when no assessments completed', () => {
-      discoveryAttestationSpy.getDiscoveryProfile.and.returnValue(null);
+      discoveryAttestationSpy.getDiscoveryProfile.mockReturnValue(null);
       expect(service.getDiscoveryProfile()).toBeNull();
     });
 
@@ -172,7 +175,7 @@ describe('LearnerContextService', () => {
         topTraits: [{ framework: 'enneagram', label: '4w5' }],
       };
 
-      discoveryAttestationSpy.getDiscoveryProfile.and.returnValue(mockProfile as never);
+      discoveryAttestationSpy.getDiscoveryProfile.mockReturnValue(mockProfile as never);
       const result = service.getDiscoveryProfile();
       expect(result).toBeTruthy();
       expect(result!.totalAssessments).toBe(2);

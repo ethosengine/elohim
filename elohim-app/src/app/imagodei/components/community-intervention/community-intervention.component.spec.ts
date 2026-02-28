@@ -4,12 +4,13 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { CommunityInterventionComponent } from './community-intervention.component';
 import { StewardshipService } from '../../services/stewardship.service';
 import type { CommunityIntervention } from '../../models/stewardship.model';
+import { vi, Mock } from 'vitest';
 
 describe('CommunityInterventionComponent', () => {
   let component: CommunityInterventionComponent;
   let fixture: ComponentFixture<CommunityInterventionComponent>;
-  let mockStewardshipService: jasmine.SpyObj<StewardshipService>;
-  let mockRouter: jasmine.SpyObj<Router>;
+  let mockStewardshipService: any;
+  let mockRouter: any;
   let mockActivatedRoute: Partial<ActivatedRoute>;
 
   const mockIntervention: CommunityIntervention = {
@@ -29,18 +30,18 @@ describe('CommunityInterventionComponent', () => {
   };
 
   beforeEach(async () => {
-    mockStewardshipService = jasmine.createSpyObj('StewardshipService', [
-      'getIntervention',
-      'initiateIntervention',
-      'supportIntervention',
-    ]);
+    mockStewardshipService = {
+    getIntervention: vi.fn(),
+    initiateIntervention: vi.fn(),
+    supportIntervention: vi.fn(),
+  };
 
-    mockRouter = jasmine.createSpy('Router') as any;
+    mockRouter = vi.fn() as any;
 
     mockActivatedRoute = {
       snapshot: {
         paramMap: {
-          get: jasmine.createSpy('get').and.returnValue(null),
+          get: vi.fn().mockReturnValue(null),
         } as any,
       } as any,
     };
@@ -117,7 +118,7 @@ describe('CommunityInterventionComponent', () => {
     });
 
     it('should initialize with subject ID from route', () => {
-      (mockActivatedRoute.snapshot!.paramMap.get as jasmine.Spy).and.callFake((param: string) => {
+      (mockActivatedRoute.snapshot!.paramMap.get as Mock).mockImplementation((param: string) => {
         return param === 'subjectId' ? 'subject-789' : null;
       });
 
@@ -130,7 +131,7 @@ describe('CommunityInterventionComponent', () => {
     });
 
     it('should initialize in view mode with intervention ID', () => {
-      (mockActivatedRoute.snapshot!.paramMap.get as jasmine.Spy).and.callFake((param: string) => {
+      (mockActivatedRoute.snapshot!.paramMap.get as Mock).mockImplementation((param: string) => {
         return param === 'interventionId' ? 'intervention-123' : null;
       });
 
@@ -141,10 +142,10 @@ describe('CommunityInterventionComponent', () => {
     });
 
     it('should load intervention when intervention ID present', () => {
-      (mockActivatedRoute.snapshot!.paramMap.get as jasmine.Spy).and.callFake((param: string) => {
+      (mockActivatedRoute.snapshot!.paramMap.get as Mock).mockImplementation((param: string) => {
         return param === 'interventionId' ? 'intervention-123' : null;
       });
-      spyOn(component, 'loadIntervention');
+      vi.spyOn(component, 'loadIntervention');
 
       component.ngOnInit();
 
@@ -311,7 +312,7 @@ describe('CommunityInterventionComponent', () => {
 
     it('should not submit if form invalid', () => {
       component.patternDescription.set('');
-      spyOn(console, 'error');
+      vi.spyOn(console, 'error');
 
       component.submitInitiation();
 
@@ -369,7 +370,7 @@ describe('CommunityInterventionComponent', () => {
 
     it('should not submit without intervention', () => {
       component.intervention.set(null);
-      spyOn(console, 'error');
+      vi.spyOn(console, 'error');
 
       component.submitSupport();
 

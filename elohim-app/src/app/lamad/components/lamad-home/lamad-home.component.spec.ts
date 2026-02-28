@@ -8,16 +8,17 @@ import { ProfileService } from '@app/elohim/services/profile.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import { IdentityService } from '@app/imagodei/services/identity.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
+import { vi, Mock } from 'vitest';
 
 describe('LamadHomeComponent', () => {
   let component: LamadHomeComponent;
   let fixture: ComponentFixture<LamadHomeComponent>;
-  let pathService: jasmine.SpyObj<PathService>;
-  let pathFilterService: jasmine.SpyObj<PathFilterService>;
-  let router: jasmine.SpyObj<Router>;
-  let profileService: jasmine.SpyObj<ProfileService>;
-  let agentService: jasmine.SpyObj<AgentService>;
-  let identityService: jasmine.SpyObj<IdentityService>;
+  let pathService: any;
+  let pathFilterService: any;
+  let router: any;
+  let profileService: any;
+  let agentService: any;
+  let identityService: any;
   let localStorageMock: { [key: string]: string };
 
   const mockPaths: PathIndexEntry[] = [
@@ -48,24 +49,34 @@ describe('LamadHomeComponent', () => {
   };
 
   beforeEach(async () => {
-    const pathServiceSpy = jasmine.createSpyObj('PathService', ['listPaths']);
-    const pathFilterServiceSpy = jasmine.createSpyObj('PathFilterService', ['getFeaturedPaths']);
-    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
-    const profileServiceSpy = jasmine.createSpyObj('ProfileService', ['getCurrentFocus']);
-    const agentServiceSpy = jasmine.createSpyObj('AgentService', [
-      'getCurrentAgentId',
-      'getAgentProgress',
-    ]);
-    const identityServiceSpy = jasmine.createSpyObj('IdentityService', ['mode']);
+    const pathServiceSpy = {
+    listPaths: vi.fn(),
+  };
+    const pathFilterServiceSpy = {
+    getFeaturedPaths: vi.fn(),
+  };
+    const routerSpy = {
+    navigate: vi.fn(),
+  };
+    const profileServiceSpy = {
+    getCurrentFocus: vi.fn(),
+  };
+    const agentServiceSpy = {
+    getCurrentAgentId: vi.fn(),
+    getAgentProgress: vi.fn(),
+  };
+    const identityServiceSpy = {
+    mode: vi.fn(),
+  };
     // mode() returns 'anonymous' by default (unauthenticated)
-    identityServiceSpy.mode.and.returnValue('anonymous');
+    identityServiceSpy.mode.mockReturnValue('anonymous');
 
     // Mock localStorage
     localStorageMock = {};
-    spyOn(localStorage, 'getItem').and.callFake((key: string) => {
+    vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
       return localStorageMock[key] || null;
     });
-    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
       localStorageMock[key] = value;
     });
 
@@ -81,18 +92,18 @@ describe('LamadHomeComponent', () => {
       ],
     }).compileComponents();
 
-    pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
-    pathFilterService = TestBed.inject(PathFilterService) as jasmine.SpyObj<PathFilterService>;
-    router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
-    profileService = TestBed.inject(ProfileService) as jasmine.SpyObj<ProfileService>;
-    agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
-    identityService = TestBed.inject(IdentityService) as jasmine.SpyObj<IdentityService>;
+    pathService = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
+    pathFilterService = TestBed.inject(PathFilterService) as { [K in keyof PathFilterService]?: Mock };
+    router = TestBed.inject(Router) as { [K in keyof Router]?: Mock };
+    profileService = TestBed.inject(ProfileService) as { [K in keyof ProfileService]?: Mock };
+    agentService = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
+    identityService = TestBed.inject(IdentityService) as { [K in keyof IdentityService]?: Mock };
 
-    pathService.listPaths.and.returnValue(of(mockPathIndex));
-    pathFilterService.getFeaturedPaths.and.callFake((paths: PathIndexEntry[]) => paths);
-    profileService.getCurrentFocus.and.returnValue(of([]));
-    agentService.getCurrentAgentId.and.returnValue('test-agent');
-    agentService.getAgentProgress.and.returnValue(of([]));
+    pathService.listPaths.mockReturnValue(of(mockPathIndex));
+    pathFilterService.getFeaturedPaths.mockImplementation((paths: PathIndexEntry[]) => paths);
+    profileService.getCurrentFocus.mockReturnValue(of([]));
+    agentService.getCurrentAgentId.mockReturnValue('test-agent');
+    agentService.getAgentProgress.mockReturnValue(of([]));
 
     fixture = TestBed.createComponent(LamadHomeComponent);
     component = fixture.componentInstance;
@@ -122,7 +133,7 @@ describe('LamadHomeComponent', () => {
       totalCount: 1,
       paths: [mockPaths[1]],
     };
-    pathService.listPaths.and.returnValue(of(pathsWithoutElohim));
+    pathService.listPaths.mockReturnValue(of(pathsWithoutElohim));
 
     fixture.detectChanges();
 
@@ -130,7 +141,7 @@ describe('LamadHomeComponent', () => {
   });
 
   it('should handle empty paths array', () => {
-    pathService.listPaths.and.returnValue(
+    pathService.listPaths.mockReturnValue(
       of({
         lastUpdated: '2025-01-01T00:00:00.000Z',
         totalCount: 0,
@@ -145,7 +156,7 @@ describe('LamadHomeComponent', () => {
   });
 
   it('should handle path loading error', () => {
-    pathService.listPaths.and.returnValue(throwError(() => new Error('Network error')));
+    pathService.listPaths.mockReturnValue(throwError(() => new Error('Network error')));
 
     fixture.detectChanges();
 
@@ -247,8 +258,8 @@ describe('LamadHomeComponent', () => {
   it('should cleanup on destroy', () => {
     fixture.detectChanges();
 
-    spyOn(component['destroy$'], 'next');
-    spyOn(component['destroy$'], 'complete');
+    vi.spyOn(component['destroy$'], 'next');
+    vi.spyOn(component['destroy$'], 'complete');
 
     component.ngOnDestroy();
 
@@ -267,7 +278,7 @@ describe('LamadHomeComponent', () => {
 
   it('should populate pathProgressMap from agent progress', () => {
     // Set identity mode to 'hosted' so agent progress is fetched (requires network authentication)
-    identityService.mode.and.returnValue('hosted');
+    identityService.mode.mockReturnValue('hosted');
 
     const mockAgentProgress = [
       {
@@ -296,7 +307,7 @@ describe('LamadHomeComponent', () => {
         attestationsEarned: [],
       },
     ];
-    agentService.getAgentProgress.and.returnValue(of(mockAgentProgress));
+    agentService.getAgentProgress.mockReturnValue(of(mockAgentProgress));
 
     fixture.detectChanges();
 

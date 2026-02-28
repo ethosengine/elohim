@@ -7,15 +7,19 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { InsuranceMutualService } from './insurance-mutual.service';
 import { EconomicService } from './economic.service';
 import { of } from 'rxjs';
+import { vi } from 'vitest';
 
 describe('InsuranceMutualService', () => {
   let service: InsuranceMutualService;
-  let mockEconomic: jasmine.SpyObj<EconomicService>;
+  let mockEconomic: any;
 
   beforeEach(() => {
-    mockEconomic = jasmine.createSpyObj('EconomicService', ['createEvent', 'getEventsForAgent']);
-    mockEconomic.createEvent.and.returnValue(of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any));
-    mockEconomic.getEventsForAgent.and.returnValue(of([]));
+    mockEconomic = {
+    createEvent: vi.fn(),
+    getEventsForAgent: vi.fn(),
+  };
+    mockEconomic.createEvent.mockReturnValue(of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any));
+    mockEconomic.getEventsForAgent.mockReturnValue(of([]));
 
     TestBed.configureTestingModule({
       providers: [
@@ -81,7 +85,7 @@ describe('InsuranceMutualService', () => {
 
     it('should return promise', () => {
       const result = service.assessQahalRisks('qahal-1');
-      expect(result).toEqual(jasmine.any(Promise));
+      expect(result).toEqual(expect.any(Promise));
     });
   });
 
@@ -149,15 +153,13 @@ describe('InsuranceMutualService', () => {
     });
 
     it('should throw error when coverage policy not found', async () => {
-      await expectAsync(
-        service.fileClaim('member-1', 'policy-1', {
+      await await expect(service.fileClaim('member-1', 'policy-1', {
           lossType: 'health',
           lossDate: new Date().toISOString(),
           description: 'Test claim',
           estimatedLossAmount: { hasNumericalValue: 5000, hasUnit: 'token' },
           observerAttestationIds: [],
-        })
-      ).toBeRejectedWithError(/not yet implemented/i);
+        })).rejects.toThrow(/not yet implemented/i);
     });
   });
 

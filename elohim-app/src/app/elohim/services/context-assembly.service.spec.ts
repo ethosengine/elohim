@@ -16,6 +16,7 @@ import { GovernanceService } from './governance.service';
 
 import type { CreatePayload } from '../models/create-context.model';
 import type { ElohimResponse, ElohimResponsePayload } from '../models/elohim-agent.model';
+import { type Mock, vi } from 'vitest';
 
 // ============================================================================
 // Test Fixtures
@@ -171,61 +172,70 @@ const buildActivity = (overrides: Record<string, unknown> = {}) => ({
 
 describe('ContextAssemblyService', () => {
   let service: ContextAssemblyService;
-  let mockAgentService: jasmine.SpyObj<AgentService>;
-  let mockElohimAgentService: jasmine.SpyObj<ElohimAgentService>;
-  let mockGovernanceService: jasmine.SpyObj<GovernanceService>;
-  let mockDataLoader: jasmine.SpyObj<DataLoaderService>;
-  let mockRelatedConcepts: jasmine.SpyObj<RelatedConceptsService>;
+  let mockAgentService: any;
+  let mockElohimAgentService: any;
+  let mockGovernanceService: any;
+  let mockDataLoader: any;
+  let mockRelatedConcepts: any;
   let mockPathContextService: { currentContext: unknown };
-  let mockIdentityService: { profile: jasmine.Spy };
-  let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
+  let mockIdentityService: { profile: Mock };
+  let mockSessionHumanService: any;
 
   beforeEach(() => {
-    mockAgentService = jasmine.createSpyObj('AgentService', [
-      'getCurrentAgentId',
-      'getAttestations',
-      'getLearningAnalytics',
-    ]);
-    mockAgentService.getCurrentAgentId.and.returnValue('agent-test-1');
-    mockAgentService.getAttestations.and.returnValue(['author-verified']);
-    mockAgentService.getLearningAnalytics.and.returnValue(of(buildAnalytics()));
+    mockAgentService = {
+    getCurrentAgentId: vi.fn(),
+    getAttestations: vi.fn(),
+    getLearningAnalytics: vi.fn(),
+  };
+    mockAgentService.getCurrentAgentId.mockReturnValue('agent-test-1');
+    mockAgentService.getAttestations.mockReturnValue(['author-verified']);
+    mockAgentService.getLearningAnalytics.mockReturnValue(of(buildAnalytics()));
 
-    mockElohimAgentService = jasmine.createSpyObj('ElohimAgentService', ['invoke', 'selectElohim']);
-    mockElohimAgentService.invoke.and.returnValue(of(buildFulfilledResponse()));
+    mockElohimAgentService = {
+    invoke: vi.fn(),
+    selectElohim: vi.fn(),
+  };
+    mockElohimAgentService.invoke.mockReturnValue(of(buildFulfilledResponse()));
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    mockElohimAgentService.selectElohim.and.returnValue(of(buildElohimAgent()) as any);
+    mockElohimAgentService.selectElohim.mockReturnValue(of(buildElohimAgent()) as any);
 
-    mockGovernanceService = jasmine.createSpyObj('GovernanceService', [
-      'getConstitutionalPrecedents',
-      'getActiveProposals',
-      'getGovernanceSummary',
-    ]);
-    mockGovernanceService.getConstitutionalPrecedents.and.returnValue(
+    mockGovernanceService = {
+    getConstitutionalPrecedents: vi.fn(),
+    getActiveProposals: vi.fn(),
+    getGovernanceSummary: vi.fn(),
+  };
+    mockGovernanceService.getConstitutionalPrecedents.mockReturnValue(
       of([buildPrecedent('p-1', 'Human dignity'), buildPrecedent('p-2', 'Knowledge access')])
     );
-    mockGovernanceService.getActiveProposals.and.returnValue(
+    mockGovernanceService.getActiveProposals.mockReturnValue(
       of([buildProposal('proposal-1'), buildProposal('proposal-2')])
     );
-    mockGovernanceService.getGovernanceSummary.and.returnValue(
+    mockGovernanceService.getGovernanceSummary.mockReturnValue(
       of({ activeChallenges: 1, votingProposals: 5, recentPrecedents: 2, activeDiscussions: 0 })
     );
 
-    mockDataLoader = jasmine.createSpyObj('DataLoaderService', ['getContent']);
+    mockDataLoader = {
+    getContent: vi.fn(),
+  };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    mockDataLoader.getContent.and.returnValue(of(buildParentContent()) as any);
+    mockDataLoader.getContent.mockReturnValue(of(buildParentContent()) as any);
 
-    mockRelatedConcepts = jasmine.createSpyObj('RelatedConceptsService', ['getRelatedConcepts']);
+    mockRelatedConcepts = {
+    getRelatedConcepts: vi.fn(),
+  };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    mockRelatedConcepts.getRelatedConcepts.and.returnValue(of(buildRelatedConceptsResult()) as any);
+    mockRelatedConcepts.getRelatedConcepts.mockReturnValue(of(buildRelatedConceptsResult()) as any);
 
     mockPathContextService = { currentContext: null };
 
     mockIdentityService = {
-      profile: jasmine.createSpy('profile').and.returnValue({ affinities: ['community-alpha'] }),
+      profile: vi.fn().mockReturnValue({ affinities: ['community-alpha'] }),
     };
 
-    mockSessionHumanService = jasmine.createSpyObj('SessionHumanService', ['getActivityHistory']);
-    mockSessionHumanService.getActivityHistory.and.returnValue([buildActivity()]);
+    mockSessionHumanService = {
+    getActivityHistory: vi.fn(),
+  };
+    mockSessionHumanService.getActivityHistory.mockReturnValue([buildActivity()]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -305,7 +315,7 @@ describe('ContextAssemblyService', () => {
       const activities = Array.from({ length: 30 }, (_, i) =>
         buildActivity({ resourceId: `r-${i}`, timestamp: new Date(Date.now() + i).toISOString() })
       );
-      mockSessionHumanService.getActivityHistory.and.returnValue(activities);
+      mockSessionHumanService.getActivityHistory.mockReturnValue(activities);
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.createContext.threadContext.sessionActions.length).toBe(20);
@@ -320,7 +330,7 @@ describe('ContextAssemblyService', () => {
 
   describe('author profile layer', () => {
     it('should compute trust score from attestation types', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue(['author-verified', 'peer-reviewed']);
+      mockAgentService.getAttestations.mockReturnValue(['author-verified', 'peer-reviewed']);
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         const profile = result.createContext.authorProfile;
@@ -331,7 +341,7 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should return zero trust score for no attestations', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([]);
+      mockAgentService.getAttestations.mockReturnValue([]);
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.createContext.authorProfile.trustIndicators.trustScore).toBe(0);
@@ -341,7 +351,7 @@ describe('ContextAssemblyService', () => {
 
     it('should derive reach ceiling from attestation types', fakeAsync(() => {
       // 'author-verified' meets requirements for 'invited' and 'local'
-      mockAgentService.getAttestations.and.returnValue(['author-verified']);
+      mockAgentService.getAttestations.mockReturnValue(['author-verified']);
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.createContext.authorProfile.reachCeiling).toBe('local');
@@ -350,7 +360,7 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should return private reach ceiling for no attestations', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([]);
+      mockAgentService.getAttestations.mockReturnValue([]);
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.createContext.authorProfile.reachCeiling).toBe('private');
@@ -363,7 +373,7 @@ describe('ContextAssemblyService', () => {
       tick(5000);
 
       // Reset spy call count
-      mockAgentService.getLearningAnalytics.calls.reset();
+      mockAgentService.getLearningAnalytics.mockClear();
 
       // Second call should use cache
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe();
@@ -380,7 +390,7 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should use default profile when analytics fails', fakeAsync(() => {
-      mockAgentService.getLearningAnalytics.and.returnValue(throwError(() => new Error('fail')));
+      mockAgentService.getLearningAnalytics.mockReturnValue(throwError(() => new Error('fail')));
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.createContext.authorProfile.trustIndicators.trustScore).toBe(0);
@@ -416,8 +426,8 @@ describe('ContextAssemblyService', () => {
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe();
       tick(5000);
 
-      mockElohimAgentService.selectElohim.calls.reset();
-      mockGovernanceService.getConstitutionalPrecedents.calls.reset();
+      mockElohimAgentService.selectElohim.mockClear();
+      mockGovernanceService.getConstitutionalPrecedents.mockClear();
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe();
       tick(5000);
@@ -427,7 +437,7 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should use default when elohim selection fails', fakeAsync(() => {
-      mockElohimAgentService.selectElohim.and.returnValue(throwError(() => new Error('fail')));
+      mockElohimAgentService.selectElohim.mockReturnValue(throwError(() => new Error('fail')));
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.createContext.constitutional.stackHash).toBe('unverified');
@@ -443,8 +453,8 @@ describe('ContextAssemblyService', () => {
   describe('community norms layer', () => {
     it('should include community IDs from identity profile affinities', fakeAsync(() => {
       // Low trust forces deep pipeline which includes community-norms
-      mockAgentService.getAttestations.and.returnValue([]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getAttestations.mockReturnValue([]);
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 0 })
       );
 
@@ -455,8 +465,8 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should include active governance proposals', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getAttestations.mockReturnValue([]);
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 0 })
       );
 
@@ -468,14 +478,14 @@ describe('ContextAssemblyService', () => {
 
     it('should be skipped for high-trust authors', fakeAsync(() => {
       // High trust: > 0.8 trust score, > 10 contributions in last 30 days
-      mockAgentService.getAttestations.and.returnValue([
+      mockAgentService.getAttestations.mockReturnValue([
         'governance-ratified',
         'peer-reviewed',
         'steward-approved',
         'safety-reviewed',
         'community-endorsed',
       ]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 50 })
       );
 
@@ -493,8 +503,8 @@ describe('ContextAssemblyService', () => {
 
   describe('graph neighborhood layer', () => {
     it('should include related nodes when parent exists', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getAttestations.mockReturnValue([]);
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 0 })
       );
 
@@ -506,8 +516,8 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should return empty neighborhood when no parent', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getAttestations.mockReturnValue([]);
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 0 })
       );
 
@@ -519,8 +529,8 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should include parent context with reach and trust', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getAttestations.mockReturnValue([]);
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 0 })
       );
 
@@ -535,14 +545,14 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should be skipped for high-trust authors', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([
+      mockAgentService.getAttestations.mockReturnValue([
         'governance-ratified',
         'peer-reviewed',
         'steward-approved',
         'safety-reviewed',
         'community-endorsed',
       ]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 50 })
       );
 
@@ -560,14 +570,14 @@ describe('ContextAssemblyService', () => {
 
   describe('pipeline depth', () => {
     it('should use light pipeline for high-trust authors', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([
+      mockAgentService.getAttestations.mockReturnValue([
         'governance-ratified',
         'peer-reviewed',
         'steward-approved',
         'safety-reviewed',
         'community-endorsed',
       ]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 50 })
       );
 
@@ -586,8 +596,8 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should use deep pipeline for new authors', fakeAsync(() => {
-      mockAgentService.getAttestations.and.returnValue([]);
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getAttestations.mockReturnValue([]);
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         of({ ...buildAnalytics(), totalStepsCompleted: 0 })
       );
 
@@ -645,7 +655,7 @@ describe('ContextAssemblyService', () => {
       tick(5000);
 
       expect(mockElohimAgentService.invoke).toHaveBeenCalled();
-      const request = mockElohimAgentService.invoke.calls.mostRecent().args[0];
+      const request = mockElohimAgentService.invoke.mock.lastCall[0];
       expect(request.capability).toBe('reach-negotiation');
     }));
 
@@ -687,7 +697,7 @@ describe('ContextAssemblyService', () => {
   describe('timeout', () => {
     it('should return fallback result when assembly times out', fakeAsync(() => {
       // Make a service very slow
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         timer(2000).pipe(map(() => buildAnalytics()))
       );
 
@@ -699,7 +709,7 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should use default 500ms timeout when not specified', fakeAsync(() => {
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         timer(1000).pipe(map(() => buildAnalytics()))
       );
 
@@ -710,7 +720,7 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should still return valid structure on timeout', fakeAsync(() => {
-      mockAgentService.getLearningAnalytics.and.returnValue(
+      mockAgentService.getLearningAnalytics.mockReturnValue(
         timer(2000).pipe(map(() => buildAnalytics()))
       );
 
@@ -719,7 +729,7 @@ describe('ContextAssemblyService', () => {
         expect(result.negotiationResult).toBeDefined();
         expect(result.birthContext).toBeDefined();
         expect(result.createContext.payload).toEqual(
-          jasmine.objectContaining({ actionType: 'post' })
+          expect.objectContaining({ actionType: 'post' })
         );
       });
       tick(2000);
@@ -732,7 +742,7 @@ describe('ContextAssemblyService', () => {
 
   describe('graceful degradation', () => {
     it('should use default negotiation result when invoke fails', fakeAsync(() => {
-      mockElohimAgentService.invoke.and.returnValue(throwError(() => new Error('Network error')));
+      mockElohimAgentService.invoke.mockReturnValue(throwError(() => new Error('Network error')));
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.negotiationResult.recommendedReach).toBe('community');
@@ -742,10 +752,10 @@ describe('ContextAssemblyService', () => {
     }));
 
     it('should use default when governance service fails', fakeAsync(() => {
-      mockGovernanceService.getConstitutionalPrecedents.and.returnValue(
+      mockGovernanceService.getConstitutionalPrecedents.mockReturnValue(
         throwError(() => new Error('fail'))
       );
-      mockElohimAgentService.selectElohim.and.returnValue(throwError(() => new Error('fail')));
+      mockElohimAgentService.selectElohim.mockReturnValue(throwError(() => new Error('fail')));
 
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
         expect(result.createContext.constitutional.stackHash).toBe('unverified');
@@ -756,10 +766,10 @@ describe('ContextAssemblyService', () => {
 
     it('should never throw — always returns a result', fakeAsync(() => {
       // Make everything fail
-      mockAgentService.getLearningAnalytics.and.returnValue(throwError(() => new Error('fail')));
-      mockElohimAgentService.invoke.and.returnValue(throwError(() => new Error('fail')));
-      mockElohimAgentService.selectElohim.and.returnValue(throwError(() => new Error('fail')));
-      mockGovernanceService.getConstitutionalPrecedents.and.returnValue(
+      mockAgentService.getLearningAnalytics.mockReturnValue(throwError(() => new Error('fail')));
+      mockElohimAgentService.invoke.mockReturnValue(throwError(() => new Error('fail')));
+      mockElohimAgentService.selectElohim.mockReturnValue(throwError(() => new Error('fail')));
+      mockGovernanceService.getConstitutionalPrecedents.mockReturnValue(
         throwError(() => new Error('fail'))
       );
 

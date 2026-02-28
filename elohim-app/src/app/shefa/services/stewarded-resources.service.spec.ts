@@ -9,15 +9,20 @@ import { StewardedResourceService } from './stewarded-resources.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
 import { EconomicService } from './economic.service';
 import { ConstitutionalLimit, FinancialAsset, IncomeStream, FinancialObligation } from '@app/shefa/models/stewarded-resources.model';
+import { vi } from 'vitest';
 
 describe('StewardedResourceService', () => {
   let service: StewardedResourceService;
-  let mockHolochain: jasmine.SpyObj<HolochainClientService>;
-  let mockEconomicService: jasmine.SpyObj<EconomicService>;
+  let mockHolochain: any;
+  let mockEconomicService: any;
 
   beforeEach(() => {
-    mockHolochain = jasmine.createSpyObj('HolochainClientService', ['callZome']);
-    mockEconomicService = jasmine.createSpyObj('EconomicService', ['createEvent']);
+    mockHolochain = {
+    callZome: vi.fn(),
+  };
+    mockEconomicService = {
+    createEvent: vi.fn(),
+  };
 
     TestBed.configureTestingModule({
       providers: [
@@ -450,7 +455,7 @@ describe('StewardedResourceService', () => {
   describe('Error Handling', () => {
     describe('getResource', () => {
       it('should return null when resource not found', async () => {
-        mockHolochain.callZome.and.returnValue(
+        mockHolochain.callZome.mockReturnValue(
           Promise.reject(new Error('Resource not found'))
         );
 
@@ -460,8 +465,8 @@ describe('StewardedResourceService', () => {
       });
 
       it('should log warning for unexpected errors', async () => {
-        spyOn(console, 'warn');
-        mockHolochain.callZome.and.returnValue(
+        vi.spyOn(console, 'warn');
+        mockHolochain.callZome.mockReturnValue(
           Promise.reject(new Error('Network error'))
         );
 
@@ -473,7 +478,7 @@ describe('StewardedResourceService', () => {
 
     describe('getStewardResources', () => {
       it('should return empty array on error', async () => {
-        mockHolochain.callZome.and.returnValue(
+        mockHolochain.callZome.mockReturnValue(
           Promise.reject(new Error('Connection failed'))
         );
 
@@ -483,8 +488,8 @@ describe('StewardedResourceService', () => {
       });
 
       it('should log warning on error', async () => {
-        spyOn(console, 'warn');
-        mockHolochain.callZome.and.returnValue(
+        vi.spyOn(console, 'warn');
+        mockHolochain.callZome.mockReturnValue(
           Promise.reject(new Error('Connection failed'))
         );
 
@@ -509,8 +514,8 @@ describe('StewardedResourceService', () => {
 
   describe('createResource', () => {
     it('should create a new stewarded resource', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-1' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
       const result = await service.createResource(
         'steward-1',
@@ -526,7 +531,7 @@ describe('StewardedResourceService', () => {
       expect(result.subcategory).toBe('checking');
       expect(result.totalCapacity.value).toBe(10000);
       expect(mockHolochain.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'content_store',
           fnName: 'create_stewarded_resource',
         })
@@ -534,8 +539,8 @@ describe('StewardedResourceService', () => {
     });
 
     it('should create resource with permanent reserve', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-1' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
       const result = await service.createResource(
         'steward-1',
@@ -553,8 +558,8 @@ describe('StewardedResourceService', () => {
     });
 
     it('should initialize resource with correct defaults', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-1' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
       const result = await service.createResource(
         'steward-1',
@@ -573,8 +578,8 @@ describe('StewardedResourceService', () => {
     });
 
     it('should handle observer-enabled resources', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-1' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
       const result = await service.createResource(
         'steward-1',
@@ -597,7 +602,7 @@ describe('StewardedResourceService', () => {
         { id: 'r3', category: 'financial-asset' },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResources })
       );
 
@@ -609,7 +614,7 @@ describe('StewardedResourceService', () => {
     });
 
     it('should return empty array when no resources match', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
 
       const result = await service.getResourcesByCategory('steward-1', 'energy');
 
@@ -623,8 +628,8 @@ describe('StewardedResourceService', () => {
 
   describe('createAllocation', () => {
     it('should create allocation block', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-1' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
       const result = await service.createAllocation(
         'resource-1',
@@ -640,8 +645,8 @@ describe('StewardedResourceService', () => {
     });
 
     it('should create allocation with governance level', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-1' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
       const result = await service.createAllocation(
         'resource-1',
@@ -657,8 +662,8 @@ describe('StewardedResourceService', () => {
 
   describe('recordUsage', () => {
     it('should record usage with economic event', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-123' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-123' }) as any);
 
       const result = await service.recordUsage(
         'resource-1',
@@ -672,8 +677,8 @@ describe('StewardedResourceService', () => {
     });
 
     it('should record usage with observer attestation', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: {} }));
-      mockEconomicService.createEvent.and.returnValue(of({ id: 'event-1' }) as any);
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: {} }));
+      mockEconomicService.createEvent.mockReturnValue(of({ id: 'event-1' }) as any);
 
       const result = await service.recordUsage(
         'resource-1',
@@ -700,7 +705,7 @@ describe('StewardedResourceService', () => {
         ],
       };
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResource })
       );
 
@@ -716,7 +721,7 @@ describe('StewardedResourceService', () => {
     });
 
     it('should return null when resource not found', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: null }));
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: null }));
 
       const result = await service.updateAllocationUtilization(
         'nonexistent',
@@ -733,7 +738,7 @@ describe('StewardedResourceService', () => {
         allocations: [],
       };
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResource })
       );
 
@@ -770,7 +775,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResources })
       );
 
@@ -783,7 +788,7 @@ describe('StewardedResourceService', () => {
     });
 
     it('should handle category with no resources', async () => {
-      mockHolochain.callZome.and.returnValue(Promise.resolve({ success: true, data: [] }));
+      mockHolochain.callZome.mockReturnValue(Promise.resolve({ success: true, data: [] }));
 
       const result = await service.getCategorySummary('steward-1', 'energy');
 
@@ -809,7 +814,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResources })
       );
 
@@ -835,7 +840,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResources })
       );
 
@@ -951,7 +956,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResources })
       );
 
@@ -971,7 +976,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockResources })
       );
 
@@ -1017,7 +1022,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockAssets })
       );
 
@@ -1049,7 +1054,7 @@ describe('StewardedResourceService', () => {
         },
       ];
 
-      mockHolochain.callZome.and.returnValue(
+      mockHolochain.callZome.mockReturnValue(
         Promise.resolve({ success: true, data: mockAssets })
       );
 

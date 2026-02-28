@@ -6,23 +6,24 @@ import { StreakTrackerService } from '../../services/streak-tracker.service';
 import { QuizSoundService } from '../../services/quiz-sound.service';
 import { QuestionPoolService } from '../../services/question-pool.service';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
+import { vi } from 'vitest';
 
 describe('InlineQuizComponent', () => {
   let component: InlineQuizComponent;
   let fixture: ComponentFixture<InlineQuizComponent>;
-  let mockStreakTracker: jasmine.SpyObj<StreakTrackerService>;
-  let mockSoundService: jasmine.SpyObj<QuizSoundService>;
-  let mockPoolService: jasmine.SpyObj<QuestionPoolService>;
-  let mockGovernanceSignal: jasmine.SpyObj<GovernanceSignalService>;
+  let mockStreakTracker: any;
+  let mockSoundService: any;
+  let mockPoolService: any;
+  let mockGovernanceSignal: any;
 
   beforeEach(async () => {
-    mockStreakTracker = jasmine.createSpyObj('StreakTrackerService', [
-      'startTracking',
-      'recordAnswer',
-      'onAchieved',
-      'offAchieved',
-    ]);
-    mockStreakTracker.startTracking.and.returnValue({
+    mockStreakTracker = {
+    startTracking: vi.fn(),
+    recordAnswer: vi.fn(),
+    onAchieved: vi.fn(),
+    offAchieved: vi.fn(),
+  };
+    mockStreakTracker.startTracking.mockReturnValue({
       contentId: 'test-content',
       humanId: 'test-human',
       currentStreak: 0,
@@ -36,14 +37,16 @@ describe('InlineQuizComponent', () => {
       startedAt: new Date().toISOString(),
     });
 
-    mockSoundService = jasmine.createSpyObj('QuizSoundService', [
-      'playCorrectAnswerFeedback',
-      'playIncorrectAnswerFeedback',
-      'playStreakAchieved',
-    ]);
+    mockSoundService = {
+    playCorrectAnswerFeedback: vi.fn(),
+    playIncorrectAnswerFeedback: vi.fn(),
+    playStreakAchieved: vi.fn(),
+  };
 
-    mockPoolService = jasmine.createSpyObj('QuestionPoolService', ['getPoolForContent']);
-    mockPoolService.getPoolForContent.and.returnValue(
+    mockPoolService = {
+    getPoolForContent: vi.fn(),
+  };
+    mockPoolService.getPoolForContent.mockReturnValue(
       of({
         contentId: 'test-content',
         questions: [],
@@ -73,8 +76,10 @@ describe('InlineQuizComponent', () => {
       })
     );
 
-    mockGovernanceSignal = jasmine.createSpyObj('GovernanceSignalService', ['recordLearningSignal']);
-    mockGovernanceSignal.recordLearningSignal.and.returnValue(of(true));
+    mockGovernanceSignal = {
+    recordLearningSignal: vi.fn(),
+  };
+    mockGovernanceSignal.recordLearningSignal.mockReturnValue(of(true));
 
     await TestBed.configureTestingModule({
       imports: [InlineQuizComponent],

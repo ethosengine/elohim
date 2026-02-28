@@ -15,14 +15,15 @@ import type { SessionHuman } from '@app/imagodei/models/session-human.model';
 import type { ContentMastery } from '../models';
 import type { LevelUpEvent } from '../models/learner-mastery-profile.model';
 import type { PracticePool } from '../models/practice.model';
+import { vi, Mock } from 'vitest';
 
 describe('MasteryStatsService', () => {
   let service: MasteryStatsService;
-  let mockMasteryService: jasmine.SpyObj<ContentMasteryService>;
-  let mockPointsService: jasmine.SpyObj<PointsService>;
-  let mockPracticeService: jasmine.SpyObj<PracticeService>;
-  let mockSessionHuman: jasmine.SpyObj<SessionHumanService>;
-  let mockSourceChain: jasmine.SpyObj<LocalSourceChainService>;
+  let mockMasteryService: any;
+  let mockPointsService: any;
+  let mockPracticeService: any;
+  let mockSessionHuman: any;
+  let mockSourceChain: any;
 
   let masterySubject: BehaviorSubject<Map<string, ContentMastery>>;
   let totalPointsSubject: BehaviorSubject<number>;
@@ -74,48 +75,32 @@ describe('MasteryStatsService', () => {
     levelUpSubject = new Subject<LevelUpEvent>();
     sessionSubject = new BehaviorSubject<SessionHuman | null>(createMockSession());
 
-    mockMasteryService = jasmine.createSpyObj(
-      'ContentMasteryService',
-      [],
-      {
-        mastery$: masterySubject.asObservable(),
-        levelUp$: levelUpSubject.asObservable(),
-      }
-    );
+    mockMasteryService = {
+      mastery$: masterySubject.asObservable(),
+      levelUp$: levelUpSubject.asObservable(),
+      totalPoints$: totalPointsSubject.asObservable(),
+    };
 
-    mockPointsService = jasmine.createSpyObj(
-      'PointsService',
-      ['earnPoints', 'refreshBalance'],
-      {
-        totalPoints$: totalPointsSubject.asObservable(),
-      }
-    );
-    mockPointsService.earnPoints.and.returnValue(of(null));
+    mockPointsService = {
+      earnPoints: vi.fn(),
+      refreshBalance: vi.fn(),
+    };
+    mockPointsService.earnPoints.mockReturnValue(of(null));
 
-    mockPracticeService = jasmine.createSpyObj(
-      'PracticeService',
-      ['getPoolSync'],
-      {
-        pool$: of(null),
-      }
-    );
-    mockPracticeService.getPoolSync.and.returnValue(null);
+    mockPracticeService = { getPoolSync: vi.fn() };
+    mockPracticeService.getPoolSync.mockReturnValue(null);
 
-    mockSessionHuman = jasmine.createSpyObj(
-      'SessionHumanService',
-      [],
-      {
-        session$: sessionSubject.asObservable(),
-      }
-    );
+    mockSessionHuman = {
+      session$: sessionSubject.asObservable(),
+    };
 
-    mockSourceChain = jasmine.createSpyObj('LocalSourceChainService', [
-      'isInitialized',
-      'createEntry',
-      'getEntriesByType',
-    ]);
-    mockSourceChain.isInitialized.and.returnValue(true);
-    mockSourceChain.getEntriesByType.and.returnValue([]);
+    mockSourceChain = {
+      isInitialized: vi.fn(),
+      createEntry: vi.fn(),
+      getEntriesByType: vi.fn(),
+    };
+    mockSourceChain.isInitialized.mockReturnValue(true);
+    mockSourceChain.getEntriesByType.mockReturnValue([]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -157,7 +142,7 @@ describe('MasteryStatsService', () => {
   });
 
   describe('Empty State', () => {
-    it('should produce learner profile with zero values when initialized', done => {
+    it('should produce learner profile with zero values when initialized', () => new Promise<void>(done => {
       service.learnerProfile$.subscribe(profile => {
         expect(profile).toBeDefined();
         expect(profile?.totalMasteredNodes).toBe(0);
@@ -165,9 +150,9 @@ describe('MasteryStatsService', () => {
         expect(profile?.nodesAboveGate).toBe(0);
         done();
       });
-    });
+    }));
 
-    it('should produce empty streak info initially', done => {
+    it('should produce empty streak info initially', () => new Promise<void>(done => {
       service.streakInfo$.subscribe(streak => {
         expect(streak).toBeDefined();
         expect(streak.currentStreak).toBe(0);
@@ -176,18 +161,18 @@ describe('MasteryStatsService', () => {
         expect(streak.lastActiveDate).toBe('');
         done();
       });
-    });
+    }));
 
-    it('should produce empty level ups initially', done => {
+    it('should produce empty level ups initially', () => new Promise<void>(done => {
       service.recentLevelUps$.subscribe(levelUps => {
         expect(levelUps).toEqual([]);
         done();
       });
-    });
+    }));
   });
 
   describe('Profile Computation', () => {
-    it('should compute profile when mastery and points update', done => {
+    it('should compute profile when mastery and points update', () => new Promise<void>(done => {
       const masteries = new Map<string, ContentMastery>([
         ['content-1', createMockMastery('content-1', 'seen')],
         ['content-2', createMockMastery('content-2', 'remember')],
@@ -208,9 +193,9 @@ describe('MasteryStatsService', () => {
           done();
         });
       }, 50);
-    });
+    }));
 
-    it('should exclude not_started from totalMasteredNodes', done => {
+    it('should exclude not_started from totalMasteredNodes', () => new Promise<void>(done => {
       const masteries = new Map<string, ContentMastery>([
         ['content-1', createMockMastery('content-1', 'not_started')],
         ['content-2', createMockMastery('content-2', 'seen')],
@@ -224,9 +209,9 @@ describe('MasteryStatsService', () => {
           done();
         });
       }, 50);
-    });
+    }));
 
-    it('should count nodesAboveGate correctly', done => {
+    it('should count nodesAboveGate correctly', () => new Promise<void>(done => {
       const masteries = new Map<string, ContentMastery>([
         ['content-1', createMockMastery('content-1', 'seen')],
         ['content-2', createMockMastery('content-2', 'understand')],
@@ -242,9 +227,9 @@ describe('MasteryStatsService', () => {
           done();
         });
       }, 50);
-    });
+    }));
 
-    it('should compute level distribution correctly', done => {
+    it('should compute level distribution correctly', () => new Promise<void>(done => {
       const masteries = new Map<string, ContentMastery>([
         ['content-1', createMockMastery('content-1', 'seen')],
         ['content-2', createMockMastery('content-2', 'seen')],
@@ -267,7 +252,7 @@ describe('MasteryStatsService', () => {
           done();
         });
       }, 50);
-    });
+    }));
   });
 
   describe('getProfileSync()', () => {
@@ -277,7 +262,7 @@ describe('MasteryStatsService', () => {
       expect(profile?.totalMasteredNodes).toBe(0);
     });
 
-    it('should return cached profile after computation', done => {
+    it('should return cached profile after computation', () => new Promise<void>(done => {
       const masteries = new Map<string, ContentMastery>([
         ['content-1', createMockMastery('content-1', 'seen')],
       ]);
@@ -290,7 +275,7 @@ describe('MasteryStatsService', () => {
         expect(profile?.totalMasteredNodes).toBe(1);
         done();
       }, 50);
-    });
+    }));
   });
 
   describe('refreshProfile()', () => {
@@ -310,7 +295,7 @@ describe('MasteryStatsService', () => {
       service.recordDailyEngagement('view');
       expect(mockSourceChain.createEntry).toHaveBeenCalledWith(
         'streak-record',
-        jasmine.objectContaining({
+        expect.objectContaining({
           engagementTypes: ['view'],
         })
       );
@@ -324,7 +309,7 @@ describe('MasteryStatsService', () => {
       expect(mockSourceChain.createEntry).toHaveBeenCalledTimes(1);
 
       // Mock the source chain to return the entry we just created
-      mockSourceChain.getEntriesByType.and.returnValue([
+      mockSourceChain.getEntriesByType.mockReturnValue([
         {
           entryHash: 'hash-1',
           content: {
@@ -362,7 +347,7 @@ describe('MasteryStatsService', () => {
 
       expect(mockSourceChain.createEntry).toHaveBeenCalledWith(
         'mastery-level-up',
-        jasmine.objectContaining({
+        expect.objectContaining({
           contentId: 'content-1',
           fromLevel: 'seen',
           toLevel: 'remember',
@@ -401,13 +386,13 @@ describe('MasteryStatsService', () => {
 
       expect(mockSourceChain.createEntry).toHaveBeenCalledWith(
         'streak-record',
-        jasmine.objectContaining({
+        expect.objectContaining({
           engagementTypes: ['level_up'],
         })
       );
     });
 
-    it('should update recent level-ups list', done => {
+    it('should update recent level-ups list', () => new Promise<void>(done => {
       const event: LevelUpEvent = {
         id: 'levelup-1',
         contentId: 'content-1',
@@ -427,7 +412,7 @@ describe('MasteryStatsService', () => {
           done();
         });
       }, 50);
-    });
+    }));
   });
 
   describe('recordLevelUp()', () => {
@@ -450,8 +435,8 @@ describe('MasteryStatsService', () => {
   });
 
   describe('Practice Summary', () => {
-    it('should return empty summary when pool is null', done => {
-      mockPracticeService.getPoolSync.and.returnValue(null);
+    it('should return empty summary when pool is null', () => new Promise<void>(done => {
+      mockPracticeService.getPoolSync.mockReturnValue(null);
 
       setTimeout(() => {
         service.learnerProfile$.subscribe(profile => {
@@ -462,11 +447,11 @@ describe('MasteryStatsService', () => {
           done();
         });
       }, 50);
-    });
+    }));
 
-    it('should extract practice stats from pool via getPoolSync', done => {
+    it('should extract practice stats from pool via getPoolSync', () => new Promise<void>(done => {
       // Configure getPoolSync to return pool data
-      mockPracticeService.getPoolSync.and.returnValue({
+      mockPracticeService.getPoolSync.mockReturnValue({
         total_challenges_taken: 25,
         total_level_ups: 10,
         total_level_downs: 3,
@@ -488,12 +473,12 @@ describe('MasteryStatsService', () => {
         expect(profile?.practice.refreshQueueSize).toBe(2);
         done();
       }, 100);
-    });
+    }));
   });
 
   describe('Source Chain Integration', () => {
     it('should not create entries when source chain not initialized', () => {
-      mockSourceChain.isInitialized.and.returnValue(false);
+      mockSourceChain.isInitialized.mockReturnValue(false);
 
       service.recordDailyEngagement('view');
 

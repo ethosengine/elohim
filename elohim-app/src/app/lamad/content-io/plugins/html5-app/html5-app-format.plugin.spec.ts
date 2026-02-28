@@ -33,23 +33,23 @@ describe('Html5AppFormatPlugin', () => {
 
   describe('Capabilities', () => {
     it('should support import', () => {
-      expect(plugin.canImport).toBeTrue();
+      expect(plugin.canImport).toBe(true);
     });
 
     it('should support export', () => {
-      expect(plugin.canExport).toBeTrue();
+      expect(plugin.canExport).toBe(true);
     });
 
     it('should support validation', () => {
-      expect(plugin.canValidate).toBeTrue();
+      expect(plugin.canValidate).toBe(true);
     });
 
     it('should support rendering', () => {
-      expect(plugin.canRender).toBeTrue();
+      expect(plugin.canRender).toBe(true);
     });
 
     it('should not support editing', () => {
-      expect(plugin.canEdit).toBeFalse();
+      expect(plugin.canEdit).toBe(false);
     });
   });
 
@@ -76,7 +76,7 @@ describe('Html5AppFormatPlugin', () => {
       const config = plugin.getEditorConfig();
 
       expect(config.editorMode).toBe('code');
-      expect(config.supportsLivePreview).toBeFalse();
+      expect(config.supportsLivePreview).toBe(false);
     });
   });
 
@@ -132,9 +132,7 @@ describe('Html5AppFormatPlugin', () => {
     });
 
     it('should throw on invalid JSON', async () => {
-      await expectAsync(plugin.import('not json')).toBeRejectedWithError(
-        'Invalid HTML5 app JSON structure'
-      );
+      await await expect(plugin.import('not json')).rejects.toThrow('Invalid HTML5 app JSON structure');
     });
 
     it('should add default tags', async () => {
@@ -193,14 +191,14 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(content);
 
-        expect(result.valid).toBeTrue();
+        expect(result.valid).toBe(true);
         expect(result.errors).toEqual([]);
       });
 
       it('should error on invalid JSON', async () => {
         const result = await plugin.validate('not json');
 
-        expect(result.valid).toBeFalse();
+        expect(result.valid).toBe(false);
         expect(result.errors[0].code).toBe('INVALID_JSON');
       });
 
@@ -209,8 +207,8 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(content);
 
-        expect(result.valid).toBeFalse();
-        expect(result.errors.some(e => e.code === 'MISSING_APP_ID')).toBeTrue();
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'MISSING_APP_ID')).toBe(true);
       });
 
       it('should error on invalid appId format', async () => {
@@ -221,8 +219,8 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(content);
 
-        expect(result.valid).toBeFalse();
-        expect(result.errors.some(e => e.code === 'INVALID_APP_ID')).toBeTrue();
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'INVALID_APP_ID')).toBe(true);
       });
 
       it('should accept valid appId with hyphens', async () => {
@@ -233,7 +231,7 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(content);
 
-        expect(result.valid).toBeTrue();
+        expect(result.valid).toBe(true);
       });
 
       it('should error on missing entryPoint', async () => {
@@ -241,8 +239,8 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(content);
 
-        expect(result.valid).toBeFalse();
-        expect(result.errors.some(e => e.code === 'MISSING_ENTRY_POINT')).toBeTrue();
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'MISSING_ENTRY_POINT')).toBe(true);
       });
 
       it('should warn on non-HTML entryPoint', async () => {
@@ -253,8 +251,8 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(content);
 
-        expect(result.valid).toBeTrue();
-        expect(result.warnings.some(w => w.code === 'ENTRY_POINT_NOT_HTML')).toBeTrue();
+        expect(result.valid).toBe(true);
+        expect(result.warnings.some(w => w.code === 'ENTRY_POINT_NOT_HTML')).toBe(true);
       });
 
       it('should warn when no fallbackUrl', async () => {
@@ -265,8 +263,8 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(content);
 
-        expect(result.valid).toBeTrue();
-        expect(result.warnings.some(w => w.code === 'NO_FALLBACK')).toBeTrue();
+        expect(result.valid).toBe(true);
+        expect(result.warnings.some(w => w.code === 'NO_FALLBACK')).toBe(true);
       });
     });
 
@@ -276,7 +274,7 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(file);
 
-        expect(result.valid).toBeTrue();
+        expect(result.valid).toBe(true);
       });
 
       it('should error on non-ZIP file', async () => {
@@ -284,8 +282,8 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(file);
 
-        expect(result.valid).toBeFalse();
-        expect(result.errors.some(e => e.code === 'NOT_ZIP')).toBeTrue();
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.code === 'NOT_ZIP')).toBe(true);
       });
 
       it('should warn on large files', async () => {
@@ -295,7 +293,7 @@ describe('Html5AppFormatPlugin', () => {
 
         const result = await plugin.validate(file);
 
-        expect(result.warnings.some(w => w.code === 'LARGE_FILE')).toBeTrue();
+        expect(result.warnings.some(w => w.code === 'LARGE_FILE')).toBe(true);
       });
 
       it('should include stats in validation result', async () => {
@@ -304,7 +302,7 @@ describe('Html5AppFormatPlugin', () => {
         const result = await plugin.validate(file);
 
         expect(result.stats?.['formatId']).toBe('html5-app');
-        expect(result.stats?.['isFile']).toBeTrue();
+        expect(result.stats?.['isFile']).toBe(true);
       });
     });
   });
@@ -355,7 +353,7 @@ describe('Html5AppFormatPlugin', () => {
       expect(metadata.displayName).toBe('HTML5 Application');
       expect(metadata.icon).toBe('web');
       expect(metadata.category).toBe('media');
-      expect(metadata.supportsRoundTrip).toBeFalse();
+      expect(metadata.supportsRoundTrip).toBe(false);
       expect(metadata.priority).toBe(15);
     });
 

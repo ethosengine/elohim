@@ -7,6 +7,7 @@ import { QuestionPoolService } from './question-pool.service';
 import { StreakTrackerService } from './streak-tracker.service';
 import { ELOHIM_CLIENT } from '@app/elohim/providers/elohim-client.provider';
 import type { QuizResult, ContentScore } from '../models/quiz-session.model';
+import { vi } from 'vitest';
 
 /**
  * Path Adaptation Service — Story-First Tests
@@ -62,22 +63,22 @@ function makeContentScore(contentId: string, avgScore: number): ContentScore {
 
 describe('PathAdaptationService (story-first)', () => {
   let service: PathAdaptationService;
-  let cooldownSpy: jasmine.SpyObj<AttemptCooldownService>;
-  let poolSpy: jasmine.SpyObj<QuestionPoolService>;
-  let streakSpy: jasmine.SpyObj<StreakTrackerService>;
+  let cooldownSpy: any;
+  let poolSpy: any;
+  let streakSpy: any;
 
   const PATH_ID = 'elohim-protocol';
   const HUMAN_ID = 'matthew';
   const SECTION_ID = 'foundations';
 
   beforeEach(() => {
-    cooldownSpy = jasmine.createSpyObj('AttemptCooldownService', [
-      'getCooldownStatus',
-      'recordAttempt',
-      'getBestScore',
-      'isMastered',
-    ]);
-    cooldownSpy.getCooldownStatus.and.returnValue({
+    cooldownSpy = {
+    getCooldownStatus: vi.fn(),
+    recordAttempt: vi.fn(),
+    getBestScore: vi.fn(),
+    isMastered: vi.fn(),
+  };
+    cooldownSpy.getCooldownStatus.mockReturnValue({
       inCooldown: false,
       cooldownEndsAt: null,
       remainingMs: 0,
@@ -87,19 +88,23 @@ describe('PathAdaptationService (story-first)', () => {
       resetsAt: new Date().toISOString(),
       timeUntilResetMs: 86400000,
     });
-    cooldownSpy.getBestScore.and.returnValue(0);
-    cooldownSpy.isMastered.and.returnValue(false);
+    cooldownSpy.getBestScore.mockReturnValue(0);
+    cooldownSpy.isMastered.mockReturnValue(false);
 
-    poolSpy = jasmine.createSpyObj('QuestionPoolService', ['getQuestions']);
-    streakSpy = jasmine.createSpyObj('StreakTrackerService', ['isAchieved']);
-    streakSpy.isAchieved.and.returnValue(false);
+    poolSpy = {
+    getQuestions: vi.fn(),
+  };
+    streakSpy = {
+    isAchieved: vi.fn(),
+  };
+    streakSpy.isAchieved.mockReturnValue(false);
 
-    const mockElohimClient = jasmine.createSpyObj('ElohimClient', [
-      'getContent',
-      'listContent',
-    ]);
-    mockElohimClient.getContent.and.returnValue(Promise.resolve(null));
-    mockElohimClient.listContent.and.returnValue(Promise.resolve([]));
+    const mockElohimClient = {
+    getContent: vi.fn(),
+    listContent: vi.fn(),
+  };
+    mockElohimClient.getContent.mockReturnValue(Promise.resolve(null));
+    mockElohimClient.listContent.mockReturnValue(Promise.resolve([]));
 
     // Clear localStorage to prevent state leaking between tests
     // (the service persists adaptation state to localStorage)
@@ -132,13 +137,13 @@ describe('PathAdaptationService (story-first)', () => {
     it('new gate should be locked with reason "not_attempted"', () => {
       const gate = service.getGateStatus(PATH_ID, SECTION_ID, HUMAN_ID);
 
-      expect(gate.locked).toBeTrue();
+      expect(gate.locked).toBe(true);
       expect(gate.reason).toBe('not_attempted');
-      expect(gate.mastered).toBeFalse();
+      expect(gate.mastered).toBe(false);
     });
 
     it('canProceed should return false for unmastered gate', () => {
-      expect(service.canProceed(PATH_ID, SECTION_ID, HUMAN_ID)).toBeFalse();
+      expect(service.canProceed(PATH_ID, SECTION_ID, HUMAN_ID)).toBe(false);
     });
   });
 
@@ -158,8 +163,8 @@ describe('PathAdaptationService (story-first)', () => {
         result
       );
 
-      expect(gate.locked).toBeFalse();
-      expect(gate.mastered).toBeTrue();
+      expect(gate.locked).toBe(false);
+      expect(gate.mastered).toBe(true);
       expect(gate.bestScore).toBe(0.9);
     });
 
@@ -167,7 +172,7 @@ describe('PathAdaptationService (story-first)', () => {
       const result = makeQuizResult({ passed: true, score: 0.85 });
       service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
 
-      expect(service.canProceed(PATH_ID, SECTION_ID, HUMAN_ID)).toBeTrue();
+      expect(service.canProceed(PATH_ID, SECTION_ID, HUMAN_ID)).toBe(true);
     });
 
     it('section should be marked as completed', () => {
@@ -175,7 +180,7 @@ describe('PathAdaptationService (story-first)', () => {
       service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
 
       const state = service.getState(PATH_ID, HUMAN_ID);
-      expect(state.completedSections.has(SECTION_ID)).toBeTrue();
+      expect(state.completedSections.has(SECTION_ID)).toBe(true);
     });
   });
 
@@ -196,9 +201,9 @@ describe('PathAdaptationService (story-first)', () => {
         result
       );
 
-      expect(gate.locked).toBeTrue();
+      expect(gate.locked).toBe(true);
       expect(gate.reason).toBe('failed');
-      expect(gate.mastered).toBeFalse();
+      expect(gate.mastered).toBe(false);
     });
 
     it('best score should be tracked even on failure', () => {
@@ -218,7 +223,7 @@ describe('PathAdaptationService (story-first)', () => {
       service.recordMasteryResult(PATH_ID, SECTION_ID, HUMAN_ID, result);
 
       const state = service.getState(PATH_ID, HUMAN_ID);
-      expect(state.completedSections.has(SECTION_ID)).toBeFalse();
+      expect(state.completedSections.has(SECTION_ID)).toBe(false);
     });
   });
 
@@ -271,12 +276,12 @@ describe('PathAdaptationService (story-first)', () => {
         sectionMapping
       );
 
-      expect(skipResult.eligible).toBeTrue();
+      expect(skipResult.eligible).toBe(true);
 
       const foundationsSection = skipResult.skippableSections.find(
         s => s.sectionId === 'foundations'
       );
-      expect(foundationsSection?.recommendSkip).toBeTrue();
+      expect(foundationsSection?.recommendSkip).toBe(true);
     });
 
     it('skipped section gates should be unlocked', () => {
@@ -302,8 +307,8 @@ describe('PathAdaptationService (story-first)', () => {
 
       // "all steps in section 'foundations' should be accessible"
       const gate = service.getGateStatus(PATH_ID, 'foundations', HUMAN_ID);
-      expect(gate.locked).toBeFalse();
-      expect(gate.mastered).toBeTrue();
+      expect(gate.locked).toBe(false);
+      expect(gate.mastered).toBe(true);
     });
 
     it('section below skip threshold should NOT be skippable', () => {
@@ -330,7 +335,7 @@ describe('PathAdaptationService (story-first)', () => {
       const foundationsSection = skipResult.skippableSections.find(
         s => s.sectionId === 'foundations'
       );
-      expect(foundationsSection?.recommendSkip).toBeFalse();
+      expect(foundationsSection?.recommendSkip).toBe(false);
     });
 
     it('recommended start section should be first non-skippable section', () => {
@@ -443,7 +448,7 @@ describe('PathAdaptationService (story-first)', () => {
   describe('Admin gate unlock', () => {
     it('unlockGate should open a locked gate', () => {
       // Gate starts locked
-      expect(service.canProceed(PATH_ID, SECTION_ID, HUMAN_ID)).toBeFalse();
+      expect(service.canProceed(PATH_ID, SECTION_ID, HUMAN_ID)).toBe(false);
 
       // Manually set up the gate in state first
       const result = makeQuizResult({ passed: false, score: 0.3 });
@@ -453,8 +458,8 @@ describe('PathAdaptationService (story-first)', () => {
       service.unlockGate(PATH_ID, SECTION_ID, HUMAN_ID);
 
       const gate = service.getGateStatus(PATH_ID, SECTION_ID, HUMAN_ID);
-      expect(gate.locked).toBeFalse();
-      expect(gate.mastered).toBeTrue();
+      expect(gate.locked).toBe(false);
+      expect(gate.mastered).toBe(true);
     });
   });
 
@@ -476,7 +481,7 @@ describe('PathAdaptationService (story-first)', () => {
 
     it('recommendations should be enabled by default', () => {
       const config = service.getConfig();
-      expect(config.enableRecommendations).toBeTrue();
+      expect(config.enableRecommendations).toBe(true);
     });
 
     it('configuration should be overridable', () => {
@@ -522,18 +527,18 @@ describe('PathAdaptationService (story-first)', () => {
       ]);
 
       const state = service.getState(PATH_ID, HUMAN_ID);
-      expect(state.skippedSections.has('section-a')).toBeTrue();
-      expect(state.skippedSections.has('section-b')).toBeTrue();
-      expect(state.completedSections.has('section-a')).toBeTrue();
-      expect(state.completedSections.has('section-b')).toBeTrue();
+      expect(state.skippedSections.has('section-a')).toBe(true);
+      expect(state.skippedSections.has('section-b')).toBe(true);
+      expect(state.completedSections.has('section-a')).toBe(true);
+      expect(state.completedSections.has('section-b')).toBe(true);
     });
 
     it('applySkipAhead unlocks gates for skipped sections', () => {
       service.applySkipAhead(PATH_ID, HUMAN_ID, ['section-a']);
 
       const gate = service.getGateStatus(PATH_ID, 'section-a', HUMAN_ID);
-      expect(gate.locked).toBeFalse();
-      expect(gate.mastered).toBeTrue();
+      expect(gate.locked).toBe(false);
+      expect(gate.mastered).toBe(true);
     });
   });
 
@@ -544,7 +549,7 @@ describe('PathAdaptationService (story-first)', () => {
 
   describe('Inline quiz integration', () => {
     it('incomplete inline quizzes should block mastery gate when configured', () => {
-      streakSpy.isAchieved.and.returnValue(false);
+      streakSpy.isAchieved.mockReturnValue(false);
 
       const complete = service.areSectionInlinesComplete(
         PATH_ID,
@@ -552,11 +557,11 @@ describe('PathAdaptationService (story-first)', () => {
         ['content-1', 'content-2']
       );
 
-      expect(complete).toBeFalse();
+      expect(complete).toBe(false);
     });
 
     it('completed inline quizzes allow mastery gate', () => {
-      streakSpy.isAchieved.and.returnValue(true);
+      streakSpy.isAchieved.mockReturnValue(true);
 
       const complete = service.areSectionInlinesComplete(
         PATH_ID,
@@ -564,12 +569,12 @@ describe('PathAdaptationService (story-first)', () => {
         ['content-1', 'content-2']
       );
 
-      expect(complete).toBeTrue();
+      expect(complete).toBe(true);
     });
 
     it('inline check bypassed when requireInlineBeforeMastery is false', () => {
       service.configure({ requireInlineBeforeMastery: false });
-      streakSpy.isAchieved.and.returnValue(false);
+      streakSpy.isAchieved.mockReturnValue(false);
 
       const complete = service.areSectionInlinesComplete(
         PATH_ID,
@@ -577,7 +582,7 @@ describe('PathAdaptationService (story-first)', () => {
         ['content-1', 'content-2']
       );
 
-      expect(complete).toBeTrue();
+      expect(complete).toBe(true);
     });
   });
 });

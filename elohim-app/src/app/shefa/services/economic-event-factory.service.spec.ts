@@ -81,17 +81,13 @@ describe('EconomicEventFactoryService', () => {
     it('should reject non-approved transactions', async () => {
       const staged = createMockStagedTransaction('tx-1', 'pending', -100, 'debit');
 
-      await expectAsync(service.createFromStaged(staged)).toBeRejectedWithError(
-        /non-approved/
-      );
+      await await expect(service.createFromStaged(staged)).rejects.toThrow(/non-approved/);
     });
 
     it('should reject already-converted transactions', async () => {
       const staged = createMockStagedTransaction('tx-1', 'approved', -100, 'debit', 'event-123');
 
-      await expectAsync(service.createFromStaged(staged)).toBeRejectedWithError(
-        /already created/
-      );
+      await await expect(service.createFromStaged(staged)).rejects.toThrow(/already created/);
     });
 
     it('should preserve transaction quantity and unit', async () => {
@@ -387,9 +383,7 @@ describe('EconomicEventFactoryService', () => {
     });
 
     it('should reject correction event creation when not implemented', async () => {
-      await expectAsync(
-        service.createCorrectionEvent('event-1', {}, 'Incorrect amount')
-      ).toBeRejectedWithError(/not yet implemented/i);
+      await await expect(service.createCorrectionEvent('event-1', {}, 'Incorrect amount')).rejects.toThrow(/not yet implemented/i);
     });
   });
 

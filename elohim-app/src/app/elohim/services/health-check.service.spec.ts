@@ -3,33 +3,34 @@ import { HealthCheckService, HealthStatus, HealthState, HealthCheck } from './he
 import { HolochainClientService } from './holochain-client.service';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
+import { vi } from 'vitest';
 
 describe('HealthCheckService', () => {
   let service: HealthCheckService;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockIndexedDbCache: jasmine.SpyObj<IndexedDBCacheService>;
-  let mockLogger: jasmine.SpyObj<LoggerService>;
+  let mockHolochainClient: any;
+  let mockIndexedDbCache: any;
+  let mockLogger: any;
 
   beforeEach(() => {
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', [
-      'isConnected',
-      'getDisplayInfo',
-    ]);
-    mockHolochainClient.isConnected.and.returnValue(true);
-    mockHolochainClient.getDisplayInfo.and.returnValue({
+    mockHolochainClient = {
+    isConnected: vi.fn(),
+    getDisplayInfo: vi.fn(),
+  };
+    mockHolochainClient.isConnected.mockReturnValue(true);
+    mockHolochainClient.getDisplayInfo.mockReturnValue({
       appUrl: 'ws://localhost:8888',
       adminUrl: 'ws://localhost:8889',
       mode: 'direct' as const,
     } as ReturnType<HolochainClientService['getDisplayInfo']>);
 
-    mockIndexedDbCache = jasmine.createSpyObj('IndexedDBCacheService', [
-      'init',
-      'isAvailable',
-      'getStats',
-    ]);
-    mockIndexedDbCache.init.and.returnValue(Promise.resolve(true));
-    mockIndexedDbCache.isAvailable.and.returnValue(true);
-    mockIndexedDbCache.getStats.and.returnValue(
+    mockIndexedDbCache = {
+    init: vi.fn(),
+    isAvailable: vi.fn(),
+    getStats: vi.fn(),
+  };
+    mockIndexedDbCache.init.mockReturnValue(Promise.resolve(true));
+    mockIndexedDbCache.isAvailable.mockReturnValue(true);
+    mockIndexedDbCache.getStats.mockReturnValue(
       Promise.resolve({
         contentCount: 10,
         pathCount: 5,
@@ -38,17 +39,19 @@ describe('HealthCheckService', () => {
     );
 
     const mockChildLogger = {
-      debug: jasmine.createSpy('debug'),
-      info: jasmine.createSpy('info'),
-      warn: jasmine.createSpy('warn'),
-      error: jasmine.createSpy('error'),
-      startTimer: jasmine.createSpy('startTimer').and.returnValue({
-        end: jasmine.createSpy('end'),
-        elapsed: jasmine.createSpy('elapsed').and.returnValue(100),
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      startTimer: vi.fn().mockReturnValue({
+        end: vi.fn(),
+        elapsed: vi.fn().mockReturnValue(100),
       }),
     };
-    mockLogger = jasmine.createSpyObj('LoggerService', ['createChild']);
-    mockLogger.createChild.and.returnValue(
+    mockLogger = {
+    createChild: vi.fn(),
+  };
+    mockLogger.createChild.mockReturnValue(
       mockChildLogger as unknown as ReturnType<LoggerService['createChild']>
     );
 
@@ -411,7 +414,7 @@ describe('HealthCheckService', () => {
   // constructor starts an async refresh that blocks subsequent refresh() calls.
   // Proper testing would require refactoring the service to allow test control
   // over the initial refresh timing. See ELOHIM-TEST-DEBT.
-  xdescribe('Health Checks', () => {
+  describe.skip('Health Checks', () => {
     it('should report healthy when all systems are up', async () => {
       const status = await service.refresh();
       expect(status.status).toBe('healthy');
@@ -420,7 +423,7 @@ describe('HealthCheckService', () => {
     });
 
     it('should report unhealthy when Holochain is disconnected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       const status = await service.refresh();
       expect(status.status).toBe('unhealthy');
       expect(status.checks.holochain.status).toBe('unhealthy');
@@ -428,7 +431,7 @@ describe('HealthCheckService', () => {
     });
 
     it('should report degraded when IndexedDB is unavailable', async () => {
-      mockIndexedDbCache.isAvailable.and.returnValue(false);
+      mockIndexedDbCache.isAvailable.mockReturnValue(false);
       const status = await service.refresh();
       expect(['degraded', 'healthy']).toContain(status.status);
       expect(status.checks.indexedDb.status).toBe('degraded');
@@ -449,7 +452,7 @@ describe('HealthCheckService', () => {
 
   // NOTE: All async refresh tests are skipped due to constructor timing issues.
   // See ELOHIM-TEST-DEBT for details.
-  xdescribe('Computed Signals', () => {
+  describe.skip('Computed Signals', () => {
     it('should compute isHealthy correctly', async () => {
       await service.refresh();
       expect(service.isHealthy()).toBe(true);
@@ -458,14 +461,14 @@ describe('HealthCheckService', () => {
     });
 
     it('should compute isUnhealthy when Holochain disconnected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       await service.refresh();
       expect(service.isHealthy()).toBe(false);
       expect(service.isUnhealthy()).toBe(true);
     });
   });
 
-  xdescribe('Quick Status', () => {
+  describe.skip('Quick Status', () => {
     it('should return healthy quick status', async () => {
       await service.refresh();
       const quick = service.getQuickStatus();
@@ -474,7 +477,7 @@ describe('HealthCheckService', () => {
     });
 
     it('should return unhealthy quick status when disconnected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       await service.refresh();
       const quick = service.getQuickStatus();
       expect(quick.color).toBe('red');
@@ -482,7 +485,7 @@ describe('HealthCheckService', () => {
     });
   });
 
-  xdescribe('Refresh Behavior', () => {
+  describe.skip('Refresh Behavior', () => {
     it('should set isChecking during refresh', async () => {
       let wasChecking = false;
       const promise = service.refresh();
@@ -510,7 +513,7 @@ describe('HealthCheckService', () => {
     });
   });
 
-  xdescribe('Individual Check', () => {
+  describe.skip('Individual Check', () => {
     it('should allow checking only Holochain', async () => {
       const check = await service.checkHolochainOnly();
       expect(check.name).toBe('holochain');
@@ -520,22 +523,22 @@ describe('HealthCheckService', () => {
     it('should update overall status after individual check', async () => {
       await service.refresh();
       expect(service.status().status).toBe('healthy');
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       await service.checkHolochainOnly();
       expect(service.status().status).toBe('unhealthy');
     });
   });
 
-  xdescribe('Error Handling', () => {
+  describe.skip('Error Handling', () => {
     it('should handle check errors gracefully', async () => {
-      mockHolochainClient.isConnected.and.throwError('Connection error');
+      mockHolochainClient.isConnected.mockImplementation(() => { throw 'Connection error'; });
       const status = await service.refresh();
       expect(status.checks.holochain.status).toBe('unhealthy');
       expect(status.checks.holochain.message).toContain('Connection error');
     });
 
     it('should handle IndexedDB errors as degraded', async () => {
-      mockIndexedDbCache.getStats.and.returnValue(Promise.reject(new Error('DB error')));
+      mockIndexedDbCache.getStats.mockReturnValue(Promise.reject(new Error('DB error')));
       const status = await service.refresh();
       expect(status.checks.indexedDb.status).toBe('degraded');
     });
@@ -545,7 +548,7 @@ describe('HealthCheckService', () => {
     it('should stop auto-check on destroy when interval is active', () => {
       // Simulate afterNextRender having set up the interval
       (service as any).autoCheckInterval = setInterval(() => {}, 60000);
-      spyOn(globalThis, 'clearInterval').and.callThrough();
+      vi.spyOn(globalThis, 'clearInterval').mockRestore();
 
       service.ngOnDestroy();
 
@@ -555,7 +558,7 @@ describe('HealthCheckService', () => {
 
     it('should handle destroy when no interval is set', () => {
       // afterNextRender hasn't fired (e.g. service-only test) - no interval to clear
-      spyOn(globalThis, 'clearInterval');
+      vi.spyOn(globalThis, 'clearInterval');
 
       service.ngOnDestroy();
 
@@ -563,14 +566,14 @@ describe('HealthCheckService', () => {
     });
   });
 
-  xdescribe('Summary Generation', () => {
+  describe.skip('Summary Generation', () => {
     it('should generate appropriate summary for healthy status', async () => {
       const status = await service.refresh();
       expect(status.summary).toBe('All systems operational');
     });
 
     it('should list unhealthy components in summary', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       const status = await service.refresh();
       expect(status.summary).toContain('holochain');
     });

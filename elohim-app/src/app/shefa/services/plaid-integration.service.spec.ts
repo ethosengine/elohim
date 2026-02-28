@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Plaid Integration Service Tests
  *
@@ -31,8 +32,8 @@ describe('PlaidIntegrationService', () => {
 
     // Stub private crypto methods — tests pass fake tokens that aren't valid base64,
     // so atob() throws. Spying prevents real Web Crypto API calls.
-    spyOn(service as any, 'decryptAccessToken').and.resolveTo('fake-decrypted-token');
-    spyOn(service as any, 'encryptAccessToken').and.resolveTo('fake-encrypted-token');
+    vi.spyOn(service as any, 'decryptAccessToken').mockResolvedValue('fake-decrypted-token');
+    vi.spyOn(service as any, 'encryptAccessToken').mockResolvedValue('fake-encrypted-token');
   });
 
   // ==========================================================================
@@ -202,7 +203,7 @@ describe('PlaidIntegrationService', () => {
       expect(observable.subscribe).toBeDefined();
     });
 
-    it('should emit webhook events on handleWebhook', (done) => {
+    it('should emit webhook events on handleWebhook', () => new Promise<void>(done => {
       const payload: PlaidWebhookPayload = {
         webhook_type: 'ITEM',
         webhook_code: 'LOGIN_REQUIRED',
@@ -216,7 +217,7 @@ describe('PlaidIntegrationService', () => {
       });
 
       service.handleWebhook(payload);
-    });
+    }));
   });
 
   // ==========================================================================
@@ -447,7 +448,7 @@ describe('PlaidIntegrationService', () => {
   // ==========================================================================
 
   describe('edge cases', () => {
-    it('should handle multiple webhook subscriptions', (done) => {
+    it('should handle multiple webhook subscriptions', () => new Promise<void>(done => {
       let count = 0;
       const payload: PlaidWebhookPayload = {
         webhook_type: 'TRANSACTIONS',
@@ -469,7 +470,7 @@ describe('PlaidIntegrationService', () => {
       });
 
       service.handleWebhook(payload);
-    });
+    }));
 
     it('should accept empty linked accounts array', () => {
       const mockConnection: PlaidConnection = {

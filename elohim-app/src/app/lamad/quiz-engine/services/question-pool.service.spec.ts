@@ -7,11 +7,12 @@ import { PathService } from '../../services/path.service';
 import type { PerseusItem } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { QuestionPool } from '../models/question-pool.model';
 import type { LearningPath } from '../../models/learning-path.model';
+import { vi } from 'vitest';
 
 describe('QuestionPoolService', () => {
   let service: QuestionPoolService;
-  let mockDataLoader: jasmine.SpyObj<DataLoaderService>;
-  let mockPathService: jasmine.SpyObj<PathService>;
+  let mockDataLoader: any;
+  let mockPathService: any;
 
   const createMockQuestion = (id: string, contentId: string, bloomsLevel = 'understand', difficulty = 'medium'): PerseusItem => ({
     id,
@@ -85,11 +86,15 @@ describe('QuestionPoolService', () => {
   } as LearningPath);
 
   beforeEach(() => {
-    mockDataLoader = jasmine.createSpyObj('DataLoaderService', ['getContent']);
-    mockDataLoader.getContent.and.returnValue(of(null as any));
+    mockDataLoader = {
+    getContent: vi.fn(),
+  };
+    mockDataLoader.getContent.mockReturnValue(of(null as any));
 
-    mockPathService = jasmine.createSpyObj('PathService', ['getPath']);
-    mockPathService.getPath.and.returnValue(of(null as any));
+    mockPathService = {
+    getPath: vi.fn(),
+  };
+    mockPathService.getPath.mockReturnValue(of(null as any));
 
     TestBed.configureTestingModule({
       providers: [
@@ -110,11 +115,11 @@ describe('QuestionPoolService', () => {
   });
 
   describe('getPoolForContent', () => {
-    it('should load question pool for content', (done) => {
+    it('should load question pool for content', () => new Promise<void>(done => {
       const questions = [createMockQuestion('q1', 'content-1')];
       const pool = createMockPool('content-1', questions);
 
-      mockDataLoader.getContent.and.returnValue(of({
+      mockDataLoader.getContent.mockReturnValue(of({
         content: JSON.stringify(pool),
         contentType: 'question-pool'
       } as any));
@@ -128,10 +133,10 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should return null if pool not found', (done) => {
-      mockDataLoader.getContent.and.returnValue(of(null as any));
+    it('should return null if pool not found', () => new Promise<void>(done => {
+      mockDataLoader.getContent.mockReturnValue(of(null as any));
 
       service.getPoolForContent('content-1').subscribe({
         next: (result) => {
@@ -140,13 +145,13 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should cache loaded pools', (done) => {
+    it('should cache loaded pools', () => new Promise<void>(done => {
       const questions = [createMockQuestion('q1', 'content-1')];
       const pool = createMockPool('content-1', questions);
 
-      mockDataLoader.getContent.and.returnValue(of({
+      mockDataLoader.getContent.mockReturnValue(of({
         content: JSON.stringify(pool),
         contentType: 'question-pool'
       } as any));
@@ -166,10 +171,10 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should handle error gracefully', (done) => {
-      mockDataLoader.getContent.and.returnValue(throwError(() => new Error('Load failed')));
+    it('should handle error gracefully', () => new Promise<void>(done => {
+      mockDataLoader.getContent.mockReturnValue(throwError(() => new Error('Load failed')));
 
       service.getPoolForContent('content-1').subscribe({
         next: (result) => {
@@ -178,15 +183,15 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should wrap raw questions array in pool format', (done) => {
+    it('should wrap raw questions array in pool format', () => new Promise<void>(done => {
       const questions = [
         createMockQuestion('q1', 'content-1'),
         createMockQuestion('q2', 'content-1')
       ];
 
-      mockDataLoader.getContent.and.returnValue(of({
+      mockDataLoader.getContent.mockReturnValue(of({
         content: JSON.stringify(questions),
         contentType: 'question-pool'
       } as any));
@@ -200,15 +205,15 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('getPoolsForContents', () => {
-    it('should load multiple pools', (done) => {
+    it('should load multiple pools', () => new Promise<void>(done => {
       const pool1 = createMockPool('content-1', [createMockQuestion('q1', 'content-1')]);
       const pool2 = createMockPool('content-2', [createMockQuestion('q2', 'content-2')]);
 
-      mockDataLoader.getContent.and.callFake((path: string) => {
+      mockDataLoader.getContent.mockImplementation((path: string) => {
         if (path.includes('content-1')) {
           return of({ content: JSON.stringify(pool1), contentType: 'question-pool' } as any);
         }
@@ -227,9 +232,9 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should return empty map for empty input', (done) => {
+    it('should return empty map for empty input', () => new Promise<void>(done => {
       service.getPoolsForContents([]).subscribe({
         next: (result) => {
           expect(result.size).toBe(0);
@@ -237,12 +242,12 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should skip content with no pool', (done) => {
+    it('should skip content with no pool', () => new Promise<void>(done => {
       const pool1 = createMockPool('content-1', [createMockQuestion('q1', 'content-1')]);
 
-      mockDataLoader.getContent.and.callFake((path: string) => {
+      mockDataLoader.getContent.mockImplementation((path: string) => {
         if (path.includes('content-1')) {
           return of({ content: JSON.stringify(pool1), contentType: 'question-pool' } as any);
         }
@@ -252,19 +257,19 @@ describe('QuestionPoolService', () => {
       service.getPoolsForContents(['content-1', 'content-2']).subscribe({
         next: (result) => {
           expect(result.size).toBe(1);
-          expect(result.has('content-1')).toBeTrue();
-          expect(result.has('content-2')).toBeFalse();
+          expect(result.has('content-1')).toBe(true);
+          expect(result.has('content-2')).toBe(false);
           done();
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('getHierarchicalPool', () => {
-    it('should get hierarchical pool from path', (done) => {
+    it('should get hierarchical pool from path', () => new Promise<void>(done => {
       const path = createMockPath();
-      mockPathService.getPath.and.returnValue(of(path));
+      mockPathService.getPath.mockReturnValue(of(path));
 
       service.getHierarchicalPool('path-1', 'section-1').subscribe({
         next: (result) => {
@@ -277,10 +282,10 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should return empty source if path not found', (done) => {
-      mockPathService.getPath.and.returnValue(of(null as any));
+    it('should return empty source if path not found', () => new Promise<void>(done => {
+      mockPathService.getPath.mockReturnValue(of(null as any));
 
       service.getHierarchicalPool('path-1', 'section-1').subscribe({
         next: (result) => {
@@ -290,11 +295,11 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should include content up to current section', (done) => {
+    it('should include content up to current section', () => new Promise<void>(done => {
       const path = createMockPath();
-      mockPathService.getPath.and.returnValue(of(path));
+      mockPathService.getPath.mockReturnValue(of(path));
 
       service.getHierarchicalPool('path-1', 'section-2').subscribe({
         next: (result) => {
@@ -306,11 +311,11 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('loadHierarchicalPools', () => {
-    it('should load and combine pools', (done) => {
+    it('should load and combine pools', () => new Promise<void>(done => {
       const pool1 = createMockPool('content-1', [
         createMockQuestion('q1', 'content-1', 'remember', 'easy')
       ]);
@@ -318,7 +323,7 @@ describe('QuestionPoolService', () => {
         createMockQuestion('q2', 'content-2', 'understand', 'medium')
       ]);
 
-      mockDataLoader.getContent.and.callFake((path: string) => {
+      mockDataLoader.getContent.mockImplementation((path: string) => {
         if (path.includes('content-1')) {
           return of({ content: JSON.stringify(pool1), contentType: 'question-pool' } as any);
         }
@@ -365,9 +370,9 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should handle empty eligibleContentIds', (done) => {
+    it('should handle empty eligibleContentIds', () => new Promise<void>(done => {
       const source = {
         currentContentId: 'section-1',
         pathId: 'path-1',
@@ -400,7 +405,7 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('selectQuestions', () => {
@@ -416,7 +421,7 @@ describe('QuestionPoolService', () => {
       const result = service.selectQuestions(questions, { count: 3, randomize: false });
 
       expect(result.questions.length).toBe(3);
-      expect(result.selectionComplete).toBeTrue();
+      expect(result.selectionComplete).toBe(true);
     });
 
     it('should filter by Blooms level', () => {
@@ -427,7 +432,7 @@ describe('QuestionPoolService', () => {
       });
 
       expect(result.questions.length).toBe(2);
-      expect(result.questions.every(q => q.metadata?.['bloomsLevel'] === 'remember')).toBeTrue();
+      expect(result.questions.every(q => q.metadata?.['bloomsLevel'] === 'remember')).toBe(true);
     });
 
     it('should filter by difficulty', () => {
@@ -438,7 +443,7 @@ describe('QuestionPoolService', () => {
       });
 
       expect(result.questions.length).toBe(2);
-      expect(result.questions.every(q => q.metadata?.['difficulty'] === 'easy')).toBeTrue();
+      expect(result.questions.every(q => q.metadata?.['difficulty'] === 'easy')).toBe(true);
     });
 
     it('should filter by tags', () => {
@@ -470,7 +475,7 @@ describe('QuestionPoolService', () => {
         randomize: false
       });
 
-      expect(result.selectionComplete).toBeFalse();
+      expect(result.selectionComplete).toBe(false);
       expect(result.selectionNotes).toBeDefined();
       expect(result.selectionNotes![0]).toContain('Only 2 questions available');
     });
@@ -546,7 +551,7 @@ describe('QuestionPoolService', () => {
       expect(result.questions.length).toBeLessThanOrEqual(3);
       expect(result.questions.every(q =>
         ['remember', 'understand', 'apply'].includes(q.metadata?.['bloomsLevel'] as string)
-      )).toBeTrue();
+      )).toBe(true);
     });
   });
 
@@ -573,18 +578,18 @@ describe('QuestionPoolService', () => {
 
       expect(result.questions.every(q =>
         ['understand', 'apply', 'analyze'].includes(q.metadata?.['bloomsLevel'] as string)
-      )).toBeTrue();
+      )).toBe(true);
     });
   });
 
   describe('selectInlineQuestions', () => {
-    it('should select questions for content', (done) => {
+    it('should select questions for content', () => new Promise<void>(done => {
       const pool = createMockPool('content-1', [
         createMockQuestion('q1', 'content-1', 'remember'),
         createMockQuestion('q2', 'content-1', 'understand')
       ]);
 
-      mockDataLoader.getContent.and.returnValue(of({
+      mockDataLoader.getContent.mockReturnValue(of({
         content: JSON.stringify(pool),
         contentType: 'question-pool'
       } as any));
@@ -594,66 +599,66 @@ describe('QuestionPoolService', () => {
           expect(result.questions.length).toBe(2);
           expect(result.questions.every(q =>
             ['remember', 'understand'].includes(q.metadata?.['bloomsLevel'] as string)
-          )).toBeTrue();
+          )).toBe(true);
           done();
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should return empty result if no pool available', (done) => {
-      mockDataLoader.getContent.and.returnValue(of(null as any));
+    it('should return empty result if no pool available', () => new Promise<void>(done => {
+      mockDataLoader.getContent.mockReturnValue(of(null as any));
 
       service.selectInlineQuestions('content-1', 10).subscribe({
         next: (result) => {
           expect(result.questions.length).toBe(0);
-          expect(result.selectionComplete).toBeFalse();
+          expect(result.selectionComplete).toBe(false);
           expect(result.selectionNotes).toContain('No questions available for this content');
           done();
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('Pool Management', () => {
     describe('canPracticeContent', () => {
-      it('should return true if pool has enough questions', (done) => {
+      it('should return true if pool has enough questions', () => new Promise<void>(done => {
         const pool = createMockPool('content-1', [
           createMockQuestion('q1', 'content-1'),
           createMockQuestion('q2', 'content-1'),
           createMockQuestion('q3', 'content-1')
         ]);
 
-        mockDataLoader.getContent.and.returnValue(of({
+        mockDataLoader.getContent.mockReturnValue(of({
           content: JSON.stringify(pool),
           contentType: 'question-pool'
         } as any));
 
         service.canPracticeContent('content-1').subscribe({
           next: (result) => {
-            expect(result).toBeTrue();
+            expect(result).toBe(true);
             done();
           },
           error: done.fail
         });
-      });
+      }));
 
-      it('should return false if no pool', (done) => {
-        mockDataLoader.getContent.and.returnValue(of(null as any));
+      it('should return false if no pool', () => new Promise<void>(done => {
+        mockDataLoader.getContent.mockReturnValue(of(null as any));
 
         service.canPracticeContent('content-1').subscribe({
           next: (result) => {
-            expect(result).toBeFalse();
+            expect(result).toBe(false);
             done();
           },
           error: done.fail
         });
-      });
+      }));
     });
 
     describe('canMasteryContent', () => {
-      it('should return true if pool has enough questions', (done) => {
+      it('should return true if pool has enough questions', () => new Promise<void>(done => {
         const pool = createMockPool('content-1', [
           createMockQuestion('q1', 'content-1'),
           createMockQuestion('q2', 'content-1'),
@@ -662,30 +667,30 @@ describe('QuestionPoolService', () => {
           createMockQuestion('q5', 'content-1')
         ]);
 
-        mockDataLoader.getContent.and.returnValue(of({
+        mockDataLoader.getContent.mockReturnValue(of({
           content: JSON.stringify(pool),
           contentType: 'question-pool'
         } as any));
 
         service.canMasteryContent('content-1').subscribe({
           next: (result) => {
-            expect(result).toBeTrue();
+            expect(result).toBe(true);
             done();
           },
           error: done.fail
         });
-      });
+      }));
     });
 
     describe('getPoolCompleteness', () => {
-      it('should calculate completeness percentage', (done) => {
+      it('should calculate completeness percentage', () => new Promise<void>(done => {
         const pool = createMockPool('content-1', [
           createMockQuestion('q1', 'content-1'),
           createMockQuestion('q2', 'content-1'),
           createMockQuestion('q3', 'content-1')
         ]);
 
-        mockDataLoader.getContent.and.returnValue(of({
+        mockDataLoader.getContent.mockReturnValue(of({
           content: JSON.stringify(pool),
           contentType: 'question-pool'
         } as any));
@@ -698,10 +703,10 @@ describe('QuestionPoolService', () => {
           },
           error: done.fail
         });
-      });
+      }));
 
-      it('should return 0 if no pool', (done) => {
-        mockDataLoader.getContent.and.returnValue(of(null as any));
+      it('should return 0 if no pool', () => new Promise<void>(done => {
+        mockDataLoader.getContent.mockReturnValue(of(null as any));
 
         service.getPoolCompleteness('content-1').subscribe({
           next: (result) => {
@@ -710,12 +715,12 @@ describe('QuestionPoolService', () => {
           },
           error: done.fail
         });
-      });
+      }));
     });
   });
 
   describe('searchPools', () => {
-    it('should return empty array for empty contentIds', (done) => {
+    it('should return empty array for empty contentIds', () => new Promise<void>(done => {
       service.searchPools({ contentIds: [] }).subscribe({
         next: (result) => {
           expect(result.length).toBe(0);
@@ -723,9 +728,9 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should filter by minimum questions', (done) => {
+    it('should filter by minimum questions', () => new Promise<void>(done => {
       const pool1 = createMockPool('content-1', [createMockQuestion('q1', 'content-1')]);
       const pool2 = createMockPool('content-2', [
         createMockQuestion('q2', 'content-2'),
@@ -733,7 +738,7 @@ describe('QuestionPoolService', () => {
         createMockQuestion('q4', 'content-2')
       ]);
 
-      mockDataLoader.getContent.and.callFake((path: string) => {
+      mockDataLoader.getContent.mockImplementation((path: string) => {
         if (path.includes('content-1')) {
           return of({ content: JSON.stringify(pool1), contentType: 'question-pool' } as any);
         }
@@ -751,9 +756,9 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should filter by isComplete flag', (done) => {
+    it('should filter by isComplete flag', () => new Promise<void>(done => {
       const completePool = createMockPool('content-1', [
         createMockQuestion('q1', 'content-1'),
         createMockQuestion('q2', 'content-1'),
@@ -763,7 +768,7 @@ describe('QuestionPoolService', () => {
       ]);
       const incompletePool = createMockPool('content-2', [createMockQuestion('q2', 'content-2')]);
 
-      mockDataLoader.getContent.and.callFake((path: string) => {
+      mockDataLoader.getContent.mockImplementation((path: string) => {
         if (path.includes('content-1')) {
           return of({ content: JSON.stringify(completePool), contentType: 'question-pool' } as any);
         }
@@ -776,19 +781,19 @@ describe('QuestionPoolService', () => {
       service.searchPools({ contentIds: ['content-1', 'content-2'], isComplete: true }).subscribe({
         next: (result) => {
           expect(result.length).toBe(1);
-          expect(result[0].metadata.isComplete).toBeTrue();
+          expect(result[0].metadata.isComplete).toBe(true);
           done();
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('clearCache', () => {
-    it('should clear the pool cache', (done) => {
+    it('should clear the pool cache', () => new Promise<void>(done => {
       const pool = createMockPool('content-1', [createMockQuestion('q1', 'content-1')]);
 
-      mockDataLoader.getContent.and.returnValue(of({
+      mockDataLoader.getContent.mockReturnValue(of({
         content: JSON.stringify(pool),
         contentType: 'question-pool'
       } as any));
@@ -810,6 +815,6 @@ describe('QuestionPoolService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 });

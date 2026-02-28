@@ -5,10 +5,11 @@ import { QuizSessionService } from './quiz-session.service';
 import { QuestionPoolService } from './question-pool.service';
 import type { PerseusItem, PerseusScoreResult } from '../../content-io/plugins/sophia/sophia-moment.model';
 import type { QuizSession } from '../models/quiz-session.model';
+import { vi } from 'vitest';
 
 describe('QuizSessionService', () => {
   let service: QuizSessionService;
-  let mockQuestionPool: jasmine.SpyObj<QuestionPoolService>;
+  let mockQuestionPool: any;
 
   const createMockQuestion = (id: string, contentId: string): PerseusItem => ({
     id,
@@ -55,25 +56,25 @@ describe('QuizSessionService', () => {
   } as PerseusScoreResult);
 
   beforeEach(() => {
-    mockQuestionPool = jasmine.createSpyObj('QuestionPoolService', [
-      'getHierarchicalPool',
-      'loadHierarchicalPools',
-      'selectPracticeQuestions',
-      'selectMasteryQuestions',
-      'selectInlineQuestions',
-      'selectQuestions'
-    ]);
+    mockQuestionPool = {
+    getHierarchicalPool: vi.fn(),
+    loadHierarchicalPools: vi.fn(),
+    selectPracticeQuestions: vi.fn(),
+    selectMasteryQuestions: vi.fn(),
+    selectInlineQuestions: vi.fn(),
+    selectQuestions: vi.fn(),
+  };
 
     // Set up default mock returns
     const emptySource = createMockHierarchicalSource();
-    mockQuestionPool.getHierarchicalPool.and.returnValue(of(emptySource));
-    mockQuestionPool.loadHierarchicalPools.and.returnValue(of(emptySource));
-    mockQuestionPool.selectPracticeQuestions.and.returnValue({
+    mockQuestionPool.getHierarchicalPool.mockReturnValue(of(emptySource));
+    mockQuestionPool.loadHierarchicalPools.mockReturnValue(of(emptySource));
+    mockQuestionPool.selectPracticeQuestions.mockReturnValue({
       questions: [],
       selectionComplete: true,
       contentIds: []
     });
-    mockQuestionPool.selectInlineQuestions.and.returnValue(of({
+    mockQuestionPool.selectInlineQuestions.mockReturnValue(of({
       questions: [],
       selectionComplete: true,
       contentIds: []
@@ -93,16 +94,16 @@ describe('QuizSessionService', () => {
   });
 
   describe('startPracticeQuiz', () => {
-    it('should create a practice quiz session', (done) => {
+    it('should create a practice quiz session', () => new Promise<void>(done => {
       const questions = [
         createMockQuestion('q1', 'content-1'),
         createMockQuestion('q2', 'content-2')
       ];
       const source = createMockHierarchicalSource(questions);
 
-      mockQuestionPool.getHierarchicalPool.and.returnValue(of(source));
-      mockQuestionPool.loadHierarchicalPools.and.returnValue(of(source));
-      mockQuestionPool.selectPracticeQuestions.and.returnValue({
+      mockQuestionPool.getHierarchicalPool.mockReturnValue(of(source));
+      mockQuestionPool.loadHierarchicalPools.mockReturnValue(of(source));
+      mockQuestionPool.selectPracticeQuestions.mockReturnValue({
         questions,
         selectionComplete: true,
         contentIds: ['content-1', 'content-2']
@@ -121,12 +122,12 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should call question pool services with correct parameters', (done) => {
+    it('should call question pool services with correct parameters', () => new Promise<void>(done => {
       const source = createMockHierarchicalSource();
-      mockQuestionPool.getHierarchicalPool.and.returnValue(of(source));
-      mockQuestionPool.loadHierarchicalPools.and.returnValue(of(source));
+      mockQuestionPool.getHierarchicalPool.mockReturnValue(of(source));
+      mockQuestionPool.loadHierarchicalPools.mockReturnValue(of(source));
 
       service.startPracticeQuiz('path-1', 'section-1', 'human-1', 10).subscribe({
         next: () => {
@@ -137,17 +138,17 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('startMasteryQuiz', () => {
-    it('should create a mastery quiz session', (done) => {
+    it('should create a mastery quiz session', () => new Promise<void>(done => {
       const questions = [createMockQuestion('q1', 'content-1')];
       const source = createMockHierarchicalSource(questions);
 
-      mockQuestionPool.getHierarchicalPool.and.returnValue(of(source));
-      mockQuestionPool.loadHierarchicalPools.and.returnValue(of(source));
-      mockQuestionPool.selectMasteryQuestions.and.returnValue({
+      mockQuestionPool.getHierarchicalPool.mockReturnValue(of(source));
+      mockQuestionPool.loadHierarchicalPools.mockReturnValue(of(source));
+      mockQuestionPool.selectMasteryQuestions.mockReturnValue({
         questions,
         selectionComplete: true,
         contentIds: ['content-1']
@@ -161,14 +162,14 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should pass practiced content IDs to question pool', (done) => {
+    it('should pass practiced content IDs to question pool', () => new Promise<void>(done => {
       const questions = [createMockQuestion('q1', 'content-1')];
       const source = createMockHierarchicalSource(questions);
-      mockQuestionPool.getHierarchicalPool.and.returnValue(of(source));
-      mockQuestionPool.loadHierarchicalPools.and.returnValue(of(source));
-      mockQuestionPool.selectMasteryQuestions.and.returnValue({
+      mockQuestionPool.getHierarchicalPool.mockReturnValue(of(source));
+      mockQuestionPool.loadHierarchicalPools.mockReturnValue(of(source));
+      mockQuestionPool.selectMasteryQuestions.mockReturnValue({
         questions,
         selectionComplete: true,
         contentIds: ['content-1', 'content-2']
@@ -186,17 +187,17 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('startInlineQuiz', () => {
-    it('should create an inline quiz session', (done) => {
+    it('should create an inline quiz session', () => new Promise<void>(done => {
       const questions = [
         createMockQuestion('q1', 'content-1'),
         createMockQuestion('q2', 'content-1')
       ];
 
-      mockQuestionPool.selectInlineQuestions.and.returnValue(of({
+      mockQuestionPool.selectInlineQuestions.mockReturnValue(of({
         questions,
         selectionComplete: true,
         contentIds: ['content-1']
@@ -207,16 +208,16 @@ describe('QuizSessionService', () => {
           expect(session.type).toBe('inline');
           expect(session.streakInfo).toBeDefined();
           expect(session.streakInfo?.targetStreak).toBe(3);
-          expect(session.config.allowRetry).toBeTrue();
-          expect(session.config.showImmediateFeedback).toBeTrue();
+          expect(session.config.allowRetry).toBe(true);
+          expect(session.config.showImmediateFeedback).toBe(true);
           done();
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should call selectInlineQuestions with correct parameters', (done) => {
-      mockQuestionPool.selectInlineQuestions.and.returnValue(of({
+    it('should call selectInlineQuestions with correct parameters', () => new Promise<void>(done => {
+      mockQuestionPool.selectInlineQuestions.mockReturnValue(of({
         questions: [],
         selectionComplete: true,
         contentIds: []
@@ -229,17 +230,17 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('startPreAssessment', () => {
-    it('should create a pre-assessment quiz session', (done) => {
+    it('should create a pre-assessment quiz session', () => new Promise<void>(done => {
       const questions = [createMockQuestion('q1', 'content-1')];
       const source = createMockHierarchicalSource(questions);
 
-      mockQuestionPool.getHierarchicalPool.and.returnValue(of(source));
-      mockQuestionPool.loadHierarchicalPools.and.returnValue(of(source));
-      mockQuestionPool.selectQuestions.and.returnValue({
+      mockQuestionPool.getHierarchicalPool.mockReturnValue(of(source));
+      mockQuestionPool.loadHierarchicalPools.mockReturnValue(of(source));
+      mockQuestionPool.selectQuestions.mockReturnValue({
         questions,
         selectionComplete: true,
         contentIds: ['content-1']
@@ -253,7 +254,7 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('createCustomSession', () => {
@@ -273,8 +274,8 @@ describe('QuizSessionService', () => {
 
       const session = service.createCustomSession('practice', 'human-1', questions, config);
 
-      expect(session.config.allowBackNavigation).toBeTrue();
-      expect(session.config.showImmediateFeedback).toBeFalse();
+      expect(session.config.allowBackNavigation).toBe(true);
+      expect(session.config.showImmediateFeedback).toBe(false);
     });
   });
 
@@ -296,7 +297,7 @@ describe('QuizSessionService', () => {
   });
 
   describe('getSession$', () => {
-    it('should return observable for existing session', (done) => {
+    it('should return observable for existing session', () => new Promise<void>(done => {
       const questions = [createMockQuestion('q1', 'content-1')];
       const created = service.createCustomSession('practice', 'human-1', questions);
 
@@ -307,9 +308,9 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
 
-    it('should return null observable for unknown session', (done) => {
+    it('should return null observable for unknown session', () => new Promise<void>(done => {
       service.getSession$('unknown-id').subscribe({
         next: (session) => {
           expect(session).toBeNull();
@@ -317,7 +318,7 @@ describe('QuizSessionService', () => {
         },
         error: done.fail
       });
-    });
+    }));
   });
 
   describe('Session State Management', () => {
@@ -392,7 +393,7 @@ describe('QuizSessionService', () => {
       const response = service.submitAnswer(session.id, 'q1', { answer: 'test' }, scoreResult);
 
       expect(response).not.toBeNull();
-      expect(response?.correct).toBeTrue();
+      expect(response?.correct).toBe(true);
       expect(response?.score).toBe(1);
       expect(response?.questionId).toBe('q1');
     });
@@ -403,7 +404,7 @@ describe('QuizSessionService', () => {
       const response = service.submitAnswer(session.id, 'q1', { answer: 'test' }, scoreResult);
 
       expect(response).not.toBeNull();
-      expect(response?.correct).toBeFalse();
+      expect(response?.correct).toBe(false);
       expect(response?.score).toBe(0);
     });
 
@@ -592,24 +593,24 @@ describe('QuizSessionService', () => {
     it('should mark hint as used', () => {
       const result = service.useHint(session.id);
 
-      expect(result).toBeTrue();
+      expect(result).toBe(true);
 
       const updated = service.getSession(session.id);
-      expect(updated?.questions[0].hintUsed).toBeTrue();
+      expect(updated?.questions[0].hintUsed).toBe(true);
     });
 
     it('should return true if hint already used', () => {
       service.useHint(session.id);
       const result = service.useHint(session.id);
 
-      expect(result).toBeTrue();
+      expect(result).toBe(true);
     });
 
     it('should return false if session not in progress', () => {
       service.pauseSession(session.id);
       const result = service.useHint(session.id);
 
-      expect(result).toBeFalse();
+      expect(result).toBe(false);
     });
   });
 
@@ -676,7 +677,7 @@ describe('QuizSessionService', () => {
       expect(result).not.toBeNull();
 
       const updated = service.getSession(session.id);
-      expect(updated?.timing.timeExceeded).toBeTrue();
+      expect(updated?.timing.timeExceeded).toBe(true);
     });
   });
 
@@ -729,7 +730,7 @@ describe('QuizSessionService', () => {
       it('should return false for active session', () => {
         const complete = service.isSessionComplete(session.id);
 
-        expect(complete).toBeFalse();
+        expect(complete).toBe(false);
       });
 
       it('should return true for completed session', () => {
@@ -739,18 +740,18 @@ describe('QuizSessionService', () => {
 
         const complete = service.isSessionComplete(session.id);
 
-        expect(complete).toBeTrue();
+        expect(complete).toBe(true);
       });
 
       it('should return false for unknown session', () => {
         const complete = service.isSessionComplete('unknown-id');
 
-        expect(complete).toBeFalse();
+        expect(complete).toBe(false);
       });
     });
 
     describe('cleanupSessions', () => {
-      it('should remove old completed sessions', (done) => {
+      it('should remove old completed sessions', () => new Promise<void>(done => {
         service.startSession(session.id);
         service.submitAnswer(session.id, 'q1', { answer: 'test' }, createScoreResult(true));
         service.submitAnswer(session.id, 'q2', { answer: 'test' }, createScoreResult(true));
@@ -764,7 +765,7 @@ describe('QuizSessionService', () => {
           expect(retrieved).toBeNull();
           done();
         }, 10);
-      });
+      }));
 
       it('should not remove active sessions', () => {
         service.startSession(session.id);

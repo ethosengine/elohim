@@ -126,7 +126,7 @@ run_gate() {
     case "$PROJECT_NAME" in
       elohim-app)
         pnpm exec ng build --configuration=development 2>&1 && \
-        pnpm exec ng test --watch=false --browsers=ChromeHeadlessCI 2>&1
+        pnpm exec vitest run --config vite.config.ts 2>&1
         rc=$?
         ;;
       doorway|elohim-node)

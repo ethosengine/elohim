@@ -7,18 +7,19 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { RequestsAndOffersService } from './requests-and-offers.service';
 import { EconomicService } from './economic.service';
 import { of } from 'rxjs';
+import { vi } from 'vitest';
 
 describe('RequestsAndOffersService', () => {
   let service: RequestsAndOffersService;
-  let mockEconomic: jasmine.SpyObj<EconomicService>;
+  let mockEconomic: any;
 
   beforeEach(() => {
-    mockEconomic = jasmine.createSpyObj('EconomicService', [
-      'createEvent',
-      'getEventsForAgent',
-    ]);
-    mockEconomic.createEvent.and.returnValue(of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any));
-    mockEconomic.getEventsForAgent.and.returnValue(of([]));
+    mockEconomic = {
+    createEvent: vi.fn(),
+    getEventsForAgent: vi.fn(),
+  };
+    mockEconomic.createEvent.mockReturnValue(of({ id: 'event-123', hasPointInTime: new Date().toISOString() } as any));
+    mockEconomic.getEventsForAgent.mockReturnValue(of([]));
 
     TestBed.configureTestingModule({
       providers: [
@@ -407,8 +408,8 @@ describe('RequestsAndOffersService', () => {
 
     it('should return paginated result', fakeAsync(async () => {
       const result = await service.searchRequests({});
-      expect(result).toEqual(jasmine.objectContaining({
-        requests: jasmine.any(Array),
+      expect(result).toEqual(expect.objectContaining({
+        requests: expect.any(Array),
         totalCount: 0,
         page: 1,
         pageSize: 20,
@@ -424,8 +425,8 @@ describe('RequestsAndOffersService', () => {
 
     it('should return paginated result', fakeAsync(async () => {
       const result = await service.searchOffers({});
-      expect(result).toEqual(jasmine.objectContaining({
-        offers: jasmine.any(Array),
+      expect(result).toEqual(expect.objectContaining({
+        offers: expect.any(Array),
         totalCount: 0,
         page: 1,
         pageSize: 20,

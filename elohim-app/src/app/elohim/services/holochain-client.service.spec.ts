@@ -1,8 +1,10 @@
+import { vi, Mock } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { HolochainClientService } from './holochain-client.service';
+import { provideHttpClient } from '@angular/common/http';
 
 /**
  * Unit tests for HolochainClientService
@@ -34,8 +36,7 @@ describe('HolochainClientService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [HolochainClientService, { provide: CONNECTION_STRATEGY, useValue: mockStrategy }],
+      providers: [provideHttpClient(), provideHttpClientTesting(), HolochainClientService, { provide: CONNECTION_STRATEGY, useValue: mockStrategy }],
     });
     service = TestBed.inject(HolochainClientService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -55,7 +56,7 @@ describe('HolochainClientService', () => {
     });
 
     it('should not be connected initially', () => {
-      expect(service.isConnected()).toBeFalse();
+      expect(service.isConnected()).toBe(false);
     });
 
     it('should have no error initially', () => {
@@ -135,7 +136,7 @@ describe('HolochainClientService', () => {
         payload: { id: 'test' },
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
       expect(result.error).toContain('Not connected');
     });
 
@@ -149,7 +150,7 @@ describe('HolochainClientService', () => {
         payload: { id: 'test' },
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
     });
 
     it('should use default role name lamad', async () => {
@@ -160,7 +161,7 @@ describe('HolochainClientService', () => {
       });
 
       // Should fail gracefully with disconnected state
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
     });
 
     it('should accept explicit role name', async () => {
@@ -171,7 +172,7 @@ describe('HolochainClientService', () => {
         payload: {},
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
       expect(result.error).toBeTruthy();
     });
 
@@ -184,7 +185,7 @@ describe('HolochainClientService', () => {
       });
 
       // Should not throw - correlation ID generation is internal
-      expect(true).toBeTrue();
+      expect(true).toBe(true);
     });
   });
 
@@ -196,7 +197,7 @@ describe('HolochainClientService', () => {
         payload: { id: 'test' },
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
       expect(result.error).toBeTruthy();
     });
 
@@ -207,7 +208,7 @@ describe('HolochainClientService', () => {
         payload: {},
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
     });
 
     // TODO(test-generator): [HIGH] Test successful REST zome call with mocked HTTP
@@ -223,14 +224,14 @@ describe('HolochainClientService', () => {
     it('should timeout if connection not established', async () => {
       const connected = await service.waitForConnection(100); // 100ms timeout
 
-      expect(connected).toBeFalse();
+      expect(connected).toBe(false);
     });
 
     it('should return false if in error state', async () => {
       await service.disconnect();
       const connected = await service.waitForConnection(100);
 
-      expect(connected).toBeFalse();
+      expect(connected).toBe(false);
     });
   });
 
@@ -239,7 +240,7 @@ describe('HolochainClientService', () => {
       await service.disconnect();
 
       expect(service.state()).toBe('disconnected');
-      expect(service.isConnected()).toBeFalse();
+      expect(service.isConnected()).toBe(false);
     });
 
     it('should clear connection data', async () => {
@@ -266,7 +267,7 @@ describe('HolochainClientService', () => {
       service.setAutoReconnect(false);
 
       const status = service.getReconnectStatus();
-      expect(status.isReconnecting).toBeFalse();
+      expect(status.isReconnecting).toBe(false);
     });
 
     it('should get reconnect status', () => {
@@ -282,7 +283,7 @@ describe('HolochainClientService', () => {
       service.setAutoReconnect(false);
 
       const status = service.getReconnectStatus();
-      expect(status.isReconnecting).toBeFalse();
+      expect(status.isReconnecting).toBe(false);
       expect(status.retryCount).toBe(0);
     });
 
@@ -290,9 +291,9 @@ describe('HolochainClientService', () => {
       const status = service.getReconnectStatus();
 
       expect(status).toEqual({
-        isReconnecting: jasmine.any(Boolean),
-        retryCount: jasmine.any(Number),
-        maxRetries: jasmine.any(Number),
+        isReconnecting: expect.any(Boolean),
+        retryCount: expect.any(Number),
+        maxRetries: expect.any(Number),
       });
     });
   });
@@ -344,7 +345,7 @@ describe('HolochainClientService', () => {
         payload: {},
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
       expect(result.error).toContain('Not connected');
     });
 
@@ -360,7 +361,7 @@ describe('HolochainClientService', () => {
         });
 
         // Should fail with not connected, but accept the role
-        expect(result.success).toBeFalse();
+        expect(result.success).toBe(false);
       }
     });
 
@@ -372,7 +373,7 @@ describe('HolochainClientService', () => {
         payload: {},
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
       // Error either about not connected or no cell found
       expect(result.error).toBeTruthy();
     });
@@ -404,7 +405,7 @@ describe('HolochainClientService', () => {
       });
 
       // Metrics recorded internally - verify no errors
-      expect(true).toBeTrue();
+      expect(true).toBe(true);
     });
   });
 
@@ -430,7 +431,7 @@ describe('HolochainClientService', () => {
       const connected = await service.waitForConnection(50);
       const elapsed = Date.now() - startTime;
 
-      expect(connected).toBeFalse();
+      expect(connected).toBe(false);
       expect(elapsed).toBeGreaterThanOrEqual(50);
       expect(elapsed).toBeLessThan(150); // Allow some margin
     });
@@ -439,7 +440,7 @@ describe('HolochainClientService', () => {
       // Should poll every 100ms by default
       await service.waitForConnection(250);
       // If it doesn't throw, polling worked
-      expect(true).toBeTrue();
+      expect(true).toBe(true);
     });
   });
 
@@ -544,21 +545,21 @@ describe('HolochainClientService', () => {
     });
 
     it('should report no credentials initially', () => {
-      expect(service.hasStoredCredentials()).toBeFalse();
+      expect(service.hasStoredCredentials()).toBe(false);
     });
 
     it('should detect credentials in localStorage', () => {
       // Manually add credentials to localStorage
       localStorage.setItem('holochain-signing-credentials', JSON.stringify({ test: 'data' }));
 
-      expect(service.hasStoredCredentials()).toBeTrue();
+      expect(service.hasStoredCredentials()).toBe(true);
     });
 
     it('should handle localStorage errors gracefully', () => {
       // Mock localStorage to throw
-      spyOn(localStorage, 'getItem').and.throwError('Storage error');
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => { throw 'Storage error'; });
 
-      expect(service.hasStoredCredentials()).toBeFalse();
+      expect(service.hasStoredCredentials()).toBe(false);
     });
   });
 
@@ -575,7 +576,7 @@ describe('HolochainClientService', () => {
 
       // All should fail (not connected), but shouldn't interfere with each other
       results.forEach(result => {
-        expect(result.success).toBeFalse();
+        expect(result.success).toBe(false);
       });
     });
   });
@@ -589,7 +590,7 @@ describe('HolochainClientService', () => {
       });
 
       // Metrics are recorded internally - no errors means success
-      expect(true).toBeTrue();
+      expect(true).toBe(true);
     });
 
     it('should record metrics for failed calls', async () => {
@@ -599,7 +600,7 @@ describe('HolochainClientService', () => {
         payload: {},
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
       // Metrics still recorded even on failure
     });
 
@@ -611,7 +612,7 @@ describe('HolochainClientService', () => {
       });
 
       // Should not throw - metrics recorded
-      expect(true).toBeTrue();
+      expect(true).toBe(true);
     });
   });
 
@@ -660,7 +661,7 @@ describe('HolochainClientService', () => {
       const sources = service.getContentSources();
 
       expect(sources).toBeDefined();
-      expect(Array.isArray(sources)).toBeTrue();
+      expect(Array.isArray(sources)).toBe(true);
     });
 
     it('should provide valid source configurations', () => {
@@ -730,7 +731,7 @@ describe('HolochainClientService', () => {
         payload: { id: 'test' },
       });
 
-      expect(result.success).toBeFalse();
+      expect(result.success).toBe(false);
       expect(result.error).toBeTruthy();
     });
   });

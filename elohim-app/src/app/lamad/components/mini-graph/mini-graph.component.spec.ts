@@ -10,11 +10,12 @@ import {
   MiniGraphNode,
   MiniGraphEdge,
 } from '../../models/exploration-context.model';
+import { vi, Mock } from 'vitest';
 
 describe('MiniGraphComponent', () => {
   let component: MiniGraphComponent;
   let fixture: ComponentFixture<MiniGraphComponent>;
-  let relatedConceptsService: jasmine.SpyObj<RelatedConceptsService>;
+  let relatedConceptsService: any;
 
   // Mock data
   const mockMiniGraphNode: MiniGraphNode = {
@@ -46,10 +47,9 @@ describe('MiniGraphComponent', () => {
   };
 
   beforeEach(async () => {
-    const relatedConceptsServiceSpy = jasmine.createSpyObj(
-      'RelatedConceptsService',
-      ['getNeighborhood']
-    );
+    const relatedConceptsServiceSpy = {
+    getNeighborhood: vi.fn(),
+  };
 
     await TestBed.configureTestingModule({
       imports: [MiniGraphComponent],
@@ -60,7 +60,7 @@ describe('MiniGraphComponent', () => {
 
     relatedConceptsService = TestBed.inject(
       RelatedConceptsService
-    ) as jasmine.SpyObj<RelatedConceptsService>;
+    ) as { [K in keyof RelatedConceptsService]?: Mock };
     fixture = TestBed.createComponent(MiniGraphComponent);
     component = fixture.componentInstance;
   });
@@ -238,7 +238,7 @@ describe('MiniGraphComponent', () => {
 
   describe('Simple Method Tests', () => {
     it('should emit exploreRequested when onExpandClick is called', () => {
-      spyOn(component.exploreRequested, 'emit');
+      vi.spyOn(component.exploreRequested, 'emit');
       component.onExpandClick();
       expect(component.exploreRequested.emit).toHaveBeenCalledWith();
     });
@@ -252,7 +252,7 @@ describe('MiniGraphComponent', () => {
           isFirstChange: () => true,
         },
       };
-      relatedConceptsService.getNeighborhood.and.returnValue(of(mockGraphData));
+      relatedConceptsService.getNeighborhood.mockReturnValue(of(mockGraphData));
       component.focusNodeId = 'new-id';
       component.ngOnChanges(changes);
       expect(component.focusNodeId).toBe('new-id');

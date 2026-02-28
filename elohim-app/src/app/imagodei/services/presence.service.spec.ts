@@ -7,11 +7,12 @@ import { PresenceService } from './presence.service';
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
 import { IdentityService } from './identity.service';
 import { ContributorPresenceView, PresenceState } from '../models/presence.model';
+import { vi, Mock } from 'vitest';
 
 describe('PresenceService', () => {
   let service: PresenceService;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
+  let mockHolochainClient: any;
+  let mockIdentityService: any;
 
   const mockPresenceEntry = {
     id: 'presence-123',
@@ -49,14 +50,14 @@ describe('PresenceService', () => {
   };
 
   beforeEach(() => {
-    mockHolochainClient = jasmine.createSpyObj('HolochainClientService', [
-      'isConnected',
-      'callZome',
-    ]);
+    mockHolochainClient = {
+      isConnected: vi.fn(),
+      callZome: vi.fn(),
+    };
 
-    mockIdentityService = jasmine.createSpyObj('IdentityService', [], {
-      agentPubKey: jasmine.createSpy().and.returnValue('agent-pub-key-123'),
-    });
+    mockIdentityService = {
+      agentPubKey: vi.fn().mockReturnValue('agent-pub-key-123'),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -89,18 +90,16 @@ describe('PresenceService', () => {
 
   describe('createPresence', () => {
     it('should throw when not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
-      await expectAsync(
-        service.createPresence({
-          displayName: 'New Contributor',
-        })
-      ).toBeRejectedWithError('Not connected to network');
+      await expect(service.createPresence({
+        displayName: 'New Contributor',
+      })).rejects.toThrow('Not connected to network');
     });
 
     it('should create presence when connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: {
           action_hash: new Uint8Array([1, 2, 3]),
@@ -116,7 +115,7 @@ describe('PresenceService', () => {
       expect(result.displayName).toBe('Test Contributor');
       expect(result.presenceState).toBe('unclaimed');
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           zomeName: 'imagodei',
           fnName: 'create_contributor_presence',
           roleName: 'imagodei',
@@ -125,8 +124,8 @@ describe('PresenceService', () => {
     });
 
     it('should cache created presence', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: {
           action_hash: new Uint8Array([1, 2, 3]),
@@ -140,10 +139,10 @@ describe('PresenceService', () => {
     });
 
     it('should set loading state during creation', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       let capturedLoading = false;
-      (mockHolochainClient.callZome as jasmine.Spy).and.callFake(async () => {
+      (mockHolochainClient.callZome as Mock).mockImplementation(async () => {
         capturedLoading = service.isLoading();
         return {
           success: true,
@@ -158,15 +157,13 @@ describe('PresenceService', () => {
     });
 
     it('should set error on failure', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({
         success: false,
         error: 'Network error',
       });
 
-      await expectAsync(service.createPresence({ displayName: 'Test' })).toBeRejectedWithError(
-        'Network error'
-      );
+      await expect(service.createPresence({ displayName: 'Test' })).rejects.toThrow('Network error');
 
       expect(service.error()).toBe('Network error');
     });
@@ -174,24 +171,20 @@ describe('PresenceService', () => {
 
   describe('beginStewardship', () => {
     it('should throw when not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
-      await expectAsync(service.beginStewardship('presence-123')).toBeRejectedWithError(
-        'Not connected to network'
-      );
+      await expect(service.beginStewardship('presence-123')).rejects.toThrow('Not connected to network');
     });
 
     it('should throw when not authenticated', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      (mockIdentityService.agentPubKey as jasmine.Spy).and.returnValue(null);
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      (mockIdentityService.agentPubKey as Mock).mockReturnValue(null);
 
-      await expectAsync(service.beginStewardship('presence-123')).toBeRejectedWithError(
-        'Must be authenticated to begin stewardship'
-      );
+      await expect(service.beginStewardship('presence-123')).rejects.toThrow('Must be authenticated to begin stewardship');
     });
 
     it('should begin stewardship when authenticated', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       const stewardedEntry = {
         ...mockPresenceEntry,
@@ -200,7 +193,7 @@ describe('PresenceService', () => {
         stewardshipStartedAt: new Date().toISOString(),
       };
 
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: { action_hash: new Uint8Array([1]), presence: stewardedEntry },
       });
@@ -210,9 +203,9 @@ describe('PresenceService', () => {
       expect(result.presenceState).toBe('stewarded');
       expect(result.stewardId).toBe('agent-pub-key-123');
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'begin_stewardship',
-          payload: jasmine.objectContaining({
+          payload: expect.objectContaining({
             presenceId: 'presence-123',
             stewardAgentId: 'agent-pub-key-123',
             commitmentNote: 'I will care for this',
@@ -224,7 +217,7 @@ describe('PresenceService', () => {
 
   describe('getMyStewardedPresences', () => {
     it('should return empty when not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       const result = await service.getMyStewardedPresences();
 
@@ -232,8 +225,8 @@ describe('PresenceService', () => {
     });
 
     it('should return empty when not authenticated', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      (mockIdentityService.agentPubKey as jasmine.Spy).and.returnValue(null);
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      (mockIdentityService.agentPubKey as Mock).mockReturnValue(null);
 
       const result = await service.getMyStewardedPresences();
 
@@ -241,9 +234,9 @@ describe('PresenceService', () => {
     });
 
     it('should return stewarded presences', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: [
           { action_hash: new Uint8Array([1]), presence: mockPresenceEntry },
@@ -263,19 +256,17 @@ describe('PresenceService', () => {
 
   describe('initiateClaim', () => {
     it('should throw when not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
-      await expectAsync(
-        service.initiateClaim({
-          presenceId: 'presence-123',
-          claimEvidence: { proof: 'test' },
-          verificationMethod: 'email',
-        })
-      ).toBeRejectedWithError('Not connected to network');
+      await expect(service.initiateClaim({
+        presenceId: 'presence-123',
+        claimEvidence: { proof: 'test' },
+        verificationMethod: 'email',
+      })).rejects.toThrow('Not connected to network');
     });
 
     it('should initiate claim', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       const claimingEntry = {
         ...mockPresenceEntry,
@@ -283,7 +274,7 @@ describe('PresenceService', () => {
         claimVerificationMethod: 'email',
       };
 
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: { action_hash: new Uint8Array([1]), presence: claimingEntry },
       });
@@ -301,7 +292,7 @@ describe('PresenceService', () => {
 
   describe('verifyClaim', () => {
     it('should verify claim', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
 
       const claimedEntry = {
         ...mockPresenceEntry,
@@ -310,7 +301,7 @@ describe('PresenceService', () => {
         claimedAgentId: 'agent-123',
       };
 
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: { action_hash: new Uint8Array([1]), presence: claimedEntry },
       });
@@ -325,8 +316,8 @@ describe('PresenceService', () => {
   describe('getPresenceById', () => {
     it('should return cached presence', async () => {
       // First, add to cache by creating
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: { action_hash: new Uint8Array([1]), presence: mockPresenceEntry },
       });
@@ -334,7 +325,7 @@ describe('PresenceService', () => {
       await service.createPresence({ displayName: 'Test' });
 
       // Reset spy to verify cache hit
-      mockHolochainClient.callZome.calls.reset();
+      mockHolochainClient.callZome.mockClear();
 
       const result = await service.getPresenceById('presence-123');
 
@@ -343,8 +334,8 @@ describe('PresenceService', () => {
     });
 
     it('should fetch when not cached', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: { action_hash: new Uint8Array([1]), presence: mockPresenceEntry },
       });
@@ -353,7 +344,7 @@ describe('PresenceService', () => {
 
       expect(result?.id).toBe('presence-123');
       expect(mockHolochainClient.callZome).toHaveBeenCalledWith(
-        jasmine.objectContaining({
+        expect.objectContaining({
           fnName: 'get_contributor_presence_by_id',
           payload: 'presence-123',
         })
@@ -361,7 +352,7 @@ describe('PresenceService', () => {
     });
 
     it('should return null when not connected and not cached', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       const result = await service.getPresenceById('presence-123');
 
@@ -371,7 +362,7 @@ describe('PresenceService', () => {
 
   describe('getPresencesByState', () => {
     it('should return empty when not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
 
       const result = await service.getPresencesByState('unclaimed');
 
@@ -379,8 +370,8 @@ describe('PresenceService', () => {
     });
 
     it('should return presences by state', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: [{ action_hash: new Uint8Array([1]), presence: mockPresenceEntry }],
       });
@@ -395,7 +386,7 @@ describe('PresenceService', () => {
   describe('cache management', () => {
     it('should clear error', () => {
       // Trigger an error first
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       service.createPresence({ displayName: 'Test' }).catch(() => {});
 
       service.clearError();
@@ -404,8 +395,8 @@ describe('PresenceService', () => {
     });
 
     it('should clear cache', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
-      mockHolochainClient.callZome.and.resolveTo({
+      mockHolochainClient.isConnected.mockReturnValue(true);
+      mockHolochainClient.callZome.mockResolvedValue({
         success: true,
         data: { action_hash: new Uint8Array([1]), presence: mockPresenceEntry },
       });

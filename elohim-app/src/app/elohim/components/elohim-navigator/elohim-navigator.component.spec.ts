@@ -14,48 +14,50 @@ import { IdentityService } from '@app/imagodei/services/identity.service';
 import { AuthService } from '@app/imagodei/services/auth.service';
 import { RunningContextService } from '@app/doorway/services/running-context.service';
 import { UpgradeBannerProvider } from '@app/imagodei/services/providers/upgrade-banner.provider';
+import { vi } from 'vitest';
 
 describe('ElohimNavigatorComponent', () => {
   let component: ElohimNavigatorComponent;
   let fixture: ComponentFixture<ElohimNavigatorComponent>;
-  let mockSessionHumanService: jasmine.SpyObj<SessionHumanService>;
-  let mockRouter: jasmine.SpyObj<Router>;
-  let mockHolochainService: jasmine.SpyObj<HolochainClientService>;
-  let mockIdentityService: jasmine.SpyObj<IdentityService>;
-  let mockAuthService: jasmine.SpyObj<AuthService>;
-  let mockRunningContext: jasmine.SpyObj<RunningContextService>;
-  let mockBannerService: jasmine.SpyObj<BannerService>;
-  let mockUpgradeBannerProvider: jasmine.SpyObj<UpgradeBannerProvider>;
+  let mockSessionHumanService: any;
+  let mockRouter: any;
+  let mockHolochainService: any;
+  let mockIdentityService: any;
+  let mockAuthService: any;
+  let mockRunningContext: any;
+  let mockBannerService: any;
+  let mockUpgradeBannerProvider: any;
   let routerEventsSubject: Subject<unknown>;
 
   beforeEach(async () => {
     routerEventsSubject = new Subject();
 
-    mockSessionHumanService = jasmine.createSpyObj('SessionHumanService', [], {
+    mockSessionHumanService = {
       session$: new Subject(),
       upgradePrompts$: new Subject(),
-    });
+    };
 
-    mockRouter = jasmine.createSpyObj('Router', ['navigate', 'createUrlTree', 'serializeUrl'], {
+    mockRouter = {
+      navigate: vi.fn(),
+      createUrlTree: vi.fn(),
+      serializeUrl: vi.fn(),
       events: routerEventsSubject.asObservable(),
       url: '/lamad',
-    });
-    mockRouter.createUrlTree.and.returnValue({
+    };
+    mockRouter.createUrlTree.mockReturnValue({
       root: {},
       queryParams: {},
       fragment: null,
       queryParamMap: new Map(),
     } as any);
-    mockRouter.serializeUrl.and.returnValue('/lamad');
+    mockRouter.serializeUrl.mockReturnValue('/lamad');
 
-    mockHolochainService = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['disconnect', 'connect', 'getDisplayInfo'],
-      {
-        state: signal('disconnected'),
-      }
-    );
-    mockHolochainService.getDisplayInfo.and.returnValue({
+    mockHolochainService = {
+      disconnect: vi.fn(),
+      connect: vi.fn(),
+      getDisplayInfo: vi.fn(),
+    };
+    mockHolochainService.getDisplayInfo.mockReturnValue({
       state: 'disconnected',
       mode: 'doorway',
       adminUrl: 'ws://localhost:8888',
@@ -70,45 +72,43 @@ describe('ElohimNavigatorComponent', () => {
       error: null,
     });
 
-    mockIdentityService = jasmine.createSpyObj('IdentityService', ['logout'], {
-      mode: signal('session'),
-      displayName: signal('Test User'),
-    });
+    mockIdentityService = { logout: vi.fn() };
 
-    mockAuthService = jasmine.createSpyObj('AuthService', ['isAuthenticated'], {
-      identifier: signal(null),
-      doorwayUrl: signal(null),
-    });
-    mockAuthService.isAuthenticated.and.returnValue(false);
+    mockAuthService = { isAuthenticated: vi.fn() };
+    mockAuthService.isAuthenticated.mockReturnValue(false);
 
-    mockRunningContext = jasmine.createSpyObj('RunningContextService', [
-      'startPeriodicDetection',
-      'stopPeriodicDetection',
-      'hasDoorwayCapableNode',
-    ]);
-    mockRunningContext.hasDoorwayCapableNode.and.returnValue(false);
+    mockRunningContext = {
+      startPeriodicDetection: vi.fn(),
+      stopPeriodicDetection: vi.fn(),
+      hasDoorwayCapableNode: vi.fn(),
+    };
+    mockRunningContext.hasDoorwayCapableNode.mockReturnValue(false);
 
-    mockBannerService = jasmine.createSpyObj('BannerService', [
-      'registerProvider',
-      'unregisterProvider',
-      'noticesForContext$',
-      'dismissNotice',
-      'handleAction',
-    ]);
-    mockBannerService.noticesForContext$.and.returnValue(of([]));
-
-    mockUpgradeBannerProvider = jasmine.createSpyObj('UpgradeBannerProvider', [], {
+    mockUpgradeBannerProvider = {
       upgradeModalRequested$: new Subject<void>(),
-    });
+      providerId: 'upgrade-banner',
+      notices$: of([]),
+      dismissNotice: vi.fn(),
+      handleAction: vi.fn(),
+    };
+
+    mockBannerService = {
+      registerProvider: vi.fn(),
+      unregisterProvider: vi.fn(),
+      noticesForContext$: vi.fn(),
+      dismissNotice: vi.fn(),
+      handleAction: vi.fn(),
+    };
+    mockBannerService.noticesForContext$.mockReturnValue(of([]));
 
     await TestBed.configureTestingModule({
       imports: [ElohimNavigatorComponent],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: SessionHumanService, useValue: mockSessionHumanService },
         { provide: Router, useValue: mockRouter },
-        { provide: ActivatedRoute, useValue: { queryParams: of({}) } },
+        { provide: ActivatedRoute, useValue: { snapshot: {}, params: of({}) } },
+        { provide: SessionHumanService, useValue: mockSessionHumanService },
         { provide: HolochainClientService, useValue: mockHolochainService },
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: AuthService, useValue: mockAuthService },

@@ -7,19 +7,27 @@ import { PathService } from '@app/lamad/services/path.service';
 import { AffinityTrackingService } from './affinity-tracking.service';
 import { AgentService } from './agent.service';
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
+import { vi, Mock } from 'vitest';
 
 describe('ProfileService', () => {
   let service: ProfileService;
-  let dataLoaderMock: jasmine.SpyObj<DataLoaderService>;
-  let pathServiceMock: jasmine.SpyObj<PathService>;
-  let affinityServiceMock: jasmine.SpyObj<AffinityTrackingService>;
-  let agentServiceMock: jasmine.SpyObj<AgentService>;
-  let sessionHumanServiceMock: jasmine.SpyObj<SessionHumanService>;
+  let dataLoaderMock: any;
+  let pathServiceMock: any;
+  let affinityServiceMock: any;
+  let agentServiceMock: any;
+  let sessionHumanServiceMock: any;
 
   beforeEach(() => {
-    const dataLoaderSpy = jasmine.createSpyObj('DataLoaderService', ['getPathIndex', 'getContent']);
-    const pathServiceSpy = jasmine.createSpyObj('PathService', ['getPath']);
-    const affinitySpy = jasmine.createSpyObj('AffinityTrackingService', ['trackView']);
+    const dataLoaderSpy = {
+      getPathIndex: vi.fn(),
+      getContent: vi.fn(),
+    };
+    const pathServiceSpy = {
+      getPath: vi.fn(),
+    };
+    const affinitySpy = {
+      trackView: vi.fn(),
+    };
 
     // Add affinitySubject property to the mock
     Object.defineProperty(affinitySpy, 'affinitySubject', {
@@ -28,16 +36,16 @@ describe('ProfileService', () => {
       configurable: true,
     });
 
-    const agentServiceSpy = jasmine.createSpyObj('AgentService', [
-      'getCurrentAgent',
-      'getAgentProgress',
-      'getAttestations',
-    ]);
-    const sessionHumanSpy = jasmine.createSpyObj('SessionHumanService', [
-      'getSession',
-      'getAllPathProgress',
-      'getActivityHistory',
-    ]);
+    const agentServiceSpy = {
+      getCurrentAgent: vi.fn(),
+      getAgentProgress: vi.fn(),
+      getAttestations: vi.fn(),
+    };
+    const sessionHumanSpy = {
+      getSession: vi.fn(),
+      getAllPathProgress: vi.fn(),
+      getActivityHistory: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -51,15 +59,15 @@ describe('ProfileService', () => {
     });
 
     service = TestBed.inject(ProfileService);
-    dataLoaderMock = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    pathServiceMock = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
+    dataLoaderMock = TestBed.inject(DataLoaderService) as { [K in keyof DataLoaderService]?: Mock };
+    pathServiceMock = TestBed.inject(PathService) as { [K in keyof PathService]?: Mock };
     affinityServiceMock = TestBed.inject(
       AffinityTrackingService
-    ) as jasmine.SpyObj<AffinityTrackingService>;
-    agentServiceMock = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+    ) as { [K in keyof AffinityTrackingService]?: Mock };
+    agentServiceMock = TestBed.inject(AgentService) as { [K in keyof AgentService]?: Mock };
     sessionHumanServiceMock = TestBed.inject(
       SessionHumanService
-    ) as jasmine.SpyObj<SessionHumanService>;
+    ) as { [K in keyof SessionHumanService]?: Mock };
   });
 
   it('should be created', () => {
@@ -73,10 +81,10 @@ describe('ProfileService', () => {
     });
 
     it('should return observable', () => {
-      agentServiceMock.getCurrentAgent.and.returnValue(of(null));
-      agentServiceMock.getAgentProgress.and.returnValue(of([]));
-      agentServiceMock.getAttestations.and.returnValue([]);
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+      agentServiceMock.getCurrentAgent.mockReturnValue(of(null));
+      agentServiceMock.getAgentProgress.mockReturnValue(of([]));
+      agentServiceMock.getAttestations.mockReturnValue([]);
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       const result = service.getProfile();
 
@@ -91,25 +99,25 @@ describe('ProfileService', () => {
       expect(typeof service.getProfileSummary).toBe('function');
     });
 
-    it('should return observable of profile summary', (done) => {
-      agentServiceMock.getCurrentAgent.and.returnValue(of(null));
-      agentServiceMock.getAgentProgress.and.returnValue(of([]));
-      agentServiceMock.getAttestations.and.returnValue([]);
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+    it('should return observable of profile summary', () => new Promise<void>(done => {
+      agentServiceMock.getCurrentAgent.mockReturnValue(of(null));
+      agentServiceMock.getAgentProgress.mockReturnValue(of([]));
+      agentServiceMock.getAttestations.mockReturnValue([]);
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       service.getProfileSummary().subscribe({
         next: (result) => {
           expect(result).toEqual(
-            jasmine.objectContaining({
-              displayName: jasmine.any(String),
-              isSessionBased: jasmine.any(Boolean),
+            expect.objectContaining({
+              displayName: expect.any(String),
+              isSessionBased: expect.any(Boolean),
             })
           );
           done();
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getJourneyStats', () => {
@@ -118,24 +126,24 @@ describe('ProfileService', () => {
       expect(typeof service.getJourneyStats).toBe('function');
     });
 
-    it('should return observable of journey stats', (done) => {
-      sessionHumanServiceMock.getSession.and.returnValue(null);
-      agentServiceMock.getAgentProgress.and.returnValue(of([]));
+    it('should return observable of journey stats', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getSession.mockReturnValue(null);
+      agentServiceMock.getAgentProgress.mockReturnValue(of([]));
 
       service.getJourneyStats().subscribe({
         next: (result) => {
           expect(result).toEqual(
-            jasmine.objectContaining({
-              territoryExplored: jasmine.any(Number),
-              journeysStarted: jasmine.any(Number),
-              journeysCompleted: jasmine.any(Number),
+            expect.objectContaining({
+              territoryExplored: expect.any(Number),
+              journeysStarted: expect.any(Number),
+              journeysCompleted: expect.any(Number),
             })
           );
           done();
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getCurrentFocus', () => {
@@ -144,8 +152,8 @@ describe('ProfileService', () => {
       expect(typeof service.getCurrentFocus).toBe('function');
     });
 
-    it('should return observable of current focus array', (done) => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+    it('should return observable of current focus array', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       service.getCurrentFocus().subscribe({
         next: (result) => {
@@ -154,10 +162,10 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should return empty array when no path progress', (done) => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+    it('should return empty array when no path progress', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       service.getCurrentFocus().subscribe({
         next: (result) => {
@@ -166,7 +174,7 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getDevelopedCapabilities', () => {
@@ -175,8 +183,8 @@ describe('ProfileService', () => {
       expect(typeof service.getDevelopedCapabilities).toBe('function');
     });
 
-    it('should return observable of capabilities array', (done) => {
-      agentServiceMock.getAttestations.and.returnValue(['attestation-1', 'attestation-2']);
+    it('should return observable of capabilities array', () => new Promise<void>(done => {
+      agentServiceMock.getAttestations.mockReturnValue(['attestation-1', 'attestation-2']);
 
       service.getDevelopedCapabilities().subscribe({
         next: (result) => {
@@ -186,28 +194,28 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should transform attestation IDs to capabilities', (done) => {
-      agentServiceMock.getAttestations.and.returnValue(['test-attestation']);
+    it('should transform attestation IDs to capabilities', () => new Promise<void>(done => {
+      agentServiceMock.getAttestations.mockReturnValue(['test-attestation']);
 
       service.getDevelopedCapabilities().subscribe({
         next: (result) => {
           expect(result[0]).toEqual(
-            jasmine.objectContaining({
+            expect.objectContaining({
               id: 'test-attestation',
-              name: jasmine.any(String),
-              description: jasmine.any(String),
+              name: expect.any(String),
+              description: expect.any(String),
             })
           );
           done();
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should return empty array when no attestations', (done) => {
-      agentServiceMock.getAttestations.and.returnValue([]);
+    it('should return empty array when no attestations', () => new Promise<void>(done => {
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       service.getDevelopedCapabilities().subscribe({
         next: (result) => {
@@ -216,7 +224,7 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getTimeline', () => {
@@ -225,8 +233,8 @@ describe('ProfileService', () => {
       expect(typeof service.getTimeline).toBe('function');
     });
 
-    it('should return observable of timeline events array', (done) => {
-      sessionHumanServiceMock.getActivityHistory.and.returnValue([]);
+    it('should return observable of timeline events array', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
 
       service.getTimeline().subscribe({
         next: (result) => {
@@ -235,10 +243,10 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should accept optional limit parameter', (done) => {
-      sessionHumanServiceMock.getActivityHistory.and.returnValue([]);
+    it('should accept optional limit parameter', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
 
       service.getTimeline(10).subscribe({
         next: (result) => {
@@ -247,10 +255,10 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should return empty array with no activities', (done) => {
-      sessionHumanServiceMock.getActivityHistory.and.returnValue([]);
+    it('should return empty array with no activities', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
 
       service.getTimeline().subscribe({
         next: (result) => {
@@ -259,7 +267,7 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getTopEngagedContent', () => {
@@ -268,7 +276,7 @@ describe('ProfileService', () => {
       expect(typeof service.getTopEngagedContent).toBe('function');
     });
 
-    it('should return observable of engaged content array', (done) => {
+    it('should return observable of engaged content array', () => new Promise<void>(done => {
       service.getTopEngagedContent().subscribe({
         next: (result) => {
           expect(Array.isArray(result)).toBe(true);
@@ -276,9 +284,9 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should accept optional limit parameter', (done) => {
+    it('should accept optional limit parameter', () => new Promise<void>(done => {
       service.getTopEngagedContent(5).subscribe({
         next: (result) => {
           expect(Array.isArray(result)).toBe(true);
@@ -286,9 +294,9 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should return empty array when no affinity data', (done) => {
+    it('should return empty array when no affinity data', () => new Promise<void>(done => {
       service.getTopEngagedContent().subscribe({
         next: (result) => {
           expect(result).toEqual([]);
@@ -296,7 +304,7 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getAllNotes', () => {
@@ -305,8 +313,8 @@ describe('ProfileService', () => {
       expect(typeof service.getAllNotes).toBe('function');
     });
 
-    it('should return observable of notes array', (done) => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+    it('should return observable of notes array', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       service.getAllNotes().subscribe({
         next: (result) => {
@@ -315,10 +323,10 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should return empty array with no path progress', (done) => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+    it('should return empty array with no path progress', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       service.getAllNotes().subscribe({
         next: (result) => {
@@ -327,7 +335,7 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getResumePoint', () => {
@@ -336,25 +344,25 @@ describe('ProfileService', () => {
       expect(typeof service.getResumePoint).toBe('function');
     });
 
-    it('should return observable of resume point', (done) => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+    it('should return observable of resume point', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       service.getResumePoint().subscribe({
         next: (result) => {
           expect(result).toEqual(
-            jasmine.objectContaining({
-              type: jasmine.any(String),
-              title: jasmine.any(String),
+            expect.objectContaining({
+              type: expect.any(String),
+              title: expect.any(String),
             })
           );
           done();
         },
         error: done.fail,
       });
-    });
+    }));
 
-    it('should suggest exploration when no active paths', (done) => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+    it('should suggest exploration when no active paths', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       service.getResumePoint().subscribe({
         next: (result) => {
@@ -363,7 +371,7 @@ describe('ProfileService', () => {
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('getPathsOverview', () => {
@@ -372,32 +380,32 @@ describe('ProfileService', () => {
       expect(typeof service.getPathsOverview).toBe('function');
     });
 
-    it('should return observable of paths overview', (done) => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
-      dataLoaderMock.getPathIndex.and.returnValue(of({ paths: [], lastUpdated: new Date().toISOString(), totalCount: 0 }));
+    it('should return observable of paths overview', () => new Promise<void>(done => {
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
+      dataLoaderMock.getPathIndex.mockReturnValue(of({ paths: [], lastUpdated: new Date().toISOString(), totalCount: 0 }));
 
       service.getPathsOverview().subscribe({
         next: (result) => {
           expect(result).toEqual(
-            jasmine.objectContaining({
-              inProgress: jasmine.any(Array),
-              completed: jasmine.any(Array),
-              suggested: jasmine.any(Array),
+            expect.objectContaining({
+              inProgress: expect.any(Array),
+              completed: expect.any(Array),
+              suggested: expect.any(Array),
             })
           );
           done();
         },
         error: done.fail,
       });
-    });
+    }));
   });
 
   describe('Observable returns', () => {
     it('getProfile should return observable', () => {
-      agentServiceMock.getCurrentAgent.and.returnValue(of(null));
-      agentServiceMock.getAgentProgress.and.returnValue(of([]));
-      agentServiceMock.getAttestations.and.returnValue([]);
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+      agentServiceMock.getCurrentAgent.mockReturnValue(of(null));
+      agentServiceMock.getAgentProgress.mockReturnValue(of([]));
+      agentServiceMock.getAttestations.mockReturnValue([]);
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       const result = service.getProfile();
 
@@ -405,10 +413,10 @@ describe('ProfileService', () => {
     });
 
     it('getProfileSummary should return observable', () => {
-      agentServiceMock.getCurrentAgent.and.returnValue(of(null));
-      agentServiceMock.getAgentProgress.and.returnValue(of([]));
-      agentServiceMock.getAttestations.and.returnValue([]);
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+      agentServiceMock.getCurrentAgent.mockReturnValue(of(null));
+      agentServiceMock.getAgentProgress.mockReturnValue(of([]));
+      agentServiceMock.getAttestations.mockReturnValue([]);
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       const result = service.getProfileSummary();
 
@@ -416,8 +424,8 @@ describe('ProfileService', () => {
     });
 
     it('getJourneyStats should return observable', () => {
-      sessionHumanServiceMock.getSession.and.returnValue(null);
-      agentServiceMock.getAgentProgress.and.returnValue(of([]));
+      sessionHumanServiceMock.getSession.mockReturnValue(null);
+      agentServiceMock.getAgentProgress.mockReturnValue(of([]));
 
       const result = service.getJourneyStats();
 
@@ -425,7 +433,7 @@ describe('ProfileService', () => {
     });
 
     it('getCurrentFocus should return observable', () => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       const result = service.getCurrentFocus();
 
@@ -433,7 +441,7 @@ describe('ProfileService', () => {
     });
 
     it('getDevelopedCapabilities should return observable', () => {
-      agentServiceMock.getAttestations.and.returnValue([]);
+      agentServiceMock.getAttestations.mockReturnValue([]);
 
       const result = service.getDevelopedCapabilities();
 
@@ -441,7 +449,7 @@ describe('ProfileService', () => {
     });
 
     it('getTimeline should return observable', () => {
-      sessionHumanServiceMock.getActivityHistory.and.returnValue([]);
+      sessionHumanServiceMock.getActivityHistory.mockReturnValue([]);
 
       const result = service.getTimeline();
 
@@ -455,7 +463,7 @@ describe('ProfileService', () => {
     });
 
     it('getAllNotes should return observable', () => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       const result = service.getAllNotes();
 
@@ -463,7 +471,7 @@ describe('ProfileService', () => {
     });
 
     it('getResumePoint should return observable', () => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
 
       const result = service.getResumePoint();
 
@@ -471,8 +479,8 @@ describe('ProfileService', () => {
     });
 
     it('getPathsOverview should return observable', () => {
-      sessionHumanServiceMock.getAllPathProgress.and.returnValue([]);
-      dataLoaderMock.getPathIndex.and.returnValue(of({ paths: [], lastUpdated: new Date().toISOString(), totalCount: 0 }));
+      sessionHumanServiceMock.getAllPathProgress.mockReturnValue([]);
+      dataLoaderMock.getPathIndex.mockReturnValue(of({ paths: [], lastUpdated: new Date().toISOString(), totalCount: 0 }));
 
       const result = service.getPathsOverview();
 

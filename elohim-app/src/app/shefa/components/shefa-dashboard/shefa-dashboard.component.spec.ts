@@ -20,63 +20,64 @@ import { ComputeEventService } from '../../services/compute-event.service';
 import { FamilyCommunityProtectionService } from '../../services/family-community-protection.service';
 import { ShefaComputeService } from '../../services/shefa-compute.service';
 import { ShefaDashboardComponent } from './shefa-dashboard.component';
+import { vi } from 'vitest';
 
 describe('ShefaDashboardComponent', () => {
   let component: ShefaDashboardComponent;
   let fixture: ComponentFixture<ShefaDashboardComponent>;
-  let shefaComputeMock: jasmine.SpyObj<ShefaComputeService>;
-  let familyProtectionMock: jasmine.SpyObj<FamilyCommunityProtectionService>;
-  let computeEventsMock: jasmine.SpyObj<ComputeEventService>;
-  let holochainClientMock: jasmine.SpyObj<HolochainClientService>;
-  let shefaServiceMock: jasmine.SpyObj<ShefaService>;
-  let performanceMetricsMock: jasmine.SpyObj<PerformanceMetricsService>;
-  let custodianCommitmentMock: jasmine.SpyObj<CustodianCommitmentService>;
-  let economicServiceMock: jasmine.SpyObj<EconomicService>;
-  let stewardedResourceMock: jasmine.SpyObj<StewardedResourceService>;
+  let shefaComputeMock: any;
+  let familyProtectionMock: any;
+  let computeEventsMock: any;
+  let holochainClientMock: any;
+  let shefaServiceMock: any;
+  let performanceMetricsMock: any;
+  let custodianCommitmentMock: any;
+  let economicServiceMock: any;
+  let stewardedResourceMock: any;
 
   beforeEach(async () => {
     // Reset to ensure clean test isolation
     TestBed.resetTestingModule();
 
-    holochainClientMock = jasmine.createSpyObj('HolochainClientService', [
-      'callZome',
-      'isConnected',
-    ]);
-    holochainClientMock.isConnected.and.returnValue(true);
+    holochainClientMock = {
+    callZome: vi.fn(),
+    isConnected: vi.fn(),
+  };
+    holochainClientMock.isConnected.mockReturnValue(true);
 
-    shefaServiceMock = jasmine.createSpyObj('ShefaService', [
-      'getComputeMetrics',
-      'getTokenBalance',
-    ]);
+    shefaServiceMock = {
+    getComputeMetrics: vi.fn(),
+    getTokenBalance: vi.fn(),
+  };
 
-    performanceMetricsMock = jasmine.createSpyObj('PerformanceMetricsService', [
-      'getMetrics',
-      'recordResponseTime',
-    ]);
+    performanceMetricsMock = {
+    getMetrics: vi.fn(),
+    recordResponseTime: vi.fn(),
+  };
 
-    custodianCommitmentMock = jasmine.createSpyObj('CustodianCommitmentService', [
-      'getCommitments',
-      'createCommitment',
-    ]);
+    custodianCommitmentMock = {
+    getCommitments: vi.fn(),
+    createCommitment: vi.fn(),
+  };
 
-    economicServiceMock = jasmine.createSpyObj('EconomicService', [
-      'isAvailable',
-      'getTokenBalance',
-    ]);
+    economicServiceMock = {
+    isAvailable: vi.fn(),
+    getTokenBalance: vi.fn(),
+  };
 
-    stewardedResourceMock = jasmine.createSpyObj('StewardedResourceService', [
-      'getAllocatedResources',
-    ]);
+    stewardedResourceMock = {
+    getAllocatedResources: vi.fn(),
+  };
 
-    shefaComputeMock = jasmine.createSpyObj('ShefaComputeService', [
-      'initializeDashboard',
-    ]);
-    familyProtectionMock = jasmine.createSpyObj('FamilyCommunityProtectionService', [
-      'initializeProtectionMonitoring',
-    ]);
-    computeEventsMock = jasmine.createSpyObj('ComputeEventService', [
-      'initializeEventEmission',
-    ]);
+    shefaComputeMock = {
+    initializeDashboard: vi.fn(),
+  };
+    familyProtectionMock = {
+    initializeProtectionMonitoring: vi.fn(),
+  };
+    computeEventsMock = {
+    initializeEventEmission: vi.fn(),
+  };
 
     await TestBed.configureTestingModule({
       imports: [ShefaDashboardComponent],
@@ -140,7 +141,7 @@ describe('ShefaDashboardComponent', () => {
 
   describe('UI state', () => {
     it('should start with loading state', () => {
-      expect(component.isLoading).toBeTrue();
+      expect(component.isLoading).toBe(true);
     });
 
     it('should have null lastUpdateTime initially', () => {
@@ -152,7 +153,7 @@ describe('ShefaDashboardComponent', () => {
     });
 
     it('should have config panel hidden initially', () => {
-      expect(component.showConfigPanel).toBeFalse();
+      expect(component.showConfigPanel).toBe(false);
     });
   });
 

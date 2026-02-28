@@ -11,48 +11,49 @@ import { ShefaHomeComponent } from './shefa-home.component';
 import { AppreciationService } from '../../services/appreciation.service';
 import { EconomicService } from '../../services/economic.service';
 import { HolochainClientService } from '@app/elohim/services/holochain-client.service';
+import { vi } from 'vitest';
 
 describe('ShefaHomeComponent', () => {
   let component: ShefaHomeComponent;
   let fixture: ComponentFixture<ShefaHomeComponent>;
-  let mockEconomicService: jasmine.SpyObj<EconomicService>;
-  let mockAppreciationService: jasmine.SpyObj<AppreciationService>;
-  let mockHolochainClient: jasmine.SpyObj<HolochainClientService>;
+  let mockEconomicService: any;
+  let mockAppreciationService: any;
+  let mockHolochainClient: any;
 
   beforeEach(async () => {
-    mockEconomicService = jasmine.createSpyObj('EconomicService', [
-      'testAvailability',
-      'isAvailable',
-      'getEventsForAgent',
-    ]);
-    mockEconomicService.testAvailability.and.returnValue(Promise.resolve(true));
-    mockEconomicService.isAvailable.and.returnValue(false);
-    mockEconomicService.getEventsForAgent.and.returnValue(of([]));
+    mockEconomicService = {
+    testAvailability: vi.fn(),
+    isAvailable: vi.fn(),
+    getEventsForAgent: vi.fn(),
+  };
+    mockEconomicService.testAvailability.mockReturnValue(Promise.resolve(true));
+    mockEconomicService.isAvailable.mockReturnValue(false);
+    mockEconomicService.getEventsForAgent.mockReturnValue(of([]));
 
-    mockAppreciationService = jasmine.createSpyObj('AppreciationService', [
-      'testAvailability',
-      'isAvailable',
-      'getAppreciationsFor',
-    ]);
-    mockAppreciationService.testAvailability.and.returnValue(Promise.resolve(true));
-    mockAppreciationService.isAvailable.and.returnValue(false);
-    mockAppreciationService.getAppreciationsFor.and.returnValue(of([]));
+    mockAppreciationService = {
+    testAvailability: vi.fn(),
+    isAvailable: vi.fn(),
+    getAppreciationsFor: vi.fn(),
+  };
+    mockAppreciationService.testAvailability.mockReturnValue(Promise.resolve(true));
+    mockAppreciationService.isAvailable.mockReturnValue(false);
+    mockAppreciationService.getAppreciationsFor.mockReturnValue(of([]));
 
-    mockHolochainClient = jasmine.createSpyObj(
-      'HolochainClientService',
-      ['testAdminConnection'],
-      {
-        isConnected: jasmine.createSpy('isConnected').and.returnValue(false),
-      }
+    mockHolochainClient = {
+    testAdminConnection']: vi.fn(),
+    {
+        isConnected: vi.fn().mockReturnValue(false): vi.fn(),
+    }
     );
-    mockHolochainClient.testAdminConnection.and.returnValue(
+    mockHolochainClient.testAdminConnection.mockReturnValue(
       Promise.resolve({ success: false })
     );
 
     await TestBed.configureTestingModule({
-      imports: [ShefaHomeComponent],
-      providers: [
-        provideRouter([]),
+      imports: [ShefaHomeComponent]: vi.fn(),
+    providers: [
+        provideRouter([: vi.fn(),
+  },
         { provide: EconomicService, useValue: mockEconomicService },
         { provide: AppreciationService, useValue: mockAppreciationService },
         { provide: HolochainClientService, useValue: mockHolochainClient },
@@ -152,15 +153,15 @@ describe('ShefaHomeComponent', () => {
 
   describe('Data Loading - Success', () => {
     beforeEach(() => {
-      mockEconomicService.testAvailability.and.returnValue(Promise.resolve(true));
-      mockEconomicService.isAvailable.and.returnValue(true);
-      mockEconomicService.getEventsForAgent.and.returnValue(of([
+      mockEconomicService.testAvailability.mockReturnValue(Promise.resolve(true));
+      mockEconomicService.isAvailable.mockReturnValue(true);
+      mockEconomicService.getEventsForAgent.mockReturnValue(of([
         { id: 'event-1', action: 'use', provider: 'p1', receiver: 'r1', hasPointInTime: new Date().toISOString(), state: 'validated' },
       ] as any));
 
-      mockAppreciationService.testAvailability.and.returnValue(Promise.resolve(true));
-      mockAppreciationService.isAvailable.and.returnValue(true);
-      mockAppreciationService.getAppreciationsFor.and.returnValue(of([
+      mockAppreciationService.testAvailability.mockReturnValue(Promise.resolve(true));
+      mockAppreciationService.isAvailable.mockReturnValue(true);
+      mockAppreciationService.getAppreciationsFor.mockReturnValue(of([
         { id: 'app-1', appreciationOf: 'content', appreciatedBy: 'user1', appreciationTo: 'user2', quantityValue: 10, quantityUnit: 'points', note: null, createdAt: new Date().toISOString() },
       ]));
     });
@@ -200,9 +201,9 @@ describe('ShefaHomeComponent', () => {
 
   describe('Data Loading - Errors', () => {
     it('should load demo data when not connected', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
-      mockEconomicService.isAvailable.and.returnValue(false);
-      mockAppreciationService.isAvailable.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
+      mockEconomicService.isAvailable.mockReturnValue(false);
+      mockAppreciationService.isAvailable.mockReturnValue(false);
 
       fixture.detectChanges();
       await fixture.whenStable();
@@ -212,7 +213,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show error message when connection fails', async () => {
-      mockEconomicService.testAvailability.and.returnValue(Promise.reject(new Error('Connection failed')));
+      mockEconomicService.testAvailability.mockReturnValue(Promise.reject(new Error('Connection failed')));
 
       fixture.detectChanges();
       await fixture.whenStable();
@@ -221,7 +222,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should set loading to false even on error', async () => {
-      mockEconomicService.testAvailability.and.returnValue(Promise.reject(new Error('Error')));
+      mockEconomicService.testAvailability.mockReturnValue(Promise.reject(new Error('Error')));
 
       fixture.detectChanges();
       await fixture.whenStable();
@@ -267,8 +268,8 @@ describe('ShefaHomeComponent', () => {
 
   describe('User Actions', () => {
     it('should refresh data when refreshData is called', async () => {
-      mockEconomicService.testAvailability.calls.reset();
-      mockAppreciationService.testAvailability.calls.reset();
+      mockEconomicService.testAvailability.mockClear();
+      mockAppreciationService.testAvailability.mockClear();
 
       await component.refreshData();
 
@@ -277,7 +278,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should test connection when testConnection is called', async () => {
-      mockHolochainClient.testAdminConnection.and.returnValue(Promise.resolve({ success: true }));
+      mockHolochainClient.testAdminConnection.mockReturnValue(Promise.resolve({ success: true }));
 
       await component.testConnection();
 
@@ -285,7 +286,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show error when connection test fails', async () => {
-      mockHolochainClient.testAdminConnection.and.returnValue(Promise.resolve({ success: false }));
+      mockHolochainClient.testAdminConnection.mockReturnValue(Promise.resolve({ success: false }));
 
       await component.testConnection();
 
@@ -293,7 +294,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should handle exception in testConnection', async () => {
-      mockHolochainClient.testAdminConnection.and.returnValue(Promise.reject(new Error('Network error')));
+      mockHolochainClient.testAdminConnection.mockReturnValue(Promise.reject(new Error('Network error')));
 
       await component.testConnection();
 
@@ -422,7 +423,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show connection status', async () => {
-      mockHolochainClient.isConnected.and.returnValue(true);
+      mockHolochainClient.isConnected.mockReturnValue(true);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
@@ -432,7 +433,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should show disconnected status', async () => {
-      mockHolochainClient.isConnected.and.returnValue(false);
+      mockHolochainClient.isConnected.mockReturnValue(false);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
@@ -484,7 +485,7 @@ describe('ShefaHomeComponent', () => {
     });
 
     it('should call refreshData when refresh button is clicked', async () => {
-      const refreshSpy = spyOn(component, 'refreshData');
+      const refreshSpy = vi.spyOn(component, 'refreshData');
       component.loading.set(false);
       fixture.detectChanges();
       await fixture.whenStable();
